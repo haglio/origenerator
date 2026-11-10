@@ -253,7 +253,9 @@ def test_both_regions_can_hold_a_slideshow_at_once(qtbot, tmp_path, monkeypatch)
     landscape = view._slideshows._region_slideshows["landscape"]
     assert portrait is not None
     assert portrait.shown.isVisible()
-    assert landscape is not None
+    assert landscape is not None, (
+        "the point of sending slideshows to the satellite regions: the main window stays usable "
+        "while up to two slideshows run")
     assert landscape.shown.isVisible()
     assert portrait is not landscape
     for slideshow in (portrait, landscape):
@@ -374,7 +376,9 @@ def test_a_region_slideshow_is_muted_like_every_satellite(qtbot, tmp_path):
     slideshow = view._slideshows.open_on_preview((str(wide), "image"), None)
 
     qtbot.addWidget(slideshow.shown)
-    assert engine_of(slideshow.shown).muted is True
+    assert engine_of(slideshow.shown).muted is True, (
+        "on a satellite region the session's Main Funestra owns the room's audio, and the "
+        "Satellites are silent by design")
 
 
 def _a_region_slideshow_beside_the_gallerys_radio(qtbot, tmp_path):
@@ -393,7 +397,8 @@ def _a_region_slideshow_beside_the_gallerys_radio(qtbot, tmp_path):
 def test_a_region_slideshow_plays_none_of_the_gallerys_radio(qtbot, tmp_path):
     _view, _slideshow, radio = _a_region_slideshow_beside_the_gallerys_radio(qtbot, tmp_path)
 
-    assert radio.held == []
+    assert radio.held == [], (
+        "hosted, each Satellite Funestra plays the stations the session deals it")
 
 
 def test_a_region_slideshows_volume_is_not_what_a_standing_one_opens_at(qtbot, tmp_path):
@@ -726,7 +731,9 @@ def test_the_maps_loop_button_loops_the_seed_row_and_the_next_press_ends_it(
     assert model.active_loop == "seed"
     assert model.filter_query == model.current_action == "Source image"
     assert model.title.startswith("Looping seeds")
-    assert "Unlocked" not in model.title
+    assert "Unlocked" not in model.title, (
+        "a set playing through holds nothing, so the line drops Unlocked, exactly as a looping "
+        "Satellite's does")
     assert words(slideshow.shown._note) == "Looping seeds: 2"
 
     slideshow.shown.press("portrait_no_loop")
@@ -770,7 +777,9 @@ def test_the_base_state_is_not_a_loop_and_says_so(qtbot, tmp_path, monkeypatch):
     slideshow = view.region_slideshow("portrait")
     qtbot.addWidget(slideshow.shown)
     model = slideshow_hud_model("portrait", slideshow)
-    assert model.active_loop == ""
+    assert model.active_loop == "", (
+        "a region browsing its whole library is what a Satellite does with no loop on, so its "
+        "HUD must read that way")
     assert model.title == "Unlocked · Shuffle"
 
 
@@ -815,7 +824,9 @@ def test_a_spoken_favorites_is_the_slideshows_own_f_mode(qtbot, tmp_path, monkey
     qtbot.addWidget(slideshow.shown)
 
     view._voice.on_command(CollectionCommand("__starred__", "portrait"))
-    assert slideshow.hud_favorites_filter is True
+    assert slideshow.hud_favorites_filter is True, (
+        "on a Funestra the word favorites is F-mode, which the HUD has a button for; opening "
+        "the collection as a fresh slideshow would answer it with something else entirely")
     assert slideshow.pass_size() == 1
 
     view._voice.on_command(CollectionCommand("__starred__", "portrait"))
@@ -842,7 +853,9 @@ def test_a_spoken_fix_names_which_region_it_means(qtbot, tmp_path, monkeypatch):
 
     view._voice.on_command(SurfaceCommand([teeth], "landscape"))
 
-    assert [entry[0] for entry in fixed] == [landscape]
+    assert [entry[0] for entry in fixed] == [landscape], (
+        "hosted, two slideshows run and neither is the active window, so the shape word is the "
+        "only thing that says which image")
     assert fixed[0][2] == "fixing teeth"
 
 
@@ -868,8 +881,12 @@ def test_a_lock_on_a_hosted_slideshow_opens_its_generate_tab(qtbot, tmp_path, mo
     slideshow.slideshow_toggle_lock()
     slideshow.tick()
 
-    assert opened == ["id-tall-0"]
-    assert navigated == ["id-tall-0"]
+    assert opened == ["id-tall-0"], (
+        "the item held, not a sibling of it: every seed of one set of settings shares a "
+        "settings folder, so a tab picked by folder came up on the wrong image")
+    assert navigated == ["id-tall-0"], (
+        "landing on the item is what opens its tab, so the test spies on the link rather than "
+        "swallowing it")
 
     slideshow.slideshow_toggle_lock()
     assert len(opened) == 1
@@ -1152,7 +1169,9 @@ def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path)
 
     view.set_room_paused(True)
 
-    assert _moving_thumbnails(view) == []
+    assert _moving_thumbnails(view) == [], (
+        "swept rather than listed: a list of what moves has been wrong before, and a sweep "
+        "cannot miss the next thing that is added")
 
     view.set_room_paused(False)
     assert _moving_thumbnails(view)
@@ -1168,7 +1187,9 @@ def test_omnipause_reaches_a_slideshow_the_region_map_does_not_answer_for(
 
     view.set_room_paused(True)
 
-    assert slideshow.shown._paused is True
+    assert slideshow.shown._paused is True, (
+        "the freeze goes out to every slideshow this window has open, not only to the ones the "
+        "region map calls visible")
     assert not _will_move_on(slideshow)
 
 

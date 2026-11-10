@@ -79,6 +79,9 @@ def test_presets_made_unavailable_stay_listed_but_cannot_be_picked_and_say_why_o
 
     items = [dropdown.model().item(i) for i in range(dropdown.count())]
     assert [(item.text(), item.isEnabled()) for item in items] == [
-        ("16 fps", True), ("24 fps", False), ("32 fps", True)]
+        ("16 fps", True), ("24 fps", False), ("32 fps", True)], (
+        "a preset the model cannot produce is worse than a missing one: chosen, it silently "
+        "becomes a different setting; it is grayed rather than dropped so the list reads as the "
+        "same list at every workflow, with the ones out of reach visibly out of reach")
     assert items[1].toolTip() == "example reason"
 

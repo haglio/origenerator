@@ -255,7 +255,10 @@ def test_a_rows_path_steps_from_its_side_down_through_every_row_holding_it(qtbot
 
     for key, row in tree.item_by_key.items():
         shape, *steps = tree.path_steps(row)
-        assert shape == PathStep(SHAPE_LABELS[shape_of(key)], None)
+        assert shape == PathStep(SHAPE_LABELS[shape_of(key)], None), (
+            "the shape leads the path because a folder's label alone would not say which of the "
+            "two copies of it the user is standing in, and it comes from the row's own key, "
+            "each half being a tree of its own")
         assert [step.key for step in steps] == [
             held.data(0, TREE_KEY_ROLE) for held in _rows_down_to(row)]
         assert tree.folder_path(row) == PATH_SEPARATOR.join(

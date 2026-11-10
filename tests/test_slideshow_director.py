@@ -1940,12 +1940,15 @@ def test_a_region_slideshow_is_placed_muted_frameless_and_on_top(slideshows):
     director.open([("a.png", "image", "g1", None)], shape=PORTRAIT)
 
     window = made[0].shown
-    assert window.audio_muted is True
+    assert window.audio_muted is True, (
+        "silent like every Satellite Funestra: the session's Main Funestra owns the room's "
+        "audio")
     assert window.geometry == (1920, 0, 960, 540)
     assert window.raised == 1
     assert window.activated == 1
     assert window.window_flags & Qt.WindowType.FramelessWindowHint
-    assert window.window_flags & Qt.WindowType.WindowStaysOnTopHint
+    assert window.window_flags & Qt.WindowType.WindowStaysOnTopHint, (
+        "topmost because the Satellite Funestra it covers is topmost itself")
 
 
 def test_a_standalone_slideshow_takes_the_whole_monitor(slideshows):

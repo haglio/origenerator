@@ -237,7 +237,9 @@ def test_a_state_said_of_a_side_is_asked_for_by_name_rather_than_flipped():
         assert answer(host, action), action
 
     assert host.calls == [("locked", True), ("locked", False),
-                          ("favorites filter", True), ("favorites filter", False)]
+                          ("favorites filter", True), ("favorites filter", False)], (
+        "a spoken lock, unlock, f mode on or f mode off names the state wanted; a flip would "
+        "hand the other one to a speaker who cannot see which way the switch stands")
 
 
 def test_filter_said_of_a_side_narrows_to_the_action_on_screen():

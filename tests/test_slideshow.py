@@ -514,7 +514,8 @@ def test_jumping_to_a_place_the_set_does_not_have_reports_nothing_and_stays_put(
 def test_the_items_in_play_order_follow_the_pass_rather_than_the_set():
     playlist = _four(shuffle=lambda order: order.reverse())
     assert [slide[2] for slide in playlist.in_play_order()] == [
-        "id-d", "id-c", "id-b", "id-a"]
+        "id-d", "id-c", "id-b", "id-a"], (
+        "so a playlist built from these, in order, takes up where this one stopped")
 
 
 def test_an_unnamed_generation_matches_none_of_the_unnamed_slides():

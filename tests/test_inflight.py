@@ -46,8 +46,12 @@ def test_the_action_follows_the_kind_so_two_runs_on_one_image_read_apart():
 def test_the_two_marks_at_the_end_are_only_ever_added():
     plain = queue_lead_text(_item(job_kind="Image"))
     assert plain == "~2 min · Image"
-    assert queue_lead_text(_item(job_kind="Image", populating=True)) == plain + " · Populate"
-    assert queue_lead_text(_item(job_kind="Image", requested=True)) == plain + " · Request"
+    assert queue_lead_text(_item(job_kind="Image", populating=True)) == plain + " · Populate", (
+        "a job nobody typed a prompt for is the kind that piles up unnoticed, so its row says "
+        "where it came from")
+    assert queue_lead_text(_item(job_kind="Image", requested=True)) == plain + " · Request", (
+        "a request is the one kind of job the user launched without looking at a form, so it is "
+        "easy not to recognize later")
     assert queue_lead_text(_item(job_kind="Image", populating=True, requested=True)) == (
         plain + " · Populate · Request")
     assert queue_lead_text(_item(job_kind="Image", batch_modified=True)) == plain + " · Modify batch"

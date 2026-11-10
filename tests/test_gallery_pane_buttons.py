@@ -99,7 +99,9 @@ def test_the_radio_switch_lit_in_a_paused_room_draws_its_mark_dark_on_the_yellow
              if lit.pixelColor(x, y).alpha() == 255]
 
     assert inked
-    assert all(color == BG_PRIMARY for color in inked)
+    assert all(color == BG_PRIMARY for color in inked), (
+        "the family's yellow is light, so a mark on it takes the dark ink a lit yellow control "
+        "on a HUD does")
 
 
 def test_the_radio_switch_off_looks_the_same_in_a_paused_room_as_in_a_playing_one(buttons):
@@ -116,7 +118,9 @@ def test_the_bank_opens_with_its_optional_buttons_away(buttons):
 
     assert made.slideshow.isHidden()
     assert made.group.isHidden()
-    assert not made.populate.isHidden()
+    assert not made.populate.isHidden(), (
+        "never hidden: Populate runs until it is stopped, and a switch that went away with its "
+        "folder would leave it running with nothing on screen to say so")
 
 
 def test_one_state_writes_every_button(buttons):
@@ -161,7 +165,9 @@ def test_populate_running_elsewhere_shows_the_clickable_tip_and_no_tooltip(butto
     made.apply(_state(populate=Button(tip=""), populate_tip=POPULATE_ELSEWHERE_TIP))
 
     assert made.populate.toolTip() == ""
-    assert "Go to it" in made.populate_tip._html
+    assert "Go to it" in made.populate_tip._html, (
+        "naming the folder is no use when its name is a short code, so the tip offers to go "
+        "there instead")
 
 
 def test_the_tip_s_link_leads_wherever_populate_is_now(buttons):
@@ -312,7 +318,9 @@ def test_every_mark_on_the_row_stays_inside_the_familys_inset(buttons):
 
 def test_the_group_button_offers_a_collection_of_his_own(buttons):
     made = buttons()
-    assert made.group.toolTip() == "Group the selected folders into a collection of your own"
+    assert made.group.toolTip() == "Group the selected folders into a collection of your own", (
+        "a folder the user gathers is a custom collection, the user's own word for it, so the "
+        "button that makes one says collection")
 
 
 def test_the_play_pause_button_asks_the_room_to_pause_or_play(buttons):

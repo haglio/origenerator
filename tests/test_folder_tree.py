@@ -150,7 +150,10 @@ def test_right_clicking_a_folder_leaves_its_caret_alone(qtbot):
     qtbot.mouseClick(tree.viewport(), Qt.MouseButton.RightButton,
                      pos=_caret_pos(tree, parent))
 
-    assert parent.isExpanded()
+    assert parent.isExpanded(), (
+        "a folder with sub-folders has no star of its own, so its menu is the only way to "
+        "favorite it, and the menu pops over the tree: a caret shut by the right click would "
+        "read as something the star did")
     assert tree.currentItem() is parent
 
 
@@ -326,7 +329,9 @@ def test_dragging_a_row_outside_the_pick_takes_that_row_alone(qtbot, monkeypatch
     (drag,) = started
     _drop_at(tree, collection, drag.mime)
 
-    assert dropped == [("__starred__", [shaped_key("k/a", LANDSCAPE)])]
+    assert dropped == [("__starred__", [shaped_key("k/a", LANDSCAPE)])], (
+        "dragging a row that is not in the selection drags that row alone: what a file manager "
+        "does, and what keeps a stale selection of several from being dropped by accident")
 
 
 def test_a_row_holding_no_folder_starts_no_drag_at_all(qtbot, monkeypatch):
@@ -508,7 +513,9 @@ def test_an_ordinary_folder_refuses_a_drop(qtbot):
 
     mime = _drag(["k/a"])
 
-    assert not _drag_move_at(tree, b, mime).isAccepted()
+    assert not _drag_move_at(tree, b, mime).isAccepted(), (
+        "a drag is accepted only over a row it could land on, so the cursor says outright where "
+        "the folders or the item can go")
     _drop_at(tree, b, mime)
 
     assert dropped == []
@@ -618,7 +625,8 @@ def test_a_drag_held_at_the_top_edge_jumps_the_tree_to_its_top(qtbot):
 
     tree.dragMoveEvent(_held_at(QPoint(40, 2), mime))
 
-    assert bar.value() == 0
+    assert bar.value() == 0, (
+        "the collections of the user's own are at the top, where a drag nearly always goes")
 
 
 def test_a_drag_held_at_the_bottom_edge_scrolls_the_tree_down(qtbot):

@@ -1192,7 +1192,9 @@ def test_an_image_to_video_row_shows_the_frame_it_animates(queue, tmp_path):
     frame = _image(tmp_path / "frame.png")
     queue.set_items([_item(job_kind="Video", source_image=frame,
                            folder_thumbnails=(_image(tmp_path / "other.png"),))])
-    assert queue.rows()[0]._thumbs._showing == ("source", Combination(frame))
+    assert queue.rows()[0]._thumbs._showing == ("source", Combination(frame)), (
+        "the start frame wins whenever there is one: it is about this run rather than about "
+        "where it will land, and it is all that separates two rows off one folder's settings")
 
 
 def test_a_row_with_no_frame_shows_what_its_folder_holds(queue, tmp_path):
@@ -1280,7 +1282,9 @@ def test_the_thumbnail_sits_at_the_near_edge_of_the_line(queue, tmp_path):
 
 def test_a_job_with_nothing_to_show_carries_no_block(queue):
     queue.set_items([_item(job_kind="Image")])
-    assert queue.rows()[0]._thumbs.isHidden()
+    assert queue.rows()[0]._thumbs.isHidden(), (
+        "a folder with nothing in it yet leaves the block off the row rather than draw an empty "
+        "grid")
 
 
 def test_rows_are_the_height_that_shows_about_two_at_a_time(queue):

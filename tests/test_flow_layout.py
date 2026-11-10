@@ -34,7 +34,9 @@ def test_flow_layout_fits_more_per_row_when_wider(qtbot):
     assert layout.hasHeightForWidth()
     narrow = layout.heightForWidth(200)
     wide = layout.heightForWidth(900)
-    assert wide < narrow
+    assert wide < narrow, (
+        "unlike a QGridLayout's fixed column count, this fits as many items in a row as the "
+        "width allows and flows them again on a resize")
 
 
 def test_items_that_exactly_fill_the_width_stay_on_one_row(qtbot):
@@ -99,7 +101,9 @@ def test_flow_layout_lays_every_item_out_at_its_own_size(qtbot):
     host.resize(150, 200)
     host.show()
 
-    assert [w.width() for w in host.findChildren(QWidget)] == [120, 120, 120]
+    assert [w.width() for w in host.findChildren(QWidget)] == [120, 120, 120], (
+        "unlike a QHBoxLayout, every item is laid out at its own size hint, so a row of buttons "
+        "wraps onto a second line rather than squeezing every label down to an unreadable stub")
 
 
 def test_align_right_pushes_each_row_against_the_right_edge(qtbot):

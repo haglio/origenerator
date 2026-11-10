@@ -629,7 +629,9 @@ def test_a_tile_the_grid_merges_fills_both_of_its_columns(window):
     made, _store, _stage = window("gen-one", tiles=(Tile("button one", 0, 0, columns=2),
                                                     Tile("button two", 0, 2)))
 
-    assert _where(made, "button one") == (0, 0, 1, 2)
+    assert _where(made, "button one") == (0, 0, 1, 2), (
+        "the user's decision: a merged tile is double-wide, taking the whole space of both "
+        "columns")
     assert _tile(made, "button one").width() == (
         _tile(made, "button two").width() * 2 + GAP_MEDIUM)
 
@@ -641,7 +643,9 @@ def test_the_tile_down_every_row_is_as_tall_as_all_of_them_and_their_gaps(window
 
     assert _where(made, "button three") == (0, 1, 2, 1)
     assert _tile(made, "button three").height() == (
-        _tile(made, "button one").height() * 2 + GAP_MEDIUM)
+        _tile(made, "button one").height() * 2 + GAP_MEDIUM), (
+        "the user's decision: the background of the tile down a column is as tall as all the "
+        "rows it spans, the whole of them")
 
 
 def _drawing_rows(made, name):
@@ -664,7 +668,9 @@ def test_a_tile_down_several_rows_draws_in_the_middle_of_them(window, tmp_path):
         rows = _drawing_rows(made, name)
         return (rows[0] + rows[-1]) // 2 - _tile(made, name).height() // 2
 
-    assert abs(below_the_middle("button four") - below_the_middle("button two")) <= 2
+    assert abs(below_the_middle("button four") - below_the_middle("button two")) <= 2, (
+        "the user's decision: on a tile down several rows the image is aligned in a row with "
+        "the images of the single-row tiles beside its middle")
 
 
 def test_a_tile_down_several_rows_draws_no_box_of_one_row_inside_its_own(window, qtbot):
@@ -691,7 +697,9 @@ def test_ten_rows_of_buttons_stand_in_the_room_the_window_has(window):
                                                          for n in range(rows)))
 
     tall = _tile(made, "button 0").height()
-    assert rows * tall + GAP_MEDIUM * (rows - 1) <= ROOM_FOR_THE_GRID
+    assert rows * tall + GAP_MEDIUM * (rows - 1) <= ROOM_FOR_THE_GRID, (
+        "the user's decision: the buttons are shrunk so every row of the sheet is there to "
+        "press without the strip of them scrolling")
 
 
 def test_a_term_too_wide_for_a_button_goes_on_to_the_next_line():

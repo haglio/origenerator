@@ -39,7 +39,8 @@ def test_folder_tile_without_context_omits_the_folder_path_line(qtbot):
 
     texts = _label_texts(tile)
     assert "a dog" in texts
-    assert all("\u203a" not in t for t in texts)
+    assert all("\u203a" not in t for t in texts), (
+        "a tile reached by drilling down has no path line: its siblings share a parent")
 
 
 def test_folder_tile_shows_its_toc_initial(qtbot):
@@ -48,7 +49,9 @@ def test_folder_tile_shows_its_toc_initial(qtbot):
     qtbot.addWidget(tile)
 
     initials = [w for w in tile.findChildren(QLabel) if w.toolTip() == "Model"]
-    assert initials
+    assert initials, (
+        "a model, LoRA or workflow tile wears the same TOC initial the tree does, so a folder's "
+        "place in the hierarchy reads even in the mixed Favorites collection")
     assert not initials[0].pixmap().isNull()
 
 

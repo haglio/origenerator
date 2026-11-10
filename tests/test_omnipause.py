@@ -33,7 +33,10 @@ def test_something_built_into_a_frozen_room_opens_frozen():
     omnipause.freeze(True)
     pane = _Pane()
     omnipause.holds(pane)
-    assert pane.told == [True]
+    assert pane.told == [True], (
+        "whatever joins is told the current answer the moment it joins, so a pane built into a "
+        "frozen room opens frozen because it asked, not because whoever built it remembered to "
+        "say so")
     assert omnipause.frozen() is True
 
 

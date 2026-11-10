@@ -196,7 +196,9 @@ def test_a_file_the_funestra_would_not_open_is_stepped_past(qtbot, tmp_path):
     _says(slideshow, video="one.png", idle=True)
     slideshow.tick()
 
-    assert _sent(slideshow) == ["NEXT"]
+    assert _sent(slideshow) == ["NEXT"], (
+        "a video carries no pace of its own, its length is its pace, so a file the Funestra "
+        "cannot open would be a black screen for the rest of the slideshow")
 
 
 def test_each_file_that_would_not_open_is_stepped_past_once(qtbot, tmp_path):
@@ -217,7 +219,9 @@ def test_a_file_that_would_not_open_is_stepped_past_even_while_locked(qtbot, tmp
     _says(slideshow, video="one.png", locked=True, idle=True)
     slideshow.tick()
 
-    assert _sent(slideshow) == ["LOCK_OFF", "NEXT"]
+    assert _sent(slideshow) == ["LOCK_OFF", "NEXT"], (
+        "a lock replays what it holds, so a locked file that cannot play would hold the black "
+        "screen for good: the item stays in the set and the lock comes off")
 
 
 def test_a_file_that_would_not_open_waits_out_a_paused_room_before_it_is_stepped_past(
@@ -230,7 +234,9 @@ def test_a_file_that_would_not_open_waits_out_a_paused_room_before_it_is_stepped
     _says(slideshow, video="one.png", idle=True)
     slideshow.tick()
 
-    assert (held, _sent(slideshow)) == ([], ["NEXT"])
+    assert (held, _sent(slideshow)) == ([], ["NEXT"]), (
+        "a slideshow hunting through its set for something it can play is the room moving while "
+        "it is held")
 
 
 def test_a_slideshow_hands_the_funestra_the_pass_it_is_to_play(qtbot, tmp_path):

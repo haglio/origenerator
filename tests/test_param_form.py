@@ -2668,3 +2668,28 @@ def test_a_prompt_read_to_its_end_grays_nothing(qtbot):
 
     (box,) = form._widgets["audio_prompt"].boxes()
     assert _grayed(box) == []
+
+
+def test_a_story_is_laid_down_before_the_values_laid_over_its_scenes(qtbot):
+    story, *the_rest = _scene_defs()
+    form = ParamForm([*the_rest, story])
+    qtbot.addWidget(form)
+
+    form.set_values({"positive_prompt": "a\n---\nb\n---\nc", "negative_prompt": "x\n---\ny\n---\nz",
+                     "scene_frames": [81, 81, 81], "frame_count": 241})
+
+    editor = form._widgets["scene_frames"]
+    assert [field.toPlainText() for field in editor.fields("negative_prompt")] == ["x", "y", "z"], (
+        "the story sets how many scenes there are, and every other per-scene value is laid over the "
+        "scenes it made")
+
+
+def test_showing_the_derived_size_is_no_edit_of_it(qtbot):
+    form = _sized_form(qtbot)
+    edited = []
+    form._widgets["width"].valueChanged.connect(edited.append)
+
+    form.set_values({"input_image": "a.png"})
+
+    assert form._dim_value_labels["width"].text() == "864"
+    assert edited == [], "a refresh of what is shown is no edit by the user"

@@ -2574,3 +2574,38 @@ def test_a_fixs_window_opened_on_a_version_since_trashed_offers_to_switch(
 
     assert window.lora.currentData() == _NEW_FIX_LORA
     assert window.positive.value() == "zznew, a part"
+
+
+def test_a_second_load_clears_the_parts_the_first_one_ticked(qtbot):
+    pane, _ = _panel(qtbot)
+    pane.show_settings(EnhanceSettings(params={"enhance_detail_fixes": {"faces": 0.7}}))
+    assert pane._fix_checks["faces"].isChecked()
+
+    pane.show_settings(EnhanceSettings(params={}))
+
+    assert not pane._fix_checks["faces"].isChecked(), (
+        "a part the settings do not name is a part left alone: filling in only what is named would "
+        "leave the last folder's fixes standing on a folder that asked for none")
+
+
+def test_a_new_frame_at_the_same_settings_leaves_the_rows_facts_in_place(qtbot):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_versions(_items(_versions(1)), RunningEnhancement("running", None, "2x"))
+    facts = versions._pending.findChildren(QLabel)
+
+    versions.update_pending(RunningEnhancement("running", b"not a real png", "2x"))
+
+    assert versions._pending.findChildren(QLabel) == facts, (
+        "a run streams several frames a second, and each would otherwise rebuild the row under the cursor")
+
+
+def test_the_original_has_no_settings_to_hand_over_and_so_does_not_drag(qtbot, tmp_path, version_drags):
+    original = _VersionRow(_versions(1)[-1], 1, _an_image(tmp_path / "src.png"))
+    qtbot.addWidget(original)
+
+    qtbot.mousePress(original, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
+    qtbot.mouseMove(original, QPoint(90, 90))
+
+    assert version_drags == [], (
+        "a drag onto the Enhance pane says do that again, and the original was made by no enhancement")

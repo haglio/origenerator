@@ -131,6 +131,19 @@ def test_stopping_commands_ends_their_execution(qtbot):
 
     assert ran == []
     assert hearing.stopped
+    assert not hearing.closed
+
+
+def test_closing_ends_the_commands_and_waits_for_the_microphone_to_close(qtbot):
+    listener, hearing = _listener()
+    ran = []
+    listener.start_commands(_into(ran))
+    listener.close()
+
+    hearing.hear()
+
+    assert ran == []
+    assert hearing.closed
 
 
 

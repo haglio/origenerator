@@ -24,7 +24,7 @@ def _engines(readings, **more):
 def _said(qtbot, hearing):
     with qtbot.waitSignal(hearing.said, timeout=PATIENCE_MS) as arrived:
         hearing.start()
-    hearing.stop()
+    hearing.close()
     return arrived.args[0]
 
 
@@ -39,7 +39,7 @@ def test_a_word_arrives_with_the_time_it_began_to_be_said(qtbot):
 
     with qtbot.waitSignal(hearing.said, timeout=PATIENCE_MS) as arrived:
         hearing.start()
-    hearing.stop()
+    hearing.close()
 
     assert arrived.args[1] == pytest.approx(50.0, abs=2.0)
 
@@ -78,7 +78,7 @@ def test_a_quiet_sound_with_no_words_in_it_is_not_worth_a_caption(qtbot):
 
     with qtbot.waitSignal(hearing.said, timeout=PATIENCE_MS):
         hearing.start()
-    hearing.stop()
+    hearing.close()
 
     assert arrived == [" . . . "]
 
@@ -103,7 +103,7 @@ def test_a_microphone_that_cannot_be_opened_is_reported_with_its_reason(qtbot):
 
     with qtbot.waitSignal(hearing.failed, timeout=PATIENCE_MS) as failed:
         hearing.start()
-    hearing.stop()
+    hearing.close()
 
     assert failed.args == ["no input device"]
 
@@ -116,7 +116,7 @@ def test_left_to_itself_it_listens_the_way_this_app_needs(qtbot, monkeypatch):
 
     hearing = Hearing({"undo", "genau"}, said_in={"genau": "de"}.get)
     hearing.start()
-    hearing.stop()
+    hearing.close()
 
     _rules, settings, _events, engines = built.call_args.args
     assert (settings.model_name, settings.device_name) == ("a-model", "a-microphone")

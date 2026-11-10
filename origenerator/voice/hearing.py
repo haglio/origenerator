@@ -42,6 +42,9 @@ class Hearing(QObject):
     def stop(self) -> None:
         self._thread.stop()
 
+    def close(self) -> None:
+        self._thread.close()
+
     def _listener(self) -> CommandListener:
         events = ListenerEvents(heard=self._on_heard, speech=self._on_speech)
         return CommandListener(

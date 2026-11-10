@@ -168,6 +168,9 @@ class FakeCommandAndRequestListener(QObject):
         self.commands_on = False
         self._execute = None
 
+    def close(self):
+        self.stop_commands()
+
     def speak_command(self, text):
         if not self.commands_on:
             return None
@@ -219,6 +222,7 @@ class FakeHearing(QObject):
         self.says = says
         self.started = False
         self.stopped = False
+        self.closed = False
 
     def hear(self, spoken_at=0.0):
         self.said.emit(self.says, spoken_at)
@@ -228,6 +232,10 @@ class FakeHearing(QObject):
 
     def stop(self):
         self.stopped = True
+
+    def close(self):
+        self.stop()
+        self.closed = True
 
 
 def keep_the_microphone_shut(setattr) -> None:

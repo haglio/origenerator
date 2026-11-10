@@ -44,6 +44,10 @@ class CommandAndRequestListener(QObject):
         self._hearing.stop()
         self.drop_the_request()
 
+    def close(self) -> None:
+        self.stop_commands()
+        self._hearing.close()
+
     def bare_command(self, text: str):
         return self._bare_matcher(text) if self._bare_matcher is not None else None
 

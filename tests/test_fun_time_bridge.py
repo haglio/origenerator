@@ -369,9 +369,7 @@ def test_filter_enhanced_narrows_both_regions_and_widens_them_again(
 
     _press_filter_enhanced(bridge, tmp_path)
 
-    assert [slideshow.hud_enhanced_mode for slideshow in (portrait, landscape)] == [True, True], (
-        "one switch in the session and two regions under it: flipped side by side they could "
-        "disagree, and one lit switch cannot say that")
+    assert [slideshow.hud_enhanced_mode for slideshow in (portrait, landscape)] == [True, True]
     assert [slideshow.pass_size() for slideshow in (portrait, landscape)] == [1, 1]
 
     _press_filter_enhanced(bridge, tmp_path)
@@ -450,8 +448,8 @@ def test_the_status_file_says_this_app_is_up(qtbot, tmp_path):
 
     text = (tmp_path / "origenerator_status.txt").read_text(encoding="utf-8")
     assert text.strip() == FunTimeBridge.READY, (
-        "the session waits on this file appearing, and nothing else, before it opens the mode: a "
-        "mode opened over an app still starting has nothing under it")
+        "the session waits on this file appearing, and reads nothing else of it, to know the mode "
+        "can be opened")
 
 
 def test_a_status_file_cleared_under_it_is_written_again(qtbot, tmp_path):
@@ -1130,9 +1128,7 @@ def test_asking_the_room_for_the_mode_writes_it_on_the_dashboard_channel(tmp_pat
 
     ask_for_origenerator_mode(channel)
 
-    assert consume_command_file(channel) == [ORIGENERATOR_MODE.upper()], (
-        "the session parks this window under its Funestras in video mode, so anything that has to "
-        "be seen here asks for the mode before it shows anything")
+    assert consume_command_file(channel) == [ORIGENERATOR_MODE.upper()]
 
 
 def test_a_session_that_names_no_dashboard_channel_is_not_asked_for_the_mode():

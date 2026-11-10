@@ -176,6 +176,4 @@ def test_a_point_on_no_screen_gets_the_fallback_origin():
 def test_a_length_is_rounded_to_the_nearest_pixel_not_truncated():
     os.environ["QT_SCALE_FACTOR"] = "0.6"
 
-    assert ui_scale.to_logical_size(1) == 2, (
-        "truncating an x and a width walks a rect's right edge inward by up to two pixels, enough "
-        "to show the desktop through the seam between two Satellite regions")
+    assert ui_scale.to_logical_size(1) == 2

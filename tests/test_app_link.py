@@ -192,10 +192,11 @@ def test_a_click_leaves_a_line_in_the_log_the_launcher_writes(monkeypatch, tmp_p
     app_link.follow(["launch_origenerator.vbs", app_link.link_to("alpha-1")],
                     checkout=tmp_path)
 
-    written = (tmp_path / "state" / "origenerator_launcher.log").read_text(encoding="utf-8")
-    assert "alpha-1" in written, (
+    log = tmp_path / "state" / "origenerator_launcher.log"
+    assert log.exists(), (
         "the handler has no console and no window, so a click that did nothing would otherwise "
         "look like one that never happened")
+    assert "alpha-1" in log.read_text(encoding="utf-8")
 
 
 def test_a_log_that_cannot_be_written_costs_the_click_nothing(monkeypatch, tmp_path):

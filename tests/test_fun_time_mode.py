@@ -165,7 +165,7 @@ def test_a_poll_that_finds_no_takeover_says_nothing(tmp_path, caplog):
     assert take_the_takeover(tmp_path, pid=4321) is None
 
     assert caplog.text == "", (
-        "four of these a second, for as long as the window stands its offer")
+        "an empty poll comes four times a second, for as long as the window stands its offer")
 
 
 def test_region_for_size_splits_on_aspect():

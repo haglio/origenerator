@@ -85,7 +85,9 @@ def test_a_row_the_queue_is_still_holding_is_left_alone(tmp_path):
 
     summary = reconcile_in_flight(db, FakeComfy(), OutputFolders(OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs"))
 
-    assert db.get_generation("p1")["status"] == "pending"
+    assert db.get_generation("p1")["status"] == "pending", (
+        "ComfyUI has never heard of a job the app's own queue still holds, "
+        "so asking it would delete a run the user is waiting on")
     assert summary == {"finalized": 0, "running": 0, "cleared": 0}
 
 
@@ -122,7 +124,7 @@ def test_a_run_comfyui_is_still_making_keeps_what_its_folder_holds_so_far(tmp_pa
 def test_completed_rows_are_untouched(tmp_path):
     db = Database(tmp_path / "t.db")
     _insert_in_flight(db, "done", status="completed")
-    _insert_in_flight(db, "gone")
+    _insert_in_flight(db, "in-flight-so-the-reconcile-runs")
 
     reconcile_in_flight(db, FakeComfy(), OutputFolders(OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs"))
 
@@ -135,7 +137,8 @@ def test_server_unreachable_leaves_rows_intact(tmp_path):
 
     summary = reconcile_in_flight(db, FakeComfy(queue_error=True), OutputFolders(OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs"))
 
-    assert db.get_generation("p1")["status"] == "running"
+    assert db.get_generation("p1")["status"] == "running", (
+        "a server that cannot be read is no evidence the job is gone")
     assert summary["running"] == 1
 
 
@@ -436,7 +439,8 @@ def test_reconcile_keeps_a_gathered_folder_that_is_simply_gone(tmp_path):
 
     summary = reconcile_custom_collections(db)
 
-    assert db.list_custom_collections()[0]["folders"] == [dead]
+    assert db.list_custom_collections()[0]["folders"] == [dead], (
+        "its generations may come back, as after an undone delete")
     assert summary["orphaned"] == 1
 
 
@@ -558,7 +562,8 @@ def test_the_favorites_are_reconciled_before_the_hand_composed_folders(tmp_path,
 
     favorite_reconcile.reconcile_favorites(db)
 
-    assert ran == ["reconcile_folder_meta", "reconcile_custom_collections"]
+    assert ran == ["reconcile_folder_meta", "reconcile_custom_collections"], (
+        "a custom collection gathers the same keys a star sits on, so the star's move is settled first")
 
 
 def test_an_empty_library_builds_no_tree_at_all(tmp_path, monkeypatch):

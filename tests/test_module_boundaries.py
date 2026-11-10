@@ -19,6 +19,10 @@ from origenerator.db import Database
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 QT_FREE = (
+    "origenerator.prompt_edit",
+    "origenerator.generation_config",
+    "origenerator.action_settings",
+    "origenerator.gallery.signatures",
     "origenerator.gallery",
     "origenerator.experiments.policy",
     "origenerator.gallery.tree",
@@ -122,6 +126,21 @@ def test_every_unstamped_row_is_stamped_in_one_write(tmp_path):
     provenance.stamp_unstamped(db, history=lambda _workflow: [])
 
     assert writes == [1], "a commit for each row took half a minute of the launch that writes them all"
+
+
+def test_the_trash_that_moves_files_knows_no_record_and_no_hold_time():
+    assert _loaded_after_importing("origenerator.trash", "origenerator.db") is False, (
+        "how long a batch is held is the Trash collection's to decide")
+    assert _loaded_after_importing("origenerator.trash", "origenerator.trash_collection") is False
+
+
+def test_the_folder_types_and_their_walkers_lean_on_nothing_else_of_this_app():
+    groups = ast.parse((REPO_ROOT / "origenerator" / "gallery" / "groups.py").read_text(
+        encoding="utf-8"))
+    imported = {node.module or "" for node in ast.walk(groups) if isinstance(node, ast.ImportFrom)}
+
+    assert not [module for module in imported if module.startswith(("origenerator", "."))], (
+        "the walkers need only the folder types, so they live with them and not with the tree's builder")
 
 
 def test_timing_loads_no_database():

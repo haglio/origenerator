@@ -98,7 +98,8 @@ def test_settings_grouping_ignores_derived_size_and_length_params():
                width=1024, height=576, frame_count=121, start_at_step=10, end_at_step=20, frame_rate=24.0),
         _video("b1", "alpha", "2026-01-03", lora_high="Y", steps=20),
     ]
-    assert action_settings.most_used_video("alpha", rows) == "a2"
+    assert action_settings.most_used_video("alpha", rows) == "a2", (
+        "b1, the newest row, would win if a size or a length made a1 and a2 two settings")
 
 
 def test_most_used_video_breaks_count_ties_by_recency():
@@ -140,7 +141,8 @@ def test_genau_mines_only_looping_videos():
 
     long_form_only = [_video("v1", "beta", "2026-01-01", lora_high="Z")]
     assert action_settings.most_used_video("beta", long_form_only) == "v1"
-    assert action_settings.most_used_video("beta", long_form_only, action_settings.GENAU) is None
+    assert action_settings.most_used_video("beta", long_form_only, action_settings.GENAU) is None, (
+        "Genau scrubs one complete cycle against the device, which only a looping video is")
 
 
 def test_genau_available_categories_need_a_loop_or_pinned_settings():

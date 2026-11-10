@@ -519,7 +519,8 @@ def test_the_tool_folds_each_repair_into_the_row_it_belongs_to(tmp_path, monkeyp
 
     assert code == 0
     originals = gallery.original_files_of(db.get_generation("gone"))
-    assert [f["filename"] for f in originals] == ["base.png"]
+    assert [f["filename"] for f in originals] == ["base.png"], (
+        "attached the way the app attaches one, so a row repaired here reads like any other")
 
 
 def test_the_tool_reports_a_repair_that_produced_nothing_rather_than_folding_it(
@@ -532,7 +533,8 @@ def test_the_tool_reports_a_repair_that_produced_nothing_rather_than_folding_it(
     code = backfill_tool.main(["--apply", "--db", str(tmp_path / "repair.db")])
 
     assert code == 1
-    assert "produced nothing" in capsys.readouterr().out
+    assert "produced nothing" in capsys.readouterr().out, (
+        "the tool runs unattended over a long backlog, so a wedged ComfyUI has to show")
     assert not gallery.original_files_of(db.get_generation("gone"))
 
 

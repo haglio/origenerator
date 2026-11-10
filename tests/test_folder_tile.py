@@ -43,7 +43,8 @@ def test_folder_tile_without_a_level_shows_no_toc_initial(qtbot):
     tile = FolderTile("k", "a dog", [], 3)
     qtbot.addWidget(tile)
 
-    assert all(w.toolTip() != "Model" for w in tile.findChildren(QLabel))
+    assert all(w.toolTip() != "Model" for w in tile.findChildren(QLabel)), (
+        "a settings folder is where the items themselves are, so it has no level to name")
 
 
 def test_a_folder_tile_is_the_same_tile_as_the_ones_it_stands_beside(qtbot):

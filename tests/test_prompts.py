@@ -13,7 +13,7 @@ SYSTEM_PROMPTS = (
     "COLLECTION_NOTES_SYSTEM_PROMPT",
 )
 
-_PROSE = 200
+_LONGER_THAN_ANY_SETTING = 200
 
 
 def _assigned_strings(module: str) -> dict[str, str]:
@@ -31,9 +31,11 @@ def _assigned_strings(module: str) -> dict[str, str]:
 def test_config_declares_settings_and_not_prose():
     verbose = {name: len(value)
                for name, value in _assigned_strings("config.py").items()
-               if len(value) > _PROSE}
+               if len(value) > _LONGER_THAN_ANY_SETTING}
 
-    assert verbose == {}
+    assert verbose == {}, (
+        "a prompt is behavior, tuned by reading what the model does with it, "
+        "and changes for reasons no setting shares")
 
 
 @pytest.mark.parametrize("name", SYSTEM_PROMPTS)

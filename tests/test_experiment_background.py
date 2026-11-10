@@ -41,7 +41,8 @@ def test_each_launch_records_what_it_was_bred_from_and_what_it_varies(caplog):
     with caplog.at_level("INFO", logger="origenerator.experiments.background"):
         queue_experiments([], StubPolicy(limit=1), FakeLauncher())
 
-    assert "bred from base, varying steps" in caplog.text
+    assert "bred from base, varying steps" in caplog.text, (
+        "the app is shut while the batch runs, so the log is the one record of what it explored")
 
 
 def test_closing_fills_the_queue_with_a_batch_of_experiments():
@@ -49,13 +50,18 @@ def test_closing_fills_the_queue_with_a_batch_of_experiments():
     launcher = FakeLauncher()
     assert queue_experiments([], policy, launcher) == EXPERIMENTS_QUEUED_PER_ABSENCE
     assert len(launcher.launched) == EXPERIMENTS_QUEUED_PER_ABSENCE
+    assert EXPERIMENTS_QUEUED_PER_ABSENCE <= 10, (
+        "every one comes back as a tile to review: enough to fill an evening, "
+        "few enough for one sitting")
 
 
 def test_a_launch_that_didnt_take_doesnt_use_up_the_batch():
     policy = StubPolicy()
     launcher = FakeLauncher(refuse=(1, 4))
     assert queue_experiments([], policy, launcher) == EXPERIMENTS_QUEUED_PER_ABSENCE
-    assert len(launcher.launched) == EXPERIMENTS_QUEUED_PER_ABSENCE + 2
+    assert len(launcher.launched) == EXPERIMENTS_QUEUED_PER_ABSENCE + 2, (
+        "a refused launch is usually a proposal landing in a folder an earlier one claimed, "
+        "so the next proposal is worth trying")
 
 
 def test_a_gallery_with_nothing_to_build_on_queues_nothing():
@@ -108,7 +114,9 @@ def test_opening_drops_every_experiment_still_waiting_in_the_queue(tmp_path):
     assert db.get_generation("exp-1") is None
     assert db.get_generation("exp-2") is None
     assert db.get_generation("exp-done") is not None
-    assert db.get_generation("mine") is not None
+    assert db.get_generation("mine") is not None, (
+        "only experiments are dropped: with the app open the graphics card is for the "
+        "user's own work, and no experiment may compete for it")
 
 
 def test_each_experiment_is_asked_to_stop_by_name_in_case_it_is_mid_render(tmp_path):

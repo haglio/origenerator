@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 FILE_LISTS = ("output_files", "original_files")
 
 
+# ComfyUI numbers saved files per filename prefix, so two subfolders can hold one name.
 def _by_name(places: OutputPlaces) -> dict[str, set[str]]:
     index: dict[str, set[str]] = defaultdict(set)
     for path, subfolder in places.files():

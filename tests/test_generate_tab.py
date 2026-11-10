@@ -335,23 +335,24 @@ def test_the_button_bank_wraps_rather_than_squeezing_its_labels(tab):
 
 
 def test_the_pane_keeps_a_margin_round_its_contents(tab):
+    margin_written_out = 8
     tab.show()
     tab.resize(700, 800)
     QApplication.processEvents()
 
     top_left = tab._viewport.mapTo(tab, tab._viewport.rect().topLeft())
-    assert top_left.x() == 8
-    assert top_left.y() == 8
+    assert top_left.x() == margin_written_out
+    assert top_left.y() == margin_written_out
     form = tab._form_host
-    assert form.mapTo(tab, form.rect().topLeft()).x() == 8
+    assert form.mapTo(tab, form.rect().topLeft()).x() == margin_written_out
     viewport = tab._settings_scroll.viewport()
     bar_side = viewport.mapTo(tab, viewport.rect().topRight()).x()
-    assert bar_side - form.mapTo(tab, form.rect().topRight()).x() == 8
+    assert bar_side - form.mapTo(tab, form.rect().topRight()).x() == margin_written_out
     generate = tab._generate_btn.parentWidget()
-    assert tab.width() - generate.mapTo(tab, generate.rect().topRight()).x() - 1 == 8
+    assert tab.width() - generate.mapTo(tab, generate.rect().topRight()).x() - 1 == margin_written_out
     item_viewport = tab._item_scroll.viewport()
     lower = item_viewport.mapTo(tab, item_viewport.rect().bottomLeft()).y()
-    assert tab.height() - lower - 1 == 8
+    assert tab.height() - lower - 1 == margin_written_out
 
 
 def test_generate_and_the_top_setting_keep_clear_of_the_borders_round_them(tab):

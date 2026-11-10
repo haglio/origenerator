@@ -54,7 +54,9 @@ def test_a_gallery_shown_after_a_close_takes_the_keys_back(qtbot, monkeypatch):
     monkeypatch.setattr(view, "_handle_escape", lambda _modifiers: bool(reached.append(True)))
     _press_escape_elsewhere(qtbot)
 
-    assert reached
+    assert reached, (
+        "the key filter dropped as the gallery closes has to go back on as it is shown, or a "
+        "reopened gallery is one Delete and one Esc short of working")
 
 
 def test_being_shown_again_over_an_unmoved_library_draws_nothing_afresh(qtbot, monkeypatch):

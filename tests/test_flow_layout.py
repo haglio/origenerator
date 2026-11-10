@@ -164,10 +164,11 @@ def test_a_full_row_sits_alone_across_the_whole_width_between_the_rows_of_tiles(
     layout.addWidget(above)
     layout.add_full_row(heading)
     layout.addWidget(below)
-    host.resize(300, 200)
+    room_for_all_three_side_by_side = 300
+    host.resize(room_for_all_three_side_by_side, 200)
     host.show()
 
-    assert (heading.x(), heading.width()) == (0, 300)
+    assert (heading.x(), heading.width()) == (0, room_for_all_three_side_by_side)
     assert above.y() < heading.y() < below.y()
     assert below.x() == 0
 

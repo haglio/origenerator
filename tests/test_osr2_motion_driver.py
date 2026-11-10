@@ -200,7 +200,9 @@ def test_the_status_line_says_the_motion_is_stopped_but_keeps_the_bars(qtbot):
     driver, _broker, _clock = _driver(qtbot)
     driver.adjust_speed(50)
     assert driver.status_text() == (
-        "Motion stopped · 200/min · sine · travel 100 around 50")
+        "Motion stopped · 200/min · sine · travel 100 around 50"), (
+        "stopped is all it says: a funscript may have the device meanwhile, and OSR2 off read "
+        "as the device, or the app's control of it, being off")
 
 
 def test_the_learned_motion_takes_the_motion_over_and_it_is_what_is_streamed(qtbot):

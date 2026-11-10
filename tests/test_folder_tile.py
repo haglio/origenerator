@@ -86,7 +86,10 @@ def test_a_folder_square_wears_the_picked_frame_when_it_is_marked(qtbot):
 
     tile.set_selected(True)
 
-    assert tile._selected
+    assert tile._selected, (
+        "leaving a slideshow of All or Favorites lands on the folder the item came out of, "
+        "because those show folders rather than the items inside them, so a folder's tile has "
+        "to be able to show that it is the picked one")
     assert tile_shape.selected_css("folderTile") in tile.styleSheet()
 
     tile.set_selected(False)

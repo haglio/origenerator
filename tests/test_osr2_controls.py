@@ -593,6 +593,22 @@ def test_the_readout_holds_the_waves_drawing_still_between_knots(qtbot):
     assert after.slide > before.slide
 
 
+def test_the_readouts_drawing_slides_on_through_the_end_of_a_cycle(qtbot):
+    motion = FakeMotion()
+    live = motion.state
+    live.state.playing = True
+    slides, phases = [], []
+    while len(phases) < 2 or phases[-1] > phases[-2]:
+        assert len(phases) < 2000, "the wave never came round"
+        motion_engine.advance(live, 0.02)
+        phases.append(live.phase)
+        slides.append(drive_hud(live, active=True).slide)
+
+    assert slides[-1] > slides[-2], (
+        "the drawing is anchored to the phase counted up without wrapping, so its knots stay "
+        "put from one cycle to the next")
+
+
 def test_the_readout_holds_the_learned_motions_drawing_still_between_knots(qtbot):
 
     phrase = Phrase(tuple((500, 80 if i % 2 == 0 else 20) for i in range(16)))

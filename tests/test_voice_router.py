@@ -664,6 +664,18 @@ def test_a_matched_kind_nobody_wired_through_is_logged_not_dropped(router, caplo
 
 
 
+def test_enhanced_only_heard_by_the_session_narrows_the_slideshow_and_enhances_nothing(router):
+    slideshows = FakeSlideshows(showing=FakeSlideshow(target="g7"))
+    voice, host, _slideshows = router(slideshows=slideshows)
+    voice.listener.bare = voice.listener.built_with["bare_matcher"]("enhanced only")
+
+    assert voice.run_spoken_command("enhanced only") is True
+
+    assert (host.enhanced, slideshows.filters) == ([], [(True, None)]), (
+        "the words are asked as a command of their own before the looser matcher, which reads "
+        "enhanced only as enhance with a word after it and spends a generation on it")
+
+
 def test_an_order_about_the_image_goes_to_the_slide_filling_the_screen(router):
     slideshow = FakeSlideshow(target="g7")
     voice, host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow))

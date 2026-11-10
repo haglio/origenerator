@@ -525,3 +525,17 @@ class TestThePointerOnTheBlock:
         pointer.wheel(-1, 0, -50)
 
         assert pointer.first == 0
+
+
+def test_a_press_on_the_heads_frame_opens_its_folder():
+    opened = []
+    pointer, _host = _pointer_over([
+        _item("j1", status="running", started_at=0.0, typical_seconds=30,
+              reveal=lambda: opened.append("j1")),
+        _item("j2", typical_seconds=30)])
+    at = _middle_of(pointer, f"{FRAME}|j1")
+
+    pointer.press(*at)
+    pointer.release(*at)
+
+    assert opened == ["j1"], "the head's frame goes where its row goes"

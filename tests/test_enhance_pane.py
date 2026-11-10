@@ -122,7 +122,9 @@ def test_the_model_left_to_match_the_source_says_which_model_it_falls_back_to(qt
 
 def test_auto_enhance_is_a_bare_switch_at_the_top_right(qtbot):
     pane, _ = _panel(qtbot)
-    assert isinstance(pane._auto, ToggleSwitch)
+    assert isinstance(pane._auto, ToggleSwitch), (
+        "auto-enhance is the pane's power, not one of its settings, so it is a bare switch on the "
+        "title row and no labeled checkbox among them")
     assert pane._auto.isCheckable()
     assert pane._auto.text() == ""
     assert pane._auto.toolTip()
@@ -160,7 +162,9 @@ def test_the_switch_draws_at_both_states(qtbot):
 def test_loading_a_folders_settings_writes_nothing_back(qtbot):
     pane, edits = _panel(qtbot)
     pane.show_settings(EnhanceSettings(auto=True, params={"enhance_steps": 40}))
-    assert edits == []
+    assert edits == [], (
+        "opening a folder fills the pane and is no edit: saved back, it would stamp defaults over "
+        "settings it failed to load")
     assert pane.settings().auto is True
     assert pane.settings().params["enhance_steps"] == 40
 
@@ -728,7 +732,8 @@ def test_a_part_with_no_detector_installed_cannot_be_ticked(qtbot):
 
 def test_a_detector_by_another_name_does_not_count_as_installed(qtbot):
     pane, _ = _panel(qtbot, detectors=("cat_finder.pt",))
-    assert not any(checkbox.isEnabled() for checkbox in pane._fix_checks.values())
+    assert not any(checkbox.isEnabled() for checkbox in pane._fix_checks.values()), (
+        "some other detector in that folder would leave every part tickable and every pass finding nothing")
 
 
 def _mean_ink(widget) -> float:
@@ -757,7 +762,9 @@ def test_switched_off_the_panel_actually_looks_switched_off(qtbot):
 
     assert not pane.isEnabled()
     assert pane.toolTip() == "no video enhancer"
-    assert _mean_ink(pane) < live
+    assert _mean_ink(pane) < live, (
+        "the app's stylesheet colors every label, dropdown and spinner outright and names no disabled "
+        "state, so a pane only disabled went on reading as live")
 
     pane.set_applicable(True)
     assert pane.isEnabled()
@@ -775,7 +782,9 @@ def test_coming_back_on_leaves_the_detail_pass_dimmed_without_a_detector(qtbot):
 def test_a_model_no_longer_installed_is_still_shown(qtbot):
     pane, _ = _panel(qtbot)
     pane.show_settings(EnhanceSettings(params={"checkpoint": "retired_v1.safetensors"}))
-    assert pane.settings().params["checkpoint"] == "retired_v1.safetensors"
+    assert pane.settings().params["checkpoint"] == "retired_v1.safetensors", (
+        "a folder set against a checkpoint since removed comes back reading as that checkpoint, "
+        "never snapped to whatever sorts first")
 
 
 def test_the_model_dropdown_shows_a_files_title_and_keeps_its_name(qtbot, titled_models):
@@ -1071,7 +1080,8 @@ def test_a_shift_click_with_the_arrows_on_the_enhance_row_picks_just_the_version
     qtbot.keyClick(row, Qt.Key.Key_Up)
     _click(qtbot, _rows(versions)[1], Qt.KeyboardModifier.ShiftModifier)
 
-    assert (enhance_row._selected, versions.selected_positions()) == (False, [1])
+    assert (enhance_row._selected, versions.selected_positions()) == (False, [1]), (
+        "the Enhance row is no version, so a run of versions has nowhere to start from there")
 
 
 @pytest.mark.parametrize("enter", [Qt.Key.Key_Return, Qt.Key.Key_Enter],
@@ -1640,7 +1650,9 @@ def test_a_small_move_on_a_version_is_a_click_not_a_drag(qtbot, tmp_path, versio
     qtbot.mousePress(thumbnail, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
     qtbot.mouseMove(thumbnail, QPoint(3, 3))
 
-    assert version_drags == []
+    assert version_drags == [], (
+        "the other drag tests move far past the threshold and cannot see it go: without it a click "
+        "that wobbles a pixel picks the row up in place of selecting it")
 
 
 def test_a_big_versions_thumbnail_drags_at_the_shared_size(qtbot, tmp_path, version_drags):
@@ -1714,7 +1726,9 @@ def test_a_new_frame_updates_the_tile_without_a_rebuild(qtbot):
     assert versions.update_pending(RunningEnhancement("running", b"not a real png", "2x")) is True
     assert versions._pending is thumbnail
 
-    assert versions.update_pending(None) is False
+    assert versions.update_pending(None) is False, (
+        "a run starting or ending changes the strip's shape, which only a rebuild can do, so the "
+        "caller is told rather than left with a stale strip")
 
 
 def _held(mime) -> tuple:
@@ -1748,7 +1762,8 @@ def test_dropping_a_version_absorbs_its_settings(qtbot):
     assert settings.params["enhance_scale"] == 3.0
     assert settings.params["enhance_steps"] == 40
     assert settings.params["enhance_denoise"] == 0.35
-    assert settings.auto is True
+    assert settings.auto is True, (
+        "the drop says what to enhance at, not whether to keep enhancing")
     assert edits
     assert edits[-1] == settings
 
@@ -1852,7 +1867,9 @@ def test_a_narrow_row_puts_its_facts_under_the_thumbnail(qtbot):
     host.show()
 
     side_by_side = row._thumbnail.sizeHint().width() + row._facts.minimumSize().width()
-    assert row.minimumSizeHint().width() < side_by_side
+    assert row.minimumSizeHint().width() < side_by_side, (
+        "side by side, a thumbnail and its facts want more width than a narrow Generate pane has; "
+        "stacked, the row asks for the wider of the two rather than their sum")
 
     host.resize(side_by_side + 60, 400)
     QApplication.processEvents()

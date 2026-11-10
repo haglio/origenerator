@@ -1138,7 +1138,9 @@ def test_an_image_nobody_has_sorted_yet_narrows_nothing(combine, monkeypatch):
 
     controller.widget.image_zone.set_item("img")
 
-    assert sorted(controller.widget.available) == ["alpha", "leaning"]
+    assert sorted(controller.widget.available) == ["alpha", "leaning"], (
+        "graying every action over an image that says nothing about itself would read as the tab "
+        "being broken")
 
 
 def _accepted_only(monkeypatch, *accepted):

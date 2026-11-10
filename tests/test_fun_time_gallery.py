@@ -1188,7 +1188,9 @@ def test_a_portrait_image_stands_beside_the_form_when_hosted(qtbot):
     tab._viewport._pixmap = QPixmap(400, 900)
     tab._reflow_for_the_media()
 
-    assert tab._media_split.orientation() == Qt.Orientation.Horizontal
+    assert tab._media_split.orientation() == Qt.Orientation.Horizontal, (
+        "stacked in the Random Favs Browser's upright region, a portrait preview pushes every prompt "
+        "field off the foot")
     assert tab._media_split.indexOf(tab._settings_pane) == 0
     assert tab._media_split.indexOf(tab._viewport_pane) == 1
 

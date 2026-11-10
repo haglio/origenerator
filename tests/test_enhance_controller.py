@@ -422,7 +422,8 @@ def test_a_launch_the_server_refused_is_logged_rather_than_dropped(enhance,
     with caplog.at_level("WARNING"):
         controller.enhance_items(["i1"])
 
-    assert "could not launch" in caplog.text
+    assert "could not launch" in caplog.text, (
+        "a request the user made and never saw run is the one failure they cannot work out from the screen")
 
 
 def test_an_image_already_holding_an_enhancement_at_these_settings_is_not_enhanced_again(
@@ -509,7 +510,9 @@ def test_an_edit_reaches_every_tab_and_re_aims_the_button(enhance):
     settings = gallery.EnhanceSettings()
     controller.pane.on_changed(settings)
 
-    assert tab.settings is settings
+    assert tab.settings is settings, (
+        "the pane holds the settings and the tabs hold the images, so only once the two meet can a "
+        "row know whether it would make a version it already has")
     assert host.offers == 1
     assert gallery_pane.corner_refreshes == 1
 
@@ -669,6 +672,7 @@ def test_a_run_over_is_nobody_s_enhance_any_more(enhance, monkeypatch):
     db.rows["run-a"] = {"prompt_id": "run-a", "enhance_of": "i1"}
     controller, _host = enhance(db=db, jobs=FakeReroll([FakeJob("run-a")]))
     controller.run_of(_image("i1"))
+    assert "run-a" in controller._targets, "asking reads the stamp and keeps it, or nothing is here to forget"
 
     controller.forget("run-a")
 
@@ -718,7 +722,9 @@ def test_a_spoken_enhance_refuses_an_image_that_already_has_one(enhance,
     monkeypatch.setattr(module.gallery, "is_enhanced_row", lambda row: True)
     controller, _host = enhance(db=FakeDB([_image("i1")]))
 
-    assert controller.enhance_it("i1") == (None, "this one is enhanced already", WARNING)
+    assert controller.enhance_it("i1") == (None, "this one is enhanced already", WARNING), (
+        "spoken over a slideshow with no view of the Enhance pane, it must not make again, at "
+        "whatever the settings say now, an enhancement someone chose")
 
 
 def test_a_spoken_enhance_over_a_clip_says_there_is_nothing_to_enhance(enhance,

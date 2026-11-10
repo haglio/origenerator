@@ -231,7 +231,8 @@ def test_generate_grays_while_the_pair_dropped_in_is_already_being_made(qtbot):
 
     assert not combine._generate_btn.isEnabled()
     assert combine._generate_btn.toolTip() == "This folder is already making one"
-    assert combine._open_btn.isEnabled()
+    assert combine._open_btn.isEnabled(), (
+        "there is still a tab to open the pair in")
 
 
 def test_generate_comes_back_once_that_one_is_made(qtbot):

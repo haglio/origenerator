@@ -2488,21 +2488,28 @@ class GalleryView(QWidget):
     def restore_from_trash(self, prompt_ids):
         if not prompt_ids:
             return
-        try:
-            restored = trash_collection.restore_from_trash(self._db, self._jobs, prompt_ids,
-                                                   self._edits.restore_deleted,
-                                                   self.image_config_index())
-        except Exception as e:
-            logger.exception("Failed to restore %d deleted item(s)", len(prompt_ids))
-            QMessageBox.warning(
-                self, "Restore failed",
-                f"Could not restore the selected item(s):\n\n{e}",
-            )
-            return
-        self._gallery_pane.clear_selection()
-        self.refresh()
-        if restored:
-            self._go_to_generation(restored)
+        self._edit_then_redraw(
+            lambda: trash_collection.restore_from_trash(self._db, self._jobs, prompt_ids,
+                                                        self._edits.restore_deleted,
+                                                        self.image_config_index()),
+            lambda restored: restored and self._go_to_generation(restored),
+            failed="Restore failed", could_not="Could not restore the selected item(s)",
+            logged=f"Failed to restore {len(prompt_ids)} deleted item(s)")
+
+    def _edit_then_redraw(self, edit, then, *, failed: str, could_not: str, logged: str):
+        error = None
+        with working():
+            try:
+                outcome = edit()
+            except Exception as e:
+                logger.exception(logged)
+                error = e
+            else:
+                self._gallery_pane.clear_selection()
+                self.refresh()
+                then(outcome)
+        if error is not None:
+            QMessageBox.warning(self, failed, f"{could_not}:\n\n{error}")
 
     def purge_from_trash(self, prompt_ids):
         if not prompt_ids:
@@ -2513,17 +2520,10 @@ class GalleryView(QWidget):
             f"Permanently delete {count} item{plural}? This cannot be undone."
         ):
             return
-        try:
-            self._edits.purge_deleted(prompt_ids)
-        except Exception as e:
-            logger.exception("Failed to permanently delete %d item(s)", count)
-            QMessageBox.warning(
-                self, "Delete failed",
-                f"Could not permanently delete the selected item(s):\n\n{e}",
-            )
-            return
-        self._gallery_pane.clear_selection()
-        self.refresh()
+        self._edit_then_redraw(
+            lambda: self._edits.purge_deleted(prompt_ids), lambda _outcome: None,
+            failed="Delete failed", could_not="Could not permanently delete the selected item(s)",
+            logged=f"Failed to permanently delete {count} item(s)")
 
     def _current_deletable_folders(self) -> list:
         if self._showing_search():
@@ -2579,18 +2579,10 @@ class GalleryView(QWidget):
     def _delete_rows(self, rows):
         if not rows:
             return
-        try:
-            self._edits.delete_rows(rows)
-        except Exception as e:
-            logger.exception("Failed to delete %d generation(s)", len(rows))
-            QMessageBox.warning(
-                self, "Delete failed",
-                f"Could not delete the selected item(s):\n\n{e}",
-            )
-            return
-        self._gallery_pane.clear_selection()
-        self.refresh()
-        self._re_aim()
+        self._edit_then_redraw(
+            lambda: self._edits.delete_rows(rows), lambda _outcome: self._re_aim(),
+            failed="Delete failed", could_not="Could not delete the selected item(s)",
+            logged=f"Failed to delete {len(rows)} generation(s)")
 
     def _undo(self):
         if not self._edits.can_undo():

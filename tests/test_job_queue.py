@@ -461,7 +461,9 @@ def test_comfyui_is_handed_one_job_at_a_time(qtbot, tmp_path):
     first = _launch_video(queue, "k1", seed=1)
     second = _launch_video(queue, "k2", seed=2)
 
-    client.submit_job.assert_called_once()
+    assert client.submit_job.call_count == 1, (
+        "the queue hands ComfyUI one prompt at a time so the Job Queue can still be put in "
+        "another order by whoever is watching")
     assert db.get_generation(first.prompt_id)["status"] == "running"
     assert db.get_generation(second.prompt_id)["status"] == "pending"
     assert queue.queue_order == [first.prompt_id, second.prompt_id]
@@ -1486,8 +1488,8 @@ def test_a_video_waiting_out_the_minute_goes_to_comfyui_as_the_app_closes(qtbot,
     client, queue, video = _a_video_waiting_on_an_image(tmp_path, [1000.0])
 
     assert queue.flush_to_server() == 1, (
-        "the queue hands ComfyUI one prompt at a time so the Job Queue can still be put in "
-        "another order by whoever is watching, and closing the app ends that reason")
+        "the Job Queue is held back so it can still be put in another order by whoever is "
+        "watching, and closing the app ends that reason")
     assert client.submit_job.call_args_list[-1].args[1] == video.prompt_id
 
 

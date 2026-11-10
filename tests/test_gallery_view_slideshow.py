@@ -1014,10 +1014,10 @@ def test_a_slideshow_reopened_on_a_locked_slide_comes_back_locked(qtbot, monkeyp
     view._slideshows.start()
 
     qtbot.addWidget(view._slideshows.showing.shown)
-    assert view._slideshows.showing._set.playlist.current()[2] == held, (
+    assert view._slideshows.showing._set.playlist.current()[2] == held
+    assert view._slideshows.showing.locked, (
         "a hold is the user saying this is the one, so the slideshow reopened on the folder it "
         "was playing is still stopped on that slide")
-    assert view._slideshows.showing.locked
     view._slideshows.showing.close()
 
 

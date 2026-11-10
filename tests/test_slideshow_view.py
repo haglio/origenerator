@@ -2368,7 +2368,8 @@ def test_a_slide_still_being_made_says_so(qtbot, tmp_path):
 
     _press(view, Qt.Key.Key_Right)
 
-    assert view.slideshow.hud_item_note == "Generating…"
+    assert view.slideshow.hud_item_note == "Generating…", (
+        "an early iteration looks exactly like a bad generation, so the corner says which")
 
 
 def test_the_order_pair_asks_the_gallery_for_the_side_in_that_order(qtbot):
@@ -2446,7 +2447,7 @@ class TestMovingTheSlideshowsHud:
                                               Qt.KeyboardModifier.ControlModifier))
 
         assert moves == ["left", "right", "up", "down"], (
-            "both sets of keys, the ones a Fun Time session gives its portrait Funestra and its "
+            "both sets of keys move the HUD, the ones a Fun Time session gives its portrait Funestra and its "
             "landscape one, since a Standalone slideshow can be either shape")
 
     @_ARROW_KEYS_OR_WASD

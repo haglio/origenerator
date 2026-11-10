@@ -409,7 +409,9 @@ def test_a_widening_that_found_nothing_leaves_results_already_on_screen(controll
 
     _let_the_widening_land(qtbot, found)
 
-    assert len(host.shown) == drawn
+    assert len(host.shown) == drawn, (
+        "the plain search draws first and the model only ever adds words, so a widening that "
+        "arrives improves a view the user is already looking at")
 
 
 def test_a_widening_that_found_nothing_redraws_an_empty_pane_to_say_so(controller, qtbot):

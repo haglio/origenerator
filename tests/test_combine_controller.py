@@ -652,6 +652,26 @@ def test_an_action_with_nothing_assigned_runs_its_most_used_video_and_asks_no_mo
     controller.generate_category("img", "alpha")
 
     assert sent == []
+    assert host.revealed == ["folder-of-clip"]
+
+
+def test_a_video_the_gallery_gained_after_the_window_opened_is_one_generate_can_run(
+        combine, monkeypatch):
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: None)
+    monkeypatch.setattr(module.action_settings, "pinned_settings", lambda c, i: None)
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
+    monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
+    monkeypatch.setattr(module.gallery, "combined_params",
+                        lambda video_row, image_row, wf: {"seed": 7})
+    db = FakeDB([_image("img", state="state one")])
+    controller, host = combine(db=db)
+    controller.generate_category("img", "alpha")
+    assert host.revealed == []
+    gained = _video("clip", action="alpha")
+    db.rows[gained["prompt_id"]] = dict(gained)
+
+    controller.generate_category("img", "alpha")
+
     assert host.revealed == ["folder-of-clip"], (
         "the pool of past videos is read fresh when Generate is pressed: the gallery may have "
         "gained a video since")
@@ -1167,7 +1187,7 @@ def test_the_actions_narrow_to_what_the_dropped_image_can_start_from(combine,
     controller.image_dropped()
 
     assert sorted(controller.widget.available) == ["alpha"], (
-        "said rather than guessed: a guess would be an action the image cannot do, which is "
+        "read off what the image was sorted as showing, said rather than guessed: a guess would be an action the image cannot do, which is "
         "minutes of the one machine spent on a video that was never going to work")
 
 

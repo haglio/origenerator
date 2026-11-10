@@ -36,7 +36,7 @@ from origenerator.item_actions import ItemActions
 from origenerator.media import MediaType
 from origenerator.setter_voice import PRESS, SAME, SKIP, TRASH, UNDO, setter_words
 
-ROOM_FOR_THE_GRID = 1260
+ROOM_FOR_THE_GRID_ON_THE_SHORTEST_SCREEN = 1260
 MARK = 96
 NAME_LINES = 2
 
@@ -261,7 +261,7 @@ class ActionSetterWindow(QWidget):
         if not faces:
             return
         rows = max((tile.row + tile.rows for tile in tiles), default=1)
-        allowed = (ROOM_FOR_THE_GRID - GAP_MEDIUM * (rows - 1)) // rows
+        allowed = (ROOM_FOR_THE_GRID_ON_THE_SHORTEST_SCREEN - GAP_MEDIUM * (rows - 1)) // rows
         tall = max(face.sizeHint().height() for face in faces)
         self._mark = MARK if tall <= allowed else MARK - (tall - allowed)
         self._draw_at(self._mark, drawings, scale)

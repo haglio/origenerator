@@ -697,16 +697,16 @@ def test_populate_opens_no_tabs(qtbot, tmp_path):
     for _ in range(3):
         client.job_completed.emit(view._live_jobs[key].prompt_id, _REROLL_HISTORY)
 
-    assert view._generate_pane.count() == 1, (
-        "a variation loaded into the pane's resting tab would stop that tab being blank, and "
-        "the next clicked generation would open a tab beside it")
+    assert view._generate_pane.count() == 1
     tab = view._generate_pane.current_generate_tab()
     assert tab.displayed_row()["prompt_id"] == "orig"
 
     landed = next(r for r in db.list_generations() if r["status"] == "completed")
     view._on_thumbnail_clicked(landed["prompt_id"])
 
-    assert view._generate_pane.count() == 1
+    assert view._generate_pane.count() == 1, (
+        "a variation loaded into the pane's resting tab would stop that tab being blank, and "
+        "the next clicked generation would open a tab beside it")
 
 
 def test_populate_leaves_the_open_tabs_preview_alone(qtbot, tmp_path):

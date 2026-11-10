@@ -43,16 +43,16 @@ def _corner(view) -> str:
     return "" if view._note.isHidden() else words(view._note)
 
 
-def test_the_line_up_while_a_request_is_being_said_does_not_fade(qtbot):
+def test_the_message_up_while_a_request_is_being_said_does_not_fade(qtbot):
     view = _view(qtbot)
     view.flash("Locked")
 
     view.dictating("Request: no hat")
+    view._note_timer.timeout.emit()
 
-    assert not view._note_timer.isActive(), (
-        "held rather than flashed: with no HUD up, this line is the only sign that the mic is "
-        "taking a sentence")
-    assert "Request" in _corner(view)
+    assert "Request" in _corner(view), (
+        "held rather than flashed: with no HUD up, this message is the only sign that the mic "
+        "is taking a sentence")
 
 
 def test_the_note_that_says_the_app_is_still_working_does_not_fade(qtbot):

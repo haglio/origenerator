@@ -913,7 +913,7 @@ def test_closing_hands_comfyui_the_queue_it_was_holding(qtbot, tmp_path):
         win.close()
         win.hand_comfyui_what_runs_while_closed()
 
-    assert flush.call_count == 1, (
+    assert flush.call_args_list == [((), {})], (
         "the queue holds work back for the sake of somebody watching, and closing the app ends "
         "every one of those reasons: ComfyUI outlives it and works through the rest alone")
 

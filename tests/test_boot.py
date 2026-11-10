@@ -341,6 +341,6 @@ def test_no_function_of_the_boot_outgrows_the_ceiling():
         cwd=REPO_ROOT, capture_output=True, text=True, encoding="utf-8", check=False)
 
     assert ruff.returncode == 0, (
-        "the ceiling only comes down: the next thing the launch takes on becomes a step of Boot "
+        "the next thing the launch takes on becomes a step of Boot "
         "with a test of its own, or seams one out, rather than one more branch of the routine\n"
         + ruff.stdout + ruff.stderr)

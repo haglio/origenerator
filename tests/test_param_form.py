@@ -1738,11 +1738,10 @@ def test_a_prompt_under_a_key_the_form_has_never_heard_of_is_a_text_field_too(qt
 
     assert len(form.text_fields()) == 1, (
         "the form finds its prompts by asking which fields are multiline text, never by naming "
-        "keys, so a workflow that grows another prompt has it searched and marked from the day "
-        "it lands")
+        "keys, so a workflow that grows another prompt has it searched from the day it lands")
 
 
-def test_a_drop_zones_help_goes_on_its_label_and_leaves_the_zones_own_tooltip_alone(qtbot):
+def test_a_drop_zones_help_goes_on_its_label_alone(qtbot):
     image = ParamDef("input_image", "Input Image", "image", "")
     form = ParamForm([image])
     qtbot.addWidget(form)

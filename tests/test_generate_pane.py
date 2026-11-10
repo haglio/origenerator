@@ -414,10 +414,7 @@ def test_load_selection_reuses_the_tab_for_a_run_made_before_the_workflow_change
         tabs.load_selection(row, [row])
         tabs.pin_current_tab()
 
-    assert tabs.count() == count, (
-        "the finished row is handed over directly rather than found through the folder the job "
-        "was keyed under: a re-roll of a folder made by an older version of its workflow lands "
-        "its result in the current version's folder")
+    assert tabs.count() == count
 
 
 def test_load_selection_replaces_the_preview_tab_rather_than_forking(tabs):

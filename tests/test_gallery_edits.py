@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+from PIL import Image
+
 from origenerator.db import Database, NewGeneration
 from origenerator.gallery import enhancement_versions, is_enhanced_row
 from origenerator.gallery_edits import GalleryEdits, GalleryEnvironment
@@ -72,6 +75,37 @@ def test_undo_restores_the_row_and_its_file(tmp_path):
     assert not actions.can_undo()
 
 
+def test_a_delete_whose_files_will_not_move_keeps_its_item(tmp_path, monkeypatch):
+    actions, db, output_dir = _actions(tmp_path)
+    row = _completed_row(db, output_dir, "p1", "a.png")
+
+    def held_open(*_args, **_kwargs):
+        raise PermissionError("in use")
+
+    monkeypatch.setattr("origenerator.trash._move", held_open)
+
+    with pytest.raises(PermissionError):
+        actions.delete_rows([row])
+
+    assert db.get_generation("p1") == row
+    assert db.list_trashed() == []
+
+
+def test_a_version_whose_file_will_not_move_stays_listed(tmp_path, monkeypatch):
+    actions, db, output_dir = _actions(tmp_path)
+    row = _enhanced_row(db, output_dir)
+
+    def held_open(*_args, **_kwargs):
+        raise PermissionError("in use")
+
+    monkeypatch.setattr("origenerator.trash._move", held_open)
+
+    with pytest.raises(PermissionError):
+        actions.delete_enhance_versions(row, ["enhanced.png"])
+
+    assert db.get_generation("p1")["output_files"] == row["output_files"]
+
+
 def test_undoing_a_delete_after_a_newer_image_took_its_name_lists_its_new_name(tmp_path):
     actions, db, output_dir = _actions(tmp_path)
     actions.delete_rows([_completed_row(db, output_dir, "p1", "alpha_t2i_00005_.png")])
@@ -110,7 +144,8 @@ def test_delete_also_takes_the_video_metadata_sidecar(tmp_path):
 
     actions.delete_rows([row])
     assert not (output_dir / "video" / "clip.mp4").exists()
-    assert not sidecar.exists()
+    assert not sidecar.exists(), \
+        "left behind, the sidecar would come back at the next import as an image of its own"
 
     actions.undo()
     assert (output_dir / "video" / "clip.mp4").exists()
@@ -350,7 +385,8 @@ def test_restoring_from_the_trash_is_not_an_undo_step(tmp_path):
 
     actions.restore_deleted(["p1"])
 
-    assert actions.undo_label() == "Delete 1 item"
+    assert actions.undo_label() == "Delete 1 item", \
+        "undoing a restore would only delete the item again, which the user can do directly"
 
 
 def test_two_rows_claiming_one_file_move_it_once_and_both_come_back(tmp_path):
@@ -418,7 +454,9 @@ def test_delete_stops_an_enhancement_being_made_of_what_it_takes(tmp_path):
 
     actions.delete_rows([row])
 
-    assert seen == [[("p1", True)]]
+    assert seen == [[("p1", True)]], (
+        "an enhancement can be stopped only while its input is still where ComfyUI reads it; "
+        "left running it holds the queue for minutes and lands as an image with no original")
 
 
 def test_rejecting_an_experiment_stops_its_enhancement_too(tmp_path):
@@ -428,7 +466,8 @@ def test_rejecting_an_experiment_stops_its_enhancement_too(tmp_path):
 
     actions.reject_experiment(row)
 
-    assert [r["prompt_id"] for r in seen] == ["e1"]
+    assert [r["prompt_id"] for r in seen] == ["e1"], \
+        "an enhancement that landed would bring the rejected image back, enhanced"
 
 
 def test_deleting_a_version_leaves_a_running_enhancement_alone(tmp_path):
@@ -457,7 +496,8 @@ def test_rejecting_an_experiment_releases_its_files_too(tmp_path):
 
     actions.reject_experiment(row)
 
-    assert seen == [output_dir / "video" / "exp.mp4"]
+    assert seen == [output_dir / "video" / "exp.mp4"], \
+        "the Experiments collection is where a rejected item is most likely on screen"
 
 
 def test_rejecting_an_experiment_files_nothing_in_the_trash(tmp_path):
@@ -466,7 +506,7 @@ def test_rejecting_an_experiment_files_nothing_in_the_trash(tmp_path):
 
     actions.reject_experiment(row)
 
-    assert db.list_trashed() == []
+    assert db.list_trashed() == [], "the Trash holds deleted items, and a rejected one is kept"
 
 
 def test_undoing_a_rejection_returns_the_experiment_to_review(tmp_path):
@@ -483,6 +523,13 @@ def test_undoing_a_rejection_returns_the_experiment_to_review(tmp_path):
     assert restored["thumbnail_path"] == row["thumbnail_path"]
     assert (output_dir / "exp.png").exists()
     assert (tmp_path / "thumbs" / "e1.jpg").exists()
+
+
+def test_undoing_a_rejection_moves_the_selection_nowhere(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    actions.reject_experiment(_completed_row(db, output_dir, "e1", "exp.png"))
+
+    assert actions.undo() is None, "the experiment goes back to review, which is no folder"
 
 
 def test_undoing_a_rejection_after_a_newer_image_took_its_name_lists_its_new_name(tmp_path):
@@ -545,7 +592,8 @@ def test_deleting_the_original_keeps_the_enhancement_readable(tmp_path):
 
     updated = db.get_generation("p1")
     (level,) = enhancement_versions(updated)
-    assert level.label == "Enhancement 1/1"
+    assert level.label == "Enhancement 1/1", \
+        "deleting the original to save its space leaves what is still an enhancement"
     assert level.params == {"enhance_scale": 2.0}
 
 
@@ -553,7 +601,8 @@ def test_deleting_every_version_is_refused(tmp_path):
     actions, db, output_dir = _actions(tmp_path)
     row = _enhanced_row(db, output_dir)
 
-    assert actions.delete_enhance_versions(row, ["enhanced.png", "base.png"]) is False
+    assert actions.delete_enhance_versions(row, ["enhanced.png", "base.png"]) is False, \
+        "an image with no file left is a deleted item, which is the gallery's own delete"
 
     assert db.get_generation("p1")["output_files"] == row["output_files"]
     assert (output_dir / "image" / "enhanced.png").exists()
@@ -575,7 +624,7 @@ def test_deleting_a_version_files_nothing_in_the_trash_collection(tmp_path):
 
     actions.delete_enhance_versions(row, ["enhanced.png"])
 
-    assert db.list_trashed() == []
+    assert db.list_trashed() == [], "the Trash holds deleted items, and this item stays"
 
 
 def test_a_versions_files_are_ended_once_its_undo_entry_falls_off_the_stack(tmp_path):
@@ -598,6 +647,25 @@ def test_a_versions_files_are_ended_once_its_undo_entry_falls_off_the_stack(tmp_
     actions.delete_enhance_versions(second, ["enhanced2.png"])
 
     assert len(held()) == 1
+
+
+def test_deleting_the_version_a_thumbnail_shows_redraws_it_from_the_one_now_leading(tmp_path):
+    thumb_dir = tmp_path / "thumbs"
+    actions, db, output_dir = _actions(tmp_path, thumb_dir=thumb_dir)
+    _completed_row(db, output_dir, "p1", "image/base.png", thumb_dir=thumb_dir)
+    Image.new("RGB", (8, 8), (200, 0, 0)).save(output_dir / "image" / "base.png")
+    (output_dir / "image" / "enhanced.png").write_bytes(b"better")
+    db.update_generation(
+        "p1",
+        output_files=json.dumps([{"filename": "enhanced.png", "subfolder": "image"},
+                                 {"filename": "base.png", "subfolder": "image"}]),
+        original_files=json.dumps([{"filename": "base.png", "subfolder": "image"}]))
+
+    actions.delete_enhance_versions(db.get_generation("p1"), ["enhanced.png"])
+
+    with Image.open(db.get_generation("p1")["thumbnail_path"]) as thumbnail:
+        red, green, _blue = thumbnail.convert("RGB").getpixel((0, 0))
+    assert red > 150 > green, "the thumbnail would go on showing the version just deleted"
 
 
 def test_a_thumbnail_that_cannot_be_redrawn_stays_as_it_was(tmp_path):

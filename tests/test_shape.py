@@ -86,7 +86,8 @@ def test_an_image_goes_to_the_side_its_folder_names_whatever_its_own_shape(tmp_p
                 {"positive_prompt": "scene one", "width": 720, "height": 1280},
                 "sdxl_t2i_w1.png")
     _thumbed(wide, tmp_path, 160, 90)
-    assert row_shape(wide) == "portrait"
+    assert row_shape(wide) == "portrait", \
+        "an image that disagrees with its folder shows up there, not hidden on the other side"
 
 
 def test_a_generation_with_no_image_yet_goes_by_the_size_it_asked_for():
@@ -97,12 +98,14 @@ def test_a_generation_with_no_image_yet_goes_by_the_size_it_asked_for():
 
 
 def test_a_video_being_made_from_an_image_goes_by_that_images_shape(tmp_path):
-    frame = tmp_path / "frame.png"
-    Image.new("RGB", (90, 160)).save(frame)
+    absolute_frame = tmp_path / "frame.png"
+    Image.new("RGB", (90, 160)).save(absolute_frame)
     in_flight = _row("v1", "wan22_i2v",
-                   {"positive_prompt": "scene four", "input_image": str(frame)},
+                   {"positive_prompt": "scene four", "input_image": str(absolute_frame)},
                    "wan22_i2v_v1.mp4", status="running", output_files="[]")
-    assert row_shape(in_flight) == "portrait"
+    assert row_shape(in_flight) == "portrait", (
+        "by any other shape a running portrait video sat in Landscape's Latest "
+        "and changed sides the moment it landed")
 
 
 def test_a_video_goes_by_its_folders_start_frame_whatever_size_its_row_stored(tmp_path):
@@ -112,7 +115,8 @@ def test_a_video_goes_by_its_folders_start_frame_whatever_size_its_row_stored(tm
                  {"positive_prompt": "scene five", "input_image": str(frame),
                   "width": 720, "height": 544},
                  "wan22_i2v_v2.mp4")
-    assert row_shape(video) == "portrait"
+    assert row_shape(video) == "portrait", \
+        "the size an early video row stored was never the size its graph used"
 
 
 def test_a_video_with_a_thumbnail_goes_by_its_thumbnail_before_its_start_frame(tmp_path):
@@ -138,11 +142,12 @@ def test_a_folder_holds_itself_and_the_folders_below_it_on_the_same_shape_only()
 
 def test_an_unreadable_shape_files_under_landscape():
     bare = _image("b1", "scene three", 50, 3)
-    assert row_shape(bare) == "landscape"
+    assert row_shape(bare) == "landscape", \
+        "the same default a slideshow's routing uses for a set it cannot measure"
 
 
-def _start_frame(tmp_path: Path, name: str, width: int, height: int) -> Path:
-    path = tmp_path / name
+def _start_frame(tmp_path: Path, its_images_output_name: str, width: int, height: int) -> Path:
+    path = tmp_path / its_images_output_name
     Image.new("RGB", (width, height)).save(path)
     return path
 
@@ -174,7 +179,9 @@ def test_a_queued_rows_click_opens_its_folder_across_the_split(qtbot, tmp_path):
         in_flight, gallery.build_image_config_index([image]))
     (row,) = view._queue.rows()
     qtbot.mouseDClick(row, Qt.MouseButton.LeftButton)
-    assert view.selected_folder_key() == shaped_key(folder, "portrait")
+    assert view.selected_folder_key() == shaped_key(folder, "portrait"), (
+        "each shape's tree keys a video's folder from the whole library's start frames; "
+        "from its own side's images alone the folder would get a key nothing else works out")
 
 
 def _rows(pane, shape) -> list[str]:
@@ -195,7 +202,8 @@ def test_the_pane_is_one_table_of_contents_per_shape(qtbot, tmp_path):
     view.refresh()
 
     for shape in ("portrait", "landscape"):
-        assert _rows(view._tree, shape) == ["All"]
+        assert _rows(view._tree, shape) == ["All"], \
+            "a set mixing the shapes has no one screen to play on, so each shape has the whole tree"
         assert _under_all(view._tree, shape)[:5] == [
             "Latest", "Favorites", "Enhanced", "Experiments", "Trash",
         ]
@@ -306,7 +314,9 @@ def test_the_radio_builds_no_list_it_has_already_built(qtbot, tmp_path, monkeypa
     view._tree.separate_button.click()
     view._tree.together_button.click()
 
-    assert built == [1]
+    assert built == [1], (
+        "each list is a pass over the whole library, and a landing redraws Separate "
+        "far more often than the radio moves, so Together's list is built when first drawn")
 
 
 def test_a_library_that_has_changed_builds_its_lists_again(qtbot, tmp_path, monkeypatch):
@@ -327,18 +337,35 @@ def _word_beside(button):
     return button.parent().findChild(QLabel).text()
 
 
+def test_a_folder_given_a_name_builds_the_lists_again(qtbot, tmp_path, monkeypatch):
+    tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
+    db = FakeDB([tall])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    built = _counting_builds(monkeypatch)
+
+    db.upsert_folder_meta(gallery.settings_folder_key(tall), custom_name="Tall ones",
+                          favorite=False, level="settings", ref_prompt_id="t1")
+    view.refresh()
+
+    assert built
+
+
 def test_the_radio_over_the_list_wears_each_word_beside_its_button(qtbot, tmp_path):
     tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     view = GalleryView(FakeDB([tall]))
     qtbot.addWidget(view)
     view.refresh()
 
-    assert _word_beside(view._tree.separate_button) == "Separate"
+    assert _word_beside(view._tree.separate_button) == "Separate", \
+        "two marks alone left the user reading the shapes to work out which was which"
     assert _word_beside(view._tree.together_button) == "Together"
     assert view._tree.separate_button.isChecked()
     assert not view._tree.together_button.isChecked()
     for button in (view._tree.separate_button, view._tree.together_button):
-        assert button.text() == ""
+        assert button.text() == "", \
+            "on the buttons the two words took two rows of the narrowest column"
         assert button.property(CHOSEN) is True
         assert not button.icon().isNull()
 
@@ -418,7 +445,7 @@ def test_each_heading_is_led_by_a_frame_of_its_own_shape(qtbot, tmp_path):
     marks = [_heading_mark(section).pixmap() for section in _sections(view)]
     assert [mark.isNull() for mark in marks] == [False, False]
     portrait, landscape = (_ink_bounds(mark) for mark in marks)
-    assert portrait[1] > portrait[0]
+    assert portrait[1] > portrait[0], "a shape reads faster drawn than spelled"
     assert landscape[0] > landscape[1]
     assert portrait == landscape[::-1]
 
@@ -536,8 +563,10 @@ def test_both_shapes_are_drawn_even_for_one_with_nothing_in_it(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert _rows(view._tree, "portrait") == ["All"]
-    assert _under_all(view._tree, "portrait") == ["Experiments", "Trash"]
+    assert _rows(view._tree, "portrait") == ["All"], \
+        "a shape nothing has been made for yet is still somewhere to start a slideshow from"
+    assert _under_all(view._tree, "portrait") == ["Experiments", "Trash"], \
+        "the collections a first generation of that shape would land in"
     assert "Favorites" in _under_all(view._tree, "landscape")
 
 

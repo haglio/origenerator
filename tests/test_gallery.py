@@ -122,7 +122,8 @@ def test_generate_tab_title_handles_unknown_workflow():
 
 def test_job_kind_separates_a_video_from_an_image():
     assert job_kind_label("sdxl_t2i") == "Image"
-    assert job_kind_label("wan22_i2v") == "Video"
+    assert job_kind_label("wan22_i2v") == "Video", \
+        "a job's kind is what it costs: an image takes seconds, a video minutes"
 
 
 def test_every_video_workflow_is_one_kind_of_job():
@@ -135,7 +136,7 @@ def test_an_enhancement_is_its_own_kind_of_job():
 
 
 def test_an_unregistered_workflow_claims_no_kind():
-    assert job_kind_label("nope") == ""
+    assert job_kind_label("nope") == "", "a guessed kind would misstate how long the job takes"
     assert job_kind_label(None) == ""
 
 
@@ -218,13 +219,14 @@ def test_a_rows_kind_is_read_out_of_its_stored_files_once(monkeypatch):
     assert media_type_of_row(row) == "image"
     assert media_type_of_row(dict(row)) == "image"
 
-    assert len(parsed) == 1
+    assert len(parsed) == 1, "one redraw asks every row its kind several times over"
 
 
 def test_media_type_of_row_uses_actual_output_file_over_workflow_type():
     mislabeled = _row(workflow_name="wan22_flf2v_loop",
                       output_files=json.dumps([{"filename": "flf2v_loop_00001_.png"}]))
-    assert media_type_of_row(mislabeled) == "image"
+    assert media_type_of_row(mislabeled) == "image", \
+        "many imported images are filed under a video workflow's name, and belong in Images"
 
     real_video = _row(workflow_name="wan22_i2v",
                       output_files=json.dumps([{"filename": "wan22_i2v_00001_.mp4"}]))
@@ -232,7 +234,8 @@ def test_media_type_of_row_uses_actual_output_file_over_workflow_type():
 
 
 def test_media_type_of_row_falls_back_to_registry_without_output_files():
-    assert media_type_of_row(_row(workflow_name="sdxl_t2i")) == "image"
+    assert media_type_of_row(_row(workflow_name="sdxl_t2i")) == "image", \
+        "a row still waiting to run has no file yet, so its workflow answers"
     assert media_type_of_row(_row(workflow_name="wan22_i2v")) == "video"
 
 
@@ -300,7 +303,10 @@ def test_a_start_frames_signature_follows_the_index_it_is_given():
     params = json.dumps({"positive_prompt": "", "input_image": "sdxl_t2i_lantern.png"})
     lantern = build_image_config_index([_img("lantern", "a lantern", 30, 1)])
 
-    assert settings_signature("wan22_i2v", params, lantern) !=         settings_signature("wan22_i2v", params, {})
+    assert settings_signature("wan22_i2v", params, lantern) != \
+        settings_signature("wan22_i2v", params, {}), (
+        "a folder keyed from an index of part of the library is still drawn, "
+        "and no click, star or name reaches it")
 
 
 def test_an_image_answers_as_itself_under_each_of_the_files_it_lists():
@@ -343,14 +349,18 @@ def test_an_import_keeps_one_folder_however_this_param_varies(key, one, other):
     def params(value):
         return json.dumps({"positive_prompt": "a lighthouse", key: value})
 
-    assert settings_signature(None, params(one)) == settings_signature(None, params(other))
+    assert settings_signature(None, params(one)) == settings_signature(None, params(other)), (
+        "only a row with no registered workflow reads the two fixed key lists, "
+        "so a key dropped from either shows here or nowhere")
 
 
 def test_settings_signature_drops_input_image_for_an_unknown_workflow():
     a = json.dumps({"steps": 20, "input_image": "img_a.png", "seed": 1})
     b = json.dumps({"steps": 20, "input_image": "image/img_b.png [output]", "seed": 2})
     c = json.dumps({"steps": 30, "input_image": "img_a.png", "seed": 1})
-    assert settings_signature(None, a) == settings_signature(None, b)
+    assert settings_signature(None, a) == settings_signature(None, b), (
+        "nothing says a row of an unknown workflow animates its input image, "
+        "so the image is ignored as a seed is")
     assert settings_signature(None, a) != settings_signature(None, c)
 
 
@@ -379,7 +389,8 @@ def test_settings_signature_folds_the_frames_config_for_an_image_result():
         return json.dumps({"positive_prompt": "", "input_image": frame})
 
     assert settings_signature("image_enhance", enhanced("sdxl_t2i_face1.png"), index) == \
-        settings_signature("image_enhance", enhanced("sdxl_t2i_face2.png"), index)
+        settings_signature("image_enhance", enhanced("sdxl_t2i_face2.png"), index), \
+        "Images has no source-image level, so a batch of enhancements stays one folder"
 
 
 def test_settings_signature_falls_back_to_the_frame_filename_when_unresolvable():
@@ -403,7 +414,9 @@ def test_settings_signature_splits_workflow_generations():
     new = json.dumps(dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                           positive_prompt="a lighthouse"))
     assert settings_signature("sdxl_t2i", old, None, workflow_version="v002") \
-        != settings_signature("sdxl_t2i", new, None, workflow_version="v003")
+        != settings_signature("sdxl_t2i", new, None, workflow_version="v003"), (
+        "an old version's row stores none of the newer settings, "
+        "so by its settings alone it reads like a new run left at the defaults")
     assert settings_signature("sdxl_t2i", old, None, workflow_version="v002") \
         == settings_signature("sdxl_t2i", new, None, workflow_version="v002")
 
@@ -527,7 +540,8 @@ def test_enhance_params_for_builds_an_image_enhance_config():
     assert params["input_image"] == "image/sdxl_t2i_s.png [output]"
     assert params["positive_prompt"] == "a lakeside cabin"
     assert params["negative_prompt"] == "blurry"
-    assert params["checkpoint"] == "dreamscape_v3.safetensors"
+    assert params["checkpoint"] == "dreamscape_v3.safetensors", \
+        "the model that made the image keeps its enhancement in the image's own style"
 
     assert enhance_params_for(_row(output_files=None)) is None
     bare = _row(params_json="{}",
@@ -543,7 +557,8 @@ def test_enhance_params_for_builds_an_image_enhance_config():
         original_files=json.dumps([{"filename": "sdxl_t2i_s.png", "subfolder": "image",
                                     "type": "output"}]),
     )
-    assert enhance_params_for(folded)["input_image"] == "image/sdxl_t2i_s.png [output]"
+    assert enhance_params_for(folded)["input_image"] == "image/sdxl_t2i_s.png [output]", \
+        "an enhancement of the enhanced file would upscale an upscale"
 
 
 def test_an_enhance_leaves_the_seed_at_the_workflows_default():
@@ -620,7 +635,9 @@ def test_i2v_import_with_derived_size_shares_a_folder_with_a_generation():
         params_json=json.dumps(imported_params),
         output_files=json.dumps([{"filename": "wan22_i2v_i.mp4"}]),
     )
-    assert settings_folder_key(imported) == settings_folder_key(generated)
+    assert settings_folder_key(imported) == settings_folder_key(generated), (
+        "the graph works the size out from the input image, so a generation never stores it "
+        "and an imported graph does")
 
 
 def _settings_folders(groups):
@@ -974,7 +991,8 @@ def test_settings_folder_key_matches_an_i2v_leaf_under_its_source_folder():
     video = _i2v_frame("vf", "sdxl_t2i_face.png")
     index = build_image_config_index([face])
     (leaf,) = _i2v_leaves([video, face])
-    assert settings_folder_key(video, index) == leaf.key
+    assert settings_folder_key(video, index) == leaf.key, \
+        "a Generate tab and a re-roll find the folder their run in flight will join by this key"
 
 
 def test_an_i2v_workflow_still_gets_no_source_image_level_under_images():
@@ -1018,7 +1036,8 @@ def test_a_retired_workflows_folder_keeps_the_name_it_had():
 
 def test_a_workflow_that_made_both_kinds_has_a_folder_of_each_by_the_workflows_own_name():
     assert _workflow_labels([_LOOP_STILL, _LOOP_VIDEO]) == {
-        "image/wan22_flf2v_loop": _LOOPING, "video/wan22_flf2v_loop": _LOOPING}
+        "image/wan22_flf2v_loop": _LOOPING, "video/wan22_flf2v_loop": _LOOPING}, \
+        "Images holds the one and Videos the other, so neither name has to tell them apart"
     assert _workflow_labels([_LOOP_VIDEO]) == {"video/wan22_flf2v_loop": _LOOPING}
 
 
@@ -1043,10 +1062,14 @@ def test_legacy_preframe_settings_folder_key_drops_the_frame():
     video = _i2v_frame("vf", "sdxl_t2i_face.png")
     index = build_image_config_index([face])
     assert legacy_preframe_settings_folder_key(video) != settings_folder_key(video, index)
+
+
+def test_an_image_never_folded_a_frame_so_its_two_legacy_keys_agree():
     image = _img("cat", "a cat", 20, 1)
     assert legacy_preframe_settings_folder_key(image) \
         == legacy_preversion_settings_folder_key(image)
-    assert legacy_preframe_settings_folder_key(image) != settings_folder_key(image)
+    assert legacy_preframe_settings_folder_key(image) != settings_folder_key(image), \
+        "today's key folds in the workflow's version"
 
 
 def test_build_gallery_tree_nests_lora_under_model_for_lora_workflows():
@@ -1165,7 +1188,8 @@ def test_build_gallery_tree_collapses_the_lora_level_without_lora_keys():
     (model,) = _workflows(build_gallery_tree(rows))[0].children
     (lora,) = model.children
     assert isinstance(lora, LoraGroup)
-    assert lora.label == "(no LoRA)"
+    assert lora.label == "(no LoRA)", \
+        "one empty LoRA level is drawn, so every branch of the tree nests to the same depth"
     assert all(isinstance(child, SettingsGroup) for child in lora.children)
 
 
@@ -1243,7 +1267,8 @@ def test_build_gallery_tree_includes_in_progress_rows_so_a_new_folder_appears():
     ]
     tree = build_gallery_tree(rows)
     surfaced = {r["prompt_id"] for folder in tree for r in rows_under(folder)}
-    assert surfaced == {"i1", "run"}
+    assert surfaced == {"i1", "run"}, \
+        "a Generate into a new settings folder needs that folder to go to while it runs"
     assert {w.key for w in _workflows(tree)} == {"image/sdxl_t2i", "video/wan22_i2v"}
 
 
@@ -1467,7 +1492,8 @@ def test_recent_generations_lists_imported_files_where_they_arrived():
     generated = _img("gen", "a cat", 50, 1)
     imported = _row(prompt_id="imp", source="imported", id=2,
                     output_files=json.dumps([{"filename": "imp.png"}]))
-    assert [r["prompt_id"] for r in recent_generations([imported, generated])] == ["imp", "gen"]
+    assert [r["prompt_id"] for r in recent_generations([imported, generated])] == ["imp", "gen"], \
+        "left off Latest, a video queued straight on ComfyUI showed in its workflow's folder alone"
 
 
 def test_recent_generations_lists_a_file_found_on_disk_by_when_it_was_found_however_old_the_file():
@@ -1485,7 +1511,15 @@ def test_recent_generations_leaves_experiments_to_their_own_collection():
                       output_files=json.dumps([{"filename": "exp.png"}]))
     cut = _row(prompt_id="cut", source="stroke_trim", id=3,
                output_files=json.dumps([{"filename": "cut.mp4"}]))
-    assert [r["prompt_id"] for r in recent_generations([cut, experiment, generated])] == ["cut", "gen"]
+    assert [r["prompt_id"] for r in recent_generations([cut, experiment, generated])] == ["cut", "gen"], \
+        "listed in Latest too, an experiment would read as something the user asked for"
+
+
+def test_recent_generations_lists_a_cut_made_for_genau():
+    cut = _row(prompt_id="cut", source="stroke_trim", id=3,
+               output_files=json.dumps([{"filename": "cut.mp4"}]))
+    assert recent_generations([cut]) == [cut], \
+        "a cut lands in its video's settings folder, so nothing else says it was made"
 
 
 def test_recent_generations_excludes_rows_that_produced_no_output():
@@ -1566,7 +1600,8 @@ def test_recent_generations_places_an_enhanced_image_by_when_its_enhancement_fin
         "filename": "image_enhance_e1.png", "params": {}, "run_id": 3,
         "finished_at": "2026-09-12T19:40:00+00:00"}])
     assert [r["prompt_id"] for r in recent_generations([later, slow, enhanced])] \
-        == ["later", "enhanced", "slow"]
+        == ["later", "enhanced", "slow"], \
+        "an enhancement is no item of its own, so the image itself is what moves"
 
 
 def test_recent_generations_leads_with_an_image_being_enhanced_over_a_run_that_finished_before_it_was_asked():
@@ -1599,7 +1634,8 @@ def test_recent_generations_leaves_an_enhancement_older_than_the_record_in_place
     i1["enhance_history"] = json.dumps(
         [{"filename": "image_enhance_e1.png", "params": {}}])
     rows = [*_collection(("i3", 3), ("i2", 2)), i1]
-    assert [r["prompt_id"] for r in recent_generations(rows)] == ["i3", "i2", "i1"]
+    assert [r["prompt_id"] for r in recent_generations(rows)] == ["i3", "i2", "i1"], \
+        "an enhancement older than the record of it was made long ago"
 
 
 def test_recent_generations_lifts_the_image_a_re_enhance_runs_on_its_original():
@@ -1643,7 +1679,8 @@ def test_settings_folders_are_named_by_a_code_not_by_their_prompt():
     assert leaf.label == folder_id(leaf.key)
     assert leaf.label.isalnum()
     assert leaf.label == leaf.label.upper()
-    assert "cat" not in leaf.label.lower()
+    assert "cat" not in leaf.label.lower(), \
+        "a prompt is a paragraph, and a folder's name is one line"
 
 
 def test_a_folders_code_outlives_a_rebuild_and_no_sibling_shares_it():
@@ -1846,14 +1883,17 @@ def test_a_lone_scene_groups_with_the_clip_length_it_runs_for():
     before = canonical_settings("wan22_i2v", {"frame_count": 121})
     rerolled = canonical_settings("wan22_i2v", {"frame_count": 121, "scene_frames": [121]})
     stale = canonical_settings("wan22_i2v", {"frame_count": 121, "scene_frames": [81]})
-    assert before == rerolled == stale
+    assert before == rerolled == stale, \
+        "a row from before scenes stores only frame_count, and its re-roll writes the one scene out"
     story = canonical_settings("wan22_i2v", {"frame_count": 241, "scene_frames": [161, 81]})
     assert story["scene_frames"] == [161, 81]
 
 
 @pytest.mark.parametrize("name", ["sdxl_t2i", "sdxl_pose_transfer"])
 def test_the_redraw_amount_that_left_the_form_still_keys_every_sdxl_folder(name):
-    assert canonical_settings(name, {})["denoise"] == 1.0
+    assert canonical_settings(name, {})["denoise"] == 1.0, (
+        "without the default every SDXL folder gets a new key, "
+        "and is parted from its name and its star")
     assert canonical_settings(name, {"denoise": 0.4})["denoise"] == 0.4
 
 
@@ -1873,7 +1913,8 @@ def test_the_folder_of_the_newest_generation_is_marked_lately_worked_in():
 def test_only_a_folder_with_nothing_nested_under_it_is_marked():
     marked = recently_worked_folders({PORTRAIT: _worked_tree(1)}, [])
 
-    assert marked == {(PORTRAIT, "s1")}
+    assert marked == {(PORTRAIT, "s1")}, \
+        "a folder of folders is fresh whenever anything under it is, so a mark on it says nothing"
 
 
 def test_a_folder_is_marked_only_on_the_side_the_work_landed_on():
@@ -1881,13 +1922,15 @@ def test_a_folder_is_marked_only_on_the_side_the_work_landed_on():
         {PORTRAIT: _worked_tree(2), LANDSCAPE: _worked_tree()}, [])
 
     assert (PORTRAIT, "s2") in marked
-    assert (LANDSCAPE, "s2") not in marked
+    assert (LANDSCAPE, "s2") not in marked, \
+        "both shapes' trees draw the same folder keys, each over its own rows"
 
 
 def test_only_the_last_few_folders_worked_in_are_marked():
     marked = recently_worked_folders({PORTRAIT: _worked_tree(1, 2, 3)}, [], limit=2)
 
-    assert marked == {(PORTRAIT, "s3"), (PORTRAIT, "s2")}
+    assert marked == {(PORTRAIT, "s3"), (PORTRAIT, "s2")}, \
+        "with every folder marked, the mark would tell none of them apart"
 
 
 def test_enhancing_an_old_image_marks_the_folder_it_sits_in():

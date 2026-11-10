@@ -13,21 +13,25 @@ from origenerator.workflows.lora_rows import (
     strength_without_its_lora,
 )
 
-_FAVORITE_BONUS = 2.0
 _UP_BONUS = 1.0
-_RECENT_BONUS = 0.5
-_RECENT_WINDOW = 25
+_FAVORITE_BONUS = 2 * _UP_BONUS
+_RECENT_BONUS = _UP_BONUS / 2
+_NEWEST_ROWS_THAT_COUNT_AS_RECENT = 25
 
 _VIDEO_SHARE = 0.8
 _LORA_DIM_WEIGHT = 4.0
 
 _SECOND_DIM_CHANCE = 0.3
-_EXPLORE_CHANCE = 0.25
+_CHANCE_TO_IGNORE_THE_VERDICTS = 0.25
 _VETO_MIN_VOTES = 3
 _VETO_MAX_WEIGHT = 0.25
-_JITTER_SPREAD = 8.0
+_JITTER_SHARE_OF_THE_RANGE = 1 / 8
 _NUMERIC_CANDIDATES = 5
 _NUMERIC_BUCKETS = 8
+
+
+def _rule_of_succession(ups: int, downs: int) -> float:
+    return (1.0 + ups) / (2.0 + ups + downs)
 
 
 @dataclass
@@ -79,13 +83,13 @@ class ExperimentPolicy:
         return videos if self._rng.random() < _VIDEO_SHARE else stills
 
     @staticmethod
-    def _base_weight(row, index):
+    def _base_weight(row, rows_newer):
         weight = 1.0
         if row.get("starred"):
             weight += _FAVORITE_BONUS
         if row.get("experiment_verdict") == "up":
             weight += _UP_BONUS
-        if index < _RECENT_WINDOW:
+        if rows_newer < _NEWEST_ROWS_THAT_COUNT_AS_RECENT:
             weight += _RECENT_BONUS
         return weight
 
@@ -177,7 +181,7 @@ class ExperimentPolicy:
             base = float(base)
         except (TypeError, ValueError):
             base = float(pd.default)
-        sigma = (pd.max_val - pd.min_val) / _JITTER_SPREAD
+        sigma = (pd.max_val - pd.min_val) * _JITTER_SHARE_OF_THE_RANGE
         candidates = []
         for _ in range(_NUMERIC_CANDIDATES):
             value = self._snap(base + self._rng.gauss(0.0, sigma), pd)
@@ -203,7 +207,7 @@ class ExperimentPolicy:
         weights = []
         for i, candidate in enumerate(candidates):
             ups, downs = tallies.get(self._bucket(value_of(candidate), pd), (0, 0))
-            weight = (1.0 + ups) / (2.0 + ups + downs)
+            weight = _rule_of_succession(ups, downs)
             if ups + downs >= _VETO_MIN_VOTES and weight <= _VETO_MAX_WEIGHT:
                 continue
             pool.append(candidate)
@@ -241,7 +245,7 @@ class ExperimentPolicy:
         return value
 
     def _explore_or_exploit(self, candidates, weights):
-        if self._rng.random() < _EXPLORE_CHANCE:
+        if self._rng.random() < _CHANCE_TO_IGNORE_THE_VERDICTS:
             return self._rng.choice(candidates)
         return self._weighted_choice(candidates, weights)
 

@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from origenerator import local_llm, search
+from origenerator import gallery, local_llm, search
 from origenerator.generation_state import GenerationSource
 
 
@@ -71,7 +71,9 @@ def test_a_prompt_several_generations_share_is_not_taken_apart_per_generation(mo
                         lambda text: taken_apart.append(text) or words(text))
     prompt = "a vermilion kite on a quay"
     _index([_row(f"g{n}", prompt) for n in range(3)])
-    assert taken_apart.count(prompt) <= 1
+    assert taken_apart.count(prompt) <= 1, (
+        "every seed of a settings folder repeats its prompt, and taking it apart once per row "
+        "was most of what a large library's first draw took")
 
 
 class _Asked(dict):
@@ -287,6 +289,46 @@ def test_a_volunteered_word_ranks_below_a_word_actually_written():
     assert by_id["g2"] > by_id["g1"]
 
 
+def test_a_volunteered_word_ranks_below_a_synonym_from_the_table():
+    rows = [_row("g1", "a lone kitten"), _row("g2", "a lone couch")]
+    index = _index(rows)
+    volunteered, = index.search("cat", expansions={"cat": ["kitten"]}).results
+    from_the_table, = index.search("sofa").results
+    assert from_the_table.score > volunteered.score
+
+
+def test_what_made_an_item_ranks_below_what_it_shows_and_a_folders_name_ranks_with_that():
+    shown = _row("g1", "a harbor at dawn")
+    made_with = _row("g2", "a quiet street", params={"checkpoint": "harbor_xl.safetensors"})
+    filed = _row("g3", "a quiet street")
+    by_id = {result.row["prompt_id"]: result.score for result in _index(
+        [shown, made_with, filed], {"g3": ("Harbor",)}).search("harbor").results}
+    assert by_id["g1"] > by_id["g2"], \
+        "a model's or a LoRA's name answers what made the item, a different question"
+    assert by_id["g3"] == by_id["g1"], "a name the user gave a folder says what is in it"
+
+
+def test_a_row_handed_over_twice_is_found_once():
+    row = _row("g1", "a red lamp")
+    assert _hits(_index([row, dict(row)]), "lamp") == ["g1"], \
+        "the gallery's rows and the Trash's are handed over together, and may overlap"
+
+
+def test_part_of_a_seed_finds_nothing():
+    rows = [_row("g1", "a quiet street", seed=778899)]
+    assert _hits(_index(rows), "7788") == []
+
+
+def test_every_row_of_a_settings_folder_falls_under_one_model_and_lora_heading():
+    one, other = (dict(_row(f"g{seed}", "a quiet street", seed=seed,
+                            params={"checkpoint": "sample_xl.safetensors"}),
+                       output_files=json.dumps([{"filename": f"g{seed}.png"}]))
+                  for seed in (1, 2))
+    assert gallery.settings_folder_key(one) == gallery.settings_folder_key(other)
+    assert search.model_lora_heading(one) == search.model_lora_heading(other), \
+        "a folder's one tile in the results is filed under a heading by one of its rows alone"
+
+
 def test_an_expansion_for_a_word_not_in_the_query_is_ignored():
     rows = [_row("g1", "a lone kitten")]
     assert _hits(_index(rows), "puppy", expansions={"cat": ["kitten"]}) == []
@@ -307,7 +349,9 @@ def test_a_hidden_starting_frame_is_never_found():
 def test_results_come_back_in_the_order_the_rows_were_given():
     rows = [_row("g3", "a red lamp"), _row("g1", "a red lamp"),
             _row("g2", "a red lamp")]
-    assert _hits(_index(rows), "lamp") == ["g3", "g1", "g2"]
+    assert _hits(_index(rows), "lamp") == ["g3", "g1", "g2"], (
+        "the view hands the rows over newest first and reads the results straight out; "
+        "in score order they would reshuffle under the user each time the model's words landed")
 
 
 def test_a_re_index_keeps_the_words_and_takes_the_fresh_row():

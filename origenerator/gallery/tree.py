@@ -259,11 +259,11 @@ def _joined_the_library_at(row: dict) -> datetime:
     return moment_of(row.get("created_at") if found_on_disk else row.get("completed_at"))
 
 
-RECENTLY_WORKED_COUNT = 20
+FOLDERS_A_SITTING_REACHES = 20
 
 
 def recently_worked_folders(
-    trees: dict[str, list], rows: list[dict], limit: int = RECENTLY_WORKED_COUNT,
+    trees: dict[str, list], rows: list[dict], limit: int = FOLDERS_A_SITTING_REACHES,
     *, bumped=None,
 ) -> set[tuple[str, str]]:
     if bumped is None:
@@ -290,8 +290,8 @@ def recently_worked_folders(
     return {folder for _freshest, folder in ranked[:limit]}
 
 
-def favorite_generations(rows: list[dict]) -> list[dict]:
-    return [row for row in rows if row.get("starred") and produced_output(row)]
+def favorite_generations(newest_first: list[dict]) -> list[dict]:
+    return [row for row in newest_first if row.get("starred") and produced_output(row)]
 
 
 def enhanced_generations(rows: list[dict]) -> list[dict]:

@@ -260,7 +260,8 @@ def test_describe_names_each_part_the_pass_redrew_at_its_own_denoise():
     assert describe_enhance_params({
         "enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.15,
         "enhance_detail_fixes": {"faces": 0.45, "hands": 0.6},
-    }) == "2x · 20 steps · 0.15 redraw · faces 0.45 & hands 0.6"
+    }) == "2x · 20 steps · 0.15 redraw · faces 0.45 & hands 0.6", \
+        "each part is redrawn at a denoise the whole frame could not take"
     assert describe_enhance_params({
         "enhance_scale": 2.0, "enhance_detail_fixes": {"faces": 0}}) == "2x"
 
@@ -281,7 +282,8 @@ def test_describe_names_a_pinned_model_by_its_title_but_not_the_source_matching_
 
 def test_an_unenhanced_image_still_lists_its_one_file_as_the_original():
     (version,) = displayed_versions(_source_row())
-    assert version.is_original
+    assert version.is_original, \
+        "a list that appears only once an image has versions is a list nobody finds"
     assert version.file["filename"] == "sdxl_t2i_src.png"
 
 
@@ -362,7 +364,8 @@ def test_removing_an_inline_tails_enhancement_untags_its_base_render():
 def test_removing_every_version_changes_nothing(tmp_path):
     row = _folded(tmp_path, count=1)
     assert remove_enhance_versions(
-        row, ["image_enhance_00001_.png", "sdxl_t2i_src.png"]) == {}
+        row, ["image_enhance_00001_.png", "sdxl_t2i_src.png"]) == {}, \
+        "an image with no file left is a deleted item, which is the gallery's own delete"
 
 
 def test_removing_a_name_the_row_never_held_changes_nothing(tmp_path):
@@ -406,7 +409,8 @@ def test_a_spoken_fix_redoes_the_latest_enhancement_with_the_parts_pass(
     params = fix_params_for(row, _spoken("fix teeth"),
                             EnhanceSettings(params={"enhance_scale": 1.5}))
 
-    assert params["enhance_scale"] == 3.0
+    assert params["enhance_scale"] == 3.0, \
+        "the ask is the same enhancement plus the fix, at the scale and model the image was finished at"
     assert params["enhance_steps"] == 40
     assert params["checkpoint"] == "driftwood_v1.safetensors"
     assert params["input_image"] == "image/sdxl_t2i_src.png [output]"
@@ -430,7 +434,8 @@ def test_a_spoken_fix_runs_the_part_asked_for_and_not_the_panels_other_ticks(
 
     params = fix_params_for(_source_row(), _spoken("fix teeth"), pane)
 
-    assert params["enhance_detail_fixes"] == {"teeth": 0.6}
+    assert params["enhance_detail_fixes"] == {"teeth": 0.6}, \
+        "a spoken fix is asked for with the Enhance pane out of sight, so its other ticks stay out"
 
 
 def test_a_spoken_fix_can_ask_for_several_parts_at_once(monkeypatch):
@@ -455,7 +460,8 @@ def test_a_spoken_fix_runs_the_part_at_the_number_the_panel_gives_it(monkeypatch
     params = fix_params_for(
         _source_row(), _spoken("fix hands"),
         EnhanceSettings(params={"enhance_detail_fixes": {"hands": 0.7}}))
-    assert params["enhance_detail_fixes"] == {"hands": 0.7}
+    assert params["enhance_detail_fixes"] == {"hands": 0.7}, \
+        "nobody says a denoise out loud, so the pane gives the number"
 
 
 def test_a_spoken_fix_with_no_detector_for_the_part_declines(monkeypatch):
@@ -474,7 +480,8 @@ def test_successive_spoken_fixes_accumulate_rather_than_trade_away(
     params = fix_params_for(db.get_generation("src"), _spoken("fix eyes"))
 
     assert params["enhance_detail_fixes"] == {
-        "teeth": 0.5, "eyes": DEFAULT_FIX_DENOISE}
+        "teeth": 0.5, "eyes": DEFAULT_FIX_DENOISE}, \
+        "every enhancement starts again from the original, so a pass left out is a fix undone"
 
 
 def test_a_spoken_fix_accumulates_onto_a_version_recorded_the_old_way(

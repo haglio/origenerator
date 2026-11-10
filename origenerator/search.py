@@ -40,7 +40,7 @@ _STOP_WORDS = frozenset(
     ["a", "an", "the", "of", "in", "on", "at", "by", "with", "and", "or", "to", "for", "from", "is", "are", "was", "were", "be", "it", "its", "her", "his", "their", "this", "that", "there", "here", "as", "into", "over", "under"]
 )
 
-_SYNONYM_GROUPS = (
+_TIGHT_SYNONYMS = (
     ("woman", "lady", "female", "doll", "babe", "chick", "gal"),
     ("man", "guy", "male", "dude", "boy", "gentleman"),
     ("two", "pair", "duo", "couple"),
@@ -81,7 +81,7 @@ def _words(text) -> list[str]:
 
 
 @lru_cache(maxsize=READINGS_KEPT)
-def _stem(word: str) -> str:
+def _crude_stem(word: str) -> str:
     word = _IRREGULAR_PLURALS.get(word, word)
     word = _NUMBER_WORDS.get(word, word)
     if len(word) > _LONGEST_UNSTEMMED:
@@ -102,7 +102,7 @@ def _tags(text: str) -> tuple[tuple[str, ...], ...]:
 
 @lru_cache(maxsize=READINGS_KEPT)
 def _stems(text: str) -> frozenset[str]:
-    return frozenset(_stem(word) for tag in _tags(text) for word in tag)
+    return frozenset(_crude_stem(word) for tag in _tags(text) for word in tag)
 
 
 def _unquoted(query: str) -> str:
@@ -116,12 +116,12 @@ def _quoted(query: str) -> tuple[tuple[str, ...], ...]:
 
 def _synonym_index(groups=()) -> dict[str, frozenset[str]]:
     merged: list[set[str]] = []
-    for group in (*_SYNONYM_GROUPS, *groups):
+    for group in (*_TIGHT_SYNONYMS, *groups):
         stems = set()
         for entry in group:
             words = _words(entry)
             if len(words) == 1:
-                stems.add(_stem(words[0]))
+                stems.add(_crude_stem(words[0]))
         if len(stems) <= 1:
             continue
         overlapping = [g for g in merged if g & stems]
@@ -137,12 +137,12 @@ def _synonym_index(groups=()) -> dict[str, frozenset[str]]:
     return index
 
 
-def _overlay_groups() -> tuple:
+def _the_librarys_own_synonyms() -> tuple:
     groups = load_content().get("search_synonyms") or ()
     return tuple(tuple(group) for group in groups if isinstance(group, (list, tuple)))
 
 
-_SYNONYMS = _synonym_index(_overlay_groups())
+_SYNONYMS = _synonym_index(_the_librarys_own_synonyms())
 
 
 @dataclass(frozen=True)
@@ -197,9 +197,9 @@ def parse_query(query: str, *, expansions=None, synonyms=None) -> list[QueryTerm
     terms += [QueryTerm(text=" ".join(words), stem="", side_by_side=words)
               for words in _quoted(query)]
     for word in query_words(query):
-        stem = _stem(word)
+        stem = _crude_stem(word)
         table = set(synonyms.get(stem, ())) - {stem}
-        volunteered = {_stem(w) for w in (expansions or {}).get(word, ())}
+        volunteered = {_crude_stem(w) for w in (expansions or {}).get(word, ())}
         terms.append(QueryTerm(
             text=word,
             stem=stem,

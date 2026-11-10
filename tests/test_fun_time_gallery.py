@@ -106,7 +106,9 @@ def test_fun_time_gallery_builds_no_shared_appliance_switches(qtbot):
 
 def test_fun_time_gallery_builds_no_osr2_surface(qtbot):
     view = _fun_time_view(qtbot)
-    assert view._osr2_motion is None
+    assert view._osr2_motion is None, (
+        "Fun Time's Main Funestra owns the OSR2 for the whole session, so a hosted Origenerator "
+        "must offer no way to reach the device")
     assert view._osr2_driver is None
     assert view.osr2_control.isEnabled() is False
     assert view.osr2_control.state() == OSR2_PARKED
@@ -817,7 +819,10 @@ def test_a_region_the_session_wants_never_stays_empty(qtbot, tmp_path, monkeypat
 
     slideshow.close()
     later = view.region_slideshow("portrait")
-    assert later is not None
+    assert later is not None, (
+        "not a dead end: the tree this reads is built by the first refresh, and the session's "
+        "open can arrive before it, the launch racing the boot, so a region owed its base state "
+        "gets it on the next refresh")
     assert later is not slideshow
     qtbot.addWidget(later.shown)
 

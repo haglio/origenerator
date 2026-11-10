@@ -53,7 +53,10 @@ def test_hosted_stacks_generate_then_folders_then_the_queue_across_the_foot(qtbo
     root = arrangement.hosted()
     qtbot.addWidget(root)
 
-    assert [root.widget(i) for i in range(3)] == [parts["generate_column"], arrangement.panes, parts["queue"]]
+    assert [root.widget(i) for i in range(3)] == [parts["generate_column"], arrangement.panes, parts["queue"]], (
+        "hosted, the Job Queue spans the whole foot of the rect, so the corner under the TOC is "
+        "the Job Queue rather than more TOC, and the Generate pane leads because it is what the "
+        "user is doing")
     assert arrangement.left_column is None
 
 

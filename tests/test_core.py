@@ -1349,7 +1349,8 @@ def _headset_session(tmp_path, main=(10, 20, 200, 100)):
 def test_a_window_hosted_in_the_headset_is_shown_rather_than_parked(qtbot, tmp_path):
     win = _window(qtbot, tmp_path, fun_time=_headset_session(tmp_path))
 
-    assert not win.isMinimized()
+    assert not win.isMinimized(), (
+        "shown, because Qt draws nothing for a window Windows has unmapped")
     assert win.hands_its_window_over is not None
 
 
@@ -1385,7 +1386,8 @@ def test_a_window_a_room_in_the_headset_has_is_off_the_monitors(
 
     win.become_hosted(_headset_session(tmp_path))
 
-    assert seen == [("out of sight", int(win.winId()))]
+    assert seen == [("out of sight", int(win.winId()))], (
+        "out of sight, because the user is not in front of it")
 
 
 def test_a_window_the_monitors_take_back_is_in_sight_again(
@@ -1396,7 +1398,8 @@ def test_a_window_the_monitors_take_back_is_in_sight_again(
 
     win.become_standalone()
 
-    assert seen == [("in sight", int(win.winId()))]
+    assert seen == [("in sight", int(win.winId()))], (
+        "parked out of sight it would come back from the taskbar invisible")
 
 
 def test_a_window_hosted_on_the_monitors_hands_no_frame_over(qtbot, tmp_path):

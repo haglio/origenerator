@@ -539,7 +539,9 @@ def test_asking_whether_anything_can_play_stops_at_the_first_item(slideshows, mo
     monkeypatch.setattr(module.gallery, "resolve_preview", resolve)
 
     assert director.anything_to_play()
-    assert read == ["g0"]
+    assert read == ["g0"], (
+        "reading every row's files to answer it is what made one click on the TOC redraw for "
+        "seconds")
 
 
 def test_asking_whether_anything_can_play_lists_no_folder_of_upscales(slideshows, monkeypatch):
@@ -669,7 +671,9 @@ def test_a_double_clicked_item_s_slideshow_opens_on_it_before_the_rest_of_its_fo
 
     director.open_in_its_folder(("a2.png", "image"), "a2")
 
-    assert [item[2] for item in made[0].items] == ["a2"]
+    assert [item[2] for item in made[0].items] == ["a2"], (
+        "worked out whole before anything showed, a folder of thousands held its slideshow back "
+        "for a second or more")
     (fill_in,) = host.holding
     fill_in()
     assert [item[2] for item in made[0].items] == ["a3", "a2", "a1"]

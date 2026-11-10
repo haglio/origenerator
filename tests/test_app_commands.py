@@ -154,6 +154,12 @@ def test_the_slideshow_filter_is_said_either_way_round_not_toggled():
     assert match_app_command("no filter") is AppCommand.FILTER_OFF
 
 
+def test_original_only_and_enhanced_and_original_are_said_as_fun_time_says_them():
+    assert match_app_command("original only") is AppCommand.FILTER_ORIGINALS
+    assert match_app_command("enhanced and original") is AppCommand.ENHANCED_AND_ORIGINAL
+    assert match_app_command("original and enhanced") is AppCommand.ENHANCED_AND_ORIGINAL
+
+
 def test_marking_a_favorite_and_standing_in_the_favorites_collection_are_different_words():
     assert match_app_command("favorite") is AppCommand.FAVORITE
     assert match_app_command("go to favorites") is AppCommand.FAVORITES

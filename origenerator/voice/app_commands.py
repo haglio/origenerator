@@ -36,6 +36,8 @@ class AppCommand(Enum):
     MIC_OFF = "mic_off"
 
     FILTER_ENHANCED = "filter_enhanced"
+    FILTER_ORIGINALS = "filter_originals"
+    ENHANCED_AND_ORIGINAL = "enhanced_and_original"
     FILTER_OFF = "filter_off"
 
     SPEED_UP = "speed_up"
@@ -112,6 +114,8 @@ for _osr2 in ("osr two", "o s r two"):
 _say(AppCommand.FILTER_ENHANCED, "filter enhanced", "enhanced filter",
      "filter enhanced only", "enhanced only",
      "upscales", "upscales only", "filter upscales", "upscaled only")
+_say(AppCommand.FILTER_ORIGINALS, "original only")
+_say(AppCommand.ENHANCED_AND_ORIGINAL, "enhanced and original", "original and enhanced")
 _say(AppCommand.FILTER_OFF, "clear filter", "no filter", "filter off")
 
 _say(AppCommand.SPEED_UP, "speed up")

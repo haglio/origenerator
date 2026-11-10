@@ -300,7 +300,11 @@ class VoiceRouter(QObject):
         if command in _COLLECTIONS:
             self._go_to_collection(command, shape)
         elif command is AppCommand.FILTER_ENHANCED:
-            self._slideshows.filter_enhanced(True, shape)
+            self._slideshows.filter_enhanced(shape)
+        elif command is AppCommand.FILTER_ORIGINALS:
+            self._slideshows.filter_originals(shape)
+        elif command is AppCommand.ENHANCED_AND_ORIGINAL:
+            self._slideshows.show_enhanced_and_original(shape)
         elif command is AppCommand.FILTER_OFF:
             self._slideshows.clear_action_filter(shape)
         elif command in _SWITCHES:

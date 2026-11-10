@@ -161,8 +161,14 @@ class FakeSlideshows:
     def run_slideshow_command(self, command, shape):
         self.slideshow_commands.append((command, shape))
 
-    def filter_enhanced(self, enhanced_only, shape):
-        self.filters.append((enhanced_only, shape))
+    def filter_enhanced(self, shape):
+        self.filters.append(("enhanced only", shape))
+
+    def filter_originals(self, shape):
+        self.filters.append(("original only", shape))
+
+    def show_enhanced_and_original(self, shape):
+        self.filters.append(("enhanced and original", shape))
 
     def clear_action_filter(self, shape):
         self.filters.append(("action filter off", shape))
@@ -654,7 +660,17 @@ def test_a_filter_word_narrows_the_slideshow_rather_than_the_gallery(router):
 
     voice.on_command(AppCommand.FILTER_ENHANCED)
 
-    assert slideshows.filters == [(True, None)]
+    assert slideshows.filters == [("enhanced only", None)]
+
+
+def test_original_only_and_enhanced_and_original_reach_the_side_they_are_said_of(router):
+    voice, _host, slideshows = router()
+
+    voice.on_command(SurfaceCommand(AppCommand.FILTER_ORIGINALS, "portrait"))
+    voice.on_command(SurfaceCommand(AppCommand.ENHANCED_AND_ORIGINAL, "landscape"))
+
+    assert slideshows.filters == [("original only", "portrait"),
+                                  ("enhanced and original", "landscape")]
 
 
 def test_no_filter_said_of_a_side_lifts_only_that_sides_action_filter(router):

@@ -90,7 +90,6 @@ from origenerator.gui.enhance_controller import (
     EnhanceParts,
     Offer,
 )
-from origenerator.gui.folder_modify_tile import FolderModifyTile
 from origenerator.gui.folder_path import FolderPath
 from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
 from origenerator.gui.folder_tree import offer_collapse_and_expand
@@ -141,6 +140,7 @@ from origenerator.gui.job_queue import JobQueue
 from origenerator.gui.job_queue_view import JobQueueView
 from origenerator.gui.look_training_controller import LookTrainingController
 from origenerator.gui.message import ERROR, HEARD_MARK, INFO
+from origenerator.gui.modify_batch_tile import ModifyBatchTile
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.new_tile import NewTile
 from origenerator.gui.off_thread import run_off_thread
@@ -677,7 +677,7 @@ class GalleryView(QWidget):
             app.aboutToQuit.connect(self._radio.stop)
         self._generate_pane.generate_requested.connect(self._on_generate_requested)
         self._generate_pane.turn_generate_requested.connect(self._on_turn_generate_requested)
-        self._generate_pane.modify_requested.connect(self._on_modify_requested)
+        self._generate_pane.modify_batch_requested.connect(self._on_modify_batch_requested)
         self._generate_pane.folder_requested.connect(self._go_to_folder)
         generate_pane = QWidget()
         info_column = QVBoxLayout(generate_pane)
@@ -1594,8 +1594,8 @@ class GalleryView(QWidget):
         plus.add_requested.connect(lambda: self._start_reroll(group.key))
         return LeadTiles(
             reroll=plus,
-            modify=(self._folder_modify_tile_for(group)
-                     if self._can_modify(group) else None),
+            modify_batch=(self._modify_batch_tile_for(group)
+                           if self._can_modify_batch(group) else None),
             generating=None if job is None else self._generating_tile_for(group.key, job))
 
     def _forget_generating_tile(self):
@@ -1630,35 +1630,35 @@ class GalleryView(QWidget):
             self._populate.stop(key)
             self._cancel_reroll(key)
 
-    def _can_modify(self, group) -> bool:
-        return self._can_reroll(group) and bool(self._folder_modify_rows(group))
+    def _can_modify_batch(self, group) -> bool:
+        return self._can_reroll(group) and bool(self._modify_batch_rows(group))
 
     @staticmethod
-    def _folder_modify_rows(group) -> list[dict]:
+    def _modify_batch_rows(group) -> list[dict]:
         if not isinstance(group, gallery.SettingsGroup):
             return []
         return [row for row in group.rows if gallery.produced_output(row)]
 
-    def _folder_modify_tile_for(self, group) -> FolderModifyTile:
-        tile = FolderModifyTile()
-        tile.clicked.connect(lambda g=group: self._open_folder_modify(g))
+    def _modify_batch_tile_for(self, group) -> ModifyBatchTile:
+        tile = ModifyBatchTile()
+        tile.clicked.connect(lambda g=group: self._open_modify_batch(g))
         return tile
 
-    def _open_folder_modify(self, group):
-        rows = self._folder_modify_rows(group)
+    def _open_modify_batch(self, group):
+        rows = self._modify_batch_rows(group)
         workflow = WORKFLOW_REGISTRY.get(rows[0].get("workflow_name") or "") if rows else None
         if workflow is None or self._client is None:
             return
         thumbnails = [row.get("thumbnail_path") for row in rows]
         self._clear_reroll_selection()
-        self._generate_pane.open_folder_modify(group.key, group.label, workflow.name,
+        self._generate_pane.open_modify_batch(group.key, group.label, workflow.name,
                                       filled_params(rows[0], workflow), thumbnails)
 
-    def _on_modify_requested(self, folder_key: str, workflow_name: str, params: dict):
+    def _on_modify_batch_requested(self, folder_key: str, workflow_name: str, params: dict):
         wf = WORKFLOW_REGISTRY.get(workflow_name)
         item = self._tree_item_for(folder_key)
         group = item.data(0, _GROUP_ROLE) if item is not None else None
-        rows = self._folder_modify_rows(group) if group is not None else []
+        rows = self._modify_batch_rows(group) if group is not None else []
         if self._client is None or wf is None or not rows:
             return
         params = {**wf.default_params(), **params}

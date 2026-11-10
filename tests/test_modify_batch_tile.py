@@ -5,7 +5,7 @@ from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtWidgets import QApplication
 
 from origenerator.gui import tile_shape
-from origenerator.gui.folder_modify_tile import FolderModifyTile
+from origenerator.gui.modify_batch_tile import ModifyBatchTile
 from origenerator.gui.new_tile import NewTile
 
 
@@ -18,28 +18,28 @@ def _click(tile):
 
 
 def test_the_tile_says_what_it_keeps_and_what_it_changes(qtbot):
-    tile = FolderModifyTile()
+    tile = ModifyBatchTile()
     qtbot.addWidget(tile)
     assert tile._caption.text() == "Modify batch (all seeds)"
     assert "seed" in tile.toolTip()
 
 
 def test_the_tile_wears_the_familys_pencil(qtbot):
-    tile = FolderModifyTile()
+    tile = ModifyBatchTile()
     qtbot.addWidget(tile)
 
     assert tile._glyph.mark == "pencil"
 
 
 def test_clicking_the_tile_asks_for_the_rewrite(qtbot):
-    tile = FolderModifyTile()
+    tile = ModifyBatchTile()
     qtbot.addWidget(tile)
     with qtbot.waitSignal(tile.clicked):
         _click(tile)
 
 
 def test_the_tile_is_the_same_size_as_the_one_beside_it(qtbot):
-    request, reroll = FolderModifyTile(), NewTile()
+    request, reroll = ModifyBatchTile(), NewTile()
     qtbot.addWidget(request)
     qtbot.addWidget(reroll)
     assert request.size() == reroll.size()

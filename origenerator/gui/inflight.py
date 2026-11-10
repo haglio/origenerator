@@ -26,7 +26,7 @@ class InFlightItem:
     starts_at: float | None = None
     job_kind: str = ""
     requested: bool = False
-    modified: bool = False
+    batch_modified: bool = False
     source_image: str | None = None
     source_file: str | None = None
     action: str = ""
@@ -48,7 +48,7 @@ def queue_lead_text(item: InFlightItem) -> str:
         parts.append("Populate")
     if item.requested:
         parts.append("Request")
-    if item.modified:
+    if item.batch_modified:
         parts.append("Modify batch")
     return " · ".join(parts)
 
@@ -68,7 +68,7 @@ def queue_lead_tooltip(item: InFlightItem) -> str:
         lines.append("Queued by its folder's Populate")
     if item.requested:
         lines.append("Queued by a request")
-    if item.modified:
+    if item.batch_modified:
         lines.append("Queued by its folder's Modify batch (all seeds)")
     return "\n".join(lines)
 

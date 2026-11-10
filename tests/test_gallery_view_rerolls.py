@@ -20,10 +20,10 @@ from origenerator.gui import (
     combine_controller,
 )
 from origenerator.gui import gallery_view as gallery_view_module
-from origenerator.gui.folder_modify_tile import FolderModifyTile
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.item_tile import ItemTile
+from origenerator.gui.modify_batch_tile import ModifyBatchTile
 from origenerator.gui.new_tile import NewTile
 from origenerator.item_shape import base_of
 from origenerator.prompt_edit import work_out
@@ -174,8 +174,8 @@ def test_starting_a_reroll_grays_the_plus_and_gives_the_run_a_tile_after_the_req
 
     assert not _new_tile(view).isEnabled()
     kinds = _tile_kinds_in_order(view)
-    assert kinds.index(FolderModifyTile) == kinds.index(NewTile) + 1
-    assert kinds.index(GeneratingTile) == kinds.index(FolderModifyTile) + 1
+    assert kinds.index(ModifyBatchTile) == kinds.index(NewTile) + 1
+    assert kinds.index(GeneratingTile) == kinds.index(ModifyBatchTile) + 1
 
 
 def _press_at(qtbot, view, spot):
@@ -216,7 +216,7 @@ def test_clicking_add_twice_starts_only_one_job(qtbot, tmp_path):
 
 
 def _request_tile(view):
-    tiles = view._scroll.widget().findChildren(FolderModifyTile)
+    tiles = view._scroll.widget().findChildren(ModifyBatchTile)
     return tiles[0] if tiles else None
 
 
@@ -242,7 +242,7 @@ def _folder_db(tmp_path, seeds=(7, 8, 9), prompt="a cat on a couch"):
 def _rewritten(view, key, prompt="a dog on a couch"):
     params = dict(_SDXL.default_params(), seed=7, positive_prompt=prompt,
                   negative_prompt="blurry")
-    view._on_modify_requested(key, "sdxl_t2i", params)
+    view._on_modify_batch_requested(key, "sdxl_t2i", params)
 
 
 def test_a_folder_offers_a_request_tile_beside_its_new_tile(qtbot, tmp_path):
@@ -276,7 +276,7 @@ def test_the_tile_opens_the_folders_prompt_in_a_tab_rather_than_launching(qtbot,
     _request_tile(view).clicked.emit()
 
     tab = view._generate_pane.current_generate_tab()
-    assert tab._folder_modify.folder_key == key
+    assert tab._modify_batch.folder_key == key
     assert tab._viewport._stack.currentWidget() is tab._viewport._sheet
     client.submit_job.assert_not_called()
 
@@ -1104,7 +1104,7 @@ def test_only_a_settings_folder_has_generations_to_rewrite(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert GalleryView._folder_modify_rows(_image_workflow(view._tree).data(0, _GROUP_ROLE)) == []
+    assert GalleryView._modify_batch_rows(_image_workflow(view._tree).data(0, _GROUP_ROLE)) == []
 
 
 def test_the_tile_counts_a_run_for_every_image_with_or_without_a_thumbnail(qtbot, tmp_path):
@@ -1116,7 +1116,7 @@ def test_the_tile_counts_a_run_for_every_image_with_or_without_a_thumbnail(qtbot
     _request_tile(view).clicked.emit()
 
     tab = view._generate_pane.current_generate_tab()
-    assert tab._folder_modify.count == 3
+    assert tab._modify_batch.count == 3
 
 
 def test_opening_a_folders_prompt_in_a_tab_puts_the_run_down_as_the_selection(qtbot, tmp_path):
@@ -1167,7 +1167,7 @@ def test_a_rewrite_of_a_sparsely_recorded_image_keeps_its_own_seed_not_the_tabs(
     view.refresh()
     key = _select_first_leaf(view)
 
-    view._on_modify_requested(key, "sdxl_t2i", {"positive_prompt": "a dog", "seed": 123456})
+    view._on_modify_batch_requested(key, "sdxl_t2i", {"positive_prompt": "a dog", "seed": 123456})
 
     (job,) = view._jobs.all_jobs
     assert job.params["seed"] != 123456
@@ -1179,7 +1179,7 @@ def test_a_rewrite_lands_in_the_folder_of_its_words_on_the_workflows_defaults(qt
     view.refresh()
     key = _select_first_leaf(view)
 
-    view._on_modify_requested(key, "sdxl_t2i", {"positive_prompt": "a dog"})
+    view._on_modify_batch_requested(key, "sdxl_t2i", {"positive_prompt": "a dog"})
 
     assert list(view._jobs.jobs_by_folder) == [view.folder_key_for(
         "sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a dog"))]

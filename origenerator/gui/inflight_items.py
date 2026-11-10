@@ -126,7 +126,7 @@ class InFlightItems:
                 starts_at=starts_at,
                 job_kind=kind,
                 requested=bool(words_of(records.get(pid))),
-                modified=pid in records and not words_of(records[pid]),
+                batch_modified=pid in records and not words_of(records[pid]),
                 source_image=start_frame_of(kind, params),
                 source_file=source_file_of(
                     row_by_id.get((records.get(pid) or {}).get("source_prompt_id")),

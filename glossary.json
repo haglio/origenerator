@@ -539,6 +539,25 @@
       ]
     },
     {
+      "id": "modify_batch_tile",
+      "thing": "the pencil tile beside New in a leaf folder: rewrite the folder's prompt and run every image in it again with the same seeds; each image it makes links back as Batch-modified from, and the one it was made from as Batch-modified into",
+      "screen": [
+        "Modify batch (all seeds)",
+        "Batch-modified from",
+        "Batch-modified into"
+      ],
+      "his_word": "Modify batch (2026-11-10: 'it should be \"Modify batch (all seeds)\"'; batch-modified for the links)",
+      "code_today": [
+        "modify batch"
+      ],
+      "code_word": "modify batch",
+      "status": "ruled",
+      "ruled": "2026-11-10, his words",
+      "retired": [
+        "folder modify"
+      ]
+    },
+    {
       "id": "in_flight_card",
       "thing": "on Latest, the square for an image or video still being made: its live frame and status",
       "screen": null,

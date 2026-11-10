@@ -235,7 +235,7 @@ def _between_headings(flow, rows, headings, draw) -> list[_Entry]:
 @dataclass(frozen=True)
 class LeadTiles:
     reroll: QWidget | None = None
-    modify: QWidget | None = None
+    modify_batch: QWidget | None = None
     generating: QWidget | None = None
 
 
@@ -827,12 +827,12 @@ class GalleryPane(QObject):
         opens_now = ((lead.reroll is not None or bool(tiles))
                      and gallery.new_work_opens_a_section(finished))
         sections = opens_now + sum(1 for heading in headings if heading)
-        modify_above = lead.modify is not None and sections > 1
-        if modify_above:
-            flow.addWidget(lead.modify)
+        modify_batch_above = lead.modify_batch is not None and sections > 1
+        if modify_batch_above:
+            flow.addWidget(lead.modify_batch)
 
         def draw_leading():
-            for tile in (lead.reroll, None if modify_above else lead.modify):
+            for tile in (lead.reroll, None if modify_batch_above else lead.modify_batch):
                 if tile is not None:
                     flow.addWidget(tile)
             for item in tiles:

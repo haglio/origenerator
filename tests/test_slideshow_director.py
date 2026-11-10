@@ -767,7 +767,7 @@ def test_a_request_landing_leaves_a_slideshow_that_moved_off_what_it_was_asked_o
     assert made[0].shown_locked == []
 
 
-def test_a_folder_s_modify_landing_leaves_a_slideshow_locked_on_its_original(slideshows):
+def test_a_folder_s_modify_batch_landing_leaves_a_slideshow_locked_on_its_original(slideshows):
     modified = _row("g2")
     director, _host, made = slideshows(
         db=FakeDB([_row("g1"), modified], requests=[_request("g2", "g1", asked="")]))

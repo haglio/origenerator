@@ -22,6 +22,7 @@ class _Wanting(QWidget):
 
 
 def _settle():
+    # Qt posts the layout pass a resize starts; it runs only when the event loop turns.
     for _ in range(4):
         QApplication.processEvents()
 
@@ -93,7 +94,6 @@ def test_a_held_splitter_is_not_moved_by_dragging_its_handle(qtbot):
     _drag(splitter.handle(1), 120)
 
     assert splitter.sizes() == before
-    # Qt gives a disabled widget no drag, shows no resize pointer over it, and does not light it under the pointer.
     assert not splitter.handle(1).isEnabled()
 
 

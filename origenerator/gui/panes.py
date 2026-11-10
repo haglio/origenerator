@@ -52,6 +52,7 @@ class PaneSplitter(QSplitter):
             self._dragged = True
 
     def hold_still(self, held: bool) -> None:
+        # Qt gives a disabled widget no drag, shows no resize pointer over it, and does not light it under the pointer.
         for index in range(self.count()):
             self.handle(index).setEnabled(not held)
 

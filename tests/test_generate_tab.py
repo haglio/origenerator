@@ -240,7 +240,6 @@ def _names_its_setting(label: ElidingLabel) -> bool:
 @pytest.mark.parametrize("workflow", [None, "sdxl_t2i", "wan22_i2v", "flux_t2i_upscaled"])
 def test_a_narrow_pane_shortens_its_labels_rather_than_dropping_them(
         app_chrome, blank_panel, workflow):
-    # Qt's QFormLayout gives its labels the widest one's width when a row fits beside its field and no width at all when none does.
     tab = blank_panel
     if workflow is not None:
         tab._workflow_dropdown.setCurrentIndex(_dropdown_index(tab, workflow))
@@ -262,7 +261,6 @@ def test_a_narrow_pane_shortens_its_labels_rather_than_dropping_them(
 @pytest.mark.parametrize("workflow", ["sdxl_t2i", "wan22_i2v", "wan22_animate"])
 def test_a_narrow_pane_shortens_a_label_before_it_squeezes_a_field(
         app_chrome, blank_panel, workflow):
-    # Qt's QFormLayout kept a section's labels whole while any one of its fields still fit beside them, and squeezed the rest.
     tab = blank_panel
     tab._workflow_dropdown.setCurrentIndex(_dropdown_index(tab, workflow))
     sections = tab._param_form._sections.values()

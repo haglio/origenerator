@@ -67,6 +67,8 @@ class LabelForm(QFormLayout):
         self.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
 
     def setGeometry(self, rect: QRect) -> None:
+        # Qt's QFormLayout gives its labels the widest one's width when a row fits beside its field and no width at all when none does.
+        # Qt's QFormLayout keeps a section's labels whole while any one of its fields still fits beside them, and squeezes the rest.
         self.label_column.fit_in(self._room_for_labels(rect.width()))
         super().setGeometry(rect)
 

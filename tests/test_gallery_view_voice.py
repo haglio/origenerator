@@ -966,7 +966,9 @@ def test_a_pressed_generate_of_the_same_action_is_not_what_the_guard_counts(
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
 
-    assert len(_spoken_genau_rows(view)) == 1
+    assert len(_spoken_genau_rows(view)) == 1, (
+        "only a spoken one is stamped, and only a spoken one can be said again into the wait: "
+        "someone at the keyboard can see the queue they just joined")
 
 
 def test_a_spoken_enhance_asks_for_the_better_version_of_the_slide(qtbot, tmp_path):

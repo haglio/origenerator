@@ -109,7 +109,13 @@ def test_a_region_rect_is_not_required_of_a_launch():
             for flag in contract.required_flags()[1:]
             for word in (flag, "7")] + [contract.MODE_FLAG]
 
-    session = contract.parse_app_args(full).fun_time
+    try:
+        session = contract.parse_app_args(full).fun_time
+    except SystemExit:
+        pytest.fail(
+            "a session that hands a Funestra over opens no window of ours on that side, so the "
+            "rect it would take is beside the point, and a session too old to send one must go "
+            "on launching")
 
     assert session is not None
     assert session.region_rect("portrait") == contract.Rect(0, 0, 0, 0)

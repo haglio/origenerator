@@ -307,6 +307,8 @@ def enhancement_recency(rows) -> dict[str, tuple[datetime, int]]:
         for entry in parse_file_list(row.get("enhance_history")):
             if isinstance(entry, dict):
                 note(row.get("prompt_id"), entry.get("finished_at"), entry.get("run_id"))
+        if row.get("evolver_upscaled_at"):
+            note(row.get("prompt_id"), row["evolver_upscaled_at"], row.get("id"))
     return recency
 
 

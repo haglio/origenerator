@@ -2600,7 +2600,7 @@ def test_a_new_frame_at_the_same_settings_leaves_the_rows_facts_in_place(qtbot):
         "a run streams several frames a second, and each would otherwise rebuild the row under the cursor")
 
 
-def test_the_original_has_no_settings_to_hand_over_and_so_does_not_drag(qtbot, tmp_path, version_drags):
+def test_the_original_does_not_drag(qtbot, tmp_path, version_drags):
     original = _VersionRow(_versions(1)[-1], 1, _an_image(tmp_path / "src.png"))
     qtbot.addWidget(original)
 

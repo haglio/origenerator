@@ -4844,7 +4844,7 @@ def test_a_videos_file_and_created_are_listed_under_enhancements_never_metadata(
     assert {"File", "Created"}.isdisjoint(_shown_metadata(tab))
 
 
-def test_a_prefill_on_the_workflow_already_picked_shows_the_newest_result_too(
+def test_a_prefill_on_the_same_workflow_shows_the_newest_result(
         qtbot, tmp_path, monkeypatch):
     db = Database(tmp_path / "t.db")
     db.insert_generation(NewGeneration(
@@ -4879,9 +4879,10 @@ def test_a_finished_run_with_no_file_leaves_the_frames_standing(tab, monkeypatch
     monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: None)
     tab._viewport.show_media = MagicMock()
     tab._viewport.show_message = MagicMock()
+    tab._viewport.clear = MagicMock()
 
     tab.show_finished_media({"prompt_id": "g1"})
 
     tab._viewport.show_media.assert_not_called()
-    assert tab._viewport.show_message.call_count == 0, (
+    assert tab._viewport.show_message.call_count + tab._viewport.clear.call_count == 0, (
         "with nothing to look at, the last frames stay rather than the pane going blank")

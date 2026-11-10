@@ -1301,7 +1301,7 @@ def test_the_bar_leaves_the_strip_to_the_queue(queue):
     assert queue._scroll.width() + queue._for_all.width() > queue._running.width()
 
 
-def test_the_hand_is_on_the_frame_alone_since_only_the_frame_goes_anywhere(queue):
+def test_the_hand_is_on_the_frame_alone(queue):
     queue.set_items([_item(key="a", reveal=lambda: None)])
     QApplication.processEvents()
 

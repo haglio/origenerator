@@ -2224,7 +2224,7 @@ def test_two_requests_out_at_once_hold_the_line_until_both_have_let_go(qtbot, tm
     assert client.submit_job.call_count == 1
 
 
-def test_a_chained_runs_video_answers_to_the_id_its_start_frame_began_under(qtbot, tmp_path):
+def test_the_video_of_a_chained_run_shares_its_images_origin(qtbot, tmp_path):
     client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
@@ -2239,7 +2239,7 @@ def test_a_chained_runs_video_answers_to_the_id_its_start_frame_began_under(qtbo
     video = queue.newest_job_for("k")
     assert video is not frame
     assert video.origin == frame.origin, (
-        "the frame and the video made on it are two prompts, and one run to whoever asked for it")
+        "the image and the video made on it are two prompts, and one run to whoever asked for it")
 
 
 def test_a_progress_write_that_fails_leaves_the_run_going(qtbot, tmp_path, monkeypatch):
@@ -2258,7 +2258,9 @@ def test_a_progress_write_that_fails_leaves_the_run_going(qtbot, tmp_path, monke
 
     monkeypatch.setattr(db, "update_generation", refusing_progress)
 
-    client.progress.emit(job.prompt_id, "s", 5, 10)
+    with qtbot.capture_exceptions() as raised:
+        client.progress.emit(job.prompt_id, "s", 5, 10)
 
-    assert job.state == "running", "a hiccup in saving a run's progress must never disturb the run"
+    assert raised == [], "a hiccup in saving a run's progress must never disturb the run"
+    assert job.state == "running"
     assert queue.jobs[key] is job

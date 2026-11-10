@@ -2670,7 +2670,7 @@ def test_a_prompt_read_to_its_end_grays_nothing(qtbot):
     assert _grayed(box) == []
 
 
-def test_a_story_is_laid_down_before_the_values_laid_over_its_scenes(qtbot):
+def test_the_story_is_set_before_the_per_scene_values(qtbot):
     story, *the_rest = _scene_defs()
     form = ParamForm([*the_rest, story])
     qtbot.addWidget(form)

@@ -181,9 +181,9 @@ CREATE TABLE IF NOT EXISTS custom_folder_generations (
 -- the one it came from. Kept even when its generation goes: a delete here is
 -- undoable, and a restored item should come back with the request that made it.
 --
--- A request records one, and so does a folder's Modify (all seeds), which
+-- A request records one, and so does a folder's Modify batch (all seeds), which
 -- rewrites every image in a folder at once and records one per image,
--- linking each result to the one it was rewritten from. A Modify has nothing
+-- linking each result to the one it was rewritten from. A Modify batch has nothing
 -- heard and no single term — it says what it wanted by rewriting the prompt,
 -- which the old/new pair holds — so `heard` is empty there and
 -- `term`/`polarity`/`action` are unset.

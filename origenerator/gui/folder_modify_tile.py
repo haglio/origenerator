@@ -9,7 +9,7 @@ _IDLE_FRAME_CSS = tile_shape.idle_css("folderModifyTile")
 
 _MARK_PX = 48
 
-_CAPTION = "Modify (all seeds)"
+_CAPTION = "Modify batch (all seeds)"
 _TOOLTIP = (
     "Rewrite this folder's prompt and run every image in it again with the same "
     "seed, so the new folder is this one said differently."

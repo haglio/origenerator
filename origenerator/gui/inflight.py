@@ -49,7 +49,7 @@ def queue_lead_text(item: InFlightItem) -> str:
     if item.requested:
         parts.append("Request")
     if item.modified:
-        parts.append("Modify")
+        parts.append("Modify batch")
     return " · ".join(parts)
 
 
@@ -69,7 +69,7 @@ def queue_lead_tooltip(item: InFlightItem) -> str:
     if item.requested:
         lines.append("Queued by a request")
     if item.modified:
-        lines.append("Queued by its folder's Modify (all seeds)")
+        lines.append("Queued by its folder's Modify batch (all seeds)")
     return "\n".join(lines)
 
 

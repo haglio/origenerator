@@ -13,12 +13,14 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui import colors
 from shared_ui.colors import TEXT_PRIMARY
 from shared_ui.icons import icon_then_text
 from shared_ui.palette import TEXT_MUTED, as_hex
 from shared_ui.spacing import BUTTON_ICON, BUTTON_RADIUS, GAP_SMALL, HAIRLINE
 
 from origenerator.gui import palette, tile_shape
+from origenerator.gui.text_color import color_text
 
 _CELL_GAP = HAIRLINE
 _CELL_SIZE = ((tile_shape.THUMBNAIL_SIZE[0] - _CELL_GAP) // 2,
@@ -64,7 +66,7 @@ class FolderTile(QFrame):
 
         if context:
             crumb = QLabel()
-            crumb.setStyleSheet(f"color: {as_hex(TEXT_MUTED)};")
+            color_text(crumb, colors.TEXT_MUTED)
             crumb.setFont(tile_shape.caption_font())
             crumb.setFixedHeight(tile_shape.line_height())
             crumb.setText(crumb.fontMetrics().elidedText(
@@ -88,7 +90,7 @@ class FolderTile(QFrame):
         layout.addLayout(caption_row)
 
         count_label = QLabel(f"{count} item{'s' if count != 1 else ''}")
-        count_label.setStyleSheet(f"color: {as_hex(TEXT_MUTED)};")
+        color_text(count_label, colors.TEXT_MUTED)
         count_label.setFont(tile_shape.caption_font())
         count_label.setFixedHeight(tile_shape.line_height())
         layout.addWidget(count_label)

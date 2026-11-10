@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 
 import pytest
-from PyQt6.QtWidgets import QApplication, QLabel, QPushButton
+from PyQt6.QtCore import QPoint
+from PyQt6.QtGui import QPalette
+from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QToolTip, QWidget
 from shared_ui.colors import TEXT_MUTED
 
 import origenerator.gui.metadata_section as metadata_section_module
@@ -204,3 +206,26 @@ def test_hovering_a_frame_count_says_why_the_model_makes_fewer_frames_than_the_f
     assert "16 frames a second" in tips["Frames from model"]
     assert "filled in" in tips["Total frames"]
     assert tips["113"] == tips["Total frames"]
+
+
+def _tip_color_shown_from(widget) -> str:
+    QToolTip.showText(widget.mapToGlobal(QPoint(1, 1)), "one", widget)
+    tip = next(w for w in QApplication.topLevelWidgets()
+               if w.metaObject().className() == "QTipLabel")
+    tip.ensurePolished()
+    color = tip.palette().color(QPalette.ColorRole.WindowText).name()
+    QToolTip.hideText()
+    return color
+
+
+def test_a_lines_tooltip_looks_like_every_other_tooltip_in_the_app(block, qtbot):
+    block.show_row(_row(workflow_name="wan22_flf2v_loop",
+                        params_json=json.dumps({"frame_count": 17, "frame_rate": 112.0})))
+    block.show()
+    plain = QWidget()
+    qtbot.addWidget(plain)
+    plain.show()
+    labels = {lbl.text(): lbl for lbl in block.findChildren(QLabel)}
+
+    assert _tip_color_shown_from(labels["Total frames"]) == _tip_color_shown_from(plain)
+    assert _tip_color_shown_from(labels["113"]) == _tip_color_shown_from(plain)

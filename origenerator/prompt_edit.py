@@ -281,7 +281,8 @@ _ANSWER_SHAPE = (
     '"instead": "<what the image shows in its place, or empty>", "for": "<his words>"} for '
     'something gone. "for" quotes the words of his, from this request or an earlier one, that '
     'the change answers; a change answering none of his words is thrown away. When nothing '
-    'should change, "changes" is an empty list.')
+    'should change, "changes" is an empty list and "why" says to him, in one sentence, why '
+    'nothing should change.')
 
 
 _NO_WEIGHTS = (

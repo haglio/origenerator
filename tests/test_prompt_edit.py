@@ -149,7 +149,7 @@ def test_a_model_that_changes_nothing_says_so_and_there_is_nothing_to_make():
     revision = work_out("a woman, freckles", "", "more freckles", ask=_Model(_answer()))
 
     assert not revision.changed
-    assert revision.answer == "Nothing changed."
+    assert revision.answer == "The model gave no change and no reason, so nothing changed."
 
 
 def test_the_models_stronger_words_are_held_to_his_own_prompts_and_notes():
@@ -372,7 +372,8 @@ def test_the_answer_asked_for_is_a_list_of_changes_each_naming_his_words():
     assert "thrown away" in shape
     assert '{"more": "<the part of the positive prompt' in shape
     assert '{"gone": "<the thing he wants gone, bare>"' in shape
-    assert shape.endswith('When nothing should change, "changes" is an empty list.')
+    assert shape.endswith('When nothing should change, "changes" is an empty list and "why" '
+                          'says to him, in one sentence, why nothing should change.')
     assert "..." not in content.rsplit("\n\n", 1)[0]
 
 

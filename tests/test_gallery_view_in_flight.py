@@ -676,10 +676,11 @@ def test_a_queue_of_the_users_own_jobs_leaves_the_plain_waiting_note(qtbot, tmp_
 
 def test_a_run_waiting_out_the_minute_after_an_image_says_when_it_starts(
         qtbot, tmp_path, monkeypatch):
+    clear_of_a_rollover = 0.5
     view, _client = _waiting_view(qtbot, tmp_path, backlog=0)
     waiting, = view._live_jobs.values()
     monkeypatch.setattr(view._jobs, "starts_at",
-                        lambda prompt_id: time.monotonic() + 42.5
+                        lambda prompt_id: time.monotonic() + 42 + clear_of_a_rollover
                         if prompt_id == waiting.prompt_id else None)
 
     view._poll()

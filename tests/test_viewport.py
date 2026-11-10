@@ -106,6 +106,9 @@ def test_show_image_fits_the_pane_without_clipping(qtbot, tmp_path):
     assert pm.width() <= 400
     assert pm.height() <= 300
     assert pm.width() == 400 or pm.height() == 300
+    assert (pm.width(), pm.height()) == (120, 300), (
+        "a tall image whose aspect ratio does not match a wide pane: a correct fit touches the "
+        "short edges and leaves the long ones letterboxed")
 
 
 def test_image_refits_when_the_pane_grows(qtbot, tmp_path):

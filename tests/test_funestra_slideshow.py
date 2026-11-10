@@ -293,6 +293,10 @@ def test_a_video_the_session_s_funestra_plays_is_none_on_this_app_s_own_screen(q
     slideshow = _slideshow(qtbot, tmp_path, items=[("clip.mp4", "video", "id-1")])
 
     assert slideshow.video_on_screen() is None
+    assert slideshow.osr2_drive_target() is None, (
+        "the one device switch follows the video on screen where this app drives the OSR2, its "
+        "own window, and nothing on a session's Funestra, where the OSR2 is the Main Funestra's "
+        "alone")
 
 
 def test_the_funestra_is_told_how_long_an_image_holds_that_nothing_holds_it_and_to_read_the_list(

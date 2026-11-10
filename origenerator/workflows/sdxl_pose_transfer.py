@@ -3,6 +3,7 @@ from __future__ import annotations
 from origenerator.config import CUSTOM_POSES_DIR
 from origenerator.media import MediaType
 from origenerator.workflows.base import (
+    GENTLE_ENHANCE_DENOISE,
     ParamDef,
     ParamType,
     WorkflowTemplate,
@@ -17,13 +18,15 @@ from origenerator.workflows.model_files import WORKS_ON_PIXELS
 from origenerator.workflows.parts import NodeRefs
 from origenerator.workflows.prompt_readers import CLIP
 
-_TARGET_MEGAPIXELS = 1.0
+# SDXL is trained at about one megapixel.
+_SDXL_MEGAPIXELS = 1.0
 
 
 class SdxlPoseTransferWorkflow(WorkflowTemplate):
     """SDXL T2I steered by the structure of an input image.
 
     ComfyUI's SetUnionControlNetType is added only for union ControlNets: a plain single-purpose one crashes on the extra argument.
+    ComfyUI's DWPose preprocessor loses the person on close-ups and overlapping bodies.
     """
     name = "sdxl_pose_transfer"
     version = "v004"
@@ -63,7 +66,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
             "upscale_model": "4xUltrasharp_4xUltrasharpV10.pt",
             "enhance_scale": 2.0,
             "enhance_steps": 20,
-            "enhance_denoise": 0.15,
+            "enhance_denoise": GENTLE_ENHANCE_DENOISE,
             "filename_prefix": "image/sdxl_pose_transfer",
         }
 
@@ -101,7 +104,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
 
     def derived_display_size(self, params: dict) -> tuple[int, int] | None:
         return measure_derived_size(
-            params.get("input_image", ""), megapixels=_TARGET_MEGAPIXELS
+            params.get("input_image", ""), megapixels=_SDXL_MEGAPIXELS
         )
 
     @staticmethod
@@ -140,7 +143,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
         return nodes, ["23", 0]
 
     def build_api_payload(self, params: dict) -> dict:
-        sized = self.image_size_nodes(["1", 0], params, megapixels=_TARGET_MEGAPIXELS)
+        sized = self.image_size_nodes(["1", 0], params, megapixels=_SDXL_MEGAPIXELS)
         size_nodes, scaled_ref = sized.nodes, sized.image
         width_ref, height_ref = sized.width, sized.height
         structure, hint_ref = self._structure_nodes(params, scaled_ref)

@@ -3,7 +3,13 @@ from __future__ import annotations
 from dataclasses import replace
 
 from origenerator.media import MediaType
-from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate, prompt_conditioning
+from origenerator.workflows.base import (
+    GENTLE_ENHANCE_DENOISE,
+    ParamDef,
+    ParamType,
+    WorkflowTemplate,
+    prompt_conditioning,
+)
 from origenerator.workflows.derived_size import measure_image_size, override_size
 from origenerator.workflows.detail_parts import FIX_MAX
 from origenerator.workflows.flux_t2i_upscaled import FluxT2iUpscaledWorkflow
@@ -45,7 +51,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
             "upscale_model": "4xFaceUpDAT.pth",
             "enhance_scale": 2.0,
             "enhance_steps": 20,
-            "enhance_denoise": 0.15,
+            "enhance_denoise": GENTLE_ENHANCE_DENOISE,
             "enhance_detail_fixes": {},
             "enhance_fix_prompts": {},
             "filename_prefix": "image/image_enhance",

@@ -48,6 +48,7 @@ RIFE_CHECKPOINT = "rife47.pth"
 _RIFE_CACHE_FRAMES = 10
 
 UPSCALE_MODEL_FACTOR = 4.0
+GENTLE_ENHANCE_DENOISE = 0.15
 
 # The defaults of ComfyUI's detailer node. It enlarges each crop to the guide size before sampling,
 # which gives a hand the size of a thumbnail enough pixels to be redrawn, and never past the
@@ -60,6 +61,8 @@ _SIZE_SCALE, _SIZE_GET = "size_scale", "size_get"
 _ENH_LOADER, _ENH_UPSCALE, _ENH_RESCALE = "enh_loader", "enh_upscale", "enh_rescale"
 _ENH_ENCODE, _ENH_SAMPLER, _ENH_DECODE = "enh_encode", "enh_sampler", "enh_decode"
 SOURCE_MODEL_PREFIX = "source_"
+# ComfyUI's HunyuanVideo-Foley sampler hands out its one generated track on output 0, audio_first.
+_FOLEY_AUDIO_FIRST = 0
 
 
 def _text_encode(clip_ref, text: str) -> dict:
@@ -569,7 +572,7 @@ class WorkflowTemplate(ABC):
                 },
             },
         }
-        return nodes, [sampler_id, 0]
+        return nodes, [sampler_id, _FOLEY_AUDIO_FIRST]
 
     @staticmethod
     def speech_window_nodes(prefix: str, line_ref, encoder_ref, offset: int, length: int):

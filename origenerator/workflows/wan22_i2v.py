@@ -40,6 +40,7 @@ _SPEECH_SHIFT = 8.0
 
 
 class Wan22I2vWorkflow(WorkflowTemplate):
+    """ComfyUI's own wan22_14b_i2v_dual_noise_template graph."""
     name = "wan22_i2v"
     version = "v007"
     display_name = "WAN 2.2 I2V"
@@ -179,6 +180,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             "ref_image": start,
         }
         if previous is not None:
+            # ComfyUI's WanSoundImageToVideo reads its motion off the last frames of whatever batch it is handed.
             conditioning["ref_motion"] = previous
         nodes = {
             **heard,
@@ -217,7 +219,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         scenes = scene_prompts(params["positive_prompt"])
         negatives = scene_prompts(params["negative_prompt"])
         spoken = scene_speech(params)
-        offsets: dict[int, int] = {}
+        heard_so_far_in_plan_order: dict[int, int] = {}
 
         def segment(at):
             index, scene, start, length, _last, _previous = at
@@ -225,8 +227,8 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             negative_nodes, negative_ref = self.scene_prompt_nodes(
                 at, negatives, ["1", 0], ["11", 0], role="negative")
             if spoken[scene] is not None:
-                offset = offsets.get(scene, 0)
-                offsets[scene] = offset + length - 1
+                offset = heard_so_far_in_plan_order.get(scene, 0)
+                heard_so_far_in_plan_order[scene] = offset + length - 1
                 nodes, frames = self._speaking_segment(
                     at, offset, (positive_ref, negative_ref), (width_ref, height_ref), params)
                 return {**prompt_nodes, **negative_nodes, **nodes}, frames

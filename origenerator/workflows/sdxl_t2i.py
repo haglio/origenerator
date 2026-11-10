@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from origenerator.media import MediaType
 from origenerator.workflows.base import (
+    GENTLE_ENHANCE_DENOISE,
     ParamDef,
     ParamType,
     WorkflowTemplate,
@@ -48,7 +49,7 @@ class SdxlT2iWorkflow(WorkflowTemplate):
             "upscale_model": "4xUltrasharp_4xUltrasharpV10.pt",
             "enhance_scale": 2.0,
             "enhance_steps": 20,
-            "enhance_denoise": 0.15,
+            "enhance_denoise": GENTLE_ENHANCE_DENOISE,
             "filename_prefix": "image/sdxl_t2i",
         }
 

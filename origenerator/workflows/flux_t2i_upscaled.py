@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from origenerator.media import MediaType
 from origenerator.workflows.base import (
+    GENTLE_ENHANCE_DENOISE,
     SOURCE_MODEL_PREFIX,
     ParamDef,
     ParamType,
@@ -59,7 +60,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
             "enhance": False,
             "enhance_scale": 2.0,
             "enhance_steps": 20,
-            "enhance_denoise": 0.15,
+            "enhance_denoise": GENTLE_ENHANCE_DENOISE,
             "filename_prefix": "image/flux_t2i_upscaled",
         }
 

@@ -62,7 +62,9 @@ def test_a_speaking_segment_samples_the_speech_model_under_its_lightning_lora():
     for sampler in samplers:
         assert (sampler["inputs"]["steps"], sampler["inputs"]["cfg"]) == (4, 1.0)
         assert (sampler["inputs"]["sampler_name"], sampler["inputs"]["scheduler"]) == ("uni_pc", "simple")
-        assert _model_chain(payload, sampler) == ["ModelSamplingSD3", "LoraLoaderModelOnly", "UNETLoader"]
+        assert _model_chain(payload, sampler) == ["ModelSamplingSD3", "LoraLoaderModelOnly", "UNETLoader"], (
+            "the user's own LoRAs stay off the speech model: the one tried put artifacts all over the "
+            "video, and the lightning LoRA alone is the run the user judged by eye")
         shifted = payload[sampler["inputs"]["model"][0]]
         lora = payload[shifted["inputs"]["model"][0]]
         loader = payload[lora["inputs"]["model"][0]]
@@ -134,7 +136,8 @@ def test_the_speech_slot_offers_only_the_speech_model_and_the_experts_never_do(i
     installed_models.add("diffusion_models", "expert_low.safetensors", arch="wan")
     by_key = {pd.key: pd for pd in Wan22I2vWorkflow().param_definitions()}
     assert "speaker.safetensors" in by_key["unet_s2v"].options
-    assert "expert_high.safetensors" not in by_key["unet_s2v"].options
+    assert "expert_high.safetensors" not in by_key["unet_s2v"].options, (
+        "an expert in the speaking model's place would render deaf to the line, with no error")
     assert "speaker.safetensors" not in by_key["unet_high"].options
     assert "speaker.safetensors" not in by_key["unet_low"].options
 

@@ -18,7 +18,8 @@ def test_an_empty_thumbnail_says_how_wide_it_drew():
     image = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
 
     assert empty_thumbnail(ImageDraw.Draw(image), 2, 2, 8) == 8
-    assert image.getpixel((5, 5))[3] > 0
+    assert image.getpixel((5, 5))[3] > 0, (
+        "a faint square reads as waiting for its thumbnail, not as failing to draw one")
     assert image.getpixel((12, 12))[3] == 0
 
 

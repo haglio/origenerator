@@ -118,7 +118,9 @@ def test_a_second_region_widens_the_total_rather_than_pinning_the_bar(enhance_pa
     for node in (tail, faces, hands):
         tracker.update(1, 20, node)
         tracker.update(20, 20, node)
-    assert tracker.update(1, 20, hands) == (16, 19)
+    assert tracker.update(1, 20, hands) == (16, 19), (
+        "Impact Pack's detailer names the same node for every region it samples, "
+        "so a count starting over is a new pass too")
     assert tracker.update(20, 20, hands) == (19, 19)
 
 
@@ -137,7 +139,8 @@ def test_a_step_that_names_no_node_belongs_to_the_pass_already_running():
 
 def test_each_sampler_pass_is_named_the_way_the_form_names_it():
     names = stage_names(_payload("wan22_i2v", steps=20))
-    assert (names["15"], names["16"], names["24"]) == ("First pass", "Second pass", "Sound")
+    assert (names["15"], names["16"], names["24"]) == ("First pass", "Second pass", "Sound"), (
+        "named from each node's own settings: a table per workflow would go stale")
 
 
 def test_a_stills_second_sampler_is_named_for_the_denoise_that_marks_it(enhance_payload):
@@ -165,14 +168,15 @@ def test_the_minutes_before_the_first_step_are_named_too():
 def test_a_node_with_nothing_worth_saying_is_left_unnamed():
     payload = _payload("wan22_i2v", steps=20)
     named = stage_names(payload)
-    assert "8" not in named
+    assert "8" not in named, "an instant node's name would only flash between two real stages"
     assert "21" not in named
 
 
 def test_current_pass_reads_the_pass_in_hand_on_its_own_count():
     tracker = ProgressTracker(60, passes=3)
     tracker.update(5, 20)
-    assert tracker.current_pass() == (5, 20)
+    assert tracker.current_pass() == (5, 20), (
+        "shown from the first step, the pass's bar does not appear from nowhere partway through")
     tracker.update(20, 20)
     tracker.update(3, 20)
     assert tracker.current_pass() == (3, 20)
@@ -196,7 +200,9 @@ def test_a_band_grows_when_an_unbudgeted_second_pass_turns_up():
 def test_an_unbudgeted_pass_is_charged_at_the_cheapest_rate_the_job_knows():
     tracker = ProgressTracker(90, passes=2, step_seconds={"a": 40.0, "b": 0.1})
     tracker.update(2, 2, "a")
-    assert tracker.update(1, 200, "?") == (80, 100)
+    assert tracker.update(1, 200, "?") == (80, 100), (
+        "charged too dear, a pass nobody budgeted buries the real passes; "
+        "too cheap, it only slows the tail")
     assert tracker.update(200, 200, "?") == (100, 100)
 
 
@@ -279,7 +285,7 @@ def test_snapshot_is_json_serializable():
     tracker.update(10, 10)
     tracker.update(3, 10)
     snap = tracker.snapshot()
-    assert json.loads(json.dumps(snap)) == snap
+    assert json.loads(json.dumps(snap)) == snap, "it is stored on the job's row as text"
 
 
 def test_current_is_zero_when_total_is_unknown():
@@ -327,7 +333,8 @@ def test_a_video_length_derived_in_graph_sizes_its_samplers_as_stills():
 
 def test_a_job_budgeted_for_under_a_second_still_reports_a_total_of_one():
     tracker = ProgressTracker(0.2, step_seconds={"a": 0.01})
-    assert tracker.update(1, 1, node="a") == (0, 1)
+    assert tracker.update(1, 1, node="a") == (0, 1), (
+        "a total of nothing means no reading, which shows a sweeping bar on a job that is measuring")
 
 
 def test_a_snapshot_with_banked_seconds_and_no_pass_index_restores_inside_a_second_pass():

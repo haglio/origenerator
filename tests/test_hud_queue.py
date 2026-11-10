@@ -302,7 +302,7 @@ def test_the_word_that_throws_a_job_away_is_drawn_in_the_huds_own_ink():
 
     image, _targets = _painted(section)
 
-    assert _reds(image) == 0
+    assert _reds(image) == 0, "the Funestras keep red for a recording under way"
 
 
 class _Host:

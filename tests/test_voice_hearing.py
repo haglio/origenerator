@@ -11,7 +11,8 @@ from voice_core.whisper_reader import WhisperReader
 from origenerator.voice.dictation import request_bias
 from origenerator.voice.hearing import Hearing
 
-QUIET = bytes(960)
+ONE_30_MS_FRAME = 960
+QUIET = bytes(ONE_30_MS_FRAME)
 LOUD = array.array("h", [3000, -3000] * 240).tobytes()
 ONE_UTTERANCE = [QUIET] * 15 + [LOUD] * 8 + [QUIET] * 20
 PATIENCE_MS = 10_000

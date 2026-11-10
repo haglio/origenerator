@@ -229,7 +229,7 @@ def test_undo_takes_back_the_last_burst_of_typing_and_redo_puts_it_back(pair, qt
 
     qtbot.keyClick(pair.edit, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
     assert diff_text.live_text(pair.edit) == "a cat on a couch", (
-        "the field's own undo is off: rewritten under the typist on every settle, it would step back "
+        "the field's own undo is off: rewritten under the user's typing on every settle, it would step back "
         "through renders rather than through edits")
     assert _marks(pair.edit) == [("a cat on a couch", "plain")]
 

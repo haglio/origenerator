@@ -133,7 +133,9 @@ def test_an_action_both_lanes_carry_stays_picked_across_the_switch(qtbot):
 def test_only_the_video_drop_zone_is_drained_of_color(qtbot):
     combine = _panel(qtbot)
 
-    assert combine.video_zone._grayscale
+    assert combine.video_zone._grayscale, (
+        "the video zone holds a source video, not a result: in color it reads as a second subject "
+        "beside the image it will animate")
     assert not combine.image_zone._grayscale
 
 

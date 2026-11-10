@@ -103,9 +103,7 @@ def test_the_name_it_already_shows_leaves_the_block_alone(block):
 
     block.show_name("AB12CD34 007")
 
-    assert block.findChild(CollapsibleSection) is section, (
-        "asked again after every redraw of the gallery, while the name may be text the user is "
-        "selecting on it")
+    assert block.findChild(CollapsibleSection) is section
 
 
 def test_copy_button_copies_just_the_filename(block):

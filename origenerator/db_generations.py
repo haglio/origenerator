@@ -180,6 +180,9 @@ class GenerationStore(Store):
     def set_experiment_verdict(self, prompt_id: str, verdict: str | None):
         self._set(prompt_id, "experiment_verdict", verdict)
 
+    def say_why_it_cannot_be_made_again(self, prompt_id: str, reason: str):
+        self._set(prompt_id, "why_it_cannot_be_made_again", reason)
+
     def set_image_state(self, prompt_id: str, state: str | None):
         self._set(prompt_id, "picture_state", state or None)
 

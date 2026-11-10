@@ -1366,3 +1366,53 @@ def test_no_gallery_the_suite_builds_reaches_the_libraries_kino(qtbot):
     kino = view._edits._environment.kino
     assert not kino.library.is_relative_to(config.LIBRARY_ROOT)
     assert not kino.trash.is_relative_to(config.LIBRARY_ROOT)
+
+
+class _PointerWatchingActions(FakeActions):
+    def __init__(self):
+        super().__init__()
+        self.pointers = []
+
+    def _watch(self):
+        cursor = QApplication.overrideCursor()
+        self.pointers.append(cursor and cursor.shape())
+
+    def delete_rows(self, rows, *, pressed=None):
+        self._watch()
+        super().delete_rows(rows, pressed=pressed)
+
+    def restore_deleted(self, prompt_ids):
+        self._watch()
+        return super().restore_deleted(prompt_ids)
+
+    def purge_deleted(self, prompt_ids):
+        self._watch()
+        super().purge_deleted(prompt_ids)
+
+
+def _pointer_while_redrawing(view, monkeypatch):
+    seen = []
+    real = view.refresh
+    monkeypatch.setattr(view, "refresh", lambda *a, **kw: (
+        seen.append((cursor := QApplication.overrideCursor()) and cursor.shape()),
+        real(*a, **kw))[1])
+    return seen
+
+
+@pytest.mark.parametrize("act", ["restore", "purge", "send to trash"])
+def test_each_trash_action_spins_the_pointer_until_the_gallery_is_redrawn(qtbot, monkeypatch, act):
+    actions = _PointerWatchingActions()
+    db = _trash_db(rows=[_image("i1", "a dog", 50, 2)],
+                   held=[("d1", _image("d1", "a cat", 50, 1))])
+    view = GalleryView(db, actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(view, "_confirm", lambda text: True)
+    redrawing = _pointer_while_redrawing(view, monkeypatch)
+
+    {"restore": lambda: view.restore_from_trash(["d1"]),
+     "purge": lambda: view.purge_from_trash(["d1"]),
+     "send to trash": lambda: view._delete_rows([db.get_generation("i1")])}[act]()
+
+    assert actions.pointers == redrawing == [Qt.CursorShape.WaitCursor]
+    assert QApplication.overrideCursor() is None

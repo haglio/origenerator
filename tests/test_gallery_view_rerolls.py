@@ -1140,6 +1140,20 @@ def test_generate_under_a_turn_runs_it_records_its_request_and_leaves_the_tab_on
     assert list(exchange._in_flight) == [job.prompt_id]
 
 
+def test_generate_under_a_turn_that_would_make_an_image_already_made_still_keeps_its_seed(
+        qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path)
+    _completed_image(view._db, "already", "two cats", 7)
+    view.refresh()
+    tab = view._generate_pane.current_generate_tab()
+
+    tab._param_form.request_exchange().generate_asked.emit(0)
+
+    (job,) = view._live_jobs.values()
+    assert job.params["seed"] == 7
+    assert not tab._param_form.seed_is_random()
+
+
 def _request_turns_shown(view):
     tab = view._generate_pane.current_generate_tab()
     return tab._param_form.request_exchange().turns(), tab._param_form._widgets["positive_prompt"].value()

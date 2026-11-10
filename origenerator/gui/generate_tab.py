@@ -1448,7 +1448,8 @@ class GenerateTab(DropZones):
             in_scenes=self._param_form.tells_a_story(), since=tuple(aim.turns),
             weights=workflow_named(self._form_workflow_key).prompts_take_weights,
             owner=self._request_aims,
-            then=partial(self._request_aims.take_answer, aim, self._param_form.get_values()))
+            then=partial(self._request_aims.take_answer, aim,
+                         {**self._param_form.get_values(), **self._param_form.item_seeds()}))
 
     def _on_request_answered(self, aim: RequestAim, revision) -> None:
         if aim is not self._request_aim:

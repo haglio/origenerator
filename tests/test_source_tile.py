@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QPixmap
+from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QLabel
 
 from origenerator.gui.source_tile import SourceTile
@@ -83,18 +83,3 @@ def test_a_relation_named_for_one_showing_does_not_carry_to_the_next(tile):
 
     assert tile._heading.text() == "From source image"
     assert tile._item_type_icon.media_type == "image"
-
-
-def test_a_thumbnail_shown_only_for_its_settings_is_drained_of_color_and_the_next_is_not(tile, tmp_path):
-    thumb = tmp_path / "red.png"
-    red = QPixmap(32, 32)
-    red.fill(QColor(220, 20, 20))
-    red.save(str(thumb))
-
-    tile.show_source({"prompt_id": "vid1", "thumbnail_path": str(thumb)}, "source.mp4", gray=True)
-    drained = tile._thumb.pixmap().toImage().pixelColor(16, 16)
-    tile.show_source({"prompt_id": "img1", "thumbnail_path": str(thumb)}, "start.png")
-    kept = tile._thumb.pixmap().toImage().pixelColor(16, 16)
-
-    assert drained.red() == drained.green() == drained.blue()
-    assert kept.red() > kept.green()

@@ -292,7 +292,7 @@ def test_selecting_a_folder_shows_its_full_name_as_a_title(qtbot):
     workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow)
     assert "SDXL T2I" in view._folder_path.display_text(), (
-        "the title carries the full folder path, which the narrow TOC cuts short")
+        "the folder path is shown in full here, which the narrow TOC cuts short")
     assert "All" in view._folder_path.display_text()
 
 

@@ -76,6 +76,11 @@ pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 
 
 
+def _minimized_from_the_taskbar(slideshow):
+    # Windows: the taskbar minimizes any window.
+    slideshow.shown.showMinimized()
+
+
 def test_slideshow_opens_the_folders_media(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
@@ -116,8 +121,7 @@ def test_an_item_picked_while_a_slideshow_sits_minimized_is_where_the_button_beg
     view._buttons.slideshow.click()
     minimized = view._slideshows.showing
     qtbot.addWidget(minimized.shown)
-    # The Windows taskbar still minimizes any window, so this is a way the user has.
-    minimized.shown.showMinimized()
+    _minimized_from_the_taskbar(minimized)
     picked = next(pid for pid in view.listed_prompt_ids()
                   if pid != minimized._set.playlist.current().prompt_id)
     view._gallery_pane.apply_selection(picked, _NO_MOD)
@@ -222,8 +226,7 @@ def test_starting_a_slideshow_while_the_last_one_sits_minimized_puts_it_back_on_
     view.resize(1200, 800)
     with qtbot.waitExposed(view):
         view.show()
-    # The Windows taskbar still minimizes any window, so this is a way the user has.
-    slideshow.shown.showMinimized()
+    _minimized_from_the_taskbar(slideshow)
     assert slideshow.shown.isMinimized()
 
     gestures.click(view._buttons.slideshow, view._buttons.slideshow.rect().center())
@@ -1079,8 +1082,7 @@ def _left_by_enter_then_the_slideshow_button(view, slideshow):
 
 
 def _minimized_then_the_slideshow_button(view, slideshow):
-    # The Windows taskbar still minimizes any window, so this is a way the user has.
-    slideshow.shown.showMinimized()
+    _minimized_from_the_taskbar(slideshow)
     view._buttons.slideshow.click()
 
 

@@ -354,3 +354,13 @@ def test_a_snapshot_with_banked_seconds_and_no_pass_index_restores_inside_a_seco
     tracker = ProgressTracker(60)
     tracker.restore(snapshot)
     assert tracker.current_pass() == (5, 20)
+
+
+def test_an_audio_step_costs_twice_as_much_over_twice_the_audio():
+    def a_step_over(seconds):
+        payload = {"1": {"class_type": "HunyuanFoleySampler", "inputs": {"steps": 5, "duration": seconds}}}
+        return sampler_costs(payload)["1"][1]
+
+    assert a_step_over(10) == 2 * a_step_over(5), (
+        "the audio pass diffuses a latent as long as the audio, so its cost follows the length the "
+        "way a video step's does")

@@ -2264,3 +2264,30 @@ def test_a_progress_write_that_fails_leaves_the_run_going(qtbot, tmp_path, monke
     assert raised == [], "a hiccup in saving a run's progress must never disturb the run"
     assert job.state == "running"
     assert queue.jobs[key] is job
+
+
+def test_a_tiles_cancel_says_nothing_of_the_line_changing(qtbot, tmp_path):
+    queue = JobQueue(Database(tmp_path / "test.db"), _client())
+    _launch_video(queue, "k1", seed=1)
+    announced = []
+    queue.changed.connect(lambda: announced.append(True))
+
+    queue.cancel("k1")
+
+    assert not queue.has("k1")
+    assert announced == [], "the tile's own Cancel draws what follows from it, so the queue stays silent"
+
+
+def test_a_closed_queue_hands_over_on_the_thread_that_closed_it(qtbot, tmp_path):
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    _launch_video(queue, "v1", seed=1)
+    _launch_video(queue, "v2", seed=2)
+    sent_on = []
+    client.submit_job = MagicMock(side_effect=lambda *sent: sent_on.append(threading.current_thread()))
+
+    queue.flush_to_server()
+
+    assert sent_on
+    assert set(sent_on) == {threading.current_thread()}, (
+        "a closed queue has no window left to keep answering, so it makes the plain blocking call")

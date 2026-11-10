@@ -55,6 +55,7 @@ def first_frame_of(path: Path) -> Image.Image | None:
 def generate_animated_thumbnail(
     source_path: Path, thumb_dir: Path, *, name: str, frames: int = 8, duration_ms: int = 140
 ) -> Path | None:
+    # WebP played by Qt's QMovie keeps many previews light, with no video player per tile.
     dest = animated_thumbnail_path(thumb_dir, name)
     if dest.exists():
         return dest

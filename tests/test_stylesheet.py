@@ -46,6 +46,7 @@ def test_a_tabs_close_mark_is_styled_flat_not_as_a_button():
 
 
 def test_stylesheet_greys_disabled_buttons():
+    # Without an explicit :disabled rule a styled QPushButton ignores Qt's disabled palette and never looks grayed out.
     rule = build_stylesheet().split("QPushButton:disabled {", 1)[1].split("}", 1)[0]
     assert TEXT_MUTED.name() in rule
     assert TEXT_PRIMARY.name() not in rule

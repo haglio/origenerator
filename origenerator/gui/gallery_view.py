@@ -472,6 +472,7 @@ class GalleryView(QWidget):
         if app is None:
             return
         if intercepting:
+            # Qt's scroll area keeps a clicked thumbnail's key press from the view, so neither keyPressEvent nor a shortcut delivers it.
             app.installEventFilter(self)
         else:
             app.removeEventFilter(self)
@@ -563,6 +564,7 @@ class GalleryView(QWidget):
         self._tree_view = GalleryTree(self._tree)
         self._tree.context_menu_requested.connect(self._on_tree_context_menu)
         self._tree.currentItemChanged.connect(self._on_folder_selected)
+        # Qt emits itemSelectionChanged after currentItemChanged, so the selection has the last word on what the panes show.
         self._tree.itemSelectionChanged.connect(self._on_tree_selection_changed)
         self._tree.favorite_clicked.connect(self._toggle_favorite)
         self._tree.delete_clicked.connect(self._delete_folder_by_key)

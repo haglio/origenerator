@@ -17,6 +17,7 @@ from app_support.win32 import mutex_name, try_acquire_mutex
 
 from origenerator.single_instance import let_go_of
 
+# Windows keeps a toast after the app that raised it has gone, and answers a click on one by following the link it carries and running whatever is registered for the link's scheme.
 SCHEME = "origenerator"
 _GO_TO = "go-to"
 _GENERATION = "generation"

@@ -1123,3 +1123,41 @@ def test_a_spoken_enhance_still_takes_the_panes_settings(enhance, monkeypatch):
 
     ((_key, params),) = jobs.prepared
     assert params["enhance_steps"] == 35
+
+
+def test_a_running_enhancement_is_described_by_its_jobs_own_settings(enhance, monkeypatch):
+    monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
+                        lambda target, image, row: True)
+    monkeypatch.setattr(module.gallery, "describe_enhance_params",
+                        lambda params: f"from {params['input_image']}")
+    row = _image("i1")
+    tab = FakeGenerateTab(row)
+    parts = EnhanceParts(jobs=FakeReroll([FakeJob("run-a", input_image="what-it-was-launched-on.png")]),
+                         gallery_pane=FakeGalleryPane(), slideshows=FakeSlideshows(),
+                         info_tabs_of=lambda: FakeTabs([tab]))
+    controller, _host = _assembled(FakeHost(rows=[row]), parts, None)
+
+    controller.reconcile()
+
+    assert tab.pending[2] == "from what-it-was-launched-on.png", (
+        "the Enhance pane may have moved on since the run was launched, so the job's own settings "
+        "are the only true word on what is being made")
+
+
+def test_a_generate_pane_built_after_the_controller_still_hears_of_a_run(enhance, monkeypatch):
+    monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
+                        lambda target, image, row: True)
+    monkeypatch.setattr(module.gallery, "describe_enhance_params", lambda params: "upscale x2")
+    row = _image("i1")
+    built_later = []
+    parts = EnhanceParts(jobs=FakeReroll([FakeJob("run-a")]), gallery_pane=FakeGalleryPane(),
+                         slideshows=FakeSlideshows(), info_tabs_of=lambda: built_later[0])
+    controller, _host = _assembled(FakeHost(rows=[row]), parts, None)
+    tab = FakeGenerateTab(row)
+    built_later.append(FakeTabs([tab]))
+
+    controller.reconcile()
+
+    assert tab.pending == ("running", b"frame", "upscale x2"), (
+        "the tabs are built by the window's own layout after the controller, so they are asked "
+        "for at each run rather than held from the start")

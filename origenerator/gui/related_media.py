@@ -102,7 +102,7 @@ class RelatedMedia(QWidget):
         rows.setSpacing(GAP_MEDIUM)
         self._section.content_form().addRow(rows_host)
         self._requests = _LinkRow(self._movie_of)
-        self._modifications = _LinkRow(self._movie_of)
+        self._batch_modified = _LinkRow(self._movie_of)
         self._animations = _LinkRow(self._movie_of)
         self._trims = _LinkRow(self._movie_of)
         for row in self._rows():
@@ -121,7 +121,7 @@ class RelatedMedia(QWidget):
         videos = [video for video in (*self._video_rows(), *self._held_of_kind(MediaType.VIDEO))
                   if produced_output(video)]
         prompt_id = row.get("prompt_id")
-        self.show_requests_and_modifications(prompt_id)
+        self.show_requests_and_batch_modified(prompt_id)
         trimmed_from, animated_from = self._made_from(row, start_image_of, videos)
         into = (STARTING_FRAME_ANIMATED_INTO if media_type_of_row(row) == MediaType.VIDEO
                 else ANIMATED_INTO)
@@ -145,7 +145,7 @@ class RelatedMedia(QWidget):
             self._section.set_collapsed(folded)
 
     def _rows(self) -> tuple[_LinkRow, ...]:
-        return (self._requests, self._modifications, self._animations, self._trims)
+        return (self._requests, self._batch_modified, self._animations, self._trims)
 
     def clear(self) -> None:
         for row in self._rows():
@@ -184,7 +184,7 @@ class RelatedMedia(QWidget):
         return [(VIDEO_SETTINGS_USED_FOR_ANIMATION_OF, video) for video in videos
                 if prompt_id and video.get("source_video") == prompt_id]
 
-    def show_requests_and_modifications(self, prompt_id: str | None) -> None:
+    def show_requests_and_batch_modified(self, prompt_id: str | None) -> None:
         request = self._request_of(prompt_id) if prompt_id else None
         made_from = self._item(request["source_prompt_id"]) if request else None
         made_into = [(record, made)
@@ -192,7 +192,7 @@ class RelatedMedia(QWidget):
                      if (made := self._item(record["prompt_id"])) is not None]
         for links, is_request, from_heading, into_heading in (
                 (self._requests, True, "Requested from", "Requested into"),
-                (self._modifications, False, "Batch-modified from", "Batch-modified into")):
+                (self._batch_modified, False, "Batch-modified from", "Batch-modified into")):
             links.show_links(
                 ([(from_heading, made_from)]
                  if made_from is not None and _is_request(request) == is_request else [])

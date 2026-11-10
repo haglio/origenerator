@@ -232,7 +232,7 @@ def _drawn_links(related, row, image_rows):
     QApplication.processEvents()
     shown = row["prompt_id"]
     drawn = set()
-    for section in (related._requests, related._modifications,
+    for section in (related._requests, related._batch_modified,
                     related._animations, related._trims):
         drawn |= {(other, shown) if heading in POINTING_BACK else (shown, other)
                   for heading, other in _links(section)}
@@ -409,13 +409,13 @@ def test_an_image_points_at_what_was_requested_of_it_under_requests(make_related
         ("Requested into", "img3"), ("Requested into", "img2")]
 
 
-def test_an_image_points_at_what_a_folders_modify_batch_made_of_it_under_modifications(make_related):
+def test_an_image_points_at_what_a_folders_modify_batch_made_of_it_as_batch_modified_into(make_related):
     related = make_related(rows=[_image_row("img2", "sdxl_t2i_img2.png")],
                            requests=[_request("img2", "img1")])
 
     related.show_row(_image_row(), [])
 
-    assert _links(related._modifications) == [("Batch-modified into", "img2")]
+    assert _links(related._batch_modified) == [("Batch-modified into", "img2")]
     assert related._requests.isHidden()
 
 
@@ -479,12 +479,12 @@ def test_a_click_that_shows_the_image_it_names_outlives_its_own_link(make_relate
     assert _links(related._requests) == [("Requested from", "img1")]
 
 
-def test_an_image_a_folders_modify_batch_made_points_at_the_one_it_was_modified_from(make_related):
+def test_an_image_a_folders_modify_batch_made_points_at_the_one_it_was_batch_modified_from(make_related):
     related = make_related(rows=[_image_row()], requests=[_request("img2", "img1")])
 
     related.show_row(_image_row("img2", "sdxl_t2i_img2.png"), [])
 
-    section = related._modifications
+    section = related._batch_modified
     assert not section.isHidden()
     assert _links(section) == [("Batch-modified from", "img1")]
     assert no_sources(related)
@@ -500,7 +500,7 @@ def test_every_kind_of_link_sits_in_the_one_section_headed_links(make_related):
     section = related._section
     assert (section.title(), section.isHidden()) == ("Links", False)
     assert all(section.isAncestorOf(row) for row in (
-        related._requests, related._modifications, related._animations, related._trims))
+        related._requests, related._batch_modified, related._animations, related._trims))
 
 
 def test_a_row_animated_into_nothing_shows_no_animations(make_related):

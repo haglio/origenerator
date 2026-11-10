@@ -1109,7 +1109,7 @@ class GenerateTab(DropZones):
     def show_running_generation(self, row: dict):
         self._point_elsewhere(row)
         self._hide_footer()
-        self._related.show_requests_and_modifications(row["prompt_id"])
+        self._related.show_requests_and_batch_modified(row["prompt_id"])
         self._viewport.clear()
         self._note_displayed_config(being_made=row)
         self._emit_title()

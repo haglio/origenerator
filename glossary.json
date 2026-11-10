@@ -548,7 +548,8 @@
       ],
       "his_word": "Modify batch (2026-11-10: 'it should be \"Modify batch (all seeds)\"'; batch-modified for the links)",
       "code_today": [
-        "modify batch"
+        "modify batch",
+        "batch modified"
       ],
       "code_word": "modify batch",
       "status": "ruled",
@@ -1032,7 +1033,7 @@
     },
     {
       "id": "trash_box",
-      "thing": "the dashed box labeled in the Trash that holds the items in the trash among a tab's linked items, under Source, Requests, Modifications, Animations, Combine and Trims",
+      "thing": "the dashed box labeled in the Trash that holds the items in the trash among a tab's linked items, under Source, Requests, Batch-modified, Animations, Combine and Trims",
       "screen": [
         "in the Trash"
       ],

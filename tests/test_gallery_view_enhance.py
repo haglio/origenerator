@@ -455,7 +455,9 @@ def test_a_running_enhance_also_streams_onto_the_images_own_tile(qtbot, tmp_path
     view.enhance_items(["g0"])
 
     tile = view._gallery_pane._thumb_widgets["g0"]
-    assert tile._enhancing is not None
+    assert tile._enhancing is not None, (
+        "the Gallery pane is where the user is looking while a folder enhances itself, so the "
+        "run streams onto the image's own tile there too")
     assert view._gallery_pane._thumb_widgets["g1"]._enhancing is None
 
     (job,) = view._jobs.all_jobs
@@ -613,7 +615,9 @@ def test_deleting_an_image_cancels_the_enhance_being_made_of_it(qtbot, monkeypat
 
     view._delete_rows([db.get_generation("g0")])
 
-    assert doomed.state == "canceled"
+    assert doomed.state == "canceled", (
+        "on a delete the run has nowhere to fold, and left running it would spend minutes "
+        "making a file with no original")
     assert db.get_generation(doomed.prompt_id) is None
     assert view._jobs.all_jobs == [kept]
 

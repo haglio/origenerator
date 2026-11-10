@@ -1632,6 +1632,71 @@ def test_a_walk_with_nothing_that_way_says_so_and_stays(qtbot, tmp_path):
     assert (_sent(slideshow), said) == ([], ["Nothing that way"])
 
 
+def test_a_switch_to_an_item_plays_it_and_says_switched(qtbot, tmp_path):
+    said = []
+    slideshow = _slideshow(qtbot, tmp_path, say=_into(said))
+    _sent(slideshow)
+
+    slideshow.switch_to("three.png")
+
+    assert (_sent(slideshow), said) == (["PLAY_FILE three.png"], ["Switched"])
+
+
+def test_a_switch_to_an_item_the_slideshow_does_not_hold_says_nothing(qtbot, tmp_path):
+    said = []
+    slideshow = _slideshow(qtbot, tmp_path, say=_into(said))
+    _sent(slideshow)
+
+    slideshow.switch_to("nowhere.png")
+
+    assert (_sent(slideshow), said) == ([], [])
+
+
+def test_cycle_seed_plays_the_next_seed_and_says_so(qtbot, tmp_path):
+    said = []
+    slideshow = _slideshow(qtbot, tmp_path, say=_into(said),
+                           actions=SlideshowActions(neighbors=_around))
+    _sent(slideshow)
+
+    slideshow.slideshow_cycle("seed")
+
+    assert (_sent(slideshow), said) == (["PLAY_FILE one-b.png"], ["Next seed"])
+
+
+def test_cycle_action_plays_the_next_action_and_names_it(qtbot, tmp_path):
+    said = []
+    slideshow = _slideshow(qtbot, tmp_path, say=_into(said), actions=SlideshowActions(
+        neighbors=_around, actions_of=lambda asked: dict.fromkeys(asked, "dawn")))
+    _sent(slideshow)
+
+    slideshow.slideshow_cycle("action")
+
+    assert (_sent(slideshow), said) == (["PLAY_FILE one-x.png"], ["Action: dawn"])
+
+
+def test_cycle_action_onto_an_item_with_no_action_says_nothing(qtbot, tmp_path):
+    said = []
+    slideshow = _slideshow(qtbot, tmp_path, say=_into(said),
+                           actions=SlideshowActions(neighbors=_around))
+    _sent(slideshow)
+
+    slideshow.slideshow_cycle("action")
+
+    assert (_sent(slideshow), said) == (["PLAY_FILE one-x.png"], [])
+
+
+@pytest.mark.parametrize(("axis", "said_then"), [("seed", "No other seeds"),
+                                                 ("action", "No other actions")])
+def test_a_cycle_with_nothing_else_on_its_row_says_so_and_stays(qtbot, tmp_path, axis, said_then):
+    said = []
+    slideshow = _slideshow(qtbot, tmp_path, say=_into(said))
+    _sent(slideshow)
+
+    slideshow.slideshow_cycle(axis)
+
+    assert (_sent(slideshow), said) == ([], [said_then])
+
+
 def test_trash_over_a_favorite_takes_its_star_and_moves_on(qtbot, tmp_path):
     unfavorited, deleted = [], []
     slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(favorite_ids={"id-1"}),

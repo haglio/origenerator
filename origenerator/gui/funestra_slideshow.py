@@ -22,7 +22,7 @@ from funestra.funestra_verbs import (
     step_version,
 )
 from funestra.hud_title import SHUFFLE_LABEL
-from funestra.loop_cycle import LOCK
+from funestra.loop_cycle import ACTION, LOCK, SEED
 from funestra.on_screen_history import OnScreenHistory
 from funestra.playlist import PlaylistItem
 from funestra.status import parse_status
@@ -62,6 +62,9 @@ class OnTheFunestra:
 def _heard(fields: dict) -> OnTheFunestra:
     status = parse_status(fields)
     return OnTheFunestra(status.video, fields.get("showing", status.video))
+
+
+_CYCLES_TOWARD = {SEED: "right", ACTION: "down"}
 
 
 class FunestraSlideshow(QObject):
@@ -480,13 +483,18 @@ class FunestraSlideshow(QObject):
         self._set.reorder(items, latest=latest, enhanced_ids=enhanced_ids,
                           keep_slide=keep_slide)
 
-    def show_item(self, path, *, lock: bool = False) -> None:
+    def show_item(self, path, *, lock: bool = False) -> bool:
         slide = self._set.slide_for_path(path)
         if slide is None:
-            return
+            return False
         self._jump_to(slide)
         if lock:
             self.set_locked(True)
+        return True
+
+    def switch_to(self, path) -> None:
+        if self.show_item(path):
+            self._flash("Switched")
 
     def show_locked(self, path) -> None:
         self.show_item(path, lock=True)
@@ -548,6 +556,20 @@ class FunestraSlideshow(QObject):
             self._flash("Nothing that way", kind=WARNING)
             return
         self._jump_to(target)
+
+    def slideshow_cycle(self, axis: str) -> None:
+        target = self._set.nav_target(_CYCLES_TOWARD[axis])
+        if target is None:
+            self._flash(f"No other {axis}s", kind=WARNING)
+            return
+        self._jump_to(target)
+        said = "Next seed" if axis == SEED else self._action_now_on_screen()
+        if said:
+            self._flash(said)
+
+    def _action_now_on_screen(self) -> str:
+        action = self._set.action_on_screen()
+        return f"Action: {action}" if action else ""
 
     @property
     def hud_prompt_id(self) -> str:

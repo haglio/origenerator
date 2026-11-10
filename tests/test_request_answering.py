@@ -35,7 +35,8 @@ def _answerer(qtbot, tmp_path, *, work_out, wait=lambda comfyui, holder, **setti
     qtbot.addWidget(parent)
     answerer = RequestAnswerer(db, jobs, client, notes_path=tmp_path / "notes.json",
                                work_out=work_out, wait_for_the_graphics_card=wait, parent=parent,
-                               leave_the_graphics_card=stand_ins.pop("leave_the_graphics_card", lambda: None))
+                               leave_the_graphics_card=stand_ins.pop("leave_the_graphics_card", lambda: None),
+                               **stand_ins)
     return answerer, db, jobs, parent
 
 
@@ -186,8 +187,37 @@ def test_a_failure_answers_with_nothing_and_logs_only_its_kind(qtbot, tmp_path, 
                      owner=parent, then=answers.append)
         qtbot.waitUntil(lambda: answers == [None], timeout=5000)
 
-    assert caplog.messages == ["Could not work out a request (ValueError)"]
+    assert caplog.messages[0] == "Could not work out a request (ValueError)"
     assert jobs.let_go == 1
+
+
+def _how_it_ended(qtbot, tmp_path, caplog, **stand_ins):
+    ticks = iter([100.0, 112.5])
+    answerer, _db, _jobs, parent = _answerer(qtbot, tmp_path, clock=lambda: next(ticks),
+                                             **stand_ins)
+    with caplog.at_level(logging.INFO, logger="origenerator.gui.request_answering"):
+        _answered(qtbot, answerer, parent, "no example lantern")
+    return caplog.messages[-1]
+
+
+def test_a_request_the_model_answered_is_logged_with_the_seconds_it_took(qtbot, tmp_path, caplog):
+    assert _how_it_ended(qtbot, tmp_path, caplog, work_out=_the_revision) == (
+        "A Request was answered by the model in 12.5 s")
+
+
+def test_a_request_the_model_gave_no_answer_to_is_logged_with_the_seconds_it_took(
+        qtbot, tmp_path, caplog):
+    def no_answer(*_args, **_known):
+        raise TimeoutError("an example lantern")
+
+    assert _how_it_ended(qtbot, tmp_path, caplog, work_out=no_answer) == (
+        "The model gave no answer to a Request in 12.5 s")
+
+
+def test_a_request_with_no_graphics_card_is_logged_with_the_seconds_it_took(qtbot, tmp_path, caplog):
+    assert _how_it_ended(qtbot, tmp_path, caplog, work_out=None,
+                         wait=lambda comfyui, holder, **settings: False) == (
+        "A Request could not get the graphics card in 12.5 s")
 
 
 def test_the_settings_he_may_change_ride_along_to_the_model(qtbot, tmp_path):

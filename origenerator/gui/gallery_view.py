@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from functools import partial
 from typing import NamedTuple
 
 from PyQt6.QtCore import QEvent, QPoint, Qt, QTimer, pyqtSignal
@@ -34,6 +35,7 @@ from origenerator.comfyui_api import ForeignQueue, format_execution_error
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     EVOLVER_SOURCE,
+    GENAU_DIR,
     KINO_TRASH_DIR,
     KINO_UPSCALES_DIR,
     OUTPUT_PLACES,
@@ -41,6 +43,7 @@ from origenerator.config import (
     TRASH_DIR,
 )
 from origenerator.db import Database, NewRequest
+from origenerator.evolver_trash import in_the_background as delete_through_evolver
 from origenerator.fun_time_bridge import ask_for_origenerator_mode
 from origenerator.fun_time_mode import FunTimeSession
 from origenerator.gallery.collection import COLLECTION_LABELS, FolderCollection, folder_collection
@@ -186,7 +189,7 @@ from origenerator.osr2_motion_driver import Osr2MotionDriver
 from origenerator.prompt_tokens import boxed_as_typed
 from origenerator.published_actions import give_the_launch_its_actions
 from origenerator.radio import OrigeneratorRadio
-from origenerator.trash import Kino, Trash
+from origenerator.trash import Genau, Kino, Trash
 from origenerator.voice.app_commands import AppCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import resolve_input_image_path
@@ -310,7 +313,12 @@ class GalleryView(QWidget):
                 release_files=self._release_held_media, thumb_dir=THUMB_DIR,
                 cancel_enhancements=self._enhance.cancel_for_delete,
                 kino=Kino(KINO_UPSCALES_DIR, KINO_TRASH_DIR, EVOLVER_SOURCE),
+                genau=Genau.in_folder(GENAU_DIR),
+                bring_in=partial(outside_videos.bring_in_one, db),
+                delete_for_good=delete_through_evolver,
+
             ),
+
         )
         self._foreign_queue = ForeignQueue(running=[], pending=[])
         self._build_ui()
@@ -2006,9 +2014,10 @@ class GalleryView(QWidget):
         if row is not None and self._edits.trash(row):
             self._re_aim()
 
-    def trash_file(self, path: str):
+    def trash_file(self, path: str, already_at: str | None = None):
         try:
-            self._edits.trash_file(path)
+            self._edits.trash_file(path, already_at)
+
         except OSError:
             logger.exception("Could not send %s to Trash", path)
             return

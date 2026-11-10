@@ -340,6 +340,24 @@ def _never_take_a_video_out_of_the_real_kino(monkeypatch, _this_tests_own_folder
     monkeypatch.setattr(gallery_view, "KINO_TRASH_DIR", kino / "trash")
 
 
+@pytest.fixture(autouse=True)
+def _never_take_a_video_out_of_the_real_genau(monkeypatch, _this_tests_own_folder):
+    monkeypatch.setattr(gallery_view, "GENAU_DIR", _this_tests_own_folder / "genau")
+
+
+@pytest.fixture(autouse=True)
+def _never_ask_the_real_evolver_to_delete_anything(monkeypatch):
+    monkeypatch.setattr(gallery_view, "delete_through_evolver", lambda _videos: None)
+
+
+@pytest.fixture(autouse=True)
+def _never_bring_a_real_record_into_a_tests_gallery(monkeypatch):
+    monkeypatch.setattr(gallery_view.outside_videos, "bring_in_one", lambda *_args, **_kw: False)
+
+
+
+
+
 def keep_silent(setattr) -> list:
     sounded = []
     setattr(winsound, "MessageBeep", sounded.append)

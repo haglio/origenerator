@@ -909,6 +909,7 @@ def _told_on_a_fresh_bridge(tmp_path, line: str) -> None:
 def _a_line_like(template: str, tmp_path) -> str:
     return template.format(
         file=r"C:\library\scene one.png", row="alpha", words="favorites",
+        waits_at=r"C:\library\trash\scene one.png",
         corner="lower_right", on="1", has="1", x="10", y="5", steps="-1",
         frames=str(tmp_path / "frame.bin"), input=str(tmp_path / "input.txt"))
 
@@ -1015,7 +1016,22 @@ def test_a_video_the_session_sends_to_trash_goes_to_this_apps_trash(qtbot, tmp_p
     assert actions.trashed_files == [r"C:\library\upscaled\portrait\site\scene one.mp4"]
 
 
+def test_a_video_genau_already_moved_to_its_trash_goes_to_this_apps_trash_from_there(
+        qtbot, tmp_path):
+    actions = FakeActions()
+    view = GalleryView(FakeDB([]), fun_time=_session(tmp_path), actions=actions)
+    qtbot.addWidget(view)
+    bridge = FunTimeBridge(view._fun_time, view, parent=view)
+
+    _press(bridge, tmp_path,
+           r"TRASH_FILE|C:\library\genau\flicks\2D\AI\loop.mp4|C:\library\genau\trash\2D\AI\loop.mp4")
+
+    assert actions.trashed_files == [(r"C:\library\genau\flicks\2D\AI\loop.mp4",
+                                      r"C:\library\genau\trash\2D\AI\loop.mp4")]
+
+
 def test_the_session_says_where_each_sides_hud_sits(qtbot, tmp_path):
+
     view, bridge = _view_with_bridge(qtbot, tmp_path)
 
     view._fun_time.command_file.write_text(

@@ -763,15 +763,6 @@ def test_a_site_video_whose_name_kinos_trash_already_holds_stays_in_kino(tmp_pat
     assert (kino_trash / "video one.mp4").read_bytes() == b"another video"
 
 
-def test_purging_the_trash_leaves_a_site_video_in_kinos_trash(tmp_path):
-    actions, db, _video, kino_trash = _site_video_actions(tmp_path)
-    actions.delete_rows([db.get_generation("v1")])
-
-    actions.purge_deleted(["v1"])
-
-    assert (kino_trash / "video one.mp4").read_bytes() == b"site video"
-
-
 def test_a_file_outside_kinos_library_stays_where_it_is(tmp_path):
     db = Database(tmp_path / "test.db")
     kino = Kino(library=tmp_path / "upscaled", trash=tmp_path / "kino trash", own_source="origenerator")
@@ -855,17 +846,6 @@ def test_an_upscale_sent_to_trash_sends_the_generation_it_copies_there(tmp_path)
 
     assert db.get_generation("v1") is None
     assert (kino_trash / upscale.name).read_bytes() == b"upscale"
-
-
-def test_a_kino_video_the_gallery_has_no_entry_for_still_leaves_kino_for_its_trash(tmp_path):
-    actions, db, video, kino_trash = _site_video_actions(tmp_path)
-    stranger = video.with_name("video two.mp4")
-    stranger.write_bytes(b"another site video")
-
-    actions.trash_file(stranger)
-
-    assert (kino_trash / stranger.name).read_bytes() == b"another site video"
-    assert db.get_generation("v1") is not None
 
 
 def test_a_file_outside_kino_the_gallery_has_no_entry_for_stays_where_it_is(tmp_path):

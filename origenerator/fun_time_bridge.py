@@ -172,8 +172,10 @@ class FunTimeBridge(QObject):
             self._gallery.run_spoken_command(argument, said_at)
             return
         if keyword == TRASH_FILE and marker == "|":
-            self._gallery.trash_file(argument)
+            played, _, already_at = argument.partition("|")
+            self._gallery.trash_file(played, already_at or None)
             return
+
         self._apply_to_a_shape(line, keyword, marker, argument, said_at)
 
     def _apply_to_a_shape(self, line: str, keyword: str, marker: str, argument: str, said_at: float | None) -> None:

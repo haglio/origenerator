@@ -20,7 +20,7 @@ from PIL import Image
 from origenerator import config, evolver_agreement
 from origenerator.db_generations import library_paths_in
 from origenerator.evolver_export import PARTIAL_MARKER
-from origenerator.evolver_upscales import filed_upscales
+from origenerator.evolver_upscales import filed_under, filed_upscales
 from origenerator.gallery.output import generations_by_stem, parse_file_list, stem_as_made
 from origenerator.gallery.signatures import parse_params
 from origenerator.gallery.source_image import videos_from_source_image
@@ -179,13 +179,26 @@ def scan_in_turn(db, places: Places, *, wait_s: float = WAIT_S) -> int:
         return scan(db, places) if ours else 0
 
 
+_LOOK_FOR_THEM = object()
+
+
+def bring_in_one(db, video: Path, *, places=_LOOK_FOR_THEM, grab=first_frame_of) -> bool:
+    places = places_here() if places is _LOOK_FOR_THEM else places
+    source = None if places is None else filed_under(places.upscaled_dir, video)
+    if source is None:
+        return False
+    with turn_at(db).taken() as ours:
+        return ours and scan(db, places, grab=grab, only=OutsideVideo(video, source)) > 0
+
+
 def scan(db, places: Places, *, grab=first_frame_of,
-         videos_per_write: int = VIDEOS_PER_WRITE) -> int:
+         videos_per_write: int = VIDEOS_PER_WRITE, only: OutsideVideo | None = None) -> int:
     rows = db.list_generations()
-    new = [(video, record_of(video.path, places.records_folder))
-           for video in outside_videos(places.upscaled_dir, skip_sources=places.skip_sources,
-                                       rows=rows,
-                                       held=db.library_paths() | db.trashed_library_paths())]
+    found = [only] if only is not None else outside_videos(
+        places.upscaled_dir, skip_sources=places.skip_sources, rows=rows,
+        held=db.library_paths() | db.trashed_library_paths())
+    new = [(video, record_of(video.path, places.records_folder)) for video in found]
+
     kinds = _kinds_by_site(rows, new)
     images = _bring_up_to_records(db, places, rows, kinds)
     brought = (made for video, record in new

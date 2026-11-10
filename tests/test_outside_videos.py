@@ -40,6 +40,7 @@ from origenerator.outside_videos import (
     OutsideVideo,
     Places,
     Record,
+    bring_in_one,
     journal_favorites,
     outside_videos,
     places_here,
@@ -282,7 +283,48 @@ def test_a_scan_writes_what_it_brings_in_a_few_videos_at_a_time(tmp_path):
     assert writes == [4, 2]
 
 
+def test_one_video_kino_plays_is_brought_in_by_itself(tmp_path):
+    db, places = Database(tmp_path / "test.db"), _places(tmp_path)
+    one = _filed(places.upscaled_dir, "portrait", "a-site", "c1_topaz.mp4")
+    _filed(places.upscaled_dir, "portrait", "a-site", "c2_topaz.mp4")
+
+    brought = bring_in_one(db, one, places=places, grab=_still)
+
+    assert brought is True
+    assert [json.loads(row["output_files"])[0]["library_path"] for row in _videos(db)] == [str(one)]
+
+
+def test_one_video_of_this_apps_own_source_is_brought_in_when_asked_for_by_itself(tmp_path):
+    db, places = Database(tmp_path / "test.db"), _places(tmp_path)
+    own = _filed(places.upscaled_dir, "landscape", "this-app", "c3_topaz.mp4")
+
+    assert bring_in_one(db, own, places=places, grab=_still) is True
+    assert len(_videos(db)) == 1
+
+
+def test_a_video_outside_kinos_upscales_is_never_brought_in_by_itself(tmp_path):
+    db, places = Database(tmp_path / "test.db"), _places(tmp_path)
+    elsewhere = _filed(tmp_path / "elsewhere", "portrait", "a-site", "c4_topaz.mp4")
+
+    assert bring_in_one(db, elsewhere, places=places, grab=_still) is False
+    assert _videos(db) == []
+
+
+def test_a_video_whose_frame_cannot_be_read_is_not_brought_in_by_itself(tmp_path):
+    db, places = Database(tmp_path / "test.db"), _places(tmp_path)
+    one = _filed(places.upscaled_dir, "portrait", "a-site", "c5_topaz.mp4")
+
+    assert bring_in_one(db, one, places=places, grab=lambda _path: None) is False
+
+
+def test_no_records_folder_means_no_video_is_brought_in_by_itself(tmp_path):
+    db = Database(tmp_path / "test.db")
+
+    assert bring_in_one(db, tmp_path / "c6_topaz.mp4", places=None) is False
+
+
 def _deleted(db, row: dict) -> None:
+
     db.delete_generation(row["prompt_id"])
     db.record_trashed(row["prompt_id"], row, {"moves": [], "subdir": None})
 

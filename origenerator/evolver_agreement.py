@@ -45,7 +45,16 @@ def records_folder(checkout: Path, library_root: Path) -> Path | None:
     return library_root / Path(folder) if folder else None
 
 
+def published_command(checkout: Path, name: str) -> tuple[str, ...] | None:
+    try:
+        command = tuple(str(part) for part in (_published(checkout) or {})[name])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    return command or None
+
+
 def _differing(what: str, ours, theirs) -> str | None:
+
     if theirs is None or str(ours) == str(theirs):
         return None
     return f"{what}: this app has {ours}, Evolver has {theirs}"

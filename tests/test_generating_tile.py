@@ -227,7 +227,19 @@ def test_a_tile_rebuilt_mid_run_shows_the_jobs_cached_state(qtbot):
     qtbot.addWidget(tile)
     assert _has_image(tile)
     assert tile._status_scrim.text() == "Generating…"
-    assert tile._bar.caption().startswith("50% · "), (
+    assert tile._bar.caption().startswith("50% · ")
+
+
+def test_the_tiles_own_clock_draws_the_line_the_jobs_progress_does(qtbot):
+    job = FakeJob(state="running", last_progress=(5, 10), last_preview=_png_bytes(),
+                  started_at=time.time() - 20.5)
+    tile = GeneratingTile(job)
+    qtbot.addWidget(tile)
+    job.last_progress = (8, 10)
+
+    tile._tick.timeout.emit()
+
+    assert tile._bar.caption().startswith("80% · "), (
         "the numbers are read back off the job rather than taken from a signal: the tile's own "
         "clock re-renders on a tick that carries none, and both paths must draw the same line")
 

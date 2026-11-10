@@ -71,6 +71,7 @@ QT_FREE = (
     "origenerator.gui.picking",
     "origenerator.gui.slideshow_set",
     "origenerator.nav_map",
+    "origenerator.gui.modify_batch",
     "origenerator.fun_time_mode",
 )
 

@@ -844,8 +844,7 @@ def test_a_start_frame_many_videos_share_is_looked_for_once(monkeypatch):
 
     assert [start_image(video)["prompt_id"] for video in videos] == ["img", "img", "img"]
     assert looked_for == ["start.png"], (
-        "source_image_of for many rows over one pool: each start frame is looked for once "
-        "however many rows share it")
+        "each start frame is looked for once however many rows share it")
 
 
 def test_output_reference_round_trips_back_to_its_source_image():

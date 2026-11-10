@@ -23,6 +23,7 @@ from origenerator.gui.prompt_marks import (
     mark_past_the_limit,
     mark_problems,
 )
+from origenerator.gui.text_color import color_text
 from origenerator.prompt_checks import (
     bad_weights,
     duplicate_things,
@@ -49,7 +50,7 @@ class Countdown(QLabel):
             self.hide()
             return
         self.setText(f"{left} left" if left >= 0 else f"{-left} over")
-        self.setStyleSheet(f"color: {(YELLOW if left >= 0 else RED).name()};")
+        color_text(self, YELLOW if left >= 0 else RED)
         self.show()
 
 

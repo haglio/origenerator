@@ -32,6 +32,7 @@ from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, MARGIN_STANDARD
 from shared_ui.tick_control import TickControl
 
 from origenerator.branch_session import titled
+from origenerator.gui.text_color import color_text
 from origenerator.item_actions import ItemActions
 from origenerator.media import MediaType
 from origenerator.setter_voice import PRESS, SAME, SKIP, TRASH, UNDO, setter_words
@@ -149,7 +150,7 @@ class ActionSetterWindow(QWidget):
         self._stage = stage if stage is not None else _a_viewport()
         self._stage.setMinimumSize(320, 320)
         self._previously = QLabel(PREVIOUSLY, objectName=PREVIOUSLY_LINE)
-        self._previously.setStyleSheet(f"color: {YELLOW.name()};")
+        color_text(self._previously, YELLOW)
         kept = self._previously.sizePolicy()
         kept.setRetainSizeWhenHidden(True)
         self._previously.setSizePolicy(kept)

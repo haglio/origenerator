@@ -25,6 +25,7 @@ from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.eliding import ElidingButton, ElidingLabel
 from origenerator.gui.label_cells import LabelCell, LabelForm
+from origenerator.gui.text_color import color_text
 from origenerator.gui.warning_mark import WarningMark
 from origenerator.reveal import show_in_explorer
 
@@ -160,7 +161,7 @@ def _value_widget(item: MetadataItem) -> QLabel:
     value = QLabel(wrappable(item.value))
     value.setTextInteractionFlags(_SELECTABLE)
     value.setWordWrap(True)
-    value.setStyleSheet(f"QLabel {{ color: {_h(TEXT_MUTED)}; }}")
+    color_text(value, TEXT_MUTED)
     return value
 
 

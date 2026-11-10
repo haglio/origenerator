@@ -10,6 +10,7 @@ from shared_ui.spacing import BUTTON_RADIUS, GAP_DIALOG, GAP_SMALL, MARGIN_STAND
 
 from origenerator.gui import tile_shape
 from origenerator.gui.flow_layout import FlowLayout
+from origenerator.gui.text_color import color_text
 
 _EDGE = 1
 _DASH = 10
@@ -47,7 +48,7 @@ class TrashBox(_TileGroup):
         super().__init__(tiles, parent, side_inset=_INSET)
         self.label = QLabel("in the Trash")
         tile_shape.style_caption(self.label)
-        self.label.setStyleSheet(f"color: {TEXT_MUTED.name()};")
+        color_text(self.label, TEXT_MUTED)
         self._column.addWidget(self.label)
 
     def _widest_line(self) -> int:

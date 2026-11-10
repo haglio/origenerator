@@ -573,12 +573,16 @@ def test_a_standing_slideshows_volume_comes_back_after_a_restart(qtbot, monkeypa
     assert (engine.volume, engine.muted) == (40, True)
 
 
+def _clear_of_the_hud_and_the_corners_that_open_it(window) -> QPoint:
+    return QPoint(window.width() * 3 // 4, window.height() * 3 // 4)
+
+
 def _click_the_slide(slideshow):
     engine_of(slideshow.shown)
     slideshow.shown.showFullScreen()
     QTest.qWaitForWindowExposed(slideshow.shown)
     window = slideshow.shown._pane._window
-    gestures.click(window, QPoint(window.width() * 3 // 4, window.height() * 3 // 4))
+    gestures.click(window, _clear_of_the_hud_and_the_corners_that_open_it(window))
 
 
 def test_a_click_on_a_slideshow_pauses_the_device_the_sound_and_the_slides_with_it(
@@ -599,7 +603,7 @@ def test_a_click_on_a_slideshow_pauses_the_device_the_sound_and_the_slides_with_
 
 def _double_click_the_slide(slideshow):
     window = slideshow.shown._pane._window
-    gestures.double_click(window, QPoint(window.width() * 3 // 4, window.height() * 3 // 4))
+    gestures.double_click(window, _clear_of_the_hud_and_the_corners_that_open_it(window))
 
 
 @pytest.mark.parametrize("leave", [_double_click_the_slide, _press_enter],

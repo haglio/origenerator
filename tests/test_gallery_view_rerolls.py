@@ -410,7 +410,9 @@ def test_the_new_folder_lists_its_images_in_the_order_the_old_one_reads(qtbot, t
 
     made = {job.prompt_id for job in view._jobs.all_jobs}
     now = [row["seed"] for row in db.list_generations() if row["prompt_id"] in made]
-    assert was == [9, 8, 7]
+    assert was == [9, 8, 7], (
+        "the gallery lists rows newest first, which is the order they were written in reversed, "
+        "so this is the order the new folder will draw them in")
     assert now == was, (
         "the same order, not merely a steady one: laid side by side, the two folders show at a "
         "glance that it worked")

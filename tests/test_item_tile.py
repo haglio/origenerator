@@ -435,7 +435,8 @@ def test_an_enhancing_tile_says_so_over_the_thumbnail_and_on_a_bar(qtbot):
 
     assert tw._enhancing is not None
     assert tw._status_scrim.text() == "Enhancing…"
-    assert tw._enhancing_bar.caption() == "50% · ~6:02 left"
+    assert tw._enhancing_bar.caption() == "50% · ~6:02 left", (
+        "the compact reading, since a tile is a third of the Job Queue's width")
     assert (tw._enhancing_bar.value(), tw._enhancing_bar.maximum()) == (10, 20)
 
 

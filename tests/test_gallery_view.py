@@ -1182,7 +1182,9 @@ def test_latest_collection_lists_imported_files_too(qtbot):
     view.refresh()
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    assert sorted(view.listed_prompt_ids()) == ["gen", "imp"]
+    assert sorted(view.listed_prompt_ids()) == ["gen", "imp"], (
+        "a file ComfyUI wrote on its own arrives at the launch that finds it, and Latest is "
+        "where it is looked for then")
 
 
 def test_clicking_a_recent_item_previews_it_without_leaving_the_collection(qtbot):

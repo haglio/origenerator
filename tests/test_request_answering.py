@@ -75,7 +75,10 @@ def test_the_model_is_asked_off_the_ui_thread_with_the_items_exchange_and_the_no
     assert seen["asked"] == ("a woman, a hat", "blurry", "no hat")
     assert [(turn.said, turn.answered) for turn in seen["exchange"]] == [("a hat", "Gave her a hat.")]
     assert seen["notes"].patterns == "the patterns"
-    assert seen["thread"] is not threading.main_thread()
+    assert seen["thread"] is not threading.main_thread(), (
+        "a finished request can be a call to the local LLM, and a second of network wait on the "
+        "window's thread is a second of frozen slideshow, at the one moment the app must not "
+        "stutter")
     assert jobs.let_go == 1
 
 

@@ -41,7 +41,9 @@ def test_revisiting_the_current_location_is_a_noop():
     history.visit("a")
     history.visit("a")
     assert history.current() == "a"
-    assert not history.can_go_back()
+    assert not history.can_go_back(), (
+        "revisiting the current location is a no-op, so the gallery's refresh-driven re- "
+        "selection of the same view never piles up duplicates")
 
 
 def test_visiting_after_going_back_drops_the_forward_branch():

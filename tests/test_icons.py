@@ -118,7 +118,8 @@ def test_the_tocs_favorites_enhanced_and_trash_wear_their_colors(qtbot):
 
 
 def test_a_collection_mark_is_drawn_once():
-    assert icons.collection_icon(LATEST_KEY) is icons.collection_icon(LATEST_KEY)
+    assert icons.collection_icon(LATEST_KEY) is icons.collection_icon(LATEST_KEY), (
+        "one redraw of the TOC asked for these 1,280 times")
 
 
 def _ink_at_the_edges(pixmap) -> bool:

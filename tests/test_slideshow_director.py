@@ -1084,7 +1084,9 @@ def test_a_region_says_how_long_it_took_to_fill(slideshows, caplog):
 
     opened = [record.message for record in caplog.records if "region opens" in record.message]
     assert len(opened) == 2
-    assert all(re.search(r", filled in \d+ ms$", message) for message in opened), opened
+    assert all(re.search(r", filled in \d+ ms$", message) for message in opened), (
+        "timed because the wait between the press that opens this mode and the slides arriving "
+        f"is what the user judges the mode by: {opened}")
 
 
 _LEFT_LOOPING_ON_G5 = SlideshowState(order=("g4", "g5"), current="g5", locked=True,

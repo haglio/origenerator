@@ -692,7 +692,9 @@ def test_starring_a_folder_marks_its_row_where_it_stands(qtbot):
 
     assert view._tree_item_for(key) is target
     assert target.data(0, _GROUP_ROLE).favorite
-    assert half.verticalScrollBar().value() == scrolled_to
+    assert half.verticalScrollBar().value() == scrolled_to, (
+        "the gallery used to be read back and redrawn whole for one star, seconds of it on a "
+        "real library, and the redraw scrolled the TOC")
 
 
 def test_starring_a_folder_marks_it_on_both_sides_of_the_list(qtbot):
@@ -710,7 +712,9 @@ def test_starring_a_folder_marks_it_on_both_sides_of_the_list(qtbot):
 
     view._toggle_favorite(key)
 
-    assert [row.data(0, _GROUP_ROLE).favorite for row in rows] == [True, True]
+    assert [row.data(0, _GROUP_ROLE).favorite for row in rows] == [True, True], (
+        "each shape draws the folder from a copy of its own, so a star set through one row has "
+        "to reach the other side's row too")
 
 
 def test_a_star_made_after_the_pane_moved_on_marks_what_is_on_screen(qtbot):
@@ -720,7 +724,8 @@ def test_a_star_made_after_the_pane_moved_on_marks_what_is_on_screen(qtbot):
 
     view._toggle_favorite(dog)
 
-    assert view.group_for_key(dog).favorite
+    assert view.group_for_key(dog).favorite, (
+        "the squares a star marks are the ones on screen now")
 
 
 def test_the_tick_after_a_star_finds_nothing_to_redraw(qtbot):
@@ -983,7 +988,9 @@ def test_a_branch_session_schedules_no_experiments_at_all(qtbot, monkeypatch):
 
     view._experiments_cb.setChecked(True)
 
-    assert [r for r in db.list_generations() if r.get("source") == "experiment"] == []
+    assert [r for r in db.list_generations() if r.get("source") == "experiment"] == [], (
+        "a preview shares the same ComfyUI, so a batch queued as it closes would outlive it as "
+        "work the production app can neither see nor cancel")
 
 
 def test_a_branch_session_reviews_experiments_like_the_live_app(qtbot, monkeypatch):
@@ -2325,7 +2332,9 @@ def test_the_folder_the_gallery_is_showing_is_the_one_it_reports(qtbot):
     view.refresh()
     workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow)
-    assert view.selected_folder() == shaped_key(_key(workflow), LANDSCAPE)
+    assert view.selected_folder() == shaped_key(_key(workflow), LANDSCAPE), (
+        "the row, shape and all: reopening on the other side's copy of a folder is reopening "
+        "somewhere else")
 
 
 def test_naming_a_workflow_version_is_what_puts_it_in_the_folder_key(qtbot):
@@ -2346,12 +2355,15 @@ def test_the_folder_key_index_is_rebuilt_when_the_image_rows_are(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     first = view.image_config_index()
-    assert view.image_config_index() is first
+    assert view.image_config_index() is first, (
+        "the index is kept between rebuilds rather than built again at every site that asks")
 
     db._rows.append(_image("i2", "a dog", 50, 2))
     view.refresh()
 
-    assert view.image_config_index() is not first
+    assert view.image_config_index() is not first, (
+        "an image-to-video run's folder key is derived against this index, so a stale one would "
+        "file a run under the start frame the gallery used to hold")
     assert len(view.image_config_index()) > len(first)
 
 

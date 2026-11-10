@@ -594,6 +594,27 @@ def test_a_standalone_huds_enhanced_switch_narrows_the_slideshow(qtbot, monkeypa
     slideshow.close()
 
 
+def test_an_item_another_process_files_plays_next_on_a_slideshow_in_latest(qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_latest(view)
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow.shown)
+    filed = _image("i3", "a bird", 50, 3)
+    db._rows.append(filed)
+    db._by_id["i3"] = filed
+
+    view._poll()
+
+    playlist = slideshow._set.playlist
+    assert playlist.order_ids()[playlist.index + 1] == "i3"
+    slideshow.close()
+
+
 def test_a_generation_that_lands_unenhanced_stays_out_of_a_narrowed_slideshow(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_enhanced_image("i2", "a cat", 50, 2)]))

@@ -758,6 +758,20 @@ def test_each_tick_puts_what_a_slideshow_is_locked_on_first(qtbot, monkeypatch):
         "put back the way it was left, a Funestra locking itself")
 
 
+def test_a_tick_hands_the_slideshows_each_item_another_process_filed(qtbot, monkeypatch):
+    view, _cat, _dog = _two_leaf_view(qtbot)
+    arrived = []
+    monkeypatch.setattr(view._slideshows, "note_arrived",
+                        lambda rows: arrived.append([row["prompt_id"] for row in rows]))
+    filed = _image("i3", "a bird", 50, 1)
+    view._db._rows.append(filed)
+    view._db._by_id["i3"] = filed
+
+    view._poll()
+
+    assert arrived == [["i3"]]
+
+
 def test_a_reading_of_the_library_taken_before_a_star_does_not_take_it_back(qtbot,
                                                                             monkeypatch):
     view, _cat, dog = _two_leaf_view(qtbot)

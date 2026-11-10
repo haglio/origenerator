@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app_support.file_channel import retried_while_held
+from app_support.flick_folder import flicks_folder_in, trash_folder_beside
 
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.file_numbers import NUMBERED, next_number, numbered
@@ -22,7 +23,7 @@ _MOVE_RETRY_DELAY = 0.15
 class TrashedBatch:
     moves: list[tuple[Path, Path]]
     subdir: Path | None
-    sent_to_kino_trash: list[tuple[Path, Path]] = field(default_factory=list)
+    out_of_play: list[tuple[Path, Path]] = field(default_factory=list)
 
     def restore(self) -> dict[str, str]:
         renamed = self._renamed_where_taken()
@@ -31,7 +32,7 @@ class TrashedBatch:
             back.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(trashed), str(back))
         self._discard_subdir()
-        for original, held in self.sent_to_kino_trash:
+        for original, held in self.out_of_play:
             if held.is_file() and not original.exists():
                 original.parent.mkdir(parents=True, exist_ok=True)
                 _move(held, original)
@@ -61,15 +62,18 @@ class TrashedBatch:
             if trashed != keeping:
                 trashed.unlink(missing_ok=True)
 
+    def waiting_out_of_play(self) -> list[Path]:
+        return [held for _played, held in self.out_of_play]
+
     def holding(self, original: Path) -> Path | None:
         return next((trashed for was, trashed in self.moves if was == Path(original)), None)
 
     def record(self) -> dict:
-        kino = {"sent_to_kino_trash": _as_recorded(self.sent_to_kino_trash)} if self.sent_to_kino_trash else {}
+        played = {_OUT_OF_PLAY: _as_recorded(self.out_of_play)} if self.out_of_play else {}
         return {
             "moves": _as_recorded(self.moves),
             "subdir": str(self.subdir) if self.subdir is not None else None,
-            **kino,
+            **played,
         }
 
     @classmethod
@@ -78,7 +82,8 @@ class TrashedBatch:
         return cls(
             moves=_as_read((record or {}).get("moves")),
             subdir=Path(subdir) if subdir else None,
-            sent_to_kino_trash=_as_read((record or {}).get("sent_to_kino_trash")),
+            out_of_play=_as_read((record or {}).get(_OUT_OF_PLAY)
+                                 or (record or {}).get(_WRITTEN_BEFORE_GENAU_HAD_A_PLACE)),
         )
 
     def _discard_subdir(self) -> None:
@@ -128,30 +133,67 @@ class Kino:
     trash: Path
     own_source: str
 
+    def holds(self, video: Path) -> bool:
+        return video.is_relative_to(self.library)
+
     def plays(self, video: Path) -> bool:
-        return video.is_relative_to(self.library) and video.is_file()
+        return self.holds(video) and video.is_file()
+
+    def waits_at(self, video: Path) -> Path:
+        return self.trash / video.name
 
     def upscales(self) -> EvolverUpscales:
         return EvolverUpscales.scan(self.library, self.own_source)
 
-    def take_out(self, videos) -> list[tuple[Path, Path]]:
-        sent = []
-        for video in videos:
-            held = self.trash / video.name
-            if held.exists():
-                continue
-            try:
-                self.trash.mkdir(parents=True, exist_ok=True)
-                _move(video, held)
-            except OSError:
-                logger.warning("Could not take %s out of Kino; it stays there", video.name,
-                               exc_info=True)
-                continue
-            sent.append((video, held))
-        return sent
+
+@dataclass(frozen=True)
+class Genau:
+    flicks: Path
+
+    @classmethod
+    def in_folder(cls, genau: Path) -> Genau | None:
+        flicks = flicks_folder_in(Path(genau))
+        return None if flicks is None else cls(flicks)
+
+
+    @property
+    def trash(self) -> Path:
+        return trash_folder_beside(self.flicks)
+
+    def holds(self, video: Path) -> bool:
+        return video.is_relative_to(self.flicks)
+
+    def plays(self, video: Path) -> bool:
+        return self.holds(video) and video.is_file()
+
+    def waits_at(self, video: Path) -> Path:
+        return self.trash / video.relative_to(self.flicks)
+
+    def videos(self) -> list[Path]:
+        return sorted(path for path in self.flicks.rglob("*") if path.is_file())
+
+
+
+def take_out_of_play(place: Kino | Genau, video: Path) -> tuple[Path, Path] | None:
+    held = place.waits_at(video)
+    if held.exists():
+        return None
+    try:
+        held.parent.mkdir(parents=True, exist_ok=True)
+        _move(video, held)
+    except OSError:
+        logger.warning("Could not take %s out of %s; it stays there", video.name,
+                       type(place).__name__, exc_info=True)
+        return None
+    return video, held
+
+
+_OUT_OF_PLAY = "out_of_play"
+_WRITTEN_BEFORE_GENAU_HAD_A_PLACE = "sent_to_kino_trash"
 
 
 def _as_recorded(moves: list[tuple[Path, Path]]) -> list[list[str]]:
+
     return [[str(was), str(now)] for was, now in moves]
 
 

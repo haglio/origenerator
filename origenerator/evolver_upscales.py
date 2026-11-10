@@ -38,7 +38,16 @@ def filed_upscales(upscaled_dir) -> list[tuple[str, Path]]:
     return filed
 
 
+def filed_under(upscaled_dir, video) -> str | None:
+    try:
+        shape, source, *_inside = Path(video).relative_to(upscaled_dir).parts
+    except ValueError:
+        return None
+    return source if shape in SHAPES and _inside else None
+
+
 def _filed_in(source: Path) -> list[Path]:
+
     return sorted(source.iterdir())
 
 

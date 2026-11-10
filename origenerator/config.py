@@ -111,6 +111,8 @@ COMFYUI_HOST = "127.0.0.1"
 COMFYUI_PORT = 8188
 
 GENAU_SOURCE = haglio_settings.value("genau_source")
+GENAU_DIR = Path(haglio_settings.value("genau_dir"))
+
 
 CUSTOM_POSES_DIR = LIBRARY_ROOT / "images" / "custom_poses"
 

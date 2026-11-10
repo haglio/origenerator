@@ -7,6 +7,7 @@ from pathlib import Path
 
 from origenerator import trash_collection
 from origenerator.db_generations import library_paths_in
+from origenerator.file_refs import frame_name
 from origenerator.gallery import (
     generation_of_file,
     output_disk_files,
@@ -14,10 +15,10 @@ from origenerator.gallery import (
     resolve_preview,
     unreviewed_experiments,
 )
-from origenerator.gallery.output import with_files_renamed
+from origenerator.gallery.output import row_output_files, stem_as_made, with_files_renamed
 from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import generate_thumbnail
-from origenerator.trash import Kino
+from origenerator.trash import Genau, Kino, TrashedBatch, take_out_of_play
 from origenerator.undo_stack import UndoEntry, UndoStack
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,15 @@ class GalleryEnvironment:
     cancel_enhancements: Callable[[list[dict]], None] | None = None
     thumb_dir: Path | None = None
     kino: Kino | None = None
+    genau: Genau | None = None
+    bring_in: Callable[[Path], bool] | None = None
+    delete_for_good: Callable[[list[Path]], None] | None = None
+
+
+@dataclass(frozen=True)
+class Pressed:
+    video: Path
+    already_at: Path | None = None
 
 
 class GalleryEdits:
@@ -49,30 +59,37 @@ class GalleryEdits:
     def thumb_dir(self) -> Path | None:
         return self._environment.thumb_dir
 
-    def trash_file(self, path) -> None:
-        prompt_id = generation_of_file(path, self._db.list_generations())
-        row = self._db.get_generation(prompt_id) if prompt_id is not None else None
-        if row is not None:
-            self.trash(row, pressed_in_kino=Path(path))
+    def trash_file(self, path, already_at=None) -> None:
+        pressed = Pressed(Path(path), Path(already_at) if already_at else None)
+        row = self._entry_of(pressed.video) or self._entry_brought_in(pressed.video)
+        if row is None:
+            logger.warning("%s has no gallery entry, so it was not sent to Trash",
+                           pressed.video.name)
             return
-        kino = self._environment.kino
-        if kino is not None and kino.plays(Path(path)):
-            logger.info("%s has no gallery entry, so it leaves Kino for Kino's Trash alone",
-                        Path(path).name)
-            kino.take_out([Path(path)])
+        self.trash(row, pressed=pressed)
 
-    def trash(self, row: dict, *, pressed_in_kino: Path | None = None) -> bool:
+    def _entry_of(self, video: Path) -> dict | None:
+        prompt_id = generation_of_file(video, self._db.list_generations())
+        return self._db.get_generation(prompt_id) if prompt_id is not None else None
+
+    def _entry_brought_in(self, video: Path) -> dict | None:
+        kino, bring_in = self._environment.kino, self._environment.bring_in
+        if kino is None or bring_in is None or not kino.plays(video) or not bring_in(video):
+            return None
+        return self._entry_of(video)
+
+    def trash(self, row: dict, *, pressed: Pressed | None = None) -> bool:
         if unreviewed_experiments([row]):
-            self.reject_experiment(row, pressed_in_kino=pressed_in_kino)
+            self.reject_experiment(row, pressed=pressed)
             return True
-        self.delete_rows([row], pressed_in_kino=pressed_in_kino)
+        self.delete_rows([row], pressed=pressed)
         return False
 
-    def delete_rows(self, rows: list[dict], *, pressed_in_kino: Path | None = None) -> None:
+    def delete_rows(self, rows: list[dict], *, pressed: Pressed | None = None) -> None:
         if not rows:
             return
         self._stop_enhancements(rows)
-        batches = self._trash_files(rows, pressed_in_kino=pressed_in_kino)
+        batches = self._trash_files(rows, pressed=pressed)
         for row, batch in batches:
             self._db.delete_generation(row["prompt_id"])
             self._db.record_trashed(row["prompt_id"], row, batch.record())
@@ -84,7 +101,7 @@ class GalleryEdits:
             return batches[0][0]["prompt_id"]
 
         self._history.push(UndoEntry(_delete_label(len(rows)), undo,
-                              redo=lambda: self.delete_rows(rows, pressed_in_kino=pressed_in_kino)))
+                              redo=lambda: self.delete_rows(rows, pressed=pressed)))
 
     def delete_enhance_versions(self, row: dict, filenames: list[str]) -> bool:
         prompt_id = row["prompt_id"]
@@ -131,28 +148,39 @@ class GalleryEdits:
             self._environment.cancel_enhancements(rows)
 
     def _trash_files(self, rows: list[dict], names: set[str] | None = None, *,
-                     the_item_stays: bool = False, pressed_in_kino: Path | None = None):
+                     the_item_stays: bool = False, pressed: Pressed | None = None):
         # Windows cannot move a file the app still holds open, as a preview does its video.
         by_row = self._files_by_row(rows, names)
-        in_kino = self._in_kino(rows, pressed_in_kino) if names is None else [[] for _row in rows]
+        in_play = self._in_play(rows, pressed) if names is None else [[] for _row in rows]
         if self._environment.release_files is not None:
-            self._environment.release_files([path for files in [*by_row, *in_kino] for path in files],
-                                            the_item_stays=the_item_stays)
+            self._environment.release_files(
+                [path for files in by_row for path in files]
+                + [video for copies in in_play for _place, video in copies],
+                the_item_stays=the_item_stays)
         batches = [(row, self._trash.store(files)) for row, files in zip(rows, by_row, strict=True)]
-        for (_row, batch), videos in zip(batches, in_kino, strict=True):
-            batch.sent_to_kino_trash = self._environment.kino.take_out(videos) if videos else []
+        for (_row, batch), copies in zip(batches, in_play, strict=True):
+            batch.out_of_play = [taken for place, video in copies
+                                 if (taken := take_out_of_play(place, video)) is not None]
+        if pressed is not None and pressed.already_at is not None and batches:
+            batches[0][1].out_of_play.append((pressed.video, pressed.already_at))
         return batches
 
-    def _in_kino(self, rows: list[dict], pressed: Path | None = None) -> list[list[Path]]:
+    def _in_play(self, rows: list[dict], pressed: Pressed | None = None) -> list[list[tuple]]:
+        kino, genau = self._environment.kino, self._environment.genau
+        upscales = kino.upscales() if kino is not None else None
+        genau_videos = genau.videos() if genau is not None else []
+        pressed_now = [pressed.video] if pressed is not None and pressed.already_at is None else []
+        return [[*self._in_kino(row, upscales, pressed_now),
+                 *_in_genau(genau, row, genau_videos, pressed_now)]
+                for row in rows]
+
+    def _in_kino(self, row: dict, upscales, pressed_now: list[Path]) -> list[tuple]:
         kino = self._environment.kino
         if kino is None:
-            return [[] for _row in rows]
-        upscales = kino.upscales()
-        return [list(dict.fromkeys(filter(kino.plays, [
-                    *map(Path, library_paths_in(row.get("output_files"))),
-                    *self._upscale_in_kino(row, upscales),
-                    *([pressed] if pressed is not None else [])])))
-                for row in rows]
+            return []
+        return [(kino, video) for video in dict.fromkeys(filter(kino.plays, [
+            *map(Path, library_paths_in(row.get("output_files"))),
+            *self._upscale_in_kino(row, upscales), *pressed_now]))]
 
     def _upscale_in_kino(self, row: dict, upscales) -> list[Path]:
         preview = resolve_preview(row, self._places)
@@ -185,15 +213,19 @@ class GalleryEdits:
         return restored
 
     def purge_deleted(self, prompt_ids) -> None:
+        waiting = []
         for prompt_id in prompt_ids:
             record = self._db.get_trashed(prompt_id)
             if record is not None:
+                waiting += TrashedBatch.from_record(record.get("batch") or {}).waiting_out_of_play()
                 trash_collection.purge(self._db, record)
+        if waiting and self._environment.delete_for_good is not None:
+            self._environment.delete_for_good(waiting)
 
-    def reject_experiment(self, row: dict, *, pressed_in_kino: Path | None = None) -> None:
+    def reject_experiment(self, row: dict, *, pressed: Pressed | None = None) -> None:
         prompt_id = row["prompt_id"]
         self._stop_enhancements([row])
-        ((_row, batch),) = self._trash_files([row], pressed_in_kino=pressed_in_kino)
+        ((_row, batch),) = self._trash_files([row], pressed=pressed)
         self._db.set_experiment_verdict(prompt_id, "down")
         self._db.update_generation(
             prompt_id, output_files=None, thumbnail_path=None
@@ -210,7 +242,7 @@ class GalleryEdits:
             return None
 
         self._history.push(UndoEntry("Reject experiment", undo, batch.purge,
-                              redo=lambda: self.reject_experiment(row, pressed_in_kino=pressed_in_kino)))
+                              redo=lambda: self.reject_experiment(row, pressed=pressed)))
 
     def can_undo(self) -> bool:
         return self._history.can_undo()
@@ -322,7 +354,23 @@ class CustomCollectionActions:
         return None
 
 
+def _in_genau(genau: Genau | None, row: dict, genau_videos: list[Path],
+              pressed_now: list[Path]) -> list[tuple]:
+    if genau is None:
+        return []
+    return [(genau, video) for video in dict.fromkeys(
+        [*_copies_of(row, genau_videos), *filter(genau.plays, pressed_now)])]
+
+
+def _copies_of(row: dict, genau_videos: list[Path]) -> list[Path]:
+
+    made = {stem for file in row_output_files(row)
+            if (stem := Path(frame_name(file.get("filename"))).stem)}
+    return [video for video in genau_videos if stem_as_made(video) in made]
+
+
 def _delete_label(count: int) -> str:
+
     return f"Delete {count} item{'s' if count != 1 else ''}"
 
 

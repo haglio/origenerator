@@ -113,6 +113,8 @@ def command_lines() -> tuple[str, ...]:
         f"{GO_TO}|{{file}}",
         f"{SAY.upper()}:{{words}}",
         f"{TRASH_FILE}|{{file}}",
+        f"{TRASH_FILE}|{{file}}|{{waits_at}}",
+
         *(line for shape in SHAPES for line in _lines_said_to(shape)),
     )
 

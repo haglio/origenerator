@@ -95,7 +95,7 @@ class FakeActions:
         self._label = None
         self._redo_label = None
 
-    def delete_rows(self, rows, *, pressed_in_kino=None):
+    def delete_rows(self, rows, *, pressed=None):
         self.deleted.append(list(rows))
         self._label = f"Delete {len(rows)} items"
 
@@ -110,12 +110,13 @@ class FakeActions:
     def delete_enhance_versions(self, row, filenames):
         return True
 
-    def trash_file(self, path):
-        self.trashed_files.append(path)
+    def trash_file(self, path, already_at=None):
+        self.trashed_files.append(path if already_at is None else (path, already_at))
+
 
     trash = GalleryEdits.trash
 
-    def reject_experiment(self, row, *, pressed_in_kino=None):
+    def reject_experiment(self, row, *, pressed=None):
         self.rejected.append(row)
         self._label = "Reject experiment"
 

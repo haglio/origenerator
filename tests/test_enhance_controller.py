@@ -1161,3 +1161,23 @@ def test_a_generate_pane_built_after_the_controller_still_hears_of_a_run(enhance
     assert tab.pending == ("running", b"frame", "upscale x2"), (
         "the tabs are built by the window's own layout after the controller, so they are asked "
         "for at each run rather than held from the start")
+
+
+def test_cancelling_from_a_tile_takes_the_waiting_row_out_of_the_generate_tab(enhance, monkeypatch):
+    monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
+                        lambda target, image, row: True)
+    monkeypatch.setattr(module.gallery, "describe_enhance_params", lambda params: "upscale x2")
+    row = _image("i1")
+    tab = FakeGenerateTab(row)
+    jobs = FakeReroll([FakeJob("run-a")])
+    jobs.cancel_job = lambda prompt_id: jobs.all_jobs.clear()
+    parts = EnhanceParts(jobs=jobs, gallery_pane=FakeGalleryPane(),
+                         slideshows=FakeSlideshows(), info_tabs_of=lambda: FakeTabs([tab]))
+    controller, _host = _assembled(FakeHost(rows=[row]), parts, None)
+    controller.reconcile()
+    assert tab.pending is not None
+
+    controller.cancel_for([row])
+
+    assert tab.pending is None, (
+        "the redraw after the cancel is what takes the waiting row out of the Generate tab")

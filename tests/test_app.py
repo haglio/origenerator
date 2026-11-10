@@ -95,6 +95,30 @@ def test_configuring_logging_routes_what_qt_says_into_the_log(monkeypatch, tmp_p
         "so what Qt says on its way down reaches the app's own log or nothing")
 
 
+def test_the_log_is_the_root_loggers_so_the_shared_libraries_write_to_it_too(monkeypatch, tmp_path):
+    monkeypatch.setattr("origenerator.qt_messages.install_qt_message_logging", lambda: None)
+
+    with logging_left_alone() as configure, exception_hooks_left_alone():
+        _configure_logging(tmp_path)
+
+    assert configure.call_args.args == ("", tmp_path / "origenerator.log"), (
+        "the family's rotating file log, on the root logger so the siblings' lines land in it too")
+
+
+def test_a_log_file_that_cannot_be_opened_still_leaves_the_console(monkeypatch, tmp_path):
+    monkeypatch.setattr("origenerator.qt_messages.install_qt_message_logging", lambda: None)
+    monkeypatch.setattr("logging.basicConfig", lambda **how: None)
+
+    with logging_left_alone() as configure, exception_hooks_left_alone():
+        configure.side_effect = OSError("the log file cannot be opened")
+        try:
+            logger = _configure_logging(tmp_path)
+        except OSError:
+            pytest.fail("console logging still works if the file cannot be opened")
+
+    assert logger is not None
+
+
 def test_an_error_nothing_catches_is_logged_and_the_app_keeps_running(tmp_path):
     state = tmp_path / "state"
     child = textwrap.dedent(f"""

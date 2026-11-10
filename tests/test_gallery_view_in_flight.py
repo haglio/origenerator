@@ -2060,7 +2060,10 @@ def test_pressing_generate_shows_a_row_before_there_is_a_job(qtbot, tmp_path, mo
         "the prompt all run on the window's thread; with nothing on screen for that stretch the "
         "button reads as one that did nothing")
     row, = view._queue.rows()
-    assert row._note_text == "Starting…"
+    assert row._note_text == "Starting…", (
+        "the launch itself is left for the next turn of the event loop: run at once, nothing is "
+        "painted while it works, and the stand-in row would show only once the work it stood in "
+        "for was over")
     assert view._live_jobs == {}
 
     deferred[0]()

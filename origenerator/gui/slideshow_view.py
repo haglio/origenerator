@@ -58,9 +58,8 @@ _WASD_AS_ARROWS = {
 
 
 def _sent_to_the_dashboard(shape: str) -> tuple[str, ...]:
-    return ("satellites_kino_activate", "origenerator_activate",
-            *(spelled_for(shape, verb)
-              for verb in ("prev", "nudge_prev", "nudge_next", "next", "funscript_jump", "lock", "trash")))
+    return tuple(spelled_for(shape, verb)
+                 for verb in ("prev", "nudge_prev", "nudge_next", "next", "funscript_jump", "lock", "trash"))
 
 
 @dataclass(frozen=True)

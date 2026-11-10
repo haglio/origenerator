@@ -31,7 +31,6 @@ def _cell(slide, label: str = "") -> HudCell:
 @dataclass(frozen=True)
 class HudPlacement:
     hosted: bool = True
-    own_window: bool = True
 
 
 USUAL_PLACEMENT = HudPlacement()
@@ -59,7 +58,7 @@ def slideshow_hud_model(shape: str, slideshow, placement: HudPlacement = USUAL_P
         item_note=slideshow.hud_item_note,
         rows=slideshow_rows(shape, SlideshowFacts(
             locked=locked, favorites_filter=favorites_filter, enhanced=enhanced,
-            order=order_label, hosted=placement.hosted, own_window=placement.own_window,
+            order=order_label, hosted=placement.hosted,
             has_other_versions=slideshow.has_other_versions, clip_seconds=slideshow.dwell_s,
             has_osr2=device is not None or slideshow.transport.has_osr2,
             **slideshow.transport.row_facts())),

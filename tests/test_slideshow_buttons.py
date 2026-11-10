@@ -143,17 +143,6 @@ def test_reset_is_faded_with_nothing_to_put_back():
     assert not _by_name(nothing_to_reset=False)["reset"].dim
 
 
-def test_a_hosted_slideshow_offers_the_session_the_way_back_instead_of_minimize():
-    rows = slideshow_rows("portrait", SlideshowFacts(hosted=True))
-    mode_row = [button.command for button in rows[0]]
-
-    assert mode_row == ["satellites_kino_activate", "origenerator_activate"]
-    assert [button.icon for button in rows[0]] == ["Kino", "Origenerator"]
-    assert [button.lit for button in rows[0]] == [False, True]
-    assert [button.tooltip for button in rows[0]] == ["", ""]
-    assert "minimize" not in _names(rows[-1])
-
-
 def test_a_slideshow_on_its_own_offers_no_minimize_and_no_session_to_switch():
     rows = slideshow_rows("portrait")
 
@@ -161,8 +150,8 @@ def test_a_slideshow_on_its_own_offers_no_minimize_and_no_session_to_switch():
     assert "minimize" not in _names(rows[-1])
 
 
-def test_a_slideshow_handed_to_a_funestra_declares_its_band_and_nothing_around_it():
-    rows = slideshow_rows("portrait", SlideshowFacts(hosted=True, own_window=False))
+def test_a_hosted_slideshow_declares_its_band_and_nothing_around_it():
+    rows = slideshow_rows("portrait", SlideshowFacts(hosted=True))
 
     assert len(rows) == 1
     assert _names(rows[0]) == THE_ROW
@@ -271,7 +260,7 @@ def test_the_versions_button_is_dim_where_the_item_has_only_itself():
 
 def test_every_declared_button_is_answered_by_the_slideshow():
     host = _Host()
-    for button in slideshow_rows("portrait", SlideshowFacts(hosted=True, own_window=False))[0]:
+    for button in slideshow_rows("portrait", SlideshowFacts(hosted=True))[0]:
         assert answer(host, button.command.removeprefix("portrait_")), button.command
 
     assert host.calls == [("step", -1), ("nudge", -1), ("nudge", 1), ("step", 1),

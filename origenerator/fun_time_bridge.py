@@ -33,17 +33,13 @@ from origenerator.fun_time_mode import (
 )
 from origenerator.osr2_controls_commands import shape_press, shape_spoken_to, spelled_for
 from origenerator.radio import deal_to_the_funestras
-from origenerator.slideshow_buttons import (
-    HUD_FACTS,
-    ORIGENERATOR_MODE,
-    PRESSES_ABOUT_THE_SLIDE,
-    answer,
-    origenerator_mode_on,
-)
+from origenerator.slideshow_buttons import HUD_FACTS, PRESSES_ABOUT_THE_SLIDE, answer
 
 logger = logging.getLogger(__name__)
 
 _POLL_MS = 150
+
+ORIGENERATOR_MODE = "origenerator_activate"
 
 
 def ask_for_omnipause(dashboard_cmd_file) -> None:
@@ -51,7 +47,7 @@ def ask_for_omnipause(dashboard_cmd_file) -> None:
 
 
 def ask_for_the_funestra(dashboard_cmd_file, shape: str) -> None:
-    append_command(dashboard_cmd_file, origenerator_mode_on(shape))
+    append_command(dashboard_cmd_file, spelled_for(shape, ORIGENERATOR_MODE))
 
 
 def ask_for_origenerator_mode(dashboard_cmd_file) -> None:

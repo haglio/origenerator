@@ -35,7 +35,6 @@ from tests.gallery_view_support import (
     _CTRL,
     _NO_MOD,
     _WAN_I2V,
-    MODE_VERBS,
     FakeActions,
     FakeDB,
     _a_slideshow_standing_on_its_own,
@@ -200,12 +199,10 @@ def test_a_standalone_slideshow_wears_the_funestras_own_hud(qtbot, monkeypatch):
     slideshow.close()
 
 
-def test_a_standalone_hud_draws_no_mode_row_and_no_minimize(qtbot, monkeypatch):
+def test_a_standalone_hud_draws_no_minimize(qtbot, monkeypatch):
     slideshow = _standalone_slideshow(qtbot, monkeypatch)
 
-    names = hud_button_names(slideshow.shown)
-    assert MODE_VERBS.isdisjoint(names)
-    assert "minimize" not in names
+    assert "minimize" not in hud_button_names(slideshow.shown)
     slideshow.close()
 
 

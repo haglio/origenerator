@@ -194,7 +194,7 @@ class TestTheOneHudASlideshowWears:
     def test_a_slideshow_on_a_sessions_funestra_carries_the_clip_seconds_too(self, qtbot):
         slideshow = self._window(qtbot).slideshow
 
-        rows = slideshow_hud_model("portrait", slideshow, HudPlacement(own_window=False)).rows
+        rows = slideshow_hud_model("portrait", slideshow, HudPlacement()).rows
 
         assert ("portrait_clip_seconds_down", "4s", "portrait_clip_seconds_up") in [
             tuple(button.command or button.icon for button in row[1:4]) for row in rows]

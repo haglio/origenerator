@@ -558,6 +558,7 @@ def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
+    resting = view._gallery_pane._thumb_widgets["g1"]._image_label.pixmap().toImage()
 
     view.enhance_items(["g0", "g1"])
     leader, follower = view._jobs.all_jobs
@@ -568,9 +569,10 @@ def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
     assert tiles["g1"]._enhancing is not None
     assert not tiles["g0"]._image_label.pixmap().isNull()
     assert follower.state == "idle"
-    assert tiles["g1"]._resting_pixmap is None, (
-        "a tile keeps its own thumbnail until a frame of its run arrives: the image as it stands "
-        "is worth looking at while it waits")
+    assert tiles["g1"]._resting_pixmap is None
+    assert tiles["g1"]._image_label.pixmap().toImage() == resting, (
+        "a tile keeps its own thumbnail until a frame of its run arrives: the base render is "
+        "out and worth looking at, which is the point of generating it first")
 
 
 def test_a_locked_slide_says_queued_until_comfyui_picks_its_run_up(qtbot, tmp_path,

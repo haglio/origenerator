@@ -2558,9 +2558,9 @@ def test_a_slideshow_of_favorites_plays_the_sides_whole_library_with_the_filter_
     director.start()
 
     assert _played(made[0]) == ["g1", "g2"], (
-        "Favorites is not a set of its own: it is the side's whole library with its filter held "
-        "on, so the filter can be let go to widen the slideshow and the order pair means the "
-        "library rather than what the collection lists")
+        "Favorites and Enhanced are not sets of their own: each is the side's whole library "
+        "with its filter held on, so the filter can be let go to widen the slideshow and Latest "
+        "and Shuffle mean the library rather than what the collection lists")
     assert made[0].hud_favorites_filter is True
     assert director._live_slideshows == [(made[0], ALL_PORTRAIT)]
 

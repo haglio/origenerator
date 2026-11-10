@@ -968,7 +968,7 @@ def test_the_actions_offered_come_only_from_videos_the_video_slot_would_take(com
                         lambda name: name == VIDEO_WORKFLOW)
     monkeypatch.setattr(module.action_settings, "available_categories",
                         lambda rows, intent, checked=(): [r["prompt_id"] for r in rows])
-    rows = [_video("clip"), _video("made from words alone", workflow_name="wan22_t2v"),
+    rows = [_video("vid"), _video("made from words alone", workflow_name="wan22_t2v"),
             _image("img")]
     controller, _host = combine(db=FakeDB(rows))
 
@@ -976,20 +976,19 @@ def test_the_actions_offered_come_only_from_videos_the_video_slot_would_take(com
 
     taken = [row["prompt_id"] for row in rows
              if controller.widget.video_lent_by(row["prompt_id"])]
-    assert controller.widget.available == taken == ["clip"], (
-        "the actions offered and the video slot count the same videos as ones to rebuild from, "
+    assert controller.widget.available == taken == ["vid"], (
+        "the actions offered and the video slot agree on which videos can be a source video, "
         "or an action would be offered whose only video the slot would refuse")
 
 
 def test_an_item_dragged_out_of_the_trash_is_taken_by_neither_slot(combine):
-    controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]))
+    controller, _host = combine(db=FakeDB([_image("img"), _video("vid")]))
 
     taken = (controller.widget.image_lent_by("deleted"),
              controller.widget.video_lent_by("deleted"))
 
     assert taken == (None, None), (
-        "a deleted item has no row in the gallery and its file is in the Trash, where the "
-        "workflows a Combine launches do not read")
+        "a deleted item has no row in the gallery, and both slots look an item up by its row")
 
 
 def test_switching_lanes_re_asks_which_actions_are_answerable(combine, monkeypatch):

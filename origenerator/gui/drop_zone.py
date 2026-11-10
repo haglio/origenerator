@@ -114,7 +114,6 @@ class DropZone(DropZones):
         self._grayscale = grayscale
         self._current_id: str | None = None
         self._movie: QMovie | None = None
-        self.setMinimumWidth(0)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -187,7 +186,6 @@ class DropZone(DropZones):
             self._label.setPixmap(icon_pixmap("check", 2 * self._label.fontMetrics().height(),
                                               TEXT_PRIMARY))
         self._item_type_icon.setVisible(True)
-        self._item_type_icon.raise_()
 
     def _show_where_a_click_goes(self, held: str | None, named: str) -> None:
         leads = held is not None and self._leads_to(held) is not None

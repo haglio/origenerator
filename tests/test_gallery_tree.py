@@ -8,9 +8,11 @@ from shared_ui.colors import TEXT_PRIMARY
 from shared_ui.icons import icon_pixmap
 
 from origenerator import gallery
+from origenerator.gallery.collection import TRASH_KEY, FolderCollection
 from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT, SHAPE_LABELS
+from origenerator.gallery.tree import KeptFolders
 from origenerator.gui import icons
-from origenerator.gui.folder_tree import DROP_KEY_ROLE, RECENT_ROLE, TREE_KEY_ROLE
+from origenerator.gui.folder_tree import COUNT_ROLE, DROP_KEY_ROLE, RECENT_ROLE, TREE_KEY_ROLE
 from origenerator.gui.gallery_tree import (
     GROUP_ROLE,
     PATH_SEPARATOR,
@@ -19,7 +21,7 @@ from origenerator.gui.gallery_tree import (
     ShapeModel,
 )
 from origenerator.gui.split_folder_tree import SplitFolderTree
-from origenerator.item_shape import base_of, shape_of
+from origenerator.item_shape import base_of, shape_of, shaped_key
 
 
 def _row(prompt_id, workflow_name, params, filename):
@@ -359,3 +361,48 @@ def test_all_opens_on_the_first_build_and_stays_shut_once_the_user_shuts_it(qtbo
     tree.populate([ShapeModel(LANDSCAPE, model), ShapeModel(PORTRAIT, [])])
 
     assert not tree.item_by_key[all_key].isExpanded()
+
+
+def _drawn_twice(qtbot, before_rows, after_rows, *, counts=None, recently_worked=()):
+    kept = KeptFolders()
+    pane = SplitFolderTree(GROUP_ROLE)
+    qtbot.addWidget(pane)
+    tree = GalleryTree(pane)
+    tree.populate([ShapeModel(LANDSCAPE, gallery.build_gallery_tree(before_rows, kept=kept),
+                              show_latest=True)])
+    drawn = dict(tree.item_by_key)
+    again = gallery.build_gallery_tree(after_rows, kept=KeptFolders(kept))
+    tree.populate([ShapeModel(LANDSCAPE, again, show_latest=True,
+                              collection_counts=counts or {})],
+                  recently_worked=recently_worked)
+    return tree, drawn
+
+
+_STILLS = shaped_key("image/sdxl_t2i", LANDSCAPE)
+_CLIPS = shaped_key("video/wan22_i2v", LANDSCAPE)
+
+
+def test_a_redraw_keeps_the_rows_of_every_workflow_folder_the_change_did_not_touch(qtbot):
+    still, clip = _image("i1", "scene one"), _video("v1", "alpha")
+
+    tree, drawn = _drawn_twice(qtbot, [still, clip], [still, _video("v1", "beta")])
+
+    assert tree.item_by_key[_STILLS] is drawn[_STILLS]
+    assert tree.item_by_key[_CLIPS] is not drawn[_CLIPS]
+    kept_inside = [key for key in drawn if key.startswith("image/sdxl_t2i")]
+    assert all(tree.item_by_key[key] is drawn[key] for key in kept_inside)
+    assert tree.item_by_key[_STILLS].parent() is tree.item_by_key[shaped_key("image", LANDSCAPE)]
+    assert tree.leaf_by_id["i1"].treeWidget() is not None
+
+
+def test_a_kept_folders_counts_and_recent_mark_are_brought_up_to_date(qtbot):
+    still, clip = _image("i1", "scene one"), _video("v1", "alpha")
+    trash_here = FolderCollection(TRASH_KEY, "image/sdxl_t2i").key
+
+    tree, drawn = _drawn_twice(qtbot, [still, clip], [still, _video("v1", "beta")],
+                               counts={trash_here: 3},
+                               recently_worked=[(LANDSCAPE, "image/sdxl_t2i")])
+
+    assert tree.item_by_key[_STILLS] is drawn[_STILLS]
+    assert tree.item_by_key[shaped_key(trash_here, LANDSCAPE)].data(0, COUNT_ROLE) == 3
+    assert tree.item_by_key[_STILLS].data(0, RECENT_ROLE)

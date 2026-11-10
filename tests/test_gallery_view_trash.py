@@ -987,7 +987,8 @@ def test_delete_folder_refuses_a_workflow_group(qtbot):
 
     view._delete_folders([_image_workflow(view._tree).data(0, _GROUP_ROLE)])
 
-    assert actions.deleted == []
+    assert actions.deleted == [], (
+        "a workflow's whole history can never be wiped in one action")
 
 
 def test_the_hover_rows_trash_icon_deletes_the_folder_it_names(qtbot, monkeypatch):
@@ -1358,7 +1359,9 @@ def test_trashing_an_item_with_no_row_from_a_slideshow_does_nothing(qtbot):
 
     view.trash_generation("d1")
 
-    assert actions.deleted == []
+    assert actions.deleted == [], (
+        "the only delete left in the Trash is the permanent one, which is asked for from the tile and "
+        "confirmed, never done on a keystroke")
     assert actions.rejected == []
 
 

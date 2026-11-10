@@ -388,7 +388,9 @@ def test_filter_enhanced_takes_a_split_pair_of_regions_the_same_way(
 
     _press_filter_enhanced(bridge, tmp_path)
 
-    assert [slideshow.hud_enhanced_mode for slideshow in (portrait, landscape)] == [False, False]
+    assert [slideshow.hud_enhanced_mode for slideshow in (portrait, landscape)] == [False, False], (
+        "one switch in the session and two regions under it: flipped side by side they could "
+        "disagree, and one lit switch cannot say that")
 
 
 def test_filter_enhanced_leaves_a_region_with_nothing_enhanced_playing_it_all(

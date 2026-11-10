@@ -970,7 +970,9 @@ def test_a_branch_session_schedules_no_experiments_at_all(qtbot, monkeypatch):
 
     view.set_experiments_enabled(True)
 
-    assert view.experiments_enabled() is False
+    assert view.experiments_enabled() is False, (
+        "a preview's state is seeded from production's, switch included, and scheduling experiments "
+        "is production's alone")
     assert not view._experiments_cb.isEnabled()
     assert "production app" in view._experiments_status.text()
 
@@ -1567,7 +1569,9 @@ def test_folder_keys_are_derived_against_the_index_the_rebuild_already_built(
     view.image_config_index()
     view.folder_key_of(view.row_for("v1"))
 
-    assert len(built) == indexed
+    assert len(built) == indexed, (
+        "the index changes only on a rebuild, and used to be built from scratch at eight call sites, "
+        "several of them on a click's path")
 
 
 def test_a_rebuild_builds_one_folder_tree_per_side_and_no_third(qtbot, monkeypatch):

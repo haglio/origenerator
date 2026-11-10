@@ -436,7 +436,8 @@ def test_untimed_prompt_folder_falls_back_to_workflow_time(qtbot):
     )
     assert node is not None
     view._tree.setCurrentItem(node)
-    assert view._avg_label.text() == "Average time: ~23 min (across 1 run)"
+    assert view._avg_label.text() == "Average time: ~23 min (across 1 run)", (
+        "a folder with no timed item is common for a single video prompt, which is rarely made again")
 
 
 def test_timed_prompt_folder_uses_its_own_average_not_the_workflow(qtbot):

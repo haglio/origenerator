@@ -647,7 +647,8 @@ def test_filter_enhanced_turns_the_slideshows_switch_on_and_says_what_is_left(qt
 
     view._voice._run_app_command(AppCommand.FILTER_ENHANCED)
 
-    assert slideshow.hud_enhanced_mode is True
+    assert slideshow.hud_enhanced_mode is True, (
+        "a word that set some other filter would leave the HUD's button dark over a narrowed slideshow")
     assert "1 to play" in words(slideshow.shown._note)
 
     view._voice._run_app_command(AppCommand.FILTER_OFF)

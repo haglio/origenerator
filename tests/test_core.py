@@ -1666,8 +1666,10 @@ def test_answering_a_toast_in_a_session_asks_the_room_for_origenerator_mode(
 
     win.go_to_generation("alpha-1")
 
-    assert (tmp_path / "dashboard.txt").read_text(encoding="utf-8").strip() == \
-        "origenerator_activate"
+    asked = (tmp_path / "dashboard.txt").read_text(encoding="utf-8").strip()
+    assert asked == "origenerator_activate", (
+        "the session parks this window under its Funestras in video mode, so anything that has to "
+        "be seen here asks for the mode before it shows anything")
     assert fronted == []
     assert went == ["alpha-1"]
 

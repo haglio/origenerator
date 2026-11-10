@@ -134,8 +134,8 @@ def test_an_experiment_that_wont_dequeue_keeps_its_row(tmp_path):
     _row(db, "exp-2", status="pending", source="experiment")
     client = FakeClient(refuse=["exp-1"])
 
-    assert cancel_experiments(db, client) == 1
-    assert db.get_generation("exp-1") is not None, (
+    assert cancel_experiments(db, client) == 1, (
         "with ComfyUI unreachable its run may still go on, and the app takes a row in flight "
         "up as a live job; without the row the run's result would be lost")
+    assert db.get_generation("exp-1") is not None
     assert db.get_generation("exp-2") is None

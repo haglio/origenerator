@@ -193,8 +193,9 @@ def test_what_the_watcher_says_lands_in_the_apps_log(tmp_path):
         cwd=REPO_ROOT, env=env, check=True,
     )
 
-    assert "said by the watcher" in (tmp_path / "origenerator.log").read_text(encoding="utf-8"), (
+    assert (tmp_path / "origenerator.log").exists(), (
         "the watcher has no window and no console, so a line logged anywhere else is read by nobody")
+    assert "said by the watcher" in (tmp_path / "origenerator.log").read_text(encoding="utf-8")
 
 
 def test_the_watcher_asks_whether_a_copy_holds_the_library_it_waits_for(tmp_path, monkeypatch):

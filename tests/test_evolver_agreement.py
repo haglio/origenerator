@@ -40,9 +40,7 @@ class TestWhenEvolverIsBeside:
 
         said = evolver_agreement.disagreements(_ours(), checkout)
 
-        assert len(said) == 1, (
-            "the test that holds these against Evolver's skips wherever no Evolver sits beside "
-            "the checkout, so the app itself asks at startup")
+        assert len(said) == 1
         assert "0_intake" in said[0]
         assert "0_inbox" in said[0]
 
@@ -78,9 +76,7 @@ class TestWhenThereIsNoEvolver:
 
         said = evolver_agreement.disagreements(_ours(), checkout)
 
-        assert len(said) == 1, (
-            "this runs before there is a window, and a broken file in another repo "
-            "must not be how this app declines to open")
+        assert len(said) == 1
         assert "evolver_contract.json" in said[0]
 
 

@@ -17,7 +17,6 @@ class SqliteFile:
         self._seen_others_at: int | None = None
 
     @contextmanager
-    # Windows keeps a file open, and refuses its rename, while a connection to it waits to be collected.
     def connect(self):
         with self._owning:
             conn = self._own_connection()

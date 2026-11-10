@@ -1485,7 +1485,9 @@ def test_only_the_video_at_the_front_says_when_it_starts(qtbot, tmp_path):
 def test_a_video_waiting_out_the_minute_goes_to_comfyui_as_the_app_closes(qtbot, tmp_path):
     client, queue, video = _a_video_waiting_on_an_image(tmp_path, [1000.0])
 
-    assert queue.flush_to_server() == 1
+    assert queue.flush_to_server() == 1, (
+        "the queue hands ComfyUI one prompt at a time so the Job Queue can still be put in "
+        "another order by whoever is watching, and closing the app ends that reason")
     assert client.submit_job.call_args_list[-1].args[1] == video.prompt_id
 
 

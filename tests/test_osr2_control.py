@@ -45,7 +45,9 @@ def test_on_drives_and_off_parks():
     control = _control()
 
     control.set_state(OSR2_DRIVING)
-    assert (control.isChecked(), control.state()) == (True, OSR2_DRIVING)
+    assert (control.isChecked(), control.state()) == (True, OSR2_DRIVING), (
+        "the switch has no widget of its own and wears a checkable button's names on purpose: "
+        "every caller that sets it flipped a button before")
 
     control.set_state(OSR2_PARKED)
     assert (control.isChecked(), control.state()) == (False, OSR2_PARKED)
@@ -151,10 +153,15 @@ def test_it_says_which_driver_has_the_device():
     assert control.source() is None
 
     motion.active = True
-    assert control.source() == "robot_hand"
+    assert control.source() == "robot_hand", (
+        "the answer is read back off the drivers rather than worked out a second time: which of "
+        "them drives is the view's own reconcile to decide")
 
     control.script.active = True
-    assert control.source() == "funscript"
+    assert control.source() == "funscript", (
+        "the funscript driver is held by the switch rather than asked of the gallery, so a "
+        "slideshow's OSR2 controls, which never see the gallery, can still say what has the "
+        "device")
 
 
 def test_a_switch_handed_no_drivers_lets_go_and_cannot_be_turned_on():
@@ -212,7 +219,9 @@ def test_a_session_taking_the_device_puts_the_switch_off_and_keeps_it_there():
 
     control.the_session_has_it(True)
 
-    assert changes == [OSR2_PARKED]
+    assert changes == [OSR2_PARKED], (
+        "letting go is what stops whatever this app had on the device: the view's one reconcile "
+        "answers the change, as it does for a press")
     assert not control.isEnabled()
     control.setChecked(True)
     control.set_state(OSR2_DRIVING)

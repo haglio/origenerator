@@ -79,7 +79,10 @@ def test_the_genau_lane_asks_for_settings_one_cycle_long(qtbot, tmp_path):
     view._combine._generate_combination("img", "loop", intent=action_settings.GENAU)
 
     job = next(iter(view._live_jobs.values()))
-    assert job.params["frame_count"] == gallery.CYCLE_FRAMES
+    assert job.params["frame_count"] == gallery.CYCLE_FRAMES, (
+        "the lane cuts the settings again and does not only choose which are mined: what Genau "
+        "needs of a video is a property of the video's own length, and the past video being "
+        "mined was made before anyone knew that")
     assert job.params["frame_rate"] > wf.default_params()["frame_rate"]
     assert job.params["positive_prompt"] != "alpha"
 

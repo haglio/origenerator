@@ -652,7 +652,9 @@ def test_an_action_with_nothing_assigned_runs_its_most_used_video_and_asks_no_mo
     controller.generate_category("img", "alpha")
 
     assert sent == []
-    assert host.revealed == ["folder-of-clip"]
+    assert host.revealed == ["folder-of-clip"], (
+        "the pool of past videos is read fresh when Generate is pressed: the gallery may have "
+        "gained a video since")
 
 
 def test_pinned_settings_outrank_the_mining(combine, monkeypatch):
@@ -1164,7 +1166,9 @@ def test_the_actions_narrow_to_what_the_dropped_image_can_start_from(combine,
                         lambda state, lane, **kw: ("alpha",))
     controller.image_dropped()
 
-    assert sorted(controller.widget.available) == ["alpha"]
+    assert sorted(controller.widget.available) == ["alpha"], (
+        "said rather than guessed: a guess would be an action the image cannot do, which is "
+        "minutes of the one machine spent on a video that was never going to work")
 
 
 def test_an_image_nobody_has_sorted_yet_narrows_nothing(combine, monkeypatch):

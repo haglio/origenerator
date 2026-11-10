@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from origenerator.gallery.enhance_graph import graph_version_params
+from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 
 _KEYS = ("checkpoint", "upscale_model", "enhance_scale", "enhance_steps",
          "enhance_denoise", "enhance_detail_fixes")
@@ -38,7 +39,9 @@ def test_a_graph_gives_up_every_setting_the_row_itself_is_vague_about():
     found = graph_version_params(_row(_sampler_graph()), _KEYS)
 
     assert found["checkpoint"] == "example_model_v2.safetensors"
-    assert found["upscale_model"] == "example_upscaler_4x.pth"
+    assert found["upscale_model"] == "example_upscaler_4x.pth", (
+        "a row the import scan rebuilt keeps the tail's numbers under names any sampler has "
+        "and says nothing of the upscale, which would file the version under a blank settings line")
     assert found["enhance_steps"] == 20
     assert found["enhance_denoise"] == 0.15
 
@@ -64,7 +67,9 @@ def test_the_passes_come_back_in_the_order_they_ran():
 
     fixes = graph_version_params(_row(graph), _KEYS)["enhance_detail_fixes"]
 
-    assert list(fixes.values()) == [0.5, 0.3]
+    assert list(fixes.values()) == [0.5, 0.3], (
+        "a graph's keys come in whatever order they were written, "
+        "which only happens to agree with the order the passes ran in")
 
 
 def test_a_node_id_that_is_not_a_number_sorts_last_rather_than_raising():
@@ -101,7 +106,7 @@ def test_a_setting_the_graph_left_empty_is_absent_rather_than_none():
     assert found["enhance_steps"] == 20
 
 
-def test_a_graph_that_cannot_be_read_gives_up_nothing():
+def test_a_graph_an_older_version_comfyui_or_a_hand_left_unreadable_gives_up_nothing():
     assert graph_version_params({"workflow_json": "not json"}, _KEYS) == {}
     assert graph_version_params({"workflow_json": "[1, 2]"}, _KEYS) == {}
     assert graph_version_params({"workflow_json": None}, _KEYS) == {}
@@ -125,3 +130,12 @@ def test_a_pass_redrawn_inside_an_outline_is_named_by_its_detector_too():
     fixes = graph_version_params(_row(graph), _KEYS)["enhance_detail_fixes"]
 
     assert fixes == {"skin": 0.4}
+
+
+def test_the_passes_the_enhance_workflow_lays_down_are_read_back(monkeypatch):
+    monkeypatch.setattr(detail_parts, "list_detector_files", lambda: ["face_finder.pt"])
+    enhance = WORKFLOW_REGISTRY["image_enhance"]
+    graph = enhance.build_api_payload(dict(enhance.default_params(), input_image="pick.png",
+                                           enhance_detail_fixes={"faces": 0.5}))
+
+    assert graph_version_params(_row(graph), _KEYS)["enhance_detail_fixes"] == {"faces": 0.5}

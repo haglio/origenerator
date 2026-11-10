@@ -349,7 +349,9 @@ def test_enhance_toggle_appends_the_tail_on_every_image_workflow():
         save = _find_node(payload, "SaveImage")
         final = payload[save["inputs"]["images"][0]]
         assert final["class_type"] == "VAEDecode", name
-        assert final["inputs"]["samples"] == [sampler_id, 0]
+        assert final["inputs"]["samples"] == [sampler_id, 0], (
+            f"{name}: the base render is saved after it, so the first save in the graph "
+            "is still the image the run is for")
         assert final["inputs"]["vae"] == payload[encode_id]["inputs"]["vae"]
 
 
@@ -371,9 +373,10 @@ def test_wan22_t2i_enhances_on_its_low_noise_refinement_chain():
     wf = WORKFLOW_REGISTRY["wan22_t2i"]
     payload = wf.build_api_payload(dict(wf.default_params(), enhance=True))
     encode_id = _node_id(payload, "VAEEncode")
-    sampler = next(n for n in payload.values()
-                   if n["class_type"] == "KSampler"
-                   and n["inputs"]["latent_image"] == [encode_id, 0])
+    (sampler,) = _nodes_of(payload, "KSampler")
+    assert sampler["inputs"]["latent_image"] == [encode_id, 0], (
+        "the WAN VAE gives the kept frame back as a one-frame video, "
+        "the very shape the still's own passes denoise")
     low = next(n for n in payload.values()
                if n["class_type"] == "KSamplerAdvanced"
                and n["inputs"]["add_noise"] == "disable")
@@ -1871,7 +1874,9 @@ def test_every_enhance_capable_workflow_keeps_its_base_render():
             for node in wf.build_api_payload(params).values()
             if node.get("class_type") == "SaveImage"
         ]
-        assert f"{params['filename_prefix']}_base" in saves, wf.name
+        assert f"{params['filename_prefix']}_base" in saves, (
+            f"{wf.name}: the base is made on the way and would otherwise be thrown away, "
+            "leaving the image no original")
         history = {"outputs": {
             wf.output_node_id: {"images": [{"filename": "enhanced.png"}]},
             wf.base_output_node_id: {"images": [{"filename": "base.png"}]},
@@ -2135,8 +2140,9 @@ def test_a_lone_scene_runs_for_the_clip_length_whatever_its_own_entry_says():
         "and settings carried in from the overlay hold nothing else")
 
 
-def test_the_audio_is_scored_for_the_scenes_as_they_add_up():
-    wf = Wan22I2vWorkflow()
+@pytest.mark.parametrize("wf", [Wan22I2vWorkflow(), Wan22Flf2vLoopWorkflow()],
+                         ids=lambda wf: wf.name)
+def test_the_audio_is_scored_for_the_scenes_as_they_add_up(wf):
     payload = wf.build_api_payload(dict(
         wf.default_params(), frame_count=481, scene_frames=[161, 81],
         positive_prompt="a\n---\nb"))
@@ -2286,7 +2292,8 @@ def test_the_prompts_loras_and_sampler_keep_the_names_everyone_already_uses(name
 def test_a_wan_2_2_form_offers_one_composition_focus_for_both_passes(name):
     focus = [(pd.label, pd.key, pd.also_sets) for pd in WORKFLOW_REGISTRY[name].param_definitions()
              if pd.label.startswith("Composition Focus")]
-    assert focus == [("Composition Focus", "shift_high", ("shift_low",))]
+    assert focus == [("Composition Focus", "shift_high", ("shift_low",))], (
+        "two values would hand the result over between the passes at mismatched noise")
 
 
 @pytest.mark.parametrize("name", list(WORKFLOW_REGISTRY))
@@ -2419,3 +2426,24 @@ def test_a_part_the_enhance_fixes_runs_a_real_denoise_so_the_floor_of_the_range_
                  if pd.key == "enhance_detail_fixes")
 
     assert fixes.min_val > 0, "ComfyUI's detailer node refuses a denoise of zero"
+
+
+def test_a_loops_size_set_by_hand_reaches_both_of_its_ends():
+    wf = Wan22Flf2vLoopWorkflow()
+    payload = wf.build_api_payload(dict(wf.default_params(), input_image="a.png",
+                                        width=640, height=480))
+    (segment,) = _segments(payload, "WanFirstLastFrameToVideo")
+    scaled = [_node_id(payload, "ImageScale"), 0]
+
+    assert (segment["inputs"]["start_image"], segment["inputs"]["end_image"]) == (scaled, scaled)
+    assert (segment["inputs"]["width"], segment["inputs"]["height"]) == (640, 480)
+
+
+def test_the_speaking_model_sits_between_the_expert_models_and_their_loras():
+    keys = [pd.key for pd in Wan22I2vWorkflow().param_definitions()]
+    models = [keys.index(key) for key in ("unet_high", "unet_low", "unet_s2v")]
+    first_lora = keys.index("lora_high")
+
+    assert max(models) < first_lora, (
+        "the rows come in the order the form shows and the gallery groups by: "
+        "the models together, then the LoRAs")

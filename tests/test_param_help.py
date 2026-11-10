@@ -21,7 +21,9 @@ def test_every_field_on_a_form_is_explained(workflow_name):
     wf = WORKFLOW_REGISTRY[workflow_name]
     fields = {pd.key for pd in wf.param_definitions()} - set(wf.enhance_keys())
     missing = sorted(k for k in fields if not param_help(k))
-    assert missing == [], f"{workflow_name} fields with no help: {missing}"
+    assert missing == [], (
+        f"{workflow_name} fields with no help: {missing}; a key means the same in every "
+        "workflow, so its help is written once here rather than drifting apart in each")
 
 
 def test_no_help_is_written_for_a_setting_nothing_on_screen_shows():
@@ -108,7 +110,7 @@ def test_every_number_on_a_form_recommends_what_to_set_it_to(workflow_name):
     numbers = (ParamType.INT, ParamType.FLOAT)
     unadvised = sorted(pd.key for pd in WORKFLOW_REGISTRY[workflow_name].param_definitions()
                        if pd.type in numbers and pd.good is None and pd.key not in RECOMMENDED)
-    assert unadvised == []
+    assert unadvised == [], "the user asked for what to set it to on every number's tooltip"
 
 
 @pytest.mark.parametrize("workflow_name", list(WORKFLOW_REGISTRY))

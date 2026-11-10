@@ -123,7 +123,8 @@ def test_graph_model_params_reads_flux_gguf_unet():
               "inputs": {"unet_name": "ultrarealFineTune_v4_fp16.gguf"}},
         "8": {"class_type": "KSampler", "inputs": {"model": ["1", 0]}},
     }
-    assert graph_model_params(graph) == {"unet": "ultrarealFineTune_v4_fp16.gguf"}
+    assert graph_model_params(graph) == {"unet": "ultrarealFineTune_v4_fp16.gguf"}, (
+        "the gallery files a run into its folders by these values, whichever workflow made it")
 
 
 def test_graph_model_params_reads_a_lone_unet_loader_through_its_sampler():
@@ -164,7 +165,8 @@ def test_input_image_name_reads_the_loadimage_filename():
         "1": {"class_type": "LoadImage", "inputs": {"image": "sdxl_t2i_00022_.png"}},
         "5": {"class_type": "WanFirstLastFrameToVideo", "inputs": {"start_image": ["1", 0]}},
     }
-    assert input_image_name(graph) == "sdxl_t2i_00022_.png"
+    assert input_image_name(graph) == "sdxl_t2i_00022_.png", (
+        "the value the gallery links a video back to its image by")
 
 
 def test_input_image_name_none_without_a_string_source():

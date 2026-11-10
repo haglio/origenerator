@@ -405,6 +405,7 @@ OPTION_HELP: dict[str, dict[str, str]] = {
 }
 
 def param_help(key: str) -> str:
+    # Qt shows no tooltip at all for an empty string.
     return " ".join(filter(None, (PARAM_HELP.get(key, ""), RECOMMENDED.get(key, ""))))
 
 

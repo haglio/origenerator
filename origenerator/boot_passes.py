@@ -34,6 +34,7 @@ class BootPass:
     run: Callable[[Library], object]
     failure: str
     counted: str | None = None
+    asks_comfyui: bool = False
 
 
 def _import_new_files(library: Library):
@@ -154,7 +155,7 @@ MAINTENANCE = (
              counted="Copied %d record file(s) for backup",
              failure="Copying the records for backup failed: %s"),
     BootPass("Reconnecting to running generations...", reconnect_to_running_generations,
-             failure="Reconcile of in-flight generations failed: %s"),
+             failure="Reconcile of in-flight generations failed: %s", asks_comfyui=True),
     BootPass(None, tend_the_trash,
              counted="Emptied %d item(s) that had been in the Trash for a day",
              failure="Tending the Trash failed: %s"),
@@ -209,6 +210,14 @@ MAINTENANCE = (
     BootPass("Restoring folder bookmarks...", _reconcile_favorites,
              failure="Folder bookmark reconcile failed: %s"),
 )
+
+def without_comfyui(passes) -> tuple[BootPass, ...]:
+    return tuple(boot_pass for boot_pass in passes if not boot_pass.asks_comfyui)
+
+
+def asking_comfyui(passes) -> tuple[BootPass, ...]:
+    return tuple(boot_pass for boot_pass in passes if boot_pass.asks_comfyui)
+
 
 def run_maintenance(library: Library, passes, status, logger) -> None:
     for boot_pass in passes:

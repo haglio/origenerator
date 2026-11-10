@@ -10,6 +10,7 @@ import sqlite3
 import subprocess
 import sys
 import textwrap
+import threading
 from contextlib import ExitStack, closing, contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -1198,6 +1199,37 @@ def test_main_runs_every_maintenance_pass_in_the_documented_order(qapp):
         assert main([]) == 0
 
     assert ran == [name for _, name in _MAINTENANCE_PASSES]
+
+
+class _ComfyUIStillStarting:
+    def __init__(self, comes_up=True):
+        self.comes_up = comes_up
+        self.asked = threading.Event()
+        self.answer = threading.Event()
+
+    def __call__(self):
+        self.asked.set()
+        self.answer.wait(5)
+        return self.comes_up
+
+
+def test_a_hosted_boot_builds_its_window_while_comfyui_is_still_starting(qapp):
+    ran = []
+    starting = _ComfyUIStillStarting()
+    core = MagicMock(side_effect=lambda *a, **k: ran.append("Core") or MagicMock())
+
+    try:
+        with _a_faked_boot(ran, **{"origenerator.gui.core.Core": core,
+                                   "origenerator.gui.job_queue.BRING_UP_COMFYUI": starting}) as _, \
+             patch("origenerator.comfyui_launcher.ensure_comfyui_server") as ensure:
+            assert main(hosted_launch()) == 0
+            assert starting.asked.wait(5)
+    finally:
+        starting.answer.set()
+
+    ensure.assert_not_called()
+    assert ran == [name for _, name in _MAINTENANCE_PASSES
+                   if name != "reconcile_in_flight"] + ["Core"]
 
 
 _PASS_NAMES = [boot_pass.run.__name__ for boot_pass in MAINTENANCE]

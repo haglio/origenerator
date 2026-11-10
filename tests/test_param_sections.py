@@ -61,8 +61,8 @@ def test_sorting_a_workflows_keys_by_rank_is_stable_for_unknowns():
 def test_default_collapse_leaves_only_prompts_seed_and_the_workflow_open():
     open_sections = [s.title for s in ps.SECTIONS if not s.collapsed]
     assert open_sections == [ps.PROMPTS_TITLE, ps.WORKFLOW_TITLE], (
-        "the fields touched every run start open; the rest start collapsed so a fresh form is "
-        "compact")
+        "Prompts & Seed starts open, its fields touched every run, and Workflow, Models & LoRAs "
+        "because the user asked for it open; the rest start collapsed so a fresh form is compact")
 
 
 @pytest.mark.parametrize("workflow_name", list(WORKFLOW_REGISTRY))

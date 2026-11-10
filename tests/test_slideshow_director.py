@@ -1645,10 +1645,14 @@ def test_a_freeze_that_one_slideshow_refuses_still_reaches_the_rest(slideshows):
     director.open([("a.png", "image", "g1", None)], shape=LANDSCAPE)
     director.open([("b.png", "image", "g2", None)], shape=PORTRAIT)
     made[0].pause_raises = True
+    refused = []
 
-    director.set_room_paused(True)
+    try:
+        director.set_room_paused(True)
+    except RuntimeError as error:
+        refused.append(error)
 
-    assert made[1].paused is True, (
+    assert (refused, made[1].paused) == ([], True), (
         "each slideshow is its own step, so the freeze cannot be skipped when one raises: a "
         "freeze that stopped at the slideshows left the thumbnails running with no sign of why")
 

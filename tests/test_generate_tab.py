@@ -3647,17 +3647,18 @@ def test_a_modify_batch_knows_whether_anything_has_actually_been_rewritten():
 
 
 def test_a_modify_batch_cannot_be_edited_after_the_tab_opens_on_it():
-    assert type(_modify_batch()).__dataclass_params__.frozen, (
-        "what the tab opened on is how a press tells a rewrite from a run again; one that "
-        "could be edited could quietly come to agree with whatever was typed after it")
-    with pytest.raises(FrozenInstanceError):
+    try:
         _modify_batch().count = 9
+    except FrozenInstanceError:
+        return
+    pytest.fail(
+        "what the tab opened on is how a press tells a rewrite from a re-run; one that could "
+        "be edited could quietly come to agree with whatever was typed after it")
 
 
 def test_a_modify_batch_tab_shows_the_whole_folder_in_its_preview(modify_batch_tab):
     preview = modify_batch_tab._viewport
-    assert preview._stack.currentWidget() is preview._sheet
-    assert preview._sheet.count() == 3, (
+    assert (preview._stack.currentWidget() is preview._sheet, preview._sheet.count()) == (True, 3), (
         "a rewrite lands on every item in the folder, so the preview has to be every item: "
         "showing the newest one alone would say the edit was about that item")
 

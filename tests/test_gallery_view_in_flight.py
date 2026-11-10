@@ -473,10 +473,11 @@ def test_opening_a_runs_folder_from_its_tile_loads_no_saved_item(qtbot, tmp_path
 
     view._reveal_reroll(key)
 
-    view._generate_pane.load_selection.assert_not_called()
-    assert view._generate_pane.current_generate_tab().watched_key() == key, (
+    assert view._generate_pane.load_selection.call_count == 0, (
         "the open is a step on the way to that run's tile rather than somewhere browsed to, so "
-        "it lands on no saved item of its own")
+        "it lands on no saved item of its own: one would paint an item nobody asked for over the "
+        "very tab the run belongs to, and re-seed that tab's form from a saved row mid-run")
+    assert view._generate_pane.current_generate_tab().watched_key() == key
 
 
 def test_finishing_a_reroll_keeps_a_prompt_typed_while_it_ran(qtbot, tmp_path):

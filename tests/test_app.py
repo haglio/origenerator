@@ -107,16 +107,15 @@ def test_the_log_is_the_root_loggers_so_the_shared_libraries_write_to_it_too(mon
 
 def test_a_log_file_that_cannot_be_opened_still_leaves_the_console(monkeypatch, tmp_path):
     monkeypatch.setattr("origenerator.qt_messages.install_qt_message_logging", lambda: None)
-    monkeypatch.setattr("logging.basicConfig", lambda **how: None)
+    to_the_console = []
+    monkeypatch.setattr("logging.basicConfig", lambda **how: to_the_console.append(how))
 
     with logging_left_alone() as configure, exception_hooks_left_alone():
         configure.side_effect = OSError("the log file cannot be opened")
-        try:
-            logger = _configure_logging(tmp_path)
-        except OSError:
-            pytest.fail("console logging still works if the file cannot be opened")
+        _configure_logging(tmp_path)
 
-    assert logger is not None
+    assert len(to_the_console) == 1, (
+        "console logging still works if the file cannot be opened")
 
 
 def test_an_error_nothing_catches_is_logged_and_the_app_keeps_running(tmp_path):

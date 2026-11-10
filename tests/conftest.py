@@ -67,6 +67,7 @@ def _unscaled_between_tests():
         else:
             os.environ["QT_SCALE_FACTOR"] = before
 
+# Qt reads this as the QApplication is created, so it is set before pytest-qt's qapp fixture makes one.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
@@ -488,6 +489,7 @@ def _collect_widgets_between_tests(_widgets_registered_this_test):
     """Widgets form reference cycles whose C++ objects linger until the cyclic collector runs; collect after each test, then deliver the deletions, and drain again at each test's start because pytest releases the last test's fixtures after every teardown hook."""
     _deliver_the_deletions_already_scheduled()
     yield
+    # By now pytest-qt has closed what the test registered, so letting go of it here cannot free anything Qt is still drawing.
     _widgets_registered_this_test.clear()
     gc.collect()
     _deliver_the_deletions_already_scheduled()

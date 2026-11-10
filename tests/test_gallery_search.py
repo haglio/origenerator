@@ -85,6 +85,7 @@ def controller(qtbot):
         qtbot.addWidget(parent)
         found = GallerySearchController(host or FakeHost(), parent=parent, expander=expander)
         found.index.update(list(rows))
+        # A QObject whose parent is collected takes its timers down with it, so each parent is kept.
         built.append((parent, found))
         return found
 

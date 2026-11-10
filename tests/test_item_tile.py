@@ -542,7 +542,9 @@ def test_a_streamed_frame_paints_the_thumbnail_under_the_overlays(qtbot):
 
     tw.set_enhancing(_run(frame=_png_bytes()))
 
-    assert not tw._image_label.pixmap().isNull()
+    assert not tw._image_label.pixmap().isNull(), (
+        "the scrim dims the thumbnail rather than replacing it: the base render is out and "
+        "worth looking at, which is the point of generating it first")
     assert tw._status_scrim.text() == "Enhancing…"
     assert not tw._enhancing_bar.isHidden()
 

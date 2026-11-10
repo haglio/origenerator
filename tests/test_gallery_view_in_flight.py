@@ -474,7 +474,9 @@ def test_opening_a_runs_folder_from_its_tile_loads_no_saved_item(qtbot, tmp_path
     view._reveal_reroll(key)
 
     view._generate_pane.load_selection.assert_not_called()
-    assert view._generate_pane.current_generate_tab().watched_key() == key
+    assert view._generate_pane.current_generate_tab().watched_key() == key, (
+        "the open is a step on the way to that run's tile rather than somewhere browsed to, so "
+        "it lands on no saved item of its own")
 
 
 def test_finishing_a_reroll_keeps_a_prompt_typed_while_it_ran(qtbot, tmp_path):
@@ -2478,7 +2480,8 @@ def test_going_to_a_runs_folder_is_a_stop_and_a_visit(qtbot, tmp_path):
 
     view._reveal_reroll(key)
 
-    assert [base_of(visit) for visit in view._folder_history] == [key]
+    assert [base_of(visit) for visit in view._folder_history] == [key], (
+        "the folder is a stop and a visit all the same, both recorded once the tile is picked")
     view._navigation.go_back()
     assert view._tree.currentItem() is _image_workflow(view._tree)
 

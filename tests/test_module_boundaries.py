@@ -15,6 +15,8 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 QT_FREE = (
+    "origenerator.gallery",
+    "origenerator.experiments.policy",
     "origenerator.gallery.tree",
     "origenerator.search",
     "origenerator.app",
@@ -83,6 +85,22 @@ def test_the_experiment_policy_asks_no_language_model():
     assert _loaded_after_importing(
         "origenerator.experiments.policy", "origenerator.local_llm") is False, \
         "it works from the gallery's rows alone, so it runs offline and with a random source handed in"
+
+
+OPENS_WINDOWS = {"action_setter_tool.py", "app.py", "check_animations.py", "downtime.py",
+                 "own_window.py"}
+
+
+def test_only_what_opens_a_window_imports_the_widget_package():
+    package = REPO_ROOT / "origenerator"
+    reaching_in = {
+        path.name for path in package.rglob("*.py")
+        if "gui" not in path.relative_to(package).parts
+        and any(isinstance(node, (ast.Import, ast.ImportFrom))
+                and "origenerator.gui" in ast.unparse(node)
+                for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))))}
+
+    assert reaching_in == OPENS_WINDOWS, "imports run upward: nothing below the widgets reaches in"
 
 
 def test_timing_loads_no_database():

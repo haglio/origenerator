@@ -103,7 +103,8 @@ def test_the_detail_pass_is_one_of_the_settings_the_panel_sets():
 
 def test_the_default_model_leaves_the_source_image_its_own_checkpoint():
     params = enhance_params_for(_source_row(), EnhanceSettings())
-    assert params["checkpoint"] == "anemone_v3.safetensors"
+    assert params["checkpoint"] == "anemone_v3.safetensors", (
+        "the model that made an image keeps its enhancement in the image's own style")
 
 
 def test_pinning_a_model_in_the_folder_overrides_the_sources_own():
@@ -166,7 +167,8 @@ def test_an_inline_enhanced_image_lists_the_one_enhancement_it_received():
     }))
     (version,) = enhancement_versions(row)
     assert version.label == "Enhancement 1/1"
-    assert version.settings == "2x · 20 steps · 0.15 redraw"
+    assert version.settings == "2x · 20 steps · 0.15 redraw", (
+        "named by the settings its tail ran at, it can still be dragged onto the pane and reused")
     assert version.file["filename"] == "sdxl_t2i_src.png"
 
 
@@ -271,12 +273,20 @@ def test_describe_names_a_pinned_model_by_its_title_but_not_the_source_matching_
     assert describe_enhance_params({
         "enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.15,
         "checkpoint": MATCH_SOURCE_MODEL,
-    }) == "2x · 20 steps · 0.15 redraw"
+    }) == "2x · 20 steps · 0.15 redraw", (
+        "a default is no choice, and the caption is the one place two versions show how they differ")
     assert describe_enhance_params({
         "enhance_scale": 2.0, "checkpoint": "driftwood_v1.safetensors",
     }) == "2x · Driftwood v1"
     assert describe_enhance_params({}) == ""
 
+
+
+def test_a_version_that_recorded_no_pass_over_parts_keeps_none():
+    assert "enhance_detail_fixes" not in version_settings(
+        {"enhance_scale": 2.0, "enhance_detail_fixes": {}}), (
+        "an empty record would set a version whose settings are unknown "
+        "apart from one that recorded nothing at all")
 
 
 def test_an_unenhanced_image_still_lists_its_one_file_as_the_original():
@@ -325,7 +335,9 @@ def test_removing_an_enhancement_leaves_the_others(tmp_path):
     older = json.loads(row["enhance_history"])[1]
     assert older["filename"] == "image_enhance_00001_.png"
     assert older["params"] == {"enhance_scale": 2.0}
-    assert json.loads(after["enhance_history"]) == [older]
+    assert json.loads(after["enhance_history"]) == [older], (
+        "the removed enhancement's record goes with it, "
+        "and with that the place in Latest it had lifted the image to")
 
 
 def test_removing_the_last_enhancement_leaves_a_plain_image(tmp_path):
@@ -453,7 +465,8 @@ def test_a_part_with_nothing_to_find_it_is_dropped_from_a_combination(monkeypatc
 
     params = fix_params_for(_source_row(), _spoken("fix hands and mouth"))
 
-    assert params["enhance_detail_fixes"] == {"hands": DEFAULT_FIX_DENOISE}
+    assert params["enhance_detail_fixes"] == {"hands": DEFAULT_FIX_DENOISE}, (
+        "ComfyUI refuses the whole prompt for one detector it cannot find")
 
 
 def test_a_spoken_fix_runs_the_part_at_the_number_the_panel_gives_it(monkeypatch):
@@ -510,7 +523,8 @@ def test_asking_again_for_a_part_already_fixed_fixes_it_harder(tmp_path, monkeyp
 
     params = fix_params_for(db.get_generation("src"), _spoken("fix hands"))
 
-    assert params["enhance_detail_fixes"] == {"hands": 0.55}
+    assert params["enhance_detail_fixes"] == {"hands": 0.55}, (
+        "the same fix again would draw the same hands")
 
 
 def test_a_part_fixed_as_hard_as_a_fix_goes_reads_as_the_duplicate_it_is(

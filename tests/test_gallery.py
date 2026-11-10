@@ -426,6 +426,8 @@ def test_settings_signature_gives_imports_and_live_forms_the_current_generation(
         == settings_signature("sdxl_t2i", reroll, None, workflow_version=wf.version)
     assert settings_signature("sdxl_t2i", "{}", None, workflow_version="imported") \
         == settings_signature("sdxl_t2i", reroll)
+    assert settings_signature("sdxl_t2i", "{}", None, workflow_version="unknown") \
+        == settings_signature("sdxl_t2i", reroll), "the spelling imports stored before \"imported\""
 
 
 def test_settings_signature_ignores_the_enhancement():

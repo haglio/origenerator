@@ -142,6 +142,7 @@ SCHEMA = {
     ),
 }
 
+SQLITES_OWN_INDEX_FOR_A_PRIMARY_KEY = "sqlite_autoindex_"
 DECLARED_INDEXES = (
     "idx_generations_created",
     "idx_generations_status",
@@ -179,31 +180,36 @@ def _tables(conn: sqlite3.Connection) -> set[str]:
 
 
 def test_the_database_holds_exactly_these_tables(opened):
-    assert _tables(opened) == set(SCHEMA)
+    assert _tables(opened) == set(SCHEMA), (
+        "the schema is one text in one module: the salvage rebuilds a damaged file from it, "
+        "and the migration patches every table at once")
 
 
 @pytest.mark.parametrize("table", sorted(SCHEMA))
 def test_a_tables_columns_are_what_they_have_always_been(opened, table):
-    assert _columns(opened, table) == SCHEMA[table]
+    assert _columns(opened, table) == SCHEMA[table], (
+        "an added column fails here on purpose: Evolver reads this file and every library's "
+        "database is migrated in place, so a column is written down twice, there and here; "
+        "older copies of the app open it too, so no stored name changes")
 
 
 def test_the_declared_indexes_are_all_still_declared(opened):
     named = {
         row[0] for row in opened.execute(
             "SELECT name FROM sqlite_master WHERE type = 'index'")
-        if not row[0].startswith("sqlite_autoindex_")
+        if not row[0].startswith(SQLITES_OWN_INDEX_FOR_A_PRIMARY_KEY)
     }
 
     assert named == set(DECLARED_INDEXES)
 
 
 def test_evolvers_own_select_still_runs_against_this_database(opened):
-    evolver_select = (
+    select_in_evolvers_origenerator_metadata = (
         "SELECT prompt_id, positive_prompt, negative_prompt, seed, "
         "params_json, output_files, created_at FROM generations"
     )
 
-    assert opened.execute(evolver_select).fetchall() == []
+    assert opened.execute(select_in_evolvers_origenerator_metadata).fetchall() == []
 
 
 def test_the_seven_columns_evolver_pins_are_in_the_snapshot():
@@ -212,7 +218,7 @@ def test_the_seven_columns_evolver_pins_are_in_the_snapshot():
     assert set(EVOLVER_COLUMNS) <= declared
 
 
-def test_a_read_only_open_of_the_file_sees_the_whole_generations_table(tmp_path):
+def test_opened_read_only_as_evolver_opens_it_the_file_shows_the_whole_generations_table(tmp_path):
     path = tmp_path / "origenerator.db"
     Database(path)
 
@@ -273,7 +279,7 @@ def test_every_column_either_shipped_with_the_table_or_the_migration_adds_it(tab
 
 
 
-def _create_without(conn: sqlite3.Connection, table: str, dropped: set) -> None:
+def _todays_table_without(conn: sqlite3.Connection, table: str, dropped: set) -> None:
     columns = []
     for name, type_, not_null, default, pk in SCHEMA[table]:
         if name in dropped:
@@ -294,7 +300,7 @@ def _create_without(conn: sqlite3.Connection, table: str, dropped: set) -> None:
 def test_a_database_made_before_these_columns_gains_every_one(tmp_path, table):
     path = tmp_path / f"older-{table}.db"
     with sqlite3.connect(path) as conn:
-        _create_without(conn, table, set(ADDED_COLUMNS[table]))
+        _todays_table_without(conn, table, set(ADDED_COLUMNS[table]))
 
     Database(path)
 
@@ -307,7 +313,7 @@ def test_opening_a_database_that_is_already_up_to_date_changes_nothing_in_it(tmp
     path = tmp_path / "older.db"
     with sqlite3.connect(path) as conn:
         for table in ADDED_COLUMNS:
-            _create_without(conn, table, set(ADDED_COLUMNS[table]))
+            _todays_table_without(conn, table, set(ADDED_COLUMNS[table]))
     Database(path)
     with sqlite3.connect(path) as conn:
         once = conn.execute("SELECT name, sql FROM sqlite_master ORDER BY name").fetchall()
@@ -322,7 +328,7 @@ def test_opening_a_database_that_is_already_up_to_date_changes_nothing_in_it(tmp
 def test_a_migrated_column_is_declared_the_way_the_schema_declares_it(tmp_path, table):
     path = tmp_path / f"older-{table}.db"
     with sqlite3.connect(path) as conn:
-        _create_without(conn, table, set(ADDED_COLUMNS[table]))
+        _todays_table_without(conn, table, set(ADDED_COLUMNS[table]))
 
     Database(path)
 
@@ -353,6 +359,8 @@ def test_a_library_that_named_the_folder_holdings_the_old_way_keeps_them(tmp_pat
 
     db = Database(path)
 
+    assert "custom_folder_items" in db_schema.RENAMED_TABLES.values(), (
+        "the entry stays for as long as a database written before the rename might be opened")
     assert db.list_custom_collections() == [
         {"id": 1, "name": "Favorites", "side": None,
          "folders": ["image/sdxl_t2i", "image/flux_t2i"], "items": []}]
@@ -367,7 +375,7 @@ def _row_with(params: dict) -> tuple:
 def test_a_seed_kept_before_kinds_were_is_a_videos_when_a_sound_seed_was_kept_with_it(tmp_path):
     path = tmp_path / "origenerator.db"
     with sqlite3.connect(path) as conn:
-        _create_without(conn, "seed_uses", {"media_type"})
+        _todays_table_without(conn, "seed_uses", {"media_type"})
         conn.executemany(
             "INSERT INTO seed_uses (kind, seed_key, seed, created_at) VALUES (?, ?, ?, ?)",
             [("drawn", "noise_seed", 11, "2026-10-20 10:00:00"),

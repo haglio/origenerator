@@ -658,6 +658,16 @@ def test_reset_is_faded_while_the_slideshow_is_at_its_defaults(qtbot, tmp_path):
     assert not _band_button(slideshow, "reset").dim
 
 
+def test_reset_is_offered_under_original_only_and_turns_it_off(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(enhanced_ids={"id-2"}))
+    slideshow.show_originals_only()
+
+    assert not _band_button(slideshow, "reset").dim
+    assert answer(slideshow, "reset")
+
+    assert (slideshow.hud_originals_mode, slideshow.pass_size()) == (False, 3)
+
+
 def test_reset_is_offered_while_the_funestra_plays_off_the_normal_speed(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.mp4")
     assert _band_button(slideshow, "reset").dim
@@ -974,6 +984,51 @@ def test_a_slideshow_on_a_funestra_hands_it_the_filters_it_takes_up(qtbot, tmp_p
     slideshow.take_up(SlideshowFilters(enhanced=True))
 
     assert slideshow.hud_enhanced_mode
+    assert [str(item.path) for item in read_playlist(slideshow.channel.playlist)] == [
+        "two.png", "three.png"]
+
+
+def test_original_only_plays_what_is_not_enhanced(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(enhanced_ids={"id-2", "id-3"}))
+
+    assert slideshow.show_originals_only() is True
+
+    assert slideshow.hud_originals_mode
+    assert [str(item.path) for item in read_playlist(slideshow.channel.playlist)] == ["one.png"]
+
+
+def test_original_only_turns_enhanced_only_off(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(enhanced_ids={"id-2", "id-3"}))
+    slideshow.set_enhanced_mode(True)
+
+    slideshow.show_originals_only()
+
+    assert (slideshow.hud_enhanced_mode, slideshow.hud_originals_mode) == (False, True)
+
+
+def test_enhanced_and_original_lifts_either_and_leaves_f_mode_and_the_action_filter(
+        qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of),
+                           hud=HudFacts(favorite_ids={"id-1", "id-2", "id-3"},
+                                        enhanced_ids={"id-3"}))
+    slideshow.set_favorites_filter(True)
+    slideshow.action_presses.filter("alpha")
+    for narrow in (slideshow.show_originals_only, lambda: slideshow.set_enhanced_mode(True)):
+        assert narrow() is True
+
+        assert slideshow.show_enhanced_and_original() is True
+
+        assert (slideshow.hud_enhanced_mode, slideshow.hud_originals_mode) == (False, False)
+        assert (slideshow.hud_favorites_filter, slideshow.hud_action_filter) == (True, "alpha")
+
+
+def test_the_enhanced_button_pressed_under_original_only_turns_enhanced_only_on(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(enhanced_ids={"id-2", "id-3"}))
+    slideshow.show_originals_only()
+
+    assert answer(slideshow, "enhanced")
+
+    assert (slideshow.hud_enhanced_mode, slideshow.hud_originals_mode) == (True, False)
     assert [str(item.path) for item in read_playlist(slideshow.channel.playlist)] == [
         "two.png", "three.png"]
 

@@ -263,7 +263,7 @@ def test_a_voice_that_cannot_speak_answers_with_its_reason(qtbot):
     assert answers == ["the voice broke"]
 
 
-def test_a_spoken_story_whose_send_is_refused_ends_failed_with_no_one_to_raise_to(qtbot, tmp_path):
+def test_a_refused_send_after_speaking_fails_the_job(qtbot, tmp_path):
     client, speaker = _client(), _Speaker()
     client.submit_job = MagicMock(side_effect=RuntimeError("the graph was refused"))
     job = GenerationJob(client, JobSpec(I2V, _spoken_params()), JobFolders(input_dir=tmp_path), speaker=speaker)

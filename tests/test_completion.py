@@ -8,7 +8,6 @@ from PIL import Image
 
 import origenerator.workflows.wan22_animate as animate
 from origenerator import completion, config, gallery
-from origenerator.completion import extract_completion
 from origenerator.config import MOTION_DEFAULT_HZ
 from origenerator.funscript import (
     funscript_of,
@@ -45,7 +44,7 @@ def _history_with_duration(seconds):
 
 
 def test_extracts_output_files(tmp_path):
-    files, thumb, duration = extract_completion(
+    files, thumb, duration = completion.extract_completion(
         SDXL, SDXL_HISTORY, OutputFolders(OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs"), "n1"
     )
     assert files == [{"filename": "a.png", "subfolder": ""}]
@@ -58,7 +57,7 @@ def test_renders_thumbnail_when_output_is_on_disk(tmp_path):
     out.mkdir()
     Image.new("RGB", (8, 8), (10, 20, 30)).save(out / "a.png")
 
-    _files, thumb, _dur = extract_completion(
+    _files, thumb, _dur = completion.extract_completion(
         SDXL, SDXL_HISTORY, OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "n1"
     )
 
@@ -71,7 +70,7 @@ def test_a_thumbnail_that_cannot_be_drawn_never_strands_a_finished_run(tmp_path)
     out.mkdir()
     (out / "a.png").write_bytes(b"this is not a picture")
 
-    files, thumb, duration = extract_completion(
+    files, thumb, duration = completion.extract_completion(
         SDXL, _history_with_duration(3.0), OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "n1"
     )
 
@@ -90,7 +89,7 @@ def test_a_duration_that_cannot_be_read_never_strands_a_finished_run(tmp_path, m
 
     monkeypatch.setattr(completion, "execution_duration_seconds", unreadable)
 
-    files, _thumb, duration = extract_completion(
+    files, _thumb, duration = completion.extract_completion(
         SDXL, _history_with_duration(3.0), OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "n1"
     )
 
@@ -100,14 +99,14 @@ def test_a_duration_that_cannot_be_read_never_strands_a_finished_run(tmp_path, m
 
 
 def test_parses_execution_duration(tmp_path):
-    _files, _thumb, duration = extract_completion(
+    _files, _thumb, duration = completion.extract_completion(
         SDXL, _history_with_duration(12.5), OutputFolders(OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs"), "n1"
     )
     assert duration == 12.5
 
 
 def test_no_output_yields_no_files_or_thumbnail(tmp_path):
-    files, thumb, _dur = extract_completion(
+    files, thumb, _dur = completion.extract_completion(
         SDXL, {"outputs": {}}, OutputFolders(OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs"), "n1"
     )
     assert files == []
@@ -118,7 +117,7 @@ def test_a_completed_video_has_its_thumbnail_ready_to_animate(tmp_path):
     out = tmp_path / "out"
     write_mp4(out / "video" / "wan22_i2v_00001_.mp4")
 
-    extract_completion(I2V, _video_history("19", "images", "wan22_i2v_00001_.mp4"),
+    completion.extract_completion(I2V, _video_history("19", "images", "wan22_i2v_00001_.mp4"),
                        OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "n1")
 
     assert animated_thumbnail_path(tmp_path / "thumbs", "n1").exists()
@@ -129,7 +128,7 @@ def test_a_completed_image_has_no_thumbnail_to_animate(tmp_path):
     out.mkdir()
     Image.new("RGB", (8, 8)).save(out / "a.png")
 
-    extract_completion(SDXL, SDXL_HISTORY, OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "n1")
+    completion.extract_completion(SDXL, SDXL_HISTORY, OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "n1")
 
     assert not animated_thumbnail_path(tmp_path / "thumbs", "n1").exists()
 
@@ -143,7 +142,7 @@ def test_completing_a_video_synthesizes_a_funscript(tmp_path, monkeypatch):
         "origenerator.completion.synthesize_funscript",
         lambda video_path, *, hz, places: calls.append((Path(video_path), hz, places)),
     )
-    extract_completion(
+    completion.extract_completion(
         I2V, _video_history("19", "images", "wan22_i2v_00001_.mp4"),
         OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "n1",
     )
@@ -156,11 +155,11 @@ def test_a_video_given_a_deleted_videos_name_is_scripted_for_its_own_length(tmp_
     video = out / "video" / "wan22_i2v_00001_.mp4"
     history = _video_history("19", "images", video.name)
     write_mp4(video, seconds=15.0)
-    extract_completion(I2V, history, OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "deleted")
+    completion.extract_completion(I2V, history, OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "deleted")
     video.unlink()
 
     write_mp4(video, seconds=5.0)
-    extract_completion(I2V, history, OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "namesake")
+    completion.extract_completion(I2V, history, OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "namesake")
 
     assert read_actions(funscript_of(video, places=OutputPlaces.in_one_folder(out))) == synthesize_actions(
         video_duration_seconds(video), hz=MOTION_DEFAULT_HZ)
@@ -177,7 +176,7 @@ def test_a_video_made_for_genau_is_scripted_as_exactly_one_cycle(tmp_path, monke
         partial(synthesize_funscript, duration_provider=lambda _video: cycle_seconds),
     )
 
-    extract_completion(
+    completion.extract_completion(
         FLF2V, _video_history("16", "gifs", video.name),
         OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "n1",
     )
@@ -206,7 +205,7 @@ def test_a_video_performed_from_a_library_video_takes_that_videos_script(tmp_pat
                         lambda *a, **k: metronome.append((a, k)))
     params = dict(performs.default_params(), video=str(driving), video_start=2.0, frame_count=81)
 
-    extract_completion(performs, _video_history("24", "gifs", video.name),
+    completion.extract_completion(performs, _video_history("24", "gifs", video.name),
                        OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "n1", params=params)
 
     assert read_actions(funscript_of(video, places=OutputPlaces.in_one_folder(out))) == (
@@ -221,7 +220,7 @@ def test_completing_an_image_writes_no_funscript(tmp_path, monkeypatch):
         "origenerator.completion.synthesize_funscript",
         lambda *a, **k: calls.append((a, k)),
     )
-    extract_completion(SDXL, SDXL_HISTORY, OutputFolders(OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs"), "n1")
+    completion.extract_completion(SDXL, SDXL_HISTORY, OutputFolders(OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs"), "n1")
     assert calls == []
 
 
@@ -233,7 +232,7 @@ def test_a_script_that_cannot_be_written_never_strands_a_finished_video(tmp_path
         raise OSError("disk full")
 
     monkeypatch.setattr("origenerator.completion.synthesize_funscript", refuse)
-    files, _thumb, _duration = extract_completion(
+    files, _thumb, _duration = completion.extract_completion(
         I2V, _video_history("19", "images", video.name), OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "n1")
 
     assert files == [{"filename": video.name, "subfolder": "video"}]
@@ -250,7 +249,7 @@ def test_a_finished_run_is_filed_in_the_library_before_its_thumbnail_is_drawn(tm
     history = {"outputs": {"7": {"images": [
         {"filename": "sdxl_t2i_00001_.png", "subfolder": "origenerator/n1/image", "type": "output"}]}}}
 
-    files, thumb, _duration = extract_completion(SDXL, history, OutputFolders(places, tmp_path / "thumbs"), "n1")
+    files, thumb, _duration = completion.extract_completion(SDXL, history, OutputFolders(places, tmp_path / "thumbs"), "n1")
 
     assert files == [{"filename": "sdxl_t2i_00001_.png", "subfolder": "image", "type": "output"}]
     assert (places.images / "sdxl_t2i_00001_.png").is_file()

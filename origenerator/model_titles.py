@@ -6,8 +6,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import PurePosixPath
 
+from app_support.comfy_file_refs import reference_basename
+
 from origenerator import config
-from origenerator.file_refs import reference_basename
 from origenerator.workflows.model_arch import safetensors_metadata
 
 _QUANTIZED_FLUX_SUFFIX = ".gguf"

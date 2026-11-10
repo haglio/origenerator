@@ -11,7 +11,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import NamedTuple
 
-from origenerator.file_refs import OUTPUT_TAG, TEMP_TAG, reference_place, split_annotation
+from app_support.comfy_file_refs import OUTPUT_TAG, TEMP_TAG, split_annotation
+
+from origenerator.file_refs import reference_place
 from origenerator.output_places import OutputPlaces
 
 HANDED_OVER = "origenerator"

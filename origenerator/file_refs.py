@@ -2,33 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from app_support.comfy_file_refs import INPUT_TAG, OUTPUT_TAG, TEMP_TAG, split_annotation
+
 from origenerator.output_places import OutputPlaces
-
-# ComfyUI's LoadImage annotates a non-input source as "name [output|input|temp]".
-TYPE_ANNOTATIONS = frozenset({"[output]", "[input]", "[temp]"})
-OUTPUT_TAG = "[output]"
-INPUT_TAG = "[input]"
-TEMP_TAG = "[temp]"
-
-
-def split_annotation(image_ref: str | None) -> tuple[str, str]:
-    ref = (image_ref or "").strip()
-    stem, _, tag = ref.rpartition(" ")
-    if stem and tag in TYPE_ANNOTATIONS:
-        return stem, tag
-    return ref, ""
-
-
-def unannotated(image_ref: str | None) -> str:
-    return split_annotation(image_ref)[0]
-
-
-def reference_basename(path: str | None) -> str:
-    return (path or "").replace("\\", "/").rsplit("/", 1)[-1]
-
-
-def frame_name(image_ref: str | None) -> str:
-    return reference_basename(unannotated(image_ref)).lower()
 
 
 def reference_path(

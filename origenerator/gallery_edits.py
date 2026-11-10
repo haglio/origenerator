@@ -5,9 +5,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support.comfy_file_refs import frame_name
+
 from origenerator import trash_collection
 from origenerator.db_generations import library_paths_in
-from origenerator.file_refs import frame_name
 from origenerator.gallery import (
     generation_of_file,
     output_disk_files,

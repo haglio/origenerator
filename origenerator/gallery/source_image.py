@@ -4,13 +4,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cache, partial
 
+from app_support.comfy_file_refs import frame_name
+
 from origenerator.gallery.output import (
     frame_names_of,
     input_image_reference,
     media_type_of_row,
 )
 from origenerator.gallery.signatures import (
-    _frame_name,
     _registered,
     parse_params,
     settings_signature,
@@ -34,7 +35,7 @@ def source_image_id_for(input_image: str | None, image_rows: list[dict]) -> str 
 def _image_named(input_image: str | None, image_rows: list[dict]) -> dict | None:
     if not input_image:
         return None
-    target = _frame_name(input_image)
+    target = frame_name(input_image)
     return next((image for image in image_rows
                  if target in frame_names_of(image.get("output_files"))), None)
 
@@ -67,12 +68,12 @@ def source_image_id_in(row: dict, image_index: dict) -> str | None:
 
 
 def source_image_id_of(input_image: str | None, image_index: dict) -> str | None:
-    entry = image_index.get(_frame_name(input_image))
+    entry = image_index.get(frame_name(input_image))
     return (entry.prompt_id or None) if entry is not None else None
 
 
 def rebuildable_source_image_id_in(row: dict, image_index: dict) -> str | None:
-    entry = image_index.get(_frame_name(_start_frame_of(row)))
+    entry = image_index.get(frame_name(_start_frame_of(row)))
     return (entry.prompt_id or None) if entry is not None and entry.rebuildable else None
 
 

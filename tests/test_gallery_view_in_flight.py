@@ -1615,7 +1615,7 @@ def test_a_queued_job_carries_a_few_thumbnails_from_the_folder_it_joins(qtbot):
     ), (
         "a queued job's own output does not exist yet, so its row can only be recognized by "
         "thumbnails of something else: what its folder already holds says where the run is "
-        "headed")
+        "headed, newest first, since the newest are what the user was just looking at")
 
 
 def test_the_first_run_of_new_settings_has_no_folder_to_show(qtbot):

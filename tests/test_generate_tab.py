@@ -67,8 +67,8 @@ from origenerator.gallery.tree import settings_folder_key
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import corner_buttons, diff_text, icons
-from origenerator.gui import folder_modify as folder_modify_module
 from origenerator.gui import generate_tab as generate_tab_module
+from origenerator.gui import modify_batch as modify_batch_module
 from origenerator.gui.action_row import SIDE_LABELS, action_checkbox, action_pills
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.drags import under_way
@@ -2816,7 +2816,7 @@ def _each_press_launches_a_run(tab):
         tab.note_launched(f"run {len(tab.launched_runs())}",
                           made_of=tab._param_form.get_values())
     tab.generate_requested.connect(launch)
-    tab.modify_requested.connect(launch)
+    tab.modify_batch_requested.connect(launch)
 
 
 def test_generate_takes_the_red_and_green_off_its_prompts(saved_panel, qtbot):
@@ -3546,8 +3546,8 @@ def _images(tmp_path, count):
 
 
 @pytest.fixture
-def modifying(blank_panel, tmp_path):
-    blank_panel.open_folder_modify(_FOLDER_KEY, _FOLDER_LABEL, "sdxl_t2i",
+def modify_batch_tab(blank_panel, tmp_path):
+    blank_panel.open_modify_batch(_FOLDER_KEY, _FOLDER_LABEL, "sdxl_t2i",
                                     _folder_params(), _images(tmp_path, 3))
     return blank_panel
 
@@ -3556,12 +3556,12 @@ def _positive_field(tab):
     return tab._param_form._widgets["positive_prompt"].boxes()[0]
 
 
-def test_a_tab_asking_for_changes_to_a_folder_has_no_dropdown_of_how_many(modifying):
-    assert modifying._how_many.isHidden()
+def test_a_tab_asking_for_changes_to_a_folder_has_no_dropdown_of_how_many(modify_batch_tab):
+    assert modify_batch_tab._how_many.isHidden()
 
-    modifying.prefill("sdxl_t2i", _folder_params())
+    modify_batch_tab.prefill("sdxl_t2i", _folder_params())
 
-    assert not modifying._how_many.isHidden()
+    assert not modify_batch_tab._how_many.isHidden()
 
 
 def _top_right_corner(widget):
@@ -3569,75 +3569,75 @@ def _top_right_corner(widget):
     return widget.window().grab().toImage().pixelColor(corner.x(), corner.y())
 
 
-def test_generate_keeps_rounded_corners_with_its_dropdown_and_without(modifying, app_chrome):
-    modifying.show()
+def test_generate_keeps_rounded_corners_with_its_dropdown_and_without(modify_batch_tab, app_chrome):
+    modify_batch_tab.show()
     QApplication.processEvents()
-    pair = modifying._generate_btn.parentWidget()
+    pair = modify_batch_tab._generate_btn.parentWidget()
     assert _top_right_corner(pair) == BG_PRIMARY
 
-    modifying.prefill("sdxl_t2i", _folder_params())
+    modify_batch_tab.prefill("sdxl_t2i", _folder_params())
     QApplication.processEvents()
 
     assert _top_right_corner(pair) == BG_PRIMARY
 
 
-def _modify(count=3, label=_FOLDER_LABEL, opened_on=None):
-    return folder_modify_module.FolderModify(
+def _modify_batch(count=3, label=_FOLDER_LABEL, opened_on=None):
+    return modify_batch_module.ModifyBatch(
         folder_key=_FOLDER_KEY, label=label, count=count,
         opened_on=opened_on or ConfigSnapshot("sdxl_t2i", _folder_params(), False))
 
 
-def test_a_modify_names_itself_after_the_folder_it_asks_about():
-    assert _modify().title() == f"Modify batch {_FOLDER_LABEL}"
+def test_a_modify_batch_names_itself_after_the_folder_it_asks_about():
+    assert _modify_batch().title() == f"Modify batch {_FOLDER_LABEL}"
 
 
-def test_a_modify_counts_its_runs_in_the_hover_rather_than_on_the_button():
-    assert _modify(count=3).caption() == "Modify batch (all seeds)"
-    assert "all 3 images" in _modify(count=3).tooltip()
+def test_a_modify_batch_counts_its_runs_in_the_hover_rather_than_on_the_button():
+    assert _modify_batch(count=3).caption() == "Modify batch (all seeds)"
+    assert "all 3 images" in _modify_batch(count=3).tooltip()
 
 
 def test_a_one_image_folder_gets_wording_of_its_own():
-    tooltip = _modify(count=1).tooltip()
+    tooltip = _modify_batch(count=1).tooltip()
     assert "one image" in tooltip
     assert "1 image" not in tooltip
 
 
-def test_a_modify_knows_whether_anything_has_actually_been_rewritten():
+def test_a_modify_batch_knows_whether_anything_has_actually_been_rewritten():
     opened_on = ConfigSnapshot("sdxl_t2i", _folder_params(), False)
-    request = _modify(opened_on=opened_on)
+    request = _modify_batch(opened_on=opened_on)
 
     assert request.is_unchanged(ConfigSnapshot("sdxl_t2i", _folder_params(), False))
     assert not request.is_unchanged(
         ConfigSnapshot("sdxl_t2i", _folder_params(prompt="a dog on a couch"), False))
 
 
-def test_a_modify_cannot_be_edited_after_the_tab_opens_on_it():
+def test_a_modify_batch_cannot_be_edited_after_the_tab_opens_on_it():
     with pytest.raises(FrozenInstanceError):
-        _modify().count = 9
+        _modify_batch().count = 9
 
 
-def test_a_modify_tab_shows_the_whole_folder_in_its_preview(modifying):
-    preview = modifying._viewport
+def test_a_modify_batch_tab_shows_the_whole_folder_in_its_preview(modify_batch_tab):
+    preview = modify_batch_tab._viewport
     assert preview._stack.currentWidget() is preview._sheet
     assert preview._sheet.count() == 3
 
 
-def test_the_press_asks_for_changes_and_counts_them_in_the_hover(modifying):
-    assert modifying._generate_btn.text() == "Modify batch (all seeds)"
-    assert "all 3 images" in modifying._generate_btn.toolTip()
+def test_the_press_asks_for_changes_and_counts_them_in_the_hover(modify_batch_tab):
+    assert modify_batch_tab._generate_btn.text() == "Modify batch (all seeds)"
+    assert "all 3 images" in modify_batch_tab._generate_btn.toolTip()
 
 
-def test_every_prompt_is_marked_against_what_it_says_now(modifying):
-    fields = modifying._param_form.text_fields()
+def test_every_prompt_is_marked_against_what_it_says_now(modify_batch_tab):
+    fields = modify_batch_tab._param_form.text_fields()
     assert all(w.findChildren(_Tracker) for w in fields)
     assert {w.toPlainText() for w in fields} == {"a cat on a couch", "blurry"}
 
 
-def test_the_tab_is_named_after_the_folder_it_asks_about(modifying):
-    assert modifying.title() == f"Modify batch {_FOLDER_LABEL}"
+def test_the_tab_is_named_after_the_folder_it_asks_about(modify_batch_tab):
+    assert modify_batch_tab.title() == f"Modify batch {_FOLDER_LABEL}"
 
 
-def test_a_modify_tab_offers_no_corners_over_its_wall_of_images(
+def test_a_modify_batch_tab_offers_no_corners_over_its_wall_of_images(
         saved_panel, tmp_path, monkeypatch):
     tab, db = saved_panel
     image = _image_row(db, "img1")
@@ -3648,7 +3648,7 @@ def test_a_modify_tab_offers_no_corners_over_its_wall_of_images(
     fired = []
     tab.item_action_requested.connect(lambda pid, action: fired.append(pid))
 
-    tab.open_folder_modify(_FOLDER_KEY, _FOLDER_LABEL, "sdxl_t2i",
+    tab.open_modify_batch(_FOLDER_KEY, _FOLDER_LABEL, "sdxl_t2i",
                               _folder_params(), _images(tmp_path, 3))
 
     assert tab._viewport._actions_id is None
@@ -3656,10 +3656,10 @@ def test_a_modify_tab_offers_no_corners_over_its_wall_of_images(
     assert fired == []
 
 
-def test_a_settings_push_does_not_re_arm_the_corners_over_a_wall(modifying):
-    modifying.set_enhance_settings(gallery.EnhanceSettings(auto=True))
+def test_a_settings_push_does_not_re_arm_the_corners_over_a_wall(modify_batch_tab):
+    modify_batch_tab.set_enhance_settings(gallery.EnhanceSettings(auto=True))
 
-    assert modifying._viewport._actions_id is None
+    assert modify_batch_tab._viewport._actions_id is None
 
 
 def test_a_settings_push_does_not_arm_corners_over_a_followed_runs_frames(
@@ -3685,16 +3685,16 @@ def test_an_enhancement_streaming_into_the_preview_keeps_its_corners(
     assert tab._viewport.actions_id() == "img1"
 
 
-def test_a_modify_tab_holds_no_generation_of_its_own(modifying):
-    assert modifying.displayed_row() is None
-    assert modifying._displayed_config is None
+def test_a_modify_batch_tab_holds_no_generation_of_its_own(modify_batch_tab):
+    assert modify_batch_tab.displayed_row() is None
+    assert modify_batch_tab._displayed_config is None
 
 
-def test_generate_asks_for_the_folder_rather_than_these_settings(modifying, qtbot):
-    _positive_field(modifying).setPlainText("a dog on a couch")
+def test_generate_asks_for_the_folder_rather_than_these_settings(modify_batch_tab, qtbot):
+    _positive_field(modify_batch_tab).setPlainText("a dog on a couch")
 
-    with qtbot.waitSignal(modifying.modify_requested) as caught:
-        modifying._generate_btn.click()
+    with qtbot.waitSignal(modify_batch_tab.modify_batch_requested) as caught:
+        modify_batch_tab._generate_btn.click()
 
     folder_key, workflow_name, params = caught.args
     assert folder_key == _FOLDER_KEY
@@ -3702,85 +3702,85 @@ def test_generate_asks_for_the_folder_rather_than_these_settings(modifying, qtbo
     assert params["positive_prompt"] == "a dog on a couch"
 
 
-def test_modify_takes_the_red_and_green_off_its_prompts(modifying, qtbot):
-    _each_press_launches_a_run(modifying)
-    field = _positive_field(modifying)
+def test_modify_batch_takes_the_red_and_green_off_its_prompts(modify_batch_tab, qtbot):
+    _each_press_launches_a_run(modify_batch_tab)
+    field = _positive_field(modify_batch_tab)
     field.setPlainText("a dog on a couch")
     qtbot.waitUntil(lambda: _struck_and_lit(field) == ("cat", "dog"), timeout=5000)
 
-    modifying._generate_btn.click()
+    modify_batch_tab._generate_btn.click()
 
     assert _struck_and_lit(field) == ("", "")
     assert field.toPlainText() == "a dog on a couch"
 
 
-def test_a_canceled_modify_marks_its_prompts_against_the_folder_again(modifying, qtbot):
-    _each_press_launches_a_run(modifying)
-    field = _positive_field(modifying)
+def test_a_canceled_modify_batch_marks_its_prompts_against_the_folder_again(modify_batch_tab, qtbot):
+    _each_press_launches_a_run(modify_batch_tab)
+    field = _positive_field(modify_batch_tab)
     field.setPlainText("a dog on a couch")
-    modifying._generate_btn.click()
+    modify_batch_tab._generate_btn.click()
 
-    modifying.forget_launched()
+    modify_batch_tab.forget_launched()
 
     assert _struck_and_lit(field) == ("cat", "dog")
 
 
-def test_a_modify_that_asked_for_nothing_says_so_instead_of_re_running_the_folder(
-        modifying, qtbot):
+def test_a_modify_batch_that_asked_for_nothing_says_so_instead_of_re_running_the_folder(
+        modify_batch_tab, qtbot):
     fired = []
-    modifying.modify_requested.connect(lambda *a: fired.append(a))
+    modify_batch_tab.modify_batch_requested.connect(lambda *a: fired.append(a))
 
-    modifying._generate_btn.click()
+    modify_batch_tab._generate_btn.click()
 
     assert fired == []
-    assert modifying._generate_btn.text() == "Rewrite the prompt first"
+    assert modify_batch_tab._generate_btn.text() == "Rewrite the prompt first"
 
 
-def test_a_modify_whose_prompt_has_an_unpaired_parenthesis_asks_to_resolve_it(modifying):
+def test_a_modify_batch_whose_prompt_has_an_unpaired_parenthesis_asks_to_resolve_it(modify_batch_tab):
     fired = []
-    modifying.modify_requested.connect(lambda *a: fired.append(a))
-    modifying._param_form.set_values({"positive_prompt": "a (dog"})
+    modify_batch_tab.modify_batch_requested.connect(lambda *a: fired.append(a))
+    modify_batch_tab._param_form.set_values({"positive_prompt": "a (dog"})
 
-    modifying._generate_btn.click()
+    modify_batch_tab._generate_btn.click()
 
     assert fired == []
-    assert modifying._generate_btn.text() == "Resolve parentheses first"
+    assert modify_batch_tab._generate_btn.text() == "Resolve parentheses first"
 
 
-def test_showing_a_generation_ends_the_modify(modifying, tmp_path):
+def test_showing_a_generation_ends_the_modify_batch(modify_batch_tab, tmp_path):
     row = {"prompt_id": "p1", "workflow_name": "sdxl_t2i",
            "params_json": json.dumps(_folder_params()), "output_files": "[]"}
 
-    modifying.show_saved_generation(row, [])
+    modify_batch_tab.show_saved_generation(row, [])
 
-    assert modifying._folder_modify is None
-    assert modifying._generate_btn.text() == "Generate"
+    assert modify_batch_tab._modify_batch is None
+    assert modify_batch_tab._generate_btn.text() == "Generate"
 
 
-def test_ending_the_modify_leaves_the_prompts_their_undo(modifying, qtbot):
-    modifying._end_folder_modify()
-    field = _positive_field(modifying)
+def test_ending_the_modify_batch_leaves_the_prompts_their_undo(modify_batch_tab, qtbot):
+    modify_batch_tab._end_modify_batch()
+    field = _positive_field(modify_batch_tab)
 
     field.setPlainText("a dog on a couch")
     qtbot.keyClick(field, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
 
-    assert modifying._param_form._widgets["positive_prompt"].value() == "a cat on a couch"
+    assert modify_batch_tab._param_form._widgets["positive_prompt"].value() == "a cat on a couch"
 
 
-def test_picking_another_workflow_ends_the_modify(modifying):
-    modifying._workflow_dropdown.setCurrentIndex(_dropdown_index(modifying, "flux_t2i_upscaled"))
+def test_picking_another_workflow_ends_the_modify_batch(modify_batch_tab):
+    modify_batch_tab._workflow_dropdown.setCurrentIndex(_dropdown_index(modify_batch_tab, "flux_t2i_upscaled"))
 
-    assert modifying._generate_btn.text() == "Generate"
+    assert modify_batch_tab._generate_btn.text() == "Generate"
 
 
-def test_a_landed_run_does_not_take_the_wall_of_images_away(modifying):
+def test_a_landed_run_does_not_take_the_wall_of_images_away(modify_batch_tab):
     row = {"prompt_id": "p1", "workflow_name": "sdxl_t2i",
            "params_json": json.dumps(_folder_params()), "output_files": "[]"}
 
-    modifying.show_completed_result(row, [])
+    modify_batch_tab.show_completed_result(row, [])
 
-    assert modifying.displayed_row() is None
-    assert modifying._viewport._stack.currentWidget() is modifying._viewport._sheet
+    assert modify_batch_tab.displayed_row() is None
+    assert modify_batch_tab._viewport._stack.currentWidget() is modify_batch_tab._viewport._sheet
 
 
 

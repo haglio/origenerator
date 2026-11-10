@@ -48,7 +48,7 @@ def test_the_two_marks_at_the_end_are_only_ever_added():
     assert queue_lead_text(_item(job_kind="Image", requested=True)) == plain + " · Request"
     assert queue_lead_text(_item(job_kind="Image", populating=True, requested=True)) == (
         plain + " · Populate · Request")
-    assert queue_lead_text(_item(job_kind="Image", modified=True)) == plain + " · Modify batch"
+    assert queue_lead_text(_item(job_kind="Image", batch_modified=True)) == plain + " · Modify batch"
 
 
 def test_a_row_not_sent_yet_says_so_before_anything_about_timing():
@@ -90,8 +90,8 @@ def test_the_hover_names_who_asked_when_it_was_not_a_press_of_generate():
     ]
 
 
-def test_the_hover_says_a_run_came_from_its_folders_modify():
-    lines = queue_lead_tooltip(_item(modified=True)).splitlines()
+def test_the_hover_says_a_run_came_from_its_folders_modify_batch_batch():
+    lines = queue_lead_tooltip(_item(batch_modified=True)).splitlines()
     assert lines[1:] == ["Queued by its folder's Modify batch (all seeds)"]
 
 

@@ -299,13 +299,13 @@ def test_a_tiles_shield_is_its_jobs_and_is_set_through_the_caller(build):
     assert shielded == [("g1", False)]
 
 
-def test_a_run_a_folders_modify_queued_stands_under_the_image_it_rewrites(build):
+def test_a_run_a_folders_modify_batch_queued_stands_under_the_image_it_rewrites(build):
     rows = [_row("asked-of"), _row("g1")]
     items = build(sources=_sources(rows, requests=[{"prompt_id": "g1", "source_prompt_id": "asked-of",
                                    "heard": ""}]))
 
     tile = next(item for item in items if item.key == "g1")
-    assert tile.modified
+    assert tile.batch_modified
     assert not tile.requested
     assert tile.source_file == "asked-of.jpg"
 
@@ -317,7 +317,7 @@ def test_a_run_a_typed_request_queued_is_marked_as_one(build):
 
     tile = next(item for item in items if item.key == "g1")
     assert tile.requested
-    assert not tile.modified
+    assert not tile.batch_modified
 
 
 def test_a_run_a_request_queued_is_marked_as_one(build):
@@ -327,7 +327,7 @@ def test_a_run_a_request_queued_is_marked_as_one(build):
 
     tile = next(item for item in items if item.key == "g1")
     assert tile.requested
-    assert not tile.modified
+    assert not tile.batch_modified
 
 
 def test_the_row_standing_in_for_a_request_is_the_row_its_run_will_get(build):

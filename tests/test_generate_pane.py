@@ -251,8 +251,8 @@ def test_copy_name_on_a_tab_showing_no_item_copies_the_folder_name_it_wears(tabs
     assert QApplication.clipboard().text() == tabs.tabText(0)
 
 
-def test_copy_name_on_a_modify_tab_copies_the_folders_name_alone(tabs):
-    tab = tabs.open_folder_modify("image/sdxl_t2i/abcdef123456", "AB12CD34", "sdxl_t2i",
+def test_copy_name_on_a_modify_batch_tab_copies_the_folders_name_alone(tabs):
+    tab = tabs.open_modify_batch("image/sdxl_t2i/abcdef123456", "AB12CD34", "sdxl_t2i",
                                     _sdxl_full(positive_prompt="a wizard"), [])
     QApplication.clipboard().clear()
 

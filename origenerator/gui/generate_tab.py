@@ -74,7 +74,6 @@ from origenerator.gui.enhance_versions import (
     RunningEnhancement,
 )
 from origenerator.gui.flow_layout import FlowLayout
-from origenerator.gui.folder_modify import FolderModify
 from origenerator.gui.generate_button import (
     DEFAULT_CAPTION,
     RANDOM_SEED_CAPTION,
@@ -87,6 +86,7 @@ from origenerator.gui.item_area import ItemArea
 from origenerator.gui.lora_offers import LoraOffers
 from origenerator.gui.message import set_marked_text
 from origenerator.gui.metadata_section import MetadataSection, wrappable
+from origenerator.gui.modify_batch import ModifyBatch
 from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.panes import PaneSplitter, pane
 from origenerator.gui.param_form import FormHelpers, ParamForm, WorkflowRow, WorkflowTraits
@@ -137,7 +137,7 @@ _MODIFIED_MESSAGE = "(not yet generated with modifications)"
 
 _WAITING_NOTE = "Waiting for preview…"
 
-_MODIFY_GUARD = "Rewrite the prompt first"
+_MODIFY_BATCH_GUARD = "Rewrite the prompt first"
 
 _GO_TO_FOLDER_TIP = "Go to the folder this item is in"
 
@@ -215,7 +215,7 @@ class GenerateTab(DropZones):
     go_to_folder_requested = pyqtSignal(str)
     generate_requested = pyqtSignal(str, list)
     turn_generate_requested = pyqtSignal(str, dict, dict)
-    modify_requested = pyqtSignal(str, str, dict)
+    modify_batch_requested = pyqtSignal(str, str, dict)
     cancel_requested = pyqtSignal()
     how_many_chosen = pyqtSignal(int)
     request_auto_generate_chosen = pyqtSignal(bool)
@@ -248,7 +248,7 @@ class GenerateTab(DropZones):
         self._pending_enhancement: RunningEnhancement | None = None
         self._enhance_settings = EnhanceSettings()
         self._displayed_config: ConfigSnapshot | None = None
-        self._folder_modify: FolderModify | None = None
+        self._modify_batch: ModifyBatch | None = None
         self._settings_source: tuple[str, str | None, str, tuple[str, ...]] = ("", None, "", ())
         self._source_video_row: dict | None = None
         self.lora_offers = LoraOffers(lambda: self._param_form,
@@ -547,7 +547,7 @@ class GenerateTab(DropZones):
 
     def _on_workflow_changed(self):
         self._forget_settings_source()
-        self._end_folder_modify()
+        self._end_modify_batch()
         self._fresh_form = False
         key = self._workflow_dropdown.currentData()
         wf = workflow_named(key)
@@ -731,10 +731,10 @@ class GenerateTab(DropZones):
         self._caption_timer.start()
 
     def _apply_generate_caption(self):
-        self._generate_pair.offer_how_many(self._folder_modify is None)
-        if self._folder_modify is not None:
-            self._generate_btn.set_caption(self._folder_modify.caption())
-            self._generate_btn.setToolTip(self._folder_modify.tooltip())
+        self._generate_pair.offer_how_many(self._modify_batch is None)
+        if self._modify_batch is not None:
+            self._generate_btn.set_caption(self._modify_batch.caption())
+            self._generate_btn.setToolTip(self._modify_batch.tooltip())
             return
         wf = workflow_named(self._workflow_dropdown.currentData())
         config = self.current_config()
@@ -758,11 +758,11 @@ class GenerateTab(DropZones):
                 self._generate_btn, self.prompt_fields(), self._param_form.remove_unread_emphasis):
             return
         key = self._workflow_dropdown.currentData()
-        if self._folder_modify is not None:
-            if self._folder_modify.is_unchanged(self.current_config()):
-                self._generate_btn.flash_guard(_MODIFY_GUARD)
+        if self._modify_batch is not None:
+            if self._modify_batch.is_unchanged(self.current_config()):
+                self._generate_btn.flash_guard(_MODIFY_BATCH_GUARD)
                 return
-            self.modify_requested.emit(self._folder_modify.folder_key, key,
+            self.modify_batch_requested.emit(self._modify_batch.folder_key, key,
                                        self._param_form.get_values())
             return
         if self._would_remake_what_it_shows():
@@ -976,13 +976,13 @@ class GenerateTab(DropZones):
         return self._workflow_dropdown.currentData() is None and self._displayed_row is None
 
     def title(self) -> str:
-        if self._folder_modify is not None:
-            return self._folder_modify.title()
+        if self._modify_batch is not None:
+            return self._modify_batch.title()
         return self.name() or "New generation"
 
     def name(self) -> str:
-        if self._folder_modify is not None:
-            return self._folder_modify.label
+        if self._modify_batch is not None:
+            return self._modify_batch.label
         name = self._item_name()
         if not name:
             key = self.workflow_and_signature()
@@ -1014,7 +1014,7 @@ class GenerateTab(DropZones):
     def prefill(self, workflow_name: str, params: dict):
         with self._loading():
             self._fresh_form = False
-            self._end_folder_modify()
+            self._end_modify_batch()
             self._forget_watch()
             workflow = workflow_named(workflow_name)
             if workflow is not None:
@@ -1079,10 +1079,10 @@ class GenerateTab(DropZones):
             self._media_split.take_dragged_sizes(self._media_border)
             self._settings_split.take_dragged_sizes(self._settings_border_sizes)
 
-    def open_folder_modify(self, folder_key: str, label: str, workflow_name: str,
+    def open_modify_batch(self, folder_key: str, label: str, workflow_name: str,
                       params: dict, thumbnails: list) -> None:
         self.prefill(workflow_name, params)
-        self._folder_modify = FolderModify(
+        self._modify_batch = ModifyBatch(
             folder_key=folder_key, label=label, count=len(thumbnails),
             opened_on=self.current_config(),
         )
@@ -1095,10 +1095,10 @@ class GenerateTab(DropZones):
         self._apply_generate_caption()
         self._emit_title()
 
-    def _end_folder_modify(self) -> None:
-        if self._folder_modify is None:
+    def _end_modify_batch(self) -> None:
+        if self._modify_batch is None:
             return
-        self._folder_modify = None
+        self._modify_batch = None
         self._mark_prompts()
         self._apply_generate_caption()
 
@@ -1119,7 +1119,7 @@ class GenerateTab(DropZones):
         self._forget_watch()
         self._forget_settings_source()
         self._set_displayed_row(None)
-        self._end_folder_modify()
+        self._end_modify_batch()
         workflow_name = row.get("workflow_name", "")
         self._autoshow_held = True
         try:
@@ -1133,7 +1133,7 @@ class GenerateTab(DropZones):
             self._autoshow_held = False
 
     def show_completed_result(self, row: dict, image_rows: list[dict]):
-        if self._folder_modify is not None:
+        if self._modify_batch is not None:
             return
         self._display_result(row, image_rows, made_with=merge_denormalized(row))
 
@@ -1269,8 +1269,8 @@ class GenerateTab(DropZones):
     def _marked_against(self) -> dict | None:
         if pressed := [made_of for made_of in self._launched_runs.values() if made_of is not None]:
             return pressed[-1]
-        if self._folder_modify is not None:
-            return self._folder_modify.opened_on.params
+        if self._modify_batch is not None:
+            return self._modify_batch.opened_on.params
         return None if self._displayed_config is None else self._settings_shown().params
 
     def _settings_shown(self) -> ConfigSnapshot:

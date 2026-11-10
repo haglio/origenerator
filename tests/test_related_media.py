@@ -409,7 +409,7 @@ def test_an_image_points_at_what_was_requested_of_it_under_requests(make_related
         ("Requested into", "img3"), ("Requested into", "img2")]
 
 
-def test_an_image_points_at_what_a_folders_modify_made_of_it_under_modifications(make_related):
+def test_an_image_points_at_what_a_folders_modify_batch_made_of_it_under_modifications(make_related):
     related = make_related(rows=[_image_row("img2", "sdxl_t2i_img2.png")],
                            requests=[_request("img2", "img1")])
 
@@ -479,7 +479,7 @@ def test_a_click_that_shows_the_image_it_names_outlives_its_own_link(make_relate
     assert _links(related._requests) == [("Requested from", "img1")]
 
 
-def test_an_image_a_folders_modify_made_points_at_the_one_it_was_modified_from(make_related):
+def test_an_image_a_folders_modify_batch_made_points_at_the_one_it_was_modified_from(make_related):
     related = make_related(rows=[_image_row()], requests=[_request("img2", "img1")])
 
     related.show_row(_image_row("img2", "sdxl_t2i_img2.png"), [])

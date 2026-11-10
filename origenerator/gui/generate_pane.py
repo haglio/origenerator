@@ -58,7 +58,7 @@ class GeneratePane(QTabWidget):
     tab_added = pyqtSignal(object)
     generate_requested = pyqtSignal(str, list)
     turn_generate_requested = pyqtSignal(object, str, dict, dict)
-    modify_requested = pyqtSignal(str, str, dict)
+    modify_batch_requested = pyqtSignal(str, str, dict)
     folder_requested = pyqtSignal(str)
 
     def __init__(self, client: ComfyUIClient | None, db: Database,
@@ -147,7 +147,7 @@ class GeneratePane(QTabWidget):
         tab.generate_requested.connect(
             lambda name, batch, p=tab: self._on_tab_generate(p, name, batch)
         )
-        tab.modify_requested.connect(
+        tab.modify_batch_requested.connect(
             lambda key, name, params, p=tab: self._on_tab_changes(p, key, name, params)
         )
         tab.turn_generate_requested.connect(
@@ -293,7 +293,7 @@ class GeneratePane(QTabWidget):
     def _on_tab_changes(self, tab, folder_key: str, workflow_name: str,
                            params: dict):
         self._pin_tab(tab)
-        self.modify_requested.emit(folder_key, workflow_name, params)
+        self.modify_batch_requested.emit(folder_key, workflow_name, params)
 
     def tabInserted(self, index: int):
         super().tabInserted(index)
@@ -318,12 +318,12 @@ class GeneratePane(QTabWidget):
         self.setCurrentWidget(tab)
         return tab
 
-    def open_folder_modify(self, folder_key: str, label: str, workflow_name: str,
+    def open_modify_batch(self, folder_key: str, label: str, workflow_name: str,
                       params: dict, thumbnails: list) -> GenerateTab | None:
         if self._client is None:
             return None
         tab = self._landing_tab()
-        tab.open_folder_modify(folder_key, label, workflow_name, params, thumbnails)
+        tab.open_modify_batch(folder_key, label, workflow_name, params, thumbnails)
         self._pin_tab(tab)
         self.setCurrentWidget(tab)
         return tab

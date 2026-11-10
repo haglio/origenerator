@@ -657,7 +657,8 @@ def test_a_run_with_an_image_behind_it_stands_that_instead_of_a_note(tabs):
     tab._viewport.show_combination.assert_called_once_with(
         Combination("frame.png", "clip.webp"))
     tab._viewport.show_message.assert_not_called()
-    assert not tab.is_awaiting_frame()
+    assert not tab.is_awaiting_frame(), (
+        "it is not a worded wait, so a changed queue count has nothing to rewrite")
 
 
 def test_the_pair_is_repainted_only_when_it_changes(tabs):
@@ -886,7 +887,9 @@ def test_changing_the_workflow_takes_the_italic_off(tabs):
 
     _pick_workflow(preview, "flux_t2i_upscaled")
 
-    assert tabs._preview_tab is None
+    assert tabs._preview_tab is None, (
+        "the dropdown is a field like any other, and with nothing to carry over to the new workflow "
+        "it is the only sign an edit happened at all")
     assert tabs.tabBar()._preview_index == -1
 
 

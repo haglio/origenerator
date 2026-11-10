@@ -204,7 +204,9 @@ def test_a_grayscale_zone_drains_the_clip_it_holds(qtbot, tmp_path):
 
     assert zone._label.movie() is None
     color = zone._label.pixmap().toImage().pixelColor(2, 2)
-    assert color.red() == color.green() == color.blue()
+    assert color.red() == color.green() == color.blue(), (
+        "the video zone holds a source video, not a result: in color it reads as a second subject "
+        "beside the image it will animate")
     assert zone._movie.state() == QMovie.MovieState.Running
 
 

@@ -103,7 +103,8 @@ def test_the_writer_hears_her_line_where_she_speaks_and_the_foley_where_she_does
     payload = Wan22I2vWorkflow().build_api_payload(_spoken_params())
     join = _writer_audio(payload)
     assert join["class_type"] == "AudioConcat"
-    assert payload[join["inputs"]["audio2"][0]]["class_type"] == "LoadAudio"
+    assert payload[join["inputs"]["audio2"][0]]["class_type"] == "LoadAudio", (
+        "the foley scores what it sees, and shown a woman talking it scores a garbled voice under hers")
     earlier = payload[join["inputs"]["audio1"][0]]
     assert earlier["class_type"] == "AudioConcat"
     ambience = payload[earlier["inputs"]["audio2"][0]]

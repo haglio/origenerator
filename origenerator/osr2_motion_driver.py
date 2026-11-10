@@ -16,8 +16,8 @@ from origenerator.running_ahead import ahead_while_playing
 
 logger = logging.getLogger(__name__)
 
-_THE_MOTIONS_OWN_CLOCK_HZ = 40
-_TICK_MS = 1000 // _THE_MOTIONS_OWN_CLOCK_HZ
+_MOTION_CLOCK_HZ = 40
+_TICK_MS = 1000 // _MOTION_CLOCK_HZ
 _LOOKAHEAD_MS = 40
 _HANDOFF_MS = 300
 

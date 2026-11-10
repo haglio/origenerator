@@ -336,7 +336,6 @@ def test_a_marks_distance_from_the_tab_edge_is_the_apps_own(qtbot):
     app = QApplication.instance()
     prior = app.styleSheet()
     try:
-        # Qt styles a widget as it is built, so the sheet goes on the application before the widget is made.
         app.setStyleSheet(build_stylesheet())
         tabs = QTabWidget()
         tabs.setTabBar(ElidingTabBar())

@@ -827,23 +827,30 @@ def test_output_file_reference_is_none_when_no_usable_file():
     assert output_file_reference([{"subfolder": "image"}]) is None
 
 
-def test_a_workflows_seed_keys_are_read_off_it_once(monkeypatch):
+@pytest.mark.parametrize("keys_of", [signatures_module._workflow_instance_keys,
+                                     signatures_module._workflow_enhance_keys],
+                         ids=["seed keys", "enhance keys"])
+def test_a_workflows_keys_are_read_off_it_once(monkeypatch, keys_of):
     asked = []
 
     class Workflow:
         def seed_keys(self):
-            asked.append("seed keys")
+            asked.append("keys")
             return ["seed"]
 
-    monkeypatch.setattr(signatures_module, "workflow_named", lambda name: Workflow())
-    signatures_module._workflow_instance_keys.cache_clear()
-    try:
-        signatures_module._workflow_instance_keys("a workflow")
-        signatures_module._workflow_instance_keys("a workflow")
-    finally:
-        signatures_module._workflow_instance_keys.cache_clear()
+        def enhance_keys(self):
+            asked.append("keys")
+            return ["enhance"]
 
-    assert asked == ["seed keys"], (
+    monkeypatch.setattr(signatures_module, "workflow_named", lambda name: Workflow())
+    keys_of.cache_clear()
+    try:
+        keys_of("a workflow")
+        keys_of("a workflow")
+    finally:
+        keys_of.cache_clear()
+
+    assert asked == ["keys"], (
         "cached because seed_keys walks param_definitions, which scans the model directories")
 
 

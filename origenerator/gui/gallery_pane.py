@@ -71,10 +71,9 @@ REROLL_IMAGE = "image"
 _TILE_SPACING = GAP_MEDIUM
 _PREVIEW_COUNT = 4
 _PAGE = 50
-_ROWS_PAST_A_REVEAL_AT_THE_PANES_WIDEST = 3
-_TILES_ACROSS_AT_THE_PANES_WIDEST = 4
-_NEIGHBORS_PAST_A_REVEAL = (_ROWS_PAST_A_REVEAL_AT_THE_PANES_WIDEST
-                           * _TILES_ACROSS_AT_THE_PANES_WIDEST)
+_ROWS_PAST_A_REVEAL = 3
+_MOST_TILES_ACROSS = 4
+_NEIGHBORS_PAST_A_REVEAL = _ROWS_PAST_A_REVEAL * _MOST_TILES_ACROSS
 _REACH = 600
 _ROOM_ABOVE_A_SECTIONS_HEADING = GAP_DIALOG
 SEARCH_DRAW_LIMIT = 200
@@ -351,7 +350,7 @@ class GalleryPane(QObject):
         self.show_widget(container)
         self._pages = pages
         self.follow_the_scroll()
-        # Qt has not laid out a pane drawn this turn, so its tiles have no positions yet: asked again once the layout has run.
+        # Qt has not laid out a pane drawn this turn, so its tiles have no positions yet.
         defer(self._scroll, self.follow_the_scroll)
 
     def show_empty(self):
@@ -903,6 +902,7 @@ class GalleryPane(QObject):
             return False
         self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
         self._scroll_to(widget)
+        # Qt has not laid out a pane drawn this turn, so its tiles have no positions yet.
         defer(self._scroll, lambda: self._reapply_reveal(prompt_id, widget))
         return True
 
@@ -921,6 +921,7 @@ class GalleryPane(QObject):
         self._refresh_selection_highlights()
         drawn = self._scroll.widget()
         stand_at(self._scroll, self._thumb_widgets, place, drawn)
+        # Qt has not laid out a pane drawn this turn, so its tiles have no positions yet.
         defer(self._scroll, lambda: stand_at(self._scroll, self._thumb_widgets, place, drawn))
 
     def _refresh_selection_highlights(self):

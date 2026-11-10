@@ -269,6 +269,10 @@ class WorkflowTemplate(ABC):
                      if pd.type in (ParamType.IMAGE, ParamType.VIDEO))
 
     def starts_from_an_image(self) -> bool:
+        return self._takes_an_input_image
+
+    @cached_property
+    def _takes_an_input_image(self) -> bool:
         return "input_image" in self.default_params()
 
     def pins_reused_seed(self) -> bool:

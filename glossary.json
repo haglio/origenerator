@@ -1480,6 +1480,22 @@
       ],
       "code_word": "site action",
       "status": "his_word"
+    },
+    {
+      "id": "precision",
+      "thing": "the part of a model's or LoRA's name, in parentheses in the Model dropdowns, the LoRA rows, the TOC and the Enhancements, that says how many bits each of its numbers takes, and so how big the file is",
+      "screen": [
+        "full size",
+        "half size",
+        "half size, int8",
+        "half size, packed"
+      ],
+      "his_word": null,
+      "code_today": [
+        "precision"
+      ],
+      "code_word": null,
+      "status": "unruled"
     }
   ]
 }

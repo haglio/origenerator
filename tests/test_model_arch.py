@@ -114,8 +114,8 @@ def test_a_wan_model_with_a_reference_conv_is_steered_by_a_control_video(tmp_pat
 def test_a_model_file_is_read_once_while_it_stays_the_same(tmp_path, monkeypatch):
     path = _write(tmp_path / "m.safetensors", AN_SDXL_CHECKPOINT)
     reads = []
-    read = model_arch._tensor_shapes
-    monkeypatch.setattr(model_arch, "_tensor_shapes", lambda p: reads.append(p) or read(p))
+    read = model_arch._tensor_index
+    monkeypatch.setattr(model_arch, "_tensor_index", lambda p: reads.append(p) or read(p))
 
     model_arch.describe(path)
     model_arch.describe(path)
@@ -131,7 +131,7 @@ def test_a_header_read_in_one_launch_is_remembered_by_the_next(tmp_path, monkeyp
     path = _write(tmp_path / "m.safetensors", AN_SDXL_CHECKPOINT)
     assert model_arch.describe(path).arch == SDXL
     reads = []
-    monkeypatch.setattr(model_arch, "_tensor_shapes", reads.append)
+    monkeypatch.setattr(model_arch, "_tensor_index", reads.append)
     model_arch._remembered.cache_clear()
 
     assert model_arch.describe(path).arch == SDXL
@@ -270,3 +270,43 @@ def test_a_malformed_gguf_reads_as_unknown(tmp_path):
     path = tmp_path / "broken.gguf"
     path.write_bytes(b"GGUF" + struct.pack("<I", 3) + struct.pack("<QQ", 900, 900))
     assert model_arch.describe(path).arch is None
+
+
+def _write_typed(path, dtypes_by_size):
+    header = json.dumps({f"blocks.{i}.weight": {"dtype": dtype, "shape": [size], "data_offsets": [0, 2]}
+                         for i, (dtype, size) in enumerate(dtypes_by_size)}).encode()
+    path.write_bytes(struct.pack("<Q", len(header)) + header + b"\x00\x00")
+    return path
+
+
+@pytest.mark.parametrize(("dtype", "precision"), [
+    ("F16", "fp16"), ("BF16", "bf16"), ("F8_E4M3", "fp8"), ("F8_E5M2", "fp8"), ("I8", "int8"),
+])
+def test_a_models_precision_is_how_most_of_its_numbers_are_stored(tmp_path, dtype, precision):
+    path = _write_typed(tmp_path / "m.safetensors", [(dtype, 1000), ("F32", 10), ("BF16", 20)])
+
+    assert model_arch.describe(path).precision == precision
+
+
+def test_a_model_stored_some_way_the_screen_has_no_words_for_has_no_precision(tmp_path):
+    path = _write_typed(tmp_path / "m.safetensors", [("F32", 1000)])
+
+    assert model_arch.describe(path).precision is None
+
+
+def _write_gguf(path, typed_sizes):
+    def tensor(index, stored_as, size):
+        name = f"blocks.{index}.weight".encode()
+        return (struct.pack("<Q", len(name)) + name + struct.pack("<I", 1) + struct.pack("<Q", size)
+                + struct.pack("<I", stored_as) + struct.pack("<Q", 0))
+
+    path.write_bytes(b"GGUF" + struct.pack("<I", 3) + struct.pack("<QQ", len(typed_sizes), 0)
+                     + b"".join(tensor(i, *typed) for i, typed in enumerate(typed_sizes)))
+    return path
+
+
+def test_a_gguf_packed_eight_bits_to_a_number_has_the_q8_precision(tmp_path):
+    q8_0, f32, f16 = 8, 0, 1
+    path = _write_gguf(tmp_path / "m.gguf", [(q8_0, 1000), (f32, 10), (f16, 20)])
+
+    assert model_arch.describe(path).precision == "Q8"

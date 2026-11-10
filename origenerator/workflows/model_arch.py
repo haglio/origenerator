@@ -72,6 +72,19 @@ class ModelFile:
     is_lora: bool
     expert: str | None
     is_shard: bool
+    precision: str | None = None
+
+
+@dataclass(frozen=True)
+class _Tensor:
+    shape: list[int] | None
+    stored_as: str | int
+    count: int
+
+
+_SAFETENSORS_PRECISIONS = {"F16": "fp16", "BF16": "bf16", "F8_E4M3": "fp8", "F8_E5M2": "fp8", "I8": "int8"}
+_GGUF_F16, _GGUF_Q8_0, _GGUF_BF16 = 1, 8, 30
+_GGUF_PRECISIONS = {_GGUF_F16: "fp16", _GGUF_Q8_0: "Q8", _GGUF_BF16: "bf16"}
 
 
 # A safetensors or GGUF model is a file of gigabytes to open.
@@ -109,7 +122,7 @@ def _read_remembered(path: Path) -> dict[tuple[str, int, int], ModelFile]:
         try:
             remembered[(entry["path"], entry["size"], entry["mtime_ns"])] = ModelFile(
                 arch=entry["arch"], is_lora=entry["is_lora"], expert=entry["expert"],
-                is_shard=entry["is_shard"])
+                is_shard=entry["is_shard"], precision=entry["precision"])
         except (KeyError, TypeError):
             continue
     return remembered
@@ -135,16 +148,27 @@ def _remember(described: dict[tuple[str, int, int], ModelFile]) -> None:
 def _describe(path: Path) -> ModelFile:
     if _SHARD.search(path.name):
         return ModelFile(arch=None, is_lora=False, expert=None, is_shard=True)
-    shapes = _tensor_shapes(path)
+    tensors = _tensor_index(path)
     expert = _expert_from_name(path.name)
-    if shapes is None:
+    if tensors is None:
         return ModelFile(arch=None, is_lora=False, expert=expert, is_shard=False)
     return ModelFile(
-        arch=_arch_from(shapes),
-        is_lora=any(marker in key for key in shapes for marker in _LORA_MARKERS),
+        arch=_arch_from({name: tensor.shape for name, tensor in tensors.items()}),
+        is_lora=any(marker in key for key in tensors for marker in _LORA_MARKERS),
         expert=expert,
         is_shard=False,
+        precision=_precision_of(tensors, path.suffix),
     )
+
+
+def _precision_of(tensors: dict[str, _Tensor], suffix: str) -> str | None:
+    counted: dict[str | int, int] = {}
+    for tensor in tensors.values():
+        counted[tensor.stored_as] = counted.get(tensor.stored_as, 0) + tensor.count
+    if not counted:
+        return None
+    most = max(counted, key=counted.__getitem__)
+    return (_GGUF_PRECISIONS if suffix == ".gguf" else _SAFETENSORS_PRECISIONS).get(most)
 
 
 def _expert_from_name(name: str) -> str | None:
@@ -233,13 +257,12 @@ def _arch_after_the_transformer_families(shapes, keys, has, starts) -> str | Non
     return None
 
 
-def _tensor_shapes(path: Path) -> dict[str, list[int] | None] | None:
+def _tensor_index(path: Path) -> dict[str, _Tensor] | None:
     try:
         if path.suffix == ".safetensors":
-            return _safetensors_shapes(path)
+            return _safetensors_tensors(path)
         if path.suffix == ".gguf":
-            names = _gguf_names(path)
-            return None if names is None else dict.fromkeys(names)
+            return _gguf_tensors(path)
     except (OSError, struct.error, UnicodeDecodeError, ValueError, KeyError):
         return None
     return None
@@ -256,12 +279,25 @@ def _safetensors_header(path: Path) -> dict | None:
     return json.loads(header)
 
 
-def _safetensors_shapes(path: Path) -> dict[str, list[int] | None] | None:
+def _safetensors_tensors(path: Path) -> dict[str, _Tensor] | None:
     index = _safetensors_header(path)
     if not isinstance(index, dict):
         return None
-    return {key: entry.get("shape") if isinstance(entry, dict) else None
-            for key, entry in index.items() if key != "__metadata__"}
+    return {key: _safetensors_tensor(entry) for key, entry in index.items() if key != "__metadata__"}
+
+
+def _safetensors_tensor(entry) -> _Tensor:
+    if not isinstance(entry, dict):
+        return _Tensor(shape=None, stored_as="", count=0)
+    shape = entry.get("shape")
+    return _Tensor(shape=shape, stored_as=str(entry.get("dtype", "")), count=_count(shape or ()))
+
+
+def _count(dimensions) -> int:
+    count = 1
+    for dimension in dimensions:
+        count *= int(dimension)
+    return count
 
 
 def safetensors_metadata(path: Path) -> dict:
@@ -285,7 +321,7 @@ _GGUF_TENSOR_TYPE_WIDTH = 4
 _GGUF_TENSOR_OFFSET_WIDTH = 8
 
 
-def _gguf_names(path: Path) -> list[str] | None:
+def _gguf_tensors(path: Path) -> dict[str, _Tensor] | None:
     with path.open("rb") as handle:
         if handle.read(4) != b"GGUF":
             return None
@@ -296,14 +332,16 @@ def _gguf_names(path: Path) -> list[str] | None:
             handle.read(key_length)
             (value_type,) = struct.unpack("<I", handle.read(4))
             _gguf_skip(handle, value_type)
-        names = []
+        tensors = {}
         for _ in range(min(tensor_count, _GGUF_NAMES_ENOUGH_TO_TELL)):
             (name_length,) = struct.unpack("<Q", handle.read(8))
-            names.append(handle.read(name_length).decode("utf-8"))
+            name = handle.read(name_length).decode("utf-8")
             (dimensions,) = struct.unpack("<I", handle.read(4))
-            handle.read(_GGUF_DIMENSION_WIDTH * dimensions
-                        + _GGUF_TENSOR_TYPE_WIDTH + _GGUF_TENSOR_OFFSET_WIDTH)
-    return names
+            shape = struct.unpack(f"<{dimensions}Q", handle.read(_GGUF_DIMENSION_WIDTH * dimensions))
+            (stored_as,) = struct.unpack("<I", handle.read(_GGUF_TENSOR_TYPE_WIDTH))
+            handle.read(_GGUF_TENSOR_OFFSET_WIDTH)
+            tensors[name] = _Tensor(shape=None, stored_as=stored_as, count=_count(shape))
+    return tensors
 
 
 def _gguf_skip(handle, value_type: int) -> None:

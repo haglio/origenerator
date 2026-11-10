@@ -1600,7 +1600,7 @@ def test_shift_left_counts_the_enhancements_down_and_shift_right_counts_them_up(
         named.append(view.slideshow.hud_item_note)
 
     assert named == ["Enhancement 1/2", "Original", "Enhancement 1/2", "Enhancement 2/2"], (
-        "Shift with an arrow steps through an image's enhancements on the slideshow itself, so "
+        "Shift with a step key steps through an image's enhancements on the slideshow itself, so "
         "one can be compared against the one below it at full size rather than in a thumbnail")
 
 

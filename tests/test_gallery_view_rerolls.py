@@ -830,8 +830,8 @@ def test_a_tip_with_no_link_in_it_stays_qts_own_tooltip(qtbot, tmp_path):
     view.refresh()
     _select_first_leaf(view)
 
-    assert view._buttons.populate.toolTip() != ""
-    assert view._buttons.populate_tip._html == "", (
+    said = (view._buttons.populate.toolTip() != "", view._buttons.populate_tip._html)
+    assert said == (True, ""), (
         "the tip that can be clicked into is only for words holding a link; ordinary words stay "
         "with Qt's tooltip, which shows them well enough")
 

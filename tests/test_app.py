@@ -1788,16 +1788,28 @@ def test_reopening_while_the_last_copy_is_still_closing_opens_before_its_process
             first.communicate("\n\n", timeout=60)
 
 
+def test_the_launch_check_stops_short_of_the_database_comfyui_and_any_window(qapp, monkeypatch):
+    monkeypatch.setattr("origenerator.single_instance.Copies", MagicMock())
+    database, comfyui, window = MagicMock(), MagicMock(), MagicMock()
+
+    with _a_faked_boot([], **{"origenerator.db.Database": database,
+                              "origenerator.comfyui_launcher.ensure_comfyui_server": comfyui,
+                              "origenerator.gui.core.Core": window}):
+        main(["--check-launch"])
+
+    assert (database.call_count, comfyui.call_count, window.call_count) == (0, 0, 0), (
+        "a hosting session's suite runs the real launch command through this check to prove the "
+        "launch works, so it stops short of the database, ComfyUI and any window, and a run "
+        "costs the machine next to nothing")
+
+
 def test_the_launch_check_claims_nothing_so_it_passes_beside_a_running_copy(
         qapp, monkeypatch):
     copies = MagicMock()
     monkeypatch.setattr("origenerator.single_instance.Copies", copies)
 
     with _a_faked_boot([]):
-        assert main(["--check-launch"]) == 0, (
-            "this is what a hosting session's suite runs to prove the real launch command "
-            "works, so a break that kills the launch before it can log is caught by a test: it "
-            "has to come back clean with no database, no ComfyUI and no window")
+        assert main(["--check-launch"]) == 0
 
     copies.assert_not_called()
 

@@ -145,7 +145,8 @@ def test_corner_controls_wear_the_star_green_and_the_enhance_yellow(qtbot):
     assert star.pixelColor(24, 25) == GREEN, (
         "the star's green is Fun Time's, so one color means favorited in both apps")
     assert plus.pixelColor(24, 24) == YELLOW, (
-        "the plus is yellow because green and blue are both taken")
+        "the plus is yellow: green is the star's and the two can sit on one tile, and blue is "
+        "Genau's across the family")
 
 
 def test_a_corner_control_reports_its_state_hollow_or_filled(qtbot):

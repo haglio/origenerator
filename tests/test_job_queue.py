@@ -2222,3 +2222,43 @@ def test_two_requests_out_at_once_hold_the_line_until_both_have_let_go(qtbot, tm
 
     queue.model_hold.let_go()
     assert client.submit_job.call_count == 1
+
+
+def test_a_chained_runs_video_answers_to_the_id_its_start_frame_began_under(qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    image = _image_row()
+    db.restore_generation(image)
+    queue.start_reroll("k", gallery.SettingsGroup("k", "settings", [_video_row()]), [image])
+    frame = queue.newest_job_for("k")
+
+    frame.finished.emit([{"filename": "frame_002.png", "subfolder": "", "type": "output"}],
+                        None, 1.0)
+
+    video = queue.newest_job_for("k")
+    assert video is not frame
+    assert video.origin == frame.origin, (
+        "the frame and the video made on it are two prompts, and one run to whoever asked for it")
+
+
+def test_a_progress_write_that_fails_leaves_the_run_going(qtbot, tmp_path, monkeypatch):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    key = "video/wf/deadbeef"
+    queue.start_prepared(key, _I2V, _params(steps=20))
+    job = queue.jobs[key]
+    write = db.update_generation
+
+    def refusing_progress(prompt_id, **fields):
+        if "progress_json" in fields:
+            raise OSError("the database is locked")
+        return write(prompt_id, **fields)
+
+    monkeypatch.setattr(db, "update_generation", refusing_progress)
+
+    client.progress.emit(job.prompt_id, "s", 5, 10)
+
+    assert job.state == "running", "a hiccup in saving a run's progress must never disturb the run"
+    assert queue.jobs[key] is job

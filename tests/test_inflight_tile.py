@@ -219,3 +219,12 @@ def test_right_click_requests_a_menu_for_this_tile(qtbot):
 
     assert received == ["p1"], (
         "the tile is the one thing in a collection standing for its run, so the run's menu opens from it")
+
+
+def test_the_bar_is_drawn_over_the_scrim_it_sits_on(qtbot):
+    tile = InFlightTile(_item(status="running", frame=_png_bytes()))
+    qtbot.addWidget(tile)
+
+    order = tile._bar.parentWidget().children()
+    assert order.index(tile._bar) > order.index(tile._status_scrim), (
+        "the scrim raises itself over everything each time it covers the frame, the bar included")

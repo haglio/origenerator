@@ -7,7 +7,7 @@ from app_support.funscript import read_actions
 from PIL import Image
 
 import origenerator.workflows.wan22_animate as animate
-from origenerator import config, gallery
+from origenerator import completion, config, gallery
 from origenerator.completion import extract_completion
 from origenerator.config import MOTION_DEFAULT_HZ
 from origenerator.funscript import (
@@ -78,6 +78,25 @@ def test_a_thumbnail_that_cannot_be_drawn_never_strands_a_finished_run(tmp_path)
     assert files == [{"filename": "a.png", "subfolder": ""}]
     assert thumb is None
     assert duration == 3.0
+
+
+def test_a_duration_that_cannot_be_read_never_strands_a_finished_run(tmp_path, monkeypatch):
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "a.png").write_bytes(b"this is not an image")
+
+    def unreadable(history):
+        raise ValueError("no timing in this history")
+
+    monkeypatch.setattr(completion, "execution_duration_seconds", unreadable)
+
+    files, _thumb, duration = extract_completion(
+        SDXL, _history_with_duration(3.0), OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "n1"
+    )
+
+    assert files == [{"filename": "a.png", "subfolder": ""}], (
+        "how long a run took is nice to know; failing to read it must never strand a real completion")
+    assert duration is None
 
 
 def test_parses_execution_duration(tmp_path):

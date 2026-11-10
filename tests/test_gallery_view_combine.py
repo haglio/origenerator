@@ -734,6 +734,31 @@ def test_an_image_browsed_into_combine_offers_no_way_into_the_gallery(qtbot, tmp
     assert view.selected_prompt_ids() == ["img"]
 
 
+def test_a_pair_opened_in_a_tab_holds_the_settings_generate_would_launch(
+        qtbot, tmp_path, monkeypatch):
+    view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(view._combine, "_after_painting", lambda work: work())
+    opened = []
+    monkeypatch.setattr(view._generate_pane, "open_config",
+                        lambda name, params: opened.append((name, params)))
+    lane = view._combine.widget.selected_intent()
+
+    view._combine.widget.combine_requested.emit(
+        CombineRequest(image_id="img", video_id="vid", intent=lane, edit_first=True))
+    view._combine.widget.combine_requested.emit(
+        CombineRequest(image_id="img", video_id="vid", intent=lane))
+
+    (name, in_the_tab), = opened
+    (job,) = view._live_jobs.values()
+    seeds = set(job.workflow.seed_keys())
+    launched = {key: value for key, value in job.params.items() if key not in seeds}
+    assert (job.workflow.name, launched) == (
+        name, {key: value for key, value in in_the_tab.items() if key not in seeds}), (
+        "the tab is prefilled with the same combination Generate would launch, ready to tweak")
+
+
 def test_open_category_prefers_the_pinned_settings_too(qtbot, tmp_path, monkeypatch):
     db = _combine_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())

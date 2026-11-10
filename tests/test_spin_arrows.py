@@ -35,7 +35,9 @@ def test_the_up_arrow_narrows_toward_its_top_and_the_down_arrow_toward_its_botto
 def test_the_arrows_take_the_color_they_are_asked_for(tmp_path):
     up, _ = arrow_paths(_GREEN, tmp_path)
 
-    assert Image.open(up).convert("RGBA").getpixel((4, 4)) == (0, 200, 0, 255)
+    assert Image.open(up).convert("RGBA").getpixel((4, 4)) == (0, 200, 0, 255), (
+        "the arrows are generated rather than committed, so their color comes from the same "
+        "token the rest of the stylesheet uses")
 
 
 def test_arrows_already_drawn_for_a_color_are_not_drawn_again(tmp_path):

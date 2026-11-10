@@ -12,6 +12,7 @@ from origenerator.progress import (
     sampler_costs,
     stage_names,
 )
+from origenerator.timing import RunTiming
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 
 
@@ -254,6 +255,18 @@ def test_tracker_widens_the_total_for_a_pass_it_could_not_budget():
     assert tracker.update(1, 200) == (11, 210)
     assert tracker.update(100, 200) == (110, 210)
     assert tracker.update(200, 200) == (210, 210)
+
+
+def test_the_countdown_beside_the_bar_paces_off_the_trackers_numbers():
+    tracker = ProgressTracker(20)
+    tracker.update(10, 10)
+    halfway_through_a_pass_nobody_budgeted = tracker.update(100, 200)
+
+    left = RunTiming(60.0, halfway_through_a_pass_nobody_budgeted, None).remaining_seconds()
+
+    assert left >= 1, (
+        "the countdown paces off these same numbers, so a pass left out of the total takes it "
+        "down with the bar")
 
 
 def test_tracker_unknown_total_passes_raw_numbers_through():

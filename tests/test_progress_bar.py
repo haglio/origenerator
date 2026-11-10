@@ -95,6 +95,25 @@ def test_the_scroll_holds_at_the_top_of_a_lap_then_sets_off(qtbot):
     assert narrow.scrolled() > 0
 
 
+def test_a_caption_leaving_to_the_left_is_already_arriving_from_the_right(qtbot):
+    bar = ProgressBar()
+    qtbot.addWidget(bar)
+    bar.resize(200, 22)
+    bar.show()
+    bar.show_progress("First pass · 100% · 12:30 elapsed · ~16:02 left " * 2, (0, 20))
+    while bar.scrolled() < bar._lap() - bar.width() / 2:
+        bar._advance()
+
+    image = bar.grab().toImage()
+
+    right_quarter = range(bar.width() * 3 // 4, bar.width() - 4)
+    written = {image.pixel(x, y) for x in right_quarter for y in range(4, bar.height() - 4)}
+    assert len(written) > 1, (
+        "a caption wider than its bar is drawn twice, one lap apart: as the first copy leaves to "
+        "the left the second is arriving from the right, so the reading loops without a blank "
+        "stretch between turns")
+
+
 def test_the_scroll_carries_on_when_only_the_clock_in_it_changed(qtbot):
     narrow = ProgressBar()
     qtbot.addWidget(narrow)

@@ -826,8 +826,9 @@ def test_main_in_fun_time_mode_parks_the_window_and_threads_the_session(qapp):
 
     session = mock_window.call_args.kwargs["fun_time"]
     assert (session.main_rect.x, session.main_rect.y) == (5, 6)
-    window.showMinimized.assert_called_once()
-    window.show.assert_not_called()
+    assert (window.showMinimized.call_count, window.show.call_count) == (1, 0), (
+        "parked until the session's own mode switch restores it: the session may be in Kino "
+        "mode, where coming up over the Random Favs Browser is wrong")
 
 
 def test_a_boot_hosted_in_the_headset_is_not_parked(qapp, tmp_path):
@@ -863,7 +864,10 @@ def test_main_in_fun_time_mode_shows_no_splash(qapp):
          patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
         assert main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"})) == 0
 
-    mock_loading.assert_not_called()
+    assert mock_loading.call_count == 0, (
+        "the session's own loading screen owns the boot's feedback, and an always-on-top "
+        "splash of this app's can outlive the session's reveal and sit over one of its "
+        "Funestras")
 
 
 def test_a_standalone_boot_watches_for_a_fun_time_session_until_it_quits(

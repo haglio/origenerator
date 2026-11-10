@@ -93,8 +93,10 @@ def test_left_to_itself_it_listens_for_the_phrases_it_was_given(qtbot, monkeypat
     CommandAndRequestListener(
         phrases=Phrases({"fix teeth", "mic off"}, {"mic off"}, said_in))
 
-    built.assert_called_once_with({"fix teeth", "mic off"}, never_repaired={"mic off"},
-                                  said_in=said_in)
+    assert built.call_args_list == [
+        (({"fix teeth", "mic off"},), {"never_repaired": {"mic off"}, "said_in": said_in})], (
+        "the phrases are the vocabulary said outright, which the mic hears fast and exactly; "
+        "everything else reaches the same matchers as a sentence taken down")
 
 
 def test_a_command_is_logged_by_what_it_matched_and_how_many_words_it_was(qtbot, caplog):

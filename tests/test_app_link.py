@@ -217,7 +217,10 @@ def test_the_handler_windows_runs_answers_out_of_its_own_checkout(tmp_path):
         env={k: v for k, v in os.environ.items() if k != "PYTHONPATH"}, check=False,
         **a_child_no_run_can_starve())
 
-    assert handler.returncode == 2, handler.stderr
+    assert handler.returncode == 2, (
+        "the handler is run by path from wherever Windows happens to be standing, with its own "
+        "checkout in front of everything else, so the code that answers a click is this "
+        "checkout's rather than whichever copy the venv has installed: " + handler.stderr)
     assert handler.stdout == ""
 
 

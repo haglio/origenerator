@@ -1076,7 +1076,9 @@ def test_canceling_from_an_populating_folders_tile_ends_populate_too(
     view._gallery_pane._inflight_context_menu(job.prompt_id, QPoint(0, 0))
 
     assert not view._populate.is_active(key)
-    assert view._jobs.all_jobs == []
+    assert view._jobs.all_jobs == [], (
+        "Populate goes off first: a discard while it is still on is the cue for the next seed, "
+        "so canceling first would start one")
 
 
 def test_a_tile_with_no_live_job_behind_it_raises_no_menu(qtbot, monkeypatch):

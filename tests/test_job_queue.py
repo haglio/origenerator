@@ -1266,13 +1266,15 @@ def test_a_launch_made_while_another_submit_is_out_waits_its_turn(qtbot, tmp_pat
 
     QTimer.singleShot(0, while_the_submit_is_out)
     queue.start_prepared("video/wf/first", _I2V, _params(seed=1))
+    assert seen, (
+        "the wait stays on the calling thread's stack, so everything around it stays in order "
+        "and every caller stays synchronous")
 
     first = queue.jobs["video/wf/first"].prompt_id
     second = queue.jobs["video/wf/second"].prompt_id
     assert seen["submits"] == 1, (
-        "the wait stays on the calling thread's stack, so everything around it stays in order "
-        "and every caller stays synchronous; what the pumping lets in is handled where it "
-        "arrives")
+        "what the pumping lets in is handled where it arrives: the queue starts no second "
+        "hand-over while one is out")
     assert queue.queue_order == [first, second]
     assert client.submit_job.call_count == 1
 

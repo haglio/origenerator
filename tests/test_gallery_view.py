@@ -2141,7 +2141,8 @@ def test_reopening_the_same_folder_is_not_a_second_history_stop(qtbot):
     view._poll()
 
     assert len(view._navigation._history._stack) == depth, (
-        "a rebuild re-selects the open folder every poll; each must not pile onto the stack")
+        "a rebuild re-selects the open folder every poll; each must not pile onto the stack, "
+        "or Back would walk copies of where the user already is")
 
 
 def test_back_returns_to_the_favorite_collection_after_drilling_into_a_folder(qtbot):
@@ -2211,7 +2212,9 @@ def test_back_to_a_collection_item_re_highlights_its_tile(qtbot):
 
     view._navigation.go_back()
 
-    assert view._gallery_pane._thumb_widgets["i1"]._selected
+    assert view._gallery_pane._thumb_widgets["i1"]._selected, (
+        "landing means landing: the item previewed and its tile lit, so which of the "
+        "collection's items Back returned to is visible in the pane and not just the tab")
     assert not view._gallery_pane._thumb_widgets["i2"]._selected
 
 
@@ -2259,7 +2262,8 @@ def test_back_onto_a_folder_of_sub_folders_drops_the_pick(qtbot):
     view._navigation.go_back()
 
     assert view._tree.currentItem() is lora
-    assert view._selected is None
+    assert view._selected is None, (
+        "a pane still lit on the item Back just left looks like a dead press")
 
 
 def test_an_item_looked_at_on_a_collection_goes_back_to_that_collection(qtbot):

@@ -120,7 +120,9 @@ def test_fun_time_gallery_ignores_the_motion_keys(qtbot):
     view.show()
     event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_J,
                       Qt.KeyboardModifier.NoModifier)
-    assert view.eventFilter(view, event) is False
+    assert view.eventFilter(view, event) is False, (
+        "Space and friends belong to Fun Time's own hotkeys while hosted; nothing here may "
+        "swallow them")
 
 
 def test_fun_time_gallery_does_not_put_the_standalone_osr2_state_on_but_hands_it_back_untouched(qtbot):
@@ -128,8 +130,12 @@ def test_fun_time_gallery_does_not_put_the_standalone_osr2_state_on_but_hands_it
 
     view.restore_osr2_state(OSR2_RETRACTED)
 
-    assert view.osr2_control.state() == OSR2_PARKED
-    assert view.osr2_state() == OSR2_RETRACTED
+    assert view.osr2_control.state() == OSR2_PARKED, (
+        "hosted, the device is the session's, so the state the standalone app was left in "
+        "cannot be put on")
+    assert view.osr2_state() == OSR2_RETRACTED, (
+        "handed back untouched on the way out rather than saved over, since both runs keep the "
+        "one state file")
 
 
 def test_fun_time_gallery_stacks_the_generate_tabs_over_the_gallery_pane(qtbot):
@@ -813,16 +819,16 @@ def test_a_region_the_session_wants_never_stays_empty(qtbot, tmp_path, monkeypat
     view.refresh()
     slideshow = view.region_slideshow("portrait")
     assert slideshow is not None, (
-        "the Funestra under a region is blacked for the whole mode, so a region left empty is a "
-        "black rectangle, not a fallback")
+        "not a dead end: the session's open can arrive before the first refresh has read the "
+        "library, the launch racing the boot, so a region asked for too early is filled on the "
+        "next refresh")
     qtbot.addWidget(slideshow.shown)
 
     slideshow.close()
     later = view.region_slideshow("portrait")
     assert later is not None, (
-        "not a dead end: the tree this reads is built by the first refresh, and the session's "
-        "open can arrive before it, the launch racing the boot, so a region owed its base state "
-        "gets it on the next refresh")
+        "the Funestra under a region is blacked for the whole mode, so a region left empty is a "
+        "black rectangle, not a fallback")
     assert later is not slideshow
     qtbot.addWidget(later.shown)
 
@@ -1371,7 +1377,9 @@ def test_a_gallery_a_session_never_took_over_stands_off_the_device_all_the_same(
 
     view.osr2_control.the_session_has_it(True)
 
-    assert not motion.active
+    assert not motion.active, (
+        "the takeover can miss, and a window that kept its switch keeps streaming into the one "
+        "device the session is driving")
     assert not view.osr2_control.isEnabled()
     view.toggle_osr2_drive()
     assert not motion.active

@@ -1350,7 +1350,8 @@ def test_a_window_hosted_in_the_headset_is_shown_rather_than_parked(qtbot, tmp_p
     win = _window(qtbot, tmp_path, fun_time=_headset_session(tmp_path))
 
     assert not win.isMinimized(), (
-        "shown, because Qt draws nothing for a window Windows has unmapped")
+        "shown, because Qt draws nothing for a window Windows has unmapped; the suite's Qt "
+        "draws a minimized window all the same, so the state is what this pins")
     assert win.hands_its_window_over is not None
 
 
@@ -1405,7 +1406,9 @@ def test_a_window_the_monitors_take_back_is_in_sight_again(
 def test_a_window_hosted_on_the_monitors_hands_no_frame_over(qtbot, tmp_path):
     win = _window(qtbot, tmp_path, fun_time=_fun_time_session())
 
-    assert win.hands_its_window_over is None
+    assert win.hands_its_window_over is None, (
+        "there the window itself is what is seen, so a frame written every tick would be work "
+        "for nobody")
 
 
 def test_a_session_crossing_into_the_headset_asks_for_the_window(qtbot, tmp_path):

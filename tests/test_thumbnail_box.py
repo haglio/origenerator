@@ -35,7 +35,7 @@ def test_a_source_tile_draws_a_thumbnail_the_size_the_drop_box_does(qtbot, tmp_p
 
     assert tile._thumb.pixmap().size() == _as_the_drop_box_draws_it(qtbot, path), (
         "the user's rule: every thumbnail outside the Gallery pane, where they are bigger, is "
-        "the same size, the size the Combine drop box shows")
+        "the same size, the size the Combine drop zone shows")
 
 
 def test_an_enhancement_level_draws_a_thumbnail_the_size_the_drop_box_does(qtbot, tmp_path):

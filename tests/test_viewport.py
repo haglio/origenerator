@@ -1119,7 +1119,8 @@ def test_frames_of_the_item_itself_keep_the_message_they_are_about(make_preview,
 
     assert not w._message.isHidden(), (
         "frames of an enhancement of the item on screen are the coming state of that item, so "
-        "its message and its corners are as true of them and stay")
+        "its message is as true of them and stays; cleared by each frame and put back by each "
+        "keystroke, it would flicker at the rate the run streams while the form is typed in")
 
 
 def test_frames_of_the_item_itself_keep_its_corners(make_preview, tmp_path):
@@ -1128,7 +1129,9 @@ def test_frames_of_the_item_itself_keep_its_corners(make_preview, tmp_path):
 
     w.show_frame(_png_bytes(), enhancing=True)
 
-    assert w.actions_id() == "held"
+    assert w.actions_id() == "held", (
+        "frames of an enhancement of the item on screen are the coming state of that item, so "
+        "its corners are as true of them and stay")
     assert not star.isHidden()
     assert not trash.isHidden()
 

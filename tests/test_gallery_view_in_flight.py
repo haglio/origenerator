@@ -977,8 +977,8 @@ def test_a_slideshow_is_handed_the_job_queue_worked_out_off_the_listing_in_hand(
     items, _foreign = view.queue_now()
 
     assert ([item.key for item in items], listings) == (["gen1"], []), (
-        "worked out off both tables read again for each slideshow that opened, the line held a "
-        "double-click up for a quarter of a second more")
+        "reading both tables again for each slideshow that opened held a double-click up a quarter "
+        "of a second more")
 
 
 def test_latest_shows_an_inflight_tile_above_finished_items(qtbot):

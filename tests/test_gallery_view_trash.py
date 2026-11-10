@@ -449,11 +449,11 @@ def test_clicking_a_deleted_tile_opens_it_like_any_other_generation(qtbot):
 
     _click_tile(view, "d1")
 
-    assert view._selected_row["prompt_id"] == "d1", (
+    assert view._selected_row["prompt_id"] == "d1"
+    shown = view._generate_pane.current_generate_tab().displayed_row()
+    assert shown["prompt_id"] == "d1", (
         "the Trash kept it whole, so it fills a Generate tab with the settings that made it: being "
         "able to look before deciding is the point")
-    shown = view._generate_pane.current_generate_tab().displayed_row()
-    assert shown["prompt_id"] == "d1"
 
 
 def test_double_clicking_a_deleted_tile_keeps_its_tab(qtbot):

@@ -1057,7 +1057,7 @@ def test_a_spoken_enhance_with_nothing_to_enhance_says_so(qtbot, tmp_path):
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
     assert words(view._voice.status) == NOTHING_LEFT_TO_ENHANCE, (
-        "answered in the button's own words, which is what a speaker not looking at it needs told back")
+        "answered in the button's own words, which is what the user, not looking at it, needs told back")
     assert view._live_jobs == {}
 
 
@@ -1152,7 +1152,8 @@ def test_a_collection_the_tree_has_not_got_says_so_rather_than_doing_nothing(
     view._voice.listener.speak("go to favorites")
 
     assert words(view._voice.status) == "no Favorites collection yet", (
-        "a word already taken as a command must not vanish because its row is not there yet")
+        "Favorites appears only once there are folders, and a word already taken as a command must "
+        "not vanish because its row is not there yet")
 
 
 def test_fun_times_own_words_do_here_what_they_do_there(qtbot, tmp_path):

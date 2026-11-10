@@ -175,7 +175,7 @@ def test_the_motion_lets_go_before_the_script_takes_the_device(qtbot):
     view.osr2_control.set_state(OSR2_DRIVING)
 
     assert log == ["motion lets go", "script takes"], (
-        "each driver puts back what it found when it took the device, so one that takes over before "
+        "each driver puts back what it found when it took the device, the OSR2's auto setting among it, so one that takes over before "
         "the other has let go finds it already taken, and later puts that back")
 
 
@@ -229,13 +229,13 @@ def test_space_flips_the_one_switch_rather_than_the_motion_alone(qtbot):
     _on_screen(qtbot, view, 1400, 900)
     view.osr2_control.setChecked(True)
     assert driver.started == [("pA", "aA")]
-    assert not view._osr2_motion.active, (
-        "sent to the motion directly, Space would start a second source beside a funscript the "
-        "switch already had streaming")
+    assert not view._osr2_motion.active
 
     gestures.press_key(view, Qt.Key.Key_Space)
 
-    assert not view.osr2_control.isChecked()
+    assert not view.osr2_control.isChecked(), (
+        "sent to the motion directly, Space would start a second source beside a funscript the "
+        "switch already had streaming")
     assert driver.stopped >= 1
     assert view._osr2_motion.held == OSR2_PARKED
 
@@ -486,7 +486,8 @@ def test_double_clicking_a_generating_preview_opens_it_fullscreen(qtbot, monkeyp
     assert win is not None
     assert view._slideshows.showing is win
     assert [slide.prompt_id for slide in win.whole_set()] == ["i1"], (
-        "a double-click means this one, bigger: watching the frames come in is what fullscreen is for")
+        "even in a folder Populate is filling, a double-click means this one, bigger, and no second "
+        "slideshow: watching the frames come in is what fullscreen is for")
     win.close()
 
 
@@ -737,7 +738,7 @@ def test_esc_pauses_the_room_with_the_focus_inside_a_tab(qtbot):
 
     assert _press_escape(view) is True, (
         "the driven video usually lives in the focused Generate tab, where the gallery does not own "
-        "the keys")
+        "Delete and Undo")
     assert omnipause.frozen()
     assert view.osr2_control.isChecked()
 

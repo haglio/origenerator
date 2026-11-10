@@ -99,6 +99,7 @@ from origenerator.workflows.model_files import NO_LORA
 from tests import drops
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import _struck_and_lit
+from tests.related_links import source_tile
 from tests.text_readers import clap_reader, clip_reader, word_reader, word_reading
 from tests.thumbnail_rows import looping_video, painted_row, where_the_thumbnail_is
 
@@ -164,7 +165,7 @@ def test_the_column_reads_preview_then_generate_then_settings(tab):
     assert preview_foot <= generate_top < generate_foot <= line_top < line_foot <= settings_top
 
 
-def test_a_new_tab_gives_the_preview_half_and_the_settings_and_metadata_a_quarter_each(
+def test_a_new_tab_gives_the_preview_five_eighths_and_the_settings_and_metadata_three_sixteenths_each(
         saved_panel):
     tab, db = saved_panel
     tab.resize(700, 1200)
@@ -176,7 +177,7 @@ def test_a_new_tab_gives_the_preview_half_and_the_settings_and_metadata_a_quarte
 
     preview, rest = tab._media_split.sizes()
     settings, item = tab._settings_split.sizes()
-    assert abs(rest - preview) <= 4
+    assert abs(5 * rest - 3 * preview) <= 16
     assert abs(settings - item) <= 4
 
 
@@ -392,7 +393,7 @@ def _layout_containing(root, widget):
 
 
 def test_the_settings_scroll_nearest_the_preview_with_the_item_under_a_border(tab):
-    for widget in (tab._metadata_section, tab._related._source_tile,
+    for widget in (tab._metadata_section, tab._related._requests,
                    tab._related._animations, tab._versions):
         assert _is_descendant(widget, tab._item_scroll)
     assert _is_descendant(tab._param_form, tab._settings_scroll)
@@ -1741,7 +1742,7 @@ def test_a_fresh_tab_shows_no_footer(saved_panel):
     assert _shown_metadata(tab) == [TYPICAL_TIME]
     assert tab._versions.isHidden()
     assert tab._related._animations.isHidden()
-    assert tab._related._source_tile.isHidden()
+    assert source_tile(tab._related).isHidden()
     assert tab._lane_button.isHidden()
 
 
@@ -2110,7 +2111,7 @@ def test_a_tab_with_nothing_to_autoshow_clears_the_last_selections_footer(
 
     assert _shown_metadata(tab) == [TYPICAL_TIME]
     assert tab._versions.isHidden()
-    assert tab._related._source_tile.isHidden()
+    assert source_tile(tab._related).isHidden()
     assert tab._lane_button.isHidden()
 
 
@@ -2153,8 +2154,8 @@ def test_a_video_whose_start_image_is_in_the_trash_still_shows_its_source(saved_
 
     tab.show_saved_generation(video, [])
 
-    assert not tab._related._source_tile.isHidden()
-    assert tab._related._source_tile._prompt_id == "img1"
+    assert not source_tile(tab._related).isHidden()
+    assert source_tile(tab._related)._prompt_id == "img1"
 
 
 def test_showing_an_image_lists_the_videos_it_was_animated_into(saved_panel, monkeypatch):
@@ -2167,7 +2168,7 @@ def test_showing_an_image_lists_the_videos_it_was_animated_into(saved_panel, mon
 
     assert not tab._related._animations.isHidden()
     assert len(tab._related._animations.findChildren(SourceTile)) == 1
-    assert tab._related._source_tile.isHidden()
+    assert source_tile(tab._related).isHidden()
     assert tab._lane_button.isHidden()
     assert tab._displayed_row is image
 
@@ -2196,10 +2197,11 @@ def test_showing_a_video_reveals_evolver_and_source_tile(saved_panel, monkeypatc
     tab.show_saved_generation(video, [image])
 
     assert not tab._lane_button.isHidden()
-    assert not tab._related._source_tile.isHidden()
-    assert tab._related._source_tile._prompt_id == "img1"
-    assert tab._related._source_tile._name.text() == name
-    assert tab._related._animations.isHidden()
+    assert not source_tile(tab._related).isHidden()
+    assert source_tile(tab._related)._prompt_id == "img1"
+    assert source_tile(tab._related)._name.text() == name
+    assert [tile._heading.text() for tile in tab._related._animations.findChildren(SourceTile)
+            if not tile.isHidden()] == ["Animated from"]
 
 
 def test_a_video_from_another_source_is_never_offered_to_evolver(saved_panel, monkeypatch,
@@ -2231,7 +2233,7 @@ def test_a_click_on_a_video_s_start_frame_is_a_link_clicked(saved_panel, monkeyp
     got = []
     tab.link_clicked.connect(got.append)
 
-    tab._related._source_tile.activated.emit("img1")
+    source_tile(tab._related).activated.emit("img1")
 
     assert got == ["img1"]
 
@@ -2244,7 +2246,7 @@ def test_video_without_a_known_source_hides_the_link(saved_panel, monkeypatch):
 
     tab.show_saved_generation(video, [])
 
-    assert tab._related._source_tile.isHidden()
+    assert source_tile(tab._related).isHidden()
     assert not tab._lane_button.isHidden()
 
 

@@ -829,7 +829,9 @@ def test_a_locked_slide_asking_for_one_gets_a_yes_or_no(enhance, monkeypatch):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: False)
     controller, _host = enhance(db=FakeDB([_image("i1")]))
 
-    assert controller.enhance_from_slideshow("i1") is False
+    assert controller.enhance_from_slideshow("i1") is False, (
+        "the decision is the gallery's rather than the slideshow's, because the gallery holds "
+        "the versions, and a video has none to receive")
 
 
 def test_a_lock_puts_the_enhancement_of_the_locked_image_first(enhance, monkeypatch):

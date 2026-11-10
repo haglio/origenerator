@@ -63,3 +63,7 @@ def test_this_app_takes_when_a_line_was_said_in_the_field_fun_time_fills(relied_
     field = relied_on.get("said_at_field")
 
     assert not field or "{" + field + "}" in contract.declaration()["said_at_suffix"]
+
+
+def test_this_app_writes_every_status_line_fun_time_reads(relied_on):
+    assert set(relied_on.get("status_keys", ())) <= set(contract.STATUS_KEYS)

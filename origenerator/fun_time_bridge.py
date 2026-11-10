@@ -16,6 +16,7 @@ from origenerator.config import RADIO_DIR
 from origenerator.fun_time_mode import (
     CLOSE_SLIDESHOW,
     CLOSE_SLIDESHOWS,
+    CORE_READY,
     FILTER_ENHANCED,
     GO_TO,
     HAND_OVER,
@@ -29,6 +30,7 @@ from origenerator.fun_time_mode import (
     SHAPES,
     TAKE_BACK,
     TRASH_FILE,
+    UP,
     FunTimeSession,
 )
 from origenerator.osr2_controls_commands import shape_press, shape_spoken_to, spelled_for
@@ -84,14 +86,16 @@ class FunTimeBridge(QObject):
     hand_over_asked = pyqtSignal(Path, Path)
     take_back_asked = pyqtSignal()
 
-    def __init__(self, session: FunTimeSession, gallery, parent=None, *, radio_dir=RADIO_DIR):
+    def __init__(self, session: FunTimeSession, gallery, parent=None, *, radio_dir=RADIO_DIR,
+                 core_ready: bool = True):
         super().__init__(parent)
         self._session = session
         self._radio_dir = radio_dir
         self._radio: list[Path] | None = None
         self._gallery = gallery
         self._paused = False
-        self._published = False
+        self._core_ready = core_ready
+        self._published: str | None = None
         self._session_verbs = {
             CLOSE_SLIDESHOWS: self._close_the_slideshows,
             FILTER_ENHANCED: self._filter_enhanced,
@@ -253,12 +257,18 @@ class FunTimeBridge(QObject):
         self._paused = paused
         self._gallery.set_room_paused(paused)
 
-    READY = "ready=1"
+    def core_is_ready(self) -> None:
+        self._core_ready = True
+
+    def _status(self) -> str:
+        return "".join(f"{key}={value}\n" for key, value in (
+            (UP, "1"), (CORE_READY, "1" if self._core_ready else "0")))
 
     def _publish_status(self) -> None:
         if self._session.status_file is None:
             return
-        if self._published and self._session.status_file.exists():
+        status = self._status()
+        if self._published == status and self._session.status_file.exists():
             return
-        self._published = publish_whole(self._session.status_file,
-                                        self.READY + "\n")
+        if publish_whole(self._session.status_file, status):
+            self._published = status

@@ -109,9 +109,11 @@ class Core(QMainWindow):
         self._toasts = Toasts(self.windowIcon(), parent=self, shown_as=preview,
                                        video_in_front=self._gallery_view.video_in_front)
         self._gallery_view.run_ended.connect(self._toasts.note)
+        self._bridge: FunTimeBridge | None = None
         if fun_time is not None:
-            self._answer_the_crossings(
-                FunTimeBridge(fun_time, self._gallery_view, parent=self))
+            self._bridge = FunTimeBridge(fun_time, self._gallery_view, parent=self,
+                                         core_ready=False)
+            self._answer_the_crossings(self._bridge)
         self.hands_its_window_over: HeadsetWindow | None = None
         self._found: tuple[QByteArray, float, bool] | None = None
         self._borders = RememberedBorders(self)
@@ -180,6 +182,10 @@ class Core(QMainWindow):
 
     def slideshow_showing_on(self) -> str | None:
         return self._gallery_view.slideshow_showing_on()
+
+    def core_is_ready(self) -> None:
+        if self._bridge is not None:
+            self._bridge.core_is_ready()
 
     def become_hosted(self, session: FunTimeSession) -> None:
         logger.info("Taken into a Fun Time session; the OSR2 and the appliance "

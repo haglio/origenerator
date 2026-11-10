@@ -11,6 +11,7 @@ from xml.etree import ElementTree
 
 import pytest
 from app_support import loading_screen as launchers_screen
+from app_support.file_channel import read_key_values
 from app_support.frame_channel import _HEADER
 from funestra.file_channel import append_command
 from funestra.hud_placement import HudCorner
@@ -28,7 +29,7 @@ from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
 from origenerator.fun_time_bridge import FunTimeBridge
-from origenerator.fun_time_mode import FunTimeSession, Rect
+from origenerator.fun_time_mode import CORE_READY, FunTimeSession, Rect
 from origenerator.gallery.collection import LATEST_KEY, FolderCollection
 from origenerator.gallery.shapes import BOTH, SEPARATE
 from origenerator.generation_state import GenerationSource
@@ -1502,6 +1503,34 @@ def test_a_window_launched_hosted_on_the_monitors_still_crosses_into_the_headset
 
     _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
     qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+
+
+def _publishing_status(tmp_path):
+    return replace(_fun_time_session(), status_file=tmp_path / "origenerator_status.txt")
+
+
+def _core_ready_published(qtbot, tmp_path, value):
+    status = tmp_path / "origenerator_status.txt"
+    qtbot.waitUntil(lambda: status.exists()
+                    and read_key_values(status).get(CORE_READY) == value, timeout=3000)
+
+
+def test_a_window_launched_hosted_says_core_is_not_ready_until_comfyui_has_answered(
+        qtbot, tmp_path):
+    win = _window(qtbot, tmp_path, fun_time=_publishing_status(tmp_path))
+    _core_ready_published(qtbot, tmp_path, "0")
+
+    win.core_is_ready()
+
+    _core_ready_published(qtbot, tmp_path, "1")
+
+
+def test_a_standalone_window_taken_into_a_session_says_core_is_ready(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+
+    win.become_hosted(_publishing_status(tmp_path))
+
+    _core_ready_published(qtbot, tmp_path, "1")
 
 
 def test_crossing_into_the_headset_grows_the_window_back_to_desktop_size(qtbot, tmp_path):

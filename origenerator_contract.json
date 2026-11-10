@@ -294,5 +294,9 @@
     "fix hair",
     "fix mouth",
     "fix tongue"
+  ],
+  "status_keys": [
+    "ready",
+    "core_ready"
   ]
 }

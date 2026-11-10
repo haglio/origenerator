@@ -1702,6 +1702,45 @@ def test_recent_generations_lets_a_newer_generation_outrank_an_enhancement():
     assert [r["prompt_id"] for r in recent_generations(rows)] == ["i4", "i1", "i2"]
 
 
+def _video_made(prompt_id, row_id, finished, **fields):
+    return _row(prompt_id=prompt_id, id=row_id, workflow_name="wan22_i2v",
+                created_at=f"2026-09-12 {finished}",
+                completed_at=f"2026-09-12T{finished}+00:00",
+                output_files=json.dumps([{"filename": f"{prompt_id}.mp4"}]), **fields)
+
+
+def test_recent_generations_leads_with_a_video_upscaled_after_a_newer_one_was_made():
+    upscaled = _video_made("video_one", 1, "08:00:00",
+                           evolver_upscaled_at="2026-09-12T20:00:00+00:00")
+    newer = _video_made("video_two", 2, "19:00:00")
+    assert [r["prompt_id"] for r in recent_generations([newer, upscaled])] \
+        == ["video_one", "video_two"]
+
+
+def test_recent_generations_leaves_a_video_never_upscaled_where_it_was_made():
+    older = _video_made("video_one", 1, "08:00:00")
+    newer = _video_made("video_two", 2, "19:00:00")
+    assert [r["prompt_id"] for r in recent_generations([older, newer])] \
+        == ["video_two", "video_one"]
+
+
+@pytest.mark.parametrize(("enhanced_at", "upscaled_at", "expected"), [
+    ("21:00:00", "20:00:00", ["video_one", "between", "video_two"]),
+    ("19:30:00", "20:00:00", ["between", "video_one", "video_two"]),
+    ("20:00:00", "21:00:00", ["video_one", "between", "video_two"]),
+], ids=["enhanced_last", "upscaled_last_before_between", "upscaled_last"])
+def test_recent_generations_places_an_item_enhanced_and_upscaled_by_the_later_of_the_two(
+        enhanced_at, upscaled_at, expected):
+    both = _video_made("video_one", 1, "08:00:00",
+                       evolver_upscaled_at=f"2026-09-12T{upscaled_at}+00:00",
+                       enhance_history=json.dumps([{
+                           "filename": "video_enhance_e1.mp4", "params": {}, "run_id": 3,
+                           "finished_at": f"2026-09-12T{enhanced_at}+00:00"}]))
+    rows = [_video_made("between", 4, "20:30:00"), _video_made("video_two", 2, "19:00:00"),
+            both]
+    assert [r["prompt_id"] for r in recent_generations(rows)] == expected
+
+
 def test_recent_generations_leaves_an_enhancement_older_than_the_record_in_place():
     i1, = _collection(("i1", 1))
     i1["enhance_history"] = json.dumps(

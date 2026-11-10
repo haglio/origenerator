@@ -232,11 +232,17 @@ class LibrarySnapshot:
         return (self.upscales.upscale_of(path) or path, media_type, row["prompt_id"],
                 row.get("thumbnail_path"))
 
+    def upscale_of_row(self, row: dict) -> Path | None:
+        return self._upscale_at(gallery.resolve_preview(row, OUTPUT_PLACES))
+
+    def _upscale_at(self, resolved) -> Path | None:
+        return self.upscales.upscale_of(resolved[0]) if resolved is not None else None
+
     def _versions_of_one(self, row: dict) -> tuple | None:
         media_type = gallery.media_type_of_row(row)
         resolved = (gallery.resolve_preview(row, OUTPUT_PLACES)
                     if media_type == MediaType.VIDEO else None)
-        upscale = self.upscales.upscale_of(resolved[0]) if resolved is not None else None
+        upscale = self._upscale_at(resolved)
         versions = gallery.displayed_versions(row, upscale)
         if len(versions) <= 1:
             versions = self._beside_its_original(resolved)

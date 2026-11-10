@@ -30,7 +30,7 @@ class TrashedBatch:
         for original, trashed in self.moves:
             back = renamed.get(original, original)
             back.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(trashed), str(back))
+            _move(trashed, back)
         self._discard_subdir()
         for original, held in self.out_of_play:
             if held.is_file() and not original.exists():
@@ -62,7 +62,11 @@ class TrashedBatch:
             if trashed != keeping:
                 trashed.unlink(missing_ok=True)
 
+    def trashed_files(self) -> list[Path]:
+        return [trashed for _original, trashed in self.moves]
+
     def waiting_out_of_play(self) -> list[Path]:
+
         return [held for _played, held in self.out_of_play]
 
     def holding(self, original: Path) -> Path | None:

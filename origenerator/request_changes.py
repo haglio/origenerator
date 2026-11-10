@@ -28,7 +28,11 @@ from origenerator.workflows.model_files import is_no_lora
 _WORD = re.compile(r"[A-Za-z0-9']{2,}")
 _ALIKE_ENOUGH_TO_BE_ONE_PART = 0.5
 PROMPTS = {"positive": "Positive Prompt", "negative": "Negative Prompt"}
-_NOTHING_CHANGED = "Nothing changed."
+_NO_REASON = "The model gave no change and no reason, so nothing changed."
+_NONE_OF_IT_HIS = "None of the model's changes had to do with what you asked, so nothing changed."
+_NO_WORDS = "The model's change named no words, so nothing changed."
+_LEFT_AS_IT_WAS = "The model's change left {} as it was in the {}, so nothing changed."
+_CALLED_FOR = "The Positive Prompt asks for {}, so it wasn't kept out of the Negative Prompt."
 _SAYING_NOTHING = frozenset({
     "the", "and", "in", "on", "of", "with", "to", "it", "at", "an", "is", "for", "or", "no", "not",
     "her", "his", "him", "she", "he", "you", "me", "my", "please", "make", "have", "only", "more",
@@ -312,7 +316,7 @@ _WORDS_OF_AN_EDIT = ("replace", "with", "add", "remove")
 
 class _Applying:
     def __init__(self, pair: tuple[str, str], asked: list[str], settings: list[Setting],
-                 prompts: Prompts):
+                 prompts: Prompts, why: str):
         self.shown_positive, self.negative = pair
         self.positive = self.shown_positive
         self.asked = asked
@@ -326,10 +330,15 @@ class _Applying:
         self.already_so: list[str] = []
         self.took_out = False
         self.gave_up = ""
+        self.why = why.strip()
+        self.why_nothing: list[str] = []
         self.rewritten: dict[str, list[tuple[str, str]]] = {which: [] for which in PROMPTS}
 
     def _say(self, line: str) -> None:
         self.said += [line]
+
+    def _nothing_because(self, line: str) -> None:
+        self.why_nothing += [line]
 
     def setting(self, change: dict) -> None:
         setting = setting_called(change.get("setting"), self.settings)
@@ -425,7 +434,10 @@ class _Applying:
     def gone(self, change: dict) -> None:
         thing = str(change.get("gone") or "")
         instead = self._as_these_prompts_take(str(change.get("instead") or ""))
-        if not thing or not self._answers_him(change, thing):
+        if not thing:
+            self._nothing_because(_NO_WORDS)
+            return
+        if not self._answers_him(change, thing):
             return
         there = [written for part in _parts(str(change.get("in_positive") or ""))
                  if part and _whole(self.positive, written := _as_written(self.positive, part))]
@@ -468,6 +480,8 @@ class _Applying:
         kept, said = self._what_he_asked_of(there, new, PROMPTS[which])
         if _same_parts(kept, there):
             said = []
+            self._nothing_because(_LEFT_AS_IT_WAS.format(_quoted(there), PROMPTS[which])
+                                  if _same_parts(new, there) else _NONE_OF_IT_HIS)
         else:
             self.took_out = self.took_out or (which == "positive"
                                               and len(_parts(kept)) < len(_parts(there)))
@@ -499,7 +513,10 @@ class _Applying:
         return words if self.take_weights else without_weights(words)
 
     def _answers_him(self, change: dict, changed: str) -> bool:
-        return answers_him(change.get("for"), self.asked) or self._names_what_he_asked(changed)
+        if answers_him(change.get("for"), self.asked) or self._names_what_he_asked(changed):
+            return True
+        self._nothing_because(_NONE_OF_IT_HIS)
+        return False
 
     def _names_what_he_asked(self, words: str) -> bool:
         return bool(_naming(words) & set().union(*(_naming(request) for request in self.asked)))
@@ -528,10 +545,15 @@ class _Applying:
         if left_out:
             said = [line for unwanted in left_out for line in self._add("negative", {"add": unwanted})]
             return said + (self._add(which, {**change, "add": words}) if words else [])
-        if which == "negative":
-            words = self._kept_out_bare(words)
         if not words:
+            self._nothing_because(_NO_WORDS)
             return []
+        if which == "negative":
+            bare = self._kept_out_bare(words)
+            if not bare:
+                self._nothing_because(_CALLED_FOR.format(_quoted(words)))
+                return []
+            words = bare
         text = getattr(self, which)
         kept_out = [_KEPT_OUT + words] if which == "negative" else []
         if _whole(text, words):
@@ -556,16 +578,25 @@ class _Applying:
 
     def _remove(self, which: str, change: dict) -> list[str]:
         text = getattr(self, which)
-        asked = [words for part in _parts(str(change["remove"]))
+        asked = [words for part in _parts(str(change["remove"])) if part
                  for words in self._only_what_he_quoted(_as_written(text, part))]
         parts = [part for part in asked if _whole(text, part)]
         if len(parts) > 1:
             parts = [part for part in parts if self._names_what_he_asked(part)]
-        if which == "negative" and not parts:
+        if which == "negative" and asked and not parts:
             return [f"Nothing in the Negative Prompt works against {_quoted(part)}." for part in asked]
-        self.took_out = self.took_out or (which == "positive" and bool(parts))
+        if not parts:
+            self._nothing_taken_out(text, asked)
+            return []
+        self.took_out = self.took_out or which == "positive"
         setattr(self, which, without_phrases(text, parts))
         return [f"Removed {_quoted(part)} from the {PROMPTS[which]}." for part in parts]
+
+    def _nothing_taken_out(self, text: str, asked: list[str]) -> None:
+        missing = [part for part in asked if not _whole(text, part)]
+        for line in ([f"Couldn't find {_quoted(part)} in the Positive Prompt." for part in missing]
+                     or [_NONE_OF_IT_HIS if asked else _NO_WORDS]):
+            self._nothing_because(line)
 
     def _only_what_he_quoted(self, words: str) -> list[str]:
         return [quote for quote in self.quoted if _whole(words, quote)] or [words]
@@ -592,9 +623,14 @@ class _Applying:
         return " ".join(dict.fromkeys(lines))
 
     def _line(self) -> str:
-        if self.said:
-            return self._with_what_was_not_found(self.said)
-        return self.gave_up or self._with_what_was_not_found(self.already_so) or _NOTHING_CHANGED
+        return (self._with_what_was_not_found(self.said) or self.gave_up
+                or self._with_what_was_not_found(self.already_so)
+                or " ".join(dict.fromkeys(self.why_nothing)) or self._why_no_change())
+
+    def _why_no_change(self) -> str:
+        if not self.why:
+            return _NO_REASON
+        return f"{self.why}{'' if self.why.endswith(('.', '!', '?')) else '.'} Nothing changed."
 
     def outcome(self) -> Outcome:
         return Outcome(self.positive, self.negative, self.changes, self._line())
@@ -602,7 +638,7 @@ class _Applying:
 
 def apply_changes(answer: dict, pair: tuple[str, str], *, asked: list[str],
                   settings: list[Setting], prompts: Prompts = _AS_WRITTEN) -> Outcome:
-    applying = _Applying(pair, asked, settings, prompts)
+    applying = _Applying(pair, asked, settings, prompts, str(answer.get("why") or ""))
     for change in answer.get("changes") or ():
         applying.change(change)
     return applying.outcome()

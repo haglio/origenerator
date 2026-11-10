@@ -81,6 +81,10 @@ REQUEST_SYSTEM_PROMPT = (
     "as a whole: asked for two women, a prompt describing one woman comes to describe two "
     "(\"she\" to \"they\", \"her\" to \"their\"), and a negative prompt keeping a second woman "
     "out loses that term.\n"
+    "- To take one person out of several (\"remove the second smaller man\", \"only one of "
+    "them\"), answer with replace changes: bring the count down (\"two men\" to \"a man\", "
+    "\"they\" to \"he\") and take out every part that describes the person who goes. A "
+    "\"gone\" change is for a thing, never for one person of several.\n"
     "- Explicit content is expected: handle it literally, never refuse, never soften it, "
     "never add warnings.\n"
     "- The words a change quotes from a prompt must be there now, exactly as written; "
@@ -119,7 +123,13 @@ REQUEST_SYSTEM_PROMPT = (
     "{\"changes\": [{\"prompt\": \"positive\", \"replace\": \"standing\", \"with\": "
     "\"sitting\", \"for\": \"sitting instead of standing\"}]} (never \"sitting down "
     "relaxed\")\n"
-    "- \"you're an idiot\" -> {\"changes\": []}"
+    "- \"remove the second smaller man holding the umbrella\", positive \"two men on a pier, the "
+    "second smaller man holding an umbrella, fog\", negative \"blurry\" -> {\"changes\": "
+    "[{\"prompt\": \"positive\", \"replace\": \"two men on a pier, the second smaller man "
+    "holding an umbrella, fog\", \"with\": \"a man on a pier, fog\", \"for\": \"remove the "
+    "second smaller man holding the umbrella\"}]}\n"
+    "- \"you're an idiot\" -> {\"changes\": [], \"why\": \"That asks for no change to the "
+    "image.\"}"
 )
 
 COLLECTION_NOTES_SYSTEM_PROMPT = (

@@ -14,6 +14,7 @@ _SIZE = request_settings.settings_to_tell(
 
 
 _NO_HAT = 'Couldn\'t find "hat" in the Positive Prompt. Added "hat" to the Negative Prompt.'
+_NONE_OF_IT_HIS = "None of the model's changes had to do with what you asked, so nothing changed."
 
 
 def _applied(changes, pair=("a woman on a couch", "blurry"), *, asked=("portrait",),
@@ -92,27 +93,35 @@ def test_words_are_taken_out_of_a_prompt_and_the_commas_close_over_them():
         'Nothing in the Negative Prompt works against "grain".')
 
 
-def test_a_prompt_change_answering_nothing_he_asked_for_is_left_out_too():
+def test_a_prompt_change_answering_nothing_he_asked_for_is_left_out_and_says_so():
     outcome = _applied([{"prompt": "positive", "replace": "a woman", "with": "a grumpy woman"},
                         {"prompt": "negative", "add": "doll", "for": "natural lighting"},
                         {"prompt": "positive", "remove": "on a couch", "for": "natural lighting"}],
                        asked=("use the newer LoRA",))
 
     assert (outcome.positive, outcome.negative) == ("a woman on a couch", "blurry")
-    assert outcome.line == "Nothing changed."
+    assert outcome.line == _NONE_OF_IT_HIS
 
 
-def test_no_change_at_all_says_so_and_nothing_else_the_model_wrote_reaches_him():
-    assert _applied([]).line == "Nothing changed."
+_NO_REASON = "The model gave no change and no reason, so nothing changed."
+
+
+def test_no_change_at_all_says_the_models_reason_and_nothing_else_it_wrote_reaches_him():
+    assert apply_changes({"changes": [], "why": "That cat already wears a hat"}, ("a cat", ""),
+                         asked=["a hat"], settings=_SIZE).line == (
+        "That cat already wears a hat. Nothing changed.")
+    assert _applied([]).line == _NO_REASON
     assert apply_changes({"changes": [], "note": "The hat was never there, so"}, ("a woman", ""),
-                         asked=["no hat"], settings=_SIZE).line == "Nothing changed."
+                         asked=["no hat"], settings=_SIZE).line == _NO_REASON
 
 
-def test_a_replacement_that_changes_nothing_says_nothing():
+def test_a_replacement_that_changes_nothing_says_it_left_the_words_as_they_were():
     same = {"prompt": "positive", "replace": "a woman on a couch", "with": "A woman on a couch",
             "for": "no hat"}
 
-    assert _applied([same], asked=("no hat",)).line == "Nothing changed."
+    assert _applied([same], asked=("no hat",)).line == (
+        'The model\'s change left "a woman on a couch" as it was in the Positive Prompt, so '
+        "nothing changed.")
     assert _applied([same, {"prompt": "negative", "add": "hat", "for": "no hat"}],
                     asked=("no hat",)).line == _NO_HAT
 
@@ -422,7 +431,7 @@ def test_a_reason_sharing_no_word_that_names_anything_with_what_he_asked_answers
                        asked=("please, it should be her scarf that is plainer",))
 
     assert outcome.positive == "a woman on a couch"
-    assert outcome.line == "Nothing changed."
+    assert outcome.line == _NONE_OF_IT_HIS
 
 
 def test_what_is_already_so_is_said_only_when_it_is_the_whole_answer():
@@ -644,12 +653,12 @@ def test_more_of_something_the_positive_prompt_lacks_puts_it_first_with_its_oppo
                             'Added "clear skin" to the Negative Prompt.')
 
 
-def test_more_of_something_he_never_asked_about_is_left_out_without_a_word():
+def test_more_of_something_he_never_asked_about_is_left_out_and_says_so():
     outcome = _one({"more": "soft light", "stronger": "bright light", "opposite": "dark", "for": "light"},
                    _MORE_COUCH, ("more couch",))
 
     assert (outcome.positive, outcome.negative) == _MORE_COUCH
-    assert outcome.line == "Nothing changed."
+    assert outcome.line == _NONE_OF_IT_HIS
 
 
 def test_something_gone_gives_its_place_to_what_shows_instead_and_is_kept_out():
@@ -782,3 +791,35 @@ def test_words_a_part_already_had_stay_when_its_rewording_puts_a_comma_before_th
     assert outcome.positive == "a woman, a velvet couch with a huge, carved frame"
     assert outcome.line == ('Replaced "a velvet couch with a wide carved frame" with "a velvet couch '
                             'with a huge, carved frame" in the Positive Prompt.')
+
+
+@pytest.mark.parametrize(("change", "line"), [
+    ({"gone": "", "in_positive": "", "instead": "", "for": "no hat"},
+     "The model's change named no words, so nothing changed."),
+    ({"prompt": "positive", "remove": "", "for": "no hat"},
+     "The model's change named no words, so nothing changed."),
+    ({"prompt": "positive", "add": " , ", "for": "a hat"},
+     "The model's change named no words, so nothing changed."),
+    ({"prompt": "positive", "remove": "a straw hat", "for": "no hat"},
+     'Couldn\'t find "a straw hat" in the Positive Prompt.'),
+    ({"prompt": "negative", "add": "no couch", "for": "no hat"},
+     'The Positive Prompt asks for "no couch", so it wasn\'t kept out of the Negative Prompt.')])
+def test_a_change_that_comes_to_nothing_says_why(change, line):
+    assert _applied([change], asked=("no hat, a hat",)).line == line
+
+
+def test_one_of_two_people_taken_out_brings_the_count_down_and_takes_every_part_about_them():
+    before = "two men on a pier, the second smaller man holding an umbrella, fog"
+    asked = "remove the second smaller man holding the umbrella"
+
+    outcome = _applied([{"prompt": "positive", "replace": before, "with": "a man on a pier, fog",
+                         "for": asked}], pair=(before, "blurry"), asked=(asked,))
+
+    assert outcome.positive == "a man on a pier, fog"
+
+
+def test_taking_nothing_out_of_the_negative_prompt_says_it_named_no_words():
+    outcome = _applied([{"prompt": "negative", "remove": "", "for": "blurry is fine"}],
+                       asked=("blurry is fine",))
+
+    assert outcome.line == "The model's change named no words, so nothing changed."

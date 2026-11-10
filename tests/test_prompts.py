@@ -179,3 +179,22 @@ def test_words_he_gives_to_put_in_are_taught_as_used_exactly_with_none_added():
     example = prompt[prompt.index('- "sitting instead of standing"'):].split("\n")[0]
     assert '"replace": "standing", "with": "sitting"' in example
     assert "never" in example
+
+
+def test_one_person_of_several_taken_out_is_taught_as_the_count_coming_down_never_as_gone():
+    prompt = _request_prompt()
+    rule = prompt[prompt.index("To take one person out of several"):].split("\n")[0]
+
+    assert "count" in rule
+    assert "every part" in rule
+    assert '"gone" change is for a thing' in rule
+    example = prompt[prompt.index('- "remove the second smaller man'):].split("\n")[0]
+    assert '"with": "a man on a pier, fog"' in example
+    assert '"gone"' not in example
+
+
+def test_a_request_that_asks_for_no_change_is_answered_with_why():
+    prompt = _request_prompt()
+    example = prompt[prompt.index("- \"you're an idiot\""):].split("\n")[0]
+
+    assert '"changes": [], "why": "' in example

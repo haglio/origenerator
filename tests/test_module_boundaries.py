@@ -30,7 +30,6 @@ QT_FREE = (
     "origenerator.app",
     "origenerator.boot_passes",
     "origenerator.passes_on_the_files",
-    "origenerator.app_link",
     "origenerator.windows_toast",
     "origenerator.landed_while_away",
     "origenerator.toast_raising",
@@ -101,6 +100,11 @@ def _loaded_after_importing(module: str, what: str) -> bool:
 @pytest.mark.parametrize("module", QT_FREE)
 def test_a_module_that_claims_to_be_qt_free_is(module):
     assert _loaded_after_importing(module, "PyQt6") is False
+
+
+def test_what_windows_runs_on_a_toast_click_loads_no_qt():
+    assert _loaded_after_importing("origenerator.app_link", "PyQt6") is False, (
+        "Qt-free, because this is what runs on a click")
 
 
 def test_the_experiment_policy_asks_no_language_model():

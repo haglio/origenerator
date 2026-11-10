@@ -15,6 +15,7 @@ def fit_size(path: str, size: QSize) -> QSize | None:
     return None if target.isEmpty() else target
 
 
+# Qt's QMovie plays an animated WebP through its image reader, with no video player behind it.
 def looping_movie(path: str, size: QSize, parent) -> QMovie:
     return _running(_fitted(path, size, parent))
 

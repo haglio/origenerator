@@ -133,11 +133,69 @@ def test_a_reading_of_a_library_that_has_not_moved_keeps_the_trees_of_the_readin
     before = LibrarySnapshot(rows)
     before.tree("portrait")
 
-    after = LibrarySnapshot(rows, trees_from=before)
+    after = LibrarySnapshot([dict(row) for row in rows], previous=before)
 
     assert after.tree("portrait") is before.tree("portrait")
     assert after.image_index is before.image_index
     assert after.tree("landscape") == before.tree("landscape")
+
+
+def test_a_reading_keeps_each_row_the_reading_before_it_read_unchanged():
+    before = LibrarySnapshot([_listed("pic-1"), _listed("pic-2")])
+
+    after = LibrarySnapshot([_listed("pic-1"), _listed("pic-2", starred=True)], previous=before)
+
+    assert after.rows[0] is before.rows[0]
+    assert after.rows[1] is not before.rows[1]
+    assert after.rows_by_id["pic-2"]["starred"]
+
+
+def _in_workflow(prompt_id, workflow_name, **changes):
+    return {**_listed(prompt_id), "workflow_name": workflow_name, **changes}
+
+
+def _workflows_in(library, shape="landscape"):
+    (images,) = library.tree(shape)
+    return {workflow.workflow_name: workflow for workflow in gallery.child_groups(images)}
+
+
+def test_a_change_inside_one_workflow_leaves_the_other_workflows_folders_as_they_were():
+    rows = [_in_workflow("sdxl-1", "sdxl_t2i"), _in_workflow("flux-1", "flux_t2i_upscaled")]
+    before = LibrarySnapshot(rows)
+    _workflows_in(before)
+
+    after = LibrarySnapshot([_in_workflow("sdxl-1", "sdxl_t2i", seed=7), dict(rows[1])],
+                            previous=before)
+
+    assert _workflows_in(after)["flux_t2i_upscaled"] is _workflows_in(before)["flux_t2i_upscaled"]
+    assert _workflows_in(after)["sdxl_t2i"] is not _workflows_in(before)["sdxl_t2i"]
+    assert after.tree("landscape") == gallery.build_gallery_tree(
+        after.rows, image_index=after.image_index)
+
+
+def test_a_folder_renamed_draws_every_workflows_folders_again():
+    rows = [_in_workflow("sdxl-1", "sdxl_t2i"), _in_workflow("flux-1", "flux_t2i_upscaled")]
+    before = LibrarySnapshot(rows)
+    _workflows_in(before)
+
+    after = LibrarySnapshot([dict(row) for row in rows], previous=before,
+                            folder_meta={"image": {"custom_name": "Stills"}})
+
+    assert _workflows_in(after)["flux_t2i_upscaled"] is not _workflows_in(before)["flux_t2i_upscaled"]
+    assert after.tree("landscape")[0].label == "Stills"
+
+
+def test_new_item_names_draw_every_workflows_folders_again():
+    names = {"version": 1}
+    rows = [_in_workflow("flux-1", "flux_t2i_upscaled")]
+    before = LibrarySnapshot(rows, names_version=lambda: names["version"])
+    _workflows_in(before)
+    names["version"] = 2
+
+    after = LibrarySnapshot([dict(rows[0])], previous=before,
+                            names_version=lambda: names["version"])
+
+    assert _workflows_in(after)["flux_t2i_upscaled"] is not _workflows_in(before)["flux_t2i_upscaled"]
 
 
 def _models_in(library, shape):

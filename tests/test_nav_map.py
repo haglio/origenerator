@@ -255,7 +255,8 @@ def test_a_generation_with_no_prompt_words_is_as_far_from_every_other_as_can_be(
 
     beyond = beyond_the_row(current, [current, wordy, wordless], image_index={})
 
-    assert _ids(beyond) == ["g2", "g3"]
+    assert _ids(beyond) == ["g2", "g3"], (
+        "with no prompt words there is nothing to tell the others apart but their ids")
 
 
 def test_the_lora_that_animated_a_video_comes_before_a_likelier_image():

@@ -1750,9 +1750,7 @@ def test_a_spoken_enhanced_only_narrows_the_named_regions_slideshow(qtbot, tmp_p
     qtbot.addWidget(slideshow.shown)
 
     assert view.run_spoken_command("portrait enhanced only")
-    assert slideshow.hud_enhanced_mode is True, (
-        "hosted, two slideshows run at once and neither is the active window, so the shape named "
-        "is what says which one")
+    assert slideshow.hud_enhanced_mode is True
     assert slideshow.pass_size() == 1
 
     assert view.run_spoken_command("portrait favorites")

@@ -1014,10 +1014,19 @@ class SlideshowDirector:
     def note_finished(self, row: dict | None):
         if row is None:
             return
-        for slideshow, location in list(self._live_slideshows):
+        self._line_up_where_it_plays(row, list(self._live_slideshows))
+        self._show_where_it_was_asked_for(row)
+
+    def note_arrived(self, rows) -> None:
+        in_latest = [(slideshow, location) for slideshow, location in self._live_slideshows
+                     if _plays_latest(location)]
+        for row in rows:
+            self._line_up_where_it_plays(row, in_latest)
+
+    def _line_up_where_it_plays(self, row: dict, live) -> None:
+        for slideshow, location in live:
             if any(r["prompt_id"] == row["prompt_id"] for r in self.rows_at(location)):
                 self._hand_the_file_to(slideshow, row)
-        self._show_where_it_was_asked_for(row)
 
     def _show_where_it_was_asked_for(self, row: dict) -> None:
         request = self._db.get_request(row["prompt_id"])

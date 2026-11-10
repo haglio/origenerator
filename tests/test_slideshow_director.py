@@ -1220,6 +1220,28 @@ def test_a_landing_reaches_the_slideshow_whose_own_folder_holds_it(slideshows):
     assert made[1].added == []
 
 
+def test_an_arrival_from_outside_is_lined_up_on_a_slideshow_playing_latest(slideshows):
+    gallery_pane = FakeGalleryPane(collections={LATEST_LANDSCAPE: [_row("g9")]})
+    director, _host, made = slideshows(gallery_pane=gallery_pane, fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location=LATEST_LANDSCAPE,
+                  shape=LANDSCAPE)
+
+    director.note_arrived([_row("g9", favorite=True)])
+
+    assert made[0].added == [("g9", True, False)]
+
+
+def test_an_arrival_from_outside_leaves_a_slideshow_in_shuffle_as_it_was(slideshows):
+    gallery_pane = FakeGalleryPane(collections={ALL_LANDSCAPE: [_row("g9")]})
+    director, _host, made = slideshows(gallery_pane=gallery_pane, fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], location=ALL_LANDSCAPE,
+                  shape=LANDSCAPE)
+
+    director.note_arrived([_row("g9")])
+
+    assert made[0].added == []
+
+
 def test_a_run_in_another_folder_is_turned_down(slideshows):
     host = FakeHost(rows=[_row("g1")])
     director, _host, made = slideshows(host, db=FakeDB([_row("g7")]))

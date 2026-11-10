@@ -195,6 +195,7 @@ def test_a_tile_click_picks_by_the_keys_held_during_that_click(qtbot):
     _open_latest(pane, rows)
     elsewhere = QWidget()
     qtbot.addWidget(elsewhere)
+    # Qt Test leaves Ctrl down app-wide after this.
     qtbot.keyClick(elsewhere, Qt.Key.Key_Z, _CTRL)
 
     qtbot.mouseClick(pane._thumb_widgets["g1"], Qt.MouseButton.LeftButton, _NO_MOD)

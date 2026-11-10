@@ -73,6 +73,7 @@ def _controls(qtbot):
     host = QWidget()
     host.resize(200, 200)
     qtbot.addWidget(host)
+    # Nothing else references the host, and Qt frees the buttons with it, so the test is handed it to keep.
     return host, CornerButtons(host)
 
 

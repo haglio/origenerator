@@ -1651,10 +1651,11 @@ def test_a_click_on_a_hosted_slideshow_asks_for_omnipause_on_the_sessions_channe
 
     made[0].actions.omnipause()
 
+    assert session.dashboard_cmd_file.exists(), (
+        "a click on a slideshow asks the room for OmniPause in this same file, where a "
+        "Funestra's click on what it shows asks for it")
     assert session.dashboard_cmd_file.read_text(encoding="utf-8").split() == [
-        "omnipause_toggle"], (
-        "the session's channel is where a Funestra's click on what it shows asks for OmniPause, "
-        "so a click on a slideshow asks there too")
+        "omnipause_toggle"]
 
 
 def test_a_click_on_a_slideshow_standing_on_its_own_pauses_the_whole_room(slideshows):

@@ -899,7 +899,7 @@ def test_a_spoken_loop_is_answered_on_the_surface_that_heard_it(qtbot, tmp_path,
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
 
-    assert surface.noted[0] == "img_action", (
+    assert (surface.noted or [None])[0] == "img_action", (
         "answered on the surface that heard it, not in a dialog over it: the speaker is looking "
         "at the image, not at this pane")
     assert "alpha" in surface.noted[1]

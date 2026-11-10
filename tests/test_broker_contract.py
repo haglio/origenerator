@@ -22,5 +22,6 @@ def test_the_stamp_is_read_from_the_directory_the_broker_writes_it_to():
     named = _broker_contract_found_by_walking_up_from_here()["state_dir"]
 
     assert config.project_dir(named["checkout"]) / named["name"] == osr2.SHARED_STATE_DIR, (
-        "neither repo's gate clones the other, so this is the one place the directory the "
-        "Broker writes its stamp to and the one this app reads it from can be compared")
+        "this app writes the Broker's directory layout into its own source, where a change to "
+        "it would be found by nobody, and neither repo's gate clones the other, so this is the "
+        "one place the two can be compared")

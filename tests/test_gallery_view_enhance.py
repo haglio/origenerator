@@ -483,9 +483,7 @@ def test_right_clicking_an_enhancing_tile_offers_to_cancel_the_enhancement(
 
     view._gallery_pane._thumbnail_context_menu("g0", QPoint(0, 0))
 
-    assert "Cancel 1 enhancement" in labels[0], (
-        "an enhancement gets no tile of its own, it shows on the tile of the image it improves, "
-        "so that tile's menu is the only thing in the Gallery pane that can be asked to stop it")
+    assert "Cancel 1 enhancement" in labels[0]
     assert view._jobs.all_jobs == []
     assert db.get_generation("g0") is not None
     assert view._gallery_pane._thumb_widgets["g0"]._enhancing is None

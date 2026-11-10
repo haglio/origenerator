@@ -1286,10 +1286,10 @@ def test_a_cull_that_leaves_one_image_in_the_row_locks_it(qtbot, tmp_path):
     _says(slideshow, video="one-b.png", locked=True)
     slideshow.tick()
 
-    assert "LOCK_ON" in sent
-    assert (slideshow.locked, slideshow.hud_map().loop) == (True, ""), (
+    assert "LOCK_ON" in sent, (
         "a row worn down to one image is that image over and over, which is the lock, so the "
         "cull that wore it down ends the loop and locks what is left, as a Satellite's does")
+    assert (slideshow.locked, slideshow.hud_map().loop) == (True, "")
     assert (asked, starred, opened) == ([], [], [])
 
 
@@ -1491,8 +1491,8 @@ def test_a_loop_button_for_a_row_of_one_image_locks_it_instead(qtbot, tmp_path):
 
     assert (_sent(slideshow), said) == (["LOCK_ON"], ["Locked"]), (
         "a row holding only the image on screen cannot be looped and the press still means this "
-        "one, so it locks the image, the way a Satellite's loop button locks a video whose "
-        "group holds only it")
+        "one, so it locks the image rather than refusing, the way a Satellite's loop button "
+        "locks a video whose group holds only it")
     assert slideshow.locked is True
 
 

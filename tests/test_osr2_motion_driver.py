@@ -107,7 +107,7 @@ def test_each_command_aims_as_far_ahead_as_the_time_it_gives(qtbot):
 def test_the_takeover_keeps_streaming_and_eases_its_interval_out(qtbot):
     driver, broker, clock = _driver(qtbot)
     driver.start()
-    assert broker.positions[0][1] == _HANDOFF_MS, (
+    assert [interval for _at, interval in broker.positions[:1]] == [_HANDOFF_MS], (
         "the device is parked wherever the last thing to hold it left it, so the first target "
         "can be the length of the axis away; holding the stream back for the glide turned the "
         "seam into a slam, the device sitting still and then covering all of it in one tick")

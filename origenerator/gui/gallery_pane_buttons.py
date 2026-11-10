@@ -106,7 +106,7 @@ def _tool_button(icon, tooltip: str, handler, *, checkable=False,
     return btn
 
 
-def _gap_the_flow_can_leave_out() -> QWidget:
+def _group_gap() -> QWidget:
     return QWidget()
 
 
@@ -185,7 +185,7 @@ class GalleryPaneButtons(QWidget):
             (self.power, self.play_pause, self.reference, self.mic),
         ):
             buttons = tuple(b for b in listed if b is not None)
-            gap = _gap_the_flow_can_leave_out()
+            gap = _group_gap()
             layout.addWidget(gap)
             for button in buttons:
                 layout.addWidget(button)

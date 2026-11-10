@@ -401,8 +401,8 @@ def test_the_slideshow_button_waits_until_there_is_something_to_play(qtbot):
     _select_first_leaf(view)
 
     assert view._buttons.slideshow.isHidden(), (
-        "a button offering a slideshow that opens nothing is worse than no button; it comes "
-        "back once the first item lands")
+        "a button offering a slideshow that opens nothing is worse than no button, so it waits "
+        "until there is something to play; only the Trash shows it, grayed, saying why")
 
 
 def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):

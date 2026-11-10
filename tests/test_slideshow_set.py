@@ -296,7 +296,8 @@ def test_the_map_is_the_slide_on_screen_with_its_seeds_right_and_its_configs_dow
 
     assert shown.corner.prompt_id == "id-1", (
         "this is the Funestras' nav map drawn over the slideshow's own generations: what is on "
-        "screen in the corner, its seed row running right, its column running down")
+        "screen in the corner, its seed row running right, its column running down, one cell "
+        "lit for what is playing")
     assert _ids(shown.seeds) == ["id-1b", "id-1c"]
     assert _ids(shown.actions) == ["id-1x"]
     assert (shown.playing, shown.loop) == (("corner", 0), "")

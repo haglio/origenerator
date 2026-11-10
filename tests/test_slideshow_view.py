@@ -1272,8 +1272,7 @@ def test_double_clicking_the_slide_leaves_the_slideshow(qtbot):
     gestures.double_click(view._pane._window, _on_the_slide(view))
 
     qtbot.waitUntil(lambda: not view.isVisible())
-    assert closes == [True], (
-        "a double-click is the way out of every other fullscreen view here")
+    assert closes == [True]
 
 
 def test_double_clicking_a_thumbnail_on_the_map_gives_it_the_lock_buttons_whole_lock(qtbot):
@@ -1330,9 +1329,7 @@ def test_closing_announces_itself(qtbot):
     closes = []
     view.slideshow.closed.connect(lambda: closes.append(True))
     view.close()
-    assert closes == [True], (
-        "the gallery keeps listening for voice commands tied to a surface being up, so a "
-        "dismissal it did not start must still reach it")
+    assert closes == [True]
 
 
 
@@ -2114,11 +2111,11 @@ def test_a_reopened_slideshow_stands_where_the_last_one_was_closed(qtbot):
     _press(closed, Qt.Key.Key_Right)
 
     reopened = _view(qtbot, _THREE, shuffle=lambda order: order.reverse())
-    assert reopened.slideshow.resume(closed.slideshow.state()) is True
-
-    assert reopened.slideshow._set.playlist.current()[2] == "id-c", (
+    assert reopened.slideshow.resume(closed.slideshow.state()) is True, (
         "closing a slideshow is usually a detour, to the folder under the item or a fix in a "
         "tab, so coming back is coming back to that item")
+
+    assert reopened.slideshow._set.playlist.current()[2] == "id-c"
     assert _media_on_screen(reopened) == "c.png"
 
 

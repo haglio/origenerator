@@ -2051,11 +2051,12 @@ def test_pressing_generate_shows_a_row_before_there_is_a_job(qtbot, tmp_path, mo
         CombineRequest(image_id="img", video_id="vid",
                        intent=view._combine.widget.selected_intent()))
 
-    row, = view._queue.rows()
-    assert row._note_text == "Starting…", (
+    assert len(view._queue.rows()) == 1, (
         "checking every stored generation for a duplicate, building the settings and posting "
         "the prompt all run on the window's thread; with nothing on screen for that stretch the "
         "button reads as one that did nothing")
+    row, = view._queue.rows()
+    assert row._note_text == "Starting…"
     assert view._live_jobs == {}
 
     deferred[0]()
@@ -2073,7 +2074,9 @@ def test_the_stand_in_row_already_carries_the_action_that_was_picked(qtbot, tmp_
     view._combine._on_generate_category("img", "dancing", action_settings.VIDEO)
 
     item = view._queue._items[0]
-    assert item.action == "dancing"
+    assert item.action == "dancing", (
+        "it is the row that will replace it, minus the price, so the line does not blink one "
+        "thing away and a different-looking one in")
     assert item.source_image == "sdxl_pick.png [output]"
     assert item.source_video_thumbnail is None
     assert item.cancel is None

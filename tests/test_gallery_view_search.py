@@ -650,10 +650,10 @@ def test_a_search_too_wide_to_draw_says_so_and_says_what_to_do(qtbot):
         "a one-word query over a full library can match most of it, and thousands of tiles in "
         "one pass locks the window; the cap is written out here rather than read from the "
         "constant that sets it, or this test would pass at any cap at all")
-    assert "205 results" in view._search._count.text(), (
+    assert "205 results" in view._search._count.text()
+    assert "add a word" in view._search._count.text(), (
         "the cap is stated rather than silent: the count alone would read as that many tiles to "
         "scroll to")
-    assert "add a word" in view._search._count.text()
 
 
 def test_several_hits_in_one_folder_come_back_as_that_folder(qtbot):

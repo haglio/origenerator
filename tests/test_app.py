@@ -1490,9 +1490,7 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
                 "over a folder name would cost far more than the one lane it protects")
 
         said = " ".join(str(arg) for arg in told.call_args.args)
-        assert "the inbox a send lands in" in said, (
-            "a rename on either side left videos arriving nowhere with both apps silent, so the "
-            "launch says what disagrees")
+        assert "the inbox a send lands in" in said
         window.show.assert_called_once()
 
     def test_a_hosted_session_is_told_without_a_dialog_over_it(self, qapp, capsys):

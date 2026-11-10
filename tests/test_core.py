@@ -1293,10 +1293,10 @@ def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
 
     combine = reopened._gallery_view._combine.widget
     assert combine.image_zone.current_id() == "img"
-    assert combine.selected_intent() == action_settings.GENAU
-    assert combine.video_zone.current_id() is None, (
+    assert combine.selected_intent() == action_settings.GENAU, (
         "the lane matters as much as the drop zones: it is which videos the next Generate is "
         "answered from, and which lane's dropped video the drop zone shows")
+    assert combine.video_zone.current_id() is None
     combine._video_radio.setChecked(True)
     assert combine.video_zone.current_id() == "vid"
 
@@ -1610,12 +1610,13 @@ def test_a_long_run_ending_reaches_the_desktop(qtbot, tmp_path, monkeypatch):
         RunOutcome(kind="Video", display_name="WAN 2.2 I2V", seconds=252.0,
                    ok=True, source=GenerationSource.GENERATED, generation="alpha-1"))
 
-    toast = ElementTree.fromstring(said[0])
-    assert [text.text for text in toast.findall("./visual/binding/text")] == \
-        ["Video ready", "WAN 2.2 I2V · 4:12"], (
+    assert len(said) == 1, (
         "the whole chain, because every link in it is one the app has no other reason to have: "
         "the queue's news leaves the gallery, the window hands it to the toasts, and Windows "
         "shows it wherever the user has got to")
+    toast = ElementTree.fromstring(said[0])
+    assert [text.text for text in toast.findall("./visual/binding/text")] == \
+        ["Video ready", "WAN 2.2 I2V · 4:12"]
     assert app_link.generation_in(toast.get("launch")) == "alpha-1"
 
 
@@ -1660,9 +1661,7 @@ def test_answering_a_toast_for_an_item_that_has_since_gone_still_comes_forward(
 
     win.go_to_generation("no-such-generation")
 
-    assert win._gallery_view.selected_prompt_id() is None, (
-        "a toast waits in Windows' notification center until it is answered, which can be after "
-        "the thing it announced was deleted")
+    assert win._gallery_view.selected_prompt_id() is None
 
 
 def test_answering_a_toast_in_a_session_asks_the_room_for_origenerator_mode(

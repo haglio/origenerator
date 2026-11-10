@@ -111,10 +111,7 @@ def test_a_region_rect_is_not_required_of_a_launch():
 
     session = contract.parse_app_args(full).fun_time
 
-    assert session is not None, (
-        "a session that hands a Funestra over opens no window of ours on that side, so the rect "
-        "it would take is beside the point, and a session too old to send one must go on "
-        "launching")
+    assert session is not None
     assert session.region_rect("portrait") == contract.Rect(0, 0, 0, 0)
 
 

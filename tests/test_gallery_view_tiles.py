@@ -958,9 +958,8 @@ def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
 
     groups = [buttons for _gap, buttons in view._buttons._groups]
     assert groups[0] == (view._buttons.back, view._buttons.forward), (
-        "icon-only buttons lean on their neighbors to be read, so they are laid out in groups: "
-        "where the user is, what was done, what is picked, what to do with what is in front, "
-        "and what the app is doing on its own")
+        "icon-only buttons lean on their neighbors to be read, so they are laid out in groups "
+        "with a space between")
     assert groups[1] == (view._buttons.undo, view._buttons.redo)
     assert groups[3] == (view._buttons.favorite, view._buttons.enhance, view._buttons.delete)
     assert view._buttons.populate in groups[4]

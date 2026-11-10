@@ -176,16 +176,16 @@ def test_the_tree_marks_the_folders_the_model_says_were_worked_in_lately(qtbot, 
     monkeypatch.setattr(gallery, "recently_worked_folders", fake)
     view.refresh()
 
-    assert asked == [([LANDSCAPE, "portrait"], ["i1"])]
+    assert asked == [([LANDSCAPE, "portrait"], ["i1"])], (
+        "folders no longer float up when a generation lands in one, so the mark is what is left "
+        "to say where the work has lately been")
 
     view._tree.together_button.click()
 
     assert asked[-1] == (["both"], ["i1"])
     view._tree.separate_button.click()
     workflow = _image_workflow(view._tree)
-    assert workflow.data(0, RECENT_ROLE), (
-        "folders no longer float up when a generation lands in one, so the mark is what is left "
-        "to say where the work has lately been")
+    assert workflow.data(0, RECENT_ROLE)
     assert "worked in recently" in workflow.toolTip(0)
     assert not _at(workflow, 0).data(0, RECENT_ROLE)
 
@@ -258,7 +258,9 @@ def test_every_tree_level_steps_by_one_caret_width(qtbot):
     _on_screen(qtbot, view, 1200, 800)
     tree = _shape(view._tree)
     step = tree.indentation()
-    assert step <= 16
+    assert step <= 16, (
+        "the tree is six levels deep by the time it reaches a settings folder and lives in the "
+        "window's narrowest column, so every wasted pixel a level is six wasted at the foot")
 
     def name_x(item):
         return tree.visualRect(tree.indexFromItem(item)).left()
@@ -278,8 +280,6 @@ def test_every_tree_level_steps_by_one_caret_width(qtbot):
     assert all(len(xs) == 1 for xs in starts.values()), starts
     at = [next(iter(starts[d])) for d in sorted(starts)]
     assert [b - a for a, b in pairwise(at)] == [step] * (len(at) - 1), (
-        "the tree is six levels deep by the time it reaches a settings folder and lives in the "
-        "window's narrowest column, so every wasted pixel a level is six wasted at the foot: "
         "each step is one indentation and no more")
 
 

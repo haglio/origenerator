@@ -2266,7 +2266,7 @@ def test_a_progress_write_that_fails_leaves_the_run_going(qtbot, tmp_path, monke
     assert queue.jobs[key] is job
 
 
-def test_a_tiles_cancel_says_nothing_of_the_line_changing(qtbot, tmp_path):
+def test_a_tiles_cancel_is_silent(qtbot, tmp_path):
     queue = JobQueue(Database(tmp_path / "test.db"), _client())
     _launch_video(queue, "k1", seed=1)
     announced = []
@@ -2278,7 +2278,7 @@ def test_a_tiles_cancel_says_nothing_of_the_line_changing(qtbot, tmp_path):
     assert announced == [], "the tile's own Cancel draws what follows from it, so the queue stays silent"
 
 
-def test_a_closed_queue_hands_over_on_the_thread_that_closed_it(qtbot, tmp_path):
+def test_a_closed_queue_submits_on_the_calling_thread(qtbot, tmp_path):
     client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
     _launch_video(queue, "v1", seed=1)

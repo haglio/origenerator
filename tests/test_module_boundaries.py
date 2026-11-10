@@ -234,21 +234,36 @@ def test_a_job_is_followed_with_no_database_of_its_own():
         "a job owns no database: whoever launched it decides what to keep of it")
 
 
+def _modules_imported_by(source_file: str) -> set[str]:
+    tree = ast.parse((REPO_ROOT / source_file).read_text(encoding="utf-8"))
+    named = {node.module or "" for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
+    named |= {alias.name for node in ast.walk(tree) if isinstance(node, ast.Import)
+              for alias in node.names}
+    return named - {"__future__"}
+
+
+def _beyond_the_standard_library(modules: set[str]) -> set[str]:
+    return {module for module in modules if module.split(".")[0] not in sys.stdlib_module_names}
+
+
 def test_the_undo_stack_knows_nothing_of_what_it_undoes():
-    assert _loaded_after_importing("origenerator.undo_stack", "origenerator.gallery") is False
+    assert _beyond_the_standard_library(_modules_imported_by("origenerator/undo_stack.py")) == set(), (
+        "entirely generic: nothing in it knows what a generation is")
 
 
-def test_the_dictation_hears_through_no_microphone_and_no_model():
-    assert _loaded_after_importing("origenerator.voice.dictation", "voice_core") is False, (
-        "pure and driven by text: the listener owns one and feeds it each transcription")
+def test_the_voice_text_leans_on_nothing():
+    assert _beyond_the_standard_library(_modules_imported_by("origenerator/voice/text.py")) == set(), (
+        "the matchers that call it live in the workflows and the gallery as well as in the voice code")
+
+
+def test_the_dictation_is_text_in_and_text_out():
+    assert _beyond_the_standard_library(_modules_imported_by("origenerator/voice/dictation.py")) == {
+        "origenerator.voice.text"}, (
+        "no microphone and no model: the listener owns one and feeds it each transcription")
 
 
 def test_the_script_that_speaks_imports_nothing_of_this_app():
-    source = (REPO_ROOT / "tools" / "speech_worker.py").read_text(encoding="utf-8")
-    imported = [node.module or "" for node in ast.walk(ast.parse(source))
-                if isinstance(node, ast.ImportFrom)]
-    imported += [alias.name for node in ast.walk(ast.parse(source))
-                 if isinstance(node, ast.Import) for alias in node.names]
+    imported = _modules_imported_by("tools/speech_worker.py")
 
     assert not [module for module in imported if module.split(".")[0] == "origenerator"], (
         "it is run by path under the speech environment's own Python, which has none of this app installed")

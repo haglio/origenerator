@@ -565,7 +565,8 @@ def test_cancelling_an_populate_folders_job_by_name_keeps_populate_going(qtbot, 
 
     view._cancel_job(canceled)
 
-    assert view._populate.is_active(key)
+    assert view._populate.is_active(key), (
+        "this is the Job Queue row's Cancel and a Generate tab's, which name the run to stop")
     assert client.submit_job.call_count == 2
     assert view._live_jobs[key].prompt_id != canceled
 
@@ -696,7 +697,9 @@ def test_populate_opens_no_tabs(qtbot, tmp_path):
     for _ in range(3):
         client.job_completed.emit(view._live_jobs[key].prompt_id, _REROLL_HISTORY)
 
-    assert view._generate_pane.count() == 1
+    assert view._generate_pane.count() == 1, (
+        "a variation loaded into the pane's resting tab would stop that tab being blank, and "
+        "the next clicked generation would open a tab beside it")
     tab = view._generate_pane.current_generate_tab()
     assert tab.displayed_row()["prompt_id"] == "orig"
 

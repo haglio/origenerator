@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from origenerator.media import MediaType
 from origenerator.workflows.base import (
+    GENTLE_ENHANCE_DENOISE,
     SOURCE_MODEL_PREFIX,
     ParamDef,
     ParamType,
@@ -46,7 +47,7 @@ class Wan22T2iWorkflow(WorkflowTemplate):
             "upscale_model": "4xUltrasharp_4xUltrasharpV10.pt",
             "enhance_scale": 2.0,
             "enhance_steps": 20,
-            "enhance_denoise": 0.15,
+            "enhance_denoise": GENTLE_ENHANCE_DENOISE,
             "filename_prefix": "image/wan22_t2i",
             "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
             "vae_name": "wan_2.1_vae.safetensors",
@@ -148,6 +149,8 @@ class Wan22T2iWorkflow(WorkflowTemplate):
                     "batch_size": params["batch_size"],
                 },
             },
+            # WAN 2.2's high-noise expert has to run the stage that adds the noise and its low-noise
+            # expert the stage after it: swapped, the render is ruined.
             "10": {
                 "class_type": "KSamplerAdvanced",
                 "inputs": {

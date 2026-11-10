@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from origenerator.media import MediaType
 from origenerator.workflows.base import (
+    GENTLE_ENHANCE_DENOISE,
     SOURCE_MODEL_PREFIX,
     ParamDef,
     ParamType,
@@ -58,6 +59,7 @@ class Krea2T2iWorkflow(WorkflowTemplate):
             "positive_prompt": "",
             "negative_prompt": "",
             "seed": 0,
+            # Krea 2 Turbo is step-distilled: eight steps at a prompt strength of 1.
             "steps": 8,
             "cfg": 1.0,
             "width": 720,
@@ -73,7 +75,7 @@ class Krea2T2iWorkflow(WorkflowTemplate):
             "upscale_model": "4xFaceUpDAT.pth",
             "enhance_scale": 2.0,
             "enhance_steps": 20,
-            "enhance_denoise": 0.15,
+            "enhance_denoise": GENTLE_ENHANCE_DENOISE,
             "filename_prefix": "image/krea2_t2i",
         }
 
@@ -99,6 +101,7 @@ class Krea2T2iWorkflow(WorkflowTemplate):
         ]
 
     def _model_nodes(self, params: dict, prefix: str = "") -> tuple[dict, list]:
+        # A Krea 2 LoRA trains the diffusion model alone and leaves its prompt reader as it is.
         loras = self.lora_chain(f"{prefix}4", [f"{prefix}1", 0], picked_loras(params, LORA_KEYS))
         return {
             f"{prefix}1": _diffusion_model_loader(params["unet"]),

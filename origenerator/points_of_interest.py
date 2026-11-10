@@ -11,6 +11,8 @@ _FORMAT = 1
 _EDGES = ("left", "top", "right", "bottom")
 _REPORT_ID = re.compile(r"fix(\d+)_points")
 _SIZE, _MASK, _WHOLE = "places_size", "places_mask", "places_whole"
+# ComfyUI's Impact Pack hands out a region's crop on output 3 of its From_SEG_ELT node.
+_CROP_REGION = 3
 
 
 def report_nodes(fix_index: int, segs_ref, original_ref) -> dict:
@@ -26,7 +28,7 @@ def report_nodes(fix_index: int, segs_ref, original_ref) -> dict:
                  "inputs": {"segs1": segs_ref, "segs2": [_WHOLE, 0]}},
         each: {"class_type": "ImpactDecomposeSEGS", "inputs": {"segs": [joined, 0]}},
         one: {"class_type": "ImpactFrom_SEG_ELT", "inputs": {"seg_elt": [each, 1]}},
-        points: {"class_type": "PreviewAny", "inputs": {"source": [one, 3]}},
+        points: {"class_type": "PreviewAny", "inputs": {"source": [one, _CROP_REGION]}},
     }
 
 

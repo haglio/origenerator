@@ -185,7 +185,8 @@ def test_the_two_wan_expert_pair_workflows_offer_one_and_the_same_pair(installed
 
 def test_workflows_expose_their_seed_param_keys():
     assert SdxlT2iWorkflow().seed_keys() == ("seed",)
-    assert Wan22I2vWorkflow().seed_keys() == ("noise_seed", "audio_seed")
+    assert Wan22I2vWorkflow().seed_keys() == ("noise_seed", "audio_seed"), (
+        "a variation's motion changes, so its sound is scored again too: the old track could not fit")
     assert Wan22Flf2vLoopWorkflow().seed_keys() == ("noise_seed", "audio_seed")
 
 
@@ -204,9 +205,10 @@ def test_only_the_video_workflows_go_on_drawing_seeds_once_one_is_reused():
     pinning = {name for name, wf in WORKFLOW_REGISTRY.items() if wf.pins_reused_seed()}
     drawing = set(WORKFLOW_REGISTRY) - pinning
     assert drawing == {"wan22_i2v", "wan22_flf2v_loop", "wan22_animate"}, (
-        "a video's seed is only one sample of its motion, so reusing its settings draws another")
+        "a video's seed is only one sample of its motion, and pinned it would ride every prompt "
+        "edit out of that line of videos, so reusing its settings draws another")
     assert {"sdxl_t2i", "wan22_t2i", "flux_t2i_upscaled"} <= pinning, (
-        "an image's seed is its composition, so reusing its settings keeps it")
+        "an image's seed is its composition, the point of editing one, so reusing its settings keeps it")
     assert all(WORKFLOW_REGISTRY[n].output_type == "video" for n in drawing)
     assert all(WORKFLOW_REGISTRY[n].output_type == "image" for n in pinning)
 
@@ -306,7 +308,9 @@ def test_image_workflows_carry_the_enhance_toggle_off_by_default():
         wf = WORKFLOW_REGISTRY[name]
         toggle = {pd.key: pd for pd in wf.param_definitions()}["enhance"]
         assert toggle.type == "bool", name
-        assert toggle.default is False, name
+        assert toggle.default is False, (
+            f"{name}: enhancing is a layer the gallery adds afterward, which keeps the original "
+            "and names every version, where a tail baked in here would leave neither")
         assert wf.default_params()["enhance"] is False, name
 
 
@@ -335,7 +339,9 @@ def test_enhance_toggle_appends_the_tail_on_every_image_workflow():
                        if n["class_type"] == "KSampler"
                        and n["inputs"]["latent_image"] == [encode_id, 0])
         sampler_id = next(k for k, v in payload.items() if v is sampler)
-        assert sampler["inputs"]["steps"] == 17, name
+        assert sampler["inputs"]["steps"] == 17, (
+            f"{name}: no form sets the switch any more, but a run that recorded an enhance "
+            "has to reproduce exactly what it recorded")
         assert sampler["inputs"]["denoise"] == 0.35
         assert sampler["inputs"]["seed"] == 11
         assert sampler["inputs"]["cfg"] == params["cfg"]
@@ -517,6 +523,9 @@ def test_image_enhance_is_registered_and_derives_size_from_the_source(tmp_path, 
     assert wf.__class__ is ImageEnhanceWorkflow
     assert wf.output_type == "image"
     assert wf.model_keys == ("checkpoint",)
+    assert wf.default_params()["enhance_denoise"] == 0.15, (
+        "at so low a denoise the SDXL checkpoint adds texture without repainting, "
+        "which is what lets one enhancer serve whatever made the image")
     assert wf.seed_keys() == ("seed",)
     assert wf.selectable is False
     assert all(WORKFLOW_REGISTRY[n].selectable for n in WORKFLOW_REGISTRY
@@ -620,7 +629,9 @@ def test_a_fix_given_a_lora_redraws_through_it_and_no_other_fix_does():
 
 def test_every_part_is_at_zero_by_default_and_adds_nothing():
     wf = WORKFLOW_REGISTRY["image_enhance"]
-    assert wf.default_params()["enhance_detail_fixes"] == {}
+    assert wf.default_params()["enhance_detail_fixes"] == {}, (
+        "the detail pass is a second opinion on a few small regions: each part needs its "
+        "detector installed and costs a sampling run for every region found")
     payload = wf.build_api_payload(dict(wf.default_params(), input_image="pick.png"))
     assert _nodes_of(payload, "UltralyticsDetectorProvider") == []
     assert _nodes_of(payload, "DetailerForEach") == []
@@ -645,18 +656,23 @@ def test_each_part_asked_for_is_re_sampled_in_place_at_its_own_denoise():
         segs = payload[node["inputs"]["segs"][0]]
         assert segs["class_type"] == "BboxDetectorSEGS"
         assert segs["inputs"]["bbox_detector"][0] in providers
-        assert segs["inputs"]["image"] == node["inputs"]["image"]
+        assert segs["inputs"]["image"] == node["inputs"]["image"], (
+            "each detector reads the very image its detailer repaints, "
+            "so what it found lands where it found it")
         assert node["inputs"]["seed"] == 5
         model = payload[segs["inputs"]["bbox_detector"][0]]["inputs"]["model_name"]
         denoises[model] = node["inputs"]["denoise"]
-    assert denoises == {"bbox/face_finder.pt": 0.45, "bbox/hand_finder.pt": 0.6}
+    assert denoises == {"bbox/face_finder.pt": 0.45, "bbox/hand_finder.pt": 0.6}, (
+        "the whole-image pass is too gentle to mend a part, and a denoise that would redraw "
+        "a hand would redraw everything else too, so each part gets a pass at its own")
 
     decode_id = _node_id(payload, "VAEDecode")
     first = next(nid for nid, n in detailers.items()
                  if n["inputs"]["image"] == [decode_id, 0])
     second = next(nid for nid in detailers if nid != first)
     assert detailers[second]["inputs"]["image"] == [first, 0]
-    assert payload[_node_id(payload, "SaveImage")]["inputs"]["images"] == [second, 0]
+    assert payload[_node_id(payload, "SaveImage")]["inputs"]["images"] == [second, 0], (
+        "saved off the tail's decode, every pass would run and be thrown away")
 
 
 def _linked(payload: dict, ref) -> dict:
@@ -758,7 +774,9 @@ def test_the_detail_pass_borrows_the_enhances_model_settings_and_vae():
     sampler = _find_node(payload, "KSampler")["inputs"]
     detailer = _nodes_of(payload, "DetailerForEach")[0]["inputs"]
     ckpt_id = _node_id(payload, "CheckpointLoaderSimple")
-    assert detailer["model"] == sampler["model"] == [ckpt_id, 0]
+    assert detailer["model"] == sampler["model"] == [ckpt_id, 0], (
+        "redrawn on the enhance's own model, settings and prompts, a part stays in the "
+        "image's style rather than the sampler's idea of that part")
     assert detailer["clip"] == [ckpt_id, 1]
     assert detailer["vae"] == _find_node(payload, "VAEEncode")["inputs"]["vae"]
     assert detailer["steps"] == sampler["steps"]
@@ -875,6 +893,7 @@ def test_sdxl_workflows_expose_the_enhance_settings(monkeypatch):
 _FAMILIES = ("sdxl", "sd15", "flux", "qwen", "wan", "wan_t2v", "wan_fun_control",
              "wan_animate", "ltx", "krea2")
 _MIXED_CATEGORIES = ("checkpoints", "diffusion_models", "controlnet", "loras")
+_SUITS_EVERY_FAMILY = "upscale_models"
 
 
 def test_no_picker_offers_a_model_its_graph_cannot_run(installed_models):
@@ -884,7 +903,7 @@ def test_no_picker_offers_a_model_its_graph_cannot_run(installed_models):
                 category, f"fam_{family}.safetensors",
                 arch=family, lora=(category == "loras"),
             )
-    installed_models.add_bytes("upscale_models", "an_upscaler.pt", b"not a safetensors")
+    installed_models.add_bytes(_SUITS_EVERY_FAMILY, "an_upscaler.pt", b"not a safetensors")
 
     planted = {f"fam_{family}.safetensors" for family in _FAMILIES}
     checked = 0
@@ -1048,7 +1067,9 @@ def test_a_form_starts_on_the_value_stored_settings_are_normalized_against():
         defaults = wf.default_params()
         for pd in wf.param_definitions():
             assert pd.key in defaults, f"{name}.{pd.key} is on the form but has no default"
-            assert pd.default == defaults[pd.key], f"{name}.{pd.key}"
+            assert pd.default == defaults[pd.key], (
+                f"{name}.{pd.key}: a fresh item would land in a different folder "
+                "from an identical re-roll, with nothing to say so")
             checked += 1
     assert checked > 100, "the registry stopped being walked"
 
@@ -1103,7 +1124,8 @@ def test_derived_display_size_is_none_when_not_derived_or_unmeasurable():
     assert manual.derived_display_size(manual.default_params()) is None
 
     i2v = WORKFLOW_REGISTRY["wan22_i2v"]
-    assert i2v.derived_display_size(dict(i2v.default_params(), input_image="")) is None
+    assert i2v.derived_display_size(dict(i2v.default_params(), input_image="")) is None, (
+        "the form shows no size until the image can be measured, rather than a guess")
     assert i2v.derived_display_size(
         dict(i2v.default_params(), input_image="does_not_exist.png")
     ) is None
@@ -1335,6 +1357,7 @@ def test_wan22_i2v_payload_generates_synced_foley_audio():
         audio_prompt="rhythmic audio",
         audio_negative_prompt="music",
         audio_seed=7,
+        foley_model="another_foley_model.safetensors",
     )
     payload = wf.build_api_payload(params)
 
@@ -1352,7 +1375,8 @@ def test_wan22_i2v_payload_generates_synced_foley_audio():
     deps_id = _node_id(payload, "HunyuanDependenciesLoader")
     assert sampler["hunyuan_model"] == [model_id, 0]
     assert sampler["hunyuan_deps"] == [deps_id, 0]
-    assert payload[model_id]["inputs"]["model_name"] == params["foley_model"]
+    assert payload[model_id]["inputs"]["model_name"] == params["foley_model"], (
+        "named in the settings, so a video records which sound model scored it")
     assert payload[deps_id]["inputs"]["vae_name"] == params["foley_vae"]
     assert payload[deps_id]["inputs"]["synchformer_name"] == params["foley_synchformer"]
 
@@ -1389,7 +1413,7 @@ def test_sdxl_pose_transfer_structure_image_browses_the_custom_poses_folder():
     assert config.CUSTOM_POSES_DIR == config.LIBRARY_ROOT / "images" / "custom_poses"
 
 
-def _sdxl_pose_transfer_payload() -> tuple[dict, dict]:
+def _enhanced_sdxl_pose_transfer_payload() -> tuple[dict, dict]:
     wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
     params = dict(
         wf.default_params(),
@@ -1401,12 +1425,13 @@ def _sdxl_pose_transfer_payload() -> tuple[dict, dict]:
         controlnet_end=0.9,
         enhance=True,
     )
-    assert params["control_mode"] == "depth"
+    assert params["control_mode"] == "depth", (
+        "ComfyUI's DWPose preprocessor loses the person on close-ups and overlapping bodies")
     return params, wf.build_api_payload(params)
 
 
 def test_sdxl_pose_transfer_reads_depth_off_its_image_and_controls_with_it():
-    params, payload = _sdxl_pose_transfer_payload()
+    params, payload = _enhanced_sdxl_pose_transfer_payload()
 
     load_id = _node_id(payload, "LoadImage")
     scale_id = _node_id(payload, "ImageScaleToTotalPixels")
@@ -1441,7 +1466,7 @@ def test_sdxl_pose_transfer_reads_depth_off_its_image_and_controls_with_it():
 
 
 def test_sdxl_pose_transfer_samples_through_its_control_and_saves_the_final_decode():
-    params, payload = _sdxl_pose_transfer_payload()
+    params, payload = _enhanced_sdxl_pose_transfer_payload()
     apply = _find_node(payload, "ControlNetApplyAdvanced")
 
     encodes = {
@@ -1487,6 +1512,63 @@ def test_sdxl_pose_transfer_size_override_replaces_the_in_graph_derivation():
     assert latent["inputs"]["width"] == 1152
     assert latent["inputs"]["height"] == 896
     assert _find_node(payload, "DepthAnything_V2")["inputs"]["images"] == [scale_id, 0]
+
+
+def test_sdxl_pose_transfer_enhances_under_the_same_control():
+    _, payload = _enhanced_sdxl_pose_transfer_payload()
+    apply_id = _node_id(payload, "ControlNetApplyAdvanced")
+
+    samplers = _nodes_of(payload, "KSampler")
+
+    assert len(samplers) == 2
+    assert all(sampler["inputs"]["positive"] == [apply_id, 0] for sampler in samplers), (
+        "an enhance re-sampled off the control could drift from the structure map")
+
+
+def test_sdxl_pose_transfer_draws_at_the_shape_its_structure_map_was_read_at():
+    _, payload = _enhanced_sdxl_pose_transfer_payload()
+    scaled = [_node_id(payload, "ImageScaleToTotalPixels"), 0]
+    measured = _node_id(payload, "GetImageSize")
+    latent = _find_node(payload, "EmptyLatentImage")["inputs"]
+
+    assert _find_node(payload, "DepthAnything_V2")["inputs"]["images"] == scaled
+    assert payload[measured]["inputs"]["image"] == scaled
+    assert (latent["width"], latent["height"]) == ([measured, 0], [measured, 1]), (
+        "the map is stretched to the canvas, so a size of another shape "
+        "would distort the structure it is there to keep")
+
+
+def test_the_structure_model_offers_no_sd15_controlnet(installed_models):
+    installed_models.add("controlnet", "for_sdxl.safetensors", arch="sdxl")
+    installed_models.add("controlnet", "for_sd15.safetensors", arch="sd15")
+    by_key = {pd.key: pd for pd in WORKFLOW_REGISTRY["sdxl_pose_transfer"].param_definitions()}
+
+    assert by_key["controlnet"].options == ["for_sdxl.safetensors"], (
+        "a ControlNet is built against one UNet's block shapes, "
+        "so an SD1.5 one fails outright on an SDXL model")
+
+
+def test_the_pose_transfers_base_save_sits_clear_of_its_structure_nodes():
+    wf = WORKFLOW_REGISTRY["sdxl_pose_transfer"]
+    asked = dict(wf.default_params(), input_image="a.png", enhance=True)
+
+    by_depth = wf.build_api_payload(asked)
+    by_pose = wf.build_api_payload(dict(asked, control_mode="pose"))
+
+    for payload in (by_depth, by_pose):
+        assert payload[wf.base_output_node_id]["class_type"] == "SaveImage"
+        assert len(_nodes_of(payload, "SetUnionControlNetType")) == 1
+    assert len(_nodes_of(by_depth, "DepthAnything_V2")) == 1
+    assert len(_nodes_of(by_depth, "DownloadAndLoadDepthAnythingV2Model")) == 1
+
+
+def test_every_workflows_output_node_is_the_node_that_saves():
+    saving = {"SaveImage", "VHS_VideoCombine"}
+    for name, wf in WORKFLOW_REGISTRY.items():
+        payload = wf.build_api_payload(dict(wf.default_params(), input_image="a.png",
+                                            pose_image="b.png"))
+        assert payload[wf.output_node_id]["class_type"] in saving, (
+            f"{name}: ComfyUI's history lists a run's files under the node that saved them")
 
 
 def test_sdxl_pose_transfer_derived_display_size_uses_the_sdxl_budget(tmp_path, monkeypatch):
@@ -1835,7 +1917,9 @@ def test_a_workflows_own_graph_reads_as_it_always_has(name):
 
 
 def test_the_graph_signatures_only_ever_name_a_registered_workflow():
-    assert {name for name, _ in _GRAPH_SIGNATURES} <= set(WORKFLOW_REGISTRY)
+    assert {name for name, _ in _GRAPH_SIGNATURES} <= set(WORKFLOW_REGISTRY), (
+        "the name is stored into every row, and one no workflow has "
+        "names a folder the gallery never builds")
 
 
 
@@ -1865,7 +1949,8 @@ def test_a_wan22_clip_reaches_the_longest_duration_the_form_offers(name):
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_a_video_workflow_takes_up_to_a_hundred_steps(name):
     defs = {pd.key: pd for pd in WORKFLOW_REGISTRY[name].param_definitions()}
-    assert defs["steps"].max_val == 100
+    assert defs["steps"].max_val == 100, (
+        "more steps cost only time, and a count the machine can finish is nothing the form should refuse")
     if "split_step" in defs:
         assert defs["split_step"].max_val == defs["steps"].max_val
 
@@ -1902,7 +1987,9 @@ def test_a_wan22_i2v_clip_longer_than_one_window_is_chained_from_its_last_frame(
     assert [seg["inputs"]["length"] for seg in segments] == [161, 161, 161]
     for segment in segments[1:]:
         last = payload[segment["inputs"]["start_image"][0]]
-        assert last["class_type"] == "ImageFromBatch"
+        assert last["class_type"] == "ImageFromBatch", (
+            "each segment starts from the last frame the one before it decoded, "
+            "since windows blended over each other crossfade and drift")
         assert (last["inputs"]["batch_index"], last["inputs"]["length"]) == (160, 1)
         clip_vision = payload[segment["inputs"]["clip_vision_output"][0]]
         assert clip_vision["inputs"]["image"] == segment["inputs"]["start_image"]
@@ -1914,7 +2001,8 @@ def test_a_wan22_loop_longer_than_one_window_is_chained_and_closes_on_its_start_
     segments = _segments(payload, "WanFirstLastFrameToVideo")
     assert [seg["inputs"]["length"] for seg in segments] == [161, 161, 161]
     start = segments[0]["inputs"]["start_image"]
-    assert "end_image" not in segments[0]["inputs"]
+    assert "end_image" not in segments[0]["inputs"], (
+        "an earlier segment ending on the start image would close the loop early and have to leave it again")
     assert "end_image" not in segments[1]["inputs"]
     assert segments[2]["inputs"]["end_image"] == start
     for segment in segments[1:]:
@@ -1947,7 +2035,9 @@ def test_each_chained_segment_draws_its_own_noise():
                    if n["class_type"] == "KSamplerAdvanced" and n["inputs"]["add_noise"] == "enable")
     lows = sorted(n["inputs"]["noise_seed"] for n in payload.values()
                   if n["class_type"] == "KSamplerAdvanced" and n["inputs"]["add_noise"] == "disable")
-    assert highs == [1000, 1001, 1002]
+    assert highs == [1000, 1001, 1002], (
+        "one seed on every segment would replay the same motion from each new start frame, "
+        "and stepping the stored seed still reproduces the run from the pair its row records")
     assert lows == [2000, 2001, 2002]
 
 
@@ -2240,7 +2330,8 @@ def test_a_part_with_an_outline_is_redrawn_inside_it_rather_than_in_a_box_around
 
     (detailer,) = _nodes_of(payload, "DetailerForEach")
     segs = payload[detailer["inputs"]["segs"][0]]
-    assert segs["class_type"] == "SegmDetectorSEGS"
+    assert segs["class_type"] == "SegmDetectorSEGS", (
+        "a box around the hair takes the face with it, and a box around the skin is most of the image")
     provider_id, output = segs["inputs"]["segm_detector"]
     assert payload[provider_id]["class_type"] == "UltralyticsDetectorProvider"
     assert output == 1
@@ -2327,4 +2418,4 @@ def test_a_part_the_enhance_fixes_runs_a_real_denoise_so_the_floor_of_the_range_
     fixes = next(pd for pd in WORKFLOW_REGISTRY["image_enhance"].param_definitions()
                  if pd.key == "enhance_detail_fixes")
 
-    assert fixes.min_val > 0
+    assert fixes.min_val > 0, "ComfyUI's detailer node refuses a denoise of zero"

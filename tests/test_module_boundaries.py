@@ -39,6 +39,14 @@ QT_FREE = (
     "origenerator.completion",
     "origenerator.inflight",
     "origenerator.queue_line",
+    "origenerator.gallery.combine",
+    "origenerator.gui.param_sections",
+    "origenerator.navigation",
+    "origenerator.gui.hud_nav_map",
+    "origenerator.slideshow",
+    "origenerator.app_state",
+    "origenerator.voice.dictation",
+    "origenerator.voice.text",
     "origenerator.favorite_reconcile",
     "origenerator.base_backfill",
     "origenerator.export_lane",
@@ -214,3 +222,33 @@ def test_derived_size_imports_no_workflow_so_the_form_and_the_workflows_share_it
                 if isinstance(node, ast.ImportFrom) and node.module]
 
     assert not [module for module in imported if module.startswith("origenerator.workflows")]
+
+
+def test_the_combine_is_drawn_with_no_database():
+    assert _loaded_after_importing("origenerator.gui.combine", "origenerator.db") is False, (
+        "the Combine only reports what was asked for; its controller owns the database")
+
+
+def test_a_job_is_followed_with_no_database_of_its_own():
+    assert _loaded_after_importing("origenerator.gui.generation_job", "origenerator.db") is False, (
+        "a job owns no database: whoever launched it decides what to keep of it")
+
+
+def test_the_undo_stack_knows_nothing_of_what_it_undoes():
+    assert _loaded_after_importing("origenerator.undo_stack", "origenerator.gallery") is False
+
+
+def test_the_dictation_hears_through_no_microphone_and_no_model():
+    assert _loaded_after_importing("origenerator.voice.dictation", "voice_core") is False, (
+        "pure and driven by text: the listener owns one and feeds it each transcription")
+
+
+def test_the_script_that_speaks_imports_nothing_of_this_app():
+    source = (REPO_ROOT / "tools" / "speech_worker.py").read_text(encoding="utf-8")
+    imported = [node.module or "" for node in ast.walk(ast.parse(source))
+                if isinstance(node, ast.ImportFrom)]
+    imported += [alias.name for node in ast.walk(ast.parse(source))
+                 if isinstance(node, ast.Import) for alias in node.names]
+
+    assert not [module for module in imported if module.split(".")[0] == "origenerator"], (
+        "it is run by path under the speech environment's own Python, which has none of this app installed")

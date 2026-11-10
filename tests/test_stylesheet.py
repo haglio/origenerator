@@ -105,7 +105,8 @@ def test_a_menu_lights_the_row_under_the_cursor(qtbot):
 def test_a_menus_disabled_row_does_not_light_up():
     qss = build_stylesheet()
     rule = qss.split("QMenu::item:disabled:selected {", 1)[1].split("}", 1)[0]
-    assert "background-color: transparent" in rule
+    assert "background-color: transparent" in rule, (
+        "hovering something that cannot be clicked must not promise a click")
 
 
 def _radio_image(qtbot, checked: bool):
@@ -127,10 +128,10 @@ def _lightness(image, x: int) -> int:
 
 
 def test_a_selected_radio_shows_a_light_disc_inside_its_ring(qtbot):
-    centre = 8
-    assert _lightness(_radio_image(qtbot, checked=True), centre) > 200
-    assert _lightness(_radio_image(qtbot, checked=False), centre) < 80
-    assert _lightness(_radio_image(qtbot, checked=True), 1) < 100, (
+    center, gap = 8, 1
+    assert _lightness(_radio_image(qtbot, checked=True), center) > 200
+    assert _lightness(_radio_image(qtbot, checked=False), center) < 80
+    assert _lightness(_radio_image(qtbot, checked=True), gap) < 100, (
         "the disc stops short of the ring: one filling it edge to edge is a blob, not a radio button")
 
 

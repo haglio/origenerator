@@ -20,7 +20,7 @@ def test_a_checked_button_takes_the_familys_on_ground(qtbot):
 
 def test_the_on_ground_is_lighter_than_the_resting_one(qtbot):
     assert _lightness(BG_BUTTON_ACTIVE) > _lightness(BG_BUTTON), (
-        "a button comes forward when it is engaged: a darker on would read as pressed and stuck")
+        "a button comes forward when it is engaged: a darker ground when on would read as pressed and stuck")
 
 
 def test_a_button_whose_on_state_is_a_choice_goes_blue(qtbot):

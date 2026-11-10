@@ -292,7 +292,9 @@ def test_the_osr2_controls_switch_is_the_apps_one_switch(qtbot):
     controls.drawing()
     _press(controls, OSR2_CONTROL_BUTTONS[OSR2_DRIVING])
 
-    assert control.asked == [OSR2_PARKED, OSR2_DRIVING]
+    assert control.asked == [OSR2_PARKED, OSR2_DRIVING], (
+        "which press asks for which state is read off funestra's own mapping, so a press cannot "
+        "drift from the button that lights")
 
 
 def test_the_group_lights_the_state_the_switch_is_in(qtbot):

@@ -64,11 +64,15 @@ class _Entry:
         self._settings = turn.changes()
         self.tip = ""
 
-    def changed_something(self) -> bool:
+    def has_a_change_recorded(self) -> bool:
         return any(self._change) or bool(self._settings)
 
+    def changed_anything(self) -> bool:
+        old_positive, old_negative, new_positive, new_negative = self._change
+        return (old_positive, old_negative) != (new_positive, new_negative) or bool(self._settings)
+
     def compare(self, before: str, thumbnail_of: Callable[[str], str | None] | None) -> None:
-        if not self.changed_something():
+        if not self.has_a_change_recorded():
             self.tip = ""
             return
         before_thumbnail, after_thumbnail = (
@@ -151,7 +155,7 @@ class _Conversation(QTextEdit):
                 _block(cursor, indent=MARGIN_STANDARD, above=GAP_SMALL)
                 cursor.insertImage(image_format)
                 self._tips.append(entry.tip)
-        elif entry.changed_something():
+        elif entry.has_a_change_recorded():
             button = GenerateButton(self.viewport())
             button.clicked.connect(lambda _checked=False, at=index: self.generate_asked.emit(at))
             self._reserve(cursor, button, entry)
@@ -297,7 +301,7 @@ class RequestExchange(QWidget):
         self._held[-1].take(turn)
         self._draw()
         self._settle()
-        if self._auto_generate.isChecked() and self._held[-1].changed_something():
+        if self._auto_generate.isChecked() and self._held[-1].changed_anything():
             self.generate_asked.emit(len(self._held) - 1)
 
     def set_auto_generate(self, on: bool) -> None:

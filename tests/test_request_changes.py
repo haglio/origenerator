@@ -251,6 +251,45 @@ def test_an_edit_riding_inside_a_replacement_he_asked_for_is_left_out_without_a_
     assert outcome.line == 'Replaced "two women" with "one woman" in the Positive Prompt.'
 
 
+def test_a_replacement_in_words_he_gave_adds_none_of_the_models_own():
+    outcome = _applied([{"prompt": "positive", "replace": "kneeling", "with": "lying prone",
+                         "for": "lying instead of kneeling"}],
+                       pair=("a man kneeling by a park bench, rain", "blurry"),
+                       asked=("lying instead of kneeling",))
+
+    assert outcome.positive == "a man lying by a park bench, rain"
+    assert outcome.line == 'Replaced "kneeling" with "lying" in the Positive Prompt.'
+
+
+@pytest.mark.parametrize(("asked", "made"), [
+    ("lying instead of kneeling", "a man lying, rain"),
+    ("make him lie down", "a man lying down, rain"),
+    ("he lies down", "a man lying down, rain")])
+def test_words_of_his_own_in_any_form_keep_only_his_and_shed_the_filler_left_hanging(asked, made):
+    outcome = _applied([{"prompt": "positive", "replace": "kneeling",
+                         "with": "lying down on his side", "for": asked}],
+                       pair=("a man kneeling, rain", "blurry"), asked=(asked,))
+
+    assert outcome.positive == made
+
+
+def test_a_replacement_he_gave_no_words_for_is_written_in_the_models_words():
+    outcome = _applied([{"prompt": "positive", "replace": "a young woman", "with": "a mature woman",
+                         "for": "make her older"}],
+                       pair=("a young woman, a raincoat", "blurry"), asked=("make her older",))
+
+    assert outcome.positive == "a mature woman, a raincoat"
+
+
+def test_what_shows_instead_of_something_gone_is_his_words_alone_when_he_gave_them():
+    outcome = _applied([{"gone": "hat", "in_positive": "a blue hat", "instead": "a warm knit beanie",
+                         "for": "no hat, a beanie instead"}],
+                       pair=("a cat, a blue hat, a park bench", "blurry"),
+                       asked=("no hat, a beanie instead",))
+
+    assert outcome.positive == "a cat, a beanie, a park bench"
+
+
 def test_a_replacement_that_puts_the_whole_prompt_in_the_plural_keeps_every_part_it_changed():
     one = "one woman in a red dress, she smiles at the camera, her hand on a railing, a city street"
     two = "two women in red dresses, they smile at the camera, their hands on a railing, a city street"

@@ -68,7 +68,9 @@ def test_being_shown_again_over_an_unmoved_library_draws_nothing_afresh(qtbot, m
 
     view.show()
 
-    assert drawn == []
+    assert drawn == [], (
+        "drawing four thousand generations afresh is seconds of the one thread that also "
+        "answers the session's commands")
 
 
 def test_being_shown_again_draws_what_landed_while_it_was_away(qtbot, monkeypatch):

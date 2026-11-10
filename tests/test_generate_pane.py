@@ -791,7 +791,9 @@ def test_show_running_generation_seeds_the_form_and_shows_no_file(tabs):
     assert tab.displayed_row() is None
     assert tab._metadata_section._fact_rows == 0
     tab._viewport.clear.assert_called()
-    assert not tab.is_blank()
+    assert not tab.is_blank(), (
+        "the tab is named after the folder the run will land in, so it is not blank and the "
+        "next open forks rather than taking it over")
 
 
 def test_a_landed_image_ends_the_wait_it_was_standing_on(tabs, monkeypatch):

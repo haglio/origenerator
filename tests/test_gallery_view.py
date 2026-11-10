@@ -2766,7 +2766,9 @@ def test_a_folders_hover_says_its_name_and_nothing_else(qtbot):
     (leaf,) = _subs(_at(_image_workflow(view._tree), 0, 0))
 
     assert leaf.toolTip(0).startswith(leaf.text(0))
-    assert "a cat" not in leaf.toolTip(0)
+    assert "a cat" not in leaf.toolTip(0), (
+        "the prompt and the settings, each cut to 24 characters, said nothing the user could "
+        "act on, so they are off the hover")
 
 
 def test_the_experiments_switch_is_up_only_in_the_experiments_collection(qtbot):

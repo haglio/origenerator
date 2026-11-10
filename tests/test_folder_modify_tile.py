@@ -20,7 +20,7 @@ def _click(tile):
 def test_the_tile_says_what_it_keeps_and_what_it_changes(qtbot):
     tile = FolderModifyTile()
     qtbot.addWidget(tile)
-    assert tile._caption.text() == "Modify (all seeds)"
+    assert tile._caption.text() == "Modify batch (all seeds)"
     assert "seed" in tile.toolTip()
 
 

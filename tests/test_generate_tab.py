@@ -3588,11 +3588,11 @@ def _modify(count=3, label=_FOLDER_LABEL, opened_on=None):
 
 
 def test_a_modify_names_itself_after_the_folder_it_asks_about():
-    assert _modify().title() == f"Modify {_FOLDER_LABEL}"
+    assert _modify().title() == f"Modify batch {_FOLDER_LABEL}"
 
 
 def test_a_modify_counts_its_runs_in_the_hover_rather_than_on_the_button():
-    assert _modify(count=3).caption() == "Modify (all seeds)"
+    assert _modify(count=3).caption() == "Modify batch (all seeds)"
     assert "all 3 images" in _modify(count=3).tooltip()
 
 
@@ -3623,7 +3623,7 @@ def test_a_modify_tab_shows_the_whole_folder_in_its_preview(modifying):
 
 
 def test_the_press_asks_for_changes_and_counts_them_in_the_hover(modifying):
-    assert modifying._generate_btn.text() == "Modify (all seeds)"
+    assert modifying._generate_btn.text() == "Modify batch (all seeds)"
     assert "all 3 images" in modifying._generate_btn.toolTip()
 
 
@@ -3634,7 +3634,7 @@ def test_every_prompt_is_marked_against_what_it_says_now(modifying):
 
 
 def test_the_tab_is_named_after_the_folder_it_asks_about(modifying):
-    assert modifying.title() == f"Modify {_FOLDER_LABEL}"
+    assert modifying.title() == f"Modify batch {_FOLDER_LABEL}"
 
 
 def test_a_modify_tab_offers_no_corners_over_its_wall_of_images(

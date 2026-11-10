@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from origenerator.generation_config import ConfigSnapshot, configs_match
 
-_MODIFY_CAPTION = "Modify (all seeds)"
+_MODIFY_CAPTION = "Modify batch (all seeds)"
 _MODIFY_TIP = (
     "Run all {count} images in this folder again, each with its own seed and "
     "the prompt as you have rewritten it, landing them in a new folder."
@@ -13,7 +13,7 @@ _MODIFY_TIP_ONE = (
     "Run this folder's one image again with its own seed and the prompt as "
     "you have rewritten it, landing it in a new folder."
 )
-_MODIFY_TITLE = "Modify {folder}"
+_MODIFY_TITLE = "Modify batch {folder}"
 
 
 @dataclass(frozen=True)

@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 def taskbar_identity(title: str, preview) -> str:
+    # Windows groups a window that claims no AppUserModelID with the python.exe that launched it on the taskbar, under that program's icon.
     from shared_ui.preview import taskbar_identity as named_for
 
     from origenerator.win32 import APP_USER_MODEL_ID

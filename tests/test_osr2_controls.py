@@ -558,7 +558,9 @@ def test_the_osr2_controls_keep_the_room_they_take_at_their_widest(qtbot):
     controls.show()
     controls.grab()
 
-    assert (controls.width(), controls.height()) == osr2_controls_room(motion)
+    assert (controls.width(), controls.height()) == osr2_controls_room(motion), (
+        "painted as they stand the controls are narrower than at their widest, and the room they "
+        "keep must not follow the paint")
 
 
 def test_no_state_draws_the_osr2_controls_outside_the_room_kept_for_them():

@@ -291,7 +291,9 @@ def test_every_row_inside_a_folder_of_your_own_has_a_key_of_its_own_naming_its_f
 
     assert len(set(keys)) == len(keys)
     assert all(tree.item_by_key[key] is row for key, row in zip(keys, rows, strict=True))
-    assert all(shape_of(key) == LANDSCAPE for key in keys)
+    assert all(shape_of(key) == LANDSCAPE for key in keys), (
+        "the key rides the row itself and carries its shape, because no row above it names the "
+        "shape: each half is a tree of its own")
     assert all(base_of(key) == row.data(0, GROUP_ROLE).key
                for key, row in zip(keys, rows, strict=True) if row.data(0, GROUP_ROLE) is not None)
 

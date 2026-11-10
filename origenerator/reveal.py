@@ -13,6 +13,7 @@ _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 def show_in_explorer(path: Path) -> None:
+    # Windows Explorer selects a file with /select only when handed the file's native path.
     subprocess.run(["explorer", "/select,", os.path.realpath(path)], creationflags=_NO_WINDOW,
                    check=False)
 

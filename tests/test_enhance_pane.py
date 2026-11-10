@@ -611,6 +611,7 @@ def test_settings_turned_or_loaded_onto_a_preset_show_it_and_off_one_read_custom
 
 
 def _pick(dropdown, index):
+    # Qt's own order for a choice from the open list: the box moves to it, then says it was picked.
     dropdown.setCurrentIndex(index)
     dropdown.activated.emit(index)
 

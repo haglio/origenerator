@@ -1365,7 +1365,9 @@ def test_opening_one_kinds_latest_lists_it_without_building_the_list_again(qtbot
     view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Videos"], "Latest"))
 
     assert view.listed_prompt_ids() == ["v1"]
-    assert built == []
+    assert built == [], (
+        "opening a collection cannot change a single folder, so the TOC is not built again for "
+        "it: a build takes seconds on a full library")
 
 
 def test_another_latest_opens_on_its_first_page(qtbot):
@@ -1858,7 +1860,9 @@ def test_following_a_link_lands_in_one_tab(qtbot):
 
     view.follow_link("img1")
 
-    assert view._generate_pane.count() == tabs
+    assert view._generate_pane.count() == tabs, (
+        "a followed link fills the tab a click would rather than opening another: going to look "
+        "at something costs no more tabs than browsing to it")
     assert view._generate_pane.current_generate_tab().displayed_row()["prompt_id"] == "img1"
 
 

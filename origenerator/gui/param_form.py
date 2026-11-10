@@ -403,6 +403,7 @@ class ParamForm(QWidget):
             self._copy_buttons[pd.key] = copy
             extras.append(copy)
         if kind.randomizable:
+            # Qt: a plain QCheckBox's own dark-style tick draws as a bare down-caret.
             cb = TickControl("Random")
             cb.setChecked(True)
             cb.toggled.connect(self.changed)
@@ -696,6 +697,7 @@ class ParamForm(QWidget):
             in_input = COMFYUI_INPUT_DIR / current
             if in_input.is_file():
                 return str(in_input)
+        # Qt: a file dialog pointed at a path that is missing opens wherever it likes.
         if home is not None and home.is_dir():
             return str(home)
         return str(COMFYUI_INPUT_DIR)

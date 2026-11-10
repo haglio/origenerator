@@ -29,6 +29,7 @@ class _Pair(QWidget):
 def pair(qtbot):
     widget = _Pair("a cat on a couch")
     qtbot.addWidget(widget)
+    # Qt gives no focus to a widget that is not shown, so a field in one is never left either.
     with qtbot.waitExposed(widget):
         widget.show()
     return widget

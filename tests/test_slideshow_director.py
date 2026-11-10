@@ -2127,7 +2127,9 @@ def test_the_spoken_filter_answers_even_when_the_switch_was_already_on(slideshow
 
     director.filter_enhanced(True)
 
-    assert slideshow.said == ["enhanced only — 2 to play"]
+    assert slideshow.said == ["enhanced only — 2 to play"], (
+        "said even when the switch was already that way: a word that did nothing and said "
+        "nothing reads as a mic that missed it")
 
 
 def test_clearing_the_filter_takes_f_mode_with_it(slideshows):

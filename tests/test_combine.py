@@ -839,7 +839,9 @@ def test_switching_the_lane_announces_it_once(qtbot):
     combine.intent_changed.connect(heard.append)
 
     _pick_lane(combine, action_settings.GENAU)
-    assert heard == [action_settings.GENAU]
+    assert heard == [action_settings.GENAU], (
+        "only the lane switched on is passed along: the gallery answers each announcement by "
+        "graying the whole action list again")
 
     _pick_lane(combine, action_settings.VIDEO)
     assert heard == [action_settings.GENAU, action_settings.VIDEO]

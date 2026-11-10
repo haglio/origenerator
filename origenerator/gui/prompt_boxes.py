@@ -402,6 +402,7 @@ def set_in_use(field: QPlainTextEdit | PromptBoxes, label: QLabel, unused_becaus
 def _mark_in_use(widget: QWidget, in_use: bool, tip: str) -> None:
     if widget.property("inert") != (not in_use):
         widget.setProperty("inert", not in_use)
+        # Qt reads a stylesheet's property selector again only on a repolish.
         widget.style().unpolish(widget)
         widget.style().polish(widget)
     widget.setToolTip(tip)

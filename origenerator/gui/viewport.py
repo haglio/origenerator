@@ -264,6 +264,7 @@ class Viewport(QWidget):
 
     def _drawn_size(self):
         if self.is_showing_video():
+            # Qt Multimedia: a video's resolution arrives late, or never; a backend need not report it.
             resolution = self._player.metaData().value(QMediaMetaData.Key.Resolution)
             if isinstance(resolution, QSize) and resolution.isValid():
                 return resolution.scaled(self._video.size(),
@@ -376,6 +377,7 @@ class Viewport(QWidget):
         self._player.setSource(QUrl())
 
     def release_player(self) -> None:
+        # Qt Multimedia: a stop alone leaves the backend winding down into a surface a closing widget takes down.
         self._stop_playback()
         self._player.setVideoOutput(None)
 

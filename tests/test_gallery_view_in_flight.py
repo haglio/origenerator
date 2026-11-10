@@ -667,7 +667,9 @@ def test_a_queue_of_the_users_own_jobs_leaves_the_plain_waiting_note(qtbot, tmp_
 
     view._poll()
 
-    assert _viewport_of(view).show_message.call_args.args[0] == "Waiting for preview…"
+    assert _viewport_of(view).show_message.call_args.args[0] == "Waiting for preview…", (
+        "waiting on the user's own queue means ComfyUI is generating something the user asked "
+        "for, which is no mystery at all")
 
 
 def test_a_run_waiting_out_the_minute_after_an_image_says_when_it_starts(

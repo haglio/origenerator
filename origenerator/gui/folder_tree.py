@@ -408,6 +408,7 @@ class FolderTree(QTreeWidget):
         return [key for key in bytes(data).decode("utf-8").split("\n") if key]
 
     def dragEnterEvent(self, event):
+        # Qt: a drag refused on entry is sent no moves, so it would never be offered a row to land on.
         mime = event.mimeData()
         if self._dragged_keys(mime, event.source()) or dragged_generation(mime) is not None:
             event.accept()

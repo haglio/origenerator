@@ -111,7 +111,9 @@ def test_the_side_splits_off_from_the_rest_of_what_was_said(text, shape, rest):
 
 
 def test_a_side_word_alone_is_a_side_and_nothing_else():
-    assert split_shape("portrait") == ("portrait", "")
+    assert split_shape("portrait") == ("portrait", ""), (
+        "a shape word alone names a region without asking it for anything: the caller's other "
+        "uses decide what an empty rest means")
 
 
 def test_a_shape_leading_a_bar_setting_leaves_its_number_to_set():

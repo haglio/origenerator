@@ -209,6 +209,9 @@ class GenerationStore(Store):
     def set_source(self, prompt_id: str, source: str):
         self._set(prompt_id, "source", source)
 
+    def set_evolver_upscale(self, prompt_id: str, path: str):
+        self._set(prompt_id, "evolver_upscale", path)
+
     def mark_evolver_exported(self, prompt_id: str):
         self._record_send(prompt_id, "evolver_exported_at", "evolver_unsent_at",
                           sent=True)

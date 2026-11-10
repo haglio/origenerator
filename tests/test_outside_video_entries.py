@@ -77,3 +77,14 @@ def test_the_command_the_document_names_answers_in_its_last_line_when_evolver_ru
     assert answered.returncode == 0, answered.stderr
     assert json.loads(answered.stdout.strip().splitlines()[-1]) == {"brought_in": 0}
     assert (tmp_path / "origenerator.log").is_file()
+
+
+def test_the_command_evolver_runs_marks_the_upscales_filed_for_our_own_videos(
+        tmp_path, monkeypatch):
+    marked = []
+    monkeypatch.setattr(outside_video_entries, "mark_own_upscales",
+                        lambda db: marked.append(db.path))
+
+    _the_command(tmp_path, None)
+
+    assert marked == [tmp_path / "origenerator.db"]

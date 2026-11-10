@@ -129,7 +129,8 @@ CREATE TABLE IF NOT EXISTS generations (
     video_actions TEXT,
     video_checked TEXT,
     combined_labels TEXT,
-    why_it_cannot_be_made_again TEXT
+    why_it_cannot_be_made_again TEXT,
+    evolver_upscale TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_generations_status ON generations(status);
@@ -297,6 +298,7 @@ ADDED_COLUMNS = {
         "video_actions": "TEXT",
         "video_checked": "TEXT",
         "combined_labels": "TEXT",
+        "evolver_upscale": "TEXT",
     },
     "folder_meta": {
         "level": "TEXT",
@@ -338,7 +340,7 @@ GENERATION_COLUMNS = (
     "enhance_of", "trimmed_from", "provenance", "picture_state", "shielded",
     "backfill_of", "fun_time_favorite_owed", "remade_at", "old_version_of", "shape",
     "image_actions", "image_checked", "video_actions", "video_checked", "combined_labels",
-    "why_it_cannot_be_made_again",
+    "why_it_cannot_be_made_again", "evolver_upscale",
 )
 
 

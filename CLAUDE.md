@@ -267,13 +267,19 @@ model, where the honest shrug only leaves it listed.
 
 The dropdowns, the TOC and the Enhancements name a model or LoRA file by
 its title (`model_titles.model_title`): the name its page on Civitai or Hugging
-Face gives it, tidied, with the version, the expert half and the precision where
-two files would otherwise read alike. Titles live in `model_titles.json` beside
+Face gives it, tidied, with the version where two files would otherwise read
+alike. A model's title then shows its size, full or half, read from inside the
+file, and never which pass of WAN's pair it is for, since the dropdown's label
+says so (his decision, 2026-11-10). Its tooltip says what the model is, from
+`model_descriptions.json` beside the titles, then explains each word of its
+title a person would wonder about (`title_words`), then its size
+(`precision`). Titles live in `model_titles.json` beside
 the library's records (`config.MODEL_TITLES_PATH`), keyed by the file's name
 without its extension, and outside the repo, since many of them name what the
 library holds. A file with no title is shown by its name, and a fix's LoRA by
 its fix and its version. So an agent installing a model writes its title
-there in the same piece of work: the user asked for titles in place of
+there in the same piece of work, and a sentence saying what the model is in
+`model_descriptions.json`, read off its page: the user asked for titles in place of
 filenames (2026-10-24), and a model added without one is the filename again.
 
 A title that ends in a number pair, "Example Look 1.0", is a base and a

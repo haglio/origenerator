@@ -129,12 +129,12 @@ PARAM_HELP: dict[str, str] = {
     ),
     "unet": "The model file this run generates with.",
     "unet_high": (
-        "The model for the first pass (the high-noise expert), which settles "
-        "composition and motion before the second pass refines it."
+        "The model for the first pass (high noise), which draws where things "
+        "are and how they move. The second pass finishes the detail."
     ),
     "unet_low": (
-        "The model for the second pass (the low-noise expert), which refines "
-        "detail on what the first pass laid down."
+        "The model for the second pass (low noise), which finishes the detail "
+        "on what the first pass drew."
     ),
     "upscale_model": (
         "The enlarger the enhancement runs first (an ESRGAN-family model), which "

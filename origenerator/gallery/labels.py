@@ -29,7 +29,7 @@ def workflow_label(workflow_name: str | None) -> str:
 
 
 def _joined_file_label(keys: tuple[str, ...], params: dict, fallback: str) -> str:
-    parts = [model_title(params[key]) for key in keys if params.get(key)]
+    parts = dict.fromkeys(model_title(params[key]) for key in keys if params.get(key))
     return " / ".join(parts) or fallback
 
 

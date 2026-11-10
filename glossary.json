@@ -1483,12 +1483,10 @@
     },
     {
       "id": "precision",
-      "thing": "the part of a model's or LoRA's name, in parentheses in the Model dropdowns, the LoRA rows, the TOC and the Enhancements, that says how many bits each of its numbers takes, and so how big the file is",
+      "thing": "the part of a model's name, in parentheses in the Model dropdowns, the TOC and the Enhancements, that says how many bits each of its numbers takes, and so how big the file is, read from inside the file; a LoRA's name shows it only where its title names one",
       "screen": [
         "full size",
-        "half size",
-        "half size, int8",
-        "half size, packed"
+        "half size"
       ],
       "his_word": null,
       "code_today": [

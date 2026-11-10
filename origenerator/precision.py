@@ -3,34 +3,27 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-FULL_SIZE_TRADEOFF = ("The model as its makers released it, and the best quality. The biggest file: one bigger "
-                      "than the graphics card's memory runs slower, since ComfyUI keeps part of it in the "
-                      "computer's memory.")
+FULL_SIZE = ("Full size: the model as its makers released it, with the most fine detail and the "
+             "biggest file.")
+HALF_SIZE = ("Half size: the model's numbers are stored in 8 bits instead of 16, so the file is half "
+             "as big and runs a little faster, with slightly less fine detail than full size.")
+PACKED_HALF_SIZE = ("Half size: packed into 8 bits a way that keeps more fine detail than other "
+                    "half-size files, but runs a little slower than they do.")
 
 
 @dataclass(frozen=True)
 class Precision:
     tag: str
     words: str
-    stands_for: str
-    tradeoff: str
-
-    def explained(self) -> str:
-        return f"{self.tag}: {self.stands_for}. {self.tradeoff}"
+    explained: str
 
 
 _PRECISIONS = {p.tag.casefold(): p for p in (
-    Precision("fp16", "full size", "floating point, 16 bits", FULL_SIZE_TRADEOFF),
-    Precision("bf16", "full size", "brain floating point, 16 bits", FULL_SIZE_TRADEOFF),
-    Precision("fp8", "half size", "floating point, 8 bits",
-              "Half the file of full size, and the fastest on the graphics card, with slightly less fine "
-              "detail than full size."),
-    Precision("int8", "half size, int8", "integer, 8 bits",
-              "Half the file of full size, rounded a different way from fp8: about the same quality as fp8, "
-              "or a little closer to full size."),
-    Precision("Q8", "half size, packed", "quantized, 8 bits",
-              "Half the file of full size, with detail closer to full size than fp8, but slower than fp8, "
-              "since it is unpacked while it runs."),
+    Precision("fp16", "full size", FULL_SIZE),
+    Precision("bf16", "full size", FULL_SIZE),
+    Precision("fp8", "half size", HALF_SIZE),
+    Precision("int8", "half size", HALF_SIZE),
+    Precision("Q8", "half size", PACKED_HALF_SIZE),
 )}
 
 _TAG = re.compile(r"(?<![A-Za-z0-9])(" + "|".join(_PRECISIONS) + r")(?![A-Za-z0-9])", re.IGNORECASE)
@@ -46,7 +39,11 @@ def named_in(title: str) -> Precision | None:
 
 
 def in_plain_words(title: str, precision: Precision) -> str:
-    return _TAG.sub(precision.words, title, count=1)
+    if named_in(title) is not None:
+        return _TAG.sub(precision.words, title, count=1)
+    if title.endswith(")"):
+        return f"{title[:-1]}, {precision.words})"
+    return f"{title} ({precision.words})"
 
 
 def file_size_sentence(size_bytes: int) -> str:

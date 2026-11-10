@@ -59,7 +59,10 @@ def test_the_audio_pass_is_a_sliver_of_a_video_job_not_most_of_it():
 def test_a_video_step_is_costed_by_the_length_of_the_video():
     short = sampler_costs(_payload("wan22_i2v", steps=8, frame_count=81))["15"]
     long = sampler_costs(_payload("wan22_i2v", steps=8, frame_count=161))["15"]
-    assert long[1] == pytest.approx(short[1] * 161 / 81)
+    assert long[1] == pytest.approx(short[1] * 161 / 81), (
+        "the costs are seconds measured off this app's own finished runs and only ever read "
+        "against each other: a bar needs the ratio between the passes of one job, and a faster "
+        "or slower graphics card moves every one of them together")
 
 
 def test_every_video_workflow_costs_its_audio_pass_against_its_video_one():

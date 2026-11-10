@@ -68,7 +68,9 @@ def test_the_longest_preset_fits_the_field_it_is_shown_in(qtbot):
     field = dropdown.lineEdit()
     widest = max(field.fontMetrics().horizontalAdvance(dropdown.itemText(index))
                  for index in range(dropdown.count()))
-    assert field.width() > widest + 4
+    assert field.width() > widest + 4, (
+        "measured dressed the way the app dresses it: the stylesheet's padding comes out of the "
+        "very field this is about")
 
 
 def test_presets_made_unavailable_stay_listed_but_cannot_be_picked_and_say_why_on_hover(qtbot):

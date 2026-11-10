@@ -907,7 +907,8 @@ def test_opening_a_generation_does_not_count_as_editing_it(tabs):
     preview = tabs.current_generate_tab()
     tabs.load_selection(dog, [dog])
 
-    assert tabs.count() == 1
+    assert tabs.count() == 1, (
+        "opening lays the marks on the prompts, and marking the fields is no edit of them")
     assert tabs.current_generate_tab() is preview
     assert tabs._preview_tab is preview
 

@@ -415,7 +415,7 @@ def test_an_image_points_at_what_a_folders_modify_made_of_it_under_modifications
 
     related.show_row(_image_row(), [])
 
-    assert _links(related._modifications) == [("Modified into", "img2")]
+    assert _links(related._modifications) == [("Batch-modified into", "img2")]
     assert related._requests.isHidden()
 
 
@@ -486,7 +486,7 @@ def test_an_image_a_folders_modify_made_points_at_the_one_it_was_modified_from(m
 
     section = related._modifications
     assert not section.isHidden()
-    assert _links(section) == [("Modified from", "img1")]
+    assert _links(section) == [("Batch-modified from", "img1")]
     assert no_sources(related)
     assert related._requests.isHidden()
 

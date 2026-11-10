@@ -101,11 +101,6 @@ _BUTTON_REFUSALS = {
     AppCommand.GROUP: "pick some folders first",
 }
 
-_FILTERS = {
-    AppCommand.FILTER_ENHANCED: True,
-    AppCommand.FILTER_OFF: False,
-}
-
 _ABOUT_THE_SLIDE = frozenset({
     AppCommand.BACK, AppCommand.FORWARD, AppCommand.CULL,
     AppCommand.LOCK, AppCommand.UNLOCK, AppCommand.FAVORITE,
@@ -304,8 +299,10 @@ class VoiceRouter(QObject):
                          said_at: float | None = None) -> None:
         if command in _COLLECTIONS:
             self._go_to_collection(command, shape)
-        elif command in _FILTERS:
-            self._slideshows.filter_enhanced(_FILTERS[command], shape)
+        elif command is AppCommand.FILTER_ENHANCED:
+            self._slideshows.filter_enhanced(True, shape)
+        elif command is AppCommand.FILTER_OFF:
+            self._slideshows.clear_action_filter(shape)
         elif command in _SWITCHES:
             self._flip_switch(command)
         elif command in _MOTION:

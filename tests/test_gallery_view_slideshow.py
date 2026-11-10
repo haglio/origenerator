@@ -616,7 +616,7 @@ def test_a_generation_that_lands_unenhanced_stays_out_of_a_narrowed_slideshow(qt
     slideshow.close()
 
 
-def test_clear_filter_puts_back_everything_the_switches_took(qtbot, monkeypatch):
+def test_clear_filter_leaves_f_mode_and_the_enhanced_filter_on(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
                                _row("i2", "sdxl_t2i",
@@ -624,6 +624,7 @@ def test_clear_filter_puts_back_everything_the_switches_took(qtbot, monkeypatch)
                                      "enhance": True},
                                     "sdxl_t2i_i2.png", favorite=1)]))
     qtbot.addWidget(view)
+    monkeypatch.setattr(view._slideshows, "_favorite_prompt_ids", lambda: {"i2"})
     view.refresh()
     _open_latest(view)
     view._slideshows.start()
@@ -632,12 +633,12 @@ def test_clear_filter_puts_back_everything_the_switches_took(qtbot, monkeypatch)
     slideshow.toggle_favorites_filter()
     slideshow.toggle_enhanced_mode()
     assert [item[2] for item in slideshow._set.playlist._items] == ["i2"]
+    assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_mode) == (True, True)
 
     view._voice._run_app_command(AppCommand.FILTER_OFF)
 
-    assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_mode) == (False, False), (
-        "with two switches on the HUD the phrase means both, as it does on every Satellite")
-    assert len(slideshow._set.playlist) == 2
+    assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_mode) == (True, True)
+    assert [item[2] for item in slideshow._set.playlist._items] == ["i2"]
     slideshow.close()
 
 
@@ -657,11 +658,26 @@ def test_filter_enhanced_turns_the_slideshows_switch_on_and_says_what_is_left(qt
     assert slideshow.hud_enhanced_mode is True, (
         "a word that set some other filter would leave the HUD's button dark over a narrowed slideshow")
     assert "1 to play" in words(slideshow.shown._note)
+    slideshow.close()
+
+
+def test_clear_filter_said_over_the_enhanced_filter_says_the_action_filter_is_cleared(
+        qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
+                               _enhanced_image("i2", "a dog", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_latest(view)
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow.shown)
+    view._voice._run_app_command(AppCommand.FILTER_ENHANCED)
 
     view._voice._run_app_command(AppCommand.FILTER_OFF)
 
-    assert slideshow.hud_enhanced_mode is False
-    assert "all of them" in words(slideshow.shown._note)
+    assert slideshow.hud_enhanced_mode is True
+    assert words(slideshow.shown._note) == "Filter: cleared (1)"
     slideshow.close()
 
 

@@ -1811,8 +1811,8 @@ def test_a_spoken_enhanced_only_narrows_the_named_regions_slideshow(qtbot, tmp_p
     assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_mode) == (True, True)
 
     assert view.run_spoken_command("portrait clear filter")
-    assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_mode) == (False, False)
-    assert slideshow.pass_size() == 3
+    assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_mode) == (True, True)
+    assert slideshow.pass_size() == 1
 
 
 def test_a_regions_reset_drops_the_enhanced_switch_with_the_rest(qtbot, tmp_path, monkeypatch):

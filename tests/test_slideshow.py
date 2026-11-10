@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from origenerator.slideshow import (
     LIVE,
     Slide,
@@ -465,8 +467,29 @@ def test_the_filters_read_back_as_they_were_saved():
     assert SlideshowFilters.restored({"favorites": 1, "act": ["alpha"]}) == SlideshowFilters()
 
 
+def test_original_only_reads_back_as_it_was_saved():
+    filters = SlideshowFilters(favorites=True, originals=True, action="alpha")
+
+    assert SlideshowFilters.restored(json.loads(json.dumps(filters.saved()))) == filters
+
+
+def test_enhanced_only_and_original_only_are_never_both_on():
+    with pytest.raises(ValueError):
+        SlideshowFilters(enhanced=True, originals=True)
+
+    assert SlideshowFilters.restored({"enhanced": True, "originals": True}) == SlideshowFilters(
+        enhanced=True)
+
+
+def test_filters_saved_before_original_only_existed_read_back_with_it_off():
+    saved = {"favorites": True, "enhanced": False, "act": "alpha"}
+
+    assert SlideshowFilters.restored(saved) == SlideshowFilters(favorites=True, action="alpha")
+
+
 def test_the_action_filter_is_saved_under_the_key_older_copies_of_the_app_read():
-    assert SlideshowFilters(action="alpha").saved() == {"favorites": False, "enhanced": False, "act": "alpha"}
+    assert SlideshowFilters(action="alpha").saved() == {
+        "favorites": False, "enhanced": False, "act": "alpha", "originals": False}
     assert SlideshowFilters.restored({"act": "alpha"}) == SlideshowFilters(action="alpha")
 
 

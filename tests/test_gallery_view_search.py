@@ -59,6 +59,9 @@ from tests.text_readers import clip_reader
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 
 
+_WIDE_ENOUGH_THAT_NO_PATH_ELIDES = 2000
+
+
 def _yellow_matches(field) -> int:
     return sum(sel.format.background().color() == YELLOW
                for sel in field.extraSelections())
@@ -246,7 +249,7 @@ def test_a_folders_collection_scopes_the_search_and_names_its_path(qtbot):
                  "wan22_i2v_00001_.mp4")]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
-    view._search.field.setFixedWidth(2000)
+    view._search.field.setFixedWidth(_WIDE_ENOUGH_THAT_NO_PATH_ELIDES)
     view.refresh()
     workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow.child(0))
@@ -301,7 +304,7 @@ def test_the_field_says_what_it_would_search(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(FakeDB(rows))
     qtbot.addWidget(view)
-    view._search.field.setFixedWidth(2000)
+    view._search.field.setFixedWidth(_WIDE_ENOUGH_THAT_NO_PATH_ELIDES)
     view.refresh()
     assert view._search.field.placeholderText() == "Search Landscape  \u203a  All…"
 

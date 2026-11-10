@@ -116,6 +116,7 @@ def test_an_item_picked_while_a_slideshow_sits_minimized_is_where_the_button_beg
     view._buttons.slideshow.click()
     minimized = view._slideshows.showing
     qtbot.addWidget(minimized.shown)
+    # The Windows taskbar still minimizes any window, so this is a way the user has.
     minimized.shown.showMinimized()
     picked = next(pid for pid in view.listed_prompt_ids()
                   if pid != minimized._set.playlist.current().prompt_id)
@@ -221,6 +222,7 @@ def test_starting_a_slideshow_while_the_last_one_sits_minimized_puts_it_back_on_
     view.resize(1200, 800)
     with qtbot.waitExposed(view):
         view.show()
+    # The Windows taskbar still minimizes any window, so this is a way the user has.
     slideshow.shown.showMinimized()
     assert slideshow.shown.isMinimized()
 
@@ -1077,6 +1079,7 @@ def _left_by_enter_then_the_slideshow_button(view, slideshow):
 
 
 def _minimized_then_the_slideshow_button(view, slideshow):
+    # The Windows taskbar still minimizes any window, so this is a way the user has.
     slideshow.shown.showMinimized()
     view._buttons.slideshow.click()
 

@@ -122,7 +122,8 @@ def test_the_cancel_hover_says_which_of_the_two_the_press_will_do():
 
 
 def test_the_menu_carries_the_act_the_button_has_no_room_for():
-    assert stop_populate_text() == "Cancel and stop populating"
+    assert stop_populate_text() == "Cancel and stop populating", (
+        "it says Populate goes off too, a bigger step than throwing one seed away")
     assert stop_populate_tooltip() == (
         "Throw this run away and switch Populate off")
 
@@ -165,5 +166,6 @@ def test_a_row_that_is_not_a_job_yet_says_it_is_not_in_the_line():
 def test_the_line_to_read_before_pressing_generate_counts_the_foreign_queue():
     assert foreign_queue_text(None) is None
     assert foreign_queue_text(0) is None
-    assert foreign_queue_text(1) == "1 job from another app is queued on ComfyUI"
+    assert foreign_queue_text(1) == "1 job from another app is queued on ComfyUI", (
+        "ComfyUI is shared, and can hold work this session never launched")
     assert foreign_queue_text(6) == "6 jobs from another app are queued on ComfyUI"

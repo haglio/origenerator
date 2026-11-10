@@ -201,4 +201,5 @@ def test_right_click_requests_a_menu_for_this_tile(qtbot):
 
     tile.customContextMenuRequested.emit(QPoint(5, 5))
 
-    assert received == ["p1"]
+    assert received == ["p1"], (
+        "the tile is the one thing in a collection standing for its run, so the run's menu opens from it")

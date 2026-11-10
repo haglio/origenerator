@@ -204,7 +204,8 @@ def test_a_run_comfyui_holds_but_has_not_started_says_queued(build):
     job = FakeJob("g1", state="queued")
     items = build(sources=_sources([_row("g1", status="running")], jobs=FakeJobQueue(jobs_by_folder={"video/wan22_i2v/aaa": [job]})))
 
-    assert items[0].reading.status == "queued"
+    assert items[0].reading.status == "queued", (
+        "a row says running from the moment its run is sent, though ComfyUI may still hold it in line")
 
 
 def test_a_tile_moves_its_job_up_and_down_the_queues_own_line(build):
@@ -229,7 +230,8 @@ def test_the_queues_own_line_orders_the_tiles(build):
     rows = [_row("g1"), _row("g2"), _row("g3")]
     items = build(sources=_sources(rows, jobs=FakeJobQueue(order=["g3", "g1", "g2"])))
 
-    assert [item.key for item in items] == ["g3", "g1", "g2"]
+    assert [item.key for item in items] == ["g3", "g1", "g2"], (
+        "no row records a job moved up or dragged, so only the queue's own line knows the order")
 
 
 def test_a_row_the_line_holds_no_job_for_sorts_to_the_back(build):

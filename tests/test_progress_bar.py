@@ -20,16 +20,16 @@ def bar(qtbot):
 
 @pytest.fixture
 def styled_bar(qtbot):
-    host = QWidget()
-    host.setStyleSheet(build_stylesheet())
-    layout = QVBoxLayout(host)
+    parent_styled_as_the_app_styles_it = QWidget()
+    parent_styled_as_the_app_styles_it.setStyleSheet(build_stylesheet())
+    layout = QVBoxLayout(parent_styled_as_the_app_styles_it)
     b = ProgressBar()
     b.setFixedHeight(22)
     layout.addWidget(b)
-    qtbot.addWidget(host)
-    host.resize(240, 60)
-    with qtbot.waitExposed(host):
-        host.show()
+    qtbot.addWidget(parent_styled_as_the_app_styles_it)
+    parent_styled_as_the_app_styles_it.resize(240, 60)
+    with qtbot.waitExposed(parent_styled_as_the_app_styles_it):
+        parent_styled_as_the_app_styles_it.show()
     return b
 
 
@@ -171,11 +171,14 @@ def test_the_caption_is_written_over_the_band_not_under_it(styled_bar):
     styled_bar.show_progress("50%", (30, 60), (20, 20))
     image = styled_bar.grab().toImage()
 
-    substep = range(styled_bar.height() - 7, styled_bar.height() - 1)
+    foot = styled_bar.height() - 1
+    substep = range(foot - progress_bar._SUBSTEP_BAR_PX, foot)
     clear_of_the_rounded_ends = range(styled_bar.width() // 3, styled_bar.width() * 2 // 3)
     written = [(x, y) for y in substep for x in clear_of_the_rounded_ends
                if image.pixelColor(x, y) not in (BLUE_LIGHT, BG_PRIMARY)]
-    assert written
+    assert written, (
+        "the band lies along the foot, where a line of text keeps its descenders: painted after "
+        "the caption, it would strike the foot of every letter out")
 
 
 def test_a_sweeping_bar_grows_no_band(styled_bar):

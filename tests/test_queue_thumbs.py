@@ -25,6 +25,7 @@ def _thumbnail(path, color, size=(80, 40)):
 
 
 def _color_at(pixmap, x, y):
+    # Qt: pixel() throws the alpha away, and alpha is all that tells an empty cell from a faint one.
     return pixmap.toImage().pixelColor(x, y)
 
 
@@ -68,7 +69,9 @@ def test_a_combine_draws_the_frame_then_its_source_video_in_gray(qapp, tmp_path)
     assert lead.red() > 200
     assert lead.blue() < 60
     follow = _color_at(block, _middle_of_cell(1), CELL // 2)
-    assert follow.red() == follow.green() == follow.blue()
+    assert follow.red() == follow.green() == follow.blue(), (
+        "gray because it is not what is being made: in full color the row reads as a job that is "
+        "that video")
 
 
 def _source_video_columns(block, video):
@@ -91,7 +94,9 @@ def test_a_source_video_keeps_its_cell_when_the_frame_has_not_rendered(qapp, tmp
 
     block = source_pixmap(Combination(tmp_path / "not-yet.png", video), CELL)
 
-    assert _color_at(block, _middle_of_cell(0), CELL // 2).alpha() == 0
+    assert _color_at(block, _middle_of_cell(0), CELL // 2).alpha() == 0, (
+        "each keeps its own cell, so the two read as one column down the line: a frame that has "
+        "not landed does not move the source video into its place")
     follow = _color_at(block, _middle_of_cell(1), CELL // 2)
     assert follow.blue() > 0
     assert follow.red() == follow.blue()
@@ -160,7 +165,9 @@ def test_one_thumbnail_takes_the_same_width_as_four(qapp, tmp_path):
     frame = _thumbnail(tmp_path / "frame.png", (255, 0, 0))
     mates = [_thumbnail(tmp_path / f"m{i}.png", (0, 0, 255)) for i in range(4)]
 
-    assert source_pixmap(Combination(frame), CELL).width() == folder_pixmap(mates, CELL).width()
+    assert source_pixmap(Combination(frame), CELL).width() == folder_pixmap(mates, CELL).width(), (
+        "so the text beside the block starts at the same place on every line, whether the block "
+        "holds one thumbnail or four")
 
 
 def test_a_folder_view_takes_the_first_four_and_stops(qapp, tmp_path):

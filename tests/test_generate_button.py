@@ -17,15 +17,15 @@ def button(qtbot):
 
 @pytest.fixture
 def styled_button(qtbot):
-    host = QWidget()
-    host.setStyleSheet(build_stylesheet())
-    layout = QVBoxLayout(host)
+    parent_styled_as_the_app_styles_it = QWidget()
+    parent_styled_as_the_app_styles_it.setStyleSheet(build_stylesheet())
+    layout = QVBoxLayout(parent_styled_as_the_app_styles_it)
     b = GenerateButton()
     layout.addWidget(b)
-    qtbot.addWidget(host)
-    host.resize(320, 60)
-    with qtbot.waitExposed(host):
-        host.show()
+    qtbot.addWidget(parent_styled_as_the_app_styles_it)
+    parent_styled_as_the_app_styles_it.resize(320, 60)
+    with qtbot.waitExposed(parent_styled_as_the_app_styles_it):
+        parent_styled_as_the_app_styles_it.show()
     return b
 
 

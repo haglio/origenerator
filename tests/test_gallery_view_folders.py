@@ -242,7 +242,8 @@ def test_a_folder_of_your_own_refuses_an_item_of_the_other_shape(qtbot):
     mime = generation_mime("t1")
 
     assert not _drop_on(_top_level(view._tree)["Mine"], mime), (
-        "the same rule a folder dragged out of the other shape's list meets")
+        "a folder of the user's own takes only its own shape: an item dropped on it meets the rule a "
+        "folder dragged out of the other shape's list meets")
     assert view._db.list_custom_collections()[0]["items"] == []
 
 

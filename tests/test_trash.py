@@ -134,7 +134,9 @@ def test_store_retries_a_briefly_locked_file(tmp_path, monkeypatch):
     with no_wait_for_a_held_file():
         batch = trash.store([src])
 
-    assert attempts["n"] == 2
+    assert attempts["n"] == 2, (
+        "a Funestra takes a moment to let go of a file it was playing, and deleting from a "
+        "slideshow counts on this second try to cover that moment")
     assert not src.exists()
     assert batch.moves[0][1].exists()
 

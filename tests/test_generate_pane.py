@@ -1171,3 +1171,15 @@ def test_capture_restore_round_trips_config(tabs, qtbot):
     assert tabs[1]._param_form.get_values()["seed"] == 7
     assert fresh.tabText(fresh.indexOf(tabs[1])) == tabs[1].title()
     assert fresh.currentIndex() == captured["current"]
+
+
+def test_a_refreshed_row_reaches_a_tab_that_is_not_in_front(tabs):
+    covered, _front = tabs.current_generate_tab(), tabs._add_subtab()
+    told = []
+    covered.refresh_displayed = lambda row, image_rows: told.append(row["prompt_id"])
+
+    tabs.refresh_displayed({"prompt_id": "g1"}, [])
+
+    assert told == ["g1"], (
+        "every tab is told, not only the one in front: a tab out of sight holds a row of its own, "
+        "and would show it stale the next time it came forward")

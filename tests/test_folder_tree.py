@@ -685,6 +685,23 @@ def test_a_folder_lately_worked_in_wears_a_mark_at_the_start_of_its_row(qtbot):
     assert max(marked) < delete.left()
 
 
+def test_the_marks_of_folders_at_different_depths_stand_in_one_column(qtbot):
+    tree, leaf = _tree_with_leaf(qtbot)
+    outermost = leaf
+    while outermost.parent() is not None:
+        outermost = outermost.parent()
+    assert outermost is not leaf
+    for row in (outermost, leaf):
+        row.setData(0, RECENT_ROLE, True)
+
+    def columns_marked(row):
+        return {x for x, color in _row_pixels(tree, row) if _is_blue(color)}
+
+    assert columns_marked(leaf) == columns_marked(outermost) != set(), (
+        "the mark sits at the pane's own left edge, not beside the label, so the marks read down "
+        "the edge as one column however deep a folder sits")
+
+
 def _is_white(color) -> bool:
     return min(color.red(), color.green(), color.blue()) > 200
 
@@ -708,7 +725,9 @@ def test_a_favorited_folder_wears_a_green_star_with_the_mouse_elsewhere(qtbot):
     tree, leaf = _tree_with_leaf(qtbot, favorite=True)
     star, _delete = _action_rects(tree.visualRect(tree.indexFromItem(leaf)))
 
-    assert _wears_within(tree, leaf, star, _is_green)
+    assert _wears_within(tree, leaf, star, _is_green), (
+        "a favorited star is the folder's state rather than an offer, so it stays up with the "
+        "mouse elsewhere")
 
 
 def test_a_picked_favorited_folders_star_is_ringed_in_white(qtbot):

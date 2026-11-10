@@ -32,7 +32,9 @@ def test_the_price_comes_first_because_that_is_what_a_wait_is_added_up_out_of():
 
 
 def test_a_row_says_what_kind_of_work_it_is_when_the_workflow_is_one_we_know():
-    assert queue_lead_text(_item(job_kind="Video")) == "~2 min · Video"
+    assert queue_lead_text(_item(job_kind="Video")) == "~2 min · Video", (
+        "the kind of work is a field of its own and is never read off the caption: the caption "
+        "says which settings, the kind says what the work costs")
     assert queue_lead_text(_item(job_kind="")) == "~2 min"
 
 

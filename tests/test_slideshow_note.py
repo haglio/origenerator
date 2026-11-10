@@ -49,7 +49,10 @@ def test_the_note_that_says_the_app_is_still_working_does_not_fade(qtbot):
     view.slideshow.note_request(_WORKING, _ASKED, working=True)
 
     assert _corner(view) == _WORKING
-    assert not view._note_timer.isActive()
+    assert not view._note_timer.isActive(), (
+        "working out what a request changes can mean asking the model, which routinely takes "
+        "longer than a flash lasts, and a note gone while the app still works reads as the "
+        "request having been dropped")
     _fade(view)
     assert _corner(view) == _WORKING
 

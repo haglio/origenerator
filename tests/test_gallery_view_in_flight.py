@@ -857,6 +857,18 @@ def test_image_folder_item_has_no_seed_reroll_hovers(qtbot, tmp_path):
     assert _tooltips(view, "img") == []
 
 
+def test_a_folder_of_images_made_from_an_image_has_no_seed_reroll_hovers(qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(gallery, "is_image_conditioned", lambda workflow_name: True)
+    view = GalleryView(_seeded_i2v_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_leaf_of(view, "img")
+
+    assert _tooltips(view, "img") == [], (
+        "being made from an image is not enough: an enhanced image starts from one too, and it "
+        "has no video seed to offer")
+
+
 def test_i2v_item_with_a_handpicked_frame_offers_only_the_video_seed(qtbot, tmp_path):
     view = GalleryView(_single_i2v_db(tmp_path, "handpicked.png"), client=_reroll_client())
     qtbot.addWidget(view)

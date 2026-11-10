@@ -1794,7 +1794,10 @@ def test_the_launch_check_claims_nothing_so_it_passes_beside_a_running_copy(
     monkeypatch.setattr("origenerator.single_instance.Copies", copies)
 
     with _a_faked_boot([]):
-        assert main(["--check-launch"]) == 0
+        assert main(["--check-launch"]) == 0, (
+            "this is what a hosting session's suite runs to prove the real launch command "
+            "works, so a break that kills the launch before it can log is caught by a test: it "
+            "has to come back clean with no database, no ComfyUI and no window")
 
     copies.assert_not_called()
 

@@ -470,7 +470,9 @@ def test_ending_a_slideshow_on_a_locked_slide_hands_that_slide_over(qtbot):
 
     _leave_by_double_clicking_the_slide(qtbot, view)
 
-    assert opened == ["id-b"]
+    assert opened == ["id-b"], (
+        "however a slideshow is left, the item that was on screen is the one the user wants to "
+        "find afterwards, so the gallery picks it rather than going back to where it stood")
 
 
 def test_ending_a_slideshow_on_an_unlocked_slide_hands_that_slide_over(qtbot):
@@ -1597,7 +1599,9 @@ def test_shift_left_counts_the_enhancements_down_and_shift_right_counts_them_up(
         _shift(view, arrow)
         named.append(view.slideshow.hud_item_note)
 
-    assert named == ["Enhancement 1/2", "Original", "Enhancement 1/2", "Enhancement 2/2"]
+    assert named == ["Enhancement 1/2", "Original", "Enhancement 1/2", "Enhancement 2/2"], (
+        "Shift with an arrow steps through an image's enhancements on the slideshow itself, so "
+        "one can be compared against the one below it at full size rather than in a thumbnail")
 
 
 def test_a_version_shift_stepped_to_comes_up_still_and_holds_the_slideshow(qtbot, tmp_path):

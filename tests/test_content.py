@@ -131,7 +131,10 @@ def test_a_local_overlay_missing_a_key_the_example_documents_is_named(tmp_path):
         encoding="utf-8")
 
     assert content.missing_overlay_keys(local, REPO_ROOT / "content.example.json") == (
-        "detail_fix_parts", "speech_python")
+        "detail_fix_parts", "speech_python"), (
+        "every key the example documents is named when it is missing, even one the app could "
+        "start without, so the launch can stop on it: a feature that quietly goes without its "
+        "key reads as the model having a bad day")
 
 
 def test_a_complete_overlay_is_missing_nothing(tmp_path):

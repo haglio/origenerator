@@ -144,7 +144,9 @@ def test_reveal_button_is_disabled_when_the_output_is_gone(block, monkeypatch, t
         [{"filename": "gone.mp4", "subfolder": ""}])))
     btns = _reveal_btns(block)
     assert len(btns) == 1
-    assert btns[0].isEnabled() is False
+    assert btns[0].isEnabled() is False, (
+        "Explorer handed a file that is gone ignores the selection and opens a default place "
+        "instead, so the button is not offered for one")
 
 
 def test_show_row_replaces_the_previous_render(block):

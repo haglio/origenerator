@@ -255,6 +255,7 @@ class FakeAnswerer:
 
     def ask(self, about, pair, words, *, owner, then, **told):
         self.asked.append((about, *pair, words))
+        self.told = told
         self.then = then
 
 
@@ -822,6 +823,18 @@ def test_a_finished_request_is_asked_of_the_model_about_the_image_it_was_said_ov
     ((about, _positive, _negative, asked),) = requests.asked
     assert (about, asked) == ("g1", "no hat")
     assert "working out" in words(voice.status)
+
+
+def test_a_spoken_request_tells_the_model_whether_the_items_prompts_take_weights(router):
+    requests = FakeAnswerer()
+    voice, _host, _slideshows = router(
+        db=FakeDB([_row("g1"), _row("k1", workflow_name="krea2_t2i")]), requests=requests)
+
+    voice._begin_request("g1", Spoken("no hat"))
+    with_weights = requests.told["weights"]
+    voice._begin_request("k1", Spoken("no hat"))
+
+    assert (with_weights, requests.told["weights"]) == (True, False)
 
 
 def test_a_revision_that_changed_nothing_says_so_rather_than_generating(router):

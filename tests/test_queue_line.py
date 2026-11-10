@@ -171,3 +171,47 @@ def test_an_enhancement_moved_behind_the_videos_waiting_for_it_takes_them_along(
 
     assert queue_line.moved([enhance, first, second, other], enhance, None) == [
         other, enhance, first, second]
+
+
+def _leave():
+    pass
+
+
+def test_a_model_left_loaded_by_a_request_is_the_next_requests_to_keep():
+    hold = queue_line.ModelHold(lambda: None)
+
+    assert hold.hold() is False
+    hold.let_go(_leave)
+    assert not hold
+
+    assert hold.hold() is True
+    assert hold.send_away() is None
+
+
+def test_a_model_sent_away_holds_the_line_until_it_has_left_and_is_sent_only_once():
+    let_go = []
+    hold = queue_line.ModelHold(lambda: let_go.append(bool(hold)))
+    hold.hold()
+    hold.let_go(_leave)
+
+    assert hold.stays
+    assert hold.send_away() is _leave
+    assert hold
+    assert not hold.stays
+    assert hold.send_away() is None
+
+    hold.let_go()
+    assert let_go == [False, False]
+    assert hold.send_away() is None
+
+
+def test_a_request_that_ends_without_the_model_leaves_what_an_earlier_one_left_loaded():
+    hold = queue_line.ModelHold(lambda: None)
+    hold.hold()
+    hold.hold()
+    hold.let_go(_leave)
+    assert hold.send_away() is None
+
+    hold.let_go()
+
+    assert hold.send_away() is _leave

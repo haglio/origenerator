@@ -66,11 +66,13 @@ def _column_without_margins(host: QWidget) -> QVBoxLayout:
 
 
 class _Entry:
-    def __init__(self, turn):
+    def __init__(self, turn, *, waiting: bool = False):
         self.said = turn[0]
         self.take(turn)
+        self.waiting = waiting
 
     def take(self, turn) -> None:
+        self.waiting = False
         self.answered = turn[1]
         turn = Turn(*turn)
         self.made = turn.made
@@ -343,20 +345,24 @@ class RequestExchange(QWidget):
             self._in_flight = {key: reading for key, reading in readings.items() if key in made}
             self._draw()
 
-    def _settle(self, status: str = "", *, ready: bool = True) -> None:
-        _say(self._status, status)
-        self._line.setEnabled(self._available and ready)
+    def _settle(self, status: str = "") -> None:
+        waiting = bool(self._held) and self._held[-1].waiting
+        _say(self._status, status or (_UPDATING if waiting else ""))
+        self._line.setEnabled(self._available and not waiting)
 
-    def show_exchange(self, turns, *, started_on: str | None = None) -> None:
+    def show_exchange(self, turns, *, started_on: str | None = None,
+                      asking: str | None = None) -> None:
         self._held = [_Entry(turn) for turn in turns]
+        if asking:
+            self._held.append(_Entry((asking, ""), waiting=True))
         self._started_on = started_on
         self._draw()
         self._settle()
 
     def add_turn(self, said: str) -> None:
-        self._held.append(_Entry((said, "")))
+        self._held.append(_Entry((said, ""), waiting=True))
         self._draw()
-        self._settle(_UPDATING, ready=False)
+        self._settle()
 
     def answered(self, turn) -> None:
         self._held[-1].take(turn)

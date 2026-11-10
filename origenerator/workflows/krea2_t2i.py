@@ -45,6 +45,7 @@ class Krea2T2iWorkflow(WorkflowTemplate):
     model_keys = ("unet",)
     lora_keys = LORA_KEYS
     text_reader = QWEN3VL
+    prompts_take_weights = False
     loras_keyed_only_when_named = LORA_KEYS[1:]
     extra_enhance_keys = ("upscale_model",)
     redraw_model_key = "unet"

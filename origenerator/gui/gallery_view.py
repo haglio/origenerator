@@ -649,7 +649,7 @@ class GalleryView(QWidget):
             self._client, self._db, fun_time=self._fun_time,
             views=TabViews(heights=self._prompt_heights, names=self._item_names,
                            animated_preview=self.animated_preview,
-                           requests=self._voice.requests))
+                           requests=self._voice.requests, request_aims={}))
         self._osr2_driver = Osr2Driver(parent=self) if self._osr2_motion is not None else None
         if self._osr2_driver is not None:
             omnipause.holds(self._osr2_driver)
@@ -1962,7 +1962,7 @@ class GalleryView(QWidget):
             turns=(revision.turn(spoken.text),),
         ))
         self.refresh()
-        return revision.answer or "Request submitted", INFO
+        return "Request submitted", INFO
 
     def delete_enhance_versions(self, prompt_id: str, filenames: list):
         row = self._db.get_generation(prompt_id)

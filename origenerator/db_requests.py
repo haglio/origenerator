@@ -86,6 +86,17 @@ class RequestStore(Store):
             ).fetchall()
             return [row[0] for row in rows]
 
+    def distinct_prompts(self) -> list[tuple[str, str]]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""SELECT positive_prompt, MIN(COALESCE(negative_prompt, '')) FROM generations
+                   WHERE positive_prompt IS NOT NULL AND TRIM(positive_prompt) != ''
+                     AND {MADE_HERE}
+                   GROUP BY positive_prompt ORDER BY MIN(id)""",
+                MADE_ELSEWHERE,
+            ).fetchall()
+            return [(row[0], row[1]) for row in rows]
+
     def record_turns(self, prompt_id: str, turns) -> None:
         with self._connect() as conn:
             conn.executemany(
@@ -102,7 +113,7 @@ class RequestStore(Store):
                        (SELECT id FROM request_turns WHERE prompt_id = ?
                         ORDER BY id LIMIT 1 OFFSET ?)""", (made, prompt_id, position))
 
-    def _turns_of(self, prompt_id: str) -> list[Turn]:
+    def turns_of(self, prompt_id: str) -> list[Turn]:
         with self._connect() as conn:
             rows = conn.execute(
                 """SELECT said, answered, old_positive, old_negative, new_positive, new_negative,
@@ -123,10 +134,10 @@ class RequestStore(Store):
         return chain
 
     def exchange_of(self, prompt_id: str) -> list[Turn]:
-        return [turn for link in self._chain(prompt_id) for turn in self._turns_of(link)]
+        return [turn for link in self._chain(prompt_id) for turn in self.turns_of(link)]
 
     def items_asked_into(self, prompt_id: str) -> list[str]:
-        return [link for link in self._chain(prompt_id) for _turn in self._turns_of(link)]
+        return [link for link in self._chain(prompt_id) for _turn in self.turns_of(link)]
 
     def started_on(self, prompt_id: str) -> str | None:
         root = self._chain(prompt_id)[0]

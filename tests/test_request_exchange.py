@@ -121,6 +121,20 @@ def test_a_request_just_asked_shows_as_a_turn_updating_until_its_answer_comes(qt
     assert exchange._line.isEnabled()
 
 
+def test_an_exchange_shown_with_a_request_still_being_worked_out_waits_on_it(qtbot):
+    exchange = _exchange(qtbot)
+
+    exchange.show_exchange(EXCHANGE, asking="brighter")
+
+    assert exchange.turns()[-1] == ("brighter", "")
+    assert exchange._status.text() == "updating…"
+    assert not exchange._line.isEnabled()
+
+    exchange.answered(("brighter", "Brighter now."))
+
+    assert exchange._line.isEnabled()
+
+
 def test_a_request_the_model_could_not_work_out_comes_off_and_says_so_beside_the_line(qtbot):
     exchange = _exchange(qtbot)
     exchange.show_exchange(EXCHANGE)

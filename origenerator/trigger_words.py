@@ -36,6 +36,22 @@ def with_trigger_words_swapped(prompt: str, old, new, *, in_scenes: bool = False
     return with_trigger_word(prompt, new, in_scenes=in_scenes)
 
 
+def without_trigger_word(prompt: str, words, *, in_scenes: bool = False) -> str:
+    return story_of([without_phrases(scene, words) for scene in _parts(prompt, in_scenes)])
+
+
+def without_phrases(text: str, words) -> str:
+    if not _holds_one(text, words):
+        return text
+    for word in words:
+        whole = _pattern(word).pattern
+        text = re.sub(rf"\(\s*{whole}\s*(?::\s*[0-9.]+)?\s*\)|{whole}", "", text,
+                      flags=re.IGNORECASE)
+    text = re.sub(r"(?:\s*,\s*){2,}", ", ", text)
+    text = re.sub(r"^[\s,]+|[\s,]+$", "", text)
+    return re.sub(r"[^\S\n]{2,}", " ", text)
+
+
 def _parts(prompt: str, in_scenes: bool) -> list[str]:
     return scene_prompts(prompt) if in_scenes else [prompt]
 

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from origenerator.model_titles import trained_sentence
 from origenerator.setting_advice import good_range_text
 from origenerator.workflows.base import ParamDef
 from origenerator.workflows.lora_rows import LORA_KEYS, strength_key_of
+from origenerator.workflows.model_arch import trained_sentence
 from origenerator.workflows.wan_experts import FIRST_PASS_LORA_KEYS, SECOND_PASS_LORA_KEYS
 
 _COMPOSITION_FOCUS = (

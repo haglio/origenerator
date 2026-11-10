@@ -533,6 +533,12 @@ def _speak_request(view, qtbot, *utterances):
     for text in utterances:
         view._voice.listener.speak(text)
     qtbot.waitUntil(lambda: view._slideshows.showing.shown._working_request is None, timeout=5000)
+    qtbot.waitUntil(lambda: _every_job_is_with_comfyui(view), timeout=5000)
+
+
+def _every_job_is_with_comfyui(view) -> bool:
+    return all(view._db.get_generation(job.prompt_id)["status"] != "pending"
+               for job in view._live_jobs.values())
 
 
 def test_saying_request_pauses_the_slideshow_until_over(qtbot, tmp_path, monkeypatch):
@@ -606,30 +612,35 @@ def test_a_request_on_a_prompt_in_boxes_is_recorded_as_stored_and_as_queued(
     assert record["new_positive"] == job.params["positive_prompt"]
 
 
-def test_a_queued_request_the_rules_made_says_what_they_changed(qtbot, tmp_path, monkeypatch):
-    view = _requesting_view(qtbot, tmp_path, monkeypatch)
-
-    _speak_request(view, qtbot, "Request, no hat, over.")
-
-    assert words(view._slideshows.showing.shown._note) == "Took out hat."
-
-
-def test_a_request_the_model_answered_says_its_sentence_and_keeps_the_turn(
+def test_a_request_the_model_answered_says_only_that_it_was_submitted_and_keeps_what_changed(
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     view._voice.requests._work_out = lambda positive, negative, words, **_: work_out(
         positive, negative, words,
-        ask=lambda p, n, r, known: (
-            "a woman, soft light", n, "Took the hat off her."))
+        ask=lambda p, n, r, known: {"changes": [
+            {"prompt": "positive", "remove": "a hat", "for": "no hat"}]})
 
     _speak_request(view, qtbot, "Request, no hat, over.")
 
-    assert words(view._slideshows.showing.shown._note) == "Took the hat off her."
+    assert words(view._slideshows.showing.shown._note) == "Request submitted"
     (job,) = view._live_jobs.values()
     assert job.params["positive_prompt"] == "a woman, soft light"
     (turn,) = view._db.requests.exchange_of(job.prompt_id)
-    assert (turn.said, turn.answered) == ("no hat", "Took the hat off her.")
+    assert (turn.said, turn.answered) == (
+        "no hat", 'Removed "a hat" from the Positive Prompt.')
     assert (turn.old_positive, turn.new_positive) == ("a woman, a hat, soft light", "a woman, soft light")
+
+
+def test_a_spoken_request_the_model_changes_nothing_for_says_so_and_makes_nothing(
+        qtbot, tmp_path, monkeypatch):
+    view = _requesting_view(qtbot, tmp_path, monkeypatch)
+    view._voice.requests._work_out = lambda positive, negative, words, **_: work_out(
+        positive, negative, words, ask=lambda p, n, r, known: {"changes": []})
+
+    _speak_request(view, qtbot, "Request, a hat, over.")
+
+    assert words(view._slideshows.showing.shown._note) == "Nothing changed."
+    assert not view._live_jobs
 
 
 def test_a_spoken_request_about_a_setting_remakes_the_image_with_that_setting(
@@ -637,12 +648,12 @@ def test_a_spoken_request_about_a_setting_remakes_the_image_with_that_setting(
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     view._voice.requests._work_out = lambda positive, negative, words, **given: work_out(
         positive, negative, words, settings=given["settings"],
-        ask=lambda p, n, r, known: (
-            p, n, "Fewer steps.", {"steps": 30}))
+        ask=lambda p, n, r, known: {"changes": [
+            {"setting": "steps", "to": 30, "for": "fewer steps"}]})
 
     _speak_request(view, qtbot, "Request, fewer steps, over.")
 
-    assert words(view._slideshows.showing.shown._note) == "Fewer steps."
+    assert words(view._slideshows.showing.shown._note) == "Request submitted"
     (job,) = view._live_jobs.values()
     assert job.params["steps"] == 30
     assert job.params["positive_prompt"] == "a woman, a hat, soft light"
@@ -692,7 +703,7 @@ def test_a_queued_request_is_logged_by_the_images_it_joins_never_by_its_words(
         _speak_request(view, qtbot, "Request, no example lantern, over.")
 
     (job,) = view._live_jobs.values()
-    assert f"Request on orig: term dropped, queued as {job.prompt_id}" in caplog.messages
+    assert f"Request on orig: term rewritten, queued as {job.prompt_id}" in caplog.messages
     for private in ("lantern", "soft light", "blurry"):
         assert private not in caplog.text
 
@@ -785,7 +796,7 @@ def test_a_request_item_shows_its_words_in_its_tab_s_request_section(
     view._on_thumbnail_clicked(job.prompt_id)
 
     exchange = view._generate_pane.current_generate_tab()._param_form.request_exchange()
-    assert exchange.turns() == [("no hat", "Took out hat.")]
+    assert exchange.turns() == [("no hat", 'Removed "a hat" from the Positive Prompt.')]
 
 
 def test_what_the_microphone_heard_reaches_the_slideshow(

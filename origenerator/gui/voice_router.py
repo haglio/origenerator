@@ -456,7 +456,7 @@ class VoiceRouter(QObject):
             row["prompt_id"], (params.get("positive_prompt", ""), params.get("negative_prompt", "")),
             spoken.text,
             settings=request_settings.settings_to_tell(workflow.param_definitions(), params),
-            in_scenes=workflow.tells_a_story(),
+            in_scenes=workflow.tells_a_story(), weights=workflow.prompts_take_weights,
             owner=self,
             then=lambda revision, context=(row, workflow, params, spoken, shape, standing):
                 self._on_revised(context, revision))

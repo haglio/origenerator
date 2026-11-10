@@ -50,7 +50,7 @@ from origenerator.item_shape import base_of, shaped_key
 from origenerator.media import MediaType
 from origenerator.motion_engine import Motion
 from origenerator.output_places import OutputPlaces
-from origenerator.prompt_edit import request_applier
+from origenerator.prompt_edit import work_out
 from origenerator.slideshow_buttons import MODE_BUTTONS
 from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -628,21 +628,19 @@ def _select_first_leaf(view, shape=LANDSCAPE):
 
 def _seeded_db(tmp_path, seed=7):
     db = Database(tmp_path / "test.db")
-    db.insert_generation(NewGeneration(
-        prompt_id="orig",
-        workflow_name="sdxl_t2i",
-        workflow_version=_SDXL.version,
-        positive_prompt="a cat",
-        negative_prompt="",
-        seed=seed,
-        params_json=json.dumps(dict(_SDXL.default_params(), seed=seed, positive_prompt="a cat")),
-        workflow_json="{}",
-    ))
-    db.update_generation(
-        "orig", status="completed",
-        output_files=json.dumps([{"filename": "sdxl_orig.png", "subfolder": ""}]),
-    )
+    _completed_image(db, "orig", "a cat", seed)
     return db
+
+
+def _completed_image(db, prompt_id, positive_prompt, seed):
+    db.insert_generation(NewGeneration(
+        prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
+        positive_prompt=positive_prompt, negative_prompt="", seed=seed,
+        params_json=json.dumps(dict(_SDXL.default_params(), seed=seed,
+                                    positive_prompt=positive_prompt)),
+        workflow_json="{}"))
+    db.update_generation(prompt_id, status="completed", output_files=json.dumps(
+        [{"filename": f"sdxl_{prompt_id}.png", "subfolder": ""}]))
 
 
 def _generate_in_current_tab(view, positive_prompt, seed):
@@ -1087,6 +1085,15 @@ def _requestable_db(tmp_path, prompt="a woman, a hat, soft light"):
     return db
 
 
+def _a_fake_models_answer(positive, negative, words, known):
+    if words.startswith("no "):
+        thing = words.removeprefix("no ")
+        if f"a {thing}" in positive:
+            return {"changes": [{"prompt": "positive", "remove": f"a {thing}", "for": words}]}
+        return {"changes": [{"prompt": "negative", "add": thing, "for": words}]}
+    return {"changes": [{"prompt": "positive", "add": words, "for": words}]}
+
+
 def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, places: ("orig.png", "image"))
@@ -1094,7 +1101,7 @@ def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
     qtbot.addWidget(view)
     view._voice.requests._work_out = (
         lambda positive, negative, words, *, in_scenes=False, **_:
-            request_applier(in_scenes)(positive, negative, words))
+            work_out(positive, negative, words, in_scenes=in_scenes, ask=_a_fake_models_answer))
     view._voice.requests._wait_for_the_graphics_card = lambda comfyui, holder, **settings: True
     view._buttons.mic.setChecked(True)
     view.refresh()

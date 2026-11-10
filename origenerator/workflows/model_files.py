@@ -94,5 +94,9 @@ def is_installed(folder: str, value) -> bool:
     return bool(folder) and (config.COMFYUI_DIR / "models" / folder / str(value)).is_file()
 
 
+def shown_with_what_is_held(options, held) -> list:
+    return list(options) if held in options else [*options, held]
+
+
 def is_no_lora(value) -> bool:
     return not value or value == NO_LORA

@@ -8,27 +8,26 @@ from functools import partial
 from origenerator import local_llm, request_settings
 from origenerator.box_breaks import unboxed
 from origenerator.collection_notes import CollectionNotes
-from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
+from origenerator.config import (
+    LOCAL_LLM_BASE_URL,
+    REQUEST_LLM_MODEL,
+    REQUEST_MODEL_STAYS_LOADED_S,
+)
 from origenerator.db_requests import Turn
+from origenerator.prompt_terms import without_nothing_weighted
 from origenerator.prompts import REQUEST_SYSTEM_PROMPT
+from origenerator.request_changes import Prompts, apply_changes, words_of_his
 from origenerator.workflows.base import scene_prompts, scene_text, story_of
 
 logger = logging.getLogger(__name__)
 
-# ComfyUI (term:weight) form; unweighted is 1.0, each wrapping paren 1.1x
-WEIGHT_STEP = 0.1
-_PAREN_WEIGHT = 1.1
-
 ADD = "add"
 REMOVE = "remove"
 
-DROPPED = "dropped"
-PUSHED = "pushed"
-EXCLUDED = "excluded"
-RAISED = "raised"
-ADDED = "added"
-ALLOWED = "allowed"
 REWRITTEN = "rewritten"
+UNANSWERED = "unanswered"
+NO_ANSWER = "The model couldn't answer, so nothing changed."
+NO_GRAPHICS_CARD = "The model couldn't get the graphics card, so nothing changed."
 
 REQUEST_WINDOW_TOKENS = 32768
 _ASK_TIMEOUT_S = 180.0
@@ -104,123 +103,6 @@ def parse_request(request: str) -> tuple | None:
 
 
 
-def _segments(prompt: str) -> list[str]:
-    parts, depth, start = [], 0, 0
-    for i, char in enumerate(prompt or ""):
-        if char in "([":
-            depth += 1
-        elif char in ")]":
-            depth = max(0, depth - 1)
-        elif char == "," and depth == 0:
-            parts.append((prompt or "")[start:i])
-            start = i + 1
-    parts.append((prompt or "")[start:])
-    return parts
-
-
-def _unwrap(segment: str) -> tuple:
-    # ComfyUI: (term:1.2) states its weight; each wrapping paren multiplies by 1.1
-    text = (segment or "").strip()
-    weight = 1.0
-    while len(text) > 1 and text[0] == "(" and _closes_at_end(text):
-        text = text[1:-1].strip()
-        weight *= _PAREN_WEIGHT
-    match = re.fullmatch(r"(.*?):\s*([0-9]*\.?[0-9]+)", text, re.DOTALL)
-    if match:
-        return match.group(1).strip(), float(match.group(2))
-    return text, round(weight, 3)
-
-
-def _closes_at_end(text: str) -> bool:
-    depth = 0
-    for i, char in enumerate(text):
-        if char == "(":
-            depth += 1
-        elif char == ")":
-            depth -= 1
-            if depth == 0:
-                return i == len(text) - 1
-    return False
-
-
-def _mentions(text: str, term: str) -> bool:
-    words = term.split()
-    if not words:
-        return False
-    pattern = r"\s+".join(re.escape(word) for word in words)
-    return re.search(rf"(?<!\w){pattern}(?!\w)", text, re.IGNORECASE) is not None
-
-
-def bare_terms(prompt: str) -> list[str]:
-    return [_unwrap(segment)[0] for segment in _segments(prompt)]
-
-
-def terms_with_places(prompt: str) -> list[tuple[str, int, int]]:
-    places, at = [], 0
-    for segment in _segments(prompt):
-        start = at + len(segment) - len(segment.lstrip())
-        places.append((_unwrap(segment)[0], start, start + len(segment.strip())))
-        at += len(segment) + 1
-    return places
-
-
-def literal_match(terms: list[str], term: str) -> int | None:
-    for i, text in enumerate(terms):
-        if _mentions(text, term):
-            return i
-    return None
-
-
-def _index_of(prompt: str, term: str) -> int | None:
-    return literal_match(bare_terms(prompt), term)
-
-
-def _tidy(prompt: str) -> str:
-    return re.sub(r"^[\s,]+|[\s,]+$", "", prompt)
-
-
-def _without(prompt: str, index: int) -> str:
-    segments = _segments(prompt)
-    del segments[index]
-    return _tidy(",".join(segments))
-
-
-def _format_weight(weight: float) -> str:
-    return f"{round(weight, 2):g}"
-
-
-def _reweighted(prompt: str, index: int, delta: float) -> str:
-    segments = _segments(prompt)
-    segment = segments[index]
-    term, weight = _unwrap(segment)
-    weight = round(weight + delta, 2)
-    lead = segment[:len(segment) - len(segment.lstrip())]
-    segments[index] = f"{lead}({term}:{_format_weight(weight)})"
-    return _tidy(",".join(segments))
-
-
-def _without_nothing_weighted(prompt: str) -> str:
-    segments = _segments(prompt)
-    kept = [segment for segment in segments if _unwrap(segment)[1] > 0]
-    return prompt if len(kept) == len(segments) else _tidy(",".join(kept))
-
-
-_ELLIPSIS = re.compile(r"\.\.\.|…")
-
-
-def _said(old: str, new: str) -> str:
-    return new if re.search(r"\w", new) else old
-
-
-def _leaves_out(old: str, new: str) -> bool:
-    return bool(_ELLIPSIS.search(new)) and not _ELLIPSIS.search(old)
-
-
-def _plus(prompt: str, term: str) -> str:
-    kept = _tidy(prompt)
-    return f"{kept}, {term}" if kept else term
-
-
 @dataclass(frozen=True)
 class PromptRevision:
     old_positive: str
@@ -264,26 +146,13 @@ def _joined(positive: str, negative: str, each_negative: list[str], parsed: tupl
         revisions[0].settings, revisions[0].setting_changes)
 
 
-def apply_request(positive: str, negative: str, request: str) -> PromptRevision | None:
-    parsed = parse_request(request)
-    if parsed is None:
-        return None
-    return _revised(unboxed(positive or ""), unboxed(negative or ""), parsed)
-
-
-def apply_request_to_each_scene(positive: str, negative: str, request: str) -> PromptRevision | None:
+def unanswered(positive: str, negative: str, request: str,
+               why: str = NO_ANSWER) -> PromptRevision | None:
     parsed = parse_request(request)
     if parsed is None:
         return None
     positive, negative = unboxed(positive or ""), unboxed(negative or "")
-    scenes, each_negative = _scenes_of(positive, negative)
-    revisions = [_revised(scene, scene_negative, parsed)
-                 for scene, scene_negative in zip(scenes, each_negative, strict=True)]
-    return _joined(positive, negative, each_negative, parsed, revisions)
-
-
-def request_applier(in_scenes: bool):
-    return apply_request_to_each_scene if in_scenes else apply_request
+    return PromptRevision(positive, negative, positive, negative, parsed[1], parsed[0], UNANSWERED, why)
 
 
 def _negative_story(negative: str, before: list[str], after: list[str]) -> str:
@@ -294,48 +163,13 @@ def _negative_story(negative: str, before: list[str], after: list[str]) -> str:
     return story_of(after)
 
 
-_SAID_BY_THE_RULES = {
-    DROPPED: "Took out {term}.",
-    PUSHED: "Made {term} stronger in the Negative Prompt.",
-    EXCLUDED: "Added {term} to the Negative Prompt.",
-    ALLOWED: "Took {term} out of the Negative Prompt.",
-    RAISED: "Made {term} stronger.",
-    ADDED: "Added {term}.",
-}
-
-
-def _revised(positive: str, negative: str, parsed: tuple) -> PromptRevision:
-    polarity, term = parsed
-
-    def made(new_positive, new_negative, action) -> PromptRevision:
-        said = (_SAID_BY_THE_RULES[action].format(term=term)
-                if (new_positive, new_negative) != (positive, negative) else "")
-        return PromptRevision(positive, negative, new_positive, new_negative,
-                              term, polarity, action, said)
-
-    if polarity == REMOVE:
-        index = _index_of(positive, term)
-        if index is not None:
-            return made(_without(positive, index), negative, DROPPED)
-        index = _index_of(negative, term)
-        if index is not None:
-            return made(positive, _reweighted(negative, index, WEIGHT_STEP), PUSHED)
-        return made(positive, _plus(negative, term), EXCLUDED)
-    index = _index_of(negative, term)
-    if index is not None:
-        return made(positive, _without(negative, index), ALLOWED)
-    index = _index_of(positive, term)
-    if index is not None:
-        return made(_reweighted(positive, index, WEIGHT_STEP), negative, RAISED)
-    return made(_plus(positive, term), negative, ADDED)
-
-
 @dataclass(frozen=True)
 class WhatIsKnown:
     exchange: tuple = ()
     notes: CollectionNotes | None = None
     examples: tuple = ()
     settings: tuple = ()
+    weights: bool = True
 
 
 def work_out(positive: str, negative: str, request: str, *, in_scenes: bool = False, ask=None,
@@ -347,40 +181,42 @@ def work_out(positive: str, negative: str, request: str, *, in_scenes: bool = Fa
     scenes, each_negative = (_scenes_of(positive, negative) if in_scenes
                              else ([positive], [negative]))
     told = WhatIsKnown(**known)
+    asked = [request, *(turn[0] for turn in told.exchange)]
     revisions = []
     for scene, scene_negative in zip(scenes, each_negative, strict=True):
-        revision = _answered(scene, scene_negative, parsed,
+        revision = _answered((scene, scene_negative), parsed,
                              partial(ask or ask_the_model, scene, scene_negative, request, told),
-                             told.settings)
+                             told, asked)
         if revision is None:
-            return request_applier(in_scenes)(positive, negative, request)
+            return unanswered(positive, negative, request)
         revisions.append(revision)
     return _joined(positive, negative, each_negative, parsed, revisions)
 
 
-def _answered(positive: str, negative: str, parsed: tuple, asking,
-              settings) -> PromptRevision | None:
+def _answered(pair: tuple[str, str], parsed: tuple, asking, told: WhatIsKnown,
+              asked: list[str]) -> PromptRevision | None:
+    positive, negative = pair
     polarity, term = parsed
     try:
-        new_positive, new_negative, answer, *more = asking()
+        answer = asking()
     except Exception as exc:  # noqa: BLE001 -- model down or unreadable: the rules' own edit stands
         logger.warning("prompt_edit: the model could not answer the request (%s)",
                        type(exc).__name__)
         return None
-    new_positive = _said(positive, _without_nothing_weighted(new_positive))
-    new_negative = _said(negative, _without_nothing_weighted(new_negative))
-    if _leaves_out(positive, new_positive) or _leaves_out(negative, new_negative):
-        logger.info("prompt_edit: the model's rewrite left part of the prompt out; "
-                    "the rules made the change")
+    if not isinstance(answer, dict):
         return None
-    changes = request_settings.changes_asked(more[0] if more else None, settings)
-    if (new_positive, new_negative) == (positive, negative) and not answer and not changes:
-        logger.info("prompt_edit: the model changed nothing and said nothing; "
-                    "the rules made the change")
-        return None
-    return PromptRevision(positive, negative, new_positive, new_negative, term, polarity,
-                          REWRITTEN, answer, tuple(changes.items()),
-                          tuple(request_settings.described(changes, settings)))
+    settings = told.settings
+    outcome = apply_changes(answer, pair, asked=asked, settings=settings,
+                            prompts=Prompts(take_weights=told.weights, his_words=_his_words(told)))
+    return PromptRevision(positive, negative, without_nothing_weighted(outcome.positive),
+                          without_nothing_weighted(outcome.negative), term, polarity, REWRITTEN,
+                          outcome.line, tuple(outcome.settings.items()),
+                          tuple(request_settings.described(outcome.settings, settings)))
+
+
+def _his_words(told: WhatIsKnown) -> frozenset:
+    notes = told.notes.as_told() if told.notes is not None and told.notes.complete else ""
+    return words_of_his([positive for positive, _negative in told.examples] + [notes])
 
 
 _SHORTEST_ROOT = 3
@@ -422,20 +258,48 @@ def _touches(asked: list[set[str]], prompt: str) -> int:
 
 
 def prompts_touching(request: str, prompts, *, limit: int = 8,
-                     limit_chars: int = 6000) -> list[str]:
+                     limit_chars: int = 6000) -> list[tuple[str, str]]:
     asked = _asked_about(request)
-    scored = sorted((-_touches(asked, prompt), position, prompt)
-                    for position, prompt in enumerate(prompts))
+    scored = sorted((-_touches(asked, positive), position, (positive, negative))
+                    for position, (positive, negative) in enumerate(prompts))
     chosen, used = [], 0
-    for score, _position, prompt in scored:
+    for score, _position, pair in scored:
         if score == 0 or len(chosen) == limit:
             break
-        if used + len(prompt) <= limit_chars:
-            chosen.append(prompt)
-            used += len(prompt)
+        if used + len(pair[0]) + len(pair[1]) <= limit_chars:
+            chosen.append(pair)
+            used += len(pair[0]) + len(pair[1])
     return chosen
 
 
+def _numbered(examples) -> str:
+    return "\n".join(f"{number}. {positive}" + (f"\n   negative: {negative}" if negative else "")
+                     for number, (positive, negative) in enumerate(examples, 1))
+
+
+
+
+_ANSWER_SHAPE = (
+    'Reply with only a JSON object: {"changes": [...]}. Each change is one of: '
+    '{"setting": "<key>", "to": <value>, "for": "<his words>"} to set a setting, by its [key] and '
+    'within its range or choices; {"prompt": "positive" or "negative", "replace": "<words now in '
+    'that prompt>", "with": "<new words>", "for": "<his words>"}; {"prompt": ..., "add": "<new '
+    'words>", "after": "<words now in that prompt they belong beside>", "for": "<his words>"}; '
+    '{"prompt": ..., "remove": "<words now in that prompt>", "for": "<his words>"}; '
+    '{"more": "<the part of the positive prompt that says the thing he wants more of, exactly as '
+    'written, or empty>", "stronger": "<that part in his own stronger words>", "opposite": '
+    '"<what the image shows in its place>", "for": "<his words>"} for more of something; '
+    '{"gone": "<the thing he wants gone, bare>", "in_positive": "<every part of the positive '
+    'prompt that says it or a kind of it, exactly as written, comma-separated, or empty>", '
+    '"instead": "<what the image shows in its place, or empty>", "for": "<his words>"} for '
+    'something gone. "for" quotes the words of his, from this request or an earlier one, that '
+    'the change answers; a change answering none of his words is thrown away. When nothing '
+    'should change, "changes" is an empty list.')
+
+
+_NO_WEIGHTS = (
+    "THESE PROMPTS TAKE NO WEIGHTS: the image model ignores (term:weight), so never write one. "
+    "For less of something, say it more mildly or remove it.")
 
 
 def build_request_messages(positive: str, negative: str, request: str, known: WhatIsKnown,
@@ -443,35 +307,32 @@ def build_request_messages(positive: str, negative: str, request: str, known: Wh
     parts = []
     if known.notes is not None and known.notes.complete:
         parts.append(known.notes.as_told())
-    if known.exchange:
-        turns = "\n".join(f"Artist: {turn[0]}\nYou: {turn[1]}" for turn in known.exchange)
-        parts.append(f"THE EXCHANGE SO FAR about this image, oldest first:\n{turns}")
     if known.examples:
-        numbered = "\n".join(f"{number}. {prompt}" for number, prompt in enumerate(known.examples, 1))
         parts.append("PROMPTS OF HIS THAT TOUCH WHAT HE ASKS FOR (how he writes such things; "
-                     f"carry over the details that go with them):\n{numbered}")
+                     "carry over the details that go with them, and what his negative prompts keep "
+                     f"out):\n{_numbered(known.examples)}")
     if known.settings:
         parts.append("SETTINGS HE MAY ALSO CHANGE (current values):\n"
                      + request_settings.as_told(known.settings))
+    if not known.weights:
+        parts.append(_NO_WEIGHTS)
     parts.append(f"CURRENT POSITIVE PROMPT:\n{positive}\n\nCURRENT NEGATIVE PROMPT:\n{negative}")
-    parts.append(f"THE ARTIST NOW ASKS:\n{request}")
-    parts.append(
-        'Reply with only a JSON object with four keys: "positive", holding the whole '
-        'rewritten positive prompt; "negative", holding the whole rewritten negative '
-        'prompt; "answer", one or two plain sentences to the artist on what you '
-        'changed and what in his collection you drew on; and "settings", the settings '
-        "to change by their [key], {} when none.")
-    return [{"role": "system", "content": system_prompt},
+    parts.append(f"HE NOW ASKS:\n{request}")
+    parts.append(_ANSWER_SHAPE)
+    exchange = [message for turn in known.exchange
+                for message in ({"role": "user", "content": turn[0]},
+                                {"role": "assistant", "content": turn[1]})]
+    return [{"role": "system", "content": system_prompt}, *exchange,
             {"role": "user", "content": "\n\n".join(parts)}]
 
 
+_STAYS_LOADED = f"{REQUEST_MODEL_STAYS_LOADED_S + 60}s"
+
+
 def ask_the_model(positive: str, negative: str, request: str, known: WhatIsKnown, *,
-                  llm=None) -> tuple:
-    obj = local_llm.answer_of((llm or local_llm.ask)(
+                  llm=None) -> dict:
+    return local_llm.answer_of((llm or local_llm.ask)(
         build_request_messages(positive, negative, request, known, REQUEST_SYSTEM_PROMPT),
-        base_url=LOCAL_LLM_BASE_URL, model=LOCAL_LLM_MODEL, temperature=0.4,
+        base_url=LOCAL_LLM_BASE_URL, model=REQUEST_LLM_MODEL, temperature=0.4,
         timeout=_ASK_TIMEOUT_S, json_answer=True, reads_tokens=REQUEST_WINDOW_TOKENS,
-        stays_loaded="0"))
-    return (str(obj["positive"]).strip() if "positive" in obj else positive,
-            str(obj["negative"]).strip() if "negative" in obj else negative,
-            str(obj.get("answer") or "").strip(), obj.get("settings"))
+        stays_loaded=_STAYS_LOADED))

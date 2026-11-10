@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import struct
+from datetime import datetime
 
 import pytest
 
@@ -18,6 +19,8 @@ from origenerator.workflows.model_arch import (
     WAN_FUN_CONTROL,
     WAN_S2V,
     WAN_T2V,
+    trained_sentence,
+    trained_when,
 )
 
 
@@ -240,3 +243,29 @@ def test_a_malformed_gguf_reads_as_unknown(tmp_path):
     path = tmp_path / "broken.gguf"
     path.write_bytes(b"GGUF" + struct.pack("<I", 3) + struct.pack("<QQ", 900, 900))
     assert model_arch.describe(path).arch is None
+
+
+def test_when_a_lora_was_trained_is_read_from_its_own_header(installed_models):
+    finished = installed_models.add("loras", "finished.safetensors", lora=True, metadata={
+        "ss_training_started_at": "1792851228.2", "ss_training_finished_at": "1792851468.891"})
+    started = installed_models.add("loras", "started.safetensors", lora=True,
+                                   metadata={"ss_training_started_at": "1792851228.2"})
+    undated = installed_models.add("loras", "undated.safetensors", lora=True)
+
+    assert trained_when(finished) == datetime.fromtimestamp(1792851468.891).astimezone()
+    assert trained_when(started) == datetime.fromtimestamp(1792851228.2).astimezone()
+    assert trained_when(undated) is None
+    assert trained_when(installed_models.root / "missing.safetensors") is None
+
+
+def test_a_versioned_loras_training_date_reads_as_a_sentence_of_its_own(
+        installed_models, titled_models):
+    titled_models({"example_look": "Example Look 1.0", "example_style": "Example Style"})
+    for name in ("example_look", "example_style"):
+        installed_models.add("loras", f"{name}.safetensors", arch="krea2", lora=True,
+                             metadata={"ss_training_finished_at": "1792851468.891"})
+
+    assert trained_sentence("example_look.safetensors") == (
+        f"Trained {datetime.fromtimestamp(1792851468.891).astimezone():%Y-%m-%d %H:%M}.")
+    assert trained_sentence("example_style.safetensors") == ""
+    assert trained_sentence(r"fixes\hands 1.1.safetensors") == ""

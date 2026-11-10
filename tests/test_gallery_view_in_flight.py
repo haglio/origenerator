@@ -458,7 +458,9 @@ def test_the_tab_claiming_the_tiles_run_is_kept(qtbot, tmp_path):
 
     _new_tile(view).add_requested.emit()
 
-    assert tabs._preview_tab is None
+    assert tabs._preview_tab is None, (
+        "that run's Cancel and its filling bar are in this tab now, so it is no longer one a "
+        "later click may replace")
 
 
 def test_opening_a_runs_folder_from_its_tile_loads_no_saved_item(qtbot, tmp_path):
@@ -1144,8 +1146,11 @@ def test_open_folder_shows_a_running_generation_on_its_generating_tile(qtbot, tm
     view.refresh()
     _key, job = _running_reroll(view)
 
-    assert _generating_tile(view) is not None
-    assert job.prompt_id not in view._gallery_pane._inflight_tiles
+    assert _generating_tile(view) is not None, (
+        "a tab's Generate is a re-roll, so a generation running in a folder is the folder's "
+        "generating tile")
+    assert job.prompt_id not in view._gallery_pane._inflight_tiles, (
+        "its running row must not also appear as a separate in-flight tile in that folder")
     assert job.prompt_id not in view.listed_prompt_ids()
     assert view.listed_prompt_ids() == ["orig"]
 
@@ -1268,7 +1273,8 @@ def test_a_row_the_line_holds_no_job_for_sorts_to_the_back(qtbot):
     view._jobs._waiting = [_queued_job("known")]
     view.refresh()
 
-    assert [it.key for it in view._inflight_items()] == ["known", "brand-new"]
+    assert [it.key for it in view._inflight_items()] == ["known", "brand-new"], (
+        "a row a restart has not taken back has no place in the Job Queue; it waits at the end")
 
 
 def test_the_queue_shows_the_active_job_then_empties_when_idle(qtbot):
@@ -1437,7 +1443,9 @@ def test_the_strip_has_no_clock_for_a_job_still_queued(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert view._inflight_items()[0].reading.started_at is None
+    assert view._inflight_items()[0].reading.started_at is None, (
+        "nothing has begun, so there is no elapsed time to report: the wait on ComfyUI is the "
+        "queue beside it to explain")
     assert view._queue._running.status_text() == ""
 
 

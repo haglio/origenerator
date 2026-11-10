@@ -73,7 +73,7 @@ _PREVIEW_COUNT = 4
 _PAGE = 50
 _NEIGHBORS_PAST_A_REVEAL = 12
 _REACH = 600
-_SECTION_SPACING = GAP_DIALOG
+_ROOM_ABOVE_A_SECTIONS_HEADING = GAP_DIALOG
 SEARCH_DRAW_LIMIT = 200
 
 
@@ -469,7 +469,7 @@ class GalleryPane(QObject):
         container = QWidget()
         column = QVBoxLayout(container)
         column.setContentsMargins(0, 0, 0, 0)
-        column.setSpacing(_SECTION_SPACING)
+        column.setSpacing(_ROOM_ABOVE_A_SECTIONS_HEADING)
         for heading, section in search.group_by_model_lora(tiles):
             section_widget = QWidget()
             section_flow = FlowLayout(section_widget, spacing=_TILE_SPACING)

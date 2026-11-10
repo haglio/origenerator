@@ -20,6 +20,19 @@ def test_folder_tile_shows_its_folder_path_context(qtbot):
     assert "a dog" in texts
 
 
+def test_a_path_too_long_for_the_tile_is_cut_from_the_front(qtbot):
+    path = " › ".join(["Images", *(f"a folder with a long name {n}" for n in range(8)),
+                            "the folder it sits in"])
+    tile = FolderTile("k", "a dog", [], 3, FolderMarks(context=path))
+    qtbot.addWidget(tile)
+
+    shown = next(label.text() for label in tile.findChildren(QLabel) if label.toolTip() == path)
+    assert shown != path
+    assert shown.endswith("sits in"), (
+        "the end of the path stays, since the folder this one sits in is what tells it from a "
+        "folder of the same name elsewhere")
+
+
 def test_folder_tile_without_context_omits_the_folder_path_line(qtbot):
     tile = FolderTile("k", "a dog", [], 3)
     qtbot.addWidget(tile)

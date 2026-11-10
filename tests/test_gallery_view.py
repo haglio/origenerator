@@ -56,7 +56,7 @@ from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.folder_tree import RECENT_ROLE
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView, Shared
-from origenerator.item_shape import shaped_key
+from origenerator.item_shape import row_shape, shaped_key
 from origenerator.output_places import OutputPlaces
 from origenerator.trash import Trash
 from tests import gestures
@@ -2779,7 +2779,9 @@ def test_with_nothing_selected_the_shape_in_view_is_the_one_holding_landscape(qt
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
 
-    assert view.shape_in_view() == LANDSCAPE
+    assert view.shape_in_view() == row_shape({"prompt_id": "of no known shape"}) == LANDSCAPE, (
+        "with nothing selected the gallery stands on the shape an item nobody could measure "
+        "files under everywhere else")
 
 
 def test_a_key_naming_a_drawn_shape_is_answered_by_that_shape_alone(qtbot):

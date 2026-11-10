@@ -53,6 +53,8 @@ class FakePanel:
     def __init__(self, image_lookups, video_lookups, history):
         self.history = history
         self.name_of = image_lookups.name_of
+        self.image_lent_by = image_lookups.lent_by
+        self.video_lent_by = video_lookups.lent_by
         self.browse_image = image_lookups.browse
         self.image_zone = self._Slot()
         self.video_zone = self._Slot()
@@ -959,6 +961,35 @@ def test_an_action_with_no_video_under_it_is_grayed_out(combine, monkeypatch):
                                _video("half", status="running")])
 
     assert controller.widget.available == ["clip"]
+
+
+def test_the_actions_offered_come_only_from_videos_the_video_slot_would_take(combine, monkeypatch):
+    monkeypatch.setattr(module.gallery, "is_image_conditioned",
+                        lambda name: name == VIDEO_WORKFLOW)
+    monkeypatch.setattr(module.action_settings, "available_categories",
+                        lambda rows, intent, checked=(): [r["prompt_id"] for r in rows])
+    rows = [_video("clip"), _video("made from words alone", workflow_name="wan22_t2v"),
+            _image("img")]
+    controller, _host = combine(db=FakeDB(rows))
+
+    controller.offer_the_actions(rows)
+
+    taken = [row["prompt_id"] for row in rows
+             if controller.widget.video_lent_by(row["prompt_id"])]
+    assert controller.widget.available == taken == ["clip"], (
+        "the actions offered and the video slot count the same videos as ones to rebuild from, "
+        "or an action would be offered whose only video the slot would refuse")
+
+
+def test_an_item_dragged_out_of_the_trash_is_taken_by_neither_slot(combine):
+    controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]))
+
+    taken = (controller.widget.image_lent_by("deleted"),
+             controller.widget.video_lent_by("deleted"))
+
+    assert taken == (None, None), (
+        "a deleted item has no row in the gallery and its file is in the Trash, where the "
+        "workflows a Combine launches do not read")
 
 
 def test_switching_lanes_re_asks_which_actions_are_answerable(combine, monkeypatch):

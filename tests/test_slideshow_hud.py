@@ -128,7 +128,9 @@ class TestTheOneHudASlideshowWears:
                           **kwargs)
 
     def test_the_slideshow_floats_no_second_hud(self, qtbot):
-        assert self._window(qtbot).findChildren(Osr2Controls) == []
+        assert self._window(qtbot).findChildren(Osr2Controls) == [], (
+            "the HUD a slideshow wears already carries the OSR2's line and readout; a second "
+            "set of controls under it said the status twice, and the two disagreed")
 
     def _model(self, qtbot):
         window = self._window(qtbot)
@@ -501,7 +503,10 @@ class TestTheQueueOnTheOneHud:
         window = _dressed(qtbot)
         window.set_queue([_inflight("j1", job_kind="Image", typical_seconds=30)], 0)
 
-        assert [line.key for line in window._hud_model().foot.lines] == ["j1"]
+        assert [line.key for line in window._hud_model().foot.lines] == ["j1"], (
+            "a slideshow covers the lower strip, and a slideshow is when the user keeps adding "
+            "to the queue, so what is in flight rides on the HUD the slideshow already wears "
+            "rather than on a plate of its own over the same image")
 
     def test_a_slideshow_on_another_monitor_than_core_leaves_the_job_queue_to_core(
             self, qtbot):

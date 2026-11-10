@@ -13,6 +13,7 @@ from origenerator.gui.slideshow_set import (
     item_note,
     looping_note,
     narrow_to_the_action_on_screen,
+    thumb_of,
 )
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.slideshow import LIVE, Slide, SlideshowFilters, SlideshowState, in_order
@@ -1011,3 +1012,11 @@ def test_a_set_that_is_one_row_loops_all_of_it_though_its_group_would_deal_one()
 
     assert sorted(slide.prompt_id for slide in slideshow_set.loop.pool) == ["id-1", "id-1b"]
     assert _dealt_ids(slideshow_set) == {"id-1", "id-1b"}
+
+
+def test_a_videos_cell_on_the_map_has_only_its_stored_thumbnail_to_draw():
+    assert thumb_of(Slide("four.mp4", "video", "id-4", still="four-thumb.png")) == "four-thumb.png"
+    assert thumb_of(Slide("four.mp4", "video", "id-4")) == "", (
+        "a video's own file is no still, so a video with no stored thumbnail has nothing to "
+        "draw small; only an image's file can stand in for one")
+    assert thumb_of(Slide("one.png", "image", "id-1")) == "one.png"

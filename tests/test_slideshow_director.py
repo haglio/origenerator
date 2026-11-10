@@ -1285,7 +1285,10 @@ def test_a_landed_enhancement_reaches_every_surface(slideshows, tmp_path, monkey
     director.note_enhanced(_row("g1", files=("better.png",)))
 
     assert [slideshow.enhanced for slideshow in made] == [
-        [("g1", "image", None)], [("g1", "image", None)]]
+        [("g1", "image", None)], [("g1", "image", None)]], (
+        "not only the slideshow with that image on screen: an enhancement asked for from a "
+        "slideshow lands minutes later, when the slideshow has long paged on, and an upgrade it "
+        "does not take then it never takes")
 
 
 def _evolver_upscaled_video(tmp_path, monkeypatch):
@@ -1512,7 +1515,9 @@ def test_a_region_slideshow_ending_comes_back_on_the_base_state(slideshows):
     first.close()
 
     assert director.region_slideshow(PORTRAIT) is not first
-    assert director.region_slideshow(PORTRAIT) is not None
+    assert director.region_slideshow(PORTRAIT) is not None, (
+        "the Funestra under a region is blacked for the whole session, so a region left with no "
+        "slideshow is a black rectangle")
 
 
 def test_closing_the_slideshows_drops_the_wanting_before_it_closes_anything(slideshows):
@@ -2552,7 +2557,10 @@ def test_a_slideshow_of_favorites_plays_the_sides_whole_library_with_the_filter_
 
     director.start()
 
-    assert _played(made[0]) == ["g1", "g2"]
+    assert _played(made[0]) == ["g1", "g2"], (
+        "Favorites is not a set of its own: it is the side's whole library with its filter held "
+        "on, so the filter can be let go to widen the slideshow and the order pair means the "
+        "library rather than what the collection lists")
     assert made[0].hud_favorites_filter is True
     assert director._live_slideshows == [(made[0], ALL_PORTRAIT)]
 

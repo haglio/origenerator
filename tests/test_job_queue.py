@@ -279,7 +279,9 @@ def test_user_launch_preempts_a_running_experiment(qtbot, tmp_path):
     started = queue.start_prepared("user-key", _I2V, _params(seed=7))
 
     assert started
-    client.interrupt.assert_called_once()
+    assert client.interrupt.call_count == 1, (
+        "an experiment left in front would leave the user's bar standing still, like a hang, "
+        "so a launch of the user's takes the machine from it")
     assert not queue.has("exp-key")
     assert db.get_generation(experiment.prompt_id) is None
     assert queue.has("user-key")

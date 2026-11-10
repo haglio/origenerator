@@ -10,7 +10,9 @@ def test_one_word_past_the_phrase_is_all_a_command_may_carry():
 
 
 def test_a_sentence_merely_mentioning_it_is_not_a_command():
-    assert voice_commands.match_enhance_command("enhance this one later on") is None
+    assert voice_commands.match_enhance_command("enhance this one later on") is None, (
+        "a loose match is worse than a miss here: a sentence that only mentions the command "
+        "would start a generation nobody asked for")
     assert voice_commands.match_enhance_command("") is None
     assert voice_commands.match_enhance_command(None) is None
 
@@ -55,7 +57,9 @@ def test_a_sentence_that_merely_wants_something_nicer_is_not_the_command():
 
 
 def test_a_mangled_command_is_said_back_in_the_word_the_app_knows_it_by():
-    assert voice_commands.recognized_spelling("Enhanced it!") == "enhance it"
+    assert voice_commands.recognized_spelling("Enhanced it!") == "enhance it", (
+        "the recognizer offers the past tense about as readily off a quiet mic, so it is taken "
+        "for the command; nothing looser is, since a sentence may well open with the word")
 
 
 def test_every_command_has_its_own_spelling():

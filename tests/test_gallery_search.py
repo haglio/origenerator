@@ -4,7 +4,9 @@ from contextlib import contextmanager
 from typing import NamedTuple
 
 import pytest
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtCore import QPoint, QPointF, Qt
+from PyQt6.QtGui import QWheelEvent
+from PyQt6.QtWidgets import QApplication, QWidget
 
 from origenerator import gallery
 from origenerator.gui.gallery_pane import SEARCH_DRAW_LIMIT
@@ -430,6 +432,21 @@ def test_the_sort_menu_names_the_model_lora_order_the_way_the_forms_do(controlle
     orders = [found._sort_dropdown.itemText(i) for i in range(found._sort_dropdown.count())]
 
     assert orders == ["Recent", "Model / LoRA"]
+
+
+def test_the_wheel_over_the_order_is_left_for_the_results_under_it(controller):
+    found = controller()
+    order = found._sort_dropdown
+    turn = QWheelEvent(QPointF(1, 1), QPointF(1, 1), QPoint(0, 0), QPoint(0, -120),
+                       Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier,
+                       Qt.ScrollPhase.NoScrollPhase, False)
+
+    QApplication.sendEvent(order, turn)
+
+    assert order.currentText() == "Recent", (
+        "the order sits over the scrolling results, so a turn of the wheel meant for them "
+        "must not change it")
+    assert not turn.isAccepted()
 
 
 def _folder_key(row: dict) -> str:

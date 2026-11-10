@@ -568,7 +568,9 @@ def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
     assert tiles["g1"]._enhancing is not None
     assert not tiles["g0"]._image_label.pixmap().isNull()
     assert follower.state == "idle"
-    assert tiles["g1"]._resting_pixmap is None
+    assert tiles["g1"]._resting_pixmap is None, (
+        "a tile keeps its own thumbnail until a frame of its run arrives: the image as it stands "
+        "is worth looking at while it waits")
 
 
 def test_a_locked_slide_says_queued_until_comfyui_picks_its_run_up(qtbot, tmp_path,

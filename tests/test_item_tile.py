@@ -532,6 +532,22 @@ def test_a_streamed_frame_paints_the_thumbnail_under_the_overlays(qtbot):
     assert not tw._enhancing_bar.isHidden()
 
 
+def test_the_run_ending_puts_the_tiles_own_thumbnail_back(qtbot, tmp_path):
+    thumbnail = tmp_path / "i1.png"
+    thumbnail.write_bytes(_png_bytes(color=(200, 40, 40)))
+    tw = ItemTile("p1", str(thumbnail), "label")
+    qtbot.addWidget(tw)
+    resting = tw._image_label.pixmap().toImage()
+    tw.set_enhancing(_run(frame=_png_bytes()))
+    assert tw._image_label.pixmap().toImage() != resting
+
+    tw.set_enhancing(None)
+
+    assert tw._image_label.pixmap().toImage() == resting, (
+        "the frames streamed onto the tile were a partial render of a file that does not exist "
+        "yet, so the tile shows its own thumbnail again once the run ends")
+
+
 def test_the_run_ending_takes_both_overlays_away(qtbot):
     tw = ItemTile("p1", None, "label", TileAppearance(enhancing=_run(frame=_png_bytes())))
     qtbot.addWidget(tw)

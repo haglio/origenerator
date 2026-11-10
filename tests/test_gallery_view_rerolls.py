@@ -824,6 +824,34 @@ def test_populate_greyed_on_a_leaf_with_no_comfyui_says_so(qtbot, tmp_path):
         "Populate needs ComfyUI, and Origenerator is not connected to it.")
 
 
+def test_a_tip_with_no_link_in_it_stays_qts_own_tooltip(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    assert view._buttons.populate.toolTip() != ""
+    assert view._buttons.populate_tip._html == "", (
+        "the tip that can be clicked into is only for words holding a link; ordinary words stay "
+        "with Qt's tooltip, which shows them well enough")
+
+
+def test_the_switch_stays_lit_and_live_in_a_folder_populate_is_not_running_in(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._toggle_populate(True)
+
+    view._tree.setCurrentItem(_image_workflow(view._tree))
+
+    populate = view._buttons.populate
+    assert (populate.isChecked(), populate.isEnabled()) == (True, True), (
+        "a lit switch says Populate is running somewhere, not that this folder is the one "
+        "running it, and it is grayed only when there is nothing for a press to do: here a "
+        "press stops it where it runs")
+
+
 def test_the_switchs_tip_takes_you_to_whichever_folder_populate_runs_in(qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)

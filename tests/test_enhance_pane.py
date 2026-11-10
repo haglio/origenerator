@@ -88,6 +88,19 @@ def _panel(qtbot, detectors=_FOUND_DETECTORS, **seams):
     return pane, edits
 
 
+def test_the_pane_reads_the_enhancers_setting_definitions_once(qtbot, monkeypatch):
+    enhancer = WORKFLOW_REGISTRY["image_enhance"]
+    read, definitions = [], enhancer.param_definitions
+    monkeypatch.setattr(enhancer, "param_definitions",
+                        lambda: read.append("read") or definitions())
+
+    _panel(qtbot)
+
+    assert read == ["read"], (
+        "reading the definitions scans the model folders, and every field of the pane would "
+        "otherwise pay for that scan again")
+
+
 def _versions(count, params=None):
     if not count:
         return []

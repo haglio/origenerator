@@ -491,6 +491,18 @@ def test_an_enhancing_tiles_corners_are_drawn_over_its_scrim(qtbot):
         assert order.index(corner) > order.index(tw._status_scrim)
 
 
+def test_an_enhancing_tiles_bar_is_drawn_over_its_scrim_and_its_item_type_icon(qtbot):
+    tw = ItemTile("p1", None, "label", TileAppearance(media_type="image", enhancing=_run()))
+    qtbot.addWidget(tw)
+
+    tw.set_enhancing(_run(frame=_png_bytes()))
+
+    order = tw.children()
+    under = [tw._status_scrim, *tw.findChildren(ItemTypeIcon)]
+    assert all(order.index(tw._enhancing_bar) > order.index(child) for child in under), (
+        "the bar goes over the scrim just raised, and over the item type icon")
+
+
 def test_an_enhance_still_queued_leaves_the_bar_sweeping(qtbot):
     tw = ItemTile("p1", None, "label", TileAppearance(enhancing=_run(status="queued", progress=(0, 0))))
     qtbot.addWidget(tw)

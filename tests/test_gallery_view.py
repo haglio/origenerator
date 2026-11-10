@@ -1697,6 +1697,21 @@ def test_clicking_a_step_of_the_path_goes_to_that_folder(qtbot):
     assert view._folder_path.display_text() == view._tree_view.folder_path(workflow)
 
 
+def test_clicking_a_step_of_the_path_puts_a_running_search_away(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    workflow = _image_workflow(view._tree)
+    view._tree.setCurrentItem(_first_leaf(view))
+    _search_for(view, "cat")
+
+    _click_path_step(view, workflow.text(0))
+
+    assert (view._search.field.text(), view._tree.currentItem()) == ("", workflow), (
+        "a step of the path opens its folder by the one move under every gesture that names a "
+        "folder, as a folder tile's click and a tab's Go to folder do")
+
+
 def test_the_path_links_every_folder_above_the_one_open_and_not_its_side(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
@@ -2825,6 +2840,23 @@ def test_a_folders_own_key_stays_on_the_shape_being_browsed(qtbot):
         row = view._tree_item_for(shaped_key(key, shape))
         view._tree.setCurrentItem(row)
         assert view._tree_item_for(key) is row
+
+
+def test_a_folder_saved_under_its_own_key_alone_is_still_the_one_a_rebuild_reopens(qtbot):
+    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
+    before = GalleryView(db)
+    qtbot.addWidget(before)
+    before.refresh()
+    saved = _key(before._leaf_by_id["i2"])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+
+    view.select_folder(saved)
+    view.refresh()
+
+    assert _key(view._tree.currentItem()) == saved, (
+        "a session saved before the folder list grew shapes names a folder by its own key, "
+        "and reopening must still land on that folder")
 
 
 def test_what_a_delete_takes_off_the_tree_is_a_folders_row_on_each_side_and_under_it(qtbot):

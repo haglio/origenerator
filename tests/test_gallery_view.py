@@ -772,6 +772,18 @@ def test_a_tick_hands_the_slideshows_each_item_another_process_filed(qtbot, monk
     assert arrived == [["i3"]]
 
 
+def test_a_tick_hands_the_slideshows_an_item_evolver_just_upscaled(qtbot, monkeypatch):
+    view, _cat, _dog = _two_leaf_view(qtbot)
+    arrived = []
+    monkeypatch.setattr(view._slideshows, "note_arrived",
+                        lambda rows: arrived.append([row["prompt_id"] for row in rows]))
+    view._db._rows[0] = {**view._db._rows[0], "evolver_upscale": "video_one_topaz.mp4"}
+
+    view._poll()
+
+    assert arrived == [["i1"]]
+
+
 def test_a_reading_of_the_library_taken_before_a_star_does_not_take_it_back(qtbot,
                                                                             monkeypatch):
     view, _cat, dog = _two_leaf_view(qtbot)

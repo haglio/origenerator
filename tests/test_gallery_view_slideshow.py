@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
 import pytest
 from PyQt6.QtCore import (
@@ -13,6 +14,7 @@ from PyQt6.QtGui import (
 
 from origenerator import (
     gallery,
+    library_views,
 )
 from origenerator.gallery.collection import (
     ENHANCED_KEY,
@@ -612,6 +614,34 @@ def test_an_item_another_process_files_plays_next_on_a_slideshow_in_latest(qtbot
 
     playlist = slideshow._set.playlist
     assert playlist.order_ids()[playlist.index + 1] == "i3"
+    slideshow.close()
+
+
+def test_an_item_evolver_upscales_plays_next_as_its_upscale_on_a_slideshow_in_latest(
+        qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    filed = {}
+    monkeypatch.setattr(library_views.EvolverUpscales, "scan", lambda *args: SimpleNamespace(
+        upscale_of=lambda video: filed.get(str(video))))
+    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2),
+                 _image("i3", "a bird", 50, 3)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_latest(view)
+    view._slideshows.start()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow.shown)
+    playlist = slideshow._set.playlist
+    last = playlist.order_ids()[-1]
+    filed[f"{last}.png"] = f"{last}_topaz.mp4"
+    at = next(index for index, row in enumerate(db._rows) if row["prompt_id"] == last)
+    db._rows[at] = {**db._rows[at], "evolver_upscale": f"{last}_topaz.mp4"}
+
+    view._poll()
+
+    following = playlist.in_play_order()[playlist.index + 1]
+    assert (following.prompt_id, str(following.path)) == (last, f"{last}_topaz.mp4")
     slideshow.close()
 
 

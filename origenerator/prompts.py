@@ -12,6 +12,9 @@ REQUEST_SYSTEM_PROMPT = (
     "Rules:\n"
     "- Change only what his words ask for, and all of what they ask for. Never add, remove or "
     "reword anything he did not ask about, however much it would improve the image.\n"
+    "- When he gives the words to put in (\"sitting instead of standing\", \"a beanie "
+    "instead\"), the change uses exactly those words and adds none of its own: no pose, detail "
+    "or look he did not say. The rule on PROMPTS OF HIS below does not apply to such a swap.\n"
     "- Portrait, landscape and square, asked of the image's shape, are the Width and Height "
     "settings: portrait means Height greater than Width, landscape the reverse; to switch, set "
     "the two settings to each other's values, and never write the shape into a prompt. When "
@@ -112,6 +115,10 @@ REQUEST_SYSTEM_PROMPT = (
     "- \"she shouldn't have gloves\", positive \"a woman in a garden\", negative "
     "\"blurry, gloves\" -> {\"changes\": [{\"gone\": \"gloves\", \"in_positive\": \"\", "
     "\"instead\": \"bare hands\", \"for\": \"she shouldn't have gloves\"}]}\n"
+    "- \"sitting instead of standing\", positive \"a man standing by a window\" -> "
+    "{\"changes\": [{\"prompt\": \"positive\", \"replace\": \"standing\", \"with\": "
+    "\"sitting\", \"for\": \"sitting instead of standing\"}]} (never \"sitting down "
+    "relaxed\")\n"
     "- \"you're an idiot\" -> {\"changes\": []}"
 )
 

@@ -77,6 +77,79 @@ def _naming(text) -> set[str]:
     return {word.removesuffix("s") for word in _words_of(text) - _SAYING_NOTHING}
 
 
+SHORTEST_ROOT = 3
+
+
+def roots_of(word: str) -> set[str]:
+    roots = {word}
+    if word.endswith("ying") and len(word) > len("ying"):
+        roots.add(word.removesuffix("ying") + "ie")
+    for ending in ("s", "es", "ing", "ed"):
+        if word.endswith(ending) and len(word) - len(ending) >= SHORTEST_ROOT:
+            root = word[:-len(ending)]
+            roots |= {root, root + "e"}
+    return roots
+
+
+def forms_of(word: str) -> set[str]:
+    forms = set()
+    for root in roots_of(word):
+        stem = root.removesuffix("e")
+        forms |= {root, root + "s", root + "es", root + "d", stem + "ing", stem + "ed",
+                  stem + stem[-1] + "ing", stem + stem[-1] + "ed"}
+        if root.endswith("ie"):
+            forms.add(root.removesuffix("ie") + "ying")
+    return forms
+
+
+def _roots_of_all(text) -> set[str]:
+    return set().union(*(roots_of(word) for word in _words_of(text)))
+
+
+_STRUCTURE = re.compile(r"[():]")
+
+
+def _names(token: str) -> set[str]:
+    return set() if _STRUCTURE.search(token) else _words_of(token) - _SAYING_NOTHING
+
+
+def _in_his_words_alone(old: str, new: str, asked: list[str]) -> str:
+    his, had = _roots_of_all(" ".join(asked)), _roots_of_all(old)
+    olds, news = old.split(), new.split()
+
+    def adds(token: str) -> bool:
+        return any(not roots_of(word) & had for word in _names(token))
+
+    def his_own(token: str) -> bool:
+        return any(roots_of(word) & his for word in _names(token))
+
+    if not any(adds(token) and his_own(token) for token in news):
+        return new
+    kept: list[str] = []
+    for *_old_span, j1, j2 in SequenceMatcher(None, [token.lower() for token in olds],
+                                              [token.lower() for token in news],
+                                              autojunk=False).get_opcodes():
+        span = news[j1:j2]
+        left = [token for token in span if not adds(token) or his_own(token)]
+        if left != span:
+            left = _without_dangling_filler(left, span[-1].endswith(","))
+        kept += left
+    return " ".join(kept)
+
+
+def _without_dangling_filler(tokens: list[str], ends_a_part: bool) -> list[str]:
+    def filler(token: str) -> bool:
+        return not _STRUCTURE.search(token) and not _names(token)
+
+    while tokens and filler(tokens[0]):
+        tokens = tokens[1:]
+    while tokens and filler(tokens[-1]):
+        tokens = tokens[:-1]
+    if tokens and ends_a_part and not tokens[-1].endswith(","):
+        tokens = [*tokens[:-1], tokens[-1] + ","]
+    return tokens
+
+
 def answers_him(reason, asked: list[str]) -> bool:
     return bool(_naming(reason) & set().union(*(_naming(request) for request in asked)))
 
@@ -358,7 +431,7 @@ class _Applying:
                  if part and _whole(self.positive, written := _as_written(self.positive, part))]
         said = []
         if there and instead:
-            said += self._replace("positive", {"replace": there.pop(0), "with": instead})
+            said += self._replace_in_his_words("positive", {"replace": there.pop(0), "with": instead})
         elif instead:
             said += self._add("positive", {"add": instead})
         for part in there:
@@ -375,6 +448,11 @@ class _Applying:
             self._say(_UNREADABLE)
         elif self._answers_him(change, " ".join(str(change.get(key) or "") for key in _WORDS_OF_AN_EDIT)):
             self.said += [line for line in self._EDITS[edit](self, which, change) if line]
+
+    def _replace_in_his_words(self, which: str, change: dict) -> list[str]:
+        old = _as_written(getattr(self, which), str(change["replace"]))
+        alone = _in_his_words_alone(old, str(change.get("with") or ""), self.asked)
+        return self._replace(which, {**change, "with": alone})
 
     def _replace(self, which: str, change: dict) -> list[str]:
         old = _as_written(getattr(self, which), str(change["replace"]))
@@ -497,7 +575,7 @@ class _Applying:
         return (all(word in left for word in new.lower().split())
                 and any(_whole(old, quote) and not _whole(new, quote) for quote in self.quoted))
 
-    _EDITS: ClassVar[dict] = {"replace": _replace, "add": _add, "remove": _remove}
+    _EDITS: ClassVar[dict] = {"replace": _replace_in_his_words, "add": _add, "remove": _remove}
 
     def _with_what_was_not_found(self, said: list[str]) -> str:
         shown = self.shown_positive.lower()

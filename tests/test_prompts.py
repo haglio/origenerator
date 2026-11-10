@@ -167,3 +167,15 @@ def test_more_of_something_is_taught_as_his_stronger_words_and_its_opposite_with
         assert the_apps in rule
     assert "never no X" in rule
     assert "an opposite does not fight it" in rule
+
+
+def test_words_he_gives_to_put_in_are_taught_as_used_exactly_with_none_added():
+    prompt = _request_prompt()
+    rule = prompt[prompt.index("When he gives the words to put in"):].split("\n")[0]
+
+    assert "exactly those words" in rule
+    assert "adds none" in rule
+    assert "PROMPTS OF HIS" in rule
+    example = prompt[prompt.index('- "sitting instead of standing"'):].split("\n")[0]
+    assert '"replace": "standing", "with": "sitting"' in example
+    assert "never" in example

@@ -80,9 +80,7 @@ def test_a_quiet_sound_with_no_words_in_it_is_not_worth_a_caption(qtbot):
         hearing.start()
     hearing.close()
 
-    assert arrived == [" . . . "], (
-        "the pause detector is sensitive enough to let quiet words through, and answering every "
-        "quiet nothing as well would flash the caption far more often")
+    assert arrived == [" . . . "]
 
 
 def test_a_sound_with_no_words_in_it_arrives_as_nothing_so_the_caption_can_say_so(qtbot):

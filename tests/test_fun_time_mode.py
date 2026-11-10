@@ -99,7 +99,7 @@ def test_a_session_naming_only_some_of_a_funestras_files_hands_over_none():
 
     assert args.fun_time.funestra("portrait") is None, (
         "all four files or none: half of them is a Funestra this app could write a list for "
-        "and never hear back from")
+        "and never hear back from, which is worse than the window it would otherwise open")
 
 
 def test_a_session_that_names_no_funestra_hands_over_none():

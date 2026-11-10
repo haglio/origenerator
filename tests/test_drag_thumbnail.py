@@ -34,7 +34,7 @@ def test_a_big_thumbnail_shrinks_into_the_shared_size(qtbot):
     big = QPixmap(800, 600)
     big.fill()
     fitted = fit_thumbnail(big)
-    assert fitted.width() == THUMBNAIL_MAX, (
+    assert fitted.width() == 128, (
         "about the size of a drop zone's own preview, so what is under the cursor reads as the "
         "thing about to land in the drop zone")
     assert fitted.height() <= THUMBNAIL_MAX

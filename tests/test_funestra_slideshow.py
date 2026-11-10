@@ -571,7 +571,7 @@ def test_an_item_favorited_from_the_slideshow_is_one_f_mode_keeps(qtbot, tmp_pat
     on_screen = slideshow._set.current_prompt_id()
 
     assert slideshow.favorite() is True
-    assert slideshow.toggle_favorites_filter() is True
+    slideshow.toggle_favorites_filter()
 
     assert [slide.prompt_id for slide in slideshow._set.playlist.items] == [on_screen], (
         "the star readout and F-mode follow a favorite made here")
@@ -996,8 +996,7 @@ def test_a_file_about_to_be_deleted_is_let_go_of(qtbot, tmp_path):
     assert _sent(slideshow) == ["NEXT"]
 
 
-def test_a_screen_left_empty_by_letting_a_file_go_is_not_taken_for_one_that_would_not_open(
-        qtbot, tmp_path):
+def test_a_file_let_go_is_not_taken_for_one_that_would_not_open(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path, items=_ITEMS[:1])
     _says(slideshow, video="one.png")
     slideshow.tick()

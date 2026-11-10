@@ -23,6 +23,7 @@ from funestra.hud_controls import (
 from funestra.hud_icons import shared_icon
 from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
 from funestra.hud_title import LATEST_LABEL
+from funestra.loop_cycle import ACTION, SEED
 from funestra.main_hud import VALUE_W
 
 from origenerator.osr2_controls_commands import FILTER, spelled_for
@@ -140,15 +141,15 @@ _PRESSES: dict[str, Callable[[Any], object]] = {
     "nav_right": lambda host: host.slideshow_nav("right"),
     "nav_up": lambda host: host.slideshow_nav("up"),
     "nav_down": lambda host: host.slideshow_nav("down"),
-    "cycle_seed": lambda host: host.slideshow_nav("right"),
-    "cycle_action": lambda host: host.slideshow_nav("down"),
+    "cycle_seed": lambda host: host.slideshow_cycle(SEED),
+    "cycle_action": lambda host: host.slideshow_cycle(ACTION),
     "cycle_version": lambda host: host.slideshow_step_version(_NEWER),
     "cycle_version_back": lambda host: host.slideshow_step_version(_OLDER),
     "clip_seconds_up": lambda host: host.step_dwell(1),
     "clip_seconds_down": lambda host: host.step_dwell(-1),
 }
 _PRESSES_ABOUT_A_FILE: dict[str, Callable[[Any, str], object]] = {
-    "play_video": lambda host, path: host.show_item(path, lock=False),
+    "play_video": lambda host, path: host.switch_to(path),
     "lock_video": lambda host, path: host.show_item(path, lock=True),
 }
 HUD_CORNER = "hud_corner"

@@ -209,6 +209,9 @@ class _Host:
     def show_item(self, path, *, lock=False):
         self.calls.append(("item", path, lock))
 
+    def switch_to(self, path):
+        self.calls.append(("switch", path))
+
     def slideshow_loop(self, axis):
         self.calls.append(("loop", axis))
 
@@ -220,6 +223,9 @@ class _Host:
 
     def slideshow_nav(self, direction):
         self.calls.append(("nav", direction))
+
+    def slideshow_cycle(self, axis):
+        self.calls.append(("cycle", axis))
 
     def filter(self, query):
         self.calls.append(("filter", query))
@@ -289,7 +295,7 @@ def test_a_map_click_plays_that_item_and_a_double_click_locks_it():
     answer(host, "play_video", "scene one.png")
     answer(host, "lock_video", "scene two.png")
 
-    assert host.calls == [("item", "scene one.png", False),
+    assert host.calls == [("switch", "scene one.png"),
                           ("item", "scene two.png", True)]
 
 
@@ -305,7 +311,7 @@ def test_the_maps_chrome_loops_the_axes_widens_the_row_and_walks_the_cells():
     assert host.calls == [
         ("loop", "seed"), ("loop", "action"), ("loop", ""), "loop key", "more seeds",
         ("nav", "left"), ("nav", "right"), ("nav", "up"), ("nav", "down"),
-        ("nav", "right"), ("nav", "down"), "every narrowing off", ("filter", "dawn"),
+        ("cycle", "seed"), ("cycle", "action"), "every narrowing off", ("filter", "dawn"),
     ]
 
 

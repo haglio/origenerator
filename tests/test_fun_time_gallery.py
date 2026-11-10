@@ -1815,6 +1815,22 @@ def test_a_spoken_enhanced_only_narrows_the_named_regions_slideshow(qtbot, tmp_p
     assert slideshow.pass_size() == 1
 
 
+def test_a_spoken_original_only_and_enhanced_and_original_reach_the_named_regions_slideshow(
+        qtbot, tmp_path, monkeypatch):
+    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
+    monkeypatch.setattr(view._slideshows, "_enhanced_ids_of", lambda rows: {"id-tall-1"})
+    _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
+    slideshow = view.region_slideshow("portrait")
+    qtbot.addWidget(slideshow.shown)
+
+    assert view.run_spoken_command("portrait original only")
+    assert (slideshow.hud_originals_mode, slideshow.pass_size()) == (True, 2)
+
+    assert view.run_spoken_command("portrait enhanced and original")
+    assert (slideshow.hud_originals_mode, slideshow.pass_size()) == (False, 3)
+
+
 def test_a_regions_reset_drops_the_enhanced_switch_with_the_rest(qtbot, tmp_path, monkeypatch):
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)

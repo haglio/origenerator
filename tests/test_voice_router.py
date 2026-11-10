@@ -698,7 +698,7 @@ def test_enhanced_only_heard_by_the_session_narrows_the_slideshow_and_enhances_n
 
     assert voice.run_spoken_command("enhanced only") is True
 
-    assert (host.enhanced, slideshows.filters) == ([], [(True, None)]), (
+    assert (host.enhanced, slideshows.filters) == ([], [("enhanced only", None)]), (
         "the words are asked as a command of their own before the looser matcher, which reads "
         "enhanced only as enhance with a word after it and spends a generation on it")
 

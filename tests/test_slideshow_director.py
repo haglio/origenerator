@@ -1648,7 +1648,9 @@ def test_a_freeze_that_one_slideshow_refuses_still_reaches_the_rest(slideshows):
 
     director.set_room_paused(True)
 
-    assert made[1].paused is True
+    assert made[1].paused is True, (
+        "each slideshow is its own step, so the freeze cannot be skipped when one raises: a "
+        "freeze that stopped at the slideshows left the thumbnails running with no sign of why")
 
 
 def test_a_slideshow_opened_while_the_room_is_frozen_opens_frozen(slideshows):

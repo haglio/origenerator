@@ -1788,8 +1788,7 @@ def test_a_spoken_word_is_answered_at_the_center_top_of_the_slideshows_own_windo
 
     director.answer("audio on")
 
-    assert made[0].said == ["audio on"], (
-        "where Fun Time puts the same kind of line over a Funestra")
+    assert made[0].said == ["audio on"]
     assert host.said == []
 
 
@@ -1976,10 +1975,10 @@ def test_a_side_the_session_named_no_funestra_for_still_gets_a_window(slideshows
 
     director.open([("a.png", "image", "g1", None)], shape=LANDSCAPE)
 
-    assert "channel" not in made[0].opened_with
-    assert made[0].shown.shows == 1, (
+    assert "channel" not in made[0].opened_with, (
         "an older session names no Funestras, and its regions want a window of this app's over them "
         "exactly as before")
+    assert made[0].shown.shows == 1
 
 
 def test_what_is_on_screen_opens_where_the_last_slideshow_left_off(slideshows):

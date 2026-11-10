@@ -61,8 +61,7 @@ def test_enhance_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_
     view.refresh()
     _select_first_leaf(view)
     _click_off(view)
-    assert not view._buttons.enhance.isHidden(), (
-        "a button that vanishes is one the user has to go looking for")
+    assert not view._buttons.enhance.isHidden()
     assert view._buttons.enhance.isEnabled()
     assert "1 not-yet-enhanced image" in view._buttons.enhance.toolTip()
 
@@ -76,7 +75,8 @@ def test_enhance_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_
     view.refresh()
     key = gallery.settings_folder_key(db.get_generation("g0"))
     view._tree.setCurrentItem(view._tree_item_for(key))
-    assert not view._buttons.enhance.isHidden()
+    assert not view._buttons.enhance.isHidden(), (
+        "a button that vanishes is one the user has to go looking for")
     assert not view._buttons.enhance.isEnabled()
     assert view._buttons.enhance.toolTip() == NOTHING_LEFT_TO_ENHANCE
 

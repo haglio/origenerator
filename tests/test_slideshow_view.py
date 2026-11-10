@@ -1011,7 +1011,8 @@ def test_a_spoken_answer_is_a_message_across_the_top(qtbot):
     view.slideshow.note_voice_command("next")
 
     note = view._note.geometry()
-    assert note.top() == MESSAGE_TOP_MARGIN
+    assert note.top() == MESSAGE_TOP_MARGIN, (
+        "at the center top, where Fun Time puts the same kind of line over a Funestra")
     assert abs(note.center().x() - view.width() // 2) <= 1
 
 
@@ -1145,14 +1146,14 @@ def test_asking_for_a_lock_locks_and_asking_again_changes_nothing(qtbot):
     items = [("a.png", "image", "gen-a", None), ("b.png", "image", "gen-b", None)]
     view = _view(qtbot, items=items, actions=SlideshowActions(favorite=favorite.append))
 
-    assert view.slideshow.set_locked(True) is True, (
-        "someone talking to an image asks for a state, not for the other one, and cannot see the "
-        "padlock to know which a flip would give")
+    assert view.slideshow.set_locked(True) is True
     _settle(view)
     assert view.slideshow.locked
     assert favorite == ["gen-a"]
 
-    assert view.slideshow.set_locked(True) is False
+    assert view.slideshow.set_locked(True) is False, (
+        "the user talking to an image asks for a state, not for the other one, and cannot see the "
+        "padlock to know which a flip would give")
     _settle(view)
     assert view.slideshow.locked
     assert favorite == ["gen-a"]

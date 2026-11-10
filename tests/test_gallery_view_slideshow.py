@@ -1199,7 +1199,7 @@ def test_a_generation_that_lands_joins_the_open_slideshow(qtbot, monkeypatch):
 
     assert {item[2] for item in slideshow._set.playlist._items} == {"i1", "i2"}, (
         "a slideshow in a folder that Populate is filling, replaying only what was there at the "
-        "start, is what sent people to double-click the image being made")
+        "start, is what sent the user to double-click the image being made")
     slideshow.close()
 
 

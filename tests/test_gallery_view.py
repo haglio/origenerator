@@ -390,12 +390,12 @@ def test_opening_a_folder_lands_on_its_first_item(qtbot):
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
 
     assert view.listed_prompt_ids()[0] == "i1"
-    assert view.selected_generation() == "i1", (
-        "picking a folder is picking what is in it, so it opens ready to work in rather than beside "
-        "whatever the tab in front happened to hold")
+    assert view.selected_generation() == "i1"
     assert view.selected_prompt_ids() == ["i1"]
     tab = view._generate_pane.current_generate_tab()
-    assert tab.displayed_row()["prompt_id"] == "i1"
+    assert tab.displayed_row()["prompt_id"] == "i1", (
+        "picking a folder is picking what is in it, so it opens ready to work in rather than beside "
+        "whatever the tab in front happened to hold")
     assert view._generate_pane._preview_tab is tab
 
 
@@ -799,7 +799,7 @@ def test_favoriting_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
     assert db.folder_meta_map()[key]["starred"] is True
     assert _image_workflow(view._tree).isExpanded(), (
         "the menu covers the TOC, so a right-click that shut the folder on the way in is seen only "
-        "once the menu closes")
+        "once the menu closes, and reads as something the star did")
 
 
 def test_favorite_collection_is_pinned_first_and_collects_favorite_folders(qtbot):

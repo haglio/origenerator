@@ -4887,3 +4887,19 @@ def test_a_finished_run_with_no_file_leaves_the_frames_standing(tab, monkeypatch
     tab._viewport.show_media.assert_not_called()
     assert tab._viewport.show_message.call_count + tab._viewport.clear.call_count == 0, (
         "with nothing to look at, the last frames stay rather than the pane going blank")
+
+
+def test_a_video_deleted_since_it_was_shown_is_no_drive_target(saved_panel, monkeypatch, tmp_path):
+    tab, db = saved_panel
+    video = _video_row(db, "vid1", input_image="hand.png")
+    vpath = tmp_path / "vid1.mp4"
+    vpath.write_bytes(b"v")
+    _script_for(vpath)
+    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (vpath, "video"))
+    tab.show_saved_generation(video, [])
+    assert tab.osr2_drive_target() is not None
+
+    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: None)
+
+    assert tab.osr2_drive_target() is None, (
+        "the file is looked for afresh at each ask, so one deleted since it was shown is caught")

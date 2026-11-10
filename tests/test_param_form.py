@@ -2693,3 +2693,27 @@ def test_showing_the_derived_size_is_no_edit_of_it(qtbot):
 
     assert form._dim_value_labels["width"].text() == "864"
     assert edited == [], "a refresh of what is shown is no edit by the user"
+
+
+def test_a_prompts_copy_button_hugs_the_top_of_its_tall_field(qtbot):
+    form = ParamForm([ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True)])
+    qtbot.addWidget(form)
+    cell = _field_cell_of(form, "positive_prompt")
+    copy = form._copy_buttons["positive_prompt"]
+
+    assert cell.itemAt(cell.indexOf(copy)).alignment() & Qt.AlignmentFlag.AlignTop, (
+        "beside a tall prompt the button sits at the top corner, where a one-line seed's is "
+        "centered to line up with its tick")
+
+
+def test_a_form_with_room_to_spare_keeps_its_sections_together_at_the_top(qtbot):
+    form = ParamForm([ParamDef("seed", "Seed", "seed", 0), ParamDef("steps", "Steps", "int", 20)])
+    qtbot.addWidget(form)
+    form.resize(400, 2000)
+    form.show()
+    form.layout().activate()
+
+    shown = [section for section in form._sections.values() if not section.isHidden()]
+    foot = max(section.geometry().bottom() for section in shown)
+    assert foot < form.height() // 2, (
+        "any slack collects at the foot of the form, never between its sections")

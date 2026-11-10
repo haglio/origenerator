@@ -103,9 +103,7 @@ class TestWhatTheAppCompares:
         assert ours.library_root == config.LIBRARY_ROOT
 
     def test_the_lane_folder_is_the_one_all_of_haglio_shares(self):
-        assert haglio_settings.value("genau_source") == config.GENAU_SOURCE, (
-            "Evolver upscales what arrives under this folder's name before delivering it; "
-            "sent straight on, a loop out of the graph is visibly softer than the videos there")
+        assert haglio_settings.value("genau_source") == config.GENAU_SOURCE
 
     def test_the_marker_is_the_one_a_copy_actually_wears(self):
         assert evolver_agreement.our_side().partial_marker == evolver_export.PARTIAL_MARKER

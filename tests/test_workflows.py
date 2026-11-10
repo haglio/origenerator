@@ -1414,8 +1414,7 @@ def test_sdxl_pose_transfer_structure_image_browses_the_custom_poses_folder():
     pd = next(pd for pd in wf.param_definitions() if pd.key == "input_image")
     assert pd.browse_dir == config.CUSTOM_POSES_DIR, (
         "ComfyUI's input folder fills with generated frames")
-    assert config.CUSTOM_POSES_DIR == config.LIBRARY_ROOT / "images" / "custom_poses", (
-        "the library's root is private, so no path under it is spelled out in the code")
+    assert config.CUSTOM_POSES_DIR == config.LIBRARY_ROOT / "images" / "custom_poses"
 
 
 def _enhanced_sdxl_pose_transfer_payload() -> tuple[dict, dict]:

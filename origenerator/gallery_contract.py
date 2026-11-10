@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-CONTRACT_AT_THE_CHECKOUT_ROOT = "origenerator_gallery_contract.json"
+CONTRACT_FILE = "origenerator_gallery_contract.json"
 
 DATABASE_PATH = "state/origenerator.db"
 
@@ -73,7 +73,7 @@ def published_text() -> str:
 
 
 def contract_path(root: Path | None = None) -> Path:
-    return (root if root is not None else PROJECT_DIR) / CONTRACT_AT_THE_CHECKOUT_ROOT
+    return (root if root is not None else PROJECT_DIR) / CONTRACT_FILE
 
 
 def publish(root: Path | None = None) -> Path:

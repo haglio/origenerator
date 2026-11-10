@@ -9,8 +9,12 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pytest
+
+from origenerator import config, provenance
+from origenerator.db import Database
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -94,13 +98,30 @@ OPENS_WINDOWS = {"action_setter_tool.py", "app.py", "check_animations.py", "down
 def test_only_what_opens_a_window_imports_the_widget_package():
     package = REPO_ROOT / "origenerator"
     reaching_in = {
-        path.name for path in package.rglob("*.py")
+        path.relative_to(package).as_posix() for path in package.rglob("*.py")
         if "gui" not in path.relative_to(package).parts
         and any(isinstance(node, (ast.Import, ast.ImportFrom))
-                and "origenerator.gui" in ast.unparse(node)
+                and ("origenerator.gui" in ast.unparse(node)
+                     or ast.unparse(node).startswith("from origenerator import gui"))
                 for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))))}
 
     assert reaching_in == OPENS_WINDOWS, "imports run upward: nothing below the widgets reaches in"
+
+
+def test_the_language_model_is_asked_on_this_machine():
+    assert urlparse(config.LOCAL_LLM_BASE_URL).hostname == "localhost", (
+        "no prompt leaves the machine")
+
+
+def test_every_unstamped_row_is_stamped_in_one_write(tmp_path):
+    db = Database(tmp_path / "t.db")
+    writes = []
+    fill_in = db.fill_in
+    db.fill_in = lambda *args: writes.append(1) or fill_in(*args)
+
+    provenance.stamp_unstamped(db, history=lambda _workflow: [])
+
+    assert writes == [1], "a commit for each row took half a minute of the launch that writes them all"
 
 
 def test_timing_loads_no_database():

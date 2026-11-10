@@ -29,7 +29,7 @@ def test_the_tracked_copy_is_what_publishing_writes(tmp_path):
 
 
 def test_the_document_never_names_the_folder_a_lane_arrives_under():
-    assert config.GENAU_SOURCE not in contract.contract_path().read_text(encoding="utf-8"), (
+    assert config.GENAU_SOURCE not in contract.published_text(), (
         "that folder's name is the library's own vocabulary, which no tracked file may hold")
 
 
@@ -39,7 +39,7 @@ def test_every_column_the_document_names_is_one_this_app_writes():
 
     assert declared <= set(db_schema.GENERATION_COLUMNS), (
         "a rename the document does not carry leaves Evolver reading every row as never sent, "
-        "with every suite of both apps green; a column promised and gone is a SELECT that raises")
+        "with no other test in either app failing")
 
 
 def test_a_column_added_since_the_table_first_shipped_is_one_a_reader_must_ask_for():

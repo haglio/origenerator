@@ -28,12 +28,12 @@ LIBRARY_ROOT = Path(haglio_settings.value("library_root"))
 PROJECT_ROOTS = haglio_settings.project_roots()
 
 
-_THE_RADIOS_KEY_IN_EVERY_COPYS_SETTINGS = "ambient_audio_dir"
+_RADIO_KEY = "ambient_audio_dir"
 
 
 def radio_dir(settings: dict[str, Any] | None = None) -> Path | None:
     settings = haglio_settings.load() if settings is None else settings
-    raw = settings.get(_THE_RADIOS_KEY_IN_EVERY_COPYS_SETTINGS)
+    raw = settings.get(_RADIO_KEY)
     if not raw:
         return None
     path = Path(raw)
@@ -55,7 +55,7 @@ def _overlay_path(key: str, content: dict[str, Any] | None = None) -> Path | Non
 
 
 SPEECH_PYTHON = speech_python()
-# kohya's sd-scripts pins libraries of its own too.
+# kohya's sd-scripts pins libraries this app's environment cannot take.
 LORA_TRAINING_PYTHON = _overlay_path("lora_training_python")
 LORA_TRAINING_SCRIPTS = _overlay_path("lora_training_scripts")
 KREA2_TRAINING_PYTHON = _overlay_path("krea2_training_python")
@@ -128,5 +128,5 @@ VOICE_MODEL_NAME = "vosk-model-en-us-0.22-lgraph"  # the vosk model Fun Time lis
 # Windows has made a dead headset microphone the default input before.
 VOICE_DEVICE_NAME = "Brio"
 LOCAL_LLM_BASE_URL = "http://localhost:11434"
-# Ollama's censored models refuse explicit edits.
+# Censored models served through Ollama refuse explicit edits.
 LOCAL_LLM_MODEL = "huihui_ai/qwen3.5-abliterated:9b"

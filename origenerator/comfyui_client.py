@@ -7,14 +7,7 @@ import logging
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from origenerator.comfyui_api import (  # noqa: F401
-    _HTTP_TIMEOUT_S,
-    _POLL_TIMEOUT_S,
-    ComfyUIApi,
-    ForeignQueue,
-    comfyui_responding,
-    format_prompt_error,
-)
+from origenerator.comfyui_api import ComfyUIApi, ForeignQueue
 from origenerator.comfyui_inputs import ComfyFolders
 
 logger = logging.getLogger(__name__)

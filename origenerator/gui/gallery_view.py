@@ -30,8 +30,8 @@ from origenerator import (
 )
 from origenerator.action_setter_tool import SetterHost, ThrownInto
 from origenerator.branch_session import is_branch_session
-from origenerator.comfyui_api import format_execution_error
-from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
+from origenerator.comfyui_api import ForeignQueue, format_execution_error
+from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     EVOLVER_SOURCE,
     KINO_TRASH_DIR,

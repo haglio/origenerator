@@ -5,6 +5,7 @@ import json
 import pytest
 
 from origenerator.progress import (
+    SAME_PASS_AS_BEFORE,
     ProgressTracker,
     expected_pass_count,
     expected_sampling_seconds,
@@ -125,6 +126,13 @@ def test_two_passes_of_unequal_cost_are_told_apart_by_the_node_they_name():
     tracker = ProgressTracker(100, passes=2, step_seconds={"a": 4.0, "b": 1.0})
     assert tracker.update(20, 20, "a") == (80, 100)
     assert tracker.update(20, 20, "b") == (100, 100)
+
+
+def test_a_step_that_names_no_node_belongs_to_the_pass_already_running():
+    tracker = ProgressTracker(100, passes=2, step_seconds={"a": 4.0, "b": 1.0})
+    tracker.update(10, 20, "a")
+
+    assert tracker.update(11, 20, SAME_PASS_AS_BEFORE) == (44, 100)
 
 
 def test_each_sampler_pass_is_named_the_way_the_form_names_it():

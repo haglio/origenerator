@@ -1867,6 +1867,15 @@ def test_a_better_version_that_landed_leaves_nothing_in_flight_on_the_hud(qtbot,
     assert _hud(slideshow).item_note == ""
 
 
+def test_an_item_evolver_upscaled_plays_next_as_its_upscale(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path)
+
+    slideshow.note_added(Slide("three_topaz.mp4", "video", "id-3"))
+
+    played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
+    assert played == ["one.png", "three_topaz.mp4", "two.png"]
+
+
 def test_a_slideshow_opened_while_an_item_of_it_is_being_enhanced_plays_that_item_first(
         qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(enhancing={"id-3": "running"}))

@@ -656,7 +656,10 @@ class FunestraSlideshow(QObject):
         if self._set.playlist.replace_live(prompt_id, slide.path, slide.media_type, slide.still):
             self._hand_over(land=True)
             self._frames.forget(prompt_id)
-        elif self._set.passes(slide) and self._set.playlist.add(slide):
+        elif self._set.passes(slide) and (
+                self._set.playlist.add(slide)
+                or self._set.playlist.replace_file(prompt_id, slide.path, slide.media_type,
+                                                   slide.still)):
             self._hand_over()
 
     def note_enhanced(self, prompt_id: str, path, media_type: str = MediaType.IMAGE,

@@ -754,8 +754,15 @@ def test_a_model_folder_and_a_lora_folder_are_named_by_their_files_titles(titled
               "unet_low": "example_low.safetensors",
               "lora_high": "example_style.safetensors", "lora_low": NO_LORA}
 
-    assert model_label("wan22_i2v", params) == "Example Video (High) / Example Video (Low)"
+    assert model_label("wan22_i2v", params) == "Example Video"
     assert lora_label("wan22_i2v", params) == "Example Style v1"
+
+
+def test_a_folder_of_two_passes_on_different_models_names_both_in_pass_order(titled_models):
+    titled_models({"example_high": "Example Video (High)", "other_low": "Other Video (Low)"})
+    params = {"unet_high": "example_high.safetensors", "unet_low": "other_low.safetensors"}
+
+    assert model_label("wan22_i2v", params) == "Example Video / Other Video"
 
 
 def test_lora_signature_merges_the_none_sentinel_with_no_lora():

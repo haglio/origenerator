@@ -8,7 +8,7 @@ from pathlib import Path, PurePosixPath
 
 from app_support.comfy_file_refs import reference_basename
 
-from origenerator import config, precision
+from origenerator import config, precision, title_words
 from origenerator.precision import Precision
 from origenerator.workflows.model_arch import describe, safetensors_metadata
 
@@ -19,6 +19,8 @@ FIX_LORA_FOLDER = "fixes"
 _FIX_LORA = re.compile(r"^(?P<part>.+) (?P<when>\d{4}-\d{2}-\d{2} \d{4})$")
 _VERSIONED = re.compile(r"^(?P<base>.+?) (?P<major>\d+)\.(?P<minor>\d+)$")
 _FOLDERS_SHOWN_BY_TITLE = ("diffusion_models", "checkpoints", "loras")
+_NOTES = re.compile(r"\s*\((?P<notes>[^()]*)\)$")
+_PASSES = ("high", "low")
 _read: dict[str, tuple[tuple[int, int], object]] = {}
 
 
@@ -51,18 +53,28 @@ def option_title(option) -> str:
 
 
 def model_title(value) -> str:
-    title = _kept_title(value)
-    shown = _precision_shown(value, title)
-    return title if shown is None else precision.in_plain_words(title, shown)
+    title, size = _title_and_size(value)
+    return title if size is None else precision.in_plain_words(title, size)
 
 
-def precision_help(value) -> str:
-    shown = _precision_shown(value, _kept_title(value))
-    if shown is None:
-        return ""
+def model_help(value) -> str:
+    title, size = _title_and_size(value)
     installed = _installed(value)
-    size = "" if installed is None else precision.file_size_sentence(installed.stat().st_size)
-    return " ".join(filter(None, (shown.explained(), size)))
+    return " ".join(filter(None, (
+        kept_by_stem(config.MODEL_DESCRIPTIONS_PATH).get(model_stem(value)),
+        *title_words.explained(title),
+        size and size.explained,
+        size and installed and precision.file_size_sentence(installed.stat().st_size))))
+
+
+def _title_and_size(value) -> tuple[str, Precision | None]:
+    title = _kept_title(value)
+    installed = _installed(value)
+    inside = None if installed is None else precision.tagged(describe(installed).precision)
+    if _is_a_lora(value, installed):
+        named = precision.named_in(title)
+        return title, named and (inside or named)
+    return _without_its_pass(title), inside or precision.named_in(title)
 
 
 def _kept_title(value) -> str:
@@ -70,13 +82,17 @@ def _kept_title(value) -> str:
     return kept_by_stem(config.MODEL_TITLES_PATH).get(stem) or _fix_title(value, stem) or stem
 
 
-def _precision_shown(value, title: str) -> Precision | None:
-    named = precision.named_in(title)
-    if named is None:
-        return None
-    installed = _installed(value)
-    inside = None if installed is None else describe(installed).precision
-    return precision.tagged(inside) or named
+def _is_a_lora(value, installed: Path | None) -> bool:
+    return is_a_fixs_lora(value) or (installed is not None and installed.is_relative_to(lora_folder()))
+
+
+def _without_its_pass(title: str) -> str:
+    noted = _NOTES.search(title)
+    if noted is None:
+        return title
+    kept = [note for note in noted["notes"].split(",") if note.strip().casefold() not in _PASSES]
+    notes = ",".join(kept).strip()
+    return title[:noted.start()] + (f" ({notes})" if notes else "")
 
 
 def _installed(value) -> Path | None:

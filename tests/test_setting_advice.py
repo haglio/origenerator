@@ -323,7 +323,7 @@ def test_a_model_installed_but_not_made_for_the_workflow_says_so_and_a_click_use
                                ("checkpoint",), {"checkpoint": "installed_b.safetensors"},
                                "Example T2I")
 
-    assert found["checkpoint"].said == ("Not Offered 1.5 isn't made for Example T2I, so it isn't "
+    assert found["checkpoint"].said == ("Not Offered 1.5 (full size) isn't made for Example T2I, so it isn't "
                                         "offered here. Click to use Installed B.")
     assert found["checkpoint"].fixed("not_offered.safetensors") == "installed_b.safetensors"
 

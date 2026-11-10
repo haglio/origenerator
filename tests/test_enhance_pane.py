@@ -2064,13 +2064,13 @@ def test_a_fixs_prompts_offer_its_own_fixs_loras_and_no_other_fixs(qtbot, instal
 _HANDS_LORA = os.path.join("fixes", "hands 2026-10-19 1444.safetensors")
 _ITS_TWO_WAYS_OUT = (
     "A LoRA works best on the model it was trained on. On another model it can do little or make "
-    "the fix look wrong.\nTo fix this, either turn off the Hands fix or change Model to trained_on.")
-_MODEL_SET_ELSEWHERE_SAID = ("The Hands fix's LoRA was trained on trained_on, but Model is set to "
-                             "picked.\n" + _ITS_TWO_WAYS_OUT)
-_SOME_MADE_ELSEWHERE_SAID = ("The Hands fix's LoRA was trained on trained_on, but some of the source "
-                             "images were made with picked.\n" + _ITS_TWO_WAYS_OUT)
-_SOURCE_MADE_ELSEWHERE_SAID = ("The Hands fix's LoRA was trained on trained_on, but the source image "
-                               "was made with picked.\n" + _ITS_TWO_WAYS_OUT)
+    "the fix look wrong.\nTo fix this, either turn off the Hands fix or change Model to trained_on (full size).")
+_MODEL_SET_ELSEWHERE_SAID = ("The Hands fix's LoRA was trained on trained_on (full size), but Model is set to "
+                             "picked (full size).\n" + _ITS_TWO_WAYS_OUT)
+_SOME_MADE_ELSEWHERE_SAID = ("The Hands fix's LoRA was trained on trained_on (full size), but some of the source "
+                             "images were made with picked (full size).\n" + _ITS_TWO_WAYS_OUT)
+_SOURCE_MADE_ELSEWHERE_SAID = ("The Hands fix's LoRA was trained on trained_on (full size), but the source image "
+                               "was made with picked (full size).\n" + _ITS_TWO_WAYS_OUT)
 
 
 @pytest.fixture
@@ -2166,7 +2166,7 @@ def test_matching_the_source_holds_the_fixs_model_against_the_folders_own(
     assert hidden or pane._model_warning.toolTip() == _SOURCE_MADE_ELSEWHERE_SAID
 
 
-_NO_GUARANTEE_SAID = ("The Hands fix's LoRA was trained on trained_on, and there's no guarantee "
+_NO_GUARANTEE_SAID = ("The Hands fix's LoRA was trained on trained_on (full size), and there's no guarantee "
                       "the source images here were made with it.\n" + _ITS_TWO_WAYS_OUT)
 
 

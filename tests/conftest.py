@@ -147,6 +147,11 @@ def recorded_base_models(tmp_path, monkeypatch):
     return _kept_by_stem_in(tmp_path, monkeypatch, "BASE_MODELS_PATH")
 
 
+@pytest.fixture
+def described_models(tmp_path, monkeypatch):
+    return _kept_by_stem_in(tmp_path, monkeypatch, "MODEL_DESCRIPTIONS_PATH")
+
+
 class FakeCommandAndRequestListener(QObject):
     error = pyqtSignal(str)
     heard = pyqtSignal(str)

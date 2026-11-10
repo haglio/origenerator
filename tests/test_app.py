@@ -1232,6 +1232,27 @@ def test_a_hosted_boot_builds_its_window_while_comfyui_is_still_starting(qapp):
                    if name != "reconcile_in_flight"] + ["Core"]
 
 
+def test_a_hosted_boot_says_core_is_ready_only_once_comfyui_answered_and_the_late_passes_ran(
+        qapp, qtbot):
+    ran = []
+    starting = _ComfyUIStillStarting()
+    window = MagicMock()
+    window.core_is_ready.side_effect = lambda: ran.append("core is ready")
+
+    try:
+        with _a_faked_boot(ran, **{"origenerator.gui.core.Core": MagicMock(return_value=window),
+                                   "origenerator.gui.job_queue.BRING_UP_COMFYUI": starting}):
+            assert main(hosted_launch()) == 0
+            assert starting.asked.wait(5)
+            assert "core is ready" not in ran
+            starting.answer.set()
+            qtbot.waitUntil(lambda: "core is ready" in ran, timeout=5000)
+    finally:
+        starting.answer.set()
+
+    assert ran[-2:] == ["reconcile_in_flight", "core is ready"]
+
+
 _PASS_NAMES = [boot_pass.run.__name__ for boot_pass in MAINTENANCE]
 
 

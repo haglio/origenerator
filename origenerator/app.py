@@ -301,12 +301,13 @@ class Boot:
     def maintenance(self):
         return MAINTENANCE if self.waits_for_comfyui else without_comfyui(MAINTENANCE)
 
-    def bring_comfyui_up_behind(self, library: Library) -> None:
+    def bring_comfyui_up_behind(self, library: Library, window) -> None:
         if self.waits_for_comfyui:
             return
         from origenerator.gui.comfyui_behind import bring_comfyui_up_behind_the_window
 
-        bring_comfyui_up_behind_the_window(library, self.logger, owner=self.app)
+        bring_comfyui_up_behind_the_window(library, self.logger, owner=self.app,
+                                           then=window.core_is_ready)
 
     def say(self, step: str) -> None:
         if self.loading is None:
@@ -502,7 +503,7 @@ def _boot_and_run(app, app_args, preview) -> int:
     except LoadingCanceled:
         return boot.cancel(window, client)
 
-    boot.bring_comfyui_up_behind(library)
+    boot.bring_comfyui_up_behind(library, window)
     boot.show(window)
     exit_code = boot.run()
     boot.close(window, client)

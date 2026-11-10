@@ -50,31 +50,49 @@ def test_once_comfyui_answers_the_runs_in_flight_at_launch_are_reconnected_and_n
     monkeypatch.setattr(job_queue, "BRING_UP_COMFYUI", lambda: True)
     owner = QObject()
 
-    bring_comfyui_up_behind_the_window(library, logger, owner=owner)
+    bring_comfyui_up_behind_the_window(library, logger, owner=owner, then=lambda: None)
 
     qtbot.waitUntil(lambda: "from-before" not in _statuses(db), timeout=5000)
     assert _statuses(db) == {"this-session": "running"}
+
+
+def test_core_is_ready_once_comfyui_answered_and_the_runs_in_flight_were_reconnected(
+        qtbot, tmp_path, monkeypatch):
+    db, library = _a_launch_with_a_run_in_flight(tmp_path)
+    monkeypatch.setattr(job_queue, "BRING_UP_COMFYUI", lambda: True)
+    seen_when_ready = []
+
+    bring_comfyui_up_behind_the_window(
+        library, logger, owner=QObject(), then=lambda: seen_when_ready.append(_statuses(db)))
+
+    qtbot.waitUntil(lambda: bool(seen_when_ready), timeout=5000)
+    assert seen_when_ready == [{"this-session": "running"}]
 
 
 def test_a_comfyui_that_never_comes_up_leaves_every_run_for_the_next_launch_and_says_so(
         qtbot, tmp_path, monkeypatch, caplog):
     db, library = _a_launch_with_a_run_in_flight(tmp_path)
     monkeypatch.setattr(job_queue, "BRING_UP_COMFYUI", lambda: False)
-    owner = QObject()
+    ready = []
 
     with caplog.at_level(logging.WARNING, logger=logger.name):
-        bring_comfyui_up_behind_the_window(library, logger, owner=owner)
+        bring_comfyui_up_behind_the_window(library, logger, owner=QObject(),
+                                           then=lambda: ready.append(True))
         qtbot.waitUntil(lambda: DID_NOT_COME_UP in caplog.messages, timeout=5000)
 
     assert _statuses(db) == {"from-before": "running", "this-session": "running"}
+    assert ready == []
 
 
 def test_a_copy_with_no_way_to_start_comfyui_says_so_at_once(tmp_path, monkeypatch, caplog):
     db, library = _a_launch_with_a_run_in_flight(tmp_path)
     monkeypatch.setattr(job_queue, "BRING_UP_COMFYUI", None)
+    ready = []
 
     with caplog.at_level(logging.WARNING, logger=logger.name):
-        bring_comfyui_up_behind_the_window(library, logger, owner=QObject())
+        bring_comfyui_up_behind_the_window(library, logger, owner=QObject(),
+                                           then=lambda: ready.append(True))
 
     assert caplog.messages == [DID_NOT_COME_UP]
     assert _statuses(db) == {"from-before": "running", "this-session": "running"}
+    assert ready == []

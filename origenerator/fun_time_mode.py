@@ -68,6 +68,10 @@ REQUEST_OPEN = "request_open"
 REQUEST_CLOSED = "request_closed"
 LOCK_HELD = "lock_held"
 
+UP = "ready"
+CORE_READY = "core_ready"
+STATUS_KEYS = (UP, CORE_READY)
+
 TASKBAR_IDENTITY_FLAG = "--taskbar-identity"
 
 CHECK_LAUNCH_FLAG = "--check-launch"
@@ -162,6 +166,7 @@ def declaration() -> dict:
                           for line in (REQUEST_OPEN, REQUEST_CLOSED)],
         "lock_lines": [f"{spelled_for(shape, LOCK_HELD)}|{{file}}" for shape in SHAPES],
         "fix_phrases": list(published_fix_phrases()),
+        "status_keys": list(STATUS_KEYS),
     }
 
 

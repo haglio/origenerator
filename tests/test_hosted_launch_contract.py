@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from app_support.file_channel import read_key_values
 from shared_ui.preview import Preview
 
 from origenerator import fun_time_mode as contract
@@ -75,6 +77,16 @@ def test_the_caption_the_document_names_is_the_one_hosted_core_wears(
                      launch=Launch(preview=preview))
 
     assert window.windowTitle() == _document()["window_title"]
+
+
+def test_the_document_names_every_line_a_hosted_core_writes_in_its_status_file(
+        qtbot, tmp_path):
+    status_file = tmp_path / "origenerator_status.txt"
+    _window(qtbot, tmp_path, fun_time=replace(_fun_time_session(), status_file=status_file))
+
+    qtbot.waitUntil(status_file.exists, timeout=3000)
+
+    assert sorted(read_key_values(status_file)) == sorted(_document()["status_keys"])
 
 
 def test_no_other_window_here_wears_that_caption():

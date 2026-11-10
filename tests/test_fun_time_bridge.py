@@ -6,6 +6,7 @@ import time
 from unittest.mock import MagicMock
 
 import pytest
+from app_support.file_channel import read_key_values
 from funestra.file_channel import consume_command_file
 from funestra.funestra_verbs import play_file
 from funestra.hud_placement import HudCorner
@@ -444,17 +445,16 @@ def test_omnipause_stops_the_gallerys_own_moving_thumbnails(qtbot, tmp_path):
     assert omnipause.frozen() is False
 
 
-def test_the_status_file_says_this_app_is_up(qtbot, tmp_path):
+def _published_status(tmp_path):
+    return read_key_values(tmp_path / "origenerator_status.txt")
+
+
+def test_the_status_file_says_this_app_is_up_and_core_is_ready(qtbot, tmp_path):
     _view, bridge = _view_with_bridge(qtbot, tmp_path)
 
     bridge._tick()
 
-    waited_on = (
-        "the session waits on this file appearing, and reads nothing else of it, to know the mode "
-        "can be opened: a mode opened over an app still booting has nothing under it")
-    assert (tmp_path / "origenerator_status.txt").exists(), waited_on
-    text = (tmp_path / "origenerator_status.txt").read_text(encoding="utf-8")
-    assert text.strip() == FunTimeBridge.READY, waited_on
+    assert _published_status(tmp_path) == {contract.UP: "1", contract.CORE_READY: "1"}
 
 
 def test_a_status_file_cleared_under_it_is_written_again(qtbot, tmp_path):
@@ -464,8 +464,30 @@ def test_a_status_file_cleared_under_it_is_written_again(qtbot, tmp_path):
 
     bridge._tick()
 
-    assert (tmp_path / "origenerator_status.txt").read_text(
-        encoding="utf-8").strip() == FunTimeBridge.READY
+    assert _published_status(tmp_path) == {contract.UP: "1", contract.CORE_READY: "1"}
+
+
+def test_a_bridge_whose_core_waits_on_comfyui_says_it_is_up_and_core_is_not_ready(
+        qtbot, tmp_path):
+    view = GalleryView(FakeDB([]), fun_time=_session(tmp_path))
+    qtbot.addWidget(view)
+    bridge = FunTimeBridge(view._fun_time, view, parent=view, core_ready=False)
+
+    bridge._tick()
+
+    assert _published_status(tmp_path) == {contract.UP: "1", contract.CORE_READY: "0"}
+
+
+def test_core_ready_goes_out_once_core_is_ready(qtbot, tmp_path):
+    view = GalleryView(FakeDB([]), fun_time=_session(tmp_path))
+    qtbot.addWidget(view)
+    bridge = FunTimeBridge(view._fun_time, view, parent=view, core_ready=False)
+    bridge._tick()
+
+    bridge.core_is_ready()
+    bridge._tick()
+
+    assert _published_status(tmp_path) == {contract.UP: "1", contract.CORE_READY: "1"}
 
 
 def test_a_slideshow_opened_mid_pause_opens_frozen(qtbot, tmp_path, monkeypatch):

@@ -68,6 +68,8 @@ QT_FREE = (
     "origenerator.slideshow_buttons",
     "origenerator.osr2_controls_commands",
     "origenerator.funestras_engine",
+    "origenerator.gui.picking",
+    "origenerator.gui.slideshow_set",
 )
 
 NEEDS_QT = (

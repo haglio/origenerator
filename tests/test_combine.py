@@ -92,7 +92,9 @@ def _pick_lane(combine, intent):
 def test_the_two_edit_buttons_say_which_settings_each_one_edits(qtbot):
     combine = _panel(qtbot)
 
-    assert combine._open_btn.text() == "Edit individual…"
+    assert combine._open_btn.text() == "Edit individual…", (
+        "the user's pair: one for the combination in the drop zones, one for the settings every "
+        "animation of an action runs")
     assert combine._defaults_btn.text() == "Edit default…"
 
 
@@ -103,7 +105,9 @@ def test_the_animation_settings_are_editable_with_nothing_in_the_drop_zones(qtbo
 
     combine._defaults_btn.click()
 
-    assert combine._defaults_btn.isEnabled()
+    assert combine._defaults_btn.isEnabled(), (
+        "what it opens is about the animations, not about a dropped image, so it is not gated "
+        "on one the way Generate and the other Edit button are")
     assert asked == [True]
 
 

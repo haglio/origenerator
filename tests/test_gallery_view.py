@@ -2140,7 +2140,8 @@ def test_reopening_the_same_folder_is_not_a_second_history_stop(qtbot):
     view.refresh()
     view._poll()
 
-    assert len(view._navigation._history._stack) == depth
+    assert len(view._navigation._history._stack) == depth, (
+        "a rebuild re-selects the open folder every poll; each must not pile onto the stack")
 
 
 def test_back_returns_to_the_favorite_collection_after_drilling_into_a_folder(qtbot):

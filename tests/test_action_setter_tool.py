@@ -53,7 +53,9 @@ def test_the_line_starts_with_the_image_it_was_opened_on(tmp_path):
 
     waiting = waiting_items(db, OutputPlaces.in_one_folder(tmp_path), MediaType.IMAGE, "gen-two")
 
-    assert [image["prompt_id"] for image in waiting] == ["gen-two", "gen-one"]
+    assert [image["prompt_id"] for image in waiting] == ["gen-two", "gen-one"], (
+        "the image in front of the user comes first even when it has an action already, then the "
+        "usual line")
 
 
 def test_the_image_it_was_opened_on_stands_in_the_line_once(tmp_path):

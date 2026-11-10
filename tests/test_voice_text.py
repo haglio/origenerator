@@ -10,7 +10,8 @@ def test_case_and_punctuation_are_whispers_not_the_speakers():
 
 def test_apostrophes_are_kept_only_where_the_matcher_asks():
     assert words("don't") == ["don", "t"]
-    assert words("don't", keep_apostrophes=True) == ["don't"]
+    assert words("don't", keep_apostrophes=True) == ["don't"], (
+        "a matcher that splits a contraction in two can match the wrong command on its tail")
 
 
 def test_digits_are_kept_only_where_the_matcher_asks():
@@ -20,7 +21,9 @@ def test_digits_are_kept_only_where_the_matcher_asks():
 
 def test_a_word_is_heard_through_a_single_wrong_letter():
     assert sounds_like("fix", ("fix", "fixed"))
-    assert sounds_like("six", ("fix", "fixed"))
+    assert sounds_like("six", ("fix", "fixed")), (
+        "off a quiet microphone the model lands the shape of a short word and misses a letter of "
+        "it, so an exact test drops requests the user clearly made")
     assert sounds_like("fixes", ("fix", "fixed"))
 
 

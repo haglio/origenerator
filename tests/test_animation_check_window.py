@@ -214,7 +214,8 @@ def test_making_another_sample_waits_for_a_prompt_to_be_edited(window):
     made, _store, _sent = window({_ORDER[0]: [_video()]})
 
     assert _press(made, SUBMIT).text() == "Generate new sample with current settings"
-    assert not _press(made, SUBMIT).isEnabled()
+    assert not _press(made, SUBMIT).isEnabled(), (
+        "a new sample is worth the graphics card only once a prompt differs from the one it has")
 
     _box(made, POSITIVE).setPlainText("a different scene")
 
@@ -239,7 +240,9 @@ def test_an_animation_with_no_sample_says_so_across_the_whole_width(window):
     blank = made.findChild(QLabel, BLANK)
 
     assert blank.text() == NO_SAMPLE
-    assert blank.width() > made.width() // 2
+    assert blank.width() > made.width() // 2, (
+        "sharing the row with the sample's half, it read as a caption on the image, off to the left "
+        "of the window rather than centered in it")
     assert blank.alignment() & Qt.AlignmentFlag.AlignHCenter
 
 

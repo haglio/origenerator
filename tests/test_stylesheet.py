@@ -96,7 +96,9 @@ def _menu_row_colors(qtbot):
 
 def test_a_menu_lights_the_row_under_the_cursor(qtbot):
     hovered, other = _menu_row_colors(qtbot)
-    assert hovered == BLUE
+    assert hovered == BLUE, (
+        "the app-wide rule paints a menu's items on the menu's own flat background, so without one "
+        "of its own the row under the cursor looks exactly like the rows either side of it")
     assert other != hovered
 
 
@@ -128,7 +130,8 @@ def test_a_selected_radio_shows_a_light_disc_inside_its_ring(qtbot):
     centre = 8
     assert _lightness(_radio_image(qtbot, checked=True), centre) > 200
     assert _lightness(_radio_image(qtbot, checked=False), centre) < 80
-    assert _lightness(_radio_image(qtbot, checked=True), 1) < 100
+    assert _lightness(_radio_image(qtbot, checked=True), 1) < 100, (
+        "the disc stops short of the ring: one filling it edge to edge is a blob, not a radio button")
 
 
 def test_a_radios_ring_stays_visible_in_both_states(qtbot):

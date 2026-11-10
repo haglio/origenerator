@@ -42,7 +42,9 @@ def test_the_tip_can_be_clicked_into(qtbot):
     _enter(button)
     tip._appear.timeout.emit()
 
-    assert not tip._popup.testAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+    assert not tip._popup.testAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents), (
+        "Qt's own tooltip is transparent to the mouse and vanishes as the pointer moves toward it, so "
+        "a link inside one can be drawn but never followed")
     flags = tip._popup.label.textInteractionFlags()
     assert flags & Qt.TextInteractionFlag.LinksAccessibleByMouse
 
@@ -103,7 +105,9 @@ def test_taking_the_text_away_closes_an_open_tip(qtbot):
 
     tip.set_html("")
 
-    assert not tip._popup.isVisible()
+    assert not tip._popup.isVisible(), (
+        "the reason it was worth clicking into has ended, and a stale offer to go somewhere is worse "
+        "than none")
 
 
 def test_a_widget_with_nothing_to_say_shows_no_tip(qtbot):
@@ -117,4 +121,6 @@ def test_a_widget_with_nothing_to_say_shows_no_tip(qtbot):
 
 def test_a_links_color_is_set_so_it_reads_as_a_link(qtbot):
     assert 'href="go"' in link("go", "Go to it")
-    assert "color:" in link("go", "Go to it")
+    assert "color:" in link("go", "Go to it"), (
+        "Qt's default link color is the desktop's, which on this app's dark surfaces can come out all "
+        "but unreadable, and a link nobody sees is the same as no link")

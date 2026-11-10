@@ -43,4 +43,5 @@ def test_the_same_image_at_the_same_size_is_only_rendered_once(qtbot, tmp_path):
     first = blurred_backdrop(path, QSize(172, 160))
     second = blurred_backdrop(path, QSize(172, 160))
 
-    assert first is second
+    assert first is second, (
+        "the collections rebuild on every poll, and this reads a full-size render off disk")

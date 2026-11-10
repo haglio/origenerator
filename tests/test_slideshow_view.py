@@ -558,7 +558,7 @@ def test_an_arrival_is_handed_to_the_funestra_to_play_next(qtbot, tmp_path):
 
 
 _KEYED = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
-_MORE_THAN_ONE_ROW_SO_NOTHING_LOOPS_YET = [*_KEYED, ("z.png", "image", "id-z")]
+_MORE_THAN_ONE_ROW = [*_KEYED, ("z.png", "image", "id-z")]
 
 
 def test_locking_a_slide_asks_for_it_to_be_enhanced(qtbot):
@@ -671,7 +671,7 @@ def test_a_loop_button_for_a_row_of_one_image_locks_it_instead(qtbot):
 
 
 def test_the_loop_key_locks_then_loops_the_seed_row_then_the_config_column_then_stops(qtbot):
-    view = _view(qtbot, _MORE_THAN_ONE_ROW_SO_NOTHING_LOOPS_YET, actions=SlideshowActions(neighbors=_around))
+    view = _view(qtbot, _MORE_THAN_ONE_ROW, actions=SlideshowActions(neighbors=_around))
 
     _press(view, Qt.Key.Key_E)
     assert (view.slideshow.locked, view.slideshow.hud_map().loop) == (True, "")
@@ -693,7 +693,7 @@ def test_the_loop_key_locks_then_loops_the_seed_row_then_the_config_column_then_
 
 
 def test_the_forward_step_out_of_a_row_down_to_one_image_ends_the_loop(qtbot):
-    view = _view(qtbot, _MORE_THAN_ONE_ROW_SO_NOTHING_LOOPS_YET, actions=SlideshowActions(neighbors=_around))
+    view = _view(qtbot, _MORE_THAN_ONE_ROW, actions=SlideshowActions(neighbors=_around))
     _press(view, Qt.Key.Key_E)
     _press(view, Qt.Key.Key_E)
     view.slideshow._set.playlist.drop("id-b")
@@ -709,7 +709,7 @@ def test_the_forward_step_out_of_a_row_down_to_one_image_ends_the_loop(qtbot):
 
 
 def test_the_forward_step_in_a_row_with_somewhere_to_go_stays_in_the_loop(qtbot):
-    view = _view(qtbot, [*_KEYED, ("z.png", "image", "id-z")],
+    view = _view(qtbot, _MORE_THAN_ONE_ROW,
                  actions=SlideshowActions(neighbors=_around))
     _press(view, Qt.Key.Key_E)
     _press(view, Qt.Key.Key_E)
@@ -722,7 +722,7 @@ def test_the_forward_step_in_a_row_with_somewhere_to_go_stays_in_the_loop(qtbot)
 
 
 def test_the_back_step_in_a_row_down_to_one_image_leaves_it_looping(qtbot):
-    view = _view(qtbot, [*_KEYED, ("z.png", "image", "id-z")],
+    view = _view(qtbot, _MORE_THAN_ONE_ROW,
                  actions=SlideshowActions(neighbors=_around))
     _press(view, Qt.Key.Key_E)
     _press(view, Qt.Key.Key_E)
@@ -2182,12 +2182,12 @@ def test_a_slideshow_opened_on_an_image_keeps_it_up_under_filters_that_leave_it_
 def test_a_slideshow_closed_looping_actions_reopens_looping_them_where_it_stood(qtbot):
     library = SlideshowActions(neighbors=_around, slides=slides_named(
         Slide("a.png", "image", "id-a"), Slide("c.png", "image", "id-c")))
-    closed = _view(qtbot, _MORE_THAN_ONE_ROW_SO_NOTHING_LOOPS_YET, actions=library)
+    closed = _view(qtbot, _MORE_THAN_ONE_ROW, actions=library)
     for _stop in ("the lock", "the seed row", "the action column"):
         _press(closed, Qt.Key.Key_E)
     _press(closed, Qt.Key.Key_Right)
 
-    reopened = _view(qtbot, _MORE_THAN_ONE_ROW_SO_NOTHING_LOOPS_YET, actions=library)
+    reopened = _view(qtbot, _MORE_THAN_ONE_ROW, actions=library)
     reopened.slideshow.resume(closed.slideshow.state())
     _settle(reopened)
 

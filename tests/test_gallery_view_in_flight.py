@@ -1274,7 +1274,7 @@ def test_a_row_the_line_holds_no_job_for_sorts_to_the_back(qtbot):
     view.refresh()
 
     assert [it.key for it in view._inflight_items()] == ["known", "brand-new"], (
-        "a row a restart has not taken back has no place in the Job Queue; it waits at the end")
+        "a row a restart has not taken back has no place in the queue's order; it waits at the end")
 
 
 def test_the_queue_shows_the_active_job_then_empties_when_idle(qtbot):

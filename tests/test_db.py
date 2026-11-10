@@ -216,7 +216,7 @@ def test_update_generation_refuses_a_column_it_does_not_write(tmp_path):
     assert db.get_generation("upd-002")["workflow_name"] == "sdxl_t2i"
 
 
-def test_update_generation_with_nothing_to_write_is_a_no_op(tmp_path):
+def test_an_update_whose_caller_found_nothing_to_write_is_an_ordinary_no_op(tmp_path):
     db = Database(tmp_path / "test.db")
     db.insert_generation(NewGeneration(
         prompt_id="upd-003",
@@ -228,9 +228,7 @@ def test_update_generation_with_nothing_to_write_is_a_no_op(tmp_path):
 
     db.update_generation("upd-003")
 
-    assert db.get_generation("upd-003")["status"] == "pending", (
-        "callers build the field dict conditionally, so an empty update is a normal outcome "
-        "rather than a mistake")
+    assert db.get_generation("upd-003")["status"] == "pending"
 
 
 def test_update_generation_stores_duration_seconds(tmp_path):

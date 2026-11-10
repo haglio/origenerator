@@ -244,7 +244,7 @@ def test_purging_asks_before_it_ends_anything(qtbot, monkeypatch):
     assert actions.purged == [["d1"]]
 
 
-def _with_room_under_the_tiles_for_a_press_on_nothing(view):
+def _with_room_under_the_tiles(view):
     pane = view._scroll.widget()
     pane.resize(600, 600)
     return pane
@@ -744,7 +744,7 @@ def test_clicking_the_pane_background_drops_the_selection(qtbot):
     view._gallery_pane.apply_selection("i1", _NO_MOD)
     assert view.selected_prompt_ids() == ["i1"]
 
-    pane = _with_room_under_the_tiles_for_a_press_on_nothing(view)
+    pane = _with_room_under_the_tiles(view)
     qtbot.mouseClick(pane, Qt.MouseButton.LeftButton, pos=QPoint(560, 560))
 
     assert view.selected_prompt_ids() == []
@@ -759,7 +759,7 @@ def test_clicking_the_pane_background_leaves_the_tiles_on_screen(qtbot):
     _open_leaf(view)
     view._gallery_pane.apply_selection("i1", _NO_MOD)
 
-    pane = _with_room_under_the_tiles_for_a_press_on_nothing(view)
+    pane = _with_room_under_the_tiles(view)
     qtbot.mouseClick(pane, Qt.MouseButton.LeftButton, pos=QPoint(560, 560))
 
     assert set(view.listed_prompt_ids()) == {"i1", "i2"}
@@ -784,7 +784,7 @@ def test_right_clicking_the_pane_background_keeps_the_selection(qtbot):
     _open_leaf(view)
     view._gallery_pane.apply_selection("i1", _NO_MOD)
 
-    pane = _with_room_under_the_tiles_for_a_press_on_nothing(view)
+    pane = _with_room_under_the_tiles(view)
     qtbot.mouseClick(pane, Qt.MouseButton.RightButton, pos=QPoint(560, 560))
 
     assert view.selected_prompt_ids() == ["i1"], (

@@ -188,7 +188,9 @@ def test_the_bars_shape_the_status_line(qtbot):
     driver.adjust_amplitude(-40)
     driver.adjust_center(-100)
     driver.cycle_shape()
-    assert driver.status_text() == "OSR2 · 200/min · triangle · travel 60 around 30"
+    assert driver.status_text() == "OSR2 · 200/min · triangle · travel 60 around 30", (
+        "the speed bar at its top is 200 a minute, and a center slid all the way down stops at the "
+        "floor of the sweep, 30 with this travel")
 
 
 def test_the_status_line_says_the_motion_is_stopped_but_keeps_the_bars(qtbot):

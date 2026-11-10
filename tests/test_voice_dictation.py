@@ -112,7 +112,9 @@ def test_the_shipped_limit_gives_up_after_eight_utterances():
     for _ in range(6):
         assert dictation.push("and another clause").state == COLLECTING
 
-    assert dictation.push("and one more").state == ABANDONED
+    assert dictation.push("and one more").state == ABANDONED, (
+        "the limit the app ships with, counted out here: read off the constant, a limit of a hundred "
+        "would pass just as well")
 
 
 def test_reset_drops_a_half_said_request():

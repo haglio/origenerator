@@ -99,7 +99,9 @@ def test_the_scale_is_applied_before_pyqt_is_imported():
     imported = min(node.lineno for node in ast.walk(main)
                    if isinstance(node, ast.ImportFrom)
                    and (node.module or "").startswith(("PyQt6", "origenerator.gui", "shared_ui")))
-    assert applied < imported
+    assert applied < imported, (
+        "the order inside main is the whole contract, read off the syntax tree so that a reformat of "
+        "either line leaves this standing")
 
 
 def test_a_running_app_is_redrawn_at_a_new_scale_and_back(qapp):

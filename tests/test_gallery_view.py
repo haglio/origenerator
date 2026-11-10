@@ -1425,7 +1425,9 @@ def test_the_gallery_polls_on_a_timer_of_its_own(qtbot):
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
     assert view._poll_timer.isActive()
-    assert view._poll_timer.interval() == 1500
+    assert view._poll_timer.interval() == 1500, (
+        "the number itself: read back through the constant that set it, a gallery slowed to one "
+        "tick a minute would still pass")
 
     db.add(_image("new", "a dog", 50, 2))
     view._poll_timer.timeout.emit()

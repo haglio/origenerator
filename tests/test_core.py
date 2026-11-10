@@ -660,7 +660,9 @@ def test_a_closing_branch_session_queues_nothing(qtbot, tmp_path, monkeypatch):
     win.close()
     win.hand_comfyui_what_runs_while_closed()
 
-    assert client.submitted == []
+    assert client.submitted == [], (
+        "a preview's saved state is seeded from production's, the experiments switch included, and it "
+        "still queues none")
     assert [r for r in db.list_generations() if r.get("source") == "experiment"] == []
 
 

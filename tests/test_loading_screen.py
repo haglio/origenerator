@@ -48,7 +48,9 @@ def test_the_splash_never_wears_the_apps_own_caption(qtbot):
     screen = _screen()
     qtbot.addWidget(screen)
 
-    assert screen.windowTitle() != "Origenerator"
+    assert screen.windowTitle() != "Origenerator", (
+        "a hosting Fun Time session finds Core by that exact caption, and would take the loading "
+        "screen for it")
 
 
 def test_it_opens_on_the_boots_first_words_offering_esc(qtbot):

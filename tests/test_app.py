@@ -143,7 +143,9 @@ def test_a_close_puts_the_window_away_before_comfyui_is_handed_the_queue(tmp_pat
     (asked_to_close,), (went,) = when["asked_to_close"], when["went"]
     asked_once_closing = [asked for asked in when["asked"] if asked > asked_to_close]
     assert asked_once_closing
-    assert all(asked > went for asked in asked_once_closing)
+    assert all(asked > went for asked in asked_once_closing), (
+        "handing ComfyUI the queue can take many seconds, and a window still on screen meanwhile "
+        "is a window frozen solid")
 
 
 def test_a_video_the_app_opens_leaves_none_of_its_tags_in_its_output_or_its_log(tmp_path):
@@ -1182,7 +1184,8 @@ def test_a_branch_session_maintains_the_library_exactly_as_the_live_app_does(qap
          patch("origenerator.branch_session.is_branch_session", return_value=True):
         assert main([]) == 0
 
-    assert ran == [name for _, name in _MAINTENANCE_PASSES]
+    assert ran == [name for _, name in _MAINTENANCE_PASSES], (
+        "a preview runs on the production app's own library, so it keeps it the way production does")
 
 
 def test_a_soundless_copy_sent_down_a_lane_has_its_video_sent_there_as_it_folds(tmp_path):
@@ -1267,7 +1270,9 @@ def test_the_entry_point_hands_the_process_whatever_main_gives_back():
          patch.object(sys, "argv", ["origenerator"]), pytest.raises(SystemExit) as exit_:
         runpy.run_module("origenerator", run_name="__main__")
 
-    assert exit_.value.code == 7
+    assert exit_.value.code == 7, (
+        "the exit is the entry point's, not main's: a main that returns its code can be called and "
+        "read by a test, where one that raises can only be caught")
 
 
 def test_a_real_boot_exits_with_the_code_the_qt_loop_returned(qapp):

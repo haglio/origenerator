@@ -1015,4 +1015,5 @@ def test_a_hosted_gallery_says_its_mic_is_off_since_the_session_owns_the_room_s_
     view = GalleryView(FakeDB([]), fun_time=_session())
     qtbot.addWidget(view)
 
-    assert view.mic_enabled() is False
+    assert view.mic_enabled() is False, (
+        "two listeners on one microphone are two transcriptions of every utterance")

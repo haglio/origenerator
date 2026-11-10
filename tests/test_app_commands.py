@@ -110,7 +110,8 @@ def test_each_bank_button_has_a_word(said, wanted):
 
 def test_a_switch_takes_a_flip_and_an_explicit_way():
     assert match_app_command("populate") is AppCommand.POPULATE
-    assert match_app_command("populate on") is AppCommand.POPULATE_ON
+    assert match_app_command("populate on") is AppCommand.POPULATE_ON, (
+        "a speaker who knows which way they want it never has to look first")
     assert match_app_command("populate off") is AppCommand.POPULATE_OFF
     assert match_app_command("drive off") is AppCommand.DRIVE_OFF
     assert match_app_command("radio on") is AppCommand.RADIO_ON
@@ -143,7 +144,9 @@ def test_the_enhanced_filter_answers_to_upscales_as_well():
 
 
 def test_the_slideshow_filter_is_said_either_way_round_not_toggled():
-    assert match_app_command("filter enhanced") is AppCommand.FILTER_ENHANCED
+    assert match_app_command("filter enhanced") is AppCommand.FILTER_ENHANCED, (
+        "a speaker in a slideshow is not looking at the HUD to see which way it is set, and a "
+        "phrase that turned the filter off half the time is one nobody could rely on")
     assert match_app_command("enhanced only") is AppCommand.FILTER_ENHANCED
     assert match_app_command("clear filter") is AppCommand.FILTER_OFF
     assert match_app_command("no filter") is AppCommand.FILTER_OFF

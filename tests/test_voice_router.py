@@ -628,7 +628,8 @@ def test_undo_stays_the_gallerys_even_under_a_slideshow(router):
 
     voice.on_command(AppCommand.UNDO)
 
-    assert pressed == [1]
+    assert pressed == [1], (
+        "undoing a cull that is regretted is exactly a thing to do in the middle of a slideshow")
     assert slideshows.slide_words == []
 
 

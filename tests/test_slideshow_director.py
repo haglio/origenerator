@@ -232,6 +232,13 @@ class FakeSlideshow:
         self.hud_favorites_filter = False
         self.hud_enhanced_mode = False
 
+    @property
+    def action_presses(self):
+        return self
+
+    def clear_filter(self):
+        self.filters = replace(self.filters, action="")
+
     def pass_size(self):
         return len(self.enhanced_items)
 
@@ -2171,6 +2178,25 @@ def test_clearing_the_filter_takes_f_mode_with_it(slideshows):
 
     assert slideshow.hud_favorites_filter is False
     assert slideshow.said == ["showing all of them"]
+
+
+def test_no_filter_said_of_a_slideshow_lifts_its_action_filter_alone(slideshows):
+    slideshow = FakeSlideshow()
+    slideshow.filters = SlideshowFilters(favorites=True, enhanced=True, action="beta")
+    director, _host, _made = slideshows()
+    director._slideshow = slideshow
+
+    director.clear_action_filter()
+
+    assert slideshow.filters == SlideshowFilters(favorites=True, enhanced=True)
+
+
+def test_no_filter_with_no_slideshow_up_says_there_is_nothing_to_narrow(slideshows):
+    director, host, _made = slideshows()
+
+    director.clear_action_filter()
+
+    assert host.said == ["the filter needs a slideshow to narrow"]
 
 
 def test_the_filter_with_no_slideshow_up_says_there_is_nothing_to_narrow(slideshows):

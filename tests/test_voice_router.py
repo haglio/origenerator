@@ -164,6 +164,9 @@ class FakeSlideshows:
     def filter_enhanced(self, enhanced_only, shape):
         self.filters.append((enhanced_only, shape))
 
+    def clear_action_filter(self, shape):
+        self.filters.append(("action filter off", shape))
+
     def run_on_slide(self, command, said_at=None):
         self.slide_words.append((command, said_at))
 
@@ -652,6 +655,14 @@ def test_a_filter_word_narrows_the_slideshow_rather_than_the_gallery(router):
     voice.on_command(AppCommand.FILTER_ENHANCED)
 
     assert slideshows.filters == [(True, None)]
+
+
+def test_no_filter_said_of_a_side_lifts_only_that_sides_action_filter(router):
+    voice, _host, slideshows = router()
+
+    voice.on_command(SurfaceCommand(AppCommand.FILTER_OFF, "portrait"))
+
+    assert slideshows.filters == [("action filter off", "portrait")]
 
 
 def test_a_matched_kind_nobody_wired_through_is_logged_not_dropped(router, caplog):

@@ -1182,6 +1182,13 @@ class SlideshowDirector:
         slideshow.toggle_favorites_filter()
         self._host.say("F-mode on" if slideshow.hud_favorites_filter else "F-mode off")
 
+    def clear_action_filter(self, shape: str | None = None) -> None:
+        slideshow = self.surface_for(shape)
+        if slideshow is None:
+            self._host.say("the filter needs a slideshow to narrow")
+            return
+        slideshow.action_presses.clear_filter()
+
     def filter_enhanced(self, enhanced_only: bool, shape: str | None = None):
         slideshow = self.surface_for(shape)
         if slideshow is None:

@@ -90,7 +90,9 @@ def test_configuring_logging_routes_what_qt_says_into_the_log(monkeypatch, tmp_p
     with logging_left_alone():
         _configure_logging(tmp_path)
 
-    assert installed == [True]
+    assert installed == [True], (
+        "a hosted launch's stderr goes nowhere and faulthandler cannot see a fail-fast abort, "
+        "so what Qt says on its way down reaches the app's own log or nothing")
 
 
 def test_an_error_nothing_catches_is_logged_and_the_app_keeps_running(tmp_path):
@@ -1483,10 +1485,14 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
             "origenerator.evolver_agreement.disagreements": MagicMock(return_value=self.SAID),
             "PyQt6.QtWidgets.QMessageBox.warning": told,
         }):
-            assert main([]) == 0
+            assert main([]) == 0, (
+                "said, not refused: nothing else about this app is wrong, and a launch declined "
+                "over a folder name would cost far more than the one lane it protects")
 
         said = " ".join(str(arg) for arg in told.call_args.args)
-        assert "the inbox a send lands in" in said
+        assert "the inbox a send lands in" in said, (
+            "a rename on either side left videos arriving nowhere with both apps silent, so the "
+            "launch says what disagrees")
         window.show.assert_called_once()
 
     def test_a_hosted_session_is_told_without_a_dialog_over_it(self, qapp, capsys):

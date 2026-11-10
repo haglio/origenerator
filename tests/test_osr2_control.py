@@ -253,7 +253,10 @@ def test_every_move_of_the_control_group_is_recorded(caplog):
             control.set_state(state)
 
     assert [record.message for record in caplog.records] == [
-        f"OSR2 control: {state}" for state in (OSR2_DRIVING, OSR2_PARKED)]
+        f"OSR2 control: {state}" for state in (OSR2_DRIVING, OSR2_PARKED)], (
+        "the drivers log their own engage and release, which leaves the park silent, so without "
+        "this a log could not answer whether the OSR2 was under this app at all, the first "
+        "question anyone debugging two apps on one device asks")
 
 
 def test_the_device_changing_hands_with_a_session_is_recorded(caplog):

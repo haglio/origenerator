@@ -420,7 +420,10 @@ def test_a_flash_over_a_promise_goes_back_to_the_promise(router):
     voice.say("heard: “something else”")
     voice._revert()
 
-    assert words(voice.status) == "working out “no hat”…"
+    assert words(voice.status) == "working out “no hat”…", (
+        "whatever flashed over the promise, the promise is still the truest thing this pane has "
+        "to say, and Listening over an app in the middle of a request reads as a request that "
+        "was dropped")
 
 
 def test_only_that_requests_own_answer_takes_its_promise_down(router):
@@ -711,7 +714,9 @@ def test_an_animation_asked_for_with_no_image_on_screen_says_so(router):
     voice.on_command(SurfaceCommand(AnimateRequest(VIDEO, "alpha"), None))
 
     assert host.animated == []
-    assert words(voice.status) == "an animation needs an image on screen"
+    assert words(voice.status) == "an animation needs an image on screen", (
+        "a line of its own rather than the action's name: the command is a record rather than a "
+        "word, and every action names itself differently")
 
 
 

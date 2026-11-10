@@ -683,7 +683,8 @@ def test_a_workflows_menu_offers_no_delete(qtbot, monkeypatch):
 
     _tree_menu(view, _key(_image_workflow(view._tree)))
 
-    assert "Delete folder…" not in labels
+    assert "Delete folder…" not in labels, (
+        "a whole workflow's history must never go in one action")
 
 
 def test_deleting_a_folder_from_its_menu_trashes_what_that_folder_holds(

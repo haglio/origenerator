@@ -65,7 +65,9 @@ def test_cruise_control_is_no_word_here(said):
     ("amp one hundred", BarSetting("amp", 100)),
 ])
 def test_a_bar_takes_the_number_said(said, wanted):
-    assert match_app_command(said) == wanted
+    assert match_app_command(said) == wanted, (
+        "the nudges walk a bar five at a time, and from the far end arriving takes a dozen "
+        "utterances, so a bar also takes the number said plainly")
 
 
 @pytest.mark.parametrize(("said", "wanted"), [
@@ -219,7 +221,8 @@ def test_every_bar_can_be_sent_to_every_stop_on_the_grid():
         BarSetting(bar, stop)
         for bar in ("speed", "amp", "center")
         for stop in (0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100)
-    }
+    }, (
+        "tens only: a bar is a feel rather than a figure, and nobody says amp fifty five")
 
 
 def test_a_phrase_cannot_mean_two_things():

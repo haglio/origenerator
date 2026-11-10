@@ -103,7 +103,10 @@ def test_a_message_that_keeps_arriving_is_said_once_and_counted():
         (logging.WARNING, "the audio device went away"),
         (logging.WARNING, "the audio device went away (4 of these in all)"),
         (logging.WARNING, "something else entirely"),
-    ]
+    ], (
+        "Qt repeats a message as often as the thing it complains about happens, thousands of "
+        "times a minute for anything per frame, and a log that keeps four megabytes can hold "
+        "weeks of the app's own record or three minutes of one complaint")
 
 
 def test_a_run_still_arriving_says_how_far_it_has_got_at_each_power_of_ten():

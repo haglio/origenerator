@@ -43,7 +43,10 @@ def test_the_parser_accepts_exactly_the_flags_the_document_names():
         document["check_launch_flag"],
     }
 
-    assert flags_the_parser_accepts() == declared
+    assert flags_the_parser_accepts() == declared, (
+        "no more: a flag this app grew and never published is one no host will ever send; no "
+        "fewer: a flag the document names and the parser refuses kills a hosted launch in "
+        "argparse before it can log")
 
 
 def test_a_hosted_launch_short_of_a_required_flag_is_refused():
@@ -96,7 +99,9 @@ def test_publishing_writes_the_document_where_a_host_would_look(tmp_path):
     written = contract.publish(tmp_path)
 
     assert written == tmp_path / contract.CONTRACT_FILE
-    assert written.read_bytes() == contract.published_text().encode("utf-8")
+    assert written.read_bytes() == contract.published_text().encode("utf-8"), (
+        "byte for byte what the tracked copy holds, line endings included, so publishing on "
+        "Windows leaves the checkout clean")
 
 
 def test_a_region_rect_is_not_required_of_a_launch():
@@ -106,11 +111,17 @@ def test_a_region_rect_is_not_required_of_a_launch():
 
     session = contract.parse_app_args(full).fun_time
 
-    assert session is not None
+    assert session is not None, (
+        "a session that hands a Funestra over opens no window of ours on that side, so the rect "
+        "it would take is beside the point, and a session too old to send one must go on "
+        "launching")
     assert session.region_rect("portrait") == contract.Rect(0, 0, 0, 0)
 
 
 def test_the_document_names_every_fix_a_session_should_hear_for_the_built_in_parts():
     phrases = contract.declaration()["fix_phrases"]
-    assert {"fix teeth", "fix skin", "fix hair"} <= set(phrases)
+    assert {"fix teeth", "fix skin", "fix hair"} <= set(phrases), (
+        "the session owns the room's microphone and can only hear a phrase it was told to "
+        "listen for, so a part added here without being published is one nobody can fix by "
+        "voice from the headset")
     assert [phrase for phrase in phrases if not detail_parts.match_fix_command(phrase)] == []

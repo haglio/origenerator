@@ -167,7 +167,9 @@ def test_a_line_is_padded_with_silence_or_cut_to_its_scenes_seconds():
     padded = speech_worker.fit_to_seconds(wave, 24000, 2.5)
     assert len(padded) == 60000
     assert padded[:24000].tolist() == wave.tolist()
-    assert not padded[24000:].any()
+    assert not padded[24000:].any(), (
+        "the words, then silence to the end of the scene, so the mouth that follows this audio "
+        "closes when the line is done rather than mouthing on")
     cut = speech_worker.fit_to_seconds(wave, 24000, 0.5)
     assert len(cut) == 12000
     assert cut.dtype == np.float32

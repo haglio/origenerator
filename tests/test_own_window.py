@@ -77,7 +77,9 @@ def test_an_animation_with_no_sample_starts_from_the_actions_own_settings(
 
     made = check_animations.the_animation_window()
 
-    assert made.findChild(QPlainTextEdit, POSITIVE).toPlainText() == "the action's own"
+    assert made.findChild(QPlainTextEdit, POSITIVE).toPlainText() == "the action's own", (
+        "the user's ask: the action's own settings are the starting position where nothing kept "
+        "was ever made this way")
 
 
 def test_each_window_names_itself_to_windows_under_the_apps_own_name():

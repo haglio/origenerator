@@ -358,7 +358,9 @@ def test_neither_trash_action_asks_anything_of_an_empty_pick(qtbot):
     view.restore_from_trash([])
     view.purge_from_trash([])
 
-    assert actions.restored == []
+    assert actions.restored == [], (
+        "a prompt to permanently delete 0 items would be the app asking the user to confirm "
+        "nothing")
     assert actions.purged == []
 
 

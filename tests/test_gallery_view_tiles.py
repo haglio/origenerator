@@ -149,7 +149,9 @@ def test_right_clicking_a_recent_item_offers_its_folder_its_name_favorite_enhanc
     _right_click(view, "i2")
 
     assert labels == ["Go to folder", "Copy name", "", "Favorite 1 item", "Enhance 1 image",
-                      "Delete 1 item"]
+                      "Delete 1 item"], (
+        "a collection gathers items from all over, so where this one lives is the question its "
+        "menu is most often asked: it leads, above a separator")
     assert view.selected_prompt_ids() == ["i2"]
 
 
@@ -955,7 +957,10 @@ def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
     view.refresh()
 
     groups = [buttons for _gap, buttons in view._buttons._groups]
-    assert groups[0] == (view._buttons.back, view._buttons.forward)
+    assert groups[0] == (view._buttons.back, view._buttons.forward), (
+        "icon-only buttons lean on their neighbors to be read, so they are laid out in groups: "
+        "where the user is, what was done, what is picked, what to do with what is in front, "
+        "and what the app is doing on its own")
     assert groups[1] == (view._buttons.undo, view._buttons.redo)
     assert groups[3] == (view._buttons.favorite, view._buttons.enhance, view._buttons.delete)
     assert view._buttons.populate in groups[4]

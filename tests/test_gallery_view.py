@@ -183,7 +183,9 @@ def test_the_tree_marks_the_folders_the_model_says_were_worked_in_lately(qtbot, 
     assert asked[-1] == (["both"], ["i1"])
     view._tree.separate_button.click()
     workflow = _image_workflow(view._tree)
-    assert workflow.data(0, RECENT_ROLE)
+    assert workflow.data(0, RECENT_ROLE), (
+        "folders no longer float up when a generation lands in one, so the mark is what is left "
+        "to say where the work has lately been")
     assert "worked in recently" in workflow.toolTip(0)
     assert not _at(workflow, 0).data(0, RECENT_ROLE)
 
@@ -275,7 +277,10 @@ def test_every_tree_level_steps_by_one_caret_width(qtbot):
         starts.setdefault(depth, set()).add(name_x(item))
     assert all(len(xs) == 1 for xs in starts.values()), starts
     at = [next(iter(starts[d])) for d in sorted(starts)]
-    assert [b - a for a, b in pairwise(at)] == [step] * (len(at) - 1)
+    assert [b - a for a, b in pairwise(at)] == [step] * (len(at) - 1), (
+        "the tree is six levels deep by the time it reaches a settings folder and lives in the "
+        "window's narrowest column, so every wasted pixel a level is six wasted at the foot: "
+        "each step is one indentation and no more")
 
 
 def test_selecting_a_folder_shows_its_full_name_as_a_title(qtbot):
@@ -1443,7 +1448,9 @@ def test_a_hidden_gallery_stops_polling_and_takes_it_up_again_when_shown(qtbot):
 
     view.hide()
 
-    assert not view._poll_timer.isActive()
+    assert not view._poll_timer.isActive(), (
+        "polling costs a pair of database reads a second, so it is worth paying only while the "
+        "screen is up")
 
     with qtbot.waitExposed(view):
         view.show()
@@ -1496,7 +1503,9 @@ def test_a_minimized_gallery_under_an_open_slideshow_reads_on_its_tick(qtbot, mo
 
     view._poll_timer.timeout.emit()
 
-    assert len(reads) == 1
+    assert len(reads) == 1, (
+        "the slideshow shows what is in flight while Core cannot be seen, so the poll that "
+        "feeds both goes on")
 
 
 @pytest.mark.real_thread_hop

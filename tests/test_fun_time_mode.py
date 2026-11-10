@@ -93,6 +93,15 @@ def test_a_session_on_the_monitors_asks_for_no_frame():
     assert args.fun_time.in_a_headset is False
 
 
+def test_a_session_naming_only_some_of_a_funestras_files_hands_over_none():
+    args = parse_app_args([*hosted_launch(), "--portrait-playlist", "st/portrait.tsv",
+                           "--portrait-cmd-file", "st/portrait_cmd.txt"])
+
+    assert args.fun_time.funestra("portrait") is None, (
+        "all four files or none: half of them is a Funestra this app could write a list for "
+        "and never hear back from")
+
+
 def test_a_session_that_names_no_funestra_hands_over_none():
     args = parse_app_args(hosted_launch())
 

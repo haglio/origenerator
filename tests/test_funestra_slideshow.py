@@ -996,6 +996,23 @@ def test_a_file_about_to_be_deleted_is_let_go_of(qtbot, tmp_path):
     assert _sent(slideshow) == ["NEXT"]
 
 
+def test_a_screen_left_empty_by_letting_a_file_go_is_not_taken_for_one_that_would_not_open(
+        qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, items=_ITEMS[:1])
+    _says(slideshow, video="one.png")
+    slideshow.tick()
+    _sent(slideshow)
+    slideshow.release_media(["one.png"])
+    let_go = _sent(slideshow)
+
+    _says(slideshow, video="one.png", idle=True)
+    slideshow.tick()
+
+    assert (let_go, _sent(slideshow)) == (["LET_GO"], []), (
+        "nothing is up because the file was let go, not because it would not open, so the "
+        "slideshow does not step past it")
+
+
 def test_the_order_pair_asks_the_gallery_for_the_side_in_that_order(qtbot, tmp_path):
     asked = []
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(

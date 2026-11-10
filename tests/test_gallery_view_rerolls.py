@@ -215,6 +215,22 @@ def test_clicking_add_twice_starts_only_one_job(qtbot, tmp_path):
 
 
 
+def test_a_press_into_a_folder_already_making_one_leaves_the_generate_pane_where_it_was(
+        qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._start_reroll(key)
+    view._clear_reroll_selection()
+
+    view._start_reroll(key)
+
+    assert view._selected_reroll_key is None, (
+        "a folder already making one is skipped without taking the Generate pane back to its "
+        "run")
+
+
 def _request_tile(view):
     tiles = view._scroll.widget().findChildren(ModifyBatchTile)
     return tiles[0] if tiles else None

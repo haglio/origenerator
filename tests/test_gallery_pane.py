@@ -897,3 +897,17 @@ def test_a_shut_search_section_still_holds_its_tiles_in_the_shown_order(qtbot):
 
     assert [row["prompt_id"] for row in pane.collection_rows()] == ["a", "b"], (
         "a shut section's tiles are still built and still counted, so unfolding it is instant")
+
+
+def test_search_results_are_listed_in_the_order_their_sections_are_laid_out(qtbot):
+    pane, _scroll = _pane(qtbot)
+    scored = [search.SearchTile(row=_made_with("a", "alpha.safetensors")),
+              search.SearchTile(row=_made_with("b", "beta.safetensors")),
+              search.SearchTile(row=_made_with("c", "alpha.safetensors"))]
+
+    pane.show_search_results(scored, search.SearchTerms(
+        sort_mode=search.SORT_MODEL_LORA, query="scene", outcome=None, collapsed=set()))
+
+    assert [row["prompt_id"] for row in pane.collection_rows()] == ["a", "c", "b"], (
+        "the shown order, which Shift-select and the slideshow read, is the order the sections "
+        "are laid out in rather than the order the search scored them")

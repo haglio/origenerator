@@ -1184,3 +1184,13 @@ def test_releasing_the_player_detaches_it_from_the_pane(make_preview):
         call.setSource(QUrl()),
         call.setVideoOutput(None),
     ]
+
+
+def test_a_folder_shown_fills_the_wall(make_preview, tmp_path):
+    w = make_preview()
+
+    w.show_folder([_make_png(tmp_path / "wall.png")])
+
+    assert w._sheet.count() == 1, (
+        "the pane is put down before the wall is laid out, because putting it down clears the "
+        "wall")

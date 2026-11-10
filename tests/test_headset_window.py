@@ -293,7 +293,12 @@ class TestTheRoomsPressesReachTheWindow:
             headset._heard("hover 30 40")
             headset.publish(now=1.0 + _IDLE_LOOK_S / 2)
 
-            assert grabbed == []
+            assert grabbed == [], (
+                "pointing at the window is not a change to it, and the room sends a hover every "
+                "time the laser moves a pixel: taken as a reason to look, each one costs a grab "
+                "of the whole window at the poll's rate, which in the headset halved the room's "
+                "frame rate and stopped the Funestras showing new frames while the user pointed "
+                "at the gallery")
         finally:
             headset.close()
 
@@ -308,7 +313,9 @@ class TestTheRoomsPressesReachTheWindow:
             headset._heard("press 30 40")
             headset.publish(now=1.0 + _IDLE_LOOK_S / 2)
 
-            assert grabbed == [1]
+            assert grabbed == [1], (
+                "what a press does to the window is what the room is waiting to see, so that "
+                "one is worth the grab it costs")
         finally:
             headset.close()
 

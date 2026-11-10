@@ -863,7 +863,9 @@ def test_an_enhancement_launched_for_what_a_slideshow_is_locked_on_is_put_first(
 
     controller.enhance_items(["i1"])
 
-    assert jobs.first == {"run-1"}
+    assert jobs.first == {"run-1"}, (
+        "it comes about two ways: the Auto switch enhancing an image a slideshow stayed locked "
+        "on while it was made, or a batch that takes in the locked one")
 
 
 

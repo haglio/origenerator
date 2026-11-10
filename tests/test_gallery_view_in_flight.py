@@ -1562,7 +1562,8 @@ def test_a_picked_action_shows_no_source_video_at_all(qtbot):
 
     item = {it.key: it for it in view._inflight_items()}["rr1"]
     assert item.action == "dancing"
-    assert item.source_video_thumbnail is None
+    assert item.source_video_thumbnail is None, (
+        "the action names what the video will do, which is the whole of what was chosen")
 
 
 def test_a_run_that_came_from_no_combine_carries_neither(qtbot):

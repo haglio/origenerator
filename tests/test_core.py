@@ -1554,8 +1554,11 @@ def test_a_window_hosted_in_the_headset_opens_as_big_as_the_frame_can_carry(
 
 def test_fun_time_window_is_frameless_topmost_at_the_named_rect(qtbot, tmp_path):
     win = _window(qtbot, tmp_path, fun_time=_fun_time_session())
-    assert win.windowFlags() & Qt.WindowType.FramelessWindowHint
-    assert win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint
+    assert win.windowFlags() & Qt.WindowType.FramelessWindowHint, (
+        "frameless so the client area is the rect Fun Time named")
+    assert win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint, (
+        "in the topmost layer where every managed window lives: Fun Time decides who within the "
+        "layer is in front")
     geo = win.geometry()
     assert (geo.x(), geo.y(), geo.width(), geo.height()) == (10, 20, 800, 600)
     assert win._gallery_view._fun_time is not None

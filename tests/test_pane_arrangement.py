@@ -77,7 +77,10 @@ def test_standalone_leaves_the_generate_pane_no_floor_of_its_own(qtbot):
 
     qtbot.addWidget(arrangement.standalone())
 
-    assert parts["generate_pane"].minimumWidth() == 0
+    assert parts["generate_pane"].minimumWidth() == 0, (
+        "the Generate tab inside it reports what its settings need, and an explicit minimum "
+        "here would replace that number rather than join it, pinning the pane narrower than its "
+        "contents and putting a horizontal scroll bar back under the form")
     assert parts["generate_column"].minimumWidth() == 0
 
 

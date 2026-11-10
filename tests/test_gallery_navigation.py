@@ -138,7 +138,9 @@ def test_a_stop_that_picked_nothing_lands_with_nothing_picked(trail):
 
     nav.go_back()
 
-    assert host.cleared == 1
+    assert host.cleared == 1, (
+        "nothing was picked at this stop, so nothing is picked on landing: a folder still "
+        "showing the item Back just left would look like the press had done nothing at all")
     assert host.revealed == []
 
 

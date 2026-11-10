@@ -309,9 +309,9 @@ def _shared_strength_ranges(params: dict) -> dict[str, _Range]:
 
 
 def _shown_for(pd: ParamDef) -> Callable[[object], str]:
-    if not pd.rate:
+    if not pd.shown_in_seconds_at:
         return _shown
-    return lambda frames: f"{_shown(seconds_for_frames(frames, pd.rate, pd))} {pd.unit}"
+    return lambda frames: f"{_shown(seconds_for_frames(frames, pd.shown_in_seconds_at, pd))} {pd.unit}"
 
 
 def _recommended(params: dict) -> dict:
@@ -378,8 +378,8 @@ def good_range_text(pd: ParamDef) -> str:
     if pd.good is None:
         return ""
     low, high = pd.good
-    if pd.rate:
-        low, high = (seconds_for_frames(int(edge), pd.rate, pd) for edge in (low, high))
+    if pd.shown_in_seconds_at:
+        low, high = (seconds_for_frames(int(edge), pd.shown_in_seconds_at, pd) for edge in (low, high))
     unit = f" {pd.unit}" if pd.unit else ""
     return f"Good range: {_span((low, high))}{unit}."
 

@@ -17,6 +17,7 @@ from origenerator.workflows.fix_finding import finding_nodes, parts_found_by
 from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier
 from origenerator.workflows.parts import NodeRefs, Segment
 
+# ComfyUI's own KSampler names: it refuses a run that names one it has not got.
 SAMPLER_OPTIONS = [
     "euler", "euler_ancestral", "heun", "heunpp2", "dpm_2",
     "dpm_2_ancestral", "lms", "dpm_fast", "dpm_adaptive",
@@ -31,19 +32,26 @@ SCHEDULER_OPTIONS = [
 ]
 
 DURATION_OPTIONS = [1, 5, 10, 15, 30, 60]
-LONGEST_VIDEO_FRAMES = 961
+# The WAN models take a frame count of 4k+1.
+LONGEST_VIDEO_FRAMES = int(max(DURATION_OPTIONS) * NATIVE_FPS) + 1
+_SEAM_FRAME = 1
 # One window's activations grow with its length: 165 frames at the video pixel budget is 10.5 GB and
 # 481 is 31 GB on the 16 GB graphics card, which Windows pages through system RAM at a crawl.
 SINGLE_WINDOW_FRAMES = 161
 SCENE_BREAK = "---"
 FRAME_RATE_OPTIONS = [16, 32, 48, 64, 80, 96, 112]
 
+# RIFE 4.7 is the recommendation and the default of the ComfyUI pack the interpolation node comes from.
 RIFE_CHECKPOINT = "rife47.pth"
-# ComfyUI's own default for the node: it clears the CUDA cache after this many frames.
+# ComfyUI's own default for the node: it clears the CUDA cache after this many frames, which is
+# what keeps a long video at a high multiplier from running out of memory.
 _RIFE_CACHE_FRAMES = 10
 
 UPSCALE_MODEL_FACTOR = 4.0
 
+# The defaults of ComfyUI's detailer node. It enlarges each crop to the guide size before sampling,
+# which gives a hand the size of a thumbnail enough pixels to be redrawn, and never past the
+# max size, where the graphics card's memory goes.
 _DETAIL_GUIDE_SIZE = 512
 _DETAIL_MAX_SIZE = 1024
 _DETAIL_FEATHER = 5
@@ -117,7 +125,7 @@ def story_of(scenes: list[str]) -> str:
 
 
 def chained_frames(lengths: list[int]) -> int:
-    return lengths[0] + sum(length - 1 for length in lengths[1:])
+    return lengths[0] + sum(length - _SEAM_FRAME for length in lengths[1:])
 
 
 def chained_to(total: int, lengths: list[int], shortest: int) -> list[int]:
@@ -176,7 +184,7 @@ class ParamDef:
     multiline: bool = False
     browse_dir: Path | None = None
     unit: str = ""
-    rate: float | None = None
+    shown_in_seconds_at: float | None = None
     also_sets: tuple[str, ...] = ()
     good: tuple[float, float] | None = None
     beside_model: str = ""
@@ -475,9 +483,9 @@ class WorkflowTemplate(ABC):
     def detail_fix_nodes(refs: NodeRefs, params: dict):
         nodes: dict = {}
         prompts = fix_prompts(params)
-        original = image_ref = refs.image
+        original = redrawn_so_far = refs.image
         for index, fix in enumerate(detail_fix_passes(params)):
-            found, segs_ref = finding_nodes(index, fix, image_ref, original)
+            found, segs_ref = finding_nodes(index, fix, redrawn_so_far, original)
             nodes.update(found)
             detailer_id = f"fix{index}_detailer"
             own = prompts[fix.part.name]
@@ -497,7 +505,7 @@ class WorkflowTemplate(ABC):
                 "class_type": "DetailerForEach",
                 "_meta": {"title": f"{fix.part.name.capitalize()} fix"},
                 "inputs": {
-                    "image": image_ref,
+                    "image": redrawn_so_far,
                     "segs": segs_ref,
                     "model": fixed.model,
                     "clip": fixed.clip_ref,
@@ -520,8 +528,8 @@ class WorkflowTemplate(ABC):
                     "cycle": 1,
                 },
             }
-            image_ref = [detailer_id, 0]
-        return nodes, image_ref
+            redrawn_so_far = [detailer_id, 0]
+        return nodes, redrawn_so_far
 
     @staticmethod
     def foley_audio_nodes(model_id: str, deps_id: str, sampler_id: str, frames_ref, params: dict):
@@ -588,7 +596,7 @@ class WorkflowTemplate(ABC):
         last = len(scenes) - 1
         offset = 0
         for index, (frames, line_ref) in enumerate(scenes):
-            seconds = (frames if index == last else frames - 1) / NATIVE_FPS
+            seconds = (frames if index == last else frames - _SEAM_FRAME) / NATIVE_FPS
             if line_ref is None:
                 node_id = f"{prefix}ambience{index}"
                 nodes[node_id] = {
@@ -605,7 +613,7 @@ class WorkflowTemplate(ABC):
                     "inputs": {"audio": line_ref, "start_index": 0.0, "duration": seconds},
                 }
                 piece = [node_id, 0]
-            offset += frames - 1
+            offset += frames - _SEAM_FRAME
             if track is None:
                 track = piece
                 continue

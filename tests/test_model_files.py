@@ -45,7 +45,7 @@ def test_a_picker_lists_its_files_in_the_order_of_their_titles(tmp_path, monkeyp
         "b_style.safetensors", "a_style.safetensors"]
 
 
-def test_lists_gguf_models(tmp_path, monkeypatch):
+def test_lists_the_gguf_files_quantized_flux_models_come_in(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
     diffusion = tmp_path / "models" / "diffusion_models"
     diffusion.mkdir(parents=True)
@@ -64,7 +64,8 @@ def test_lists_nested_model_files_with_relative_paths(tmp_path, monkeypatch):
     (diffusion / "split_files" / "deep.safetensors").touch()
     assert list_model_files("diffusion_models", ["fb.safetensors"], accepts=ANY) == [
         os.path.join("split_files", "deep.safetensors"), "top.safetensors",
-    ]
+    ], ("ComfyUI's loaders name a model in a subfolder this way, so it can be picked "
+        "and the value a run stored finds its file again")
 
 
 def test_a_models_folder_nothing_has_changed_in_is_not_walked_again(installed_models, monkeypatch):
@@ -126,6 +127,17 @@ def test_lora_picker_leads_with_the_none_sentinel(installed_models):
     assert NO_LORA not in list_model_files("loras", ["fallback.safetensors"], accepts=ANY)
 
 
+def test_no_file_can_be_taken_for_no_lora(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
+    loras = tmp_path / "models" / "loras"
+    loras.mkdir(parents=True)
+    (loras / NO_LORA).touch()
+    (loras / "a.safetensors").touch()
+
+    assert list_model_files("loras", [], accepts=ANY) == ["a.safetensors"], (
+        "a listed file always carries a model extension, which is what frees a bare word to mean no LoRA")
+
+
 def test_a_lora_picker_whose_default_is_none_offers_none_once(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
     assert list_lora_files([NO_LORA], accepts=(WAN,)) == [NO_LORA]
@@ -133,7 +145,9 @@ def test_a_lora_picker_whose_default_is_none_offers_none_once(tmp_path, monkeypa
 
 def test_the_detail_passs_detectors_come_from_the_ultralytics_bbox_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
-    assert list_detector_files() == []
+    assert list_detector_files() == [], (
+        "no detector installed is the ordinary start, and the empty list is how the Enhance pane "
+        "knows to dim the detail pass rather than offer a run ComfyUI would refuse")
 
     bbox = tmp_path / "models" / "ultralytics" / "bbox"
     bbox.mkdir(parents=True)
@@ -160,7 +174,8 @@ def test_a_picker_keeps_what_it_could_not_classify(installed_models):
     installed_models.add("checkpoints", "vid.safetensors", arch=WAN)
     assert list_model_files("checkpoints", ["fb.safetensors"], accepts=(SDXL,)) == [
         "cut.safetensors", "future.safetensors", "old.ckpt",
-    ]
+    ], ("a listed file that will not run costs one failed run and says why, "
+        "where a working model left out gives nothing to go on")
 
 
 def test_a_picker_drops_the_other_half_of_the_expert_pair(installed_models):

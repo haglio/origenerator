@@ -11,7 +11,7 @@ from tests.text_readers import word_reading
 
 def _editor(qtbot, scenes=3):
     frames_def = ParamDef("scene_frames", "Scenes", "scenes", [81], min_val=5, max_val=961,
-                          step=4, options=[1, 5, 10, 15, 30, 60], unit="s", rate=16.0)
+                          step=4, options=[1, 5, 10, 15, 30, 60], unit="s", shown_in_seconds_at=16.0)
     editor = ScenesEditor(frames_def, lambda dropdown: None, {})
     qtbot.addWidget(editor)
     for _ in range(scenes - 1):

@@ -261,7 +261,7 @@ class ParamForm(QWidget):
                 widget.edited.connect(lambda pd=pd: self._settle(pd))
             self._add_row(pd.key, pd.label, widget, self._make_extras(pd))
         for pd in self._param_defs:
-            if pd.rate and self._widgets[pd.key] is not self._scenes:
+            if pd.shown_in_seconds_at and self._widgets[pd.key] is not self._scenes:
                 self._write_field(pd, pd.default)
         self._build_swap_button()
         self._build_derived_dimensions()

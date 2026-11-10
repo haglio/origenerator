@@ -190,5 +190,5 @@ def test_a_definitions_good_range_is_said_in_its_tooltip():
 
 def test_a_durations_good_range_is_said_in_seconds():
     pd = ParamDef("frame_count", "Duration", ParamType.INT, 81, min_val=5, max_val=161, step=4,
-                  unit="s", rate=16, good=(81, 161))
+                  unit="s", shown_in_seconds_at=16, good=(81, 161))
     assert " Good range: 5\u201310 s. " in definition_help(pd)

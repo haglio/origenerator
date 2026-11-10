@@ -22,9 +22,12 @@ WAN_FUN_CONTROL = "wan_fun_control"
 LTX = "ltx"
 KREA2 = "krea2"
 
+# No real safetensors header comes near this: a longer length means a corrupt or misidentified file,
+# and reading that many bytes would pull the whole model into memory.
 _MAX_HEADER_BYTES = 32 * 1024 * 1024
 
-_MAX_TENSOR_NAMES = 400
+# A full-size GGUF model lists thousands of tensor names.
+_GGUF_NAMES_ENOUGH_TO_TELL = 400
 
 # Prefixes that wrap an otherwise-normal safetensors state dict. The same WAN model ships both bare
 # (``blocks.0.x``) and wrapped (``model.diffusion_model.blocks.0.x``), and a ControlNet wraps the whole net in
@@ -71,8 +74,9 @@ class ModelFile:
     is_shard: bool
 
 
+# A safetensors or GGUF model is a file of gigabytes to open.
 _HEADERS_PATH = config.STATE_DIR / "model_headers.json"
-_READER_DIGEST = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:16]
+_THIS_READER = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:16]
 
 
 def describe(path: Path) -> ModelFile:
@@ -98,7 +102,7 @@ def _read_remembered(path: Path) -> dict[tuple[str, int, int], ModelFile]:
         saved = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
-    if not isinstance(saved, dict) or saved.get("reader") != _READER_DIGEST:
+    if not isinstance(saved, dict) or _was_taken_by_another_reader(saved):
         return {}
     remembered = {}
     for entry in saved.get("entries", ()):
@@ -111,13 +115,17 @@ def _read_remembered(path: Path) -> dict[tuple[str, int, int], ModelFile]:
     return remembered
 
 
+def _was_taken_by_another_reader(saved: dict) -> bool:
+    return saved.get("reader") != _THIS_READER
+
+
 def _remember(described: dict[tuple[str, int, int], ModelFile]) -> None:
     entries = [{"path": path, "size": size, "mtime_ns": mtime_ns, **asdict(file)}
                for (path, size, mtime_ns), file in described.items()]
     try:
         _HEADERS_PATH.parent.mkdir(parents=True, exist_ok=True)
         written = _HEADERS_PATH.with_name(_HEADERS_PATH.name + ".tmp")
-        written.write_text(json.dumps({"reader": _READER_DIGEST, "entries": entries}),
+        written.write_text(json.dumps({"reader": _THIS_READER, "entries": entries}),
                            encoding="utf-8")
         written.replace(_HEADERS_PATH)
     except OSError:
@@ -270,13 +278,18 @@ def safetensors_metadata(path: Path) -> dict:
 _GGUF_FIXED_WIDTHS = {0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8}
 _GGUF_STRING = 8
 _GGUF_ARRAY = 9
+# GGUF lays out everything read here the same way in its versions 2 and 3.
+_GGUF_VERSION_WIDTH = 4
+_GGUF_DIMENSION_WIDTH = 8
+_GGUF_TENSOR_TYPE_WIDTH = 4
+_GGUF_TENSOR_OFFSET_WIDTH = 8
 
 
 def _gguf_names(path: Path) -> list[str] | None:
     with path.open("rb") as handle:
         if handle.read(4) != b"GGUF":
             return None
-        handle.read(4)
+        handle.read(_GGUF_VERSION_WIDTH)
         tensor_count, kv_count = struct.unpack("<QQ", handle.read(16))
         for _ in range(kv_count):
             (key_length,) = struct.unpack("<Q", handle.read(8))
@@ -284,11 +297,12 @@ def _gguf_names(path: Path) -> list[str] | None:
             (value_type,) = struct.unpack("<I", handle.read(4))
             _gguf_skip(handle, value_type)
         names = []
-        for _ in range(min(tensor_count, _MAX_TENSOR_NAMES)):
+        for _ in range(min(tensor_count, _GGUF_NAMES_ENOUGH_TO_TELL)):
             (name_length,) = struct.unpack("<Q", handle.read(8))
             names.append(handle.read(name_length).decode("utf-8"))
             (dimensions,) = struct.unpack("<I", handle.read(4))
-            handle.read(8 * dimensions + 12)
+            handle.read(_GGUF_DIMENSION_WIDTH * dimensions
+                        + _GGUF_TENSOR_TYPE_WIDTH + _GGUF_TENSOR_OFFSET_WIDTH)
     return names
 
 

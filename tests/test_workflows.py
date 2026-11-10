@@ -203,8 +203,10 @@ def test_a_workflow_names_its_seed_fields_building_its_form_once(monkeypatch):
 def test_only_the_video_workflows_go_on_drawing_seeds_once_one_is_reused():
     pinning = {name for name, wf in WORKFLOW_REGISTRY.items() if wf.pins_reused_seed()}
     drawing = set(WORKFLOW_REGISTRY) - pinning
-    assert drawing == {"wan22_i2v", "wan22_flf2v_loop", "wan22_animate"}
-    assert {"sdxl_t2i", "wan22_t2i", "flux_t2i_upscaled"} <= pinning
+    assert drawing == {"wan22_i2v", "wan22_flf2v_loop", "wan22_animate"}, (
+        "a video's seed is only one sample of its motion, so reusing its settings draws another")
+    assert {"sdxl_t2i", "wan22_t2i", "flux_t2i_upscaled"} <= pinning, (
+        "an image's seed is its composition, so reusing its settings keeps it")
     assert all(WORKFLOW_REGISTRY[n].output_type == "video" for n in drawing)
     assert all(WORKFLOW_REGISTRY[n].output_type == "image" for n in pinning)
 
@@ -320,6 +322,9 @@ def test_enhance_toggle_appends_the_tail_on_every_image_workflow():
         up_id = _node_id(payload, "ImageUpscaleWithModel")
         assert payload[up_id]["inputs"]["upscale_model"] == [loader_id, 0]
         scale_id = _node_id(payload, "ImageScaleBy")
+        assert scale_id is not None, (
+            f"{name}: its width and height fields are the base render's, and an enhance "
+            "rescaled to them would come out the base render's size")
         scale = payload[scale_id]["inputs"]
         assert scale["image"] == [up_id, 0]
         assert scale["scale_by"] == pytest.approx(2.0 / 4.0)
@@ -739,7 +744,9 @@ def test_a_region_reported_in_a_shape_no_fix_writes_is_passed_over():
 def test_a_third_part_is_a_third_pass_on_the_chain():
     payload = _enhance_payload(
         enhance_detail_fixes={"faces": 0.4, "hands": 0.5, "teeth": 0.6})
-    assert len(_nodes_of(payload, "DetailerForEach")) == 3
+    assert len(_nodes_of(payload, "DetailerForEach")) == 3, (
+        "the parts are found by different detectors and redrawn on their own settings, "
+        "so each is a pass over the last one's output rather than one merged list of regions")
     assert len(_nodes_of(payload, "UltralyticsDetectorProvider")) == 3
 
 
@@ -802,6 +809,9 @@ def test_sdxl_workflows_end_with_an_upscale_enhance_pass():
         up_id = _node_id(payload, "ImageUpscaleWithModel")
         assert payload[up_id]["inputs"]["upscale_model"] == [loader_id, 0]
         scale_id = _node_id(payload, "ImageScaleBy")
+        assert scale_id is not None, (
+            f"{name}: its width and height fields are the base render's, and an enhance "
+            "rescaled to them would come out the base render's size")
         scale = payload[scale_id]["inputs"]
         assert scale["image"] == [up_id, 0]
         assert scale["scale_by"] == pytest.approx(2.0 / 4.0)
@@ -1747,6 +1757,25 @@ def test_flux_t2i_upscaled_extract_output_info():
     assert files[0]["filename"] == "flux_t2i_upscaled_00004_.png"
 
 
+def test_flux_keeps_the_plain_model_upscale_as_its_base_render_under_an_enhance():
+    wf = FluxT2iUpscaledWorkflow()
+    payload = wf.build_api_payload(dict(wf.default_params(), enhance=True))
+
+    kept_as_base = payload[wf.base_output_node_id]["inputs"]["images"]
+
+    assert kept_as_base == [_node_id(payload, "ImageUpscaleWithModel"), 0]
+
+
+def test_no_form_asks_for_what_would_only_be_a_guess():
+    the_nodes_own_settings = ("guide_size", "max_size", "feather", "rife", "cache")
+    for name, wf in WORKFLOW_REGISTRY.items():
+        asked = [pd.key for pd in wf.param_definitions()
+                 if any(setting in pd.key for setting in the_nodes_own_settings)]
+        assert not asked, (
+            f"{name}: the pass already costs the user a tick and a denoise, "
+            "and an answer to any of these would be a guess")
+
+
 def test_every_enhance_capable_workflow_keeps_its_base_render():
     enhancers = [wf for wf in WORKFLOW_REGISTRY.values()
                  if "enhance" in wf.default_params()]
@@ -1814,10 +1843,11 @@ def test_the_graph_signatures_only_ever_name_a_registered_workflow():
 def test_a_video_workflow_offers_its_length_in_seconds_and_reachable_frame_rates(name):
     defs = {pd.key: pd for pd in WORKFLOW_REGISTRY[name].param_definitions()}
     frames, rate = defs["frame_count"], defs["frame_rate"]
-    assert frames.rate == NATIVE_FPS
+    assert frames.shown_in_seconds_at == NATIVE_FPS
     assert frames.options == [1, 5, 10, 15, 30, 60]
     assert frames.unit == "s"
-    assert (frames.min_val, frames.step) == (5, 4)
+    assert (frames.min_val, frames.step) == (5, 4), (
+        "the options are seconds, while the minimum, maximum and step stay frames")
     assert rate.options == [16, 32, 48, 64, 80, 96, 112]
     assert all(playback_rate(r) == r for r in rate.options)
     assert rate.unit == "fps"
@@ -2010,7 +2040,9 @@ def test_a_scene_longer_than_one_window_is_two_segments_of_the_same_scene():
 def test_a_lone_scene_runs_for_the_clip_length_whatever_its_own_entry_says():
     wf = Wan22I2vWorkflow()
     payload = wf.build_api_payload(dict(wf.default_params(), frame_count=121, scene_frames=[81]))
-    assert [seg["inputs"]["length"] for seg in _segments(payload, "WanImageToVideo")] == [121]
+    assert [seg["inputs"]["length"] for seg in _segments(payload, "WanImageToVideo")] == [121], (
+        "every other reader of the settings goes by the video's length, "
+        "and settings carried in from the overlay hold nothing else")
 
 
 def test_the_audio_is_scored_for_the_scenes_as_they_add_up():

@@ -12,11 +12,14 @@ from origenerator.workflows import model_arch
 # The directory the Impact Subpack's ``UltralyticsDetectorProvider`` scans, where the enhance graph's detail pass
 # finds its face/hand detectors in ComfyUI.
 _DETECTOR_CATEGORY = "ultralytics/bbox"
+# ComfyUI hands out a part's outline only for a model in its segm folder; the same file under bbox gives boxes alone.
 _OUTLINE_DETECTOR_CATEGORY = "ultralytics/segm"
 
 NO_LORA = "None"
 
 ANY = "any"
+WORKS_ON_PIXELS = ANY
+_NO_FALLBACK: list[str] = []
 
 
 def _model_paths(directory: Path) -> list[Path]:
@@ -37,10 +40,14 @@ def _catalogue(directory: Path) -> list[tuple[str, model_arch.ModelFile]]:
     stamp = _folder_stamp(directory)
     kept = _catalogued.get(str(directory))
     if kept is None or kept[0] != stamp:
-        kept = (stamp, [(str(path.relative_to(directory)), model_arch.describe(path))
+        kept = (stamp, [(_as_comfyui_names_it(path, directory), model_arch.describe(path))
                         for path in _model_paths(directory)])
         _catalogued[str(directory)] = kept
     return kept[1]
+
+
+def _as_comfyui_names_it(path: Path, directory: Path) -> str:
+    return str(path.relative_to(directory))
 
 
 def _offer(described: model_arch.ModelFile, accepts, expert: str | None,
@@ -49,9 +56,17 @@ def _offer(described: model_arch.ModelFile, accepts, expert: str | None,
         return False
     if described.is_lora != want_lora:
         return False
-    if accepts != ANY and described.arch is not None and described.arch not in accepts:
+    if _is_surely_another_family(described, accepts):
         return False
-    return not (expert and described.expert and described.expert != expert)
+    return not _names_the_other_expert(described, expert)
+
+
+def _is_surely_another_family(described: model_arch.ModelFile, accepts) -> bool:
+    return accepts != ANY and described.arch is not None and described.arch not in accepts
+
+
+def _names_the_other_expert(described: model_arch.ModelFile, expert: str | None) -> bool:
+    return bool(expert and described.expert and described.expert != expert)
 
 
 def _as_civitai_files_it(name: str, described: model_arch.ModelFile) -> model_arch.ModelFile:
@@ -83,11 +98,13 @@ def list_lora_files(
 
 
 def list_detector_files() -> list[str]:
-    return list_model_files(_DETECTOR_CATEGORY, [], accepts=ANY)
+    return list_model_files(_DETECTOR_CATEGORY, _NO_FALLBACK,
+                            accepts=WORKS_ON_PIXELS)
 
 
 def list_outline_detector_files() -> list[str]:
-    return list_model_files(_OUTLINE_DETECTOR_CATEGORY, [], accepts=ANY)
+    return list_model_files(_OUTLINE_DETECTOR_CATEGORY, _NO_FALLBACK,
+                            accepts=WORKS_ON_PIXELS)
 
 
 def is_installed(folder: str, value) -> bool:

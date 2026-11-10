@@ -10,7 +10,7 @@ from origenerator.workflows.flux_t2i_upscaled import FluxT2iUpscaledWorkflow
 from origenerator.workflows.krea2_t2i import Krea2T2iWorkflow
 from origenerator.workflows.model_arch import SDXL
 from origenerator.workflows.model_dropdowns import model_dropdown
-from origenerator.workflows.model_files import ANY
+from origenerator.workflows.model_files import WORKS_ON_PIXELS
 from origenerator.workflows.parts import NodeRefs
 from origenerator.workflows.prompt_readers import CLIP
 from origenerator.workflows.wan22_t2i import Wan22T2iWorkflow
@@ -61,7 +61,7 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
                          accepts=ENHANCE_MODEL_FAMILIES),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
             model_dropdown("upscale_model", "Upscaler", defaults["upscale_model"],
-                         "upscale_models", accepts=ANY),
+                         "upscale_models", accepts=WORKS_ON_PIXELS),
             ParamDef("enhance_scale", "Upscale Factor", ParamType.FLOAT, defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25, good=(1.5, 2.0)),
             ParamDef("enhance_steps", "Enhance Steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100, good=(15, 25)),

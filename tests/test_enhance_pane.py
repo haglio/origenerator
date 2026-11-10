@@ -2375,7 +2375,7 @@ def test_a_trained_fixs_button_says_retrain_grayed_until_its_images_change(
 
 
 def test_train_says_it_draws_on_the_shared_folder_only_for_a_fix_that_does(qtbot, monkeypatch):
-    monkeypatch.setattr(parts, "_overlay_parts", lambda content=None: (
+    monkeypatch.setattr(parts, "_library_only_parts", lambda content=None: (
         parts.DetailPart("alpha", ("alpha",), ("alpha",), shared_images=False),))
     pane, _edits = _panel(qtbot)
     for name in ("hands", "alpha"):

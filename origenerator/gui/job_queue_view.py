@@ -58,7 +58,7 @@ from origenerator.gui.stylesheet import CHOSEN
 from origenerator.workflows.derived_size import resolve_input_image_path
 
 _ROW_HEIGHT = 88
-_ITS_RULE = 1
+_RULE_WIDTH = 1
 _BAR_WIDTH = 290
 _HALVES_GAP = GAP_MEDIUM
 QUEUE_ROW_MIME = "application/x-origenerator-queue-row"
@@ -446,7 +446,7 @@ class JobQueueView(QWidget):
         self._line_up(self._items)
 
     def sizeHint(self) -> QSize:
-        return QSize(super().sizeHint().width(), _ROW_HEIGHT + _ITS_RULE)
+        return QSize(super().sizeHint().width(), _ROW_HEIGHT + _RULE_WIDTH)
 
     def rows(self) -> list[QueueRow]:
         return [self._rows_column.itemAt(i).widget()

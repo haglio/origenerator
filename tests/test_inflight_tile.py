@@ -194,7 +194,7 @@ def test_a_run_that_came_from_nothing_keeps_its_plain_plate(qtbot):
     qtbot.addWidget(tile)
 
     assert tile._image.pixmap().isNull(), (
-        "no stand-in picture would be a true one: a queued image with nothing behind it does look "
+        "no stand-in thumbnail would be a true one: a queued image with nothing behind it does look "
         "like every other")
 
 

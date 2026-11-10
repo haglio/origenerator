@@ -47,7 +47,7 @@ def test_the_button_keeps_the_primary_blue_with_a_run_in_flight(styled_button):
 
 def test_the_button_tracks_no_run(button):
     assert not hasattr(button, "set_progress"), (
-        "the Job Queue and the run's tile already show a run; a third account here would tie the "
+        "the Job Queue and the run's tile already show a run; a third, differently worded account here would also tie the "
         "control that starts work to the state of work already going")
     assert not hasattr(button, "start")
     assert not hasattr(button, "finish")

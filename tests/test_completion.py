@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import partial
 from pathlib import Path
 
+import pytest
 from app_support.funscript import read_actions
 from PIL import Image
 
@@ -63,6 +64,28 @@ def test_renders_thumbnail_when_output_is_on_disk(tmp_path):
 
     assert thumb is not None
     assert Path(thumb).exists()
+
+
+def test_a_time_that_cannot_be_read_never_strands_a_finished_run(tmp_path, monkeypatch):
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "a.png").write_bytes(b"not an image either")
+
+    def unreadable(history):
+        raise ValueError("no times in this history")
+
+    monkeypatch.setattr(completion, "execution_duration_seconds", unreadable)
+
+    try:
+        files, _thumb, duration = completion.extract_completion(
+            SDXL, _history_with_duration(3.0),
+            OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "n1")
+    except ValueError:
+        pytest.fail("the thumbnail and the duration are best-effort: a failure in either yields "
+                    "None rather than stranding an otherwise finished run")
+
+    assert files == [{"filename": "a.png", "subfolder": ""}]
+    assert duration is None
 
 
 def test_a_thumbnail_that_cannot_be_drawn_never_strands_a_finished_run(tmp_path):

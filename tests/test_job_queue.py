@@ -1672,7 +1672,9 @@ def test_a_restart_takes_back_every_job_comfyui_holds_but_is_not_making(qtbot, t
 
     queue.reconnect_running()
 
-    assert queue.queue_order == ["v-old", "v-new"]
+    assert queue.queue_order == ["v-old", "v-new"], (
+        "every still-in-flight row is taken back, even for a folder the user has not opened "
+        "yet: a tab's Generate is itself a re-roll, so no in-flight row is owned elsewhere")
     assert [c.args[0] for c in client.cancel_prompt.call_args_list] == ["v-new"]
     assert db.get_generation("v-new")["status"] == "pending"
     assert db.get_generation("v-old")["status"] == "running"

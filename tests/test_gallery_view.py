@@ -2824,6 +2824,19 @@ def test_a_folder_drawn_again_where_it_stands_is_one_visit(qtbot):
     assert view._folder_history == visits
 
 
+def test_going_back_to_a_folder_is_no_new_visit(qtbot):
+    view, cat, dog = _two_leaf_view(qtbot)
+    view._tree.setCurrentItem(view._tree_item_for(cat))
+    view._tree.setCurrentItem(view._tree_item_for(dog))
+    visits = list(view._folder_history)
+
+    view._buttons.back.click()
+
+    assert view._tree.currentItem() is view._tree_item_for(cat)
+    assert view._folder_history == visits, (
+        "skipped while Back or Forward is re-selecting, so it stays a genuine visit trail")
+
+
 def test_with_nothing_selected_the_shape_in_view_is_the_one_holding_landscape(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)

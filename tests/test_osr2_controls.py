@@ -307,6 +307,16 @@ def test_the_group_lights_the_state_the_switch_is_in(qtbot):
     assert controls.drawing()[0]
 
 
+def test_controls_handed_no_switch_draw_no_off_button(qtbot):
+    controls, _motion = _controls(qtbot)
+
+    controls.drawing()
+
+    drawn = [button.command for _rect, button in controls._painter.buttons]
+    assert OSR2_CONTROL_BUTTONS[OSR2_PARKED] not in drawn, (
+        "with no switch handed over an off button is a switch nothing would hear")
+
+
 def test_a_panel_with_no_switch_still_holds_the_motion(qtbot):
     controls, motion = _controls(qtbot)
     controls.drawing()

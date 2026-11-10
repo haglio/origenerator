@@ -60,6 +60,7 @@ from origenerator.gallery import (
     videos_from_source_image,
 )
 from origenerator.gallery import output as gallery_output
+from origenerator.gallery import source_image as source_image_module
 from origenerator.gallery.labels import workflow_label
 from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
 from origenerator.gallery.signatures import canonical_settings
@@ -320,7 +321,9 @@ def test_an_image_answers_as_itself_under_each_of_the_files_it_lists():
     index = build_image_config_index([enhanced, no_file])
 
     assert set(index) == {"lantern_enhanced.png", "lantern_first.png"}
-    assert index["lantern_enhanced.png"] == index["lantern_first.png"]
+    assert index["lantern_enhanced.png"] == index["lantern_first.png"], (
+        "every file an image row lists points at the same entry, which is what keeps a video "
+        "made from an enhanced frame with one made from the frame before it was enhanced")
     assert index["lantern_first.png"].prompt_id == "lantern"
 
 
@@ -821,6 +824,28 @@ def test_output_file_reference_without_subfolder_defaults_to_output():
 def test_output_file_reference_is_none_when_no_usable_file():
     assert output_file_reference([]) is None
     assert output_file_reference([{"subfolder": "image"}]) is None
+
+
+def test_a_start_frame_many_videos_share_is_looked_for_once(monkeypatch):
+    looked_for = []
+    find = source_image_module._image_named
+
+    def counted(name, image_rows):
+        looked_for.append(name)
+        return find(name, image_rows)
+
+    monkeypatch.setattr(source_image_module, "_image_named", counted)
+    image = _row(prompt_id="img", workflow_name="sdxl_t2i",
+                 output_files=json.dumps([{"filename": "start.png"}]))
+    videos = [_row(prompt_id=f"v{n}", workflow_name="wan22_i2v",
+                   params_json=json.dumps({"input_image": "start.png"})) for n in range(3)]
+
+    start_image = source_image_module.start_images_among([image])
+
+    assert [start_image(video)["prompt_id"] for video in videos] == ["img", "img", "img"]
+    assert looked_for == ["start.png"], (
+        "source_image_of for many rows over one pool: each start frame is looked for once "
+        "however many rows share it")
 
 
 def test_output_reference_round_trips_back_to_its_source_image():

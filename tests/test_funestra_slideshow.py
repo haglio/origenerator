@@ -1502,6 +1502,44 @@ def test_clearing_the_filters_lifts_the_action_filter_with_the_other_two(qtbot, 
     assert slideshow.pass_size() == 3
 
 
+def test_no_filter_lifts_the_action_filter_and_leaves_f_mode_on(qtbot, tmp_path):
+    said = []
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of),
+                           hud=HudFacts(favorite_ids={"id-1", "id-2"}), say=_into(said))
+    slideshow.set_favorites_filter(True)
+    slideshow.action_presses.filter("beta")
+    said.clear()
+
+    assert answer(slideshow, "no_filter")
+
+    assert (slideshow.hud_favorites_filter, slideshow.hud_action_filter) == (True, "")
+    assert (slideshow.pass_size(), said) == (2, ["Filter: cleared (2)"])
+
+
+def test_no_filter_lifts_the_action_filter_and_leaves_the_enhanced_filter_on(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of),
+                           hud=HudFacts(enhanced_ids={"id-2", "id-3"}))
+    slideshow.set_enhanced_mode(True)
+    slideshow.action_presses.filter("beta")
+
+    assert answer(slideshow, "no_filter")
+
+    assert (slideshow.hud_enhanced_mode, slideshow.hud_action_filter) == (True, "")
+    assert slideshow.pass_size() == 2
+
+
+def test_no_filter_with_no_action_filter_on_changes_nothing(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of),
+                           hud=HudFacts(favorite_ids={"id-1", "id-2"}))
+    slideshow.set_favorites_filter(True)
+    _sent(slideshow)
+
+    assert answer(slideshow, "no_filter")
+
+    assert (slideshow.hud_favorites_filter, slideshow.hud_action_filter) == (True, "")
+    assert (slideshow.pass_size(), _sent(slideshow)) == (2, [])
+
+
 def test_the_pass_is_as_long_as_what_the_funestra_was_handed(qtbot, tmp_path):
     assert _slideshow(qtbot, tmp_path).pass_size() == 3
 

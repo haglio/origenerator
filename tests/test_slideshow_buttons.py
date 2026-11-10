@@ -236,8 +236,8 @@ class _Host:
     def slideshow_step_version(self, delta):
         self.calls.append(("version", delta))
 
-    def clear_modes(self):
-        self.calls.append("every narrowing off")
+    def clear_filter(self):
+        self.calls.append("action filter off")
 
 
 def test_a_state_said_of_a_side_is_asked_for_by_name_rather_than_flipped():
@@ -311,7 +311,7 @@ def test_the_maps_chrome_loops_the_axes_widens_the_row_and_walks_the_cells():
     assert host.calls == [
         ("loop", "seed"), ("loop", "action"), ("loop", ""), "loop key", "more seeds",
         ("nav", "left"), ("nav", "right"), ("nav", "up"), ("nav", "down"),
-        ("cycle", "seed"), ("cycle", "action"), "every narrowing off", ("filter", "dawn"),
+        ("cycle", "seed"), ("cycle", "action"), "action filter off", ("filter", "dawn"),
     ]
 
 

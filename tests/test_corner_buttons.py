@@ -85,7 +85,9 @@ def test_every_corner_is_up_the_moment_there_is_an_item_under_it(qtbot):
     _host, controls = _controls(qtbot)
     controls.show_for(favorite=False, enhance=icons.ENHANCE_OPEN)
 
-    assert all(not b.isHidden() for b in controls.buttons())
+    assert all(not b.isHidden() for b in controls.buttons()), (
+        "the corners are up at rest, not revealed on hover: a wall of thumbnails has to say "
+        "which of them are favorited without being swept")
 
 
 def test_an_item_the_enhancer_cannot_take_grows_no_plus(qtbot):
@@ -136,7 +138,10 @@ def test_the_star_says_which_way_it_would_go(qtbot):
     assert star.toolTip() == "Favorite this item"
 
     controls.show_for(favorite=True, enhance=None)
-    assert star.toolTip() == "Unfavorite this item"
+    assert star.toolTip() == "Unfavorite this item", (
+        "the mark is the state and the button at once: a filled star is the favorite and "
+        "pressing it takes the favorite away, so an item cannot carry a sign saying one thing "
+        "beside a control doing another")
 
 
 def test_a_corner_button_under_the_pointer_wears_its_armed_icon(qtbot):
@@ -171,4 +176,6 @@ def test_they_land_one_to_a_corner_of_the_rectangle_they_are_given(qtbot):
     assert star.left() == plus.left() > area.center().x()
     assert star.top() < area.center().y() < plus.top()
     assert trash.left() < area.center().x()
-    assert trash.top() == plus.top()
+    assert trash.top() == plus.top(), (
+        "top-left is left free: the item type icon has always lived there, and a control that "
+        "landed on it would move depending on which collection is open")

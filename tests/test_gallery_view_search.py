@@ -515,7 +515,10 @@ def test_the_model_lora_sort_bands_the_results_by_model_and_lora(qtbot):
 
     headings = [w.text() for w in _section_headers(view)]
 
-    assert len(headings) == 2
+    assert len(headings) == 2, (
+        "a search answers two questions: newest first is where is the one made recently, and "
+        "Model / LoRA is which model and LoRA was that, so there the tiles are cut into a "
+        "section per combination and the answer is the heading the user stopped scrolling at")
     assert any("styleA" in h and h.endswith("(2)") for h in headings)
     assert any("styleB" in h and h.endswith("(1)") for h in headings)
     assert headings[0].endswith("(2)")

@@ -212,7 +212,9 @@ def _shaped(category="", **over):
 
 
 def test_genau_settings_are_generated_at_the_shortest_length_that_closes():
-    assert _shaped()["frame_count"] == combine.CYCLE_FRAMES == 29
+    assert _shaped()["frame_count"] == combine.CYCLE_FRAMES == 29, (
+        "the model cannot close a loop shorter than this: under 29 frames the last frame lands "
+        "visibly off the first and the lighting pops on every repeat")
 
 
 def test_genau_settings_play_at_the_top_rate_the_writer_allows():
@@ -225,8 +227,13 @@ def test_genau_settings_play_at_the_top_rate_the_writer_allows():
 def test_the_words_that_ask_for_one_cycle_are_added_to_the_videos_own():
     shaped = _shaped(positive_prompt="alpha form", negative_prompt="beta")
 
-    assert shaped["positive_prompt"].startswith("alpha form ")
-    assert len(shaped["positive_prompt"]) > len("alpha form ")
+    assert shaped["positive_prompt"].startswith("alpha form "), (
+        "added to the video's prompt rather than replacing it: the prompt says what the video "
+        "is of, and these words say how it moves")
+    assert len(shaped["positive_prompt"]) > len("alpha form "), (
+        "Genau does not play a video, it scrubs it against the device's phase as a single cycle "
+        "out and back, and left to itself the model fits about two cycles into 29 frames, so "
+        "the words ask for one outright")
     assert shaped["negative_prompt"].startswith("beta ")
 
 

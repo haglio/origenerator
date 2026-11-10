@@ -451,7 +451,9 @@ def test_the_room_between_the_drop_zones_is_the_whole_gap_that_parts_them(qtbot)
     between = combine._between.geometry()
     assert between.top() == combine.image_zone.geometry().bottom() + 1
     assert between.bottom() + 1 == combine._video_part.geometry().top()
-    assert between.height() == BUTTON_GAP + BUTTON_GROUP_GAP
+    assert between.height() == BUTTON_GAP + BUTTON_GROUP_GAP, (
+        "as far apart as a group's gap set the two in this column before the room between them "
+        "took drops")
 
 
 def test_the_neutral_option_is_custom_leading_the_actions(qtbot):
@@ -700,7 +702,8 @@ def test_recent_lists_the_video_in_the_drop_zone_first_whatever_came_since(qtbot
     combine.video_zone.set_item("vid1")
     uses.record(action_settings.VIDEO, "vid2")
 
-    assert _listed_under_recent(combine) == ["vid1", "vid2"]
+    assert _listed_under_recent(combine) == ["vid1", "vid2"], (
+        "a newer use can come from the drop zone in another copy of the app")
 
 
 def test_a_video_put_in_the_drop_zone_is_said_with_the_lane_it_went_in_under(qtbot):
@@ -784,7 +787,9 @@ def test_generate_emits_the_picked_action(qtbot):
 
 def test_the_lane_defaults_to_kino(qtbot):
     combine = _panel(qtbot)
-    assert combine.selected_intent() == action_settings.VIDEO
+    assert combine.selected_intent() == action_settings.VIDEO, (
+        "Kino is the default because it is what Combine has long done and by far the more "
+        "common ask; Genau is the deliberate detour")
     assert combine._video_radio.text() == "Kino"
     assert combine._video_radio.isChecked()
     assert not combine._genau_radio.isChecked()

@@ -195,7 +195,10 @@ def test_every_fixable_part_gets_a_tick_and_a_number_of_its_own(qtbot):
     pane._fixes["hands"].setValue(0.6)
 
     assert edits[-1].params["enhance_detail_fixes"] == {
-        "faces": DEFAULT_FIX_DENOISE, "hands": 0.6}
+        "faces": DEFAULT_FIX_DENOISE, "hands": 0.6}, (
+        "each part's denoise is its own, apart from the enhancement's and from the other "
+        "parts', because it can afford to be far bolder: nothing outside the regions a detector "
+        "finds is touched, and a mouth wants a harder redraw than a face does")
     assert pane._fixes["faces"].toolTip()
     assert pane._fix_checks["faces"].toolTip()
 
@@ -398,9 +401,14 @@ def test_a_fix_field_is_only_as_wide_as_the_number_it_holds(qtbot):
     spinner = pane._fixes["faces"]
     digits = spinner.fontMetrics().horizontalAdvance("0.00")
 
-    assert digits < spinner.minimumWidth() <= digits + 30
+    assert digits < spinner.minimumWidth() <= digits + 30, (
+        "each number is exactly as wide as its digits need, because the point of the line is "
+        "reading all the parts at once, and one number stretched to fill the pane costs another "
+        "part its place")
     assert spinner.minimumWidth() == spinner.maximumWidth()
     assert spinner.minimumWidth() < spinner.sizeHint().width()
+    assert spinner.buttonSymbols() == spinner.ButtonSymbols.NoButtons, (
+        "no step arrows: a pair for every part costs more width than the numbers beside them")
 
 
 def test_the_fixes_line_wraps_rather_than_widening_the_panel(qtbot):
@@ -409,10 +417,13 @@ def test_the_fixes_line_wraps_rather_than_widening_the_panel(qtbot):
     flow = host.layout()
     pairs = [flow.itemAt(i).widget() for i in range(flow.count())]
 
-    assert flow.heightForWidth(120) > flow.heightForWidth(4000)
+    assert flow.heightForWidth(120) > flow.heightForWidth(4000), (
+        "a pane too narrow for the line wraps the last parts onto a second line instead of "
+        "cutting them off")
     assert host.hasHeightForWidth()
     assert host.minimumSizeHint().width() <= max(
-        pair.sizeHint().width() for pair in pairs) + 8
+        pair.sizeHint().width() for pair in pairs) + 8, (
+        "the line never widens the window, which tiles into a third of a monitor")
 
 
 def _laid_out_at(pane, width, height=900):
@@ -700,7 +711,9 @@ def test_unticking_a_part_drops_its_fix_but_keeps_its_number(qtbot):
 
     pane._fix_checks["faces"].setChecked(False)
 
-    assert edits[-1].params["enhance_detail_fixes"] == {}
+    assert edits[-1].params["enhance_detail_fixes"] == {}, (
+        "only the ticked parts go into the settings: an unticked part is one this enhancement "
+        "does not do, and leaving it out lets equal settings compare equal")
     assert pane._fixes["faces"].value() == 0.7
     assert not pane._fixes["faces"].isEnabled()
 
@@ -969,7 +982,9 @@ def test_ctrl_click_adds_to_the_picking(qtbot):
     _click(qtbot, _rows(versions)[1], Qt.KeyboardModifier.ControlModifier)
 
     assert versions.selected_positions() == [0, 1]
-    assert shown == [0]
+    assert shown == [0], (
+        "Ctrl and Shift leave the preview where it was: the gesture is these ones, aimed at the "
+        "Delete that follows, and swapping the preview under each click would fight it")
 
 
 @pytest.mark.parametrize(("clicked", "shift_clicked", "run"),
@@ -986,7 +1001,9 @@ def test_shift_click_picks_the_run_from_the_version_last_clicked(qtbot, clicked,
     _click(qtbot, _rows(versions)[shift_clicked], Qt.KeyboardModifier.ShiftModifier)
 
     assert versions.selected_positions() == run
-    assert shown == [clicked]
+    assert shown == [clicked], (
+        "Ctrl and Shift leave the preview where it was: the gesture is these ones, aimed at the "
+        "Delete that follows, and swapping the preview under each click would fight it")
 
 
 def test_an_arrow_after_a_shift_click_steps_on_from_the_version_shift_clicked(qtbot):
@@ -1225,7 +1242,9 @@ def test_deleting_the_only_version_is_refused(qtbot):
     _rows(versions)[0].set_selected(True)
     qtbot.keyClick(versions, Qt.Key.Key_Delete)
 
-    assert asked == []
+    assert asked == [], (
+        "the last version is never deleted from this list: an image with no file left is a "
+        "deleted generation, and that delete is the gallery's own")
 
 
 def test_delete_with_only_the_original_picked_trashes_nothing(qtbot):
@@ -1350,7 +1369,9 @@ def test_the_menus_delete_grays_out_when_it_would_empty_the_image(qtbot, monkeyp
 
     versions._on_row_menu(0, QPoint(0, 0))
 
-    assert seen["enabled"] is False
+    assert seen["enabled"] is False, (
+        "grayed with the reason on it rather than left out: the answer to why this cannot be "
+        "deleted is the only thing the menu can offer")
     assert "only version" in seen["text"]
     assert asked == []
 

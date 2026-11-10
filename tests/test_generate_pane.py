@@ -104,7 +104,8 @@ def test_a_double_click_on_a_tab_never_asks_for_a_name(tabs, monkeypatch):
 
     tabs.tabBarDoubleClicked.emit(0)
 
-    assert asked == []
+    assert asked == [], (
+        "tabs are named after what they show, so there is nothing left for a typed name to say")
 
 
 def test_generate_tabs_includes_the_first_tab(tabs):
@@ -642,7 +643,9 @@ def test_watching_a_folder_with_no_frame_yet_shows_a_waiting_note(tabs):
     tab = tabs.currentWidget()
     tab._viewport.show_message = MagicMock()
     tab.watch_folder("image/sdxl_t2i/abc", None)
-    tab._viewport.show_message.assert_called_once_with("Waiting for preview…", live=True)
+    said = tab._viewport.show_message.call_args_list
+    assert said == [(("Waiting for preview…",), {"live": True})], (
+        "marked live, so the pane can be double-clicked open before the first frame")
     assert tab.watched_key() == "image/sdxl_t2i/abc"
     assert tab.is_awaiting_frame()
 
@@ -668,7 +671,9 @@ def test_the_pair_is_repainted_only_when_it_changes(tabs):
     tab.watch_folder("k", None, None, Combination("frame.png", "clip.webp"))
     tab.watch_folder("k", None, None, Combination("frame.png", "clip.webp"))
 
-    assert tab._viewport.show_combination.call_count == 1
+    assert tab._viewport.show_combination.call_count == 1, (
+        "the poll reads the watch again every tick, and rebuilding the pair would restart the "
+        "video looping beside the frame from its first frame each time")
 
 
 @pytest.mark.parametrize("made_from", [Combination(), Combination(prompt_edited=True)])

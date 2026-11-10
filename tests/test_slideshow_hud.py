@@ -256,7 +256,9 @@ class TestTheOneHudASlideshowWears:
 
         window.press("portrait_next")
 
-        assert channel.read_text(encoding="utf-8").split() == ["portrait_next"]
+        assert channel.read_text(encoding="utf-8").split() == ["portrait_next"], (
+            "the device's rows are checked before the session's channel, so a side's verb that "
+            "fell into them would be swallowed instead of posted")
 
     def test_a_press_on_the_transport_still_reaches_the_slideshow(self, qtbot):
         window = self._window(qtbot)

@@ -209,7 +209,9 @@ def test_plain_scalar_and_single_line_fields_get_no_copy_button(qtbot):
         ParamDef("input_image", "Input Image", "image", ""),
     ])
     qtbot.addWidget(form)
-    assert form._copy_buttons == {}
+    assert form._copy_buttons == {}, (
+        "copy buttons go on the fields worth lifting whole, the prompts and the seeds; a field "
+        "of one line can be retyped")
 
 
 def test_seed_keeps_its_random_tick_beside_the_copy_button(qtbot):
@@ -968,7 +970,10 @@ def test_relocking_drops_the_override_and_restores_the_derived_size(qtbot):
     form._widgets["width"].setValue(1024)
     form._widgets["height"].setValue(576)
 
+    announced = []
+    form.changed.connect(lambda: announced.append("changed"))
     form._unlock_btn.setChecked(False)
+    assert announced, "each turn of the padlock is announced, so the tab refreshes with it"
     assert "width" not in form.get_values()
     assert form._dim_stacks["width"].currentIndex() == 0
     assert form._dim_value_labels["width"].text() == "864"
@@ -1368,7 +1373,9 @@ def test_every_field_and_its_label_carry_the_params_help(qtbot):
         if pd.key in form._widgets:
             assert form._widgets[pd.key].toolTip() == definition_help(pd), pd.key
     steps = next(pd for pd in definitions if pd.key == "steps")
-    assert _label_beside(form, "steps").toolTip() == definition_help(steps)
+    assert _label_beside(form, "steps").toolTip() == definition_help(steps), (
+        "the label is what the user is looking at when wondering what a setting is, and "
+        "hovering the word is the natural move")
 
 
 def test_a_field_with_a_good_range_says_it_in_its_tooltip(qtbot):
@@ -1412,7 +1419,10 @@ def test_hidden_params_stay_at_the_workflow_default_whatever_is_loaded(qtbot):
     form.set_values(dict(wf.default_params(), enhance=True, enhance_steps=44))
 
     values = form.get_values()
-    assert values["enhance"] is False
+    assert values["enhance"] is False, (
+        "enhancement is the Enhance pane's to apply, as a layer of its own, and pinning these "
+        "is what stops a Generate seeded from an old enhanced run coming out enhanced again "
+        "with the Enhance pane's checkbox unchecked")
     assert values["enhance_steps"] == wf.default_params()["enhance_steps"]
 
 

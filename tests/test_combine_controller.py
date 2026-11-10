@@ -501,7 +501,8 @@ def test_a_restore_puts_the_lane_in_before_the_action(combine):
                         "intent": action_settings.GENAU, "category": "alpha"})
 
     assert controller.widget.intent == action_settings.GENAU
-    assert controller.widget.category == "alpha"
+    assert controller.widget.category == "alpha", (
+        "the lane decides which actions can be answered, so it goes in before the action does")
 
 
 def test_a_restore_skips_an_item_that_no_longer_fits_its_slot(combine):
@@ -881,7 +882,9 @@ def test_a_pressed_generate_leaves_its_clip_in_the_gallery(combine, monkeypatch)
 
     controller.generate_category("img", "alpha", action_settings.GENAU)
 
-    assert db.requested == []
+    assert db.requested == [], (
+        "only a spoken animation is sent on to Genau by itself: someone pressing Generate is at "
+        "the keyboard and can look at the video first")
 
 
 def test_a_spoken_clip_hands_itself_on_when_it_lands(combine, monkeypatch, tmp_path):
@@ -1138,7 +1141,9 @@ def test_a_second_loop_asked_for_over_an_image_with_one_coming_is_refused(
     controller, _host = combine(db=db)
 
     assert controller.animate_it("img", AnimateRequest(action_settings.GENAU, "alpha")) == (
-        None, ALREADY_GENAUD, WARNING)
+        None, ALREADY_GENAUD, WARNING), (
+        "saying it twice is what someone does when the first time appeared to do nothing, and a "
+        "second identical run would spend minutes of the one GPU on a video that already exists")
 
 
 def test_the_actions_narrow_to_what_the_dropped_image_can_start_from(combine,

@@ -182,7 +182,8 @@ def test_a_plain_click_picks_one_tile_and_ctrl_toggles_another(qtbot):
     assert pane.selected_prompt_ids() == ["g1"]
 
     pane.apply_selection("g3", _CTRL)
-    assert pane.selected_prompt_ids() == ["g1", "g3"]
+    assert pane.selected_prompt_ids() == ["g1", "g3"], (
+        "the keys mirror a typical file manager's")
 
     pane.apply_selection("g1", _CTRL)
     assert pane.selected_prompt_ids() == ["g3"]
@@ -821,7 +822,9 @@ def test_a_tile_drawn_for_a_folder_is_not_taken_for_a_collection(qtbot):
 
     pane.show_collection(LATEST_KEY, LANDSCAPE)
 
-    assert pane._thumb_widgets["a1"] is not in_folder
+    assert pane._thumb_widgets["a1"] is not in_folder, (
+        "a folder's tile and a collection's answer a double-click differently, so one is never "
+        "wired for the other")
 
 
 def test_each_folders_collection_counts_what_that_collection_lists(qtbot):
@@ -892,4 +895,5 @@ def test_a_shut_search_section_still_holds_its_tiles_in_the_shown_order(qtbot):
     pane.show_search_results(tiles, search.SearchTerms(
         sort_mode=search.SORT_MODEL_LORA, query="scene", outcome=None, collapsed={heading}))
 
-    assert [row["prompt_id"] for row in pane.collection_rows()] == ["a", "b"]
+    assert [row["prompt_id"] for row in pane.collection_rows()] == ["a", "b"], (
+        "a shut section's tiles are still built and still counted, so unfolding it is instant")

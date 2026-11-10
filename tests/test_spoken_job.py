@@ -176,7 +176,8 @@ def test_the_voice_speaks_off_the_gui_thread_and_the_job_is_sent_from_it(qtbot, 
     assert client.free_memory.call_count == 1, (
         "the models ComfyUI keeps loaded would leave the voice no room on the graphics card")
     assert seen["spoke_on"] != gui_thread
-    assert seen["sent_on"] == gui_thread
+    assert seen["sent_on"] == gui_thread, (
+        "the submit happens back on the window's thread, where every job's signals are wired")
 
 
 def test_the_voice_a_job_with_no_window_asks_for_speaks_on_the_starting_thread(

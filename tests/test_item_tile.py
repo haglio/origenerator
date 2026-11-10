@@ -240,7 +240,9 @@ def test_corner_action_click_emits_the_prompt_id_and_action_id(qtbot):
 def test_every_corner_of_a_tile_is_up_at_rest(qtbot):
     tw = ItemTile("p1", None, "label", TileAppearance(enhance=icons.ENHANCE_OPEN))
     qtbot.addWidget(tw)
-    assert all(not b.isHidden() for b in _corners(tw))
+    assert all(not b.isHidden() for b in _corners(tw)), (
+        "the corners are not revealed on hover: each reacts to the cursor on itself, and a "
+        "control that only appears once the tile is swept is one the user has to go looking for")
 
 
 def test_a_favorite_tile_shows_it_in_the_favorite(qtbot):

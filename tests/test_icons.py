@@ -73,8 +73,12 @@ def test_item_type_icons_render_for_image_and_video(qtbot):
 def test_the_side_marks_are_one_frame_and_its_quarter_turn(qtbot):
     portrait = icons.shape_mark("portrait")
     landscape = icons.shape_mark("landscape")
-    assert portrait.size() == landscape.size()
-    assert portrait.width() == portrait.height()
+    assert portrait.size() == landscape.size(), (
+        "both marks are drawn on one square canvas, so the words beside them start at the same "
+        "x")
+    assert portrait.width() == portrait.height(), (
+        "both marks are drawn on one square canvas, so the words beside them start at the same "
+        "x")
 
     tall, wide = _ink_bounds(portrait), _ink_bounds(landscape)
     assert tall[1] > tall[0]
@@ -85,7 +89,8 @@ def test_the_side_marks_are_one_frame_and_its_quarter_turn(qtbot):
 def test_a_side_mark_is_a_frame_and_not_a_filled_block(qtbot):
     image = icons.shape_mark("portrait").toImage()
     middle = image.pixelColor(image.width() // 2, image.height() // 2)
-    assert middle.alpha() == 0
+    assert middle.alpha() == 0, (
+        "a frame stands for a region an image goes in; filled, it would read as a swatch")
     assert _dominant_color(icons.shape_mark("portrait")) == TEXT_PRIMARY.rgb()
 
 

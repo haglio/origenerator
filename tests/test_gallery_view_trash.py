@@ -779,7 +779,9 @@ def test_right_clicking_the_pane_background_keeps_the_selection(qtbot):
     pane.resize(600, 600)
     qtbot.mouseClick(pane, Qt.MouseButton.RightButton, pos=QPoint(560, 560))
 
-    assert view.selected_prompt_ids() == ["i1"]
+    assert view.selected_prompt_ids() == ["i1"], (
+        "a right click opens a context menu, and losing the selection out from under one would "
+        "aim it at nothing")
 
 
 def test_delete_on_a_settings_folder_with_no_pick_deletes_the_whole_folder(

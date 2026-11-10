@@ -1810,7 +1810,10 @@ def test_an_unenhanced_image_still_shows_its_original_and_the_add_tile(saved_pan
     tab, db = saved_panel
     image = _image_row(db, "img1")
     tab.show_saved_generation(image, [image])
-    assert not tab._versions.isHidden()
+    assert not tab._versions.isHidden(), (
+        "the list of versions has to be somewhere the user can already see before the first "
+        "enhancement makes a second one, not least because an enhancement just launched "
+        "replaces the list's only other content while it runs")
     (row,) = _version_rows(tab)
     assert "Original" in _row_texts(row)
     assert tab._versions._host.findChildren(_AddRow)
@@ -1906,7 +1909,11 @@ def test_the_way_to_the_folder_is_one_button_in_the_row_with_generate(saved_pane
 
     tab.show_saved_generation(image, [image])
 
-    (button,) = tab.findChildren(QPushButton, "goToFolderButton")
+    buttons = tab.findChildren(QPushButton, "goToFolderButton")
+    assert len(buttons) == 1, (
+        "every version of an image is in the same folder, so going there is the image's act "
+        "rather than any one version's")
+    (button,) = buttons
     tab.resize(700, 1600)
     tab.show()
     QApplication.processEvents()
@@ -1931,7 +1938,9 @@ def test_an_enhancement_in_flight_shows_in_the_strip(saved_panel):
 
     assert not tab._versions.isHidden()
     assert tab._versions._host.findChildren(_PendingRow)
-    assert _version_rows(tab)
+    assert _version_rows(tab), (
+        "the original stays beside the one being made: the base render is out and worth looking "
+        "at while its enhancement is made")
 
     tab.set_pending_enhancement(None)
     assert not tab._versions._host.findChildren(_PendingRow)
@@ -1951,7 +1960,10 @@ def test_a_running_enhancement_streams_into_the_preview(saved_panel, tmp_path,
     tab._viewport.show_media.reset_mock()
 
     tab.set_pending_enhancement(RunningEnhancement("running", b"\x89PNG-ish", "2x"))
-    tab._viewport.show_frame.assert_called_once_with(b"\x89PNG-ish", enhancing=True)
+    shown = tab._viewport.show_frame.call_args_list
+    assert shown == [((b"\x89PNG-ish",), {"enhancing": True})], (
+        "the pane at the top of the tab is where this app shows what is being made, and an "
+        "enhancement of the image on display is being made")
 
     tab.set_pending_enhancement(None)
     tab._viewport.show_media.assert_called_once_with(
@@ -4020,7 +4032,9 @@ def test_a_lane_refuses_a_send_the_row_records_even_with_its_button_still_live(
     tab._displayed_row = db.get_generation("vid1")
     tab._on_send(lane)
 
-    export.assert_not_called()
+    assert export.call_count == 0, (
+        "a button is only as fresh as the last time the footer was drawn; the column is what "
+        "survives a restart, so the row decides")
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
@@ -4109,7 +4123,9 @@ def test_sending_again_before_the_delete_runs_calls_it_off(saved_panel,
 
     row = db.get_generation("vid1")
     assert row[lane.flag]
-    assert not row[lane.unsent_flag]
+    assert not row[lane.unsent_flag], (
+        "the deletion waits for the other app's next run, so a send made right after a "
+        "withdrawal has to take the withdrawal back")
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)

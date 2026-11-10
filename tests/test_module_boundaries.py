@@ -70,6 +70,8 @@ QT_FREE = (
     "origenerator.funestras_engine",
     "origenerator.gui.picking",
     "origenerator.gui.slideshow_set",
+    "origenerator.nav_map",
+    "origenerator.fun_time_mode",
 )
 
 NEEDS_QT = (

@@ -543,6 +543,7 @@ def _answer_menu(monkeypatch, label):
         act = find(menu)
         if act is None:
             raise AssertionError(f"no menu entry reading {label!r}")
+        # Qt triggers the entry clicked before exec returns it.
         act.trigger()
         return act
 

@@ -331,6 +331,8 @@ def test_the_go_to_folder_button_takes_a_collection_item_home_without_a_right_cl
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     _click_tile(view, "i2")
     (button,) = _folder_buttons(view)
+    # Qt gives an unshown button no rect for a press to land in, and the press is a real one because going there
+    # rebuilds the block the button sits in: Qt destroys it in the middle of its own click.
     button.show()
 
     qtbot.mouseClick(button, Qt.MouseButton.LeftButton)

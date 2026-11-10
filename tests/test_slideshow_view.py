@@ -1218,6 +1218,18 @@ def test_favoriting_says_no_when_there_is_nothing_to_favorite(qtbot):
     assert _view(qtbot).slideshow.favorite() is False
 
 
+def test_favoriting_an_item_with_no_generation_behind_it_says_no_and_favorites_nothing(qtbot):
+    favorited = []
+    view = _view(qtbot, [("scene one.png", "image")],
+                 actions=SlideshowActions(favorite=favorited.append))
+
+    said = view.slideshow.favorite()
+
+    assert (said, favorited) == (False, []), (
+        "a slideshow whose items carry no generation id has nothing to favorite, and says so "
+        "rather than seeming to")
+
+
 def test_stepping_and_culling_are_the_arrows_own_moves(qtbot):
     culled = []
     items = [("a.png", "image", "gen-a", None), ("b.png", "image", "gen-b", None),

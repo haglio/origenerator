@@ -800,7 +800,8 @@ def test_the_menu_over_a_folder_of_your_own_offers_its_name_and_its_removal(
 
     _tree_menu(view, gallery.custom_collection_key(folder_id))
 
-    assert labels == ["Copy name", "", "Remove collection…", "", "Collapse all", "Expand all"]
+    assert labels == ["Copy name", "", "Remove collection…", "", "Collapse all", "Expand all"], (
+        "a favorite of such a folder gathers nothing, so its menu offers no Favorite")
 
 
 def test_copy_name_on_a_folder_of_your_own_copies_the_name_you_gave_it(

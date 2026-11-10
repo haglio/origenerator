@@ -340,7 +340,7 @@ def test_redo_of_a_folder_creation_brings_it_back_at_the_same_id(tmp_path):
     actions.redo()
 
     ((record,),) = (db.list_custom_collections(),)
-    assert record["id"] == folder_id
+    assert record["id"] == folder_id, "a saved session names the collection by its id"
     assert record["side"] == PORTRAIT
     assert record["name"] == "Mine"
     assert record["folders"] == ["image/sdxl_t2i"]

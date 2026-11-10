@@ -11,6 +11,7 @@ from origenerator.gallery import (
     is_enhanced_row,
 )
 from origenerator.generation_metadata import file_item, metadata_facts
+from origenerator.generation_state import GenerationSource
 from origenerator.output_places import OutputPlaces
 
 
@@ -59,14 +60,17 @@ def test_fold_upgrades_the_source_row_in_place(tmp_path):
     upgraded = db.get_generation("src")
     files = gallery.row_output_files(upgraded)
     assert [f["filename"] for f in files] == \
-        ["image_enhance_00001_.png", "sdxl_t2i_src.png"]
+        ["image_enhance_00001_.png", "sdxl_t2i_src.png"], (
+        "the first file listed is what previews and thumbnails show, "
+        "and the earlier ones stay listed so no later import finds a file with no item")
     assert json.loads(upgraded["original_files"]) == \
         [{"filename": "sdxl_t2i_src.png", "subfolder": "image", "type": "output"}]
     assert upgraded["thumbnail_path"] == "enh_thumb.jpg"
     assert upgraded["starred"] == 1
     assert is_enhanced_row(upgraded)
     assert gallery.settings_folder_key(upgraded) == key_before
-    assert db.get_generation("e1") is None
+    assert db.get_generation("e1") is None, \
+        "only the run's row goes: its file is now the image's"
 
 
 def test_the_places_an_enhancements_fixes_found_stay_with_its_file_once_folded(tmp_path):
@@ -154,7 +158,9 @@ def test_fold_lands_on_the_image_the_run_was_stamped_with(tmp_path):
     _add_enhance(db, "e1", "image/sdxl_t2i_twin.png [output]", "image_enhance_e1.png")
     db.set_enhance_target("e1", "second")
 
-    assert fold_enhancement(db, db.get_generation("e1")) == "second"
+    assert fold_enhancement(db, db.get_generation("e1")) == "second", (
+        "two rows can name one file, after a file's number is given out again "
+        "or a completion is recorded twice; the stamp names the one the user chose")
 
     assert is_enhanced_row(db.get_generation("second"))
     assert not is_enhanced_row(db.get_generation("first"))
@@ -213,7 +219,9 @@ def test_a_run_id_this_table_never_issued_comes_off_the_version(tmp_path):
     assert gallery.disown_foreign_runs(db) == 1
 
     version, = json.loads(db.get_generation("adopted")["enhance_history"])
-    assert version["run_id"] is None
+    assert version["run_id"] is None, (
+        "Latest seats an enhanced image by its run's id, "
+        "and an id another table issued would seat it somewhere meaningless")
     assert version["params"] == {"enhance_scale": 2.0}
     assert version["filename"] == "e.png"
     assert gallery.disown_foreign_runs(db) == 0
@@ -251,11 +259,15 @@ def test_fold_completed_enhancements_sweeps_only_finished_rows(tmp_path):
     _add_enhance(db, "running", "image/sdxl_t2i_a.png [output]", "x.png", status="running")
     _add_enhance(db, "orphan", "image/sdxl_t2i_gone.png [output]", "image_enhance_o.png")
 
-    assert fold_completed_enhancements(db) == 2
+    assert fold_completed_enhancements(db) == 2, (
+        "every finished enhancement folds, however old: rows from when Image Enhance "
+        "was a workflow of its own become versions this way too")
 
     assert db.get_generation("done_a") is None
     assert db.get_generation("done_b") is None
-    assert db.get_generation("running")["status"] == "running"
+    assert db.get_generation("running")["status"] == "running", (
+        "a run has a row of its own while it is made, "
+        "so its tile and a restart's reconnection work like any run's")
     assert db.get_generation("orphan") is not None
     assert is_enhanced_row(db.get_generation("src_a"))
     assert is_enhanced_row(db.get_generation("src_b"))
@@ -285,10 +297,15 @@ def test_tree_never_grows_a_folder_for_a_running_enhance(tmp_path):
     (images,) = gallery.build_gallery_tree(db.list_generations())
     assert [w.workflow_name for w in images.children] == ["sdxl_t2i"]
 
+
+def test_a_finished_enhancement_whose_image_is_gone_keeps_a_folder(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _add_source(db)
     _add_enhance(db, "orphan", "image/sdxl_t2i_gone.png [output]",
                  "image_enhance_o.png")
     (images,) = gallery.build_gallery_tree(db.list_generations())
-    assert sorted(w.workflow_name for w in images.children) == ["image_enhance", "sdxl_t2i"]
+    assert sorted(w.workflow_name for w in images.children) == ["image_enhance", "sdxl_t2i"], \
+        "shown, it can be found and deleted; hidden, its file would stay on the disk unseen"
 
 
 def test_original_files_survives_capture_and_restore(tmp_path):
@@ -388,10 +405,64 @@ def test_a_reconstructed_enhance_is_recognized_by_its_file(tmp_path):
     _add_source(db)
     stray = _add_reconstructed_enhance(db, "i1", "image/sdxl_t2i_src.png [output]",
                                        "image_enhance_00001_.png")
-    assert gallery.is_enhance_product_row(stray)
+    assert gallery.is_enhance_product_row(stray), (
+        "the import reads an enhancement's graph as an ordinary low-denoise img2img, "
+        "so the file's name is what tells")
     assert not gallery.is_enhance_product_row(db.get_generation("src"))
     fold_enhancement(db, stray)
     assert not gallery.is_enhance_product_row(db.get_generation("src"))
+
+
+def test_latest_lifts_the_image_an_unstamped_run_will_fold_onto(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _add_source(db, "first", filename="sdxl_t2i_twin.png")
+    _add_source(db, "second", filename="sdxl_t2i_twin.png")
+    _add_enhance(db, "e1", "image/sdxl_t2i_twin.png [output]", "image_enhance_e1.png",
+                 status="running")
+    lifted = gallery.recent_generations(db.list_generations())[0]["prompt_id"]
+
+    db.update_generation("e1", status="completed", output_files=json.dumps(
+        [{"filename": "image_enhance_e1.png", "subfolder": "image", "type": "output"}]))
+
+    assert fold_enhancement(db, db.get_generation("e1")) == lifted
+
+
+def test_an_image_whose_files_left_are_all_enhancements_is_still_no_stray(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _add_source(db)
+    fold_enhancement(db, _add_enhance(db, "e1", "image/sdxl_t2i_src.png [output]",
+                                      "image_enhance_00001_.png"))
+    folded = db.get_generation("src")
+    left = dict(folded, output_files=json.dumps(
+        [file for file in gallery.row_output_files(folded)
+         if file["filename"].startswith("image_enhance")]))
+
+    assert not gallery.is_enhance_product_row(left)
+
+
+def test_a_repair_named_like_an_enhancement_is_no_stray_enhancement(tmp_path):
+    db = Database(tmp_path / "t.db")
+    stray = _add_reconstructed_enhance(db, "i1", "image/sdxl_t2i_src.png [output]",
+                                       "image_enhance_00001_.png")
+
+    assert not gallery.is_enhance_product_row(dict(stray, source=GenerationSource.BASE_RENDER)), \
+        "a repair folds by its own route"
+
+
+def test_the_launch_reads_the_library_once_however_many_enhancements_it_folds(tmp_path):
+    db = Database(tmp_path / "t.db")
+    for letter in "ab":
+        _add_source(db, f"src_{letter}", f"sdxl_t2i_{letter}.png")
+        _add_enhance(db, f"done_{letter}", f"image/sdxl_t2i_{letter}.png [output]",
+                     f"image_enhance_{letter}.png")
+    reads = []
+    list_generations = db.list_generations
+    db.list_generations = lambda *args, **kwargs: reads.append(1) or list_generations(
+        *args, **kwargs)
+
+    assert fold_completed_enhancements(db) == 2
+
+    assert reads == [1], "reading every generation once per fold turns a launch into a wait"
 
 
 def test_sweep_folds_the_enhancement_the_import_scan_rebuilt(tmp_path):

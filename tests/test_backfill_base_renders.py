@@ -22,6 +22,7 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.core import Core
+from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.job_queue import JobQueue
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -76,7 +77,9 @@ def test_an_unrebuildable_import_is_left_alone(tmp_path):
     db = Database(tmp_path / "t.db")
     _add(db, "import", params={"enhance": True}, files=[_file("mystery.png")],
          workflow="unknown")
-    assert rows_missing_their_base(db.list_generations()) == []
+    assert rows_missing_their_base(db.list_generations()) == [], (
+        "an import has no settings to re-run, and guessed ones would render a base "
+        "that is not this image's")
 
 
 def test_a_re_render_in_flight_is_not_itself_something_to_repair(tmp_path):
@@ -100,7 +103,9 @@ def test_the_rerun_is_the_recorded_settings_with_the_tail_off(tmp_path):
     params = base_params_for(row, _SDXL)
 
     assert params["enhance"] is False
-    assert params["seed"] == 4242
+    assert params["seed"] == 4242, (
+        "the same seed and settings with the enhance tail off give back the very pixels "
+        "the base pass made, which is what makes the re-run a repair")
     assert params["steps"] == 37
     assert params["cfg"] == 6.5
     assert params["positive_prompt"] == "a lantern"
@@ -181,12 +186,46 @@ def test_folding_drops_the_repair_row_it_came_from(tmp_path):
     assert gallery.original_files_of(db.get_generation("baked"))
 
 
+def test_the_target_key_reaches_no_node(tmp_path):
+    params = base_params_for(_baked(Database(tmp_path / "t.db"), "baked"), _SDXL)
+    without = {key: value for key, value in params.items() if key != TARGET_KEY}
+    assert _SDXL.build_api_payload(params) == _SDXL.build_api_payload(without)
+
+
+def test_a_finished_repair_is_folded_before_the_gallery_first_draws(qtbot, tmp_path, monkeypatch):
+    db = Database(tmp_path / "t.db")
+    _baked(db, "baked")
+    _add(db, "repair", params={TARGET_KEY: "baked"},
+         files=[_file("sdxl_t2i_baked_base.png")], source=GenerationSource.BASE_RENDER)
+    waiting_at_each_draw = []
+    draw = GalleryView.refresh
+
+    def noting(view, **how):
+        waiting_at_each_draw.append(db.get_generation("repair") is not None)
+        draw(view, **how)
+
+    monkeypatch.setattr(GalleryView, "refresh", noting)
+
+    window = Core(ComfyUIClient(folders=SUITE_FOLDERS), db, AppState(tmp_path / "ui.json"))
+    qtbot.addWidget(window)
+    window._gallery_view.refresh()
+
+    assert waiting_at_each_draw[0] is False, (
+        "a repaired image is drawn with both its versions from the first")
+
+
+def test_the_tool_waits_for_a_repair_with_the_loop_the_app_keeps():
+    assert backfill_tool.render_base_now is base_backfill.render_base_now, (
+        "a loop of the tool's own is the one piece nothing here would catch going out of step")
+
+
 def test_a_repair_whose_target_is_gone_is_left_alone(tmp_path):
     db = Database(tmp_path / "t.db")
     repair = _add(db, "repair", params={TARGET_KEY: "vanished"},
                   files=[_file("orphan_base.png")], source=GenerationSource.BASE_RENDER)
     assert fold_base_render(db, repair) is None
-    assert db.get_generation("repair") is not None
+    assert db.get_generation("repair") is not None, (
+        "left whole, it can be found and cleared by hand")
 
 
 def test_the_startup_sweep_folds_the_finished_and_leaves_the_running(tmp_path):
@@ -229,7 +268,8 @@ def test_opening_the_app_drops_what_the_absence_had_not_reached(tmp_path):
 
     assert cancel_base_renders(db, client) == 1
 
-    assert client.cancelled == ["queued"]
+    assert client.cancelled == ["queued"], (
+        "the app is open now, so the graphics card is for the user's own work")
     assert db.get_generation("queued") is None
     assert db.get_generation("done") is not None
 
@@ -291,7 +331,9 @@ def test_an_untimed_workflow_is_priced_high_rather_than_guessed_low(tmp_path):
     queued = queue_base_renders(db.list_generations(), lambda wf, p: "p",
                                 budget_minutes=5)
 
-    assert queued == 5 * 60 / UNTIMED_SECONDS
+    assert queued == 5 * 60 / UNTIMED_SECONDS, (
+        "a low guess queues more than ComfyUI can finish, which the next launch throws away; "
+        "a high one costs only another absence")
 
 
 def test_one_repair_always_goes_however_slow(tmp_path):
@@ -444,7 +486,7 @@ def test_a_repair_that_never_finishes_gives_up_rather_than_waiting_forever():
     files = render_base_now(client, _SDXL, _base_params(), now=monotonic, sleep=sleep)
 
     assert files == []
-    assert monotonic() >= base_backfill.RENDER_TIMEOUT_SECONDS
+    assert monotonic() >= base_backfill.LONG_ENOUGH_FOR_ONE_IMAGE_ON_ANY_MODEL_SECONDS
 
 
 def _repairable_db(tmp_path):

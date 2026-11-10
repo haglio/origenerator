@@ -102,7 +102,8 @@ def test_machinery_is_never_an_experiment_base_whatever_it_is_called():
 
     only_machinery = [make_row("m-1", workflow_name="machine_only")]
 
-    assert policy.propose(only_machinery) is None
+    assert policy.propose(only_machinery) is None, \
+        "varying an enhancement only enhances again an image that exists"
     assert policy.propose([*only_machinery, make_row("ok-1")]).base_prompt_id == "ok-1"
 
 
@@ -166,7 +167,8 @@ def test_batch_size_is_not_an_experiment_dimension():
     policy = make_policy(seed=8)
     for _ in range(300):
         proposal = policy.propose([base])
-        assert "batch_size" not in proposal.mutated_keys
+        assert "batch_size" not in proposal.mutated_keys, (
+            "a bigger batch repeats the same settings, exploring nothing at many times the cost")
         assert proposal.params["batch_size"] == 1
 
 
@@ -200,7 +202,9 @@ def test_video_bases_dominate_even_an_image_heavy_gallery():
     policy = make_policy(seed=9)
     picked = [policy.propose(rows).workflow.name for _ in range(300)]
     video_share = picked.count("fake_i2v") / len(picked)
-    assert video_share > 0.6
+    assert video_share > 0.6, (
+        "a gallery holds many images per video, so a weight on each video base would be swamped; "
+        "a share of the proposals is not, and leaves images the smaller share")
 
 
 def test_lora_dims_are_the_favorite_mutation(monkeypatch):
@@ -218,7 +222,7 @@ def test_lora_dims_are_the_favorite_mutation(monkeypatch):
     monkeypatch.setattr(policy_module, "_LORA_DIM_WEIGHT", 1.0)
     even = lora_share()
 
-    assert favoured > even + 0.15
+    assert favoured > even + 0.15, "a LoRA and its strength are what the user most wants explored"
 
 
 def test_video_experiments_keep_their_start_frame():
@@ -259,7 +263,7 @@ def test_proposal_mutates_declared_dims_and_rerolls_the_seed():
         assert proposal.workflow.name == "fake_t2i"
         assert proposal.base_prompt_id == "base-1"
         assert proposal.params["seed"] != 777
-        assert proposal.mutated_keys
+        assert proposal.mutated_keys, "a proposal that changes nothing but its seed teaches nothing"
         for key in proposal.mutated_keys:
             assert proposal.params[key] != base_params[key]
         untouched = set(base_params) - set(proposal.mutated_keys) - {"seed"}

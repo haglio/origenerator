@@ -89,7 +89,6 @@ class GalleryEdits:
     def delete_rows(self, rows: list[dict], *, pressed: Pressed | None = None) -> None:
         if not rows:
             return
-        self._stop_enhancements(rows)
         batches = self._trash_files(rows, pressed=pressed)
         for row, batch in batches:
             self._db.delete_generation(row["prompt_id"])
@@ -144,12 +143,10 @@ class GalleryEdits:
             return
         self._db.update_generation(prompt_id, thumbnail_path=str(path))
 
-    def _stop_enhancements(self, rows: list[dict]) -> None:
-        if self._environment.cancel_enhancements is not None:
-            self._environment.cancel_enhancements(rows)
-
     def _trash_files(self, rows: list[dict], names: set[str] | None = None, *,
                      the_item_stays: bool = False, pressed: Pressed | None = None):
+        if not the_item_stays and self._environment.cancel_enhancements is not None:
+            self._environment.cancel_enhancements(rows)
         # Windows cannot move a file the app still holds open, as a preview does its video.
         by_row = self._files_by_row(rows, names)
         in_play = self._in_play(rows, pressed) if names is None else [[] for _row in rows]
@@ -230,7 +227,6 @@ class GalleryEdits:
 
     def reject_experiment(self, row: dict, *, pressed: Pressed | None = None) -> None:
         prompt_id = row["prompt_id"]
-        self._stop_enhancements([row])
         ((_row, batch),) = self._trash_files([row], pressed=pressed)
         self._db.set_experiment_verdict(prompt_id, "down")
         self._db.update_generation(

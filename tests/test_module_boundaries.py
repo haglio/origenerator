@@ -15,6 +15,8 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 QT_FREE = (
+    "origenerator.gallery.tree",
+    "origenerator.search",
     "origenerator.app",
     "origenerator.boot_passes",
     "origenerator.passes_on_the_files",
@@ -75,6 +77,12 @@ def _loaded_after_importing(module: str, what: str) -> bool:
 @pytest.mark.parametrize("module", QT_FREE)
 def test_a_module_that_claims_to_be_qt_free_is(module):
     assert _loaded_after_importing(module, "PyQt6") is False
+
+
+def test_the_experiment_policy_asks_no_language_model():
+    assert _loaded_after_importing(
+        "origenerator.experiments.policy", "origenerator.local_llm") is False, \
+        "it works from the gallery's rows alone, so it runs offline and with a random source handed in"
 
 
 def test_timing_loads_no_database():

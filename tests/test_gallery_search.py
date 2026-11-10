@@ -173,6 +173,10 @@ def test_the_field_shows_a_search_is_still_going_until_its_widening_lands(contro
 
     _type(found, "kitten")
     assert found.field.working()
+    assert found._expand_timer.isActive(), (
+        "the model is asked only after a real pause, not in a gap between two characters: the "
+        "results the table widened are on screen throughout, so nothing is being waited for, "
+        "and the wait only decides how often the model is asked")
 
     _let_the_widening_land(qtbot, found)
     assert not found.field.working()

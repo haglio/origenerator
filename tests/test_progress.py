@@ -139,8 +139,7 @@ def test_a_step_that_names_no_node_belongs_to_the_pass_already_running():
 
 def test_each_sampler_pass_is_named_the_way_the_form_names_it():
     names = stage_names(_payload("wan22_i2v", steps=20))
-    assert (names["15"], names["16"], names["24"]) == ("First pass", "Second pass", "Sound"), (
-        "named from each node's own settings: a table per workflow would go stale")
+    assert (names["15"], names["16"], names["24"]) == ("First pass", "Second pass", "Sound")
 
 
 def test_a_stills_second_sampler_is_named_for_the_denoise_that_marks_it(enhance_payload):

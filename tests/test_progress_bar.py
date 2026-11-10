@@ -157,9 +157,7 @@ def test_a_single_pass_run_keeps_the_whole_bar(styled_bar):
     styled_bar.show_progress("50%", (1, 1))
     image = styled_bar.grab().toImage()
 
-    assert styled_bar.pass_progress() is None, (
-        "the band is for a run of several passes, where one bar starting over at each pass "
-        "would look like several jobs")
+    assert styled_bar.pass_progress() is None
     assert image.pixelColor(8, _foot(styled_bar)) == BLUE
 
 

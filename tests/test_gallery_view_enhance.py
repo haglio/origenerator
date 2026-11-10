@@ -737,7 +737,9 @@ def test_a_tile_wears_an_enhancing_scrim_while_its_run_is_in_flight(qtbot, tmp_p
     view.enhance_items(["g0"])
     view._rerender_current_leaf()
 
-    assert view._gallery_pane._thumb_widgets["g0"]._enhancing is not None
+    assert view._gallery_pane._thumb_widgets["g0"]._enhancing is not None, (
+        "without it a folder generating with auto-enhance on looks like it is turning out plain "
+        "images and ignoring the switch")
 
 
 def test_the_add_tile_enhances_the_image_the_tab_is_showing(qtbot, tmp_path):

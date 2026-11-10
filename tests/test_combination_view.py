@@ -28,7 +28,9 @@ def test_a_lone_image_is_not_a_sum(qtbot, tmp_path):
 
 
 def test_a_run_made_from_nothing_draws_nothing(qtbot, tmp_path):
-    assert combination_pixmap(Combination(), QSize(172, 160)) is None
+    assert combination_pixmap(Combination(), QSize(172, 160)) is None, (
+        "a run made from nothing has no thumbnail to its name yet, and a stand-in would be a "
+        "thumbnail of something with nothing to do with it")
     assert combination_pixmap(Combination(str(tmp_path / "gone.png")), QSize(172, 160)) is None
 
 
@@ -41,7 +43,9 @@ def test_the_clip_beside_the_frame_is_drained_of_color(qtbot, tmp_path):
     left = image.pixelColor(side // 2, side // 2)
     right = image.pixelColor(image.width() - side // 2, side // 2)
     assert left.blue() > left.red()
-    assert right.red() == right.green() == right.blue()
+    assert right.red() == right.green() == right.blue(), (
+        "gray because it is not what is being made: in full color beside the frame it reads as a "
+        "second subject")
 
 
 def _columns_of(image, color):
@@ -82,7 +86,9 @@ def test_a_click_on_the_pair_falls_through_to_the_pane(qtbot, tmp_path):
     view = _view(qtbot, Combination(_image(tmp_path / "frame.png")))
 
     for label in (view.image_label, view.plus_label, view.video_label):
-        assert label.testAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        assert label.testAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents), (
+            "the pane owns the double-click that opens a slideshow; there is nothing here to open, so "
+            "nothing here takes a click")
 
 
 def test_the_plus_shows_only_with_both_halves(qtbot, tmp_path):

@@ -69,7 +69,9 @@ def test_combined_params_drops_the_videos_stored_size():
 
     params = gallery.combined_params(video, image, _I2V)
 
-    assert "width" not in params
+    assert "width" not in params, (
+        "a source video's size sized the frame it ran on; carried onto an image of another shape "
+        "it would stretch it")
     assert "height" not in params
 
 
@@ -214,7 +216,10 @@ def test_genau_settings_are_generated_at_the_shortest_length_that_closes():
 
 
 def test_genau_settings_play_at_the_top_rate_the_writer_allows():
-    assert _shaped()["frame_rate"] == MAX_PLAYBACK_FPS
+    assert _shaped()["frame_rate"] == MAX_PLAYBACK_FPS, (
+        "29 frames of one cycle are far too coarse to scrub slowly, which is most of what Genau is "
+        "for; the frames between are interpolated after decode, so the top rate costs a pass and no "
+        "sampler time")
 
 
 def test_the_words_that_ask_for_one_cycle_are_added_to_the_videos_own():
@@ -247,7 +252,8 @@ def test_an_action_with_its_own_words_gets_them_and_the_rest_get_the_default():
     own = combine.cycle_words("beta")
     default = combine.cycle_words("")
 
-    assert own != default
+    assert own != default, (
+        "a cycle is not one motion: its stages are different parts of the body from one action to the next")
     assert combine.cycle_words("an action with no entry") == default
     assert _shaped(positive_prompt="x", category="beta")["positive_prompt"] !=         _shaped(positive_prompt="x")["positive_prompt"]
 

@@ -162,7 +162,9 @@ def test_the_column_reads_preview_then_generate_then_settings(tab):
     generate_top, generate_foot = span(tab._generate_btn.parentWidget())
     settings_top, _ = span(tab._settings_scroll)
     assert tab._viewport_pane.isAncestorOf(tab._generate_btn)
-    assert preview_foot <= generate_top < generate_foot <= line_top < line_foot <= settings_top
+    assert preview_foot <= generate_top < generate_foot <= line_top < line_foot <= settings_top, (
+        "Generate heads the settings rather than trailing them in the lower right corner, where "
+        "Windows pops its messages up over whatever is there")
 
 
 def test_a_new_tab_gives_the_preview_five_eighths_and_the_settings_and_metadata_three_sixteenths_each(
@@ -669,7 +671,8 @@ def test_picking_a_workflow_by_hand_announces_a_user_edit(blank_panel):
 
     blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
 
-    assert edits
+    assert edits, (
+        "on a form with nothing to carry over, picking a workflow is the only sign of an edit there is")
 
 
 def test_a_prefill_announces_no_user_edit(tab):
@@ -686,7 +689,9 @@ def test_the_generate_caption_is_re_read_on_a_timer_not_on_each_cue(tab):
 
     tab.refresh_generate_caption()
 
-    assert tab._caption_timer.isActive()
+    assert tab._caption_timer.isActive(), (
+        "whether a press would repeat a past generation needs every stored generation's settings, "
+        "far too much to spend on each keystroke")
     assert tab._caption_timer.isSingleShot()
 
 
@@ -711,7 +716,8 @@ def test_a_made_from_pair_already_on_show_is_not_painted_again(tab):
     tab.show_live_source(pair)
     tab.show_live_source(pair)
 
-    assert painted == [pair]
+    assert painted == [pair], (
+        "built again at every poll, the pair would restart its video's loop from the first frame each second")
 
 
 def test_a_wait_text_already_on_show_is_not_painted_again(tab):
@@ -1476,7 +1482,9 @@ def test_restore_config_pins_concrete_seed_when_not_random(tab):
 
 
 def test_a_fresh_panel_picks_no_workflow(blank_panel):
-    assert blank_panel._workflow_dropdown.currentIndex() == -1
+    assert blank_panel._workflow_dropdown.currentIndex() == -1, (
+        "the resting tab asks which workflow to run, rather than presenting whichever is registered "
+        "first as a choice already made")
     assert blank_panel._workflow_dropdown.currentData() is None
     assert blank_panel._workflow_dropdown.placeholderText()
 
@@ -1508,7 +1516,9 @@ def test_a_fresh_panel_shows_the_previews_placeholder_not_a_black_pane(blank_pan
 
 
 def test_a_fresh_panel_names_itself_for_what_it_is(blank_panel):
-    assert blank_panel.title() == "New generation"
+    assert blank_panel.title() == "New generation", (
+        "unknown would read as a workflow the app failed to recognize, not a question nobody has "
+        "answered yet")
 
 
 def test_generate_on_a_workflowless_panel_asks_for_nothing(blank_panel):
@@ -1548,7 +1558,9 @@ def test_a_displayed_item_names_the_tab_by_its_name_not_its_file(tab):
 
     tab.show_saved_generation(row, [row])
 
-    assert tab.title() == name
+    assert tab.title() == name, (
+        "named after what it shows rather than after its settings, so the row of tabs reads as the "
+        "things that are open")
 
 
 def test_title_changed_when_the_shown_item_changes(tab):
@@ -1582,7 +1594,8 @@ def test_the_mark_falls_back_to_what_the_config_makes(tab):
 
 
 def test_a_tab_with_no_workflow_yet_wears_no_mark(blank_panel):
-    assert blank_panel.tab_icon().isNull()
+    assert blank_panel.tab_icon().isNull(), (
+        "nothing is known yet, and a mark guessing at a workflow would be wrong")
 
 
 class SpyDB:
@@ -2094,7 +2107,9 @@ def test_a_generation_with_no_file_leaves_the_preview_undraggable(saved_panel, m
 
 def test_the_tab_watches_no_run_of_its_own(tab):
     tab.set_generating(True)
-    assert tab._generate_btn.text() == "Generate"
+    assert tab._generate_btn.text() == "Generate", (
+        "filled with its run's steps, the button was a third, differently worded telling of one run, "
+        "and tied the control that starts work to the state of work already going")
     assert not hasattr(tab, "_on_progress")
     assert not hasattr(tab, "_generating_prompt_id")
 
@@ -2138,7 +2153,9 @@ def test_an_image_the_tab_puts_up_itself_carries_its_own_file_row(
 
     tab.prefill("sdxl_t2i", _wiz_params())
 
-    assert tab.displayed_row()["prompt_id"] == "g1"
+    assert tab.displayed_row()["prompt_id"] == "g1", (
+        "the newest result of these settings is a real generation, not a peek: its file is reached "
+        "from it exactly as from one that was clicked")
     (row,) = _version_rows(tab)
     assert "image/sdxl_g1.png" in _row_texts(row)
     names = [b.objectName() for b in row.findChildren(QPushButton)]
@@ -2219,7 +2236,8 @@ def test_a_video_from_another_source_is_never_offered_to_evolver(saved_panel, mo
 
     tab.show_saved_generation(video, [])
 
-    assert tab._lane_button.isHidden()
+    assert tab._lane_button.isHidden(), (
+        "Evolver already holds every other source's videos")
     assert tab._sent_row.isHidden()
 
 
@@ -3041,7 +3059,9 @@ def test_the_enhancement_landing_leaves_the_mark_standing(saved_panel, tmp_path,
     tab.refresh_displayed(enhanced, [enhanced])
     tab.set_pending_enhancement(None)
 
-    assert _message(tab) == "(not yet generated with modifications)"
+    assert _message(tab) == "(not yet generated with modifications)", (
+        "nothing about the settings moved when the enhancement folded in; taking the mark again "
+        "would read the user's edits as what was generated")
 
 
 def test_a_live_frame_clears_the_mark_it_answers(saved_panel):
@@ -4032,7 +4052,9 @@ def test_a_sent_video_says_so_beside_an_unsend_button(saved_panel, monkeypatch, 
 
     assert _lane_offers(tab) == [f"✓ Sent to {lane.name}"]
     assert [button.text() for button in tab.findChildren(QPushButton)
-            if button.isVisibleTo(tab) and "Unsend" in button.text()] == ["Unsend"]
+            if button.isVisibleTo(tab) and "Unsend" in button.text()] == ["Unsend"], (
+        "a send is a file copied into another app's folders, so the only way back is a delete there, "
+        "and it stays offered however long ago the send was")
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
@@ -4066,7 +4088,9 @@ def test_a_withdrawn_clip_says_so_under_the_button_that_offers_it_again(
     tab.show_saved_generation(db.get_generation("vid1"), [])
 
     assert _lane_offers(tab) == [lane.send_caption]
-    assert tab._lane_button.toolTip() == lane.withdrawn_tooltip
+    assert tab._lane_button.toolTip() == lane.withdrawn_tooltip, (
+        "withdrawn, the button reads as it does for a video never sent, and nothing else on the tab "
+        "mentions the other app: the tooltip is the one place left to say the deletion was called off")
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
@@ -4146,7 +4170,9 @@ def test_generate_is_off_while_its_folder_is_already_making_one(tab, qtbot):
     prompt = _positive_field(tab)
 
     prompt.setPlainText("a folder making one")
-    assert tab._generate_btn.isEnabled() is False
+    assert tab._generate_btn.isEnabled() is False, (
+        "the user's rule, one item at a time per folder: a second press made to be sure the first "
+        "took used to make a second image nobody asked for")
     qtbot.waitUntil(lambda: "already making" in tab._generate_btn.toolTip())
 
     prompt.setPlainText("a folder of its own")

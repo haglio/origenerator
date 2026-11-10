@@ -237,7 +237,8 @@ def test_a_form_that_does_not_pin_keeps_random_and_shows_a_fresh_seed_over_a_loa
     form.set_values({"seed": 12345})
 
     shown = form.get_values()["seed"]
-    assert form.seed_is_random() is True
+    assert form.seed_is_random() is True, (
+        "so the settings of a video loaded into a tab do not quietly pin every later run to its seed")
     assert shown != 12345
     assert form.get_values()["seed"] == shown
 
@@ -791,7 +792,9 @@ def test_swapping_dimensions_emits_changed(qtbot):
     fired = []
     form.changed.connect(lambda: fired.append(True))
     form._swap_dimensions_btn.click()
-    assert fired
+    assert fired, (
+        "the tab refreshes its title from the form's changed signal, so a swap announces itself as "
+        "an edit by hand does")
 
 
 def test_swap_button_sits_between_the_rows_and_left_of_the_labels(qtbot):
@@ -1032,7 +1035,9 @@ def test_a_float_field_keeps_the_second_decimal_place(qtbot, sample_defs):
 
     form.set_values({"cfg": 0.85})
 
-    assert form.get_values()["cfg"] == 0.85
+    assert form.get_values()["cfg"] == 0.85, (
+        "a LoRA strength of 0.85 rounded to 0.8 is a different render, and it is what goes back "
+        "into the database as the settings")
 
 
 @pytest.mark.parametrize(("pd", "written", "read_back"), [
@@ -1062,7 +1067,9 @@ def test_every_kind_of_setting_reads_back_as_the_row_stores_it(qtbot, pd, writte
 
     value = form.get_values()[pd.key]
     assert value == read_back
-    assert type(value) is type(read_back)
+    assert type(value) is type(read_back), (
+        "what a field reads back is what a generation's settings hold, and Evolver reads those key "
+        "by key: the value and its type both")
 
 
 def test_a_number_field_with_no_stated_ceiling_takes_a_large_value(qtbot):
@@ -1097,7 +1104,9 @@ def test_set_values_keeps_a_combo_value_absent_from_the_options(qtbot):
     form = ParamForm([ParamDef("lora", "LoRA", "dropdown", "a", options=["a", "b"])])
     qtbot.addWidget(form)
     form.set_values({"lora": "gone.safetensors"})
-    assert form.get_values()["lora"] == "gone.safetensors"
+    assert form.get_values()["lora"] == "gone.safetensors", (
+        "reusing a past generation can carry a choice whose file is no longer on disk; snapping to "
+        "a default would drop the very value the reuse is meant to reproduce")
 
 
 def test_combo_default_absent_from_options_is_still_selected(qtbot):
@@ -1281,7 +1290,9 @@ def test_input_image_value_is_cleaned_of_invisible_wrapping_characters(qtbot):
     wrapped = f"image/{zwsp}sdxl_{zwsp}t2i_{zwsp}00792_{zwsp}.{zwsp}png  "
     form.set_values({"input_image": wrapped})
 
-    assert form.get_values()["input_image"] == "image/sdxl_t2i_00792_.png"
+    assert form.get_values()["input_image"] == "image/sdxl_t2i_00792_.png", (
+        "a displayed path carries zero-width spaces so long names wrap; pasted back, they would "
+        "reach ComfyUI's LoadImage, which then cannot match the file")
 
 
 def test_fields_are_grouped_into_collapsible_sections(qtbot):
@@ -1401,7 +1412,8 @@ def test_hidden_params_stay_at_the_workflow_default_whatever_is_loaded(qtbot):
     values = form.get_values()
     assert values["enhance"] is False
     assert values["enhance_steps"] == wf.default_params()["enhance_steps"]
-    assert "enhance" in values
+    assert "enhance" in values, (
+        "still handed on, so the payload always has a value to build from")
 
 
 def test_a_section_with_no_fields_stays_hidden_whatever_a_config_carries_for_it(qtbot):
@@ -1473,7 +1485,8 @@ def test_a_duration_this_model_cannot_render_is_offered_grayed_out(qtbot):
     qtbot.addWidget(form)
     duration = form._widgets["frame_count"]
 
-    assert _preset_states(duration) == {"1 s": True, "5 s": True, "10 s": False}
+    assert _preset_states(duration) == {"1 s": True, "5 s": True, "10 s": False}, (
+        "the same lengths are offered on every video form, and the models stop at different places")
     assert "5 s" in duration.model().item(2).toolTip()
 
 
@@ -1525,7 +1538,9 @@ def test_a_loaded_frame_count_is_shown_as_the_seconds_it_really_runs(qtbot):
     qtbot.addWidget(form)
     form.set_values({"frame_count": 121, "frame_rate": 24.0})
     assert form._widgets["frame_count"].currentText() == "7.6 s"
-    assert form._widgets["frame_rate"].currentText() == "32 fps"
+    assert form._widgets["frame_rate"].currentText() == "32 fps", (
+        "settings saved before the rates were multiples carry 24 fps, which loads as the reachable "
+        "rate beside it")
     assert form.get_values()["frame_count"] == 121
 
 
@@ -1552,7 +1567,9 @@ def test_a_frame_rate_the_interpolator_cannot_reach_settles_onto_one_it_can(qtbo
 
     rate.lineEdit().setFocus()
     rate.setCurrentText("60")
-    assert form.get_values()["frame_rate"] == 64.0
+    assert form.get_values()["frame_rate"] == 64.0, (
+        "between two multiples there are no frames to show, and a file written at the rate asked "
+        "for anyway would play at the wrong speed")
     qtbot.keyClick(rate.lineEdit(), Qt.Key.Key_Return)
     assert rate.currentText() == "64 fps"
 
@@ -1578,7 +1595,9 @@ def test_a_story_starts_as_one_scene_whose_length_is_the_videos(qtbot):
     assert len(editor.fields("positive_prompt")) == 1
     assert form.get_values() == {"positive_prompt": "", "negative_prompt": "",
                                  "scene_frames": [81], "scene_lines": [""], "frame_count": 81}
-    assert form._present_keys["Prompts & Seed"] == ["scene_frames"]
+    assert form._present_keys["Prompts & Seed"] == ["scene_frames"], (
+        "one row stands for the four: a prompt row of the form's own beside the tiles would read as "
+        "the video's, where the tiles' are the scenes'")
 
 
 def test_a_scenes_prompts_mark_unpaired_parentheses_and_its_spoken_line_does_not(qtbot):
@@ -1631,7 +1650,8 @@ def test_each_scene_keeps_out_its_own_and_a_new_one_starts_from_the_last(qtbot):
     editor = form._widgets["scene_frames"]
     editor.fields("negative_prompt")[0].setPlainText("blurry")
     editor.add_scene()
-    assert editor.fields("negative_prompt")[1].toPlainText() == "blurry"
+    assert editor.fields("negative_prompt")[1].toPlainText() == "blurry", (
+        "a negative mostly holds across a story, so a new scene starts with the one before it")
     editor.fields("negative_prompt")[1].setPlainText("blurry, hats")
     assert form.get_values()["negative_prompt"] == "blurry\n---\nblurry, hats"
 
@@ -1669,7 +1689,9 @@ def test_a_whole_clip_negative_carries_on_into_every_scene_of_a_story(qtbot):
     form.set_values({"positive_prompt": "a\n---\nb\n---\nc", "negative_prompt": "blurry",
                      "scene_frames": [81, 81, 81], "frame_count": 241})
     editor = form._widgets["scene_frames"]
-    assert [field.toPlainText() for field in editor.fields("negative_prompt")] == ["blurry"] * 3
+    assert [field.toPlainText() for field in editor.fields("negative_prompt")] == ["blurry"] * 3, (
+        "a story made when the negative was the whole video's has one text; the graph keeps it out "
+        "of every scene, and what is seen is what renders")
 
 
 def test_removing_a_scene_shortens_the_clip_and_the_last_one_stays(qtbot):
@@ -1811,7 +1833,8 @@ def test_a_workflow_that_cannot_speak_shows_no_lines_box(qtbot):
     editor = form._widgets["scene_frames"]
     editor.add_scene()
     for scene in editor._scenes:
-        assert "scene_lines" not in scene.fields
+        assert "scene_lines" not in scene.fields, (
+            "a field that nothing reads would be an invitation to type into the void")
         assert "Her Lines" not in {label.text() for label in scene.findChildren(ElidingLabel)}
     assert editor.lines() == []
     assert "scene_lines" not in form.get_values()
@@ -1994,7 +2017,8 @@ def test_the_voice_sample_rows_show_only_for_the_custom_voice(qtbot):
     form = ParamForm(_scene_defs() + _voice_defs())
     qtbot.addWidget(form)
     form._widgets["scene_frames"].fields("scene_lines")[0].setPlainText("Come in.")
-    assert not _row_visible(form, "voice_sample")
+    assert not _row_visible(form, "voice_sample"), (
+        "a preset voice needs no recording, and two fields under it read as a second thing to fill in")
     assert not _row_visible(form, "voice_sample_text")
     form._widgets["voice"].setCurrentText(CUSTOM_VOICE)
     assert _row_visible(form, "voice_sample")

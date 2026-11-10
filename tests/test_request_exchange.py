@@ -445,6 +445,18 @@ def test_with_auto_generate_on_each_answer_that_changes_something_is_generated(q
     assert asked == [2]
 
 
+def test_with_auto_generate_on_an_answer_that_left_everything_as_it_was_makes_nothing(qtbot):
+    exchange = _shown_at(qtbot, 400)
+    asked = []
+    exchange.generate_asked.connect(asked.append)
+    exchange.set_auto_generate(True)
+
+    exchange.add_turn("red")
+    exchange.answered(Turn("red", "It was already red.", "a red hat", "", "a red hat", ""))
+
+    assert asked == []
+
+
 def test_with_auto_generate_off_an_answer_waits_for_generate(qtbot):
     exchange = _shown_at(qtbot, 400)
     asked = []

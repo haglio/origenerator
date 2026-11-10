@@ -610,7 +610,9 @@ def test_the_llm_widening_re_runs_the_search_when_it_lands(qtbot):
 
     view._search._expander.expanded.emit("cat", {"cat": ("kitten",)})
 
-    assert view.listed_prompt_ids() == ["i1"]
+    assert view.listed_prompt_ids() == ["i1"], (
+        "the words drawn at once come first and the model only ever adds words, so a widening "
+        "that arrives improves a view the user is already looking at")
 
 
 def test_a_widening_for_an_abandoned_query_is_ignored(qtbot):

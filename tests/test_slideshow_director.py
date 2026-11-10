@@ -2637,7 +2637,9 @@ def test_a_slideshow_of_latest_opens_on_the_newest_rather_than_where_the_last_on
 
     director.start()
 
-    assert made[0].resumed is None
+    assert made[0].resumed is None, (
+        "a slideshow of Latest opens on the newest image instead, which is what Latest is "
+        "opened for")
 
 
 def test_a_slideshow_of_another_folder_opens_on_the_filters_the_last_was_left_on(slideshows):

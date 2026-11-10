@@ -1049,7 +1049,9 @@ def test_generate_from_a_tab_back_on_its_videos_own_seeds_draws_a_fresh_one(qtbo
     tab._on_generate()
 
     job = next(iter(view._live_jobs.values()))
-    assert job.params["noise_seed"] != 22
+    assert job.params["noise_seed"] != 22, (
+        "saved before its workflow gained its later settings, this video matches no saved row "
+        "key for key, so nothing but the tab's own promise of a random seed draws a fresh one")
 
 
 def test_generate_request_without_a_duplicate_launches_straight_away(qtbot, tmp_path):

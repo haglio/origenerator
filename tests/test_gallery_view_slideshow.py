@@ -1014,7 +1014,9 @@ def test_a_slideshow_reopened_on_a_locked_slide_comes_back_locked(qtbot, monkeyp
     view._slideshows.start()
 
     qtbot.addWidget(view._slideshows.showing.shown)
-    assert view._slideshows.showing._set.playlist.current()[2] == held
+    assert view._slideshows.showing._set.playlist.current()[2] == held, (
+        "a hold is the user saying this is the one, so the slideshow reopened on the folder it "
+        "was playing is still stopped on that slide")
     assert view._slideshows.showing.locked
     view._slideshows.showing.close()
 
@@ -1142,7 +1144,9 @@ def test_leaving_a_slideshow_on_a_slide_from_another_folder_opens_that_folder_on
 
     _press_enter(slideshow)
 
-    assert view.selected_folder_key() == folder_of_the_video
+    assert view.selected_folder_key() == folder_of_the_video, (
+        "the Slideshow button plays the folder on screen, so leaving on one of the image's "
+        "videos has to put that video's own folder on screen")
     assert view._gallery_pane.selected_ids == {"v1"}
 
 

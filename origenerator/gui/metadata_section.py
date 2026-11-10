@@ -88,8 +88,9 @@ class MetadataSection(QWidget):
             form.removeRow(0)
         for line, item in enumerate(items):
             _label, value, *buttons = metadata_cells(item)
-            form.insertRow(line, LabelCell(WarningMark(), ElidingLabel(item.label),
-                                           form.label_column),
+            label = ElidingLabel(item.label)
+            label.setToolTip(item.tooltip)
+            form.insertRow(line, LabelCell(WarningMark(), label, form.label_column),
                            _value_with(value, buttons))
         self._fact_rows = len(items)
 
@@ -118,9 +119,12 @@ def label_column_width(items: list[MetadataItem]) -> int:
 
 
 def metadata_cells(item: MetadataItem, label_width: int = 0) -> tuple:
+    label, value = _label_widget(item.label, label_width), _value_widget(item)
+    for widget in (label, value):
+        widget.setToolTip(item.tooltip)
     return (
-        _label_widget(item.label, label_width),
-        _value_widget(item),
+        label,
+        value,
         CopyButton(item.copy) if item.copy is not None else None,
         _reveal_button(item.reveal) if item.reveal is not None else None,
     )

@@ -6,9 +6,11 @@ from datetime import datetime
 from pathlib import Path
 
 from origenerator import config, gallery
+from origenerator.generation_config import merge_denormalized
 from origenerator.output_places import OutputPlaces
 from origenerator.provenance import BASIS, FILE_DATE, WORKFLOW_VERSION
 from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.frame_rate import NATIVE_FPS, frames_filled_in
 
 
 @dataclass
@@ -17,6 +19,7 @@ class MetadataItem:
     value: str
     copy: str | None = None
     reveal: str | None = None
+    tooltip: str = ""
 
 
 METADATA_TITLE = "Metadata"
@@ -84,9 +87,38 @@ def metadata_facts(row: dict, upscale: Path | None = None, *,
         held = row.get("days_in_trash")
         items += [file_item(f, held_days=held) for f in files]
         items.append(MetadataItem("Created", str(row.get("created_at", ""))))
+    items += _frame_items(row)
     if row.get("provenance") and row.get("workflow_name") in WORKFLOW_REGISTRY:
         items.append(_version_line(json.loads(row["provenance"])))
     return MetadataFacts(METADATA_TITLE, items) if items else None
+
+
+_LENGTH_KEYS = {"frame_count", "scene_frames"}
+_FPS = f"{NATIVE_FPS:g} frames a second"
+_FRAMES_FROM_MODEL_TIP = (
+    f"The frames WAN 2.2 made itself. It was trained on videos at {_FPS}, so each frame "
+    f"it makes moves the scene 1/{NATIVE_FPS:g} of a second forward: asking it for more "
+    "frames makes the motion last longer, never smoother.")
+_TOTAL_FRAMES_TIP = (
+    f"The frames in the file. Above {_FPS}, the frames between the model's own are "
+    "filled in afterward (interpolated), as many as the Frame Rate setting asks for.")
+
+
+def _knows_its_frames(workflow, recorded: dict) -> bool:
+    return (workflow is not None and "frame_rate" in workflow.default_params()
+            and bool(_LENGTH_KEYS & recorded.keys()))
+
+
+def _frame_items(row: dict) -> list[MetadataItem]:
+    workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name"))
+    recorded = merge_denormalized(row)
+    if not _knows_its_frames(workflow, recorded):
+        return []
+    params = {**workflow.default_params(), **recorded}
+    made = workflow.video_frames(workflow.scene_plan(params))
+    return [MetadataItem("Frames from model", str(made), tooltip=_FRAMES_FROM_MODEL_TIP),
+            MetadataItem("Total frames", str(frames_filled_in(made, params["frame_rate"])),
+                      tooltip=_TOTAL_FRAMES_TIP)]
 
 
 def _version_line(block: dict) -> MetadataItem:

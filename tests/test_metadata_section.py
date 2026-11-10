@@ -194,3 +194,13 @@ def test_a_facts_value_is_plain_text_in_the_muted_gray_typical_time_wears(block)
                 if label.text().replace("\u200b", "") == "AB12CD34 007"]
 
     assert TEXT_MUTED.name() in value.styleSheet()
+
+
+def test_hovering_a_frame_count_says_why_the_model_makes_fewer_frames_than_the_file_holds(block):
+    block.show_row(_row(workflow_name="wan22_flf2v_loop",
+                        params_json=json.dumps({"frame_count": 17, "frame_rate": 112.0})))
+    tips = {lbl.text(): lbl.toolTip() for lbl in block.findChildren(QLabel)}
+
+    assert "16 frames a second" in tips["Frames from model"]
+    assert "filled in" in tips["Total frames"]
+    assert tips["113"] == tips["Total frames"]

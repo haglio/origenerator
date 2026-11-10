@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app_support.video_names import UPSCALE_SUFFIX
@@ -63,4 +64,16 @@ def _predates(video: Path, upscale: Path) -> bool:
         written, upscaled = video.stat(), upscale.stat()
     except OSError:
         return False
-    return written.st_mtime <= getattr(upscaled, "st_birthtime", upscaled.st_mtime)
+    return written.st_mtime <= _filed_stamp(upscaled)
+
+
+def filed_at(upscale) -> datetime | None:
+    try:
+        upscaled = Path(upscale).stat()
+    except OSError:
+        return None
+    return datetime.fromtimestamp(_filed_stamp(upscaled), UTC)
+
+
+def _filed_stamp(upscaled) -> float:
+    return getattr(upscaled, "st_birthtime", upscaled.st_mtime)

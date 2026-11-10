@@ -650,7 +650,9 @@ def test_f_mode_on_a_slideshow_narrows_the_set_to_the_favorites(qtbot, tmp_path,
     slideshow.shown.press("portrait_fmode")
     assert slideshow.pass_size() == 3
     slideshow._set.playlist.jump_to(1)
-    assert slideshow.hud_is_favorite is True
+    assert slideshow.hud_is_favorite is True, (
+        "every item of this fixture shares one file, so the slideshow is stepped to the "
+        "favorite by its position and not by its path")
     slideshow._set.playlist.jump_to(0)
     assert slideshow.hud_is_favorite is False
 

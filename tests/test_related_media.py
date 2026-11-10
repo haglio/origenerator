@@ -3,13 +3,26 @@ from __future__ import annotations
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QPoint, Qt
-from PyQt6.QtGui import QColor, QMouseEvent, QPixmap
+from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtWidgets import QApplication
 
 from origenerator.generation_state import GenerationSource
-from origenerator.gui.related_media import RelatedLookups, RelatedMedia
+from origenerator.gui.related_media import (
+    ANIMATED_INTO,
+    STARTING_FRAME_ANIMATED_INTO,
+    RelatedLookups,
+    RelatedMedia,
+)
 from origenerator.gui.source_tile import SourceTile
 from origenerator.gui.trash_box import TrashBox
+from tests.related_links import (
+    POINTING_BACK,
+    no_sources,
+    settings_tile,
+    settings_used_for,
+    settings_used_for_tiles,
+    source_tile,
+)
 
 
 def _image_row(prompt_id="img1", filename="sdxl_t2i_img1.png"):
@@ -90,9 +103,9 @@ def related(make_related):
 
 
 def test_a_row_tied_to_nothing_shows_no_links(related):
-    assert related._sources.isHidden()
-    assert related._source_tile.isHidden()
-    assert related._animations.isHidden()
+    assert no_sources(related)
+    assert source_tile(related).isHidden()
+    assert _animated(related) == []
 
 
 def test_a_video_points_back_at_the_image_that_seeded_its_start_frame(related):
@@ -100,15 +113,15 @@ def test_a_video_points_back_at_the_image_that_seeded_its_start_frame(related):
 
     related.show_row(_video_row(), [image])
 
-    assert not related._source_tile.isHidden()
-    assert related._source_tile._prompt_id == "img1"
-    assert related._animations.isHidden()
+    assert not source_tile(related).isHidden()
+    assert source_tile(related)._prompt_id == "img1"
+    assert _animated(related) == []
 
 
 def test_the_start_image_is_called_by_its_name_not_its_file(related):
     related.show_row(_video_row(), [_image_row()])
 
-    assert related._source_tile._name.text() == "3FA9C0D2 004"
+    assert source_tile(related)._name.text() == "3FA9C0D2 004"
 
 
 def _hidden_frame():
@@ -120,13 +133,13 @@ def test_a_video_another_source_made_from_words_alone_points_at_no_source(relate
 
     related.show_row(video, [_hidden_frame()])
 
-    assert related._sources.isHidden()
+    assert no_sources(related)
 
 
 def test_a_video_made_here_from_a_hidden_starting_frame_points_back_at_the_frame(related):
     related.show_row(_video_row(input_image="frame1.jpg"), [_hidden_frame()])
 
-    assert related._source_tile._prompt_id == "frame1"
+    assert source_tile(related)._prompt_id == "frame1"
 
 
 def _taken_out_of(prompt_id="vid1"):
@@ -140,7 +153,7 @@ def test_a_video_lists_what_its_starting_frame_was_animated_into(make_related):
     related.show_row(video, [_hidden_frame()])
 
     assert _animated(related) == ["vid2"]
-    assert _links(related._animations) == [("Starting frame animated in", "vid2")]
+    assert _links(related._animations) == [("Starting frame animated into", "vid2")]
 
 
 def test_a_video_animated_from_another_videos_starting_frame_points_at_that_video(make_related):
@@ -149,9 +162,9 @@ def test_a_video_animated_from_another_videos_starting_frame_points_at_that_vide
 
     related.show_row(made_here, [_hidden_frame()])
 
-    tile = related._source_tile
+    tile = source_tile(related)
     assert (tile._prompt_id, tile._heading.text(), tile._item_type_icon.media_type) == (
-        "vid1", "From starting frame of", "video")
+        "vid1", "Animated from starting frame of", "video")
 
 
 def test_two_videos_animated_from_one_starting_frame_are_not_listed_on_each_other(make_related):
@@ -160,7 +173,7 @@ def test_two_videos_animated_from_one_starting_frame_are_not_listed_on_each_othe
 
     related.show_row(made_here, [_hidden_frame()])
 
-    assert related._animations.isHidden()
+    assert _animated(related) == []
 
 
 def test_an_image_s_links_drop_the_starting_frame_heading_a_video_shown_before_it_wore(
@@ -171,7 +184,7 @@ def test_an_image_s_links_drop_the_starting_frame_heading_a_video_shown_before_i
 
     related.show_row(image, [_hidden_frame(), image])
 
-    assert "Starting frame animated in" not in {heading for heading, _ in _links(related)}
+    assert "Starting frame animated into" not in {heading for heading, _ in _links(related)}
 
 
 def test_a_video_points_at_each_video_combine_made_with_its_settings_under_combine(make_related):
@@ -179,8 +192,7 @@ def test_a_video_points_at_each_video_combine_made_with_its_settings_under_combi
 
     related.show_row(_video_row("vid0"), [_image_row()])
 
-    section = related._combines
-    assert _links(section) == [("Source video for", "made1"), ("Source video for", "made2")]
+    assert settings_used_for(related) == [("Video settings used for animation of", "made1"), ("Video settings used for animation of", "made2")]
 
 
 def test_a_video_combine_made_points_at_the_video_whose_settings_it_followed(make_related):
@@ -188,12 +200,12 @@ def test_a_video_combine_made_points_at_the_video_whose_settings_it_followed(mak
 
     related.show_row(_combined_row(), [_image_row()])
 
-    assert related._source_tile._prompt_id == "img1"
-    assert not related._source_video_tile.isHidden()
-    assert related._source_video_tile._prompt_id == "vid0"
-    assert related._source_video_tile._heading.text() == "From source video"
-    assert related._source_video_tile._item_type_icon.media_type == "video"
-    assert related._source_video_tile._name.text() == "77B2E1A0 012"
+    assert source_tile(related)._prompt_id == "img1"
+    assert not settings_tile(related).isHidden()
+    assert settings_tile(related)._prompt_id == "vid0"
+    assert settings_tile(related)._heading.text() == "Animated using video settings of"
+    assert settings_tile(related)._item_type_icon.media_type == "video"
+    assert settings_tile(related)._name.text() == "77B2E1A0 012"
 
 
 def test_an_image_lists_the_videos_it_was_animated_into(make_related):
@@ -204,25 +216,23 @@ def test_an_image_lists_the_videos_it_was_animated_into(make_related):
 
     assert not related._animations.isHidden()
     assert len(related._animations.findChildren(SourceTile)) == 1
-    assert related._source_tile.isHidden()
+    assert source_tile(related).isHidden()
 
 
 def _animated(related):
     return [tile._prompt_id for tile in related._animations.findChildren(SourceTile)
-            if not tile.isHidden()]
+            if not tile.isHidden() and tile._heading.text() in (ANIMATED_INTO,
+                                                                 STARTING_FRAME_ANIMATED_INTO)]
 
 
 def _drawn_links(related, row, image_rows):
     related.show_row(row, image_rows)
     QApplication.processEvents()
     shown = row["prompt_id"]
-    drawn = {(tile._prompt_id, shown) for tile in (related._source_tile,
-                                                   related._source_video_tile)
-             if not tile.isHidden()}
-    drawn |= {(shown, video) for video in _animated(related)}
+    drawn = set()
     for section in (related._requests, related._modifications,
-                    related._combines, related._trims):
-        drawn |= {(other, shown) if heading.endswith(" from") else (shown, other)
+                    related._animations, related._trims):
+        drawn |= {(other, shown) if heading in POINTING_BACK else (shown, other)
                   for heading, other in _links(section)}
     return drawn
 
@@ -295,7 +305,7 @@ def test_linked_items_in_the_trash_sit_in_a_box_labeled_trash(make_related):
 
     related.show_row(_video_row("vid0"), [_image_row()])
 
-    assert _boxed(related._combines.findChildren(SourceTile)) == {
+    assert _boxed(settings_used_for_tiles(related)) == {
         "made1": False, "made2": True}
 
 
@@ -305,7 +315,7 @@ def test_a_source_image_in_the_trash_sits_in_a_box_labeled_trash(make_related):
 
     related.show_row(_video_row(), [])
 
-    assert _boxed([related._source_tile]) == {"img1": True}
+    assert _boxed([source_tile(related)]) == {"img1": True}
 
 
 def test_a_source_image_put_back_from_the_trash_leaves_its_box(make_related):
@@ -316,7 +326,7 @@ def test_a_source_image_put_back_from_the_trash_leaves_its_box(make_related):
     related._held_rows = list
     related.show_row(_video_row(), [image])
 
-    assert _boxed([related._source_tile]) == {"img1": False}
+    assert _boxed([source_tile(related)]) == {"img1": False}
 
 
 def _failed(row):
@@ -338,7 +348,7 @@ def test_a_run_that_failed_to_make_its_video_is_not_listed_under_combine(make_re
 
     related.show_row(_video_row("vid0"), [_image_row()])
 
-    assert _links(related._combines) == [("Source video for", "made1")]
+    assert settings_used_for(related) == [("Video settings used for animation of", "made1")]
 
 
 def test_a_cut_is_not_among_the_animations_of_the_image_its_clip_was_made_from(make_related):
@@ -355,10 +365,10 @@ def test_of_two_images_listing_one_file_only_the_one_the_video_names_lists_it(ma
     related = make_related(_video_row())
 
     related.show_row(_video_row(), [first, twin])
-    assert related._source_tile._prompt_id == "img1"
+    assert source_tile(related)._prompt_id == "img1"
     related.show_row(twin, [first, twin])
 
-    assert related._animations.isHidden()
+    assert _animated(related) == []
 
 
 def test_a_hidden_starting_frame_lists_only_the_videos_made_from_it_here(make_related):
@@ -381,7 +391,7 @@ def test_a_requested_row_points_at_the_item_it_was_asked_about_under_requests(ma
     section = related._requests
     assert not section.isHidden()
     assert _links(section) == [("Requested from", "img1")]
-    assert related._sources.isHidden()
+    assert no_sources(related)
 
 
 def test_an_image_points_at_what_was_requested_of_it_under_requests(make_related):
@@ -475,7 +485,7 @@ def test_an_image_a_folders_modify_made_points_at_the_one_it_was_modified_from(m
     section = related._modifications
     assert not section.isHidden()
     assert _links(section) == [("Modified from", "img1")]
-    assert related._sources.isHidden()
+    assert no_sources(related)
     assert related._requests.isHidden()
 
 
@@ -488,8 +498,7 @@ def test_every_kind_of_link_sits_in_the_one_section_headed_links(make_related):
     section = related._section
     assert (section.title(), section.isHidden()) == ("Links", False)
     assert all(section.isAncestorOf(row) for row in (
-        related._sources, related._requests, related._modifications,
-        related._animations, related._combines, related._trims))
+        related._requests, related._modifications, related._animations, related._trims))
 
 
 def test_a_row_animated_into_nothing_shows_no_animations(make_related):
@@ -499,7 +508,7 @@ def test_a_row_animated_into_nothing_shows_no_animations(make_related):
 
     related.show_row(_video_row(), [image])
 
-    assert related._animations.isHidden()
+    assert _animated(related) == []
 
 
 def test_a_click_on_an_animation_names_the_video_that_was_clicked(make_related):
@@ -524,10 +533,10 @@ def test_a_cut_points_back_at_the_clip_it_was_cut_out_of(make_related):
 
     related.show_row(_trim_row(), [_image_row()])
 
-    assert not related._source_tile.isHidden()
-    assert related._source_tile._prompt_id == "vid1"
-    assert related._source_tile._heading.text() == "Trimmed from"
-    assert related._source_tile._item_type_icon.media_type == "video"
+    assert not source_tile(related).isHidden()
+    assert source_tile(related)._prompt_id == "vid1"
+    assert source_tile(related)._heading.text() == "Trimmed from"
+    assert source_tile(related)._item_type_icon.media_type == "video"
 
 
 def test_a_clip_points_at_each_cut_out_of_it_under_trims(make_related):
@@ -545,7 +554,7 @@ def test_a_cut_does_not_point_past_its_clip_at_that_clip_s_start_frame(make_rela
 
     related.show_row(_trim_row(), [_image_row()])
 
-    assert related._source_tile._prompt_id == "vid1"
+    assert source_tile(related)._prompt_id == "vid1"
 
 
 def test_a_cut_whose_clip_is_gone_falls_back_to_the_start_frame(make_related):
@@ -553,8 +562,8 @@ def test_a_cut_whose_clip_is_gone_falls_back_to_the_start_frame(make_related):
 
     related.show_row(_trim_row(trimmed_from="deleted"), [_image_row()])
 
-    assert related._source_tile._prompt_id == "img1"
-    assert related._source_tile._item_type_icon.media_type == "image"
+    assert source_tile(related)._prompt_id == "img1"
+    assert source_tile(related)._item_type_icon.media_type == "image"
 
 
 def test_a_cut_whose_video_is_in_the_trash_still_points_back_at_the_video(make_related):
@@ -562,8 +571,8 @@ def test_a_cut_whose_video_is_in_the_trash_still_points_back_at_the_video(make_r
 
     related.show_row(_trim_row(), [_image_row()])
 
-    assert related._source_tile._prompt_id == "vid1"
-    assert related._source_tile._heading.text() == "Trimmed from"
+    assert source_tile(related)._prompt_id == "vid1"
+    assert source_tile(related)._heading.text() == "Trimmed from"
 
 
 def test_a_video_whose_start_image_is_in_the_trash_still_points_back_at_it(make_related):
@@ -571,9 +580,9 @@ def test_a_video_whose_start_image_is_in_the_trash_still_points_back_at_it(make_
 
     related.show_row(_video_row(), [])
 
-    assert not related._source_tile.isHidden()
-    assert related._source_tile._prompt_id == "img1"
-    assert related._source_tile._heading.text() == "From source image"
+    assert not source_tile(related).isHidden()
+    assert source_tile(related)._prompt_id == "img1"
+    assert source_tile(related)._heading.text() == "Animated from"
 
 
 def test_a_click_on_the_source_tile_names_the_item_it_points_at(related):
@@ -582,20 +591,9 @@ def test_a_click_on_the_source_tile_names_the_item_it_points_at(related):
     named = []
     related.link_clicked.connect(named.append)
 
-    related._source_tile.activated.emit("img1")
+    source_tile(related).activated.emit("img1")
 
     assert named == ["img1"]
-
-
-def test_the_source_links_share_one_row(make_related):
-    related = make_related(_video_row("vid0"))
-
-    related.show_row(_combined_row(), [_image_row()])
-
-    section = related._sources
-    assert not section.isHidden()
-    assert section.isAncestorOf(related._source_tile)
-    assert section.isAncestorOf(related._source_video_tile)
 
 
 def test_a_row_built_from_nothing_shows_no_sources(make_related):
@@ -604,7 +602,7 @@ def test_a_row_built_from_nothing_shows_no_sources(make_related):
 
     related.show_row(_image_row(), [_image_row()])
 
-    assert related._sources.isHidden()
+    assert no_sources(related)
 
 
 def test_clearing_takes_the_source_section_down(make_related):
@@ -613,30 +611,19 @@ def test_clearing_takes_the_source_section_down(make_related):
 
     related.clear()
 
-    assert related._sources.isHidden()
+    assert no_sources(related)
 
 
 def test_the_source_video_sits_beside_the_source_image(make_related, qtbot):
     related = make_related(_video_row("vid0"))
     related.show_row(_combined_row(), [_image_row()])
+    related.resize(800, 600)
     with qtbot.waitExposed(related):
         related.show()
 
-    image, video = related._source_tile.geometry(), related._source_video_tile.geometry()
+    image, video = source_tile(related).geometry(), settings_tile(related).geometry()
     assert video.top() == image.top()
     assert video.left() > image.right()
-
-
-def test_the_source_video_is_drained_of_color_being_only_the_settings(make_related, tmp_path):
-    red = QPixmap(16, 16)
-    red.fill(QColor("red"))
-    red.save(str(tmp_path / "vid0_thumb.png"))
-    related = make_related({**_video_row("vid0"), "thumbnail_path": str(tmp_path / "vid0_thumb.png")})
-
-    related.show_row(_combined_row(), [_image_row()])
-
-    shown = related._source_video_tile._thumb.pixmap().toImage().pixelColor(8, 8)
-    assert shown.red() == shown.green() == shown.blue()
 
 
 def test_a_click_on_the_source_video_names_that_video(make_related):
@@ -645,7 +632,7 @@ def test_a_click_on_the_source_video_names_that_video(make_related):
     named = []
     related.link_clicked.connect(named.append)
 
-    related._source_video_tile.activated.emit("vid0")
+    settings_tile(related).activated.emit("vid0")
 
     assert named == ["vid0"]
 
@@ -653,11 +640,11 @@ def test_a_click_on_the_source_video_names_that_video(make_related):
 def test_showing_the_next_row_takes_the_last_one_s_answers_away(related):
     image = _image_row()
     related.show_row(_video_row(), [image])
-    assert not related._source_tile.isHidden()
+    assert not source_tile(related).isHidden()
 
     related.show_row(image, [image])
 
-    assert related._source_tile.isHidden()
+    assert source_tile(related).isHidden()
 
 
 def test_clearing_puts_both_links_down(make_related):
@@ -667,8 +654,8 @@ def test_clearing_puts_both_links_down(make_related):
 
     related.clear()
 
-    assert related._source_tile.isHidden()
-    assert related._animations.isHidden()
+    assert source_tile(related).isHidden()
+    assert _animated(related) == []
 
 
 def test_clearing_puts_the_source_video_down_too(make_related):
@@ -677,7 +664,7 @@ def test_clearing_puts_the_source_video_down_too(make_related):
 
     related.clear()
 
-    assert related._source_video_tile.isHidden()
+    assert settings_tile(related).isHidden()
 
 
 def test_the_next_row_with_no_source_video_takes_that_link_away(make_related):
@@ -686,14 +673,14 @@ def test_the_next_row_with_no_source_video_takes_that_link_away(make_related):
 
     related.show_row(_video_row(), [_image_row()])
 
-    assert related._source_video_tile.isHidden()
+    assert settings_tile(related).isHidden()
 
 
 def test_a_source_video_deleted_for_good_leaves_no_link_to_it(related):
     related.show_row(_combined_row(source_video="deleted"), [_image_row()])
 
-    assert related._source_video_tile.isHidden()
-    assert related._source_tile._prompt_id == "img1"
+    assert settings_tile(related).isHidden()
+    assert source_tile(related)._prompt_id == "img1"
 
 
 def test_a_source_video_in_the_trash_keeps_its_link(make_related):
@@ -701,8 +688,8 @@ def test_a_source_video_in_the_trash_keeps_its_link(make_related):
 
     related.show_row(_combined_row(), [_image_row()])
 
-    assert not related._source_video_tile.isHidden()
-    assert related._source_video_tile._prompt_id == "vid0"
+    assert not settings_tile(related).isHidden()
+    assert settings_tile(related)._prompt_id == "vid0"
 
 
 def test_an_image_lists_every_video_it_was_animated_into_however_many(make_related):
@@ -736,7 +723,7 @@ def test_an_image_s_animations_read_animated_in(make_related):
 
     related.show_row(image, [image])
 
-    assert _links(related._animations) == [("Animated in", "vid1")]
+    assert _links(related._animations) == [("Animated into", "vid1")]
 
 
 def _two_frames(path):
@@ -753,3 +740,11 @@ def test_a_linked_video_plays_its_animated_thumbnail(make_related, tmp_path):
 
     (tile,) = related._animations.findChildren(SourceTile)
     assert tile._thumb.movie() is not None
+
+
+def test_the_video_whose_settings_were_used_plays_like_every_linked_video(make_related, tmp_path):
+    related = make_related(_video_row("vid0"), movies={"vid0": _two_frames(tmp_path / "vid0.gif")})
+
+    related.show_row(_combined_row(), [_image_row()])
+
+    assert settings_tile(related)._thumb.movie() is not None

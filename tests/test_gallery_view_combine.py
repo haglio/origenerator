@@ -49,6 +49,7 @@ from tests.gallery_view_support import (
     _selected_folder,
     _write_looping_webp,
 )
+from tests.related_links import settings_tile, source_tile
 from tests.test_combine import _listed_under_recent
 
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
@@ -529,10 +530,10 @@ def test_open_in_generator_links_to_the_image_and_the_video_before_generating(qt
     view._combine._open_combination("img", "vid")
 
     related = _front_panel(view)._related
-    assert not related._source_tile.isHidden()
-    assert related._source_tile._prompt_id == "img"
-    assert not related._source_video_tile.isHidden()
-    assert related._source_video_tile._prompt_id == "vid"
+    assert not source_tile(related).isHidden()
+    assert source_tile(related)._prompt_id == "img"
+    assert not settings_tile(related).isHidden()
+    assert settings_tile(related)._prompt_id == "vid"
 
 
 def test_the_video_an_opened_combination_makes_keeps_both_links(qtbot, tmp_path):
@@ -548,9 +549,9 @@ def test_the_video_an_opened_combination_makes_keeps_both_links(qtbot, tmp_path)
     client.job_completed.emit(job.prompt_id, _VID_REROLL_HISTORY)
 
     assert tab.displayed_row()["prompt_id"] == job.prompt_id
-    assert tab._related._source_tile._prompt_id == "img"
-    assert tab._related._source_video_tile._prompt_id == "vid"
-    assert not tab._related._source_video_tile.isHidden()
+    assert source_tile(tab._related)._prompt_id == "img"
+    assert settings_tile(tab._related)._prompt_id == "vid"
+    assert not settings_tile(tab._related).isHidden()
 
 
 def test_an_action_whose_settings_came_from_no_video_links_to_the_image_alone(qtbot, tmp_path):
@@ -561,8 +562,8 @@ def test_an_action_whose_settings_came_from_no_video_links_to_the_image_alone(qt
     view._combine._open_category("img", "alpha + third box")
 
     related = _front_panel(view)._related
-    assert related._source_tile._prompt_id == "img"
-    assert related._source_video_tile.isHidden()
+    assert source_tile(related)._prompt_id == "img"
+    assert settings_tile(related).isHidden()
 
 
 def _combine_view_with_a_looping_video(qtbot, tmp_path):

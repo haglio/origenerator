@@ -7,7 +7,6 @@ from shared_ui.colors import BORDER_SUBTLE
 from shared_ui.spacing import BUTTON_RADIUS, GAP_SMALL
 
 from origenerator.gui import tile_shape
-from origenerator.gui.grayscale import grayscale_pixmap
 from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.link_heading import link_heading
 from origenerator.gui.looping_preview import play_in, stop_what_plays_in
@@ -53,18 +52,17 @@ class SourceTile(QWidget):
         return self._prompt_id
 
     def show_source(self, row: dict, name: str, heading: str | None = None,
-                    media_type: str | None = None, gray: bool = False,
-                    movie: str | None = None):
+                    media_type: str | None = None, movie: str | None = None):
         self._prompt_id = row["prompt_id"]
         self._heading.setText(heading or _DEFAULT_HEADING)
         self._item_type_icon.set_media_type(media_type or _DEFAULT_MEDIA_TYPE)
         self._name.setText(name)
-        if movie and not gray:
+        if movie:
             play_in(self._thumb, movie, THUMBNAIL_BOX)
         else:
             stop_what_plays_in(self._thumb)
             thumb = self._scaled_thumb(row.get("thumbnail_path"))
-            self._thumb.setPixmap(grayscale_pixmap(thumb) if gray else thumb)
+            self._thumb.setPixmap(thumb)
         self.show()
 
     def clear(self):

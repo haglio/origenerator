@@ -82,6 +82,7 @@ from tests.gallery_view_support import (
     _video_workflow,
     _write_looping_webp,
 )
+from tests.related_links import source_tile
 from tests.test_enhance_pane import _dropped_on
 from tests.test_folder_tree import _shown
 
@@ -512,7 +513,7 @@ def test_an_inflight_tile_wears_the_item_type_icon_of_its_media_type(qtbot):
 
 
 def _source_tile(view):
-    return view._generate_pane.current_generate_tab()._related._source_tile
+    return source_tile(view._generate_pane.current_generate_tab()._related)
 
 
 def test_video_source_tile_points_to_its_image_and_navigates(qtbot):

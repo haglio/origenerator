@@ -99,7 +99,11 @@ from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
 from origenerator.prompt_tokens import prompt_readings
 from origenerator.published_actions import set_actions
-from origenerator.regeneration import MADE_ELSEWHERE_TIP, workflow_gone
+from origenerator.regeneration import (
+    MADE_ELSEWHERE_TIP,
+    told_why_it_cannot_be_made_again,
+    workflow_gone,
+)
 from origenerator.seed_history import SeedHistory, SeedUse, SeedUseKind, seed_history
 from origenerator.setting_advice import (
     fresh_settings,
@@ -465,6 +469,9 @@ class GenerateTab(DropZones):
         workflow = workflow_named(self._workflow_dropdown.currentData())
         if workflow is not None and not workflow.generates_here:
             return MADE_ELSEWHERE_TIP
+        told = self._told_why_the_shown_item_cannot_be_remade()
+        if told is not None:
+            return told
         lost = self._lost_workflow()
         if lost is not None:
             return _select_a_workflow_first(lost)
@@ -473,6 +480,12 @@ class GenerateTab(DropZones):
         return ((_pick_installed_ones_first(models) if models else None)
                 or (_nothing_to_start_from(images) if images else None)
                 or (ALREADY_MAKING_ONE_TIP if self._folder_is_making_one() else None))
+
+    def _told_why_the_shown_item_cannot_be_remade(self) -> str | None:
+        shown = self._displayed_row
+        if shown is None or shown.get("workflow_name") != self._workflow_dropdown.currentData():
+            return None
+        return told_why_it_cannot_be_made_again(shown)
 
     def _why_the_item_cannot_be_remade(self) -> str | None:
         lost = self._lost_workflow()

@@ -14,7 +14,14 @@ def workflow_gone(workflow_name: str) -> str:
             else "Origenerator doesn't have the workflow this was made with")
 
 
+def told_why_it_cannot_be_made_again(row: dict | None) -> str | None:
+    return (row or {}).get("why_it_cannot_be_made_again") or None
+
+
 def why_it_cannot_be_made_again(row: dict, folders: ComfyFolders) -> str | None:
+    told = told_why_it_cannot_be_made_again(row)
+    if told is not None:
+        return told
     workflow_name = row.get("workflow_name") or ""
     workflow = workflow_named(workflow_name)
     if workflow is None:

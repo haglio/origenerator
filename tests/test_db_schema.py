@@ -100,6 +100,7 @@ SCHEMA = {
         ("video_actions", "TEXT", 0, None, 0),
         ("video_checked", "TEXT", 0, None, 0),
         ("combined_labels", "TEXT", 0, None, 0),
+        ("why_it_cannot_be_made_again", "TEXT", 0, None, 0),
     ),
     "requests": (
         ("prompt_id", "TEXT", 0, None, 1),

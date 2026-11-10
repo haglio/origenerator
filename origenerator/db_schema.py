@@ -128,7 +128,8 @@ CREATE TABLE IF NOT EXISTS generations (
     image_checked TEXT,
     video_actions TEXT,
     video_checked TEXT,
-    combined_labels TEXT
+    combined_labels TEXT,
+    why_it_cannot_be_made_again TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_generations_status ON generations(status);
@@ -283,6 +284,7 @@ ADDED_COLUMNS = {
         "enhance_of": "TEXT",
         "trimmed_from": "TEXT",
         "provenance": "TEXT",
+        "why_it_cannot_be_made_again": "TEXT",
         "picture_state": "TEXT",
         "shielded": "INTEGER NOT NULL DEFAULT 0",
         "backfill_of": "TEXT",
@@ -336,6 +338,7 @@ GENERATION_COLUMNS = (
     "enhance_of", "trimmed_from", "provenance", "picture_state", "shielded",
     "backfill_of", "fun_time_favorite_owed", "remade_at", "old_version_of", "shape",
     "image_actions", "image_checked", "video_actions", "video_checked", "combined_labels",
+    "why_it_cannot_be_made_again",
 )
 
 

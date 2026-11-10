@@ -69,6 +69,9 @@ class Database:
     def set_experiment_verdict(self, prompt_id: str, verdict: str | None):
         return self.generations.set_experiment_verdict(prompt_id, verdict)
 
+    def say_why_it_cannot_be_made_again(self, prompt_id: str, reason: str):
+        return self.generations.say_why_it_cannot_be_made_again(prompt_id, reason)
+
     def set_image_state(self, prompt_id: str, state: str | None):
         return self.generations.set_image_state(prompt_id, state)
 

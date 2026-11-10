@@ -71,3 +71,9 @@ def test_a_start_image_still_on_disk_is_no_reason(tmp_path):
 
 def test_nothing_missing_is_no_reason_at_all(tmp_path):
     assert why_it_cannot_be_made_again(_row("sdxl_t2i"), _folders(tmp_path)) is None
+
+
+def test_an_item_told_why_it_cannot_be_made_again_gives_that_reason_first(tmp_path):
+    row = {**_row("sdxl_t2i"), "why_it_cannot_be_made_again": "Its settings were lost"}
+
+    assert why_it_cannot_be_made_again(row, _folders(tmp_path)) == "Its settings were lost"

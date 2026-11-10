@@ -4822,3 +4822,22 @@ def test_generate_under_a_later_turn_of_an_earlier_exchange_marks_that_turn(save
     assert asked["source_prompt_id"] == "made-1"
     assert [turn.made for turn in db.requests.exchange_of("img1")] == [
         "", "made-1", "made-2", "img1"]
+
+
+_LOST = "This video's settings were lost, so it can't be made again"
+
+
+def test_generate_is_gray_beside_an_item_whose_settings_were_lost_and_says_why(saved_panel):
+    tab, db = saved_panel
+    db.insert_generation(NewGeneration(
+        prompt_id="lost1", workflow_name="sdxl_t2i", workflow_version="v004",
+        params_json=json.dumps({"checkpoint": "made_up.safetensors"}), workflow_json="{}"))
+    db.update_generation("lost1", status="completed",
+                         output_files=json.dumps([{"filename": "lost1.png", "subfolder": "image"}]))
+    db.say_why_it_cannot_be_made_again("lost1", _LOST)
+    tab.show_saved_generation(db.get_generation("lost1"), [])
+
+    tab._apply_generate_caption()
+
+    assert not tab._generate_pair.isEnabled()
+    assert tab._generate_btn.toolTip() == _LOST

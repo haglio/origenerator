@@ -1225,7 +1225,8 @@ def test_a_portrait_image_stands_beside_the_form_when_hosted(qtbot):
     assert tab._media_split.orientation() == Qt.Orientation.Horizontal, (
         "stacked in the Random Favs Browser's upright region, a portrait preview pushes every prompt "
         "field off the foot")
-    assert tab._media_split.indexOf(tab._settings_pane) == 0
+    assert tab._media_split.indexOf(tab._settings_pane) == 0, (
+        "settings left, image right: the order they are read in")
     assert tab._media_split.indexOf(tab._viewport_pane) == 1
 
 
@@ -1236,7 +1237,8 @@ def test_a_landscape_image_stays_stacked_when_hosted(qtbot):
     tab._viewport._pixmap = QPixmap(1200, 700)
     tab._reflow_for_the_media()
 
-    assert tab._media_split.orientation() == Qt.Orientation.Vertical
+    assert tab._media_split.orientation() == Qt.Orientation.Vertical, (
+        "a wide image beside a form gets a column too narrow to show it")
     assert tab._media_split.indexOf(tab._viewport_pane) == 0
 
 
@@ -1280,7 +1282,9 @@ def test_an_image_back_from_beside_the_form_takes_the_larger_share_again(qtbot):
     qtbot.wait(1)
 
     media, settings = tab._media_split.sizes()
-    assert media > settings
+    assert media > settings, (
+        "a landscape image after a portrait one in the same tab came back with a third of the "
+        "column, where a fresh tab gives it two thirds")
 
 
 def test_tabs_taken_into_a_session_lay_out_the_tabs_they_have_and_the_ones_opened_after(qtbot):
@@ -1698,7 +1702,8 @@ def test_standalone_never_stands_them_side_by_side(qtbot):
     tab._viewport._pixmap = QPixmap(400, 900)
     tab._reflow_for_the_media()
 
-    assert tab._media_split.orientation() == Qt.Orientation.Vertical
+    assert tab._media_split.orientation() == Qt.Orientation.Vertical, (
+        "the pane is wide there, so stacking is right at any shape")
 
 
 def test_a_tab_coming_to_the_front_lays_out_for_its_own_image(qtbot):
@@ -1707,7 +1712,8 @@ def test_a_tab_coming_to_the_front_lays_out_for_its_own_image(qtbot):
     portrait_tab = tabs.currentWidget()
     portrait_tab._viewport._pixmap = QPixmap(400, 900)
     portrait_tab.refresh_media_layout()
-    assert portrait_tab._media_split.orientation() == Qt.Orientation.Horizontal
+    assert portrait_tab._media_split.orientation() == Qt.Orientation.Horizontal, (
+        "the shape belongs to the tab")
 
     tabs._add_subtab()
     landscape_tab = tabs.currentWidget()

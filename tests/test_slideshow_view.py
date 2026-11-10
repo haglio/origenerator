@@ -130,7 +130,9 @@ def test_the_enhanced_switch_narrows_the_pass_and_keeps_the_slide_showing(qtbot,
 
     assert view.slideshow.hud_enhanced_mode is True
     assert [item[2] for item in view.slideshow._set.playlist._items] == ["b", "c"]
-    assert view.slideshow._set.playlist.current()[2] == "b"
+    assert view.slideshow._set.playlist.current()[2] == "b", (
+        "a switch is a narrowing of what the user is looking through, not a new slideshow: "
+        "taking the slide away as well would make the switch impossible to try")
 
     assert view.slideshow.toggle_enhanced_mode() is True
     assert view.slideshow.hud_enhanced_mode is False
@@ -375,7 +377,9 @@ def test_a_new_set_played_in_drops_the_switches_the_last_one_left_on(qtbot):
     view.slideshow.play(Playing([("b.png", "image", "id-b")], shuffle=in_order))
     _settle(view)
 
-    assert not view.slideshow.hud_favorites_filter
+    assert not view.slideshow.hud_favorites_filter, (
+        "the favorites filter belonged to the set it was narrowing, and carrying it over would "
+        "hide most of a set nobody had narrowed")
     assert not view.slideshow.hud_enhanced_mode
 
 
@@ -889,7 +893,9 @@ def test_the_loop_key_off_a_folder_slideshow_leaves_the_folder_in_one_press(qtbo
 
     _press(view, Qt.Key.Key_Home)
 
-    assert widened == [view.slideshow]
+    assert widened == [view.slideshow], (
+        "the loop key is on both of the keys a session gives its two Satellites, so Home "
+        "answers as E does")
     assert words(view._note) == "Loop off"
 
 
@@ -984,7 +990,10 @@ def test_an_enhancement_that_lands_after_paging_on_still_upgrades_the_item(
 
     assert view.slideshow._set.playlist.current()[0] == "b.png"
     _press(view, Qt.Key.Key_Left)
-    assert view.slideshow._set.playlist.current()[0] == better
+    assert view.slideshow._set.playlist.current()[0] == better, (
+        "it arrives minutes later, when the slideshow has moved on, and the slideshow plays a "
+        "set fixed when it opened, so an arrival dropped for being late would replay the file "
+        "from before the enhancement every pass from then on")
 
 
 def test_an_enhancement_of_another_folders_item_changes_nothing(qtbot, tmp_path):
@@ -1003,7 +1012,9 @@ def test_the_upgraded_item_is_drawn_on_the_map_as_its_new_still(qtbot, tmp_path)
     view.slideshow.note_enhanced("id-b", _png(tmp_path / "b_enhanced.png"),
                        still=better_thumb)
 
-    assert [item.still for item in view.slideshow._set.playlist.items if item.prompt_id == "id-b"] == [better_thumb]
+    assert [item.still for item in view.slideshow._set.playlist.items if item.prompt_id == "id-b"] == [better_thumb], (
+        "an item is drawn small on the map while another is on screen, and the thumbnail it "
+        "arrived with is of the version the swap just retired")
 
 
 def test_a_slideshow_with_no_enhancer_still_locks_on_down(qtbot):

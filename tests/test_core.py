@@ -33,7 +33,8 @@ from origenerator.gallery.collection import LATEST_KEY, FolderCollection
 from origenerator.gallery.shapes import BOTH, SEPARATE
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import core, toasts
-from origenerator.gui.core import Core, Launch
+from origenerator.gui.core import SESSION_UI_STATE, Core, Launch
+from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.headset_window import CAP_PX
 from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
@@ -62,6 +63,17 @@ def _window(qtbot, tmp_path, app_state=None, *, fun_time=None, launch=None):
     )
     qtbot.addWidget(win)
     return win
+
+
+def test_every_saved_preference_is_read_and_put_back_by_the_views_own_methods():
+    named_some_other_way = [
+        key for key, read, put_back in SESSION_UI_STATE
+        if getattr(GalleryView, getattr(read, "__name__", ""), None) is not read
+        or getattr(GalleryView, getattr(put_back, "__name__", ""), None) is not put_back]
+
+    assert named_some_other_way == [], (
+        "the pair is named as the view's own methods rather than by name, so a half-wired "
+        "preference is an import error and the dead-code check can still see who calls them")
 
 
 def test_a_preview_on_its_own_is_titled_for_the_feature_it_demos(qtbot, tmp_path):

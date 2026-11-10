@@ -763,6 +763,18 @@ def test_a_message_says_its_piece(make_preview, tmp_path):
     assert w._message.text() == "(not yet generated with modifications)"
 
 
+def test_a_message_already_up_is_not_raised_again(make_preview, tmp_path, monkeypatch):
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))
+    w.set_message("modified")
+    raised = []
+    monkeypatch.setattr(w, "_raise_message", lambda: raised.append("again"))
+
+    w.set_message("modified")
+
+    assert raised == [], "already saying exactly this: it is not raised again mid-typing"
+
+
 def test_the_plate_sits_in_the_top_left_corner_clear_of_both_edges(make_preview, tmp_path):
     w = make_preview()
     w._media_host.resize(300, 200)

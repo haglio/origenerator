@@ -624,7 +624,9 @@ def test_silencing_the_folder_list_silences_both_halves(qtbot, tmp_path):
     view._tree.setCurrentItem(landscape_all)
     view._tree.blockSignals(False)
 
-    assert reported == []
+    assert reported == [], (
+        "the sections are silenced along with this widget: a rebuild clears and refills them, "
+        "and it is their signals that would fire")
     assert view._tree.is_current(landscape_all)
 
 

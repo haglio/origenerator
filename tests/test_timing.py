@@ -186,8 +186,8 @@ def test_the_line_leads_with_the_step_being_taken():
         "the user asked for the step's name, since the progress bar restarts each pass without "
         "saying which: it is the part that says what is happening, and a line too wide for its "
         "bar loses its right end")
-    assert RunTiming(83.0, (10, 20), 724.0).status_label(step="Sound", compact=True) == (
-        "Sound · 50% · ~6:02 left"), (
+    assert RunTiming(83.0, (10, 20), 724.0).status_label(step="Audio", compact=True) == (
+        "Audio · 50% · ~6:02 left"), (
         "the full line is wider than a tile, which would cut the countdown off the long runs "
         "worth counting down, so a tile's line leaves the elapsed time out")
 

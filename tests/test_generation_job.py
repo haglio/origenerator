@@ -111,10 +111,9 @@ def test_progress_accumulates_across_sampler_stages(qtbot, tmp_path):
     client.progress.emit("comfy-A", "15", 10, 10)
     client.progress.emit("comfy-A", "16", 1, 10)
 
-    assert seen == [(405, 818), (446, 818)], (
-        "two video passes of ten steps, twenty in all, then an audio pass whose 50 steps are budgeted at about a "
-        "hundredth of the video's")
-    assert job.last_progress == (446, 818)
+    assert seen == [(405, 810), (446, 810)], (
+        "two video passes of ten steps, twenty in all, and no audio pass while audio is off")
+    assert job.last_progress == (446, 810)
     assert job.last_pass_progress == (1, 10)
     assert job.last_stage == "Second pass", (
         "no executing word came for this node, as for a job joined mid-node after a restart, so its first "
@@ -420,7 +419,7 @@ def test_progress_state_snapshots_the_live_progress(qtbot, tmp_path):
     job._on_progress("pid", "16", 3, 10)
 
     state = job.progress_state()
-    assert state["last_progress"] == [526, 818]
+    assert state["last_progress"] == [526, 810]
 
 
 def test_a_queued_job_has_no_start_time_yet(qtbot, tmp_path):

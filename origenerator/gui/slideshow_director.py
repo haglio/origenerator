@@ -525,7 +525,7 @@ class SlideshowDirector:
             volume_moved=self._volume_moved if self._fun_time is None else None,
         )
 
-    def _the_sound_standing_on_its_own(self) -> dict:
+    def _the_audio_standing_on_its_own(self) -> dict:
         if self._fun_time is not None:
             return {}
         return {"radio": self._radio, "volume": self._volume_left_at}
@@ -590,7 +590,7 @@ class SlideshowDirector:
                 items,
                 ViewShow(shape=shape, actions=showing.actions, pace=self._pace_on(shape),
                          hud=showing.hud, versions=showing.versions, **kwargs),
-                ViewWiring(motion=self._motion, **self._the_sound_standing_on_its_own()))
+                ViewWiring(motion=self._motion, **self._the_audio_standing_on_its_own()))
         else:
             view.slideshow.play(
                 Playing(items, actions=showing.actions, hud=showing.hud, versions=showing.versions, **kwargs))

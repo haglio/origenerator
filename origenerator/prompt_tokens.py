@@ -15,7 +15,7 @@ from tokenizers import Regex, Tokenizer, models, normalizers, pre_tokenizers
 from origenerator import config
 from origenerator.box_breaks import BOX_BREAK, flowed, prompt_boxes, unboxed
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.prompt_readers import CLIP, QWEN3VL, SOUND_PROMPT_KEYS, T5, UMT5
+from origenerator.workflows.prompt_readers import AUDIO_PROMPT_KEYS, CLIP, QWEN3VL, T5, UMT5
 
 READ_IN_PIECES = "in pieces"
 READ_WHOLE = "whole"
@@ -124,13 +124,13 @@ def boxed_as_typed(workflow_name: str, params: dict, key: str, text: str) -> str
 
 def prompt_readings(workflow_name: str, params: dict) -> dict[str, PromptReading | None]:
     return {key: prompt_reading(workflow_name, params, key)
-            for key in (*_TEXT_ENCODER_PROMPTS, *SOUND_PROMPT_KEYS)}
+            for key in (*_TEXT_ENCODER_PROMPTS, *AUDIO_PROMPT_KEYS)}
 
 
 def _reader_of(workflow, key: str) -> str | None:
     if workflow is None or not workflow.generates_here:
         return None
-    if key in SOUND_PROMPT_KEYS:
+    if key in AUDIO_PROMPT_KEYS:
         return _CLAP
     return workflow.text_reader if key in _TEXT_ENCODER_PROMPTS else None
 

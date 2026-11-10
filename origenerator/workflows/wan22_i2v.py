@@ -50,6 +50,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     lora_keys = LORA_KEYS_OF_BOTH_PASSES
     text_reader = UMT5
     loras_keyed_only_when_named = LORAS_KEYED_ONLY_WHEN_NAMED
+    keyed_only_when_on = ("enable_audio",)
     output_node_id = "19"
 
     def default_params(self) -> dict:
@@ -83,6 +84,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             "lora_high": "wan22-f4c3spl4sh-100epoc-high-k3nk.safetensors",
             "lora_low": "wan22-f4c3spl4sh-154epoc-low-k3nk.safetensors",
             **wan_expert_lora_defaults(),
+            "enable_audio": False,
             "audio_prompt": "",
             "audio_negative_prompt": "noisy, harsh",
             "audio_seed": 0,
@@ -106,13 +108,14 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             ParamDef("scene_lines", "Her Lines", ParamType.LINES, defaults["scene_lines"]),
             ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
             ParamDef("input_image", "Start Image", ParamType.IMAGE, defaults["input_image"]),
+            ParamDef("enable_audio", "Enable Audio", ParamType.BOOL, defaults["enable_audio"], switch=True),
             ParamDef("audio_prompt", "Positive Prompt", ParamType.STR, defaults["audio_prompt"], multiline=True),
             ParamDef("audio_negative_prompt", "Negative Prompt", ParamType.STR, defaults["audio_negative_prompt"], multiline=True),
             ParamDef("voice", "Voice", ParamType.DROPDOWN, defaults["voice"], options=list(VOICE_OPTIONS)),
             ParamDef("voice_sample", "Voice Sample", ParamType.AUDIO, defaults["voice_sample"], browse_dir=Path.home()),
             ParamDef("voice_sample_text", "Words in the Voice Sample", ParamType.STR, defaults["voice_sample_text"], multiline=True),
             ParamDef("noise_seed", "Seed", ParamType.SEED, defaults["noise_seed"]),
-            ParamDef("audio_seed", "Sound Seed", ParamType.SEED, defaults["audio_seed"]),
+            ParamDef("audio_seed", "Audio Seed", ParamType.SEED, defaults["audio_seed"]),
             ParamDef("frame_count", "Duration", ParamType.INT, defaults["frame_count"], min_val=5, max_val=LONGEST_VIDEO_FRAMES, step=4,
                      options=DURATION_OPTIONS, unit="s", shown_in_seconds_at=NATIVE_FPS, good=(81, 161)),
             ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=100, good=(20, 30)),
@@ -310,6 +313,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         speech = {}
         if any(scene is not None for scene in spoken):
             speech = self._speech_nodes(params, spoken)
+        if speech and params["enable_audio"]:
             track, audio_ref = self.speech_track_nodes("speech_", [
                 (frames, [f"scene{index}_line", 0] if line is not None else None)
                 for index, (frames, line) in enumerate(zip(self.scene_lengths(params), spoken, strict=True))],

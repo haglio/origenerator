@@ -10,7 +10,7 @@ from origenerator.workflows.wan22_i2v import Wan22I2vWorkflow
 def _spoken_params(**overrides):
     params = dict(Wan22I2vWorkflow().default_params(), frame_count=401, scene_frames=[161, 81, 161],
                   positive_prompt="she waves\n---\nshe turns\n---\nshe speaks",
-                  scene_lines=["Come in.", "", "Sit."], audio_seed=5, noise_seed=100)
+                  scene_lines=["Come in.", "", "Sit."], audio_seed=5, noise_seed=100, enable_audio=True)
     params.update(overrides)
     return params
 
@@ -125,7 +125,7 @@ def test_a_story_without_lines_keeps_the_graph_it_always_had():
     wf = Wan22I2vWorkflow()
     payload = wf.build_api_payload(dict(
         wf.default_params(), frame_count=401, scene_frames=[161, 81, 161],
-        positive_prompt="a\n---\nb\n---\nc", scene_lines=["", " ", ""]))
+        positive_prompt="a\n---\nb\n---\nc", scene_lines=["", " ", ""], enable_audio=True))
     kinds = {node["class_type"] for node in payload.values()}
     assert not kinds & {"WanSoundImageToVideo", "LoadAudio", "AudioMerge", "AudioEncoderLoader", "KSampler"}
     assert _writer_audio(payload)["class_type"] == "HunyuanFoleySampler"
@@ -155,3 +155,11 @@ def test_the_voice_is_a_preset_or_a_sample_and_only_the_one_shot_workflow_speaks
     loop = Wan22Flf2vLoopWorkflow()
     assert "scene_lines" not in loop.default_params()
     assert "scene_lines" not in {pd.key for pd in loop.param_definitions()}
+
+
+def test_with_audio_off_her_lines_still_move_her_mouth_and_the_video_is_saved_silent():
+    payload = Wan22I2vWorkflow().build_api_payload(_spoken_params(enable_audio=False))
+
+    assert _nodes(payload, "WanSoundImageToVideo")
+    assert not _nodes(payload, "HunyuanFoleySampler")
+    assert "audio" not in _nodes(payload, "VHS_VideoCombine")[0]["inputs"]

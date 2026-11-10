@@ -8,6 +8,7 @@ from functools import partial
 from PyQt6.QtCore import QSignalBlocker, Qt
 from PyQt6.QtWidgets import QComboBox, QLineEdit, QWidget
 from shared_ui.tick_control import TickControl
+from shared_ui.toggle_switch import ToggleSwitch
 
 from origenerator.gui.drop_zone import DropZone, ZoneLookups, placeholder_for
 from origenerator.gui.file_pick import AUDIO_FILE_FILTER, FILE_FILTERS
@@ -200,6 +201,13 @@ class _Checkbox(FieldKind):
         widget.setChecked(bool(value))
 
 
+class _Switch(_Checkbox):
+    def make(self, pd):
+        widget = ToggleSwitch()
+        widget.setChecked(bool(pd.default))
+        return widget
+
+
 class _Spinner(FieldKind, ABC):
     def change_signal(self, widget):
         return widget.valueChanged
@@ -282,6 +290,7 @@ _KINDS: dict[ParamType, FieldKind] = {
     ParamType.DROPDOWN: _Choice(),
     ParamType.AUDIO: _AudioPath(),
 }
+_SWITCH = _Switch()
 _PROMPT = _Prompt()
 _PRESETS = _Presets()
 
@@ -290,6 +299,8 @@ def field_kind(pd: ParamDef, heights=None, seed_history: SeedHistory | None = No
                items=None, browse: Callable[[str], None] | None = None) -> FieldKind:
     if pd.type == ParamType.STR and pd.multiline:
         return _Prompt(heights) if heights is not None else _PROMPT
+    if pd.switch:
+        return _SWITCH
     if pd.type == ParamType.SEED:
         return _Seed(seed_history)
     if pd.type in (ParamType.IMAGE, ParamType.VIDEO):

@@ -94,6 +94,9 @@ def canonical_settings(workflow_name: str | None, params: dict) -> dict:
         if is_no_lora(settings.get(key)):
             settings.pop(key, None)
             settings.pop(strength_key_of(key), None)
+    for key in wf.keyed_only_when_on:
+        if not settings.get(key):
+            settings.pop(key, None)
     if "scene_frames" in settings and len(settings["scene_frames"] or []) <= 1:
         settings["scene_frames"] = [settings.get("frame_count", params.get("frame_count"))]
     return settings

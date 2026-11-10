@@ -10,7 +10,7 @@ from origenerator.gallery.output import stem_as_made
 from origenerator.media import MediaType, media_type_from_filename
 from origenerator.output_places import OutputPlaces, files_under, folders_in
 from origenerator.trash import Trash
-from origenerator.workflows.base import soundless_copies_of
+from origenerator.workflows.base import silent_copies_of
 from origenerator.workflows.video_writer import VIDEO_WRITER
 
 ADD_ON_SCRATCH = frozenset({"VRGDG_TEMP"})
@@ -50,7 +50,7 @@ def _saved_by(node: dict, run: str, places: OutputPlaces) -> list[dict]:
 def _videos_comfyui_reports(names: list[str]) -> list[str]:
     videos = [{"filename": name} for name in names
               if media_type_from_filename(name) == MediaType.VIDEO]
-    silent = {copy["filename"] for copy in soundless_copies_of(videos)}
+    silent = {copy["filename"] for copy in silent_copies_of(videos)}
     return [video["filename"] for video in videos if video["filename"] not in silent]
 
 

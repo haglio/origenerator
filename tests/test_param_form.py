@@ -1331,7 +1331,7 @@ def test_prompts_seed_and_the_workflow_start_open_the_rest_collapsed(qtbot):
     assert form._sections["Workflow, Models & LoRAs"].is_collapsed() is False
     assert form._sections["Calibration"].is_collapsed() is True
     assert form._sections["Video"].is_collapsed() is True
-    assert form._sections["Sound"].is_collapsed() is True
+    assert form._sections["Audio"].is_collapsed() is True
 
 
 def test_fields_lay_out_in_canonical_order_not_param_definitions_order(qtbot):

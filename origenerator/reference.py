@@ -34,7 +34,7 @@ def _core() -> ReferenceSection:
     return ReferenceSection("Core", (
         ReferenceGroup("", (
             _row("quit", ("Ctrl+Alt+Q",)),
-            _row("pause / play everything — stops and starts the sounds and the animations; "
+            _row("pause / play everything — stops and starts the audio and the animations; "
                  "the play/pause button does the same", ("Esc",),
                  said=said_to_the_slideshow(SlideshowCommand.PAUSE)),
             _row("open / close the slideshow — opens it on the image a double click would",

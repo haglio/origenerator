@@ -17,7 +17,7 @@ from PyQt6.QtGui import QWheelEvent
 from PyQt6.QtWidgets import QApplication
 
 from origenerator import running_ahead
-from origenerator.gui.funestra_pane import FunestraPane, PaneChannel, PaneSound
+from origenerator.gui.funestra_pane import FunestraPane, PaneAudio, PaneChannel
 from tests import gestures
 from tests.running_ahead_support import record_the_app_running_ahead
 from tests.slideshow_hud_support import speaker_on_screen
@@ -323,7 +323,7 @@ class _ARadio:
 
 def test_the_funestra_plays_the_radio_its_slideshow_holds_at_its_own_volume(qtbot, tmp_path):
     radio = _ARadio()
-    pane, engine, _running = _pane(qtbot, sound=PaneSound(radio=radio))
+    pane, engine, _running = _pane(qtbot, audio=PaneAudio(radio=radio))
     _hand_over(pane, _items(tmp_path, "one"))
     engine.showing_image = True
 
@@ -334,7 +334,7 @@ def test_the_funestra_plays_the_radio_its_slideshow_holds_at_its_own_volume(qtbo
 
 def test_closing_the_pane_lets_its_slideshows_hold_on_the_radio_go(qtbot, tmp_path):
     radio = _ARadio()
-    pane, _engine, _running = _pane(qtbot, sound=PaneSound(radio=radio))
+    pane, _engine, _running = _pane(qtbot, audio=PaneAudio(radio=radio))
     _hand_over(pane, _items(tmp_path, "one"))
 
     pane.close_engine()
@@ -346,7 +346,7 @@ def test_a_press_on_the_huds_speaker_tells_the_slideshow_the_volume_it_moved_to(
         qtbot, tmp_path):
     moved = []
     pane, _engine, _running = _pane(qtbot, hud=lambda: HudModel(funestra="portrait"),
-                                    sound=PaneSound(on_volume_moved=moved.append))
+                                    audio=PaneAudio(on_volume_moved=moved.append))
     _hand_over(pane, _items(tmp_path, "one"))
     pane.tick()
 
@@ -356,7 +356,7 @@ def test_a_press_on_the_huds_speaker_tells_the_slideshow_the_volume_it_moved_to(
 
 
 def test_the_funestra_opens_at_the_volume_its_slideshow_was_left_at(qtbot, tmp_path):
-    pane, engine, _running = _pane(qtbot, sound=PaneSound(volume=VolumeHud(volume=40, muted=False)))
+    pane, engine, _running = _pane(qtbot, audio=PaneAudio(volume=VolumeHud(volume=40, muted=False)))
 
     _hand_over(pane, _items(tmp_path, "one"))
 

@@ -54,7 +54,7 @@ from origenerator.boot_passes import (
     Library,
     _fold_enhancements,
     _import_new_files,
-    _merge_soundless_copies,
+    _merge_silent_copies,
     _tidy_video_previews,
 )
 from origenerator.branch_session import ENV_FLAG, LAUNCHER
@@ -1134,8 +1134,8 @@ _MAINTENANCE_PASSES = (
     ("origenerator.relocate", "relocate_moved_outputs"),
     ("origenerator.importer", "import_comfyui_output"),
     ("origenerator.importer", "merge_video_sidecar_rows"),
-    ("origenerator.importer", "merge_soundless_copy_rows"),
-    ("origenerator.importer", "fold_sound_versions_into_their_videos"),
+    ("origenerator.importer", "merge_silent_copy_rows"),
+    ("origenerator.importer", "fold_audio_versions_into_their_videos"),
     ("origenerator.importer", "backfill_import_workflows"),
     ("origenerator.importer", "refile_enhancements_another_workflow_made"),
     ("origenerator.importer", "backfill_import_params"),
@@ -1315,7 +1315,7 @@ def test_a_soundless_copy_sent_down_a_lane_has_its_video_sent_there_as_it_folds(
                       thumb_dir=tmp_path / "thumbs",
                       log_dir=tmp_path / "logs", inbox=EvolverInbox(inbox))
 
-    assert _merge_soundless_copies(library) == 1
+    assert _merge_silent_copies(library) == 1
 
     landed = inbox / GENAU.source / "flf2v_loop_00001-audio.mp4"
     assert landed.read_bytes() == b"with its sound"

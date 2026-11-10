@@ -147,19 +147,19 @@ def test_backfill_fills_a_videos_sound_settings_from_its_stored_graph(tmp_path):
     db.insert_generation(NewGeneration(
         prompt_id="old", workflow_name="wan22_flf2v_loop", workflow_version="imported",
         params_json=json.dumps({"positive_prompt": "a fox", "noise_seed": 1}),
-        workflow_json=json.dumps(_SOUND_STAGE), source="imported",
+        workflow_json=json.dumps(_AUDIO_STAGE), source="imported",
     ))
     db.insert_generation(NewGeneration(
         prompt_id="made", workflow_name="wan22_i2v", workflow_version="v002",
-        params_json=json.dumps({**_SOUND_PARAMS, "audio_seed": 9}),
-        workflow_json=json.dumps(_SOUND_STAGE),
+        params_json=json.dumps({**_AUDIO_PARAMS, "audio_seed": 9}),
+        workflow_json=json.dumps(_AUDIO_STAGE),
     ))
 
     updated = backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path))
 
     assert updated == 1
     old = json.loads(db.get_generation("old")["params_json"])
-    assert {key: old[key] for key in _SOUND_PARAMS} == _SOUND_PARAMS
+    assert {key: old[key] for key in _AUDIO_PARAMS} == _AUDIO_PARAMS
     assert old["positive_prompt"] == "a fox"
     assert json.loads(db.get_generation("made")["params_json"])["audio_seed"] == 9
     assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 0
@@ -405,7 +405,7 @@ def test_extract_metadata_from_video_recovers_prompts_image_dims(tmp_path, monke
     assert meta["workflow_name"] == "wan22_i2v"
 
 
-_SOUND_STAGE = {
+_AUDIO_STAGE = {
     "20": {"class_type": "HunyuanModelLoader",
            "inputs": {"model_name": "foley_model.safetensors", "precision": "bf16"}},
     "21": {"class_type": "HunyuanDependenciesLoader",
@@ -417,7 +417,7 @@ _SOUND_STAGE = {
                       "seed": 4242, "cfg_scale": 4.5, "steps": 50}},
 }
 
-_SOUND_PARAMS = {
+_AUDIO_PARAMS = {
     "audio_seed": 4242, "audio_prompt": "footsteps on gravel",
     "audio_negative_prompt": "music", "foley_model": "foley_model.safetensors",
     "foley_vae": "foley_vae.safetensors", "foley_synchformer": "sync.safetensors",
@@ -456,13 +456,13 @@ def test_extract_metadata_reads_a_videos_sound_settings(tmp_path, monkeypatch):
     graph = {
         "15": {"class_type": "KSamplerAdvanced",
                "inputs": {"noise_seed": 7, "add_noise": "enable", "steps": 8}},
-        **_SOUND_STAGE,
+        **_AUDIO_STAGE,
     }
     monkeypatch.setattr(imp, "_video_prompt_graph", lambda p: graph)
 
     meta = imp._extract_metadata(tmp_path / "wan22_i2v_00001_.mp4", ".mp4")
 
-    assert {key: meta["params"][key] for key in _SOUND_PARAMS} == _SOUND_PARAMS
+    assert {key: meta["params"][key] for key in _AUDIO_PARAMS} == _AUDIO_PARAMS
     assert meta["params"]["steps"] == 8
 
 
@@ -732,7 +732,7 @@ def test_merge_folds_a_found_soundless_copy_into_the_video_the_app_made(tmp_path
     _made_here(db, "sounded", "flf2v_loop_00001-audio.mp4")
     _completed(db, "copy", "flf2v_loop_00001.mp4", "video")
 
-    assert imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send) == 1
+    assert imp.merge_silent_copy_rows(db, send_down=_nothing_to_send) == 1
     assert db.get_generation("copy") is None
     files = json.loads(db.get_generation("sounded")["output_files"])
     assert [f["filename"] for f in files] == ["flf2v_loop_00001-audio.mp4", "flf2v_loop_00001.mp4"]
@@ -745,7 +745,7 @@ def test_a_folded_copys_favorite_goes_to_its_video(tmp_path):
     _completed(db, "copy", "flf2v_loop_00001.mp4", "video")
     db.set_generation_favorite("copy", True)
 
-    imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send)
+    imp.merge_silent_copy_rows(db, send_down=_nothing_to_send)
 
     assert db.get_generation("sounded")["starred"] == 1
 
@@ -757,7 +757,7 @@ def test_a_combine_made_from_a_folded_copy_now_names_its_video_as_the_source(tmp
     _made_here(db, "combined", "flf2v_loop_00002-audio.mp4")
     db.set_settings_source("combined", category="alpha", video_prompt_id="copy")
 
-    imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send)
+    imp.merge_silent_copy_rows(db, send_down=_nothing_to_send)
 
     combined = db.get_generation("combined")
     assert (combined["action"], combined["source_video"]) == ("alpha", "sounded")
@@ -769,7 +769,7 @@ def test_a_folded_copy_combines_slot_had_is_listed_as_the_video_that_stays(tmp_p
     _completed(db, "copy", "flf2v_loop_00001.mp4", "video")
     db.record_combine_video_use("genau", "copy")
 
-    imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send)
+    imp.merge_silent_copy_rows(db, send_down=_nothing_to_send)
 
     assert [use["video_prompt_id"] for use in db.list_combine_video_uses()] == ["sounded"]
 
@@ -781,7 +781,7 @@ def test_a_favorite_folder_keyed_from_a_folded_copy_stays_a_favorite(tmp_path):
     db.upsert_folder_meta("wan22_flf2v_loop/example/abc123", custom_name="Kept for later",
                           favorite=True, level="settings", ref_prompt_id="copy")
 
-    imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send)
+    imp.merge_silent_copy_rows(db, send_down=_nothing_to_send)
 
     (folder_meta,) = db.folder_meta_full()
     assert folder_meta["ref_prompt_id"] == "sounded"
@@ -794,7 +794,7 @@ def test_a_found_sound_version_joins_the_found_video_that_carries_its_graph(tmp_
     _completed(db, "with-sound", "scene_one_00001-audio.mp4", "video")
     db.set_generation_favorite("with-sound", True)
 
-    assert imp.fold_sound_versions_into_their_videos(db) == 1
+    assert imp.fold_audio_versions_into_their_videos(db) == 1
 
     assert db.get_generation("with-sound") is None
     video = db.get_generation("silent")
@@ -838,8 +838,8 @@ def test_a_found_soundless_file_beside_a_found_sounded_one_is_left_as_its_own_it
     _completed(db, "found-copy", "old_clip_00001.mp4", "video")
     _completed(db, "lone", "wan22_i2v_00001_.mp4", "video", workflow_name="wan22_i2v")
 
-    assert imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send) == 0
-    assert imp.fold_sound_versions_into_their_videos(db) == 0
+    assert imp.merge_silent_copy_rows(db, send_down=_nothing_to_send) == 0
+    assert imp.fold_audio_versions_into_their_videos(db) == 0
     assert {r["prompt_id"] for r in db.list_generations()} == {"found-sounded", "found-copy", "lone"}
 
 
@@ -847,9 +847,9 @@ def test_folding_again_finds_nothing_and_lists_the_copy_once(tmp_path):
     db = Database(tmp_path / "test.db")
     _made_here(db, "sounded", "flf2v_loop_00001-audio.mp4")
     _completed(db, "copy", "flf2v_loop_00001.mp4", "video")
-    imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send)
+    imp.merge_silent_copy_rows(db, send_down=_nothing_to_send)
 
-    assert imp.merge_soundless_copy_rows(db, send_down=_nothing_to_send) == 0
+    assert imp.merge_silent_copy_rows(db, send_down=_nothing_to_send) == 0
     files = json.loads(db.get_generation("sounded")["output_files"])
     assert [f["filename"] for f in files] == ["flf2v_loop_00001-audio.mp4", "flf2v_loop_00001.mp4"]
 
@@ -861,7 +861,7 @@ def test_a_copy_sent_down_a_lane_its_video_never_went_down_sends_the_video_there
     db.mark_genau_exported("copy")
     sent = []
 
-    imp.merge_soundless_copy_rows(
+    imp.merge_silent_copy_rows(
         db, send_down=lambda video, lane: sent.append((video["prompt_id"], lane)))
 
     assert sent == [("sounded", "genau")]
@@ -876,7 +876,7 @@ def test_a_copy_sent_down_a_lane_its_video_already_went_down_sends_nothing(tmp_p
     db.mark_evolver_exported("sounded")
     sent = []
 
-    imp.merge_soundless_copy_rows(
+    imp.merge_silent_copy_rows(
         db, send_down=lambda video, lane: sent.append((video["prompt_id"], lane)))
 
     assert sent == []
@@ -892,7 +892,7 @@ def test_a_video_taken_back_from_a_lane_is_not_sent_there_for_its_copy(tmp_path)
     db.mark_genau_unsent("sounded")
     sent = []
 
-    imp.merge_soundless_copy_rows(
+    imp.merge_silent_copy_rows(
         db, send_down=lambda video, lane: sent.append((video["prompt_id"], lane)))
 
     assert sent == []
@@ -909,7 +909,7 @@ def test_a_copy_whose_video_could_not_be_sent_waits_for_the_next_launch(tmp_path
     def unreachable(video, lane):
         raise OSError("inbox unreachable")
 
-    assert imp.merge_soundless_copy_rows(db, send_down=unreachable) == 1
+    assert imp.merge_silent_copy_rows(db, send_down=unreachable) == 1
     assert db.get_generation("copy")["genau_exported_at"]
     assert db.get_generation("copy-2") is None
 

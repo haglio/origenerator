@@ -114,7 +114,7 @@ def guidance_params(graph: dict) -> dict:
     return {"guidance": found[-1]} if found else {}
 
 
-_SOUND_INPUTS = {
+_AUDIO_INPUTS = {
     "HunyuanFoleySampler": {"seed": "audio_seed", "prompt": "audio_prompt",
                             "negative_prompt": "audio_negative_prompt"},
     "HunyuanModelLoader": {"model_name": "foley_model"},
@@ -122,10 +122,10 @@ _SOUND_INPUTS = {
 }
 
 
-def sound_params(graph: dict) -> dict:
+def audio_params(graph: dict) -> dict:
     params: dict = {}
     for node in graph.values():
-        for input_name, key in _SOUND_INPUTS.get(node.get("class_type", ""), {}).items():
+        for input_name, key in _AUDIO_INPUTS.get(node.get("class_type", ""), {}).items():
             value = node.get("inputs", {}).get(input_name)
             if isinstance(value, (int, str)) and not isinstance(value, bool):
                 params[key] = value

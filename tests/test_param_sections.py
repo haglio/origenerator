@@ -10,7 +10,7 @@ def test_sections_are_in_the_canonical_display_order():
     titles = [s.title for s in ps.SECTIONS]
     assert titles == [
         "Prompts & Seed", "Workflow, Models & LoRAs", "Calibration",
-        "Size", "Video", "Sound",
+        "Size", "Video", "Audio",
     ]
 
 
@@ -33,8 +33,8 @@ def test_section_title_places_each_kind_of_param_in_its_section():
     assert ps.section_title("width") == "Size"
     assert ps.section_title("frame_count") == "Video"
     assert ps.section_title("frame_rate") == "Video"
-    assert ps.section_title("audio_prompt") == "Sound"
-    assert ps.section_title("audio_seed") == "Sound"
+    assert ps.section_title("audio_prompt") == "Audio"
+    assert ps.section_title("audio_seed") == "Audio"
 
 
 def test_unknown_key_falls_into_the_other_section_sorted_last():

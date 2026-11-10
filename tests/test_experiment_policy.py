@@ -202,9 +202,10 @@ def test_video_bases_dominate_even_an_image_heavy_gallery():
     policy = make_policy(seed=9)
     picked = [policy.propose(rows).workflow.name for _ in range(300)]
     video_share = picked.count("fake_i2v") / len(picked)
+    assert video_share < 1, "images keep the smaller share of the proposals"
     assert video_share > 0.6, (
         "a gallery holds many images per video, so a weight on each video base would be swamped; "
-        "a share of the proposals is not, and leaves images the smaller share")
+        "a share of the proposals is not")
 
 
 def test_lora_dims_are_the_favorite_mutation(monkeypatch):

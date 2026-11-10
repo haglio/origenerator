@@ -304,9 +304,7 @@ def test_a_start_frames_signature_follows_the_index_it_is_given():
     lantern = build_image_config_index([_img("lantern", "a lantern", 30, 1)])
 
     assert settings_signature("wan22_i2v", params, lantern) != \
-        settings_signature("wan22_i2v", params, {}), (
-        "a folder keyed from an index of part of the library is still drawn, "
-        "and no click, star or name reaches it")
+        settings_signature("wan22_i2v", params, {})
 
 
 def test_an_image_answers_as_itself_under_each_of_the_files_it_lists():
@@ -1187,9 +1185,9 @@ def test_build_gallery_tree_collapses_the_lora_level_without_lora_keys():
     rows = [_img_model("i1", "a cat", "reapony_v80.safetensors", 50, 1)]
     (model,) = _workflows(build_gallery_tree(rows))[0].children
     (lora,) = model.children
-    assert isinstance(lora, LoraGroup)
-    assert lora.label == "(no LoRA)", \
-        "one empty LoRA level is drawn, so every branch of the tree nests to the same depth"
+    assert isinstance(lora, LoraGroup), (
+        "one empty LoRA level is drawn, so every branch of the tree nests to the same depth")
+    assert lora.label == "(no LoRA)"
     assert all(isinstance(child, SettingsGroup) for child in lora.children)
 
 
@@ -1635,7 +1633,7 @@ def test_recent_generations_leaves_an_enhancement_older_than_the_record_in_place
         [{"filename": "image_enhance_e1.png", "params": {}}])
     rows = [*_collection(("i3", 3), ("i2", 2)), i1]
     assert [r["prompt_id"] for r in recent_generations(rows)] == ["i3", "i2", "i1"], \
-        "an enhancement older than the record of it was made long ago"
+        "with no run recorded for its enhancement, there is no moment to move the image to"
 
 
 def test_recent_generations_lifts_the_image_a_re_enhance_runs_on_its_original():

@@ -331,6 +331,7 @@ def test_an_untimed_workflow_is_priced_high_rather_than_guessed_low(tmp_path):
     queued = queue_base_renders(db.list_generations(), lambda wf, p: "p",
                                 budget_minutes=5)
 
+    assert UNTIMED_SECONDS >= 60, "an untimed workflow is priced at a minute or more"
     assert queued == 5 * 60 / UNTIMED_SECONDS, (
         "a low guess queues more than ComfyUI can finish, which the next launch throws away; "
         "a high one costs only another absence")
@@ -486,7 +487,7 @@ def test_a_repair_that_never_finishes_gives_up_rather_than_waiting_forever():
     files = render_base_now(client, _SDXL, _base_params(), now=monotonic, sleep=sleep)
 
     assert files == []
-    assert monotonic() >= base_backfill.LONG_ENOUGH_FOR_ONE_IMAGE_ON_ANY_MODEL_SECONDS
+    assert monotonic() >= base_backfill.ONE_IMAGE_ON_ANY_MODEL_SECONDS
 
 
 def _repairable_db(tmp_path):

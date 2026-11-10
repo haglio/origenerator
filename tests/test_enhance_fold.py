@@ -259,15 +259,11 @@ def test_fold_completed_enhancements_sweeps_only_finished_rows(tmp_path):
     _add_enhance(db, "running", "image/sdxl_t2i_a.png [output]", "x.png", status="running")
     _add_enhance(db, "orphan", "image/sdxl_t2i_gone.png [output]", "image_enhance_o.png")
 
-    assert fold_completed_enhancements(db) == 2, (
-        "every finished enhancement folds, however old: rows from when Image Enhance "
-        "was a workflow of its own become versions this way too")
+    assert fold_completed_enhancements(db) == 2
 
     assert db.get_generation("done_a") is None
     assert db.get_generation("done_b") is None
-    assert db.get_generation("running")["status"] == "running", (
-        "a run has a row of its own while it is made, "
-        "so its tile and a restart's reconnection work like any run's")
+    assert db.get_generation("running")["status"] == "running"
     assert db.get_generation("orphan") is not None
     assert is_enhanced_row(db.get_generation("src_a"))
     assert is_enhanced_row(db.get_generation("src_b"))
@@ -287,6 +283,15 @@ def test_an_enhancement_whose_image_is_gone_is_one_to_scrap(tmp_path):
         db.list_generations(), places=OutputPlaces.in_one_folder(output_dir), input_dir=tmp_path / "input")
 
     assert [row["prompt_id"] for row in gone] == ["of_a_deleted_image"]
+
+
+def test_the_launch_folds_an_enhancement_from_when_image_enhance_was_its_own_workflow(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _add_source(db)
+    _add_enhance(db, "long-ago", "image/sdxl_t2i_src.png [output]", "image_enhance_00001_.png")
+    db.update_generation("long-ago", completed_at="2025-03-01 09:00:00")
+
+    assert fold_completed_enhancements(db) == 1
 
 
 def test_tree_never_grows_a_folder_for_a_running_enhance(tmp_path):

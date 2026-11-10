@@ -173,8 +173,8 @@ def is_enhanceable_row(row: dict) -> bool:
 
 
 def enhance_target_id(enhance_row: dict, image_rows) -> str | None:
-    # ComfyUI numbers its files per prefix and gives a deleted file's number out again,
-    # so two rows can name one file.
+    # ComfyUI numbers saved files per prefix, one past the highest it finds,
+    # so a deleted newest file's number is given out again.
     stamped = enhance_row.get("enhance_of")
     if stamped:
         return stamped if any(r.get("prompt_id") == stamped for r in image_rows) else None

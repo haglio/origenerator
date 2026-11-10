@@ -715,7 +715,9 @@ def test_clicking_cancel_does_not_also_reveal_the_folder(queue):
 
 def test_the_left_half_says_what_the_bar_is_sweeping_behind(queue):
     queue.set_items([_item(status="queued", foreign_ahead=3)])
-    assert _timing(queue) == "Waiting on 3 jobs from another app"
+    assert _timing(queue) == "Waiting on 3 jobs from another app", (
+        "a bar sweeping with nothing said about it is exactly the thing a user is owed an "
+        "explanation for")
 
 
 def test_one_job_ahead_reads_in_the_singular(queue):
@@ -820,6 +822,9 @@ def test_the_users_own_queue_needs_no_explaining(queue):
                      _item(key="b", status="queued", foreign_ahead=0)])
     assert [row._note_text for row in queue.rows()] == ["", ""]
     assert _timing(queue) == ""
+    assert queue._clear.isHidden(), (
+        "Clear is only ever offered for another app's work: the user's own queue is what the "
+        "user asked for, and every row of it carries its own Cancel already")
 
 
 def _timing(queue) -> str:

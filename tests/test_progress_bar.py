@@ -141,7 +141,12 @@ def test_the_pass_being_taken_reads_as_a_band_along_the_foot(styled_bar):
     middle = styled_bar.width() // 2
 
     assert image.pixelColor(middle, styled_bar.height() // 2) == BLUE
-    assert image.pixelColor(middle, _foot(styled_bar)) == BG_PRIMARY
+    assert image.pixelColor(middle, _foot(styled_bar)) == BG_PRIMARY, (
+        "the substep progress bar reads as a groove cut into the bar rather than a second fill "
+        "of the same blue, painted over the bar rather than laid out beside it so every surface "
+        "holding one keeps the height it already gives it; it is there because one bar that "
+        "starts again at every pass makes a run look like several jobs, with nothing saying how "
+        "far through the whole thing it is")
 
 
 def test_the_band_fills_with_the_pass_it_measures(styled_bar):
@@ -149,7 +154,9 @@ def test_the_band_fills_with_the_pass_it_measures(styled_bar):
     image = styled_bar.grab().toImage()
     foot = _foot(styled_bar)
 
-    assert image.pixelColor(8, foot) == BLUE_LIGHT
+    assert image.pixelColor(8, foot) == BLUE_LIGHT, (
+        "a shade up from the bar's blue, so which is which can be told whether it lies over the "
+        "filled part of the bar or the empty part")
     assert image.pixelColor(styled_bar.width() - 9, foot) == BG_PRIMARY
 
 

@@ -62,7 +62,9 @@ def test_wrapped_rows_can_sit_further_apart_than_the_buttons_in_them(qtbot):
 
     tops = sorted({flow.itemAt(i).geometry().top() for i in range(flow.count())})
     assert len(tops) > 1, "nothing wrapped, so there is no row gap to check"
-    assert tops[1] - tops[0] == 20 + 20
+    assert tops[1] - tops[0] == 20 + 20, (
+        "a row of buttons wants its items close and its rows apart: at one gap for both, two "
+        "wrapped rows read as a single crowded block")
 
 
 def test_a_hidden_widget_takes_no_place_and_leaves_no_gap_where_it_was(qtbot):

@@ -28,7 +28,9 @@ def test_the_tile_wears_the_familys_pencil(qtbot):
     tile = ModifyBatchTile()
     qtbot.addWidget(tile)
 
-    assert tile._glyph.mark == "pencil"
+    assert tile._glyph.mark == "pencil", (
+        "a pencil rather than a plus: the tile beside it makes another one of these, and this one "
+        "writes on them")
 
 
 def test_clicking_the_tile_asks_for_the_rewrite(qtbot):

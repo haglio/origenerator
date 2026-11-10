@@ -79,7 +79,8 @@ def test_replacing_drops_the_forward_tail():
     history.replace("b again")
 
     assert history.current() == "b again"
-    assert not history.can_go_forward()
+    assert not history.can_go_forward(), (
+        "what the forward stops branched from is no longer what is on screen")
 
 
 def test_replacing_in_an_empty_history_visits():

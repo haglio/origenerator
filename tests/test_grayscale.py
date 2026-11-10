@@ -18,7 +18,9 @@ def test_a_colored_thumbnail_comes_back_with_no_color_left(qapp):
     gray = grayscale_pixmap(_filled((200, 30, 30)))
 
     color = gray.toImage().pixelColor(4, 4)
-    assert color.red() == color.green() == color.blue()
+    assert color.red() == color.green() == color.blue(), (
+        "gray says outright that a video is a setting rather than a result: in full color beside "
+        "the frame it will animate it reads as a second subject")
 
 
 def test_light_and_dark_still_differ(qapp):

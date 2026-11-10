@@ -40,7 +40,9 @@ def test_standalone_queue_keeps_its_height_when_the_window_grows(qtbot):
 
     _taller(qtbot, root, 1000)
 
-    assert parts["queue"].height() == before
+    assert parts["queue"].height() == before, (
+        "all the growth goes to the folders above it, so a taller window is more gallery rather than "
+        "more Job Queue")
 
 
 def test_hosted_stacks_generate_then_folders_then_the_queue_across_the_foot(qtbot):
@@ -142,4 +144,5 @@ def test_hosted_the_folders_row_gains_more_of_a_taller_rect_than_the_generate_ta
     folders_gain = arrangement.panes.height() - folders_before
     generate_gain = parts["generate_column"].height() - generate_before
     assert generate_gain > 0
-    assert folders_gain > generate_gain
+    assert folders_gain > generate_gain, (
+        "the Gallery pane a little ahead, so the TOC it sits beside has room to be read")

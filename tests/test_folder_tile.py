@@ -26,7 +26,9 @@ def test_folder_tile_without_context_omits_the_folder_path_line(qtbot):
 
     texts = _label_texts(tile)
     assert "a dog" in texts
-    assert all("\u203a" not in t for t in texts)
+    assert all("\u203a" not in t for t in texts), (
+        "an ordinary folder tile sits among siblings that share its parent, so a path would say "
+        "nothing")
 
 
 def test_folder_tile_shows_its_toc_initial(qtbot):

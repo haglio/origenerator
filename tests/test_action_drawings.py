@@ -36,7 +36,9 @@ def test_a_drawing_the_running_copy_carries_answers_before_the_librarys(
         (tmp_path / folder).mkdir()
         (tmp_path / folder / "state-one.png").write_bytes(b"a file, not a drawing")
 
-    assert drawing_for("state one") == tmp_path / "own" / "state-one.png"
+    assert drawing_for("state one") == tmp_path / "own" / "state-one.png", (
+        "a preview runs out of its own folder, so a drawing it carries for an action it has renamed "
+        "is what its buttons wear, while production goes on reading the library's")
 
 
 def test_the_drawings_stay_in_the_folders_every_copy_of_the_app_reads():

@@ -106,11 +106,15 @@ def _imports_the_db_module(tree) -> bool:
 
 
 def test_only_one_module_of_the_gallery_package_is_handed_a_database():
-    assert _modules(_takes_a_db) == [THE_DB_MODULE]
+    assert _modules(_takes_a_db) == [THE_DB_MODULE], (
+        "the package is otherwise rows in, answers out: whoever looks for what the gallery can "
+        "change has one file to read")
 
 
 def test_only_that_module_calls_anything_on_a_database():
-    assert _modules(_calls_a_db) == [THE_DB_MODULE]
+    assert _modules(_calls_a_db) == [THE_DB_MODULE], (
+        "taking a database and using one are two facts, and a module could pick up either without "
+        "the other")
 
 
 def test_no_module_of_the_gallery_package_imports_the_database_module():

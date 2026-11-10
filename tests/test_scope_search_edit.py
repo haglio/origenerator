@@ -22,7 +22,8 @@ def test_a_field_with_no_folder_named_yet_just_invites_a_query(qtbot):
 def test_the_placeholder_names_the_whole_path_when_there_is_room_for_it(qtbot):
     field = _field(qtbot, 900)
     field.set_scope("Library / Alpha")
-    assert field.placeholderText() == "Search Library / Alpha…"
+    assert field.placeholderText() == "Search Library / Alpha…", (
+        "a folder is named by a short code, and a code alone says nothing of the branch it sits in")
 
 
 def test_a_path_too_long_for_the_field_keeps_its_tail(qtbot):

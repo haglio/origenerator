@@ -359,7 +359,9 @@ def test_stepping_lets_go_of_a_locked_slide_first(qtbot, tmp_path):
 
     slideshow.slideshow_step(1)
 
-    assert _sent(slideshow) == ["LOCK_OFF", "NEXT"]
+    assert _sent(slideshow) == ["LOCK_OFF", "NEXT"], (
+        "the way the Funestras' own previous and next cancel a lock: still locked, the Funestra "
+        "would repeat the next one too")
 
 
 def test_a_lock_favorites_the_item_and_asks_for_a_better_version(qtbot, tmp_path):

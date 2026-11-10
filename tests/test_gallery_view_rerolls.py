@@ -791,7 +791,9 @@ def test_the_tab_opened_on_the_tiles_run_is_kept(qtbot, tmp_path):
 
     _new_tile(view).add_requested.emit()
 
-    assert view._generate_pane._preview_tab is None
+    assert view._generate_pane._preview_tab is None, (
+        "that run's Cancel and its filling bar are in the opened tab, so it is no longer one a later "
+        "click may take over")
 
 
 def test_populate_toggle_greys_off_a_settings_leaf_but_stays_on_screen(qtbot, tmp_path):

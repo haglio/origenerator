@@ -100,10 +100,14 @@ def test_the_name_lines_copy_button_copies_the_items_name(block):
 def test_the_name_it_already_shows_leaves_the_block_alone(block):
     block.show_row(_row(), name="AB12CD34 007")
     section = block.findChild(CollapsibleSection)
+    rows = block.findChildren(QLabel)
 
     block.show_name("AB12CD34 007")
 
     assert block.findChild(CollapsibleSection) is section
+    assert block.findChildren(QLabel) == rows, (
+        "the name is asked again after every redraw of the gallery, while it may be text the user "
+        "is selecting")
 
 
 def test_copy_button_copies_just_the_filename(block):

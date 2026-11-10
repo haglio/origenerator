@@ -502,6 +502,17 @@ def test_latest_tiles_wear_an_image_or_video_item_type_icon(qtbot):
     assert icon_type("v1") == "video"
 
 
+def test_a_folder_of_one_kind_leaves_the_item_type_icon_off_its_tiles(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _select_first_leaf(view)
+
+    assert view._gallery_pane._thumb_widgets["i1"].findChildren(ItemTypeIcon) == [], (
+        "inside a folder of one kind the icon would only repeat what the folder already says")
+
+
 def test_an_inflight_tile_wears_the_item_type_icon_of_its_media_type(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
     db.add(_running_row("rr1", workflow="wan22_i2v"))

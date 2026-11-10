@@ -275,3 +275,13 @@ def test_a_folder_with_no_clips_deals_each_funestra_a_radio_with_no_stations(tmp
     written = deal_to_the_funestras(playlists, videos_dir=tmp_path / "nowhere", stations=3)
 
     assert read_radio(written[0]) == []
+
+
+def test_the_videos_come_back_in_one_order_however_the_folder_lists_them(tmp_path, monkeypatch):
+    for name in ("a.mp4", "b.mp4"):
+        (tmp_path / name).touch()
+    as_listed = Path.rglob
+    monkeypatch.setattr(Path, "rglob", lambda self, pattern: reversed(list(as_listed(self, pattern))))
+
+    assert [p.name for p in find_videos(tmp_path)] == ["a.mp4", "b.mp4"], (
+        "one set always shuffles out of the same starting list, so a test can name what it expects")

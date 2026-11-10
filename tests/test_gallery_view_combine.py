@@ -174,7 +174,8 @@ def test_open_combination_prefills_a_generate_tab_without_launching(qtbot, tmp_p
     config = view._generate_pane.current_generate_tab().current_config()
     assert config.workflow_name == "wan22_i2v"
     assert config.params["input_image"] == "sdxl_pick.png [output]"
-    assert config.seed_is_random
+    assert config.seed_is_random, (
+        "a new take of the motion, never the source video's own seed")
 
 
 def test_the_tab_edit_individual_opens_lists_only_the_video_workflows(qtbot, tmp_path):

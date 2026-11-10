@@ -738,7 +738,9 @@ def test_an_item_named_for_no_action_says_so_and_leaves_the_pass_alone():
     said, narrowed = narrow_to_the_action_on_screen(slideshow_set)
 
     assert (said, narrowed) == ("No action for this one", False)
-    assert (slideshow_set.filters.action, len(slideshow_set.playlist)) == ("", 3)
+    assert (slideshow_set.filters.action, len(slideshow_set.playlist)) == ("", 3), (
+        "an empty action passed on would lift the filter, which is what nothing posted to a row's "
+        "button means")
 
 
 def test_a_reset_drops_the_action_filter_with_the_other_switches():

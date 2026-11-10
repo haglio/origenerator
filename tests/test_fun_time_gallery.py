@@ -452,7 +452,8 @@ def test_a_presented_slideshow_wears_the_funestras_own_hud(qtbot, tmp_path, monk
     assert [n for n in names if n in MODE_VERBS] == [
         "satellites_kino_activate", "origenerator_activate"]
     assert {"prev", "next", "lock", "trash"} <= set(names)
-    assert "minimize" not in names
+    assert "minimize" not in names, (
+        "the window a Funestra's minimize parks is not this slideshow's")
 
     slideshow.shown.press("portrait_next")
     posted = (tmp_path / "dashboard_cmd.txt").read_text(encoding="utf-8").split()
@@ -1749,7 +1750,9 @@ def test_a_spoken_enhanced_only_narrows_the_named_regions_slideshow(qtbot, tmp_p
     qtbot.addWidget(slideshow.shown)
 
     assert view.run_spoken_command("portrait enhanced only")
-    assert slideshow.hud_enhanced_mode is True
+    assert slideshow.hud_enhanced_mode is True, (
+        "hosted, two slideshows run at once and neither is the active window, so the shape named "
+        "is what says which one")
     assert slideshow.pass_size() == 1
 
     assert view.run_spoken_command("portrait favorites")

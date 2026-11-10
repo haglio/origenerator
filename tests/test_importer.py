@@ -207,7 +207,9 @@ def test_backfill_fills_the_size_and_prompts_an_imports_graph_states(tmp_path):
     assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 1
 
     params = json.loads(db.get_generation("old")["params_json"])
-    assert (params["width"], params["height"]) == (720, 1280)
+    assert (params["width"], params["height"]) == (720, 1280), (
+        "a setting the first reading missed never shows as missing: it shows as the "
+        "workflow's default wherever the item's settings are shown, and a re-roll then uses it")
     assert params["negative_prompt"] == "fog"
     assert backfill_import_params(db, OutputPlaces.in_one_folder(tmp_path)) == 0
 
@@ -420,6 +422,19 @@ _SOUND_PARAMS = {
     "audio_negative_prompt": "music", "foley_model": "foley_model.safetensors",
     "foley_vae": "foley_vae.safetensors", "foley_synchformer": "sync.safetensors",
 }
+
+
+def test_a_plain_samplers_seed_stands_over_a_later_sampler_that_adds_no_noise(tmp_path, monkeypatch):
+    graph = {
+        "3": {"class_type": "KSampler", "inputs": {"seed": 77}},
+        "9": {"class_type": "KSamplerAdvanced",
+              "inputs": {"noise_seed": 5, "add_noise": "disable"}},
+    }
+    monkeypatch.setattr(imp, "_video_prompt_graph", lambda p: graph)
+
+    meta = imp._extract_metadata(tmp_path / "flf2v_loop_00001_.mp4", ".mp4")
+
+    assert meta["seed"] == 77
 
 
 def test_extract_metadata_keeps_the_seed_that_added_noise_as_the_videos_seed(tmp_path,
@@ -904,10 +919,12 @@ def test_backfill_resplits_thumbnail_shared_by_a_stem_collision(tmp_path):
     (output_dir / "video").mkdir(parents=True)
     thumb_dir = tmp_path / "thumbs"
     thumb_dir.mkdir()
-    Image.new("RGB", (512, 768), (255, 0, 0)).save(output_dir / "ComfyUI_00001_.png")
+    the_images_portrait = (512, 768)
+    the_videos_landscape_frame = (256, 144)
+    Image.new("RGB", the_images_portrait, (255, 0, 0)).save(output_dir / "ComfyUI_00001_.png")
     (output_dir / "video" / "ComfyUI_00001_.mp4").write_bytes(b"")
     shared = thumb_dir / "ComfyUI_00001_.jpg"
-    Image.new("RGB", (256, 144), (0, 255, 0)).save(shared)
+    Image.new("RGB", the_videos_landscape_frame, (0, 255, 0)).save(shared)
 
     db = Database(tmp_path / "test.db")
     _completed(db, "img", "ComfyUI_00001_.png", "", thumbnail_path=str(shared))
@@ -1153,7 +1170,7 @@ def test_extract_metadata_reads_the_base_sampler_not_the_enhance_pass(tmp_path):
     wf = WORKFLOW_REGISTRY["sdxl_t2i"]
     graph = wf.build_api_payload(dict(
         wf.default_params(), positive_prompt="a harbor at dawn", seed=4242,
-        steps=50, enhance_steps=20, enhance_denoise=0.3,
+        steps=50, enhance=True, enhance_steps=20, enhance_denoise=0.3,
     ))
     _make_png_with_metadata(tmp_path / "sdxl_t2i_00001_.png", graph)
     meta = imp._extract_metadata(tmp_path / "sdxl_t2i_00001_.png", ".png")
@@ -1249,11 +1266,19 @@ def test_the_graphs_nodes_name_the_workflow(tmp_path, node_types, expected):
     assert imp._extract_metadata(path, ".png")["workflow_name"] == expected
 
 
+def test_a_text_encoder_loaded_over_a_video_latent_is_not_read_as_krea_2():
+    wan_like = {"1": {"class_type": "CLIPLoader"}, "2": {"class_type": "EmptyHunyuanLatentVideo"}}
+
+    assert imp._workflow_from_nodes(wan_like) != "krea2_t2i", (
+        "every WAN graph loads its text encoder with CLIPLoader too")
+
+
 def test_the_graph_overrules_what_the_filename_claimed(tmp_path):
     path = tmp_path / "sdxl_t2i_00001_.png"
     _make_png_with_metadata(path, _graph_of("WanImageToVideo"))
 
-    assert imp._extract_metadata(path, ".png")["workflow_name"] == "wan22_i2v"
+    assert imp._extract_metadata(path, ".png")["workflow_name"] == "wan22_i2v", (
+        "the workflow's name is stored in the row at import and never read from the file again")
 
 
 @pytest.mark.parametrize("name", sorted(WORKFLOW_REGISTRY))

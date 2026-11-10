@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from origenerator import db_schema
+from origenerator import config, db_schema
 from origenerator import gallery_contract as contract
 from origenerator.export_lane import EXPORT_LANES
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -22,21 +22,41 @@ def test_the_tracked_copy_is_what_publishing_writes(tmp_path):
     tracked = contract.contract_path(REPO_ROOT)
 
     assert (contract.publish(tmp_path).read_text(encoding="utf-8")
-            == tracked.read_text(encoding="utf-8"))
+            == tracked.read_text(encoding="utf-8")), (
+        "run origenerator.gallery_contract.publish(): Evolver cannot import this app's code, "
+        "so the document is how the promise reaches it, and a copy that has drifted tells it "
+        "something untrue")
+
+
+def test_the_document_never_names_the_folder_a_lane_arrives_under():
+    assert config.GENAU_SOURCE not in contract.contract_path().read_text(encoding="utf-8"), (
+        "that folder's name is the library's own vocabulary, which no tracked file may hold")
 
 
 def test_every_column_the_document_names_is_one_this_app_writes():
     document = _document()
     declared = {*document["columns"], *document["optional_columns"]}
 
-    assert declared <= set(db_schema.GENERATION_COLUMNS)
+    assert declared <= set(db_schema.GENERATION_COLUMNS), (
+        "a rename the document does not carry leaves Evolver reading every row as never sent, "
+        "with every suite of both apps green; a column promised and gone is a SELECT that raises")
+
+
+def test_a_column_added_since_the_table_first_shipped_is_one_a_reader_must_ask_for():
+    added = set(db_schema.ADDED_COLUMNS["generations"])
+
+    assert not added & set(contract.COLUMNS), (
+        "a gallery older than a column lacks it, and selecting it there raises")
+    assert set(contract.OPTIONAL_COLUMNS) <= added
 
 
 def test_every_lane_the_document_names_stamps_the_columns_it_promises():
     stamped = {lane.source_key: {"sent": lane.flag, "unsent": lane.unsent_flag}
                for lane in EXPORT_LANES}
 
-    assert stamped == _document()["lanes"]
+    assert stamped == _document()["lanes"], (
+        "Evolver deletes its copies of a row whose withdrawal stamp is set, "
+        "and a lane stamping other columns than the document's is a send Evolver never sees")
 
 
 def test_a_videos_soundless_copy_is_listed_under_the_role_the_document_promises():
@@ -47,7 +67,9 @@ def test_a_videos_soundless_copy_is_listed_under_the_role_the_document_promises(
 
 
 def test_the_document_promises_the_rate_every_video_is_generated_at():
-    assert _document()["generated_fps"] == NATIVE_FPS
+    assert _document()["generated_fps"] == NATIVE_FPS, (
+        "Evolver gives Topaz only the frames the model generated: "
+        "every M-th frame of a video saved at M times this rate")
 
 
 def test_the_contract_imports_first_though_the_workflows_it_reads_the_rate_from_import_it():

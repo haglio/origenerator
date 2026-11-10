@@ -97,7 +97,8 @@ def test_enhance_target_names_the_image_a_run_is_of(tmp_path):
     assert db.get_generation("enh-001")["enhance_of"] is None
 
     db.set_enhance_target("enh-001", "img-007")
-    assert db.get_generation("enh-001")["enhance_of"] == "img-007"
+    assert db.get_generation("enh-001")["enhance_of"] == "img-007", (
+        "the run's settings name a file, and a file's name can belong to more than one row")
 
     db.set_enhance_target("enh-001", None)
     assert db.get_generation("enh-001")["enhance_of"] is None
@@ -341,8 +342,12 @@ def test_taking_a_send_back_clears_it_and_says_so_for_the_other_app(tmp_path):
     db.mark_evolver_unsent("vid-002")
 
     row = Database(db_path).get_generation("vid-002")
-    assert row["evolver_exported_at"] is None
-    assert row["evolver_unsent_at"] is not None
+    assert row["evolver_exported_at"] is None, (
+        "the two stamps change in one write: with one of them written alone, the row would "
+        "hide a copy Evolver still holds or condemn one just handed over")
+    assert row["evolver_unsent_at"] is not None, (
+        "taking a send back only stamps the row: the copies are in Evolver's folders, "
+        "moved since, and only Evolver can find and delete them")
 
 
 def test_sending_again_after_taking_it_back_stands_the_send_up_again(tmp_path):
@@ -1032,6 +1037,8 @@ def test_the_genau_marks_are_independent_of_evolvers(tmp_path):
 
     reopened = Database(db_path).get_generation("clip-001")
     assert reopened["genau_requested_at"] is not None
+    assert len(reopened["genau_requested_at"]) == len(reopened["created_at"]), (
+        "stamped by the database's clock, so it reads like every other stamp on the row")
     assert reopened["genau_exported_at"] is not None
     assert reopened["evolver_exported_at"] is None
 

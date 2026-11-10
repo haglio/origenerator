@@ -83,7 +83,9 @@ def test_over_only_ends_a_request_as_the_last_word():
     dictation.push("Request.")
 
     carrying_on = dictation.push("a blanket over her legs")
-    assert carrying_on.state == COLLECTING
+    assert carrying_on.state == COLLECTING, (
+        "over is radio's own word for it, chosen because nothing in a prompt ends on it by "
+        "accident")
 
     assert dictation.push("and no hat. Over.").state == COMPLETED
 
@@ -101,7 +103,10 @@ def test_a_request_that_never_hears_over_is_given_up_on():
 
     spoken = dictation.push("and more freckles")
 
-    assert spoken.state == ABANDONED
+    assert spoken.state == ABANDONED, (
+        "the failure this guards is the over being missed: without a cap the dictation would "
+        "swallow every later utterance for the rest of the session, and the user would have no "
+        "way to tell why nothing said was landing")
     assert not dictation.listening
     assert dictation.push("a woman in a red coat") is None
 

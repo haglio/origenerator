@@ -215,7 +215,10 @@ def test_every_button_presses_its_own_handler(buttons):
     made.favorite.click()
     made.delete.click()
 
-    assert pressed == ["back", "undo", "star", "delete"]
+    assert pressed == ["back", "undo", "star", "delete"], (
+        "handlers are handed over by object rather than by attribute name: a renamed handler "
+        "spelled as a string breaks a button silently, with no import error, no type error and "
+        "no lint warning")
 
 
 def test_a_switch_hands_its_handler_the_state_it_landed_in(buttons):

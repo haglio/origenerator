@@ -26,6 +26,7 @@ SENT_COLUMNS = ("evolver_exported_at", "genau_exported_at")
 _KNOWN_SOURCES = tuple(GenerationSource)
 _OF_A_KNOWN_SOURCE = f"source IN ({', '.join('?' * len(_KNOWN_SOURCES))})"
 MADE_HERE = f"source NOT IN ({', '.join('?' * len(MADE_ELSEWHERE))})"
+_IDS_PER_QUERY = 500
 _LISTED = f"source NOT IN ({', '.join('?' * len(UNLISTED))})"
 
 
@@ -69,7 +70,8 @@ class GenerationStore(Store):
     def __init__(self, file: SqliteFile):
         super().__init__(file)
         self._version = file.version
-        self._listed: tuple[int, list[dict]] | None = None
+        self._own_changes = file.log_own_changes("generations", "prompt_id")
+        self._listed: list[dict] | None = None
         self._listing = threading.Lock()
 
     def _set(self, prompt_id: str, column: str, value):
@@ -294,16 +296,30 @@ class GenerationStore(Store):
 
     def list_generations(self) -> list[dict]:
         with self._listing:
-            version = self._version()
-            if self._listed is None or self._listed[0] != version:
-                with self._connect() as conn:
-                    rows = conn.execute(
-                        f"SELECT * FROM generations WHERE {_OF_A_KNOWN_SOURCE}"
-                        f" AND {_LISTED} ORDER BY id DESC",
-                        (*_KNOWN_SOURCES, *UNLISTED),
-                    ).fetchall()
-                self._listed = (version, [as_read(r) for r in rows])
-            return [dict(r) for r in self._listed[1]]
+            changed = self._own_changes.changed_since_last_asked()
+            if self._listed is None or changed is None:
+                self._listed = self._read_listed("", ())
+            elif changed:
+                self._listed = sorted(
+                    [row for row in self._listed if row["prompt_id"] not in changed]
+                    + self._read_listed_among(sorted(changed)),
+                    key=lambda row: row["id"], reverse=True)
+            return [dict(r) for r in self._listed]
+
+    def _read_listed_among(self, prompt_ids: list[str]) -> list[dict]:
+        return [row for start in range(0, len(prompt_ids), _IDS_PER_QUERY)
+                for chunk in [prompt_ids[start:start + _IDS_PER_QUERY]]
+                for row in self._read_listed(
+                    f" AND prompt_id IN ({', '.join('?' * len(chunk))})", chunk)]
+
+    def _read_listed(self, narrowed: str, among) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM generations WHERE {_OF_A_KNOWN_SOURCE}"
+                f" AND {_LISTED}{narrowed} ORDER BY id DESC",
+                (*_KNOWN_SOURCES, *UNLISTED, *among),
+            ).fetchall()
+        return [as_read(r) for r in rows]
 
     def rows_made_by(self, workflow_name: str) -> list[dict]:
         with self._connect() as conn:

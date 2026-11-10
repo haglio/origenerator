@@ -652,9 +652,7 @@ def test_a_change_to_a_listed_row_is_listed_at_once(tmp_path):
     assert db.list_generations()[0]["starred"] == 1
 
 
-def test_the_library_is_read_once_while_nothing_changes(tmp_path, monkeypatch):
-    db = Database(tmp_path / "test.db")
-    _add_listed(db, "listed-1")
+def _traced_statements(monkeypatch) -> list[str]:
     statements: list[str] = []
     connect = sqlite3.connect
 
@@ -664,10 +662,54 @@ def test_the_library_is_read_once_while_nothing_changes(tmp_path, monkeypatch):
         return conn
 
     monkeypatch.setattr(sqlite3, "connect", traced)
+    return statements
+
+
+def _whole_listings(statements) -> int:
+    return sum(s.startswith("SELECT * FROM generations WHERE source") and "prompt_id IN" not in s
+               for s in statements)
+
+
+def test_the_library_is_read_once_while_nothing_changes(tmp_path, monkeypatch):
+    statements = _traced_statements(monkeypatch)
+    db = Database(tmp_path / "test.db")
+    _add_listed(db, "listed-1")
     db.list_generations()
     db.list_generations()
 
     assert sum(s.startswith("SELECT * FROM generations") for s in statements) == 1
+
+
+def test_after_a_change_made_here_only_the_changed_rows_are_read_again(tmp_path, monkeypatch):
+    statements = _traced_statements(monkeypatch)
+    db = Database(tmp_path / "test.db")
+    for prompt_id in ("listed-1", "listed-2", "listed-3"):
+        _add_listed(db, prompt_id)
+    db.list_generations()
+
+    db.set_generation_favorite("listed-2", True)
+    db.delete_generation("listed-3")
+    _add_listed(db, "listed-4")
+    listed = db.list_generations()
+
+    assert _whole_listings(statements) == 1
+    monkeypatch.undo()
+    assert listed == Database(tmp_path / "test.db").list_generations()
+    assert [(r["prompt_id"], r["starred"]) for r in listed] == [
+        ("listed-4", 0), ("listed-2", 1), ("listed-1", 0)]
+
+
+def test_a_change_another_copy_of_the_app_makes_has_the_whole_library_read_again(
+        tmp_path, monkeypatch):
+    statements = _traced_statements(monkeypatch)
+    db = Database(tmp_path / "test.db")
+    _add_listed(db, "listed-1")
+    db.list_generations()
+
+    Database(tmp_path / "test.db").set_generation_favorite("listed-1", True)
+
+    assert db.list_generations()[0]["starred"] == 1
+    assert _whole_listings(statements) == 2
 
 
 def test_each_listing_hands_out_rows_of_its_own(tmp_path):

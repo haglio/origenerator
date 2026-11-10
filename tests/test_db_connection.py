@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 
 import pytest
 
@@ -23,20 +24,29 @@ def test_what_a_block_wrote_is_there_for_the_next_one(file):
         assert [r["body"] for r in conn.execute("SELECT body FROM notes")] == ["scene one"]
 
 
-def test_the_connection_is_closed_on_the_way_out(file):
+def test_the_log_names_the_rows_this_file_changed_since_it_was_last_asked(file):
+    log = file.log_own_changes("notes", "body")
+    log.changed_since_last_asked()
     with file.connect() as conn:
-        pass
+        conn.execute("INSERT INTO notes (body) VALUES ('scene one'), ('scene two')")
+        conn.execute("UPDATE notes SET body = 'scene three' WHERE body = 'scene two'")
 
-    with pytest.raises(sqlite3.ProgrammingError):
-        conn.execute("SELECT 1")
+    assert log.changed_since_last_asked() == {"scene one", "scene two", "scene three"}
+    assert log.changed_since_last_asked() == set()
 
 
-def test_the_connection_is_closed_even_when_the_block_raises(file):
-    with pytest.raises(ValueError, match="something in the middle of a write"), file.connect() as conn:
-        raise ValueError("something in the middle of a write")
+def test_the_log_cannot_say_what_another_connection_changed(file):
+    log = file.log_own_changes("notes", "body")
+    log.changed_since_last_asked()
+    with closing(sqlite3.connect(file.path)) as other, other:
+        other.execute("INSERT INTO notes (body) VALUES ('scene one')")
 
-    with pytest.raises(sqlite3.ProgrammingError):
-        conn.execute("SELECT 1")
+    assert log.changed_since_last_asked() is None
+    assert log.changed_since_last_asked() == set()
+
+
+def test_the_log_cannot_say_anything_the_first_time_it_is_asked(file):
+    assert file.log_own_changes("notes", "body").changed_since_last_asked() is None
 
 
 def _write_half_a_batch(file):

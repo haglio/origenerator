@@ -139,6 +139,7 @@ def test_a_database_damaged_before_the_table_rename_keeps_its_folders(tmp_path):
     folder_id = db.create_custom_collection("Mine")
     db.add_folders_to_custom_collection(folder_id, [("key-a", "L1", "job-0"),
                                                 ("key-b", "L1", "job-1")])
+    del db
     conn = sqlite3.connect(path)
     try:
         conn.execute("ALTER TABLE custom_folder_items RENAME TO custom_collection_members")

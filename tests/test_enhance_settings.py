@@ -260,8 +260,7 @@ def test_describe_names_each_part_the_pass_redrew_at_its_own_denoise():
     assert describe_enhance_params({
         "enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.15,
         "enhance_detail_fixes": {"faces": 0.45, "hands": 0.6},
-    }) == "2x · 20 steps · 0.15 redraw · faces 0.45 & hands 0.6", \
-        "each part is redrawn at a denoise the whole frame could not take"
+    }) == "2x · 20 steps · 0.15 redraw · faces 0.45 & hands 0.6"
     assert describe_enhance_params({
         "enhance_scale": 2.0, "enhance_detail_fixes": {"faces": 0}}) == "2x"
 
@@ -281,9 +280,11 @@ def test_describe_names_a_pinned_model_by_its_title_but_not_the_source_matching_
 
 
 def test_an_unenhanced_image_still_lists_its_one_file_as_the_original():
-    (version,) = displayed_versions(_source_row())
-    assert version.is_original, \
-        "a list that appears only once an image has versions is a list nobody finds"
+    versions = displayed_versions(_source_row())
+    assert len(versions) == 1, (
+        "a list that appears only once an image has versions is a list nobody finds")
+    (version,) = versions
+    assert version.is_original
     assert version.file["filename"] == "sdxl_t2i_src.png"
 
 

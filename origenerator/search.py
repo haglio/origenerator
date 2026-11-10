@@ -40,7 +40,7 @@ _STOP_WORDS = frozenset(
     ["a", "an", "the", "of", "in", "on", "at", "by", "with", "and", "or", "to", "for", "from", "is", "are", "was", "were", "be", "it", "its", "her", "his", "their", "this", "that", "there", "here", "as", "into", "over", "under"]
 )
 
-_TIGHT_SYNONYMS = (
+_TIGHT_PUBLIC_SYNONYMS = (
     ("woman", "lady", "female", "doll", "babe", "chick", "gal"),
     ("man", "guy", "male", "dude", "boy", "gentleman"),
     ("two", "pair", "duo", "couple"),
@@ -116,7 +116,7 @@ def _quoted(query: str) -> tuple[tuple[str, ...], ...]:
 
 def _synonym_index(groups=()) -> dict[str, frozenset[str]]:
     merged: list[set[str]] = []
-    for group in (*_TIGHT_SYNONYMS, *groups):
+    for group in (*_TIGHT_PUBLIC_SYNONYMS, *groups):
         stems = set()
         for entry in group:
             words = _words(entry)
@@ -137,12 +137,12 @@ def _synonym_index(groups=()) -> dict[str, frozenset[str]]:
     return index
 
 
-def _the_librarys_own_synonyms() -> tuple:
+def _library_synonyms() -> tuple:
     groups = load_content().get("search_synonyms") or ()
     return tuple(tuple(group) for group in groups if isinstance(group, (list, tuple)))
 
 
-_SYNONYMS = _synonym_index(_the_librarys_own_synonyms())
+_SYNONYMS = _synonym_index(_library_synonyms())
 
 
 @dataclass(frozen=True)

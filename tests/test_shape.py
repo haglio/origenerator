@@ -146,8 +146,8 @@ def test_an_unreadable_shape_files_under_landscape():
         "the same default a slideshow's routing uses for a set it cannot measure"
 
 
-def _start_frame(tmp_path: Path, its_images_output_name: str, width: int, height: int) -> Path:
-    path = tmp_path / its_images_output_name
+def _start_frame(tmp_path: Path, output_name: str, width: int, height: int) -> Path:
+    path = tmp_path / output_name
     Image.new("RGB", (width, height)).save(path)
     return path
 
@@ -443,9 +443,10 @@ def test_each_heading_is_led_by_a_frame_of_its_own_shape(qtbot, tmp_path):
     view.refresh()
 
     marks = [_heading_mark(section).pixmap() for section in _sections(view)]
-    assert [mark.isNull() for mark in marks] == [False, False]
+    assert [mark.isNull() for mark in marks] == [False, False], (
+        "a shape reads faster drawn than spelled")
     portrait, landscape = (_ink_bounds(mark) for mark in marks)
-    assert portrait[1] > portrait[0], "a shape reads faster drawn than spelled"
+    assert portrait[1] > portrait[0]
     assert landscape[0] > landscape[1]
     assert portrait == landscape[::-1]
 

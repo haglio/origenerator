@@ -107,7 +107,7 @@ def queue_within_budget(rows: list[dict], candidates: list[dict], launch_one, *,
 
 
 RENDER_POLL_SECONDS = 2.0
-LONG_ENOUGH_FOR_ONE_IMAGE_ON_ANY_MODEL_SECONDS = 900
+ONE_IMAGE_ON_ANY_MODEL_SECONDS = 900
 
 
 def render_base_now(client, workflow, params: dict, *,
@@ -116,7 +116,7 @@ def render_base_now(client, workflow, params: dict, *,
     client.submit_job(
         saving_into_its_run_folder(workflow.payload_for_comfyui(params), OUTPUT_PLACES, prompt_id),
         prompt_id)
-    deadline = now() + LONG_ENOUGH_FOR_ONE_IMAGE_ON_ANY_MODEL_SECONDS
+    deadline = now() + ONE_IMAGE_ON_ANY_MODEL_SECONDS
     while now() < deadline:
         sleep(RENDER_POLL_SECONDS)
         history = client.fetch_history(prompt_id)
@@ -128,7 +128,7 @@ def render_base_now(client, workflow, params: dict, *,
         )
         return files
     logger.warning("Base re-render %s did not land within %ss",
-                   prompt_id, LONG_ENOUGH_FOR_ONE_IMAGE_ON_ANY_MODEL_SECONDS)
+                   prompt_id, ONE_IMAGE_ON_ANY_MODEL_SECONDS)
     return []
 
 

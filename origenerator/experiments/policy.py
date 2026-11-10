@@ -16,13 +16,13 @@ from origenerator.workflows.lora_rows import (
 _UP_BONUS = 1.0
 _FAVORITE_BONUS = 2 * _UP_BONUS
 _RECENT_BONUS = _UP_BONUS / 2
-_NEWEST_ROWS_THAT_COUNT_AS_RECENT = 25
+_RECENT_ROWS = 25
 
 _VIDEO_SHARE = 0.8
 _LORA_DIM_WEIGHT = 4.0
 
 _SECOND_DIM_CHANCE = 0.3
-_CHANCE_TO_IGNORE_THE_VERDICTS = 0.25
+_EXPLORE_CHANCE = 0.25
 _VETO_MIN_VOTES = 3
 _VETO_MAX_WEIGHT = 0.25
 _JITTER_SHARE_OF_THE_RANGE = 1 / 8
@@ -89,7 +89,7 @@ class ExperimentPolicy:
             weight += _FAVORITE_BONUS
         if row.get("experiment_verdict") == "up":
             weight += _UP_BONUS
-        if rows_newer < _NEWEST_ROWS_THAT_COUNT_AS_RECENT:
+        if rows_newer < _RECENT_ROWS:
             weight += _RECENT_BONUS
         return weight
 
@@ -245,7 +245,7 @@ class ExperimentPolicy:
         return value
 
     def _explore_or_exploit(self, candidates, weights):
-        if self._rng.random() < _CHANCE_TO_IGNORE_THE_VERDICTS:
+        if self._rng.random() < _EXPLORE_CHANCE:
             return self._rng.choice(candidates)
         return self._weighted_choice(candidates, weights)
 

@@ -305,7 +305,8 @@ def test_what_made_an_item_ranks_below_what_it_shows_and_a_folders_name_ranks_wi
         [shown, made_with, filed], {"g3": ("Harbor",)}).search("harbor").results}
     assert by_id["g1"] > by_id["g2"], \
         "a model's or a LoRA's name answers what made the item, a different question"
-    assert by_id["g3"] == by_id["g1"], "a name the user gave a folder says what is in it"
+    assert by_id["g3"] == by_id["g1"], (
+        "a folder's name is the most deliberate word there is: chosen only to find it again")
 
 
 def test_a_row_handed_over_twice_is_found_once():
@@ -347,8 +348,8 @@ def test_a_hidden_starting_frame_is_never_found():
 
 
 def test_results_come_back_in_the_order_the_rows_were_given():
-    rows = [_row("g3", "a red lamp"), _row("g1", "a red lamp"),
-            _row("g2", "a red lamp")]
+    rows = [_row("g3", "a quiet street", params={"checkpoint": "lamp_xl.safetensors"}),
+            _row("g1", "a red lamp"), _row("g2", "a red lamp")]
     assert _hits(_index(rows), "lamp") == ["g3", "g1", "g2"], (
         "the view hands the rows over newest first and reads the results straight out; "
         "in score order they would reshuffle under the user each time the model's words landed")

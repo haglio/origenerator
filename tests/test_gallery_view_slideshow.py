@@ -1355,9 +1355,7 @@ def test_a_run_that_stopped_being_made_leaves_the_open_slideshow(qtbot, monkeypa
     db.get_generation("i2")["status"] = "error"
     view._update_queue()
 
-    assert not slideshow.holds("i2"), (
-        "a run that was cancelled or failed sends nothing ever again, which would leave the "
-        "half-rendered frame it got to in the pass forever")
+    assert not slideshow.holds("i2")
     slideshow.close()
 
 

@@ -1125,21 +1125,23 @@ def test_a_spoken_enhance_still_takes_the_panes_settings(enhance, monkeypatch):
     assert params["enhance_steps"] == 35
 
 
-def test_a_running_enhancement_is_described_by_its_jobs_own_settings(enhance, monkeypatch):
+def test_a_run_is_described_by_its_jobs_settings_not_the_panes(enhance, monkeypatch):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
     monkeypatch.setattr(module.gallery, "describe_enhance_params",
-                        lambda params: f"from {params['input_image']}")
+                        lambda params: f"at {params.get('enhance_scale')}")
     row = _image("i1")
     tab = FakeGenerateTab(row)
-    parts = EnhanceParts(jobs=FakeReroll([FakeJob("run-a", input_image="what-it-was-launched-on.png")]),
+    launched = FakeJob("run-a")
+    launched.params["enhance_scale"] = 3
+    parts = EnhanceParts(jobs=FakeReroll([launched]),
                          gallery_pane=FakeGalleryPane(), slideshows=FakeSlideshows(),
                          info_tabs_of=lambda: FakeTabs([tab]))
     controller, _host = _assembled(FakeHost(rows=[row]), parts, None)
 
     controller.reconcile()
 
-    assert tab.pending[2] == "from what-it-was-launched-on.png", (
+    assert tab.pending[2] == "at 3", (
         "the Enhance pane may have moved on since the run was launched, so the job's own settings "
         "are the only true word on what is being made")
 
@@ -1151,7 +1153,8 @@ def test_a_generate_pane_built_after_the_controller_still_hears_of_a_run(enhance
     row = _image("i1")
     built_later = []
     parts = EnhanceParts(jobs=FakeReroll([FakeJob("run-a")]), gallery_pane=FakeGalleryPane(),
-                         slideshows=FakeSlideshows(), info_tabs_of=lambda: built_later[0])
+                         slideshows=FakeSlideshows(),
+                         info_tabs_of=lambda: built_later[0] if built_later else FakeTabs())
     controller, _host = _assembled(FakeHost(rows=[row]), parts, None)
     tab = FakeGenerateTab(row)
     built_later.append(FakeTabs([tab]))
@@ -1163,7 +1166,7 @@ def test_a_generate_pane_built_after_the_controller_still_hears_of_a_run(enhance
         "for at each run rather than held from the start")
 
 
-def test_cancelling_from_a_tile_takes_the_waiting_row_out_of_the_generate_tab(enhance, monkeypatch):
+def test_a_tiles_cancel_clears_the_generate_tabs_waiting_row(enhance, monkeypatch):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
     monkeypatch.setattr(module.gallery, "describe_enhance_params", lambda params: "upscale x2")
@@ -1175,7 +1178,7 @@ def test_cancelling_from_a_tile_takes_the_waiting_row_out_of_the_generate_tab(en
                          slideshows=FakeSlideshows(), info_tabs_of=lambda: FakeTabs([tab]))
     controller, _host = _assembled(FakeHost(rows=[row]), parts, None)
     controller.reconcile()
-    assert tab.pending is not None
+    assert tab.pending == ("running", b"frame", "upscale x2")
 
     controller.cancel_for([row])
 

@@ -2319,7 +2319,9 @@ def test_culling_a_slide_being_made_calls_nothing_off(qtbot, tmp_path):
 
     _press(view, Qt.Key.Key_Up)
 
-    assert condemned == []
+    assert condemned == [], (
+        "the run is on the GPU and its row is a record of that, not an image that has been "
+        "judged")
     assert not view.slideshow.holds("id-run")
 
 
@@ -2443,7 +2445,9 @@ class TestMovingTheSlideshowsHud:
             slideshow.keyPressEvent(QKeyEvent(QKeyEvent.Type.KeyPress, key,
                                               Qt.KeyboardModifier.ControlModifier))
 
-        assert moves == ["left", "right", "up", "down"]
+        assert moves == ["left", "right", "up", "down"], (
+            "both sets of keys, the ones a Fun Time session gives its portrait Funestra and its "
+            "landscape one, since a Standalone slideshow can be either shape")
 
     @_ARROW_KEYS_OR_WASD
     def test_an_arrow_with_no_ctrl_asks_for_no_move(self, qtbot, arrows):

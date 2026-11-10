@@ -1582,7 +1582,8 @@ def test_the_add_tiles_plus_is_drawn_big_in_its_tile(qtbot):
 
     inked = sum(1 for y in range(plus.height()) for x in range(plus.width())
                 if plus.pixelColor(x, y).alpha() > 128)
-    assert inked >= add_row._thumbnail.width() * add_row._thumbnail.height() // 12
+    assert inked >= add_row._thumbnail.width() * add_row._thumbnail.height() // 12, (
+        "drawn, like the Gallery pane buttons' plus, not typed")
 
 
 def test_an_image_with_nothing_yet_still_gets_the_tile(qtbot):

@@ -37,8 +37,9 @@ def test_each_motion_key_asks_the_driver_for_its_own_move(key, asked):
 
     assert handled is True
     assert motion.asked == [asked], (
-        "the driver belongs to the whole app, so every surface that can drive it answers the "
-        "same keys through this one helper, and the keys are Genau's own so the habit carries")
+        "the driver belongs to the whole app, since the device should not care which window is "
+        "in front, so every surface that can drive it answers the same keys through this one "
+        "helper, and the keys are Genau's own so the habit carries")
 
 
 @pytest.mark.parametrize("key", [Qt.Key.Key_K, Qt.Key.Key_Slash],

@@ -26,11 +26,11 @@ def test_standalone_puts_the_queue_under_the_folders_and_the_generate_column_bes
     _taller(qtbot, root, 700)
 
     assert arrangement.left_column.widget(0) is arrangement.folder_panes
-    assert arrangement.left_column.widget(1) is parts["queue"]
-    assert root.widget(1) is parts["generate_column"], (
+    assert arrangement.left_column.widget(1) is parts["queue"], (
         "the Generate pane stands beside the whole column at full height: its tabs are where "
         "the user reads and edits a generation, and the Job Queue cutting across their foot "
         "would take that height for a queue already in view beside it")
+    assert root.widget(1) is parts["generate_column"]
 
 
 def test_standalone_queue_keeps_its_height_when_the_window_grows(qtbot):

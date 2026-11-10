@@ -408,7 +408,8 @@ def test_a_fix_field_is_only_as_wide_as_the_number_it_holds(qtbot):
     assert spinner.minimumWidth() == spinner.maximumWidth()
     assert spinner.minimumWidth() < spinner.sizeHint().width()
     assert spinner.buttonSymbols() == spinner.ButtonSymbols.NoButtons, (
-        "no step arrows: a pair for every part costs more width than the numbers beside them")
+        "no step arrows: a pair for every part costs more width than the numbers beside them, "
+        "and a denoise is typed or nudged with the arrow keys")
 
 
 def test_the_fixes_line_wraps_rather_than_widening_the_panel(qtbot):
@@ -1360,16 +1361,16 @@ def test_the_menus_delete_grays_out_when_it_would_empty_the_image(qtbot, monkeyp
     seen = {}
 
     def _exec(self, _pos):
-        action = self.actions()[0]
-        seen["text"] = action.text()
-        seen["enabled"] = action.isEnabled()
+        action = next(iter(self.actions()), None)
+        seen["text"] = action.text() if action else ""
+        seen["enabled"] = action.isEnabled() if action else None
         return action
 
     monkeypatch.setattr(QMenu, "exec", _exec)
 
     versions._on_row_menu(0, QPoint(0, 0))
 
-    assert seen["enabled"] is False, (
+    assert seen.get("enabled") is False, (
         "grayed with the reason on it rather than left out: the answer to why this cannot be "
         "deleted is the only thing the menu can offer")
     assert "only version" in seen["text"]
@@ -1889,7 +1890,8 @@ def test_a_narrow_row_puts_its_facts_under_the_thumbnail(qtbot):
 
     side_by_side = row._thumbnail.sizeHint().width() + row._facts.minimumSize().width()
     assert row.minimumSizeHint().width() < side_by_side, (
-        "side by side, a thumbnail and its facts want more width than a narrow Generate tab has; "
+        "side by side, a thumbnail and its facts would be the widest thing in the tab and would "
+        "decide how narrow the Generate pane can be dragged before its settings scroll sideways; "
         "stacked, the row asks for the wider of the two rather than their sum")
 
     host.resize(side_by_side + 60, 400)

@@ -26,6 +26,7 @@ from origenerator.item_shape import key_holds, shape_of, shaped_key, split_key
 from origenerator.media import MediaType
 
 GROUP_ROLE = Qt.ItemDataRole.UserRole
+_RECENT_TIP = " · worked in recently"
 
 _COLLECTION_TIPS = {
     LATEST_KEY: "Recently generated",
@@ -54,6 +55,14 @@ def _name_of(row) -> str:
     return group.label if group is not None else row.text(0)
 
 
+def _taken_out(item: QTreeWidgetItem) -> bool:
+    parent = item.parent()
+    if parent is None:
+        return False
+    parent.takeChild(parent.indexOfChild(item))
+    return True
+
+
 def _children(row) -> Iterator[QTreeWidgetItem]:
     return (row.child(i) for i in range(row.childCount()))
 
@@ -80,6 +89,14 @@ def _shown_collections(shape, folder_key: str) -> list[str]:
 
 
 @dataclass
+class _DrawnFolder:
+    group: object
+    item: QTreeWidgetItem | None
+    registered: list = field(default_factory=list)
+    leaves: list = field(default_factory=list)
+
+
+@dataclass
 class ShapeModel:
     shape: str
     tree_model: list
@@ -97,18 +114,25 @@ class GalleryTree:
         self._recently_worked: set[str] = set()
         self._drawn_shapes: frozenset[str] | None = None
         self._folders_left_open: set[str] = set()
+        self._drawn_workflows: dict[str, _DrawnFolder] = {}
+        self._to_put_back: dict[str, _DrawnFolder] = {}
+        self._drawing: _DrawnFolder | None = None
 
     def populate(self, shapes, *, folder_meta=None, recently_worked=()):
         self._recently_worked = {shaped_key(key, shape)
                                  for shape, key in recently_worked}
         self._folders_left_open = self.folders_left_open()
         self._tree.blockSignals(True)
+        self._to_put_back = {key: drawn for key, drawn in self._drawn_workflows.items()
+                             if _taken_out(drawn.item)}
+        self._drawn_workflows = {}
         self._tree.clear()
         self.item_by_key = {}
         self.leaf_by_id = {}
         self.keys_by_folder = {}
         for shape in shapes:
             self._add_side(self._tree.root_for(shape.shape), shape, folder_meta)
+        self._to_put_back = {}
         for key in self._folders_left_open:
             item = self.item_by_key.get(key)
             if item is not None:
@@ -140,14 +164,25 @@ class GalleryTree:
     def _register(self, item, key: str, parent_item,
                   folder_key: str | None = None) -> QTreeWidgetItem:
         item.setData(0, TREE_KEY_ROLE, key)
-        if shaped_key(*split_key(key)) in self._recently_worked:
-            item.setData(0, RECENT_ROLE, True)
-            item.setToolTip(0, f"{item.toolTip(0)} · worked in recently")
+        self._mark_recent(item, key)
         parent_item.addChild(item)
+        self._keep_track_of(item, key, folder_key)
+        if self._drawing is not None:
+            self._drawing.registered.append((key, item, folder_key))
+        return item
+
+    def _keep_track_of(self, item, key: str, folder_key: str | None) -> None:
         self.item_by_key[key] = item
         if folder_key is not None:
             self.keys_by_folder.setdefault(folder_key, []).append(key)
-        return item
+
+    def _mark_recent(self, item, key: str) -> None:
+        recent = shaped_key(*split_key(key)) in self._recently_worked
+        if bool(item.data(0, RECENT_ROLE)) == recent:
+            return
+        item.setData(0, RECENT_ROLE, True if recent else None)
+        tip = item.toolTip(0)
+        item.setToolTip(0, f"{tip}{_RECENT_TIP}" if recent else tip.removesuffix(_RECENT_TIP))
 
     def _open_all(self) -> None:
         if self.built or self._folders_left_open:
@@ -168,6 +203,8 @@ class GalleryTree:
                               folder_key=group.key)
 
     def _add_node(self, group, parent_item, shape, inside=()) -> QTreeWidgetItem:
+        if isinstance(group, gallery.WorkflowGroup) and not inside:
+            return self._add_workflow(group, parent_item, shape)
         if isinstance(group, gallery.CustomCollection):
             item = self._add_custom_collection(group, parent_item, shape, inside)
         else:
@@ -176,7 +213,31 @@ class GalleryTree:
         if isinstance(group, gallery.SettingsGroup) and not inside:
             for row in group.rows:
                 self.leaf_by_id[row["prompt_id"]] = item
+                if self._drawing is not None:
+                    self._drawing.leaves.append((row["prompt_id"], item))
         return item
+
+    def _add_workflow(self, group, parent_item, shape) -> QTreeWidgetItem:
+        key = shaped_key(group.key, shape.shape)
+        drawn = self._to_put_back.pop(key, None)
+        if drawn is not None and drawn.group is group:
+            self._put_back(drawn, parent_item, shape)
+        else:
+            drawn = self._drawing = _DrawnFolder(group, None)
+            drawn.item = self._add_folder(group, parent_item, shape, ())
+            self._add_children(group, drawn.item, shape, ())
+            self._drawing = None
+        self._drawn_workflows[key] = drawn
+        return drawn.item
+
+    def _put_back(self, drawn: _DrawnFolder, parent_item, shape) -> None:
+        parent_item.addChild(drawn.item)
+        for key, item, folder_key in drawn.registered:
+            self._keep_track_of(item, key, folder_key)
+            self._mark_recent(item, key)
+            if folder_key is not None and folder_collection(folder_key) is not None:
+                item.setData(0, COUNT_ROLE, shape.collection_counts.get(folder_key, 0))
+        self.leaf_by_id.update(drawn.leaves)
 
     def _add_folder(self, group, parent_item, shape, inside) -> QTreeWidgetItem:
         item = QTreeWidgetItem([group.label])

@@ -13,7 +13,7 @@ from app_support import origenerator_handoff
 from app_support.process_identity import ProcessNamer
 from shared_ui.preview import Preview, taskbar_identity, window_title
 
-from origenerator.boot_passes import MAINTENANCE, Library, run_maintenance
+from origenerator.boot_passes import MAINTENANCE, Library, run_maintenance, without_comfyui
 from origenerator.branch_session import LAUNCHER, shown_as
 
 _CLIENT_ID_KEY = "comfyui_client_id"
@@ -282,6 +282,32 @@ class Boot:
     watch: object = None
     freeze_watch: object = None
 
+    @property
+    def waits_for_comfyui(self) -> bool:
+        return self.fun_time is None
+
+    def start_comfyui_first(self) -> None:
+        if not self.waits_for_comfyui:
+            return
+        from origenerator import comfyui_launcher
+        from origenerator.config import COMFYUI_DIR, COMFYUI_HOST, COMFYUI_PORT
+
+        self.say(STARTING_THE_SERVER)
+        comfyui_launcher.ensure_comfyui_server(
+            self.logger, comfyui_launcher.Address(COMFYUI_HOST, COMFYUI_PORT), COMFYUI_DIR,
+            on_status=self.say, pump_events=self.app.processEvents,
+        )
+
+    def maintenance(self):
+        return MAINTENANCE if self.waits_for_comfyui else without_comfyui(MAINTENANCE)
+
+    def bring_comfyui_up_behind(self, library: Library) -> None:
+        if self.waits_for_comfyui:
+            return
+        from origenerator.gui.comfyui_behind import bring_comfyui_up_behind_the_window
+
+        bring_comfyui_up_behind_the_window(library, self.logger, owner=self.app)
+
     def say(self, step: str) -> None:
         if self.loading is None:
             self.loading = _open_the_loading(self.fun_time, self.app, self.logger,
@@ -397,6 +423,21 @@ def main(argv: list[str] | None = None) -> int:
         return _boot_and_run(app, app_args, preview)
 
 
+def _open_the_library(boot, client) -> Library:
+    from origenerator.config import COMFYUI_LOG_DIR, DB_PATH, OUTPUT_PLACES, THUMB_DIR
+    from origenerator.db import Database
+    from origenerator.evolver_export import default_inbox
+    from origenerator.inflight import in_flight_at
+
+    boot.say(OPENING_THE_LIBRARY)
+    boot.logger.info("Library: %s", DB_PATH)
+    db = Database(DB_PATH)
+    library = Library(db=db, client=client, places=OUTPUT_PLACES, thumb_dir=THUMB_DIR,
+                      log_dir=COMFYUI_LOG_DIR, inbox=default_inbox(), in_flight=in_flight_at(db))
+    run_maintenance(library, boot.maintenance(), boot.say, boot.logger)
+    return library
+
+
 def _boot_and_run(app, app_args, preview) -> int:
     fun_time = app_args.fun_time
     from origenerator.content import missing_overlay_keys
@@ -406,17 +447,12 @@ def _boot_and_run(app, app_args, preview) -> int:
 
     from origenerator import config
     from origenerator.config import (
-        COMFYUI_DIR,
         COMFYUI_FOLDERS,
         COMFYUI_HOST,
-        COMFYUI_LOG_DIR,
         COMFYUI_PORT,
-        DB_PATH,
         LIBRARY_STATE_DIR,
-        OUTPUT_PLACES,
         PRODUCTION_CHECKOUT,
         STATE_DIR,
-        THUMB_DIR,
         UI_STATE_PATH,
     )
 
@@ -451,41 +487,26 @@ def _boot_and_run(app, app_args, preview) -> int:
         folders=COMFYUI_FOLDERS,
     )
 
-    from origenerator import comfyui_launcher
     from origenerator.gui.loading_screen import LoadingCanceled
     window = None
     try:
-        boot.say(STARTING_THE_SERVER)
-        comfyui_launcher.ensure_comfyui_server(
-            logger, comfyui_launcher.Address(COMFYUI_HOST, COMFYUI_PORT), COMFYUI_DIR,
-            on_status=boot.say, pump_events=app.processEvents,
-        )
-
-        boot.say(OPENING_THE_LIBRARY)
-        from origenerator.db import Database
-        logger.info("Library: %s", DB_PATH)
-        db = Database(DB_PATH)
-
-        from origenerator.evolver_export import default_inbox
-        run_maintenance(
-            Library(db=db, client=client, places=OUTPUT_PLACES,
-                    thumb_dir=THUMB_DIR, log_dir=COMFYUI_LOG_DIR, inbox=default_inbox()),
-            MAINTENANCE, boot.say, logger,
-        )
+        boot.start_comfyui_first()
+        library = _open_the_library(boot, client)
 
         boot.say(CONNECTING)
         client.start()
 
         boot.say(BUILDING_THE_INTERFACE)
-        window = _build_window(client, db, app_state, boot, next_launch)
+        window = _build_window(client, library.db, app_state, boot, next_launch)
         boot.stop_if_canceled()
     except LoadingCanceled:
         return boot.cancel(window, client)
 
+    boot.bring_comfyui_up_behind(library)
     boot.show(window)
     exit_code = boot.run()
     boot.close(window, client)
     from origenerator.landed_while_away import hand_over_what_is_in_flight
     from origenerator.win32 import APP_USER_MODEL_ID
-    hand_over_what_is_in_flight(db, taskbar_identity(APP_USER_MODEL_ID, preview))
+    hand_over_what_is_in_flight(library.db, taskbar_identity(APP_USER_MODEL_ID, preview))
     return exit_code

@@ -486,6 +486,7 @@ class JobQueueView(QWidget):
             if self._rows_column.indexOf(row) != index:
                 self._rows_column.removeWidget(row)
                 self._rows_column.insertWidget(index, row)
+        # Qt's QScrollArea would otherwise squeeze every row into its own height, stacking them on top of each other instead of scrolling.
         self._host.setMinimumHeight(len(items) * QueueRow.HEIGHT)
         _offer(self._shield_all, bool(jobs_to_shield(items)))
         _offer(self._cancel_all, bool(jobs_to_cancel(items)))

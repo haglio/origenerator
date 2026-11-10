@@ -92,6 +92,7 @@ def _settled(queue):
 
 
 def _on_screen(queue):
+    # Qt's grab of a widget paints it afresh; the screen's grab of its window shows whatever was never repainted too.
     return QApplication.primaryScreen().grabWindow(queue.winId()).toImage()
 
 

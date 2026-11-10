@@ -177,8 +177,7 @@ def test_progress_signal_advances_the_bar(qtbot):
 def test_a_job_comfyui_has_not_started_leaves_the_bar_blank_and_sweeping(qtbot):
     tile = GeneratingTile(FakeJob(state="queued"))
     qtbot.addWidget(tile)
-    assert tile._bar.caption() == "", (
-        "an unstarted job's wait is the Job Queue's to explain, so its own bar says nothing")
+    assert tile._bar.caption() == ""
     assert tile._bar.maximum() == 0
 
 

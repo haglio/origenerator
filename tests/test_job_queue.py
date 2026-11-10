@@ -102,7 +102,7 @@ def test_an_interrupted_job_lands_as_an_error_not_a_completion(qtbot, tmp_path):
     row = db.get_generation(prompt_id)
     assert row["status"] == "error", (
         "ComfyUI ends an interrupted run like a finished one with no files; recorded as finished "
-        "it would hide in the gallery and still block those settings as already made")
+        "it would be an item with nothing on disk, hidden in the gallery")
     assert not json.loads(row["output_files"] or "[]")
     assert "video/wf/deadbeef" not in queue.jobs
 
@@ -1252,9 +1252,7 @@ def test_a_launch_made_while_another_submit_is_out_waits_its_turn(qtbot, tmp_pat
 
     first = queue.jobs["video/wf/first"].prompt_id
     second = queue.jobs["video/wf/second"].prompt_id
-    assert seen["submits"] == 1, (
-        "the wait pumps events on the caller's own stack, so every caller keeps its order "
-        "and no second hand-over starts while one is out")
+    assert seen["submits"] == 1
     assert queue.queue_order == [first, second]
     assert client.submit_job.call_count == 1
 

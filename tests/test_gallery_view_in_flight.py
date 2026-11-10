@@ -428,7 +428,9 @@ def test_finishing_a_reroll_loads_its_result_into_the_tab_that_launched_it(qtbot
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
-    assert tab._displayed_row is not None
+    assert tab._displayed_row is not None, (
+        "the tab that asked for the run is found before the finish is settled, because a tab "
+        "lets go of its runs as they end")
     assert tab._displayed_row["prompt_id"] == job.prompt_id
 
 

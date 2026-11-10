@@ -1304,6 +1304,25 @@ def test_an_enhance_reports_the_image_it_improved_rather_than_itself(qtbot, tmp_
     assert ended[0].generation == "the-image-it-improved"
 
 
+def test_an_enhance_whose_row_is_folded_away_as_it_finishes_still_names_its_image(
+        qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    queue.start_prepared("k", _I2V, _params())
+    job = queue.job_for("k")
+    db.set_enhance_target(job.prompt_id, "the-image-it-improved")
+    queue.finished.connect(lambda key, prompt_id, origin: db.delete_generation(prompt_id))
+    ended = []
+    queue.run_ended.connect(ended.append)
+
+    job.finished.emit([{"filename": "out.png"}], None, 252.0)
+
+    assert ended[0].generation == "the-image-it-improved", (
+        "the record is read before the finish is announced, because the announcement folds "
+        "the enhancement's row away")
+
+
 def test_a_failed_run_is_timed_by_the_clock_it_ran_under(qtbot, tmp_path):
     client = _client()
     db = Database(tmp_path / "test.db")

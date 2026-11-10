@@ -40,6 +40,9 @@ class ActionPresses:
             return
         self._tell(narrow_to_actions(playing, query))
 
+    def clear_filter(self) -> None:
+        self._tell(narrow_to_actions(self._the_set(), ""))
+
     def filter_to_the_one_on_screen(self) -> None:
         self._tell(narrow_to_the_action_on_screen(self._the_set()))
 

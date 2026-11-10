@@ -147,7 +147,6 @@ def test_the_pane_says_it_is_working_too_when_no_slideshow_is_up(qtbot, tmp_path
 
     view._voice.listener.heard.emit("something else entirely")
     assert "heard" in words(view._voice.status)
-    what_its_timer_does_when_it_fires = view._voice._revert
-    what_its_timer_does_when_it_fires()
+    view._voice._flash_timer.timeout.emit()
 
     assert "working out" in words(view._voice.status)

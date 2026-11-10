@@ -383,7 +383,7 @@ def test_clicking_a_folder_tile_drills_into_it(qtbot):
     view._tree.setCurrentItem(lora)
     a_tile_key = view._gallery_pane._listed_folders[0]
     (its_tile,) = [tile for tile in view._scroll.widget().findChildren(FolderTile)
-                   if tile._key == a_tile_key]
+                   if tile.key == a_tile_key]
 
     its_tile.clicked.emit(a_tile_key)
 

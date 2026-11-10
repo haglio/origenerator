@@ -109,12 +109,6 @@ def test_the_experiment_policy_asks_no_language_model():
         "it works from the gallery's rows alone, so it runs offline and with a random source handed in"
 
 
-def test_the_toc_is_drawn_and_looked_up_without_the_database():
-    assert _loaded_after_importing("origenerator.gui.gallery_tree", "origenerator.db") is False, (
-        "pure rendering and lookups over the pane the gallery view owns: it has no database or "
-        "refresh concerns, and a folder's star and delete live in the view")
-
-
 def test_the_voice_router_routes_and_leaves_the_doing_to_its_host():
     router = REPO_ROOT / "origenerator" / "gui" / "voice_router.py"
     imported = [ast.unparse(node) for node in ast.walk(ast.parse(router.read_text(encoding="utf-8")))

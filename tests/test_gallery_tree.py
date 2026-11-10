@@ -78,12 +78,19 @@ def test_no_section_of_the_toc_is_the_main_one(qtbot):
     pane = SplitFolderTree(GROUP_ROLE)
     qtbot.addWidget(pane)
 
+    pane.resize(300, 900)
+    with qtbot.waitExposed(pane):
+        pane.show()
+
     shares = {pane._splitter.widget(n).sizePolicy().verticalStretch()
               for n in range(pane._splitter.count())}
+    shown = [size for size in pane._splitter.sizes() if size]
 
-    assert shares == {1}, (
+    no_main_one = (
         "equal sections, and equal shares of anything the pane gains or loses: no shape is the "
         "main one, and the sizes are the user's to drag")
+    assert max(shown) - min(shown) <= 1, no_main_one
+    assert shares == {1}, no_main_one
 
 
 def _table_of_contents(qtbot, rows, collections_of_your_own=(), folder_meta=None):

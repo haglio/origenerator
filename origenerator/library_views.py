@@ -10,7 +10,7 @@ from app_support.media_renditions import original_rendition
 
 from origenerator import gallery, points_of_interest, trash_collection
 from origenerator.config import EVOLVER_AI_DIR, EVOLVER_SOURCE, KINO_UPSCALES_DIR, OUTPUT_PLACES
-from origenerator.evolver_upscales import EvolverUpscales
+from origenerator.evolver_upscales import EvolverUpscales, original_stem
 from origenerator.gallery.collection import (
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
@@ -201,6 +201,16 @@ class LibrarySnapshot:
         with one_look():
             slides = [self._once(self._slides, row, self._slide_of) for row in rows]
         return [slide for slide in slides if slide is not None]
+
+    def enhanced_ids_of(self, rows) -> set[str]:
+        with one_look():
+            return {row["prompt_id"] for row in rows if self._is_enhanced(row)}
+
+    def _is_enhanced(self, row: dict) -> bool:
+        if gallery.is_enhanced_row(row):
+            return True
+        slide = self._once(self._slides, row, self._slide_of)
+        return slide is not None and original_stem(slide[0]) is not None
 
     def versions_of(self, rows) -> dict[str, list]:
         with one_look():

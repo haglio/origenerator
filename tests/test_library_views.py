@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 from app_support import haglio_settings
 
@@ -442,3 +443,49 @@ def test_a_reading_after_another_indexes_only_the_changed_rows_start_frames(monk
 
     assert after.image_index == real(changed)
     assert asked == ["pic-2"]
+
+
+def _video_upscaled_by_evolver(tmp_path, monkeypatch, prompt_id: str) -> dict:
+    video = tmp_path / "videos" / f"{prompt_id}.mp4"
+    upscale = tmp_path / "kino" / "landscape" / "origenerator" / f"{prompt_id}_topaz.mp4"
+    for made in (video, upscale):
+        made.parent.mkdir(parents=True, exist_ok=True)
+        made.write_bytes(b"video")
+    os.utime(video, (1_000, 1_000))
+    monkeypatch.setattr(library_views.EvolverUpscales, "scan",
+                        lambda *args: library_views.EvolverUpscales({prompt_id: upscale}))
+    return {**_listed(prompt_id), "workflow_name": "wan22_i2v",
+            "output_files": json.dumps([{"filename": video.name, "path": str(video)}])}
+
+
+def test_a_video_that_plays_as_its_evolver_upscale_counts_as_enhanced(tmp_path, monkeypatch):
+    upscaled = _video_upscaled_by_evolver(tmp_path, monkeypatch, "vid-1")
+    plain_file = tmp_path / "videos" / "vid-2.mp4"
+    plain_file.write_bytes(b"video")
+    plain = {**_listed("vid-2"), "workflow_name": "wan22_i2v",
+             "output_files": json.dumps([{"filename": plain_file.name, "path": str(plain_file)}])}
+    library = LibrarySnapshot([upscaled, plain])
+
+    assert library.enhanced_ids_of(library.rows) == {"vid-1"}
+
+
+def test_an_image_origenerator_enhanced_counts_as_enhanced_and_one_it_did_not_does_not(
+        monkeypatch):
+    _resolving_by_id(monkeypatch, [])
+    enhanced = {**_listed("pic-1"), "params_json": json.dumps({"enhance": True})}
+    library = LibrarySnapshot([enhanced, _listed("pic-2")])
+
+    assert library.enhanced_ids_of(library.rows) == {"pic-1"}
+
+
+def test_a_video_brought_in_as_another_sites_upscale_counts_as_enhanced(tmp_path, monkeypatch):
+    row, _upscale, _original = _another_sites_upscale(tmp_path / "AI", monkeypatch)
+
+    assert LibrarySnapshot([row]).enhanced_ids_of([row]) == {"o1"}
+
+
+def test_a_video_with_no_file_yet_is_not_enhanced(tmp_path, monkeypatch):
+    upscaled = _video_upscaled_by_evolver(tmp_path, monkeypatch, "vid-1")
+    being_made = {**upscaled, "status": "running", "output_files": None}
+
+    assert LibrarySnapshot([being_made]).enhanced_ids_of([being_made]) == set()

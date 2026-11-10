@@ -1037,9 +1037,10 @@ class SlideshowDirector:
                 self._hand_the_file_to(slideshow, row)
 
     def _hand_the_file_to(self, slideshow, row: dict) -> None:
+        enhanced = bool(self._enhanced_ids_of([row]))
         for item in self.items_of([row]):
             slideshow.note_added(Slide(*item), favorite=bool(row.get("starred")),
-                                 enhanced=gallery.is_enhanced_row(row))
+                                 enhanced=enhanced)
 
     def note_generating(self, prompt_id: str, frame: bytes):
         for slideshow, location in self._live_slideshows:
@@ -1236,7 +1237,7 @@ class SlideshowDirector:
         return marked
 
     def _enhanced_ids_of(self, rows) -> set[str]:
-        return {row["prompt_id"] for row in rows if gallery.is_enhanced_row(row)}
+        return self._library().enhanced_ids_of(rows)
 
 
 def _plays_latest(location) -> bool:

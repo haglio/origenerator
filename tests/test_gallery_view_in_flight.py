@@ -24,7 +24,8 @@ from origenerator import (
     look_training,
     lora_training,
 )
-from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
+from origenerator.comfyui_api import ForeignQueue
+from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration, NewRequest
 from origenerator.gallery.collection import (
     LATEST_KEY,

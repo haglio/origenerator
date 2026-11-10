@@ -130,6 +130,9 @@ def expected_pass_count(payload: dict) -> int:
     return len(sampler_costs(payload))
 
 
+SAME_PASS_AS_BEFORE = None
+
+
 class ProgressTracker:
     @classmethod
     def for_payload(cls, payload: dict) -> ProgressTracker:
@@ -191,7 +194,7 @@ class ProgressTracker:
         return min(self._last_value or 0, self._stage_max), self._stage_max
 
     def update(self, value: int, max_val: int,
-               node: str | None = None) -> tuple[int, int]:
+               node: str | None = SAME_PASS_AS_BEFORE) -> tuple[int, int]:
         if self._total <= 0:
             return value, max_val
         if self._last_value is None:
@@ -209,7 +212,7 @@ class ProgressTracker:
         return self._reading(value)
 
     def _is_new_pass(self, value: int, node: str | None) -> bool:
-        if node is not None and self._node is not None and node != self._node:
+        if node is not SAME_PASS_AS_BEFORE and self._node is not None and node != self._node:
             return True
         return value < self._last_value
 

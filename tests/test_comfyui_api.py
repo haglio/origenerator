@@ -11,12 +11,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from origenerator.comfyui_api import (
+    _HTTP_TIMEOUT_S,
+    _POLL_TIMEOUT_S,
     ComfyUIApi,
     comfyui_responding,
     format_execution_error,
     format_prompt_error,
 )
-from origenerator.comfyui_client import _HTTP_TIMEOUT_S, _POLL_TIMEOUT_S
 from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.output_places import OutputPlaces
 from tests.comfyui_folders import SUITE_FOLDERS
@@ -216,7 +217,8 @@ def test_clear_foreign_queue_drops_their_pending_and_stops_their_run_by_name():
     deletes = [json.loads(d) for u, d in posted if u.endswith("/queue")]
     assert deletes == [{"delete": ["theirs-a", "theirs-b"]}]
     interrupts = [json.loads(d) for u, d in posted if u.endswith("/interrupt")]
-    assert interrupts == [{"prompt_id": "theirs-running"}]
+    assert interrupts == [{"prompt_id": "theirs-running"}], (
+        "deleting what waits alone would leave the one mid-render holding the graphics card")
 
 def test_clear_foreign_queue_touches_nothing_when_the_queue_is_all_ours():
     client, urlopen = _queue_client({
@@ -232,7 +234,9 @@ def test_cancel_prompts_deletes_a_whole_backlog_in_one_call():
     with patch("urllib.request.urlopen", return_value=_mock_response(200, b"{}")) as m:
         client.cancel_prompts(["a", "b", "c"])
 
-    assert m.call_count == 1
+    assert m.call_count == 1, (
+        "the caller is the window's thread and the backlog can be another app's whole batch, "
+        "so it goes in one round trip")
     assert json.loads(m.call_args[0][0].data) == {"delete": ["a", "b", "c"]}
 
 def test_the_queue_names_the_prompts_comfyui_is_making():
@@ -391,7 +395,7 @@ def test_a_submit_answered_too_late_stands_once_comfyui_lists_the_prompt():
                     _mock_response(200, listed)):
         assert _client_on(clock).submit_job({"1": {"class_type": "Test", "inputs": {}}},
                                             "our-id") == "our-id"
-    assert clock.now > 0
+    assert clock.now > 0, "it waits between asks rather than hammering a stalled server"
 
 
 def test_a_submit_answered_too_late_stands_once_the_prompt_is_in_history():
@@ -409,7 +413,7 @@ def test_a_submit_whose_connection_timed_out_is_waited_on_like_a_slow_answer():
     with _answering(connect_timed_out, connect_timed_out, _mock_response(200, listed)):
         assert _client_on(clock).submit_job({"1": {"class_type": "Test", "inputs": {}}},
                                             "our-id") == "our-id"
-    assert clock.now > 0
+    assert clock.now > 0, "it waits between asks rather than hammering a stalled server"
 
 
 def test_a_submit_the_server_answers_without_the_prompt_fails_after_a_grace_period():
@@ -417,7 +421,9 @@ def test_a_submit_the_server_answers_without_the_prompt_fails_after_a_grace_peri
     with _by_url(queue={"queue_running": [], "queue_pending": []}, history={}), \
             pytest.raises(RuntimeError, match="never listed"):
         _client_on(clock).submit_job({"1": {"class_type": "Test", "inputs": {}}}, "our-id")
-    assert 10 <= clock.now < 60
+    assert 10 <= clock.now < 60, (
+        "the POST the server took first gets a little longer to land, well short of the whole "
+        "wait, so a submit it really refused is not a two-minute freeze")
 
 
 def test_a_submit_the_server_never_answers_fails_at_the_end_of_the_wait():
@@ -495,7 +501,8 @@ def test_no_client_is_made_without_the_folders_comfyui_opens_files_from():
     ("", "The run failed."),
 ])
 def test_a_run_that_died_partway_is_reported_as_one_readable_line(message, said):
-    assert format_execution_error(message) == said
+    assert format_execution_error(message) == said, (
+        "a failure that reaches the user unreadable is still better than one that never does")
 
 
 def test_with_no_clock_handed_in_it_keeps_real_time_and_can_wait():

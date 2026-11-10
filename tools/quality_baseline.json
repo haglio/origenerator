@@ -18,7 +18,6 @@
     "origenerator/workflows/outside.py": 1
   },
   "private_imports": {
-    "origenerator/comfyui_client.py": 2,
     "origenerator/gallery/enhance.py": 1,
     "origenerator/gallery/labels.py": 4,
     "origenerator/gallery/source_image.py": 2,

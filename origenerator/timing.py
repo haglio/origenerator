@@ -7,6 +7,8 @@ from typing import NamedTuple
 
 
 def execution_duration_seconds(history_data: dict) -> float | None:
+    # ComfyUI's history lacks the start and success pair for a prompt that errored or is
+    # still running, and on older servers.
     messages = history_data.get("status", {}).get("messages", [])
     start = end = None
     for event, data in messages:
@@ -47,7 +49,7 @@ def clock_duration(seconds: float) -> str:
     return f"{minutes}:{secs:02d}"
 
 
-_PACE_MIN_FRACTION = 0.25
+_MODEL_LOAD_FRACTION = 0.25
 _SECONDS_PER_MINUTE = 60
 _MINUTES_PER_HOUR = 60
 _SECONDS_PER_HOUR = _SECONDS_PER_MINUTE * _MINUTES_PER_HOUR
@@ -60,6 +62,7 @@ class RunProgress(NamedTuple):
 
     @classmethod
     def of(cls, progress):
+        # ComfyUI reports no progress for a job it has not started, and some of its nodes report no step counts.
         if not progress:
             return None
         return progress if isinstance(progress, cls) else cls(*progress)
@@ -80,20 +83,20 @@ class RunTiming:
     def __post_init__(self):
         object.__setattr__(self, "progress", RunProgress.of(self.progress))
 
-    def _pace_projection(self):
+    def _whole_run_at_this_pace(self):
         if self.progress is None or not self.elapsed or self.elapsed <= 0:
             return None
         done, total = self.progress
         if total <= 0 or done <= 0:
             return None
-        if done < max(_PACE_MIN_STEPS, total * _PACE_MIN_FRACTION):
+        if done < max(_PACE_MIN_STEPS, total * _MODEL_LOAD_FRACTION):
             return None
         return self.elapsed * total / done
 
     def remaining_seconds(self):
         if self.elapsed is None:
             return None
-        pace = self._pace_projection()
+        pace = self._whole_run_at_this_pace()
         if pace is None:
             if self.typical is None:
                 return None

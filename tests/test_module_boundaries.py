@@ -37,6 +37,7 @@ QT_FREE = (
     "origenerator.undo_stack",
     "origenerator.gallery_edits",
     "origenerator.run_toast",
+    "origenerator.timing",
     "origenerator.item_shape",
     "origenerator.spin_arrows",
     "origenerator.slideshow_buttons",
@@ -50,7 +51,7 @@ NEEDS_QT = (
 )
 
 
-def _qt_after_importing(module: str) -> bool:
+def _loaded_after_importing(module: str, what: str) -> bool:
     env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
     env["PYTHONPATH"] = os.pathsep.join(
         p for p in (str(REPO_ROOT), os.environ.get("PYTHONPATH", "")) if p)
@@ -60,7 +61,7 @@ def _qt_after_importing(module: str) -> bool:
          "import origenerator.content as content\n"
          "content.LOCAL_CONTENT = content.EXAMPLE_CONTENT\n"
          f"import {module}\n"
-         'print("PyQt6" in sys.modules)')],
+         f'print("{what}" in sys.modules)')],
         cwd=REPO_ROOT, env=env, capture_output=True, text=True, check=False,
     )
     assert result.returncode == 0, result.stderr
@@ -69,12 +70,16 @@ def _qt_after_importing(module: str) -> bool:
 
 @pytest.mark.parametrize("module", QT_FREE)
 def test_a_module_that_claims_to_be_qt_free_is(module):
-    assert _qt_after_importing(module) is False
+    assert _loaded_after_importing(module, "PyQt6") is False
+
+
+def test_timing_loads_no_database():
+    assert _loaded_after_importing("origenerator.timing", "origenerator.db") is False
 
 
 @pytest.mark.parametrize("module", NEEDS_QT)
 def test_the_modules_that_do_need_qt_are_only_these(module):
-    assert _qt_after_importing(module) is True
+    assert _loaded_after_importing(module, "PyQt6") is True
 OUTSIDE_THE_WIDGETS = (
     "radio",
     "osr2_controls_commands",

@@ -21,7 +21,7 @@ from origenerator.gui.off_thread import run_off_thread
 from origenerator.library_filing import saving_into_its_run_folder
 from origenerator.media import MediaType
 from origenerator.output_places import OutputFolders
-from origenerator.progress import ProgressTracker, stage_names
+from origenerator.progress import SAME_PASS_AS_BEFORE, ProgressTracker, stage_names
 
 
 @dataclass(frozen=True)
@@ -322,7 +322,7 @@ class GenerationJob(QObject):
         self._mark_running()
         self._note_stage(node_id)
         self._last_progress = self._progress_tracker.update(
-            value, max_val, node=node_id or None)
+            value, max_val, node=node_id or SAME_PASS_AS_BEFORE)
         self._last_pass_progress = self._progress_tracker.current_pass()
         self.progress.emit(*self._last_progress)
 

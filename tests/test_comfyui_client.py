@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import struct
 
+from origenerator.comfyui_api import ComfyUIApi
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.output_places import OutputPlaces
@@ -11,9 +12,11 @@ from tests.comfyui_folders import SUITE_FOLDERS
 
 def test_stop_interrupts_reconnect_sleep_promptly(qtbot):
     client = ComfyUIClient(host="127.0.0.1", port=59999, folders=SUITE_FOLDERS)
-    with qtbot.waitSignal(client.disconnected, timeout=15000):
+    cold_start_under_load_ms = 15000
+    with qtbot.waitSignal(client.disconnected, timeout=cold_start_under_load_ms):
         client.start()
     client.stop()
+    # Windows swallows a quick relaunch while the closing instance still owns the taskbar identity.
     assert client.wait(1000), "stop() did not end the thread within 1s"
 
 def test_parse_ws_executing_none_signals_completion():
@@ -51,7 +54,8 @@ def test_executing_message_tracks_then_clears_current_prompt():
 
 def test_progress_event_tags_the_executing_prompt_for_previews(qtbot):
     client = ComfyUIClient(folders=SUITE_FOLDERS)
-    client._executing_prompt_id = ""
+    left_by_a_reconnect = ""
+    client._executing_prompt_id = left_by_a_reconnect
 
     client._handle_ws_message(json.dumps({
         "type": "progress", "data": {"prompt_id": "job1", "value": 3, "max": 10},
@@ -143,3 +147,11 @@ def test_the_client_hands_its_folders_to_the_api(qtbot, tmp_path):
     client = ComfyUIClient(folders=folders)
 
     assert client.api.folders == folders
+
+
+def test_the_client_forwards_every_rest_call():
+    rest_calls = {name for name, attr in vars(ComfyUIApi).items()
+                  if callable(attr) and not name.startswith("_")}
+
+    assert rest_calls <= set(vars(ComfyUIClient)), (
+        "every caller that holds a client already makes these calls on it")

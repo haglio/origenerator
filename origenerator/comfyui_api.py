@@ -13,14 +13,20 @@ from origenerator.comfyui_inputs import ComfyFolders, within_reach
 
 logger = logging.getLogger(__name__)
 
+# A busy ComfyUI that is answering can take a while. urllib's timeout limits a silence on the
+# socket, never the whole transfer, so ComfyUI streams a large download under it.
 _HTTP_TIMEOUT_S = 30.0
 
 _POLL_TIMEOUT_S = 2.0
 
-# ComfyUI validates a prompt on its event loop after logging it and answers nothing meanwhile
+# ComfyUI validates a prompt on its event loop after logging it and answers nothing meanwhile.
+# Validating one two-scene video took it fifty seconds.
+# ComfyUI still runs a prompt whose POST answer nobody waited for.
 _ACCEPTANCE_WAIT_S = 120.0
+# ComfyUI takes the POST before any ask, and the prompt can still be landing in its queue when it first answers one.
 _ACCEPTANCE_GRACE_S = 15.0
 _ACCEPTANCE_POLL_S = 3.0
+# A stalled ComfyUI answers no ask at all, however long each one waits.
 _ACCEPTANCE_READ_TIMEOUT_S = 10.0
 
 
@@ -181,6 +187,7 @@ class ComfyUIApi:
         return bool(self._history_entry(prompt_id, timeout=_ACCEPTANCE_READ_TIMEOUT_S))
 
     def interrupt(self, prompt_id: str | None = None):
+        # ComfyUI takes its interrupt as a POST, and urllib sends one only for a request with a body.
         body = json.dumps({"prompt_id": prompt_id}).encode() if prompt_id else b""
         req = urllib.request.Request(
             f"{self.base_url}/interrupt",
@@ -229,6 +236,8 @@ class ComfyUIApi:
             with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
                 return json.loads(resp.read())
         except urllib.error.HTTPError as e:
+            # ComfyUI says which node refused a prompt and why in the response body, which urllib's
+            # own HTTPError string leaves out as a bare "Bad Request".
             detail = e.read().decode("utf-8", "replace")
             raise RuntimeError(format_prompt_error(detail)) from e
 

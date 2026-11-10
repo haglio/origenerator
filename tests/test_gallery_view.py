@@ -33,7 +33,8 @@ from origenerator import (
     outside_videos,
 )
 from origenerator.branch_session import ENV_FLAG
-from origenerator.comfyui_client import ComfyUIClient, ForeignQueue
+from origenerator.comfyui_api import ForeignQueue
+from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
 from origenerator.gallery import tree as gallery_tree_module
 from origenerator.gallery.collection import (

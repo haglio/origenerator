@@ -58,7 +58,7 @@ class TestWhichPathsMovedAndWhichDidNot:
         assert config.COMFYUI_DIR == config.LIBRARY_ROOT / "projects" / "ComfyUIApp" / "ComfyUI"
 
 
-class TestTheValuesAnotherAppHoldsTooSpelledOutNeverWorkedOut:
+class TestSharedValuesSpelledOut:
 
     def test_the_shared_osr2_state_lives_in_fun_times_checkout(self):
         assert config.project_dir("fun_time") / "state" == osr2.SHARED_STATE_DIR

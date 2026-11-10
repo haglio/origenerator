@@ -95,7 +95,9 @@ def test_clicking_the_watched_widget_closes_the_tip(qtbot):
 
     qtbot.mouseClick(button, Qt.MouseButton.LeftButton)
 
-    assert not tip._popup.isVisible()
+    assert not tip._popup.isVisible(), (
+        "the click has done whatever the tip was offering to explain, and what it says next is "
+        "decided by the click's own outcome")
 
 
 def test_taking_the_text_away_closes_an_open_tip(qtbot):

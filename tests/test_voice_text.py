@@ -21,12 +21,11 @@ def test_digits_are_kept_only_where_the_matcher_asks():
 
 def test_a_word_is_heard_through_a_single_wrong_letter():
     assert sounds_like("fix", ("fix", "fixed"))
-    assert sounds_like("six", ("fix", "fixed")), (
-        "off a quiet microphone the model lands the shape of a short word and misses a letter of "
-        "it, so an exact test drops requests the user clearly made")
+    assert sounds_like("six", ("fix", "fixed"))
     assert sounds_like("fixes", ("fix", "fixed"))
 
 
 def test_a_word_of_another_length_is_a_different_word():
-    assert not sounds_like("fi", ("fix", "fixed"))
+    assert not sounds_like("fi", ("fix", "fixed")), (
+        "the length still has to match, which is what keeps the tolerance from swallowing ordinary speech")
     assert not sounds_like("fixer", ("fix",))

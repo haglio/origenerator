@@ -108,7 +108,7 @@ def _imports_the_db_module(tree) -> bool:
 def test_only_one_module_of_the_gallery_package_is_handed_a_database():
     assert _modules(_takes_a_db) == [THE_DB_MODULE], (
         "the package is otherwise rows in, answers out: whoever looks for what the gallery can "
-        "change has one file to read")
+        "change has one file to read, and the pure half can be taken without a database")
 
 
 def test_only_that_module_calls_anything_on_a_database():
@@ -118,4 +118,6 @@ def test_only_that_module_calls_anything_on_a_database():
 
 
 def test_no_module_of_the_gallery_package_imports_the_database_module():
-    assert _modules(_imports_the_db_module) == []
+    assert _modules(_imports_the_db_module) == [], (
+        "the two checks above see a parameter named db, so a module that built its own connection "
+        "would walk past both")

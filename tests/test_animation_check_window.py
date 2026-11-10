@@ -241,7 +241,7 @@ def test_an_animation_with_no_sample_says_so_across_the_whole_width(window):
 
     assert blank.text() == NO_SAMPLE
     assert blank.width() > made.width() // 2, (
-        "sharing the row with the sample's half, it read as a caption on the image, off to the left "
+        "sharing the row with the sample's half, the no-sample line read as a caption on the image, off to the left "
         "of the window rather than centered in it")
     assert blank.alignment() & Qt.AlignmentFlag.AlignHCenter
 

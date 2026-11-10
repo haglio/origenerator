@@ -128,5 +128,5 @@ def test_a_redone_step_can_be_undone_and_redone_any_number_of_times(stack):
         assert stack.undo_label() == "rename"
 
     assert runs == ["done"] * 4, (
-        "a redo runs the original change again rather than inverting the undo, so it files a fresh "
-        "undo entry each time")
+        "a redo runs the original change again rather than inverting the undo: the undo already "
+        "spent its trash batches, so the step files fresh ones and a fresh undo entry")

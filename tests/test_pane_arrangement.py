@@ -145,4 +145,4 @@ def test_hosted_the_folders_row_gains_more_of_a_taller_rect_than_the_generate_ta
     generate_gain = parts["generate_column"].height() - generate_before
     assert generate_gain > 0
     assert folders_gain > generate_gain, (
-        "the Gallery pane a little ahead, so the TOC it sits beside has room to be read")
+        "the Gallery pane's row takes more than the Generate tabs, so the TOC beside it has room to be read")

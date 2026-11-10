@@ -30,7 +30,7 @@ from origenerator.gui.action_setter_window import (
     LAST_LINE,
     PREVIOUSLY_LINE,
     QUIT,
-    ROOM_FOR_THE_GRID,
+    ROOM_FOR_THE_GRID_ON_THE_SHORTEST_SCREEN,
     SAME_BUTTON,
     SKIP_BUTTON,
     STATUS_LINE,
@@ -697,10 +697,9 @@ def test_ten_rows_of_buttons_stand_in_the_room_the_window_has(window):
                                                          for n in range(rows)))
 
     tall = _tile(made, "button 0").height()
-    assert rows * tall + GAP_MEDIUM * (rows - 1) <= ROOM_FOR_THE_GRID, (
+    assert rows * tall + GAP_MEDIUM * (rows - 1) <= ROOM_FOR_THE_GRID_ON_THE_SHORTEST_SCREEN, (
         "the user's decision: the buttons are shrunk so every row of the sheet is there to "
-        "press without the buttons scrolling; the room is what the rows have on the shortest "
-        "screen the user works on, once the drawing the user asked for has taken its share")
+        "press without the buttons scrolling")
 
 
 def test_a_term_too_wide_for_a_button_goes_on_to_the_next_line():

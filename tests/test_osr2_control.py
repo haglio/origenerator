@@ -44,10 +44,15 @@ def test_each_state_is_asked_for_by_name():
 def test_on_drives_and_off_parks():
     control = _control()
 
-    control.set_state(OSR2_DRIVING)
-    assert (control.isChecked(), control.state()) == (True, OSR2_DRIVING), (
+    a_buttons_names = (
         "the switch has no widget of its own and wears a checkable button's names on purpose: "
-        "every caller that sets it flipped a button before")
+        "every caller that sets it flipped a button before, and the voice router still flips the "
+        "radio and the microphone that way, so one shape across the four is one fewer thing to "
+        "keep in step")
+    assert callable(getattr(control, "isChecked", None)), a_buttons_names
+
+    control.set_state(OSR2_DRIVING)
+    assert (control.isChecked(), control.state()) == (True, OSR2_DRIVING), a_buttons_names
 
     control.set_state(OSR2_PARKED)
     assert (control.isChecked(), control.state()) == (False, OSR2_PARKED)

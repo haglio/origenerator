@@ -55,6 +55,7 @@ from origenerator.gui import (
 from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.folder_tree import RECENT_ROLE
+from origenerator.gui.gallery_tree import _RECENT_TIP
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView, Shared
 from origenerator.item_shape import row_shape, shaped_key
 from origenerator.output_places import OutputPlaces
@@ -2765,8 +2766,7 @@ def test_a_folders_hover_says_its_name_and_nothing_else(qtbot):
     view.refresh()
     (leaf,) = _subs(_at(_image_workflow(view._tree), 0, 0))
 
-    assert leaf.toolTip(0).startswith(leaf.text(0))
-    assert "a cat" not in leaf.toolTip(0), (
+    assert leaf.toolTip(0).removesuffix(_RECENT_TIP) == leaf.text(0), (
         "the prompt and the settings, each cut to 24 characters, said nothing the user could "
         "act on, so they are off the hover")
 

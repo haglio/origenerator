@@ -47,8 +47,9 @@ def test_key_rank_orders_across_and_within_sections():
     assert ps.key_rank("seed") < ps.key_rank("steps")
     assert ps.key_rank("steps") < ps.key_rank("width")
     assert ps.key_rank("steps") < ps.key_rank("cfg") < ps.key_rank("sampler_name"), (
-        "within Sampling the order is the user's own: steps, cfg, sampler, scheduler, shift")
-    assert ps.key_rank("sampler_name") < ps.key_rank("scheduler") < ps.key_rank("shift_high")
+        "within Calibration the order is the user's own: steps, cfg, sampler, scheduler, shift")
+    assert ps.key_rank("sampler_name") < ps.key_rank("scheduler") < ps.key_rank("shift_high"), (
+        "within Calibration the order is the user's own: steps, cfg, sampler, scheduler, shift")
 
 
 def test_sorting_a_workflows_keys_by_rank_is_stable_for_unknowns():

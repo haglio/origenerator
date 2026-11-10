@@ -54,7 +54,9 @@ def test_the_two_marks_at_the_end_are_only_ever_added():
         "easy not to recognize later")
     assert queue_lead_text(_item(job_kind="Image", populating=True, requested=True)) == (
         plain + " · Populate · Request")
-    assert queue_lead_text(_item(job_kind="Image", batch_modified=True)) == plain + " · Modify batch"
+    assert queue_lead_text(_item(job_kind="Image", batch_modified=True)) == plain + " · Modify batch", (
+        "a folder's Modify batch is a job nobody typed a prompt for too: it queues a run per "
+        "image at once, so its row says where it came from")
 
 
 def test_a_row_not_sent_yet_says_so_before_anything_about_timing():

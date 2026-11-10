@@ -1962,7 +1962,7 @@ def test_a_running_enhancement_streams_into_the_preview(saved_panel, tmp_path,
     tab.set_pending_enhancement(RunningEnhancement("running", b"\x89PNG-ish", "2x"))
     shown = tab._viewport.show_frame.call_args_list
     assert shown == [((b"\x89PNG-ish",), {"enhancing": True})], (
-        "the pane at the top of the tab is where this app shows what is being made, and an "
+        "the preview at the top of the tab is where this app shows what is being made, and an "
         "enhancement of the image on display is being made")
 
     tab.set_pending_enhancement(None)
@@ -4033,7 +4033,7 @@ def test_a_lane_refuses_a_send_the_row_records_even_with_its_button_still_live(
     tab._on_send(lane)
 
     assert export.call_count == 0, (
-        "a button is only as fresh as the last time the footer was drawn; the column is what "
+        "a button is only as fresh as the last time it was drawn; the column is what "
         "survives a restart, so the row decides")
 
 

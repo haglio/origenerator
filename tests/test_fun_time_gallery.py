@@ -251,7 +251,9 @@ def test_both_regions_can_hold_a_slideshow_at_once(qtbot, tmp_path, monkeypatch)
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("wide", 200, 100))
     portrait = view._slideshows._region_slideshows["portrait"]
     landscape = view._slideshows._region_slideshows["landscape"]
-    assert portrait is not None
+    assert portrait is not None, (
+        "the point of sending slideshows to the satellite regions: the main window stays usable "
+        "while up to two slideshows run")
     assert portrait.shown.isVisible()
     assert landscape is not None, (
         "the point of sending slideshows to the satellite regions: the main window stays usable "
@@ -670,7 +672,10 @@ def test_a_hosted_slideshow_keeps_up_with_its_own_folder(qtbot, tmp_path, monkey
 
     view._slideshows.note_finished(landed)
 
-    assert portrait.pass_size() == before + 1
+    assert portrait.pass_size() == before + 1, (
+        "each slideshow is fed from the folder it opened at: by the time a Populate item lands "
+        "the Gallery pane has usually moved on, and the two regions may be playing different "
+        "folders")
 
 
 def test_a_landing_reaches_only_the_slideshow_playing_its_folder(qtbot, tmp_path, monkeypatch):
@@ -729,7 +734,9 @@ def test_the_maps_loop_button_loops_the_seed_row_and_the_next_press_ends_it(
     assert [item[2] for item in slideshow._set.playlist.items] == ["g1", "g2"]
     model = slideshow_hud_model("portrait", slideshow)
     assert model.active_loop == "seed"
-    assert model.filter_query == model.current_action == "Source image"
+    assert model.filter_query == model.current_action == "Source image", (
+        "a seed loop lights the row it is playing, which is what that row's button says about "
+        "it; an action filter would light every row it keeps")
     assert model.title.startswith("Looping seeds")
     assert "Unlocked" not in model.title, (
         "a set playing through holds nothing, so the line drops Unlocked, exactly as a looping "

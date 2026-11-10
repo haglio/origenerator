@@ -645,7 +645,7 @@ def test_watching_a_folder_with_no_frame_yet_shows_a_waiting_note(tabs):
     tab.watch_folder("image/sdxl_t2i/abc", None)
     said = tab._viewport.show_message.call_args_list
     assert said == [(("Waiting for preview…",), {"live": True})], (
-        "marked live, so the pane can be double-clicked open before the first frame")
+        "marked live, so the preview can be double-clicked open before the first frame")
     assert tab.watched_key() == "image/sdxl_t2i/abc"
     assert tab.is_awaiting_frame()
 

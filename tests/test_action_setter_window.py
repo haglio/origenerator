@@ -699,7 +699,7 @@ def test_ten_rows_of_buttons_stand_in_the_room_the_window_has(window):
     tall = _tile(made, "button 0").height()
     assert rows * tall + GAP_MEDIUM * (rows - 1) <= ROOM_FOR_THE_GRID, (
         "the user's decision: the buttons are shrunk so every row of the sheet is there to "
-        "press without the strip of them scrolling")
+        "press without the buttons scrolling")
 
 
 def test_a_term_too_wide_for_a_button_goes_on_to_the_next_line():

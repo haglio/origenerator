@@ -104,7 +104,8 @@ def test_folder_level_names_the_folder_levels_and_nothing_else():
     assert folder_level(ModelGroup("k", "M", [])) == "model"
     assert folder_level(LoraGroup("k", "L", [])) == "lora"
     assert folder_level(SourceImageGroup("k", "I", [])) == "source_image"
-    assert folder_level(SettingsGroup("k", "S", [])) is None
+    assert folder_level(SettingsGroup("k", "S", [])) is None, (
+        "a settings folder is where the items themselves are, so it has no level to name")
 
 
 def test_generate_tab_title_leads_with_model_then_prompt():

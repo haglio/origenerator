@@ -90,10 +90,10 @@ def test_a_name_in_two_places_is_left_alone(tmp_path):
         (output_dir / folder).mkdir()
         (output_dir / folder / "wan22_i2v_00007_.mp4").write_bytes(b"mp4")
 
-    assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir)) == 0
-    assert _files(db, "a")[0]["subfolder"] == "", (
+    assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir)) == 0, (
         "a row that names a missing file shows as broken; "
         "one pointed at another item's file would look right and be wrong")
+    assert _files(db, "a")[0]["subfolder"] == ""
 
 
 def test_a_file_that_is_simply_gone_keeps_saying_where_it_was(tmp_path):

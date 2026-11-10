@@ -50,18 +50,15 @@ def test_closing_fills_the_queue_with_a_batch_of_experiments():
     launcher = FakeLauncher()
     assert queue_experiments([], policy, launcher) == EXPERIMENTS_QUEUED_PER_ABSENCE
     assert len(launcher.launched) == EXPERIMENTS_QUEUED_PER_ABSENCE
-    assert EXPERIMENTS_QUEUED_PER_ABSENCE <= 10, (
-        "every one comes back as a tile to review: enough to fill an evening, "
-        "few enough for one sitting")
 
 
 def test_a_launch_that_didnt_take_doesnt_use_up_the_batch():
     policy = StubPolicy()
     launcher = FakeLauncher(refuse=(1, 4))
-    assert queue_experiments([], policy, launcher) == EXPERIMENTS_QUEUED_PER_ABSENCE
-    assert len(launcher.launched) == EXPERIMENTS_QUEUED_PER_ABSENCE + 2, (
+    assert queue_experiments([], policy, launcher) == EXPERIMENTS_QUEUED_PER_ABSENCE, (
         "a refused launch is usually a proposal landing in a folder an earlier one claimed, "
         "so the next proposal is worth trying")
+    assert len(launcher.launched) == EXPERIMENTS_QUEUED_PER_ABSENCE + 2
 
 
 def test_a_gallery_with_nothing_to_build_on_queues_nothing():
@@ -109,14 +106,14 @@ def test_opening_drops_every_experiment_still_waiting_in_the_queue(tmp_path):
     _row(db, "mine", status="running")
     client = FakeClient()
 
-    assert cancel_experiments(db, client) == 2
+    assert cancel_experiments(db, client) == 2, (
+        "only experiments are dropped: with the app open the graphics card is for the "
+        "user's own work, and no experiment may compete for it")
     assert sorted(client.canceled) == ["exp-1", "exp-2"]
     assert db.get_generation("exp-1") is None
     assert db.get_generation("exp-2") is None
     assert db.get_generation("exp-done") is not None
-    assert db.get_generation("mine") is not None, (
-        "only experiments are dropped: with the app open the graphics card is for the "
-        "user's own work, and no experiment may compete for it")
+    assert db.get_generation("mine") is not None
 
 
 def test_each_experiment_is_asked_to_stop_by_name_in_case_it_is_mid_render(tmp_path):

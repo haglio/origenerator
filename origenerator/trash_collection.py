@@ -36,7 +36,7 @@ _WHAT_A_RUN_MADE = ("status", "output_files", "original_files", "enhance_history
                     "provenance")
 
 
-def _now_as_sqlite_stamps_it() -> datetime:
+def _now_in_sqlite_time() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
@@ -52,12 +52,12 @@ def days_held(record: dict, now: datetime | None = None) -> int:
     when = _deleted_at(record)
     if when is None:
         return 0
-    elapsed = ((now or _now_as_sqlite_stamps_it()) - when).total_seconds()
+    elapsed = ((now or _now_in_sqlite_time()) - when).total_seconds()
     return max(0, int(elapsed // _SECONDS_PER_DAY))
 
 
 def trash_items(records, now: datetime | None = None) -> list[dict]:
-    now = now or _now_as_sqlite_stamps_it()
+    now = now or _now_in_sqlite_time()
     return [_trash_item(record, now) for record in records
             if not (record.get("batch") or {}).get("regenerating_as")]
 
@@ -108,7 +108,7 @@ def is_emptied(record: dict) -> bool:
 
 
 def empty_what_has_waited_a_day(db, places: OutputPlaces, now: datetime | None = None) -> int:
-    now = now or _now_as_sqlite_stamps_it()
+    now = now or _now_in_sqlite_time()
     emptied = 0
     still_needed = _start_images_in_the_library(db)
     for record in db.list_trashed():

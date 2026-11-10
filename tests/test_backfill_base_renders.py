@@ -532,9 +532,9 @@ def test_the_tool_reports_a_repair_that_produced_nothing_rather_than_folding_it(
 
     code = backfill_tool.main(["--apply", "--db", str(tmp_path / "repair.db")])
 
-    assert code == 1
-    assert "produced nothing" in capsys.readouterr().out, (
+    assert code == 1, (
         "the tool runs unattended over a long backlog, so a wedged ComfyUI has to show")
+    assert "produced nothing" in capsys.readouterr().out
     assert not gallery.original_files_of(db.get_generation("gone"))
 
 

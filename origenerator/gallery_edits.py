@@ -205,12 +205,17 @@ class GalleryEdits:
         return by_row
 
     def restore_deleted(self, prompt_ids) -> str | None:
+        records = [record for prompt_id in prompt_ids
+                   if (record := self._db.get_trashed(prompt_id)) is not None]
+        if self._environment.release_files is not None and records:
+            self._environment.release_files(
+                [path for record in records
+                 for path in TrashedBatch.from_record(record.get("batch") or {}).trashed_files()])
         restored = None
-        for prompt_id in prompt_ids:
-            record = self._db.get_trashed(prompt_id)
-            if record is not None:
-                restored = trash_collection.restore(self._db, record)
+        for record in records:
+            restored = trash_collection.restore(self._db, record)
         return restored
+
 
     def purge_deleted(self, prompt_ids) -> None:
         waiting = []

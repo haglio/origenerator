@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -241,3 +242,34 @@ class TestWhereGenausVideosAre:
 
     def test_genaus_trash_is_the_trash_folder_beside_its_flicks(self, tmp_path):
         assert Genau(tmp_path / "genau" / "flicks").trash == tmp_path / "genau" / "trash"
+
+
+class TestRestoringAVideoTheAppIsShowing:
+    def test_restore_lets_go_of_the_trashed_files_before_moving_them_back(self, tmp_path):
+        released = []
+        library = Library(tmp_path)
+        made = library.made_here()
+        edits = GalleryEdits(
+            library.db, OutputPlaces.in_one_folder(library.output), Trash(tmp_path / "trash"),
+            environment=GalleryEnvironment(
+                release_files=lambda paths, **_kw: released.append(
+                    [path.exists() and path.parent.parent == tmp_path / "trash" for path in paths])))
+        edits.delete_rows([library.db.get_generation("v1")])
+        released.clear()
+
+        edits.restore_deleted(["v1"])
+
+        assert released == [[True]]
+        assert made.read_bytes() == b"made here"
+
+    def test_restore_waits_out_a_file_held_for_a_moment(self, tmp_path):
+        library = Library(tmp_path)
+        made = library.made_here()
+        library.edits.delete_rows([library.db.get_generation("v1")])
+        [trashed] = [path for path in (tmp_path / "trash").rglob("*") if path.is_file()]
+        holder = trashed.open("rb")
+        threading.Timer(0.3, holder.close).start()
+
+        library.edits.restore_deleted(["v1"])
+
+        assert made.read_bytes() == b"made here"

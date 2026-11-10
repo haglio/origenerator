@@ -565,6 +565,18 @@ def test_narrowing_hands_the_funestra_what_is_left(qtbot, tmp_path):
     assert "RELOAD_PLAYLIST" in _sent(slideshow)
 
 
+def test_an_item_favorited_from_the_slideshow_is_one_f_mode_keeps(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path,
+                           actions=SlideshowActions(favorite=lambda prompt_id: None))
+    on_screen = slideshow._set.current_prompt_id()
+
+    assert slideshow.favorite() is True
+    assert slideshow.toggle_favorites_filter() is True
+
+    assert [slide.prompt_id for slide in slideshow._set.playlist.items] == [on_screen], (
+        "the star readout and F-mode follow a favorite made here")
+
+
 def test_narrowing_reaches_a_funestra_partway_through_reading_the_last_list(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(favorite_ids={"id-3"}))
 

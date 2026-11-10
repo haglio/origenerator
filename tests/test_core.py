@@ -979,7 +979,10 @@ def test_window_can_shrink_to_tile_into_a_monitor_half(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
     win.show()
     effective_min_width = max(win.minimumWidth(), win.minimumSizeHint().width())
-    assert effective_min_width <= 704
+    assert effective_min_width <= 704, (
+        "a tiling window manager snaps windows into a third of a 2560 pixel monitor (about 853) "
+        "or half of a 1440 pixel portrait monitor (about 720); the window with its frame (about "
+        "16 more) must fit the smaller, so its least width stays under about 704")
 
 
 def test_window_still_tiles_while_showing_an_images_versions(qtbot, tmp_path):

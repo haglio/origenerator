@@ -178,7 +178,9 @@ def test_a_folder_view_takes_the_first_four_and_stops(qapp, tmp_path):
 
     assert len(paths) > FOLDER_CELLS
     last = _color_at(block, _middle_of_cell(3), CELL // 2)
-    assert last.blue() < 60
+    assert last.blue() < 60, (
+        "four cells are what fit across without the line's text starting halfway along the Job "
+        "Queue")
 
 
 def test_a_scaled_cell_is_only_ever_read_off_disk_once(qapp, tmp_path, monkeypatch):

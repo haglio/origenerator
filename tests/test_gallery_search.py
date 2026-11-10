@@ -257,7 +257,10 @@ def test_nothing_at_all_is_searched_under_the_floor(controller):
 
     found.field.setText("t" * (MIN_CHARS - 1))
 
-    assert not found._timer.isActive()
+    assert not found._timer.isActive(), (
+        "one or two letters match a large part of any library through stemming, so a search as "
+        "the user types would answer the first keystroke of every query with most of the "
+        "gallery")
     assert host.shown == []
     assert found.query == ""
 

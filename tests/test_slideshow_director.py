@@ -1291,6 +1291,23 @@ def test_a_landed_enhancement_reaches_every_surface(slideshows, tmp_path, monkey
         "does not take then it never takes")
 
 
+def test_a_landed_enhancement_hands_every_slideshow_its_new_thumbnail(
+        slideshows, tmp_path, monkeypatch):
+    output = tmp_path / "output"
+    output.mkdir()
+    (output / "better.png").write_bytes(b"pixels")
+    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
+    director, _host, made = slideshows(fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], shape=LANDSCAPE)
+
+    director.note_enhanced({**_row("g1", files=("better.png",)),
+                            "thumbnail_path": "thumbnails/better.jpg"})
+
+    assert made[0].enhanced == [("g1", "image", "thumbnails/better.jpg")], (
+        "a slideshow also draws each item small on its map, so it takes the new thumbnail "
+        "along with the new file")
+
+
 def _evolver_upscaled_video(tmp_path, monkeypatch):
     output = tmp_path / "output"
     video = output / "clip.mp4"
@@ -2782,6 +2799,18 @@ def test_a_slideshow_opened_with_no_slide_named_leads_with_the_run_being_generat
 
     assert made[0].generating == [("g-run", b"frame")]
     assert made[0].leads == 1
+
+
+def test_a_run_with_no_frame_yet_is_no_slide(slideshows):
+    host = FakeHost(rows=[_row("g1"), _row("g-run")])
+    host.queue = ([_being_made("g-run", frame=None)], 0)
+    director, _host, made = slideshows(host=host, db=FakeDB([_row("g1"), _row("g-run")]))
+
+    director.open([("a.png", "image", "g1", None)])
+
+    assert made[0].generating == [], (
+        "a black screen saying a run is being generated is nothing to watch; it joins once its "
+        "first frame comes in")
 
 
 def test_a_slideshow_opened_on_a_named_slide_is_led_nowhere_else(slideshows):

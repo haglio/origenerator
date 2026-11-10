@@ -136,7 +136,9 @@ def test_the_departed_words_wait_out_the_typing_rather_than_arriving_per_letter(
     assert settle.isActive()
     assert settle.isSingleShot()
     assert _marked(pair.edit, "struck") == ""
-    assert settle.interval() == 150
+    assert settle.interval() == 150, (
+        "short enough to read as while the user types, and long enough that a burst of typing "
+        "rewrites the document once rather than once a letter")
 
     settle.timeout.emit()
 

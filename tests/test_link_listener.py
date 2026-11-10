@@ -91,4 +91,6 @@ def test_a_channel_that_cannot_be_opened_says_so(qtbot, tmp_path, caplog, monkey
     with caplog.at_level("WARNING", logger="origenerator.gui.link_listener"):
         LinkListener(checkout=tmp_path, environ={})
 
-    assert "clicks" in caplog.text.lower()
+    assert "clicks" in caplog.text.lower(), (
+        "nothing on screen says whether clicks can be answered, so an app that could not listen "
+        "for them would look exactly like one whose toasts nobody has clicked")

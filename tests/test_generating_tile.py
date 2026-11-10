@@ -239,3 +239,12 @@ def test_right_clicking_the_tile_asks_for_its_menu(qtbot):
     tile.customContextMenuRequested.emit(QPoint(5, 5))
 
     assert len(asked) == 1
+
+
+def test_the_bar_is_drawn_over_the_scrim_it_sits_on(qtbot):
+    tile = GeneratingTile(FakeJob(state="running"))
+    qtbot.addWidget(tile)
+
+    order = tile._bar.parentWidget().children()
+    assert order.index(tile._bar) > order.index(tile._status_scrim), (
+        "the scrim raises itself over everything each time it covers the thumbnail, the bar included")

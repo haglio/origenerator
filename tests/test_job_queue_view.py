@@ -1299,3 +1299,21 @@ def test_the_bar_leaves_the_strip_to_the_queue(queue):
     _four(queue)
     QApplication.processEvents()
     assert queue._scroll.width() + queue._for_all.width() > queue._running.width()
+
+
+def test_the_hand_is_on_the_frame_alone_since_only_the_frame_goes_anywhere(queue):
+    queue.set_items([_item(key="a", reveal=lambda: None)])
+    QApplication.processEvents()
+
+    assert queue._running._frame.cursor().shape() == Qt.CursorShape.PointingHandCursor
+    assert queue._running.cursor().shape() != Qt.CursorShape.PointingHandCursor, (
+        "the hand rides on the frame, the one thing in this half that opens anything")
+
+
+def test_an_empty_half_keeps_the_line_under_its_bar_up(queue):
+    queue.set_items([])
+
+    queue._running.show_foreign("")
+
+    assert not queue._running._under_the_bar.isHidden(), (
+        "with no job of ours shown, the line holds the space its bar has stood down from")

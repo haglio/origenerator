@@ -4889,7 +4889,7 @@ def test_a_finished_run_with_no_file_leaves_the_frames_standing(tab, monkeypatch
         "with nothing to look at, the last frames stay rather than the pane going blank")
 
 
-def test_a_video_deleted_since_it_was_shown_is_no_drive_target(saved_panel, monkeypatch, tmp_path):
+def test_the_drive_target_looks_the_video_up_at_each_ask(saved_panel, monkeypatch, tmp_path):
     tab, db = saved_panel
     video = _video_row(db, "vid1", input_image="hand.png")
     vpath = tmp_path / "vid1.mp4"

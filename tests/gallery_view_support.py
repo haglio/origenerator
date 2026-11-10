@@ -542,7 +542,8 @@ def _answer_menu(monkeypatch, label):
     def pick(menu, *_args):
         act = find(menu)
         if act is None:
-            raise AssertionError(f"no menu entry reading {label!r}")
+            raise AssertionError(
+                f"no menu entry reading {label!r}: said loudly, not as a menu the user dismissed")
         # Qt triggers the entry clicked before exec returns it.
         act.trigger()
         return act
@@ -820,12 +821,15 @@ _ENHANCE_HISTORY = {"outputs": {"12": {"images": [
     {"filename": "image_enhance_00001_.png", "subfolder": "image", "type": "output"}]}}}
 
 
+_BEFORE_THE_ENHANCE_TAIL = "v002"
+
+
 def _enhanceable_db(tmp_path, count=2):
     db = Database(tmp_path / "test.db")
     for i in range(count):
         pid = f"g{i}"
         db.insert_generation(NewGeneration(
-            prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v002",
+            prompt_id=pid, workflow_name="sdxl_t2i", workflow_version=_BEFORE_THE_ENHANCE_TAIL,
             positive_prompt="a cat", seed=i,
             params_json=json.dumps({"positive_prompt": "a cat", "steps": 30, "seed": i}),
             workflow_json="{}",

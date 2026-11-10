@@ -48,6 +48,7 @@ def dressed(qtbot):
 
 
 _EITHER_WAY = object()
+CLEAR_OF_A_ROLLOVER = 0.5
 
 
 def _item(key="j1", caption="Alpha Workflow \u203a a kite", **given):
@@ -749,19 +750,19 @@ def test_a_job_of_ours_being_made_keeps_the_slot_for_its_bar(queue):
 
 
 def test_a_video_waiting_out_the_minute_after_an_image_counts_down_under_the_bar(queue):
-    queue.set_items([_item(status="queued", starts_at=time.monotonic() + 42.5)])
+    queue.set_items([_item(status="queued", starts_at=time.monotonic() + 42 + CLEAR_OF_A_ROLLOVER)])
     assert _timing(queue) == "Starts in 0:43"
 
 
 def test_the_countdown_advances_between_polls(queue):
-    queue.set_items([_item(status="queued", starts_at=time.monotonic() + 42.5)])
+    queue.set_items([_item(status="queued", starts_at=time.monotonic() + 42 + CLEAR_OF_A_ROLLOVER)])
     queue._running._item.starts_at -= 3
     queue._running._tick.timeout.emit()
     assert _timing(queue) == "Starts in 0:40"
 
 
 def test_start_now_is_offered_beside_a_countdown(queue):
-    queue.set_items([_item(status="queued", starts_at=time.monotonic() + 42.5)])
+    queue.set_items([_item(status="queued", starts_at=time.monotonic() + 42 + CLEAR_OF_A_ROLLOVER)])
     assert not queue._running._start_now.isHidden()
 
 
@@ -775,7 +776,7 @@ def test_start_now_is_not_offered_where_nothing_counts_down(queue):
 
 
 def test_start_now_goes_with_the_countdown_when_it_runs_out_between_polls(queue):
-    queue.set_items([_item(status="queued", starts_at=time.monotonic() + 42.5)])
+    queue.set_items([_item(status="queued", starts_at=time.monotonic() + 42 + CLEAR_OF_A_ROLLOVER)])
     queue._running._item.starts_at -= 60
     queue._running._tick.timeout.emit()
     assert queue._running._start_now.isHidden()
@@ -784,7 +785,7 @@ def test_start_now_goes_with_the_countdown_when_it_runs_out_between_polls(queue)
 def test_pressing_start_now_asks_for_the_waiting_video(queue):
     asked = []
     queue.start_now_requested.connect(lambda: asked.append(True))
-    queue.set_items([_item(status="queued", starts_at=time.monotonic() + 42.5)])
+    queue.set_items([_item(status="queued", starts_at=time.monotonic() + 42 + CLEAR_OF_A_ROLLOVER)])
 
     queue._running._start_now.click()
 
@@ -792,7 +793,7 @@ def test_pressing_start_now_asks_for_the_waiting_video(queue):
 
 
 def test_start_now_sits_under_the_bar_just_right_of_the_countdown(queue):
-    queue.set_items([_item(status="queued", starts_at=time.monotonic() + 42.5)],
+    queue.set_items([_item(status="queued", starts_at=time.monotonic() + 42 + CLEAR_OF_A_ROLLOVER)],
                     foreign_queued=2)
     QApplication.processEvents()
     bar, caption, start_now = (queue._running._progress, queue._running._caption,

@@ -658,7 +658,7 @@ def test_a_run_with_an_image_behind_it_stands_that_instead_of_a_note(tabs):
         Combination("frame.png", "clip.webp"))
     tab._viewport.show_message.assert_not_called()
     assert not tab.is_awaiting_frame(), (
-        "it is not a worded wait, so a changed queue count has nothing to rewrite")
+        "an image standing in for the frame is no worded wait, so a changed queue count has nothing to rewrite")
 
 
 def test_the_pair_is_repainted_only_when_it_changes(tabs):

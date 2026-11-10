@@ -17,6 +17,8 @@ THE_SLIDESHOWS_OWN = frozenset({
     "clip_seconds_down",
 })
 
+ORIGINALS_LABEL = "Originals"
+
 COLLAPSES = {"hud_minimize": True, "hud_restore": False}
 OPENS_IN = "hud_restore_at"
 
@@ -52,7 +54,7 @@ def slideshow_hud_model(shape: str, slideshow, placement: HudPlacement = USUAL_P
             playing_set=looping_label(shown.loop) if shown.loop else "",
             locked=locked, order=order_label,
             f_mode=favorites_filter, enhanced=enhanced,
-            filters=(action_filter,))),
+            filters=(ORIGINALS_LABEL if slideshow.hud_originals_mode else "", action_filter))),
         is_favorite=slideshow.hud_is_favorite,
         item_note=slideshow.hud_item_note,
         rows=slideshow_rows(shape, SlideshowFacts(

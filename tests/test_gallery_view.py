@@ -1613,8 +1613,8 @@ def test_a_rebuild_builds_one_folder_tree_per_side_and_no_third(qtbot, monkeypat
     view.refresh()
 
     assert len(built) == len((LANDSCAPE, PORTRAIT)), (
-        "a third tree of the whole library was built only to read folder names off it for the "
-        "search index")
+        "the search index reads its folder names off the two sides' trees, which already carry "
+        "them, so no third tree of the whole library is built for it")
 
 
 def test_folders_start_collapsed(qtbot):

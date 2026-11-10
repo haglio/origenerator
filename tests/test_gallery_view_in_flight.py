@@ -2217,8 +2217,7 @@ def test_clearing_wipes_the_other_apps_jobs_off_comfyui(qtbot, monkeypatch):
 
     assert client.cleared == 1, (
         "the user's ask: a way out from under a queue the user did not fill; the shared "
-        "server gathers jobs no window here can account for, as a preview's experiments "
-        "outlive the preview that queued them")
+        "server gathers jobs no window here can account for")
 
 
 def test_clearing_can_be_declined_at_the_prompt(qtbot, monkeypatch):

@@ -130,14 +130,14 @@ def test_the_enhanced_switch_narrows_the_pass_and_keeps_the_slide_showing(qtbot,
 
     assert view.slideshow.hud_enhanced_mode is True
     assert [item[2] for item in view.slideshow._set.playlist._items] == ["b", "c"]
-    assert view.slideshow._set.playlist.current()[2] == "b", (
-        "a switch is a narrowing of what the user is looking through, not a new slideshow: "
-        "taking the slide away as well would make the switch impossible to try")
+    assert view.slideshow._set.playlist.current()[2] == "b"
 
     assert view.slideshow.toggle_enhanced_mode() is True
     assert view.slideshow.hud_enhanced_mode is False
     assert len(view.slideshow._set.playlist) == 3
-    assert view.slideshow._set.playlist.current()[2] == "b"
+    assert view.slideshow._set.playlist.current()[2] == "b", (
+        "a switch is a narrowing of what the user is looking through, not a new slideshow: "
+        "taking the slide away as well would make the switch impossible to try")
 
 
 def test_a_switch_that_takes_the_slide_away_moves_to_what_is_left(qtbot, tmp_path):

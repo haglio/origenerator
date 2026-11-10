@@ -206,8 +206,7 @@ def test_a_rows_shield_and_cancel_are_grayed_where_its_job_cannot_take_them():
 
     dim = {button.command: button.dim for _rect, button in targets}
     assert (dim[f"{SHIELD}|j1"], dim[f"{CANCEL}|j1"]) == (True, True), (
-        "the user's answer for the Job Queue, and so here too: grayed, in the HUD's muted ink "
-        "and never its bright one, on a press that would do nothing")
+        "the user's answer for the Job Queue, and so here too")
     assert (dim[f"{SHIELD}|j2"], dim[f"{CANCEL}|j2"]) == (False, False)
 
 
@@ -222,17 +221,17 @@ def test_the_block_stacks_shield_all_over_cancel_all_at_the_right_end_of_its_top
     (_x, frame_y, _w, frame_height), _frame = drawn[f"{FRAME}|j1"]
     (all_x, all_y, all_width, all_height), shield_all = drawn[SHIELD_ALL]
     (cancel_x, cancel_y, cancel_width, cancel_height), cancel_all = drawn[CANCEL_ALL]
-    assert all_x == cancel_x, (
-        "where the user moved them on every slideshow's HUD: beside the job being made, its bar "
-        "stopping short of them")
+    assert all_x == cancel_x
     assert all_width == cancel_width
     assert all_x + all_width == 10 + 400
     assert all_y + all_height < cancel_y
     above, below = all_y - frame_y, frame_y + frame_height - (cancel_y + cancel_height)
-    assert above >= 0
+    assert above >= 0, (
+        "where the user moved them on every slideshow's HUD: beside the job being made")
     assert below >= 0
     assert abs(above - below) <= 1
-    assert image.getpixel((all_x - 1, frame_y + 1))[3] == 0
+    assert image.getpixel((all_x - 1, frame_y + 1))[3] == 0, (
+        "its bar stopping short of them")
     assert (shield_all.icon, cancel_all.icon) == ("All", "Cancel All")
 
 
@@ -280,7 +279,8 @@ def test_shield_all_is_grayed_out_while_no_job_is_left_for_it_to_shield():
         rect, shield_all = next((rect, b) for rect, b in targets if b.command == SHIELD_ALL)
         assert shield_all.dim == dim, (
             "the user's answer for the Job Queue, and so here too")
-        assert (_brightest(image, rect) < 180) == dim
+        assert (_brightest(image, rect) < 180) == dim, (
+            "the HUD's muted ink, never its bright one, on a press that would do nothing")
 
 
 def test_cancel_all_is_grayed_out_while_no_job_can_be_canceled():

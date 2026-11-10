@@ -1238,7 +1238,8 @@ def test_a_landscape_image_stays_stacked_when_hosted(qtbot):
     tab._reflow_for_the_media()
 
     assert tab._media_split.orientation() == Qt.Orientation.Vertical, (
-        "a wide image beside a form gets a column too narrow to show it")
+        "a wide image beside a form gets a column too narrow to show it, and the form loses "
+        "the width its prompt fields need")
     assert tab._media_split.indexOf(tab._viewport_pane) == 0
 
 
@@ -1712,8 +1713,7 @@ def test_a_tab_coming_to_the_front_lays_out_for_its_own_image(qtbot):
     portrait_tab = tabs.currentWidget()
     portrait_tab._viewport._pixmap = QPixmap(400, 900)
     portrait_tab.refresh_media_layout()
-    assert portrait_tab._media_split.orientation() == Qt.Orientation.Horizontal, (
-        "the shape belongs to the tab")
+    assert portrait_tab._media_split.orientation() == Qt.Orientation.Horizontal
 
     tabs._add_subtab()
     landscape_tab = tabs.currentWidget()
@@ -1721,7 +1721,9 @@ def test_a_tab_coming_to_the_front_lays_out_for_its_own_image(qtbot):
     tabs.setCurrentWidget(portrait_tab)
     tabs.setCurrentWidget(landscape_tab)
 
-    assert landscape_tab._media_split.orientation() == Qt.Orientation.Vertical
+    assert landscape_tab._media_split.orientation() == Qt.Orientation.Vertical, (
+        "the shape belongs to the tab, so switching to one holding a landscape image stands the "
+        "panes back up")
 
 
 def _hud_label_for(view):

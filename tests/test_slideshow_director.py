@@ -1278,7 +1278,9 @@ def test_an_enhancement_is_never_a_slide_of_its_own_frames(slideshows):
 
     director.note_generating("g8", b"frame")
 
-    assert made[0].generating == []
+    assert made[0].generating == [], (
+        "an enhancement is nobody's slide: a second slide of the image half-rendered would be "
+        "the same image twice, one of them worse")
 
 
 def test_a_run_turned_down_frame_after_frame_looks_at_the_slideshows_set_once(slideshows):
@@ -1291,7 +1293,9 @@ def test_a_run_turned_down_frame_after_frame_looks_at_the_slideshows_set_once(sl
     for frame in (b"one", b"two", b"three"):
         director.note_generating("g-run", frame)
 
-    assert made[0].generating == []
+    assert made[0].generating == [], (
+        "a collection is a deliberate set (favorited, requested, condemned) that nothing joins "
+        "by being made")
     assert gallery_pane.library.asked == 1
 
 

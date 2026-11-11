@@ -37,7 +37,7 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.output import resolve_preview as real_resolve_preview
 from origenerator.gallery_edits import GalleryEdits
 from origenerator.gui import gallery_view as gallery_view_module
-from origenerator.gui.corner_buttons import RESTORE, TRASH
+from origenerator.gui.corner_buttons import ENHANCE, RESTORE, STAR, TRASH
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.item_tile import ItemTile
 from origenerator.output_places import OutputPlaces
@@ -513,6 +513,23 @@ def _in_the_trash(view, qtbot):
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
 
 
+@pytest.mark.parametrize("action", [STAR, TRASH, ENHANCE])
+def test_an_item_in_the_trash_is_left_alone_by_each_action_that_changes_an_item(qtbot, action):
+    view = GalleryView(_emptied_db())
+    _in_the_trash(view, qtbot)
+    changed = []
+    view.set_items_favorite = lambda *asked: changed.append(STAR)
+    view._delete_rows = lambda rows: changed.append(TRASH)
+    view._enhance.enhance_items = lambda prompt_ids: changed.append(ENHANCE)
+    assert view.row_for("d1") is not None
+
+    view.run_item_action("d1", action)
+
+    assert changed == [], (
+        "the Trash hands back the row it holds for a deleted item, so an action that changes "
+        "an item reads its row from the database, which has none for a deleted one")
+
+
 def _restore_button(view):
     return view._gallery_pane._thumb_widgets["d1"]._controls.buttons()[0]
 
@@ -643,7 +660,8 @@ def test_delete_key_deletes_the_selected_thumbnail(qtbot):
     assert [r["prompt_id"] for r in actions.deleted[0]] == ["i1"]
 
 
-def test_a_branch_session_deletes_into_the_shared_trash(qtbot, monkeypatch, tmp_path):
+def test_a_branch_session_deletes_into_the_shared_trash_through_the_actions_the_app_builds(
+        qtbot, monkeypatch, tmp_path):
     monkeypatch.setenv(ENV_FLAG, "1")
     output_dir = tmp_path / "output"
     output_dir.mkdir()
@@ -1321,7 +1339,9 @@ def test_a_trash_item_wears_delete_where_every_item_does_and_restore_where_the_s
     assert delete.pos() == usual_delete.pos()
     assert not restore.isHidden()
     assert not delete.isHidden()
-    assert enhance.isHidden()
+    assert enhance.isHidden(), (
+        "an ordinary tile's star, its enhance and its right-click menu each want a row in the "
+        "gallery, and a deleted item has none")
     assert delete.toolTip() == "Delete permanently — remove it and its files for good"
 
 

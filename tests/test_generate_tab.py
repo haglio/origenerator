@@ -1506,6 +1506,15 @@ def test_picking_a_workflow_fills_in_everything_below(blank_panel):
     assert blank_panel._generate_btn.isEnabled() is True
 
 
+def test_the_enhance_params_stay_off_the_form_a_picked_workflow_lays_out(blank_panel):
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
+
+    laid_out = set(blank_panel._param_form._keys_in_order())
+    assert laid_out.isdisjoint(WORKFLOW_REGISTRY["sdxl_t2i"].enhance_keys()), (
+        "everything laid out here decides which gallery folder a run lands in, and an "
+        "enhancement does not")
+
+
 def test_a_fresh_panel_is_blank_and_a_used_one_is_not(blank_panel):
     assert blank_panel.is_blank() is True
     blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))

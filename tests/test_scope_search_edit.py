@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QToolButton
 
 from origenerator.gui.scope_search_edit import ScopeSearchEdit
 
-LONGER_THAN_ANY_FIELD_HERE = "Library / Images / Alpha Folder / One Two Three / Four Five Six Seven Eight"
+WIDER_THAN_EVERY_FIELD = "Library / Images / Alpha Folder / One Two Three / Four Five Six Seven Eight"
 
 
 def _field(qtbot, width: int) -> ScopeSearchEdit:
@@ -28,31 +28,31 @@ def test_the_placeholder_names_the_whole_path_when_there_is_room_for_it(qtbot):
 
 def test_a_path_too_long_for_the_field_keeps_its_tail(qtbot):
     field = _field(qtbot, 200)
-    field.set_scope(LONGER_THAN_ANY_FIELD_HERE)
+    field.set_scope(WIDER_THAN_EVERY_FIELD)
     shown = field.placeholderText()
-    assert shown != f"Search {LONGER_THAN_ANY_FIELD_HERE}…"
+    assert shown != f"Search {WIDER_THAN_EVERY_FIELD}…"
     kept = shown.removeprefix("Search ").lstrip("…")
     assert kept
-    assert LONGER_THAN_ANY_FIELD_HERE.endswith(kept)
+    assert WIDER_THAN_EVERY_FIELD.endswith(kept)
 
 
 def test_an_elided_path_drops_the_invitation_so_there_is_only_one_ellipsis(qtbot):
     field = _field(qtbot, 200)
-    field.set_scope(LONGER_THAN_ANY_FIELD_HERE)
+    field.set_scope(WIDER_THAN_EVERY_FIELD)
     assert field.placeholderText().count("…") == 1
 
 
 def test_a_wider_field_shows_more_of_the_path(qtbot):
     narrow = _field(qtbot, 150)
-    narrow.set_scope(LONGER_THAN_ANY_FIELD_HERE)
+    narrow.set_scope(WIDER_THAN_EVERY_FIELD)
     wide = _field(qtbot, 500)
-    wide.set_scope(LONGER_THAN_ANY_FIELD_HERE)
+    wide.set_scope(WIDER_THAN_EVERY_FIELD)
     assert len(wide.placeholderText()) > len(narrow.placeholderText())
 
 
 def test_growing_the_field_re_renders_what_it_can_now_hold(qtbot):
     field = _field(qtbot, 150)
-    field.set_scope(LONGER_THAN_ANY_FIELD_HERE)
+    field.set_scope(WIDER_THAN_EVERY_FIELD)
     narrow = field.placeholderText()
     was = field.size()
     field.resize(500, 24)

@@ -1155,6 +1155,22 @@ def test_a_spoken_collection_name_stands_you_in_that_collection(qtbot, tmp_path,
     assert _selected_folder(view) == key
 
 
+def test_a_collection_name_said_over_a_slideshow_still_moves_the_toc(
+        qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(gallery, "resolve_preview",
+                        lambda row, places: ("g0.png", "image"))
+    view = _listening(qtbot, tmp_path, db=_enhanceable_db(tmp_path, count=1))
+    _select_first_leaf(view)
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing.shown)
+
+    view._voice.listener.speak("go to experiments")
+
+    assert _selected_folder(view) == EXPERIMENTS_KEY, (
+        "the TOC is under the slideshow, and the move is what the slideshow leaves the user "
+        "standing in, so the word moves it rather than being refused")
+
+
 def test_a_collection_the_tree_has_not_got_says_so_rather_than_doing_nothing(
         qtbot, tmp_path):
     db = Database(tmp_path / "empty.db")

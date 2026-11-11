@@ -244,6 +244,20 @@ def test_a_double_click_is_two_presses_and_the_second_says_it_came_again(qtbot, 
     assert not pane.pressing_again
 
 
+def test_a_pass_handed_to_a_pane_on_screen_opens_one_engine(qtbot, tmp_path):
+    pane, engine, _running = _pane(qtbot)
+    pane.show_message("Generating…")
+    with qtbot.waitExposed(pane):
+        pane.show()
+    items = _items(tmp_path, "one")
+
+    _hand_over(pane, items)
+
+    assert engine.opened == [items[0].path], (
+        "showing the window for the first time calls back in and opens the engine there, so "
+        "the call that showed it must open none of its own")
+
+
 def test_a_pass_handed_over_before_there_is_a_window_waits_for_one(qtbot, tmp_path):
     pane = FunestraPane(channel=PaneChannel(), user=_Running, hud=lambda: None)
     qtbot.addWidget(pane)

@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import math
-import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from origenerator.gallery import JobKind
 from origenerator.gui.generation_job import JobState
-from origenerator.timing import RunTiming, clock_duration, elapsed_since, queue_estimate_label
+from origenerator.timing import (
+    JOB_QUEUE_CLOCK,
+    RunTiming,
+    clock_duration,
+    elapsed_since,
+    queue_estimate_label,
+)
 
 FOLDER_CELLS = 4
 
@@ -174,7 +179,7 @@ def stop_populate_tooltip() -> str:
 
 
 def queue_wait_text(foreign_ahead: int | None, starts_at: float | None = None, *,
-                    now=time.monotonic) -> str | None:
+                    now=JOB_QUEUE_CLOCK) -> str | None:
     if foreign_ahead:
         return (f"Waiting on {foreign_ahead} job{'' if foreign_ahead == 1 else 's'}"
                 " from another app")
@@ -183,7 +188,7 @@ def queue_wait_text(foreign_ahead: int | None, starts_at: float | None = None, *
     return None
 
 
-def seconds_until_start(starts_at: float | None, *, now=time.monotonic) -> float | None:
+def seconds_until_start(starts_at: float | None, *, now=JOB_QUEUE_CLOCK) -> float | None:
     if starts_at is None or (left := starts_at - now()) <= 0:
         return None
     return left

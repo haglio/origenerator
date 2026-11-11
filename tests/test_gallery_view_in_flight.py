@@ -2195,7 +2195,9 @@ class _QueueClient(ComfyUIClient):
         if self._fail is not None:
             raise self._fail
         self.cleared += 1
-        return self._foreign.total
+        gone = self._foreign.total
+        self._foreign = ForeignQueue(running=[], pending=[])
+        return gone
 
 
 def _queue_view(qtbot, client):
@@ -2300,7 +2302,6 @@ def test_a_cleared_queue_blanks_the_bar_without_waiting_for_a_poll(qtbot):
     view._poll()
     view._confirm_clear_queue = lambda total: True
 
-    client._foreign = ForeignQueue(running=[], pending=[])
     view._queue._clear.click()
 
     assert view._queue._running.status_text() == ""

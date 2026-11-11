@@ -1500,9 +1500,9 @@ def test_a_slideshow_is_armed_with_each_images_versions(qtbot, tmp_path):
 
     slideshow = _double_click_slideshow(view, qtbot)
 
-    (key, computed), = view._slideshows.versions_of(
+    (file_the_folder_shows_it_under, computed), = view._slideshows.versions_of(
         [view.row_for(pid) for pid in view.listed_prompt_ids()]).items()
-    versions = slideshow._versions[str(key)]
+    versions = slideshow._versions[str(file_the_folder_shows_it_under)]
     assert versions == computed
     assert [version.path.name for version in versions] == \
         ["image_enhance_1.png", "sdxl_t2i_g0.png"]

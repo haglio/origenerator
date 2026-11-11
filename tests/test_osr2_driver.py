@@ -28,6 +28,17 @@ def test_poll_streams_toward_the_next_action(qapp):
     assert broker.positions[-1] == (100, 400)
 
 
+def test_a_playhead_that_has_stopped_moving_holds_the_device_at_the_same_target(qapp):
+    broker = FakeBroker()
+    driver = Osr2Driver(broker=broker)
+    driver.start(FakePlayer(pos=100), ACTIONS)
+
+    driver.poll()
+    driver.poll()
+
+    assert broker.positions[-2:] == [(100, 400), (100, 400)]
+
+
 def test_poll_drives_from_the_playhead_without_a_playback_state(qapp):
     broker = FakeBroker()
     driver = Osr2Driver(broker=broker)

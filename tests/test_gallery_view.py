@@ -924,6 +924,14 @@ def test_experiments_collection_label_counts_the_unreviewed(qtbot):
     assert _shown(_alls(view._tree)["Experiments"]) == "(2) Experiments"
 
 
+def test_a_collection_is_called_back_by_its_plain_name_whatever_work_waits_in_it(qtbot):
+    view = GalleryView(FakeDB([_experiment_row("e1"), _experiment_row("e2", seed=10)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert view.collection_label(EXPERIMENTS_KEY) == "Experiments"
+
+
 def test_experiments_collection_offers_keep_and_reject_on_each_tile(qtbot):
     view = GalleryView(FakeDB([_experiment_row("e1")]))
     qtbot.addWidget(view)

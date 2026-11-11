@@ -304,6 +304,9 @@ def test_a_truncated_frame_leaves_what_is_on_screen_as_it_was(make_preview, tmp_
 
     assert w._image_label.pixmap().cacheKey() == shown
     assert w._message.text() == "modified"
+    assert not w._message.isHidden(), (
+        "a frame is decoded before the pane is put down, so one that does not decode leaves "
+        "the screen as it was")
 
 
 def test_the_video_on_screen_is_named_by_the_run_it_came_from(make_preview, tmp_path):

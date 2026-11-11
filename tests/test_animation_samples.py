@@ -17,6 +17,9 @@ _PATHS = {
         },
     },
 }
+_EVERY_ANIMATION_THE_TABLE_HOLDS = sum(
+    len(states) for lane in _PATHS["video_actions"]["starts_from"].values()
+    for states in lane.values())
 
 
 def _image(prompt_id, state, filename=None):
@@ -136,7 +139,7 @@ def test_the_animations_with_nothing_behind_them_fall_to_the_end(samples):
     order = animation_samples.paths_in_order(rows, content=_PATHS)
 
     assert order[0] == (VIDEO, "alpha", "state one")
-    assert len(order) == 4
+    assert len(order) == _EVERY_ANIMATION_THE_TABLE_HOLDS
 
 
 def test_animations_nothing_separates_keep_the_tables_own_order(samples):

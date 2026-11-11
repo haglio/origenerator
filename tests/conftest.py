@@ -308,8 +308,8 @@ def keep_off_the_device(setattr) -> None:
     setattr(osr2_driver, "Osr2Broker", lambda *a, **k: _NoDevice())
     setattr(osr2_motion_driver, "Osr2Broker", lambda *a, **k: _NoDevice())
     setattr(osr2_motion_driver, "_TickThread", _NoTicker)
-    setattr(osr2_controls.osr2, "device_mode",
-            lambda **_kw: osr2_controls.osr2.osr2_device.Osr2Mode.CONTROLLED)
+    before_the_controls_can_tell = osr2_controls.osr2.osr2_device.Osr2Mode.CONTROLLED
+    setattr(osr2_controls.osr2, "device_mode", lambda **_kw: before_the_controls_can_tell)
     setattr(osr2_controls.osr2, "device_trouble", lambda **_kw: None)
     setattr(osr2_controls.osr2, "broker_running", lambda **_kw: True)
     setattr(osr2_controls.osr2, "press_the_broker", lambda **_kw: None)

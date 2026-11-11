@@ -27,7 +27,13 @@ from shared_ui.palette import PREVIEW_INK
 from shared_ui.preview import Preview
 from shared_ui.spacing import GAP_SMALL
 
-from origenerator.gui.stylesheet import _drawn_arrow_rules, build_stylesheet, dress_application
+from origenerator.gui.stylesheet import (
+    _RADIO_MARK,
+    _RING,
+    _drawn_arrow_rules,
+    build_stylesheet,
+    dress_application,
+)
 
 
 def test_the_stylesheet_is_qss_with_every_shared_ui_token_resolved():
@@ -129,7 +135,7 @@ def _lightness(image, x: int) -> int:
 
 
 def test_a_selected_radio_shows_a_light_disc_inside_its_ring(qtbot):
-    center, gap = 8, 1
+    center, gap = (_RING + _RADIO_MARK + _RING) // 2, _RING
     assert _lightness(_radio_image(qtbot, checked=True), center) > 200
     assert _lightness(_radio_image(qtbot, checked=False), center) < 80
     assert _lightness(_radio_image(qtbot, checked=True), gap) < 100, (

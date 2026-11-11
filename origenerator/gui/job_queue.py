@@ -24,7 +24,7 @@ from origenerator.gui.job_records import (
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.media import MediaType
 from origenerator.run_toast import RunOutcome
-from origenerator.timing import elapsed_since
+from origenerator.timing import JOB_QUEUE_CLOCK, elapsed_since
 from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -107,7 +107,7 @@ class JobQueue(QObject):
     run_ended = pyqtSignal(object)
     reordered = pyqtSignal()
 
-    def __init__(self, db, client, parent=None, *, clock=time.monotonic, bring_up_comfyui=None):
+    def __init__(self, db, client, parent=None, *, clock=JOB_QUEUE_CLOCK, bring_up_comfyui=None):
         super().__init__(parent)
         self._db = db
         self._client = client

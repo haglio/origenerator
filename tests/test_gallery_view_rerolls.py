@@ -306,7 +306,9 @@ def test_a_request_runs_every_image_again_with_its_own_seed(qtbot, tmp_path):
     _rewritten(view, key)
 
     jobs = view._jobs.all_jobs
-    assert sorted(job.params["seed"] for job in jobs) == [7, 8, 9]
+    assert [job.params["seed"] for job in jobs] == [7, 8, 9], (
+        "launched oldest first, so the new folder lists its seeds in the old folder's order "
+        "rather than in reverse")
     assert {job.params["positive_prompt"] for job in jobs} == {"a dog on a couch"}
 
 

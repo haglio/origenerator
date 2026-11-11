@@ -49,6 +49,7 @@ def clock_duration(seconds: float) -> str:
     return f"{minutes}:{secs:02d}"
 
 
+JOB_QUEUE_CLOCK = time.monotonic
 _MODEL_LOAD_FRACTION = 0.25
 _SECONDS_PER_MINUTE = 60
 _MINUTES_PER_HOUR = 60

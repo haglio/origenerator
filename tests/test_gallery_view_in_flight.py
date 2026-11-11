@@ -1653,14 +1653,14 @@ def _finished_row_db(tmp_path):
     return db
 
 
-def _the_history_of_a_run_still_going(prompt_id):
+def _history_of_a_run_still_going(prompt_id):
     return {}
 
 
 def test_generate_inflight_tile_persists_across_navigation_and_polls(qtbot, tmp_path):
     client = ComfyUIClient(folders=SUITE_FOLDERS)
     client.submit_job = lambda payload, prompt_id: prompt_id
-    client.fetch_history = _the_history_of_a_run_still_going
+    client.fetch_history = _history_of_a_run_still_going
     db = _finished_row_db(tmp_path)
     gv = GalleryView(db, client=client)
     qtbot.addWidget(gv)
@@ -1686,7 +1686,7 @@ def test_generate_inflight_tile_persists_across_navigation_and_polls(qtbot, tmp_
 def test_reroll_inflight_tile_persists_across_navigation_and_polls(qtbot, tmp_path):
     client = ComfyUIClient(folders=SUITE_FOLDERS)
     client.submit_job = lambda payload, prompt_id: prompt_id
-    client.fetch_history = _the_history_of_a_run_still_going
+    client.fetch_history = _history_of_a_run_still_going
     db = _finished_row_db(tmp_path)
     gv = GalleryView(db, client=client)
     qtbot.addWidget(gv)

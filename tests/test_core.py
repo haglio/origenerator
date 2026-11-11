@@ -526,7 +526,7 @@ def test_restores_the_dragged_prompt_heights_from_app_state(
 
     assert forget_prompt_heights.height("positive_prompt") == 260
     tab = win._gallery_view._generate_pane.widget(0)
-    assert "positive_prompt" in tab._param_form._widgets, (
+    assert tab._param_form is not None, (
         "the resting tab lays out no form until a workflow is picked, so a restored tab is what "
         "makes a form at launch")
     assert tab._param_form._widgets["positive_prompt"].boxes()[0].height() == 260

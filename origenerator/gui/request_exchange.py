@@ -6,17 +6,9 @@ from math import ceil
 
 from PyQt6.QtCore import QEvent, QPoint, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import (
-    QFont,
-    QImage,
-    QImageReader,
-    QPainter,
     QTextBlockFormat,
     QTextCharFormat,
     QTextCursor,
-    QTextDocument,
-    QTextImageFormat,
-    QTextLength,
-    QTextTableFormat,
 )
 from PyQt6.QtWidgets import (
     QHBoxLayout,
@@ -27,29 +19,22 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.colors import BLUE_LIGHT, TEXT_MUTED, TEXT_PRIMARY
+from shared_ui.colors import BLUE_LIGHT, TEXT_PRIMARY
 from shared_ui.spacing import GAP_SMALL, MARGIN_STANDARD
 from shared_ui.toggle_switch import ToggleSwitch
 
-from origenerator import config
 from origenerator.db_requests import Turn
-from origenerator.gui.diff_text import write_request_change
+from origenerator.gui.change_tip import change_tip, fitted
 from origenerator.gui.generate_button import GenerateButton
 from origenerator.gui.inflight import RunReading
 from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
-from origenerator.gui.thumbnail_box import THUMBNAIL_BOX
 
 _ASK = "What to change, e.g. two women"
 _NOTHING_TO_ASK_OF = "Pick an image to ask a change of"
 _UPDATING = "updating…"
 _FAILED = "couldn't work that into the prompts"
 _LINES_AT_MOST = 20
-_COMPARED = THUMBNAIL_BOX * 2
-_NOT_MADE = "?"
 _THUMBNAIL_LINES = 2
-_MARK_SHARE = 0.7
-_NOT_MADE_FILL = TEXT_MUTED
-_NOT_MADE_INK = TEXT_PRIMARY
 _AUTO_GENERATE = "Auto-generate"
 _AUTO_GENERATE_TIP = "Generate each time the model comes back with its changes"
 
@@ -85,65 +70,11 @@ class _Entry:
         if not self.changed_something():
             self.tip = ""
             return
-        document = QTextDocument()
-        cursor = QTextCursor(document)
-        if thumbnail_of is not None:
-            _write_comparison(cursor, *(thumbnail_of(made) if made else None
-                                        for made in (before, self.made)))
-        write_request_change(cursor, *self._change, settings=self._settings)
-        self.tip = document.toHtml()
-
-
-def _fitted(thumbnail: str | None, box: QSize) -> QTextImageFormat | None:
-    size = QImageReader(thumbnail).size() if thumbnail else QSize()
-    if not size.isValid():
-        return None
-    fitted = size.scaled(box, Qt.AspectRatioMode.KeepAspectRatio)
-    image_format = QTextImageFormat()
-    image_format.setName(thumbnail)
-    image_format.setWidth(fitted.width())
-    image_format.setHeight(fitted.height())
-    return image_format
-
-
-def _write_comparison(cursor: QTextCursor, *thumbnails: str | None) -> None:
-    shape = QTextTableFormat()
-    shape.setBorder(0)
-    shape.setCellSpacing(GAP_SMALL)
-    shape.setColumnWidthConstraints([QTextLength(QTextLength.Type.FixedLength, _COMPARED.width())]
-                                    * len(thumbnails))
-    table = cursor.insertTable(1, len(thumbnails), shape)
-    image_formats = [_fitted(thumbnail, _COMPARED) for thumbnail in thumbnails]
-    made = next((image_format for image_format in image_formats if image_format is not None), None)
-    size = (QSize(round(made.width()), round(made.height())) if made is not None
-            else _COMPARED)
-    for column, image_format in enumerate(image_formats):
-        cell = table.cellAt(0, column).firstCursorPosition()
-        cell.insertImage(image_format if image_format is not None else _not_made(size))
-    cursor.movePosition(QTextCursor.MoveOperation.End)
-
-
-def _not_made(size: QSize) -> QTextImageFormat:
-    drawn = f"{size.width()}x{size.height()} {_NOT_MADE_FILL.name()[1:]} {_NOT_MADE_INK.name()[1:]}"
-    path = config.STATE_DIR / "not made" / f"not made {drawn}.png"
-    if not path.exists():
-        path.parent.mkdir(parents=True, exist_ok=True)
-        stand_in = QImage(size, QImage.Format.Format_RGB32)
-        stand_in.fill(_NOT_MADE_FILL)
-        painter = QPainter(stand_in)
-        font = QFont()
-        font.setPixelSize(round(min(size.width(), size.height()) * _MARK_SHARE))
-        font.setWeight(QFont.Weight.Bold)
-        painter.setFont(font)
-        painter.setPen(_NOT_MADE_INK)
-        painter.drawText(stand_in.rect(), Qt.AlignmentFlag.AlignCenter, _NOT_MADE)
-        painter.end()
-        stand_in.save(str(path))
-    image_format = QTextImageFormat()
-    image_format.setName(str(path))
-    image_format.setWidth(size.width())
-    image_format.setHeight(size.height())
-    return image_format
+        before_thumbnail, after_thumbnail = (
+            thumbnail_of(made) if thumbnail_of is not None and made else None
+            for made in (before, self.made))
+        self.tip = change_tip(before_thumbnail, after_thumbnail, self._change, self._settings,
+                              with_thumbnails=thumbnail_of is not None)
 
 
 def _block(cursor: QTextCursor, *, indent: int = 0, above: int = 0) -> None:
@@ -214,7 +145,7 @@ class _Conversation(QTextEdit):
             bar.show_progress(made.reading.caption(), *made.reading.bars())
             self._reserve(cursor, bar, entry)
         elif entry.made:
-            image_format = _fitted(made.thumbnail, self._thumbnail_box())
+            image_format = fitted(made.thumbnail, self._thumbnail_box())
             if image_format is not None:
                 _block(cursor, indent=MARGIN_STANDARD, above=GAP_SMALL)
                 cursor.insertImage(image_format)

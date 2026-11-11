@@ -117,7 +117,9 @@ def test_the_missing_lines_are_spoken_by_the_worker_under_the_speech_python(tmp_
     assert made == [tmp_path / scene.file for scene in scene_speech(params)]
     assert all(path.exists() for path in made)
     (cmd, kwargs, job), = calls
-    assert cmd[:2] == [str(Path("C:/env/python.exe")), str(Path("worker.py"))]
+    assert cmd[:2] == [str(Path("C:/env/python.exe")), str(Path("worker.py"))], (
+        "the voice is Qwen3-TTS, run in a Python environment of its own: its pins would break the "
+        "app's and ComfyUI's")
     assert kwargs["capture_output"]
     assert kwargs["text"]
     assert job["voice"] == {"mode": "preset", "speaker": "Vivian"}

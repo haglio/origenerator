@@ -1521,7 +1521,7 @@ def test_the_presets_a_model_can_reach_are_all_left_alone(qtbot):
     assert all(_preset_states(form._widgets["frame_count"]).values()), (
         "161 frames is 10.06 s, so every offered length is real here")
     assert all(_preset_states(form._widgets["frame_rate"]).values()), (
-        "and every frame rate is, since none is past what the video writer accepts")
+        "every frame rate is real too, since none is past what the video writer accepts")
 
 
 def test_a_frame_count_is_shown_and_edited_as_seconds_at_the_models_own_rate(qtbot):

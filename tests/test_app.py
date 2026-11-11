@@ -855,7 +855,7 @@ def test_main_in_fun_time_mode_parks_the_window_and_threads_the_session(qapp):
     assert (session.main_rect.x, session.main_rect.y) == (5, 6)
     assert (window.showMinimized.call_count, window.show.call_count) == (1, 0), (
         "parked until the session's own mode switch restores it: the session may be in Kino "
-        "mode, where coming up over the Random Favs Browser is wrong")
+        "mode, where coming up over the Random Faves Browser is wrong")
 
 
 def test_a_boot_hosted_in_the_headset_is_not_parked(qapp, tmp_path):

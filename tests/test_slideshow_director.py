@@ -2294,6 +2294,17 @@ def test_the_filter_with_no_slideshow_up_says_there_is_nothing_to_narrow(slidesh
     assert host.said == ["the filter needs a slideshow to narrow"]
 
 
+def test_the_filter_said_with_no_slideshow_up_is_not_kept_for_the_next_one(slideshows):
+    director, _host, made = slideshows()
+    director.filter_enhanced()
+
+    director.open([("a.png", "image", "g1", None)], shape=LANDSCAPE)
+
+    assert made[0].filters.enhanced is False, (
+        "with no slideshow up there is nothing for the word to narrow, and it says so rather "
+        "than arming the switch for the next slideshow")
+
+
 def test_every_surface_lets_go_of_a_file_a_delete_is_about_to_move(slideshows):
     director, _host, made = slideshows(fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], shape=LANDSCAPE)

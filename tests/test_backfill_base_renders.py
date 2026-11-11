@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from origenerator import base_backfill, downtime, gallery
 from origenerator.app_state import AppState
 from origenerator.base_backfill import (
@@ -521,6 +523,31 @@ def test_the_tool_folds_each_repair_into_the_row_it_belongs_to(tmp_path, monkeyp
     originals = gallery.original_files_of(db.get_generation("gone"))
     assert [f["filename"] for f in originals] == ["base.png"], (
         "attached the way the app attaches one, so a row repaired here reads like any other")
+
+
+def test_a_run_stopped_partway_keeps_what_it_folded_and_offers_only_the_rest(
+        tmp_path, monkeypatch):
+    db = _repairable_db(tmp_path)
+    _add(db, "gone2", params=dict(_SDXL.default_params(), seed=4, enhance=True),
+         files=[_file("enhanced2.png")])
+    renders = []
+
+    def stopped_on_the_second(client, workflow, params):
+        renders.append(params)
+        if len(renders) == 2:
+            raise KeyboardInterrupt
+        return [_file("base.png")]
+
+    monkeypatch.setattr(backfill_tool, "ComfyUIClient", lambda folders: object())
+    monkeypatch.setattr(backfill_tool, "render_base_now", stopped_on_the_second)
+
+    with pytest.raises(KeyboardInterrupt):
+        backfill_tool.main(["--apply", "--db", str(tmp_path / "repair.db")])
+
+    left = [row["prompt_id"] for row in rows_missing_their_base(db.list_generations())]
+    assert len(left) == 1, (
+        "each repair is folded into its row as it lands, so a run stopped partway loses only "
+        "the render in hand and the next run picks up only what is left")
 
 
 def test_the_tool_reports_a_repair_that_produced_nothing_rather_than_folding_it(

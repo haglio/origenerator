@@ -728,6 +728,18 @@ def test_a_spoken_side_and_collection_plays_it_on_that_region(qtbot, tmp_path, m
     qtbot.addWidget(slideshow.shown)
 
 
+def test_a_spoken_side_and_collection_leaves_the_gallery_pane_where_it_was(qtbot, tmp_path):
+    view = _fun_time_view(qtbot, _fox_library(tmp_path))
+    view.refresh()
+    browsing = view.selected_folder_key()
+
+    view._voice.on_command(CollectionCommand("__recents__", "portrait"))
+
+    assert view.selected_folder_key() == browsing, (
+        "a spoken side and collection starts a slideshow and is no request to browse, so the "
+        "Gallery pane stays where it was")
+
+
 def test_the_maps_loop_button_loops_the_seed_row_and_the_next_press_ends_it(
         qtbot, tmp_path, monkeypatch):
     rows = _fox_library(tmp_path)

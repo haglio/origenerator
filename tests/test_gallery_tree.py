@@ -452,3 +452,18 @@ def test_a_kept_folders_counts_and_recent_mark_are_brought_up_to_date(qtbot):
     assert tree.item_by_key[_STILLS] is drawn[_STILLS]
     assert tree.item_by_key[shaped_key(trash_here, LANDSCAPE)].data(0, COUNT_ROLE) == 3
     assert tree.item_by_key[_STILLS].data(0, RECENT_ROLE)
+
+
+def test_one_folder_picked_on_both_shapes_stays_two_folders(qtbot):
+    model = gallery.build_gallery_tree([_image("g1", "a fox in the snow")])
+    pane = SplitFolderTree(GROUP_ROLE)
+    qtbot.addWidget(pane)
+    GalleryTree(pane).populate([ShapeModel(LANDSCAPE, model), ShapeModel(PORTRAIT, model)])
+
+    for shape in (LANDSCAPE, PORTRAIT):
+        next(item for _depth, item in _rows_by_depth(pane._trees[shape])
+             if isinstance(item.data(0, GROUP_ROLE), gallery.SettingsGroup)).setSelected(True)
+
+    assert len(set(pane.selected_folder_keys())) == 2, (
+        "a row's key carries the shape it is drawn on, so a pick across both shapes stays two "
+        "folders")

@@ -137,8 +137,10 @@ class FakeDB:
     def __init__(self, rows=()):
         self.rows = {row["prompt_id"]: dict(row) for row in rows}
         self.targets = []
+        self.looked_up = []
 
     def get_generation(self, prompt_id):
+        self.looked_up.append(prompt_id)
         return self.rows.get(prompt_id)
 
     def list_generations(self):
@@ -213,6 +215,7 @@ class FakeHost:
         self.rows = list(rows)
         self.group = group
         self.offers = 0
+        self.walks = 0
 
     def selected_prompt_ids(self):
         return self.picked
@@ -221,6 +224,7 @@ class FakeHost:
         return next((r for r in self.rows if r["prompt_id"] == prompt_id), None)
 
     def image_rows(self):
+        self.walks += 1
         return self.rows
 
     def image_config_index(self):
@@ -246,6 +250,10 @@ def _image(prompt_id="i1", *, files=("one.png",), enhance_of=None, params=None):
         "params_json": json.dumps(params or {}),
         "enhance_of": enhance_of,
     }
+
+
+def _stamped_run(db, run, image):
+    db.rows[run] = {"prompt_id": run, "enhance_of": image}
 
 
 def _video(prompt_id="v1"):
@@ -635,8 +643,8 @@ def test_every_live_job_is_searched_not_each_folders_leading_one(enhance,
                         lambda target, input_image, row: target == row["prompt_id"])
     jobs = [FakeJob("run-a"), FakeJob("run-b")]
     db = FakeDB([_image("i1"), _image("i2")])
-    db.rows["run-a"] = {"prompt_id": "run-a", "enhance_of": "i1"}
-    db.rows["run-b"] = {"prompt_id": "run-b", "enhance_of": "i2"}
+    _stamped_run(db, "run-a", "i1")
+    _stamped_run(db, "run-b", "i2")
     controller, _host = enhance(db=db, jobs=FakeReroll(jobs))
 
     assert controller.run_of(_image("i2")) is not None
@@ -689,7 +697,7 @@ def test_a_run_over_is_nobody_s_enhance_any_more(enhance, monkeypatch):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
     db = FakeDB([_image("i1")])
-    db.rows["run-a"] = {"prompt_id": "run-a", "enhance_of": "i1"}
+    _stamped_run(db, "run-a", "i1")
     controller, _host = enhance(db=db, jobs=FakeReroll([FakeJob("run-a")]))
     controller.run_of(_image("i1"))
     assert "run-a" in controller._targets, "asking reads the stamp and keeps it, or nothing is here to forget"
@@ -697,6 +705,83 @@ def test_a_run_over_is_nobody_s_enhance_any_more(enhance, monkeypatch):
     controller.forget("run-a")
 
     assert "run-a" not in controller._targets
+
+
+def test_a_runs_stamp_is_read_once_however_many_frames_stream_in(enhance):
+    db = FakeDB([_image("i1")])
+    _stamped_run(db, "run-a", "i1")
+    controller, _host = enhance(FakeHost(rows=[_image("i1")]), db=db,
+                                jobs=FakeReroll([FakeJob("run-a")]))
+
+    for _frame in range(5):
+        controller.reconcile()
+
+    assert db.looked_up.count("run-a") == 1, (
+        "frames stream in several times a second, so a run's stamp is read once and kept")
+
+
+def test_which_image_a_run_is_of_is_worked_out_once_while_the_runs_stay_the_same(enhance):
+    db = FakeDB([_image("i1"), _image("i2")])
+    _stamped_run(db, "run-a", "i1")
+    host = FakeHost(rows=[_image("i1"), _image("i2")])
+    controller, _host = enhance(host, db=db, jobs=FakeReroll([FakeJob("run-a")]))
+
+    for _frame in range(5):
+        controller.reconcile()
+
+    assert host.walks == 1, (
+        "the match walks every image and frames come several times a second, so it is "
+        "worked out again only when the set of runs changes")
+
+
+def test_a_run_launched_again_on_the_same_image_is_read_afresh(enhance):
+    db = FakeDB([_image("i1")])
+    _stamped_run(db, "run-a", "i1")
+    _stamped_run(db, "run-b", "i1")
+    jobs, gallery_pane = FakeReroll([FakeJob("run-a")]), FakeGalleryPane()
+    controller, _host = enhance(FakeHost(rows=[_image("i1")]), db=db, jobs=jobs,
+                                gallery_pane=gallery_pane)
+    controller.reconcile()
+
+    jobs.all_jobs = [FakeJob("run-b", state="queued")]
+    controller.reconcile()
+
+    assert gallery_pane.enhancing["i1"].status == "queued", (
+        "the set of runs is told by the runs themselves, so a run cancelled and launched "
+        "again on the same image is read afresh rather than off the job that is gone")
+
+
+class _StampingDB(FakeDB):
+    def set_enhance_target(self, prompt_id, target):
+        super().set_enhance_target(prompt_id, target)
+        _stamped_run(self, prompt_id, target)
+
+
+def test_a_launch_records_its_image_though_the_line_was_read_before_the_stamp(enhance,
+                                                                               monkeypatch):
+    monkeypatch.setattr(module.gallery, "enhance_params_for",
+                        lambda row, settings: {"input_image": "one.png", "seed": 1})
+    monkeypatch.setattr(module.gallery, "settings_folder_key",
+                        lambda row, index: "image/image_enhance/abc")
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
+    monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
+    first, second = _image("i1", files=("one.png",)), _image("i2", files=("one.png",))
+    db, jobs, gallery_pane = _StampingDB([first, second]), FakeReroll(), FakeGalleryPane()
+    controller, _host = enhance(FakeHost(rows=[first, second]), db=db, jobs=jobs,
+                                gallery_pane=gallery_pane)
+    line_up = jobs.start_batch
+
+    def lines_up_and_tells_the_queue(*args, **kwargs):
+        launched = line_up(*args, **kwargs)
+        controller.reconcile()
+        return launched
+    jobs.start_batch = lines_up_and_tells_the_queue
+
+    controller.enhance_items(["i2"])
+
+    assert set(gallery_pane.enhancing) == {"i2"}, (
+        "the redraw the launch itself sets off reads the run's row before its stamp is "
+        "written, so the launch records which image the run is of")
 
 
 
@@ -858,8 +943,8 @@ def test_a_lock_puts_the_enhancement_of_the_locked_image_first(enhance, monkeypa
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: {"input_image": "one.png"})
     db = FakeDB([_image("i1"), _image("i2")])
-    db.rows["run-a"] = {"prompt_id": "run-a", "enhance_of": "i1"}
-    db.rows["run-b"] = {"prompt_id": "run-b", "enhance_of": "i2"}
+    _stamped_run(db, "run-a", "i1")
+    _stamped_run(db, "run-b", "i2")
     jobs = FakeReroll([FakeJob("run-b", state="queued"), FakeJob("run-a", state="queued")])
     controller, _host = enhance(FakeHost(rows=[_image("i1"), _image("i2")]), db=db,
                                 jobs=jobs, slideshows=FakeSlideshows(locked={"i1"}))

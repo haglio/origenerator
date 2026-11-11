@@ -389,6 +389,17 @@ def test_a_restored_query_comes_back_without_searching_again(controller):
     assert host.shown == []
 
 
+def test_a_back_onto_a_stop_with_no_search_forgets_it_without_drawing_the_pane(controller):
+    host = FakeHost()
+    found = controller([_row("g1", "a tabby on a wall")], host=host)
+    _type(found, "tabby")
+
+    found.restore("")
+
+    assert (found.query, host.handed_back) == ("", 0), (
+        "the restore fills the pane itself, so forgetting the search draws nothing")
+
+
 def _typed_past_a_widened_query(controller, qtbot):
     host = FakeHost()
     expander = SearchExpander(expand=lambda query: {"kitten": ("tabby",)})

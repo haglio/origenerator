@@ -8,16 +8,20 @@ from PyQt6.QtGui import QPainter, QPixmap
 from PyQt6.QtWidgets import QWidget
 
 
-def rows_for(count: int, width: int, height: int) -> int:
+def rows_for(count: int, width: int, height: int, *, shape: float) -> int:
     if count <= 0 or width <= 0 or height <= 0:
         return 0
     best = None
     for rows in range(1, count + 1):
-        cell = (width / math.ceil(count / rows), height / rows)
-        oblong = max(cell) / min(cell)
-        if best is None or oblong < best[0]:
-            best = (oblong, rows)
+        cell_shape = (width / math.ceil(count / rows)) / (height / rows)
+        mismatch = abs(math.log(cell_shape / shape))
+        if best is None or mismatch < best[0]:
+            best = (mismatch, rows)
     return best[1]
+
+
+def shape_of(thumbnails: list[QPixmap]) -> float:
+    return math.exp(sum(math.log(t.width() / t.height()) for t in thumbnails) / len(thumbnails))
 
 
 def row_counts(count: int, rows: int) -> list[int]:
@@ -62,7 +66,8 @@ class ContactSheet(QWidget):
     def cells(self) -> list[QRect]:
         if not self._thumbnails:
             return []
-        rows = rows_for(len(self._thumbnails), self.width(), self.height())
+        rows = rows_for(len(self._thumbnails), self.width(), self.height(),
+                        shape=shape_of(self._thumbnails))
         laid = []
         for row, columns in enumerate(row_counts(len(self._thumbnails), rows)):
             top = round(row * self.height() / rows)

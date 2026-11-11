@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 
 import pytest
 
-from origenerator import config, provenance
+from origenerator import config, provenance, speech
 from origenerator.db import Database
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -293,6 +293,9 @@ def test_the_dictation_is_text_in_and_text_out():
 
 
 def test_the_script_that_speaks_imports_nothing_of_this_app():
+    assert speech.WORKER.parent == REPO_ROOT / "tools", (
+        "outside the package, so the family's dependency gate, which reads the package and not "
+        "tools/, never asks the app to declare the voice's torch")
     imported = _modules_imported_by("tools/speech_worker.py")
 
     assert not [module for module in imported if module.split(".")[0] == "origenerator"], (

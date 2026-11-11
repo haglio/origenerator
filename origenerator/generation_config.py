@@ -111,6 +111,11 @@ def would_reproduce_a_completed_run(rows, workflow, params: dict, *,
     return find_duplicate_generation(rows, snapshot) is not None
 
 
+def seeds_of(row: dict | None, workflow) -> dict:
+    params = merge_denormalized(row or {})
+    return {key: params[key] for key in workflow.seed_keys() if params.get(key) not in (None, "")}
+
+
 def randomize_seeds(params: dict, seed_keys) -> dict:
     out = dict(params)
     for key in seed_keys:

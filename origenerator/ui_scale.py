@@ -1,5 +1,3 @@
-# ruff: noqa: PLC0415
-# Qt is imported inside the functions: apply_room_scale runs before the first PyQt6 import in the process.
 from __future__ import annotations
 
 import ctypes
@@ -64,42 +62,3 @@ def active_scale() -> float:
         return float(os.environ.get(_ENV_VAR, "") or 1.0)
     except ValueError:
         return 1.0
-
-
-def to_logical_size(value: int) -> int:
-    scale = active_scale()
-    return value if scale == 1.0 else round(value / scale)
-
-
-def to_logical_rect(x: int, y: int, width: int, height: int):
-    """Qt leaves a scaled screen's origin at its device position and scales only its size, so a rect converts relative to the screen it lands on."""
-    scale = active_scale()
-    if scale == 1.0:
-        return x, y, width, height
-    origin_x, origin_y = _screen_origin(x, y)
-    return (
-        origin_x + round((x - origin_x) / scale),
-        origin_y + round((y - origin_y) / scale),
-        to_logical_size(width),
-        to_logical_size(height),
-    )
-
-
-def _screen_origin(x: int, y: int) -> tuple[int, int]:
-    from PyQt6.QtGui import QGuiApplication
-
-    screens = [(screen.geometry().x(), screen.geometry().y(),
-                screen.geometry().width(), screen.geometry().height())
-               for screen in QGuiApplication.screens()]
-    primary = QGuiApplication.primaryScreen()
-    fallback = (primary.geometry().x(), primary.geometry().y()) if primary else (0, 0)
-    return origin_of_the_screen_holding(x, y, screens, active_scale(), fallback)
-
-
-def origin_of_the_screen_holding(x: int, y: int, logical_screens, scale: float,
-                                 fallback: tuple[int, int]) -> tuple[int, int]:
-    for left, top, width, height in logical_screens:
-        device_width, device_height = max(1, round(width * scale)), max(1, round(height * scale))
-        if left <= x < left + device_width and top <= y < top + device_height:
-            return left, top
-    return fallback

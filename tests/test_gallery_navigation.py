@@ -11,6 +11,7 @@ class FakeSearch:
         self.everywhere = False
         self.restored = []
         self.runs = 0
+        self.pane = []
 
     def restore(self, query, everywhere=False):
         self.query = query
@@ -19,6 +20,7 @@ class FakeSearch:
 
     def run(self):
         self.runs += 1
+        self.pane.append(self.query)
 
 
 class FakeHost:
@@ -32,6 +34,7 @@ class FakeHost:
         self.revealed = []
         self.cleared = 0
         self.buttons = (False, False)
+        self.pane = []
 
     def selected_folder_key(self):
         return self.folder
@@ -47,6 +50,7 @@ class FakeHost:
         if key not in self.folders:
             return False
         self.folder = key
+        self.pane.append(key)
         return True
 
     def go_to_generation(self, prompt_id):
@@ -67,8 +71,9 @@ class FakeHost:
 @pytest.fixture
 def trail():
     def build(host=None, search=None):
-        host = host or FakeHost()
-        return NavigationController(host, search=search or FakeSearch()), host
+        host, search = host or FakeHost(), search or FakeSearch()
+        search.pane = host.pane
+        return NavigationController(host, search=search), host
     return build
 
 
@@ -178,14 +183,10 @@ def test_a_stops_query_takes_the_pane_back_from_the_folder_shown_under_it(trail)
     nav.record()
     host.folder, search.query = "workflow/b", ""
     nav.record()
-    in_the_pane = []
-    show_folder, run = host.show_folder, search.run
-    host.show_folder = lambda key: in_the_pane.append(key) or show_folder(key)
-    search.run = lambda: in_the_pane.append("tabby") or run()
 
     nav.go_back()
 
-    assert in_the_pane[-1] == "tabby", (
+    assert host.pane[-1] == "tabby", (
         "showing the folder puts the folder in the pane, so the stop's search is run after it "
         "to take the pane back")
 

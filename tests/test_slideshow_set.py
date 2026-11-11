@@ -740,7 +740,7 @@ def test_an_action_filter_asks_the_library_about_the_whole_set_at_once():
 
     slideshow_set.set_action_filter("alpha")
 
-    assert len(asked) == 1, (
+    assert [set(ids) for ids in asked] == [{"id-1", "id-2", "id-3"}], (
         "each answer costs a walk of the library and a filter asks it of every item, so the "
         "whole set is asked about at once")
 

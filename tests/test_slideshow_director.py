@@ -1541,7 +1541,8 @@ def test_a_loop_ending_on_a_folder_slideshow_hands_it_the_library_it_is_ordered_
     assert made[0].reordered == ([("g4.png", "image", "g4", None)], False, set())
     assert made[0].kept_the_slide is True
     assert director._live_slideshows == [(made[0], ALL_LANDSCAPE)]
-    assert made[0].said == []
+    assert made[0].said == [], (
+        "the surface says \"Loop off\" itself")
 
 
 def test_a_slideshow_playing_latest_falls_back_to_latest_rather_than_to_the_shuffle(slideshows):

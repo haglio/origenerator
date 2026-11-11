@@ -150,7 +150,8 @@ def test_refresh_builds_workflow_model_settings_tree(qtbot):
     assert workflow_node.text(0) == "SDXL T2I"
     assert len(_subs(workflow_node)) == 1
     assert len(_subs(_at(workflow_node, 0))) == 1
-    assert len(_subs(_at(workflow_node, 0, 0))) == 1
+    assert len(_subs(_at(workflow_node, 0, 0))) == 1, (
+        "one settings folder, into which the two seed variants collapse")
 
 
 def test_every_folder_of_folders_leads_with_collections_of_its_own(qtbot):
@@ -892,7 +893,8 @@ def test_favorites_leads_with_its_count_and_latest_leaves_its_count_to_all(qtbot
     view._toggle_favorite(_key(cat))
 
     alls = _alls(view._tree)
-    assert _shown(alls["Favorites"]) == "(2) Favorites"
+    assert _shown(alls["Favorites"]) == "(2) Favorites", (
+        "the favorited item is in the favorited folder, and is counted once")
     assert _shown(_top_level(view._tree)["All"]) == "(3) All"
     assert _shown(alls["Latest"]) == "Latest"
 

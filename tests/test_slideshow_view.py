@@ -1594,7 +1594,10 @@ def test_shift_arrows_step_the_versions_of_the_image_on_screen(qtbot, tmp_path):
     _settle(view)
 
     _shift(view, Qt.Key.Key_Right)
-    assert _media_on_screen(view) == original
+    assert _media_on_screen(view) == original, (
+        "Shift+Right moves within the one image rather than along the set, because a version is "
+        "not a neighbor: two versions of an image are compared by texture, which cannot be told "
+        "apart from memory, from a thumbnail or over an image that is moving")
     _shift(view, Qt.Key.Key_Right)
     assert _media_on_screen(view) == enhanced
 

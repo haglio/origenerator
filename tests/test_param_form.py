@@ -1824,6 +1824,18 @@ def test_a_scene_with_a_line_shuts_its_prompts_down_and_says_why(qtbot):
         assert scene.captions[key].toolTip() == SPEAKING_HELP
 
 
+def test_settings_loaded_with_a_line_shut_the_scenes_prompts_down_as_typing_one_does(qtbot):
+    form = ParamForm(_scene_defs())
+    qtbot.addWidget(form)
+    scene = form._widgets["scene_frames"]._scenes[0]
+
+    form.set_values({"scene_lines": ["Come in."]})
+
+    assert (scene.speaking(), scene.fields["positive_prompt"].isReadOnly()) == (True, True), (
+        "typing, loading settings and a spoken edit all end in the line's text changing, which "
+        "is what the scene follows")
+
+
 def test_clearing_a_scenes_line_gives_its_prompts_back(qtbot):
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)

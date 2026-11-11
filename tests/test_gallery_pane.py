@@ -324,6 +324,24 @@ def test_a_page_too_short_to_fill_the_pane_draws_on_until_the_pane_is_full(qtbot
     assert len(_drawn(scroll)) < len(rows)
 
 
+def test_a_pane_made_taller_after_it_was_drawn_draws_on_without_a_scroll(qtbot):
+    rows = [_row(f"g{n}", n) for n in range(300)]
+    pane, scroll = _pane(qtbot, rows)
+    scroll.setWidgetResizable(True)
+    scroll.resize(1900, 1000)
+    with qtbot.waitExposed(scroll):
+        scroll.show()
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+
+    scroll.resize(1900, 2400)
+    qtbot.waitUntil(lambda: scroll.viewport().height() > 2000)
+
+    drawn_to = scroll.widget().heightForWidth(scroll.viewport().width())
+    assert drawn_to >= scroll.viewport().height() + gallery_pane._REACH, (
+        "a pane can grow with no scroll at all, so the drawing follows the scroll bar's "
+        "range as well as its value")
+
+
 def test_scrolling_to_the_foot_of_a_pane_draws_on_by_a_page_not_to_the_end(qtbot):
     rows = [_row(f"g{n}", n) for n in range(300)]
     pane, scroll = _pane(qtbot, rows)

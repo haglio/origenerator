@@ -248,7 +248,7 @@ def test_a_storys_scenes_each_get_the_trigger_word_swapped(versioned_style):
     assert outcome.positive == story_of(["exmplnew, a dog", "exmplnew, a cat"])
 
 
-def test_an_edit_riding_inside_a_replacement_he_asked_for_is_left_out_without_a_word():
+def test_an_edit_riding_inside_a_replacement_he_asked_for_is_left_out_and_a_part_it_adds_is_kept():
     outcome = _applied(
         [{"prompt": "positive", "replace": "exmplstyle, two women on a couch, soft light",
           "with": "(exmplstyle:1.2), one woman on a couch, soft light, natural lighting",
@@ -256,15 +256,20 @@ def test_an_edit_riding_inside_a_replacement_he_asked_for_is_left_out_without_a_
         pair=("exmplstyle, two women on a couch, soft light", "blurry"),
         asked=("please make it portrait and have only one woman",))
 
-    assert outcome.positive == "exmplstyle, one woman on a couch, soft light"
-    assert outcome.line == 'Replaced "two women" with "one woman" in the Positive Prompt.'
+    assert outcome.positive == "exmplstyle, one woman on a couch, soft light, natural lighting"
+    assert outcome.line == ('Replaced "two women" with "one woman" in the Positive Prompt. '
+                            'Added "natural lighting" to the Positive Prompt.')
 
 
 @pytest.mark.parametrize(("change", "made"), [
     ({"prompt": "positive", "replace": "a cap", "with": "a wide straw hat with a frayed brim",
       "for": "a straw hat instead of the cap"}, "a man on a pier, a wide straw hat with a frayed brim, fog"),
     ({"gone": "cap", "in_positive": "a cap", "instead": "a wide straw hat with a frayed brim",
-      "for": "a straw hat instead of the cap"}, "a man on a pier, a wide straw hat with a frayed brim, fog")])
+      "for": "a straw hat instead of the cap"}, "a man on a pier, a wide straw hat with a frayed brim, fog"),
+    ({"prompt": "positive", "replace": "a cap", "with": "a wide straw hat, frayed brim",
+      "for": "a straw hat instead of the cap"}, "a man on a pier, a wide straw hat, frayed brim, fog"),
+    ({"gone": "cap", "in_positive": "a cap", "instead": "a wide straw hat, frayed brim",
+      "for": "a straw hat instead of the cap"}, "a man on a pier, a wide straw hat, frayed brim, fog")])
 def test_what_a_change_puts_in_is_every_word_the_model_wrote_for_it(change, made):
     outcome = _applied([change], pair=("a man on a pier, a cap, fog", "blurry"),
                        asked=("a straw hat instead of the cap",))

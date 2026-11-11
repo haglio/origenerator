@@ -2805,3 +2805,13 @@ def test_turning_audio_on_brings_the_audio_settings_and_her_lines_back(qtbot):
     assert form._widgets["audio_seed"].isEnabled()
     assert form._labels["voice"].property("inert") is False
     assert not lines.isReadOnly()
+
+
+def test_with_audio_on_and_no_lines_the_audio_prompts_take_typing(qtbot):
+    form = ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions())
+    qtbot.addWidget(form)
+
+    form._widgets["enable_audio"].setChecked(True)
+
+    assert _in_use_with(form, "audio_prompt", param_help("audio_prompt"))
+    assert _in_use_with(form, "audio_negative_prompt", param_help("audio_negative_prompt"))

@@ -57,6 +57,7 @@ TITLES = {MediaType.IMAGE: "Origenerator — image action setter tool",
 
 _NO_BOX_OF_ITS_OWN = "border: none; background: transparent;"
 _SET_BEFORE = "set_before"
+_SCROLLBAR_ROOM = 28
 _YELLOW_BOX = (f'QToolButton[{_SET_BEFORE}="true"] {{ border: 1px solid {YELLOW.name()};'
                f' background-color: {YELLOW.name()}; color: {BLACK.name()}; }}')
 _LIT = f"QToolButton:checked {{ background-color: {as_hex(BLUE)}; border-radius: {BUTTON_RADIUS}px; }}"
@@ -237,7 +238,7 @@ class ActionSetterWindow(QWidget):
         scroll.setWidget(inside)
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setFixedWidth(inside.sizeHint().width() + 28)
+        scroll.setFixedWidth(inside.sizeHint().width() + _SCROLLBAR_ROOM)
         return scroll
 
     def _add_checkbox(self, row: QHBoxLayout, name: str) -> None:

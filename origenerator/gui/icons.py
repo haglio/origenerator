@@ -292,6 +292,7 @@ def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
         if state == ENHANCE_MORE:
             draw_icon(painter, "plus", YELLOW, size=_CORNER_MARK, x=shifted, y=shifted)
             painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Clear)
+            # Qt's CompositionMode_Clear ignores the color it is given.
             _mark(painter, "plus", YELLOW)
             painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
         _mark(painter, "plus_outline", ink)

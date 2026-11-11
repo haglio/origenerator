@@ -73,6 +73,7 @@ def _controls(qtbot):
     host = QWidget()
     host.resize(200, 200)
     qtbot.addWidget(host)
+    # pytest-qt keeps only a weak reference to a widget it is given, and Qt deletes a child with its parent.
     return host, CornerButtons(host)
 
 

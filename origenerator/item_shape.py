@@ -65,8 +65,11 @@ def shape_of(key: str | None) -> str | None:
     return split_key(key)[1]
 
 
+UNMEASURABLE_SHAPE = LANDSCAPE
+
+
 def row_shape(row: dict) -> str:
-    return row.get("shape") or shape_its_files_say(row) or LANDSCAPE
+    return row.get("shape") or shape_its_files_say(row) or UNMEASURABLE_SHAPE
 
 
 def shape_its_files_say(row: dict) -> str | None:

@@ -117,6 +117,13 @@ class ModelTree:
 
 
 @pytest.fixture
+def sheet_put_back_for_later_tests(qapp):
+    prior = qapp.styleSheet()
+    yield qapp
+    qapp.setStyleSheet(prior)
+
+
+@pytest.fixture
 def installed_models(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path)
     return ModelTree(tmp_path)

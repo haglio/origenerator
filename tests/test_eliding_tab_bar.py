@@ -332,23 +332,18 @@ def test_a_tab_with_nothing_to_show_wears_nothing(qtbot):
     assert tab_mark(QIcon()).isNull()
 
 
-def test_a_marks_distance_from_the_tab_edge_is_the_apps_own(qtbot):
-    app = QApplication.instance()
-    prior = app.styleSheet()
-    try:
-        app.setStyleSheet(build_stylesheet())
-        tabs = QTabWidget()
-        tabs.setTabBar(ElidingTabBar())
-        qtbot.addWidget(tabs)
-        tabs.setTabsClosable(True)
-        tabs.setIconSize(MARK_CANVAS)
-        tabs.addTab(QWidget(), tab_mark(_icon(256, 144)), "a tab")
-        tabs.resize(600, 400)
-        tabs.show()
-        QApplication.processEvents()
-        image = tabs.tabBar().grab().toImage()
-    finally:
-        app.setStyleSheet(prior)
+def test_a_marks_distance_from_the_tab_edge_is_the_apps_own(qtbot, sheet_put_back_for_later_tests):
+    sheet_put_back_for_later_tests.setStyleSheet(build_stylesheet())
+    tabs = QTabWidget()
+    tabs.setTabBar(ElidingTabBar())
+    qtbot.addWidget(tabs)
+    tabs.setTabsClosable(True)
+    tabs.setIconSize(MARK_CANVAS)
+    tabs.addTab(QWidget(), tab_mark(_icon(256, 144)), "a tab")
+    tabs.resize(600, 400)
+    tabs.show()
+    QApplication.processEvents()
+    image = tabs.tabBar().grab().toImage()
 
     def is_mark(x, y):
         color = image.pixelColor(x, y)

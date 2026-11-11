@@ -1040,20 +1040,18 @@ def _completed_image(db, prompt_id, **params):
     return db.get_generation(prompt_id)
 
 
-def test_the_launch_dresses_the_application_in_the_stylesheet(qapp, library):
+def test_the_launch_dresses_the_application_in_the_stylesheet(sheet_put_back_for_later_tests, library):
     # QToolTip popups are top-level widgets, so only the QApplication's sheet reaches them.
 
-    prior = qapp.styleSheet()
+    qapp = sheet_put_back_for_later_tests
     qapp.setStyleSheet("")
-    try:
-        _boot(library)
 
-        assert qapp.styleSheet() == build_stylesheet(), (
-            "read back off the application, because the same call sitting in a comment reads "
-            "identically to anything that only greps app.py for the line; and cleared first, so a "
-            "sheet an earlier launch left on cannot answer for this one")
-    finally:
-        qapp.setStyleSheet(prior)
+    _boot(library)
+
+    assert qapp.styleSheet() == build_stylesheet(), (
+        "read back off the application, because the same call sitting in a comment reads "
+        "identically to anything that only greps app.py for the line; and cleared first, so a "
+        "sheet an earlier launch left on cannot answer for this one")
 
 
 def test_the_launch_dresses_the_application_in_the_family_palette(qapp, library):

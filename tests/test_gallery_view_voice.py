@@ -672,7 +672,9 @@ def test_a_queued_request_is_recorded_against_what_it_was_asked_about(
     (job,) = view._live_jobs.values()
     record = view._db.get_request(job.prompt_id)
     assert record["source_prompt_id"] == "orig"
-    assert record["heard"] == "Request, no hat, over."
+    assert record["heard"] == "Request, no hat, over.", (
+        "what was heard is every transcription that went into the request, markers and all, kept "
+        "verbatim so a request that came out wrong shows why rather than just being wrong")
     assert record["old_positive"] == "a woman, a hat, soft light"
     assert record["new_positive"] == "a woman, soft light"
 

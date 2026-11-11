@@ -149,9 +149,7 @@ def test_what_was_heard_reads_back_as_the_request_alone():
 def test_a_record_s_words_are_its_own_else_what_was_heard_between_the_markers():
     assert words_of({"asked": "two women", "heard": ""}) == "two women"
     assert words_of({"asked": None, "heard": "Request, no hat, over."}) == "no hat", (
-        "what was heard is every transcription that went into the request, markers and all, kept "
-        "verbatim so a request that came out wrong shows why rather than just being wrong; a "
-        "record from before the words were kept reads them back out of it")
+        "a record from before the words were kept reads them back out of what was heard")
     assert words_of({"asked": None, "heard": ""}) == ""
     assert words_of(None) == ""
 

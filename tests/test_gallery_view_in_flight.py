@@ -2032,8 +2032,9 @@ def test_a_landed_generation_tells_an_open_tab_its_seed_is_now_a_duplicate(qtbot
 def test_the_random_seed_survives_a_cancel_so_re_generate_is_another_variation(
         qtbot, tmp_path, monkeypatch):
     asked = []
-    for question in ("question", "information", "warning"):
+    for question in ("question", "information", "warning", "critical"):
         monkeypatch.setattr(QMessageBox, question, staticmethod(lambda *a, **kw: asked.append(a)))
+    monkeypatch.setattr(QMessageBox, "exec", lambda box: asked.append(box.text()))
     db = _seeded_db(tmp_path, seed=42)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)

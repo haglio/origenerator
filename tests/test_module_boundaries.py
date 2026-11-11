@@ -313,9 +313,7 @@ def test_a_surface_showing_work_in_flight_never_reaches_the_job(surface):
 
 
 def test_the_gallery_tree_draws_and_looks_up_with_no_database():
-    imported = _modules_imported_by("origenerator/gui/gallery_tree.py")
-
-    assert not [module for module in imported if "db" in module.split(".")[-1].split("_")], (
+    assert _loaded_after_importing("origenerator.gui.gallery_tree", "origenerator.db") is False, (
         "starring and deleting a folder live in the gallery view, which rebuilds every shape; the "
         "tree only draws and looks rows up")
 
@@ -328,21 +326,14 @@ def test_the_drag_of_a_generation_leans_on_no_widget_of_this_app():
 
 
 def test_the_job_queues_tiles_are_put_together_with_nothing_that_draws():
-    imported = _modules_imported_by("origenerator/gui/inflight_items.py")
-
-    assert not [module for module in imported if module.startswith("PyQt6")], (
+    assert _loaded_after_importing("origenerator.gui.inflight_items", "PyQt6.QtGui") is False, (
         "a join over four sources and no rendering at all, which is why they are built outside "
         "the Gallery pane")
 
 
-def test_a_slideshow_reaches_a_generation_only_through_what_the_gallery_hands_it():
-    tree = ast.parse((REPO_ROOT / "origenerator" / "gui" / "funestra_slideshow.py").read_text(
-        encoding="utf-8"))
-    reached = _modules_imported_by("origenerator/gui/funestra_slideshow.py")
-    reached |= {alias.name for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
-                for alias in node.names}
-
-    assert not [name for name in reached
-                if "db" in name.split(".")[-1].split("_") or "gallery" in name.split(".")], (
+@pytest.mark.parametrize("holds_generations", ["origenerator.db", "origenerator.gui.gallery_view"])
+def test_a_slideshow_reaches_a_generation_only_through_what_the_gallery_hands_it(holds_generations):
+    assert _loaded_after_importing(
+        "origenerator.gui.funestra_slideshow", holds_generations) is False, (
         "what a press does to the slide is the slideshow's; the half that lands on the generation "
         "is asked of the gallery through SlideshowActions")

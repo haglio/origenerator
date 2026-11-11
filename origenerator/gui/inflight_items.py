@@ -8,8 +8,7 @@ from functools import partial
 from origenerator import gallery, timing
 from origenerator.generation_state import GenerationStatus
 from origenerator.gui.generation_job import display_status
-from origenerator.gui.inflight import InFlightItem, RunReading
-from origenerator.gui.queue_thumbs import FOLDER_CELLS
+from origenerator.gui.inflight import FOLDER_CELLS, InFlightItem, RunReading
 from origenerator.media import MediaType
 from origenerator.voice.dictation import words_of
 from origenerator.workflows import WORKFLOW_REGISTRY

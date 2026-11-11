@@ -11,10 +11,10 @@ from shared_ui.spacing import HAIRLINE
 
 from origenerator.gui.combination import Combination, draw_plus, draw_source_video, plus_width
 from origenerator.gui.grayscale import grayscale_pixmap
+from origenerator.gui.inflight import FOLDER_CELLS
 from origenerator.gui.thumbnail_box import centered_in_square, fitted_in
 
 _GAP = HAIRLINE
-FOLDER_CELLS = 4
 
 
 def block_width(cell: int) -> int:

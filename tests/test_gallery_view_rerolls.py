@@ -297,6 +297,19 @@ def test_the_tile_opens_the_folders_prompt_in_a_tab_rather_than_launching(qtbot,
     client.submit_job.assert_not_called()
 
 
+def test_opening_the_folders_prompt_lets_go_of_a_selected_run(qtbot, tmp_path):
+    view = GalleryView(_folder_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _running_reroll(view)
+    _generating_tile(view).selected.emit()
+
+    _request_tile(view).clicked.emit()
+
+    assert (view._selected_reroll_key, _generating_tile(view)._selected) == (None, False), (
+        "the tab the folder's prompt opens in is about the folder, not about a run in flight")
+
+
 def test_a_request_runs_every_image_again_with_its_own_seed(qtbot, tmp_path):
     view = GalleryView(_folder_db(tmp_path, seeds=(7, 8, 9)), client=_reroll_client())
     qtbot.addWidget(view)

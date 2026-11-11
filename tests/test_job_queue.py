@@ -2291,6 +2291,35 @@ def test_the_video_of_a_chained_run_shares_its_images_origin(qtbot, tmp_path):
         "the image and the video made on it are two prompts, and one run to whoever asked for it")
 
 
+def test_a_chained_runs_video_stage_that_cannot_be_built_lets_the_next_job_start(
+        qtbot, tmp_path, monkeypatch):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    now = [1000.0]
+    queue = JobQueue(db, client, clock=lambda: now[0])
+    image = _image_row()
+    db.restore_generation(image)
+    queue.start_reroll("k", gallery.SettingsGroup("k", "settings", [_video_row()]), [image])
+    frame = queue.newest_job_for("k")
+    waiting = _launch_video(queue, "next")
+    building = job_queue_module.GenerationJob
+
+    def refusing_the_video_stage(client, spec):
+        if spec.workflow is _I2V:
+            raise ValueError("the video stage cannot be put together")
+        return building(client, spec)
+
+    monkeypatch.setattr(job_queue_module, "GenerationJob", refusing_the_video_stage)
+    now[0] += 2 * VIDEOS_WAIT_AFTER_AN_IMAGE_S
+
+    frame.finished.emit([{"filename": "frame_002.png", "subfolder": "", "type": "output"}],
+                        None, 1.0)
+
+    assert client.submit_job.call_args_list[-1].args[1] == waiting.prompt_id, (
+        "a video stage that failed to build launches nothing, so the line is pumped after it "
+        "or the machine sits idle with work waiting")
+
+
 def test_a_progress_write_that_fails_leaves_the_run_going(qtbot, tmp_path, monkeypatch):
     client = _client()
     db = Database(tmp_path / "test.db")

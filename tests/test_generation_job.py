@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from PIL import Image
@@ -10,6 +11,7 @@ from PIL import Image
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.generation_state import GenerationStatus
+from origenerator.gui import generation_job as generation_job_module
 from origenerator.gui.generation_job import (
     GenerationJob,
     JobFolders,
@@ -452,17 +454,24 @@ def test_reconnect_resumes_the_elapsed_count_from_the_real_start(qtbot, tmp_path
     assert job.started_at == began
 
 
-def test_a_run_comfyui_starts_before_its_send_returns_keeps_its_real_start(qtbot, tmp_path):
+def test_a_run_comfyui_starts_before_its_send_returns_keeps_its_real_start(
+        qtbot, tmp_path, monkeypatch):
     client = _client()
     job = GenerationJob(client, JobSpec(SDXL, _params_with_the_two_sampler_enhance_tail(), prompt_id="comfy-A"), JobFolders(places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs"))
-    heard_at = []
-    client.submit_job.side_effect = lambda payload, prompt_id: (
-        heard_at.append(time.time()), client.progress.emit(prompt_id, "5", 1, 50))
+    now = [100.0]
+    monkeypatch.setattr(generation_job_module, "time", SimpleNamespace(time=lambda: now[0]))
+
+    def send_that_returns_later(payload, prompt_id):
+        client.progress.emit(prompt_id, "5", 1, 50)
+        now[0] += 5
+
+    client.submit_job.side_effect = send_that_returns_later
 
     job.start()
 
-    assert job.started_at is not None
-    assert job.started_at <= heard_at[0] + 1
+    assert job.started_at == 100.0, (
+        "the run's clock counts from ComfyUI's first word about it, which can come before the "
+        "send has returned")
 
 
 def test_reconnect_without_a_start_time_stamps_one_at_the_first_tick(qtbot, tmp_path):

@@ -227,6 +227,32 @@ def test_ctrl_alt_q_in_a_slideshow_takes_the_slideshow_down_with_the_app(
     assert not slideshow.shown.isVisible()
 
 
+def test_closing_it_takes_down_the_action_setter_tool_it_opened(qtbot, tmp_path, monkeypatch):
+    _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.Yes)
+    win = _window(qtbot, tmp_path)
+    win.show()
+    setter_tool = QWidget()
+    qtbot.addWidget(setter_tool)
+    setter_tool.show()
+
+    _close_from_the_title_bar(win)
+
+    assert not setter_tool.isVisible()
+
+
+def test_saying_no_keeps_the_action_setter_tool_open(qtbot, tmp_path, monkeypatch):
+    _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.No)
+    win = _window(qtbot, tmp_path)
+    win.show()
+    setter_tool = QWidget()
+    qtbot.addWidget(setter_tool)
+    setter_tool.show()
+
+    _close_from_the_title_bar(win)
+
+    assert setter_tool.isVisible()
+
+
 def test_saying_no_hands_comfyui_nothing(qtbot, tmp_path, monkeypatch):
     _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.No)
     win = _window(qtbot, tmp_path)

@@ -1954,9 +1954,6 @@ class GalleryView(QWidget):
     def fill_the_region(self, shape: str) -> None:
         self._slideshows.fill_the_region(shape)
 
-    def close_the_slideshow(self, shape: str) -> None:
-        self._slideshows.close_the_slideshow(shape)
-
     def queue_request(self, row, workflow, params, spoken, revision) -> tuple[str, str]:
         name = row.get("workflow_name") or ""
         revised = {**params, **dict(revision.settings),

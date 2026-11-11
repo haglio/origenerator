@@ -18,7 +18,6 @@ from origenerator import gallery
 from origenerator.config import FRAMES_BEING_MADE_DIR, OUTPUT_PLACES
 from origenerator.fun_time_bridge import (
     ask_for_omnipause,
-    ask_for_the_funestra,
     tell_of_a_lock,
 )
 from origenerator.fun_time_mode import majority_shape, region_for_items
@@ -440,7 +439,6 @@ class SlideshowDirector:
             self._asked_for[where] = partial(
                 self.open, items, rows=rows, location=location, shape=where,
                 carrying=replace(carrying, versions=None), **kwargs)
-            ask_for_the_funestra(self._session_channel, where)
             return None
         if follows_a_run:
             items, kwargs["start"] = carrying.folder_items or [], None
@@ -840,14 +838,6 @@ class SlideshowDirector:
                 slideshow.close()
         finally:
             self._giving_them_back = False
-
-    def close_the_slideshow(self, shape: str) -> None:
-        self._regions_wanted.discard(shape)
-        self._asked_for.pop(shape, None)
-        slideshow = self.region_slideshow(shape)
-        if slideshow is not None:
-            slideshow.close()
-        self._make_ready_what_opens_next(shape)
 
     def _pick_where_it_played(self, prompt_id: str):
         self._slideshow = None

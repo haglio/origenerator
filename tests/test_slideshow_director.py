@@ -1633,17 +1633,6 @@ def test_a_side_handed_over_alone_opens_on_that_side_alone(slideshows):
     assert director.region_slideshow(LANDSCAPE) is None
 
 
-def test_a_side_let_go_alone_stays_empty_and_leaves_the_other_playing(slideshows):
-    gallery_pane = FakeGalleryPane(collections={ALL_PORTRAIT: [_row("g4")], ALL_LANDSCAPE: [_row("g5")]})
-    director, _host, _made = slideshows(gallery_pane=gallery_pane, fun_time=FakeSession())
-    open_both_shapes(director)
-    landscape = director.region_slideshow(LANDSCAPE)
-
-    director.close_the_slideshow(PORTRAIT)
-    director.fill_the_wanted_regions()
-
-    assert director.region_slideshow(PORTRAIT) is None
-    assert director.region_slideshow(LANDSCAPE) is landscape
 
 
 def _asking_session(tmp_path):
@@ -1660,22 +1649,10 @@ def test_a_slideshow_for_a_side_the_session_still_plays_waits_for_the_session_to
     director.open([("a.png", "image", "g1", None)], shape=PORTRAIT)
 
     assert made == []
-    assert (tmp_path / "dashboard_cmd.txt").read_text(encoding="utf-8").split() == [
-        "portrait_origenerator_activate"]
     director.fill_the_region(PORTRAIT)
     assert [item[2] for item in made[0].items] == ["g1"]
 
 
-def test_a_side_let_go_before_it_was_handed_over_forgets_the_slideshow_asked_for_it(
-        slideshows, tmp_path):
-    gallery_pane = FakeGalleryPane(collections={ALL_PORTRAIT: [_row("g4")]})
-    director, _host, made = slideshows(gallery_pane=gallery_pane, fun_time=_asking_session(tmp_path))
-    director.open([("a.png", "image", "g1", None)], shape=PORTRAIT)
-
-    director.close_the_slideshow(PORTRAIT)
-    director.fill_the_region(PORTRAIT)
-
-    assert [item[2] for item in made[0].items] == ["g4"]
 
 
 def test_a_slideshow_handed_to_a_sessions_funestra_opens_with_what_is_in_flight(slideshows):
@@ -3164,17 +3141,6 @@ def test_the_library_moving_leaves_no_opening_from_before_it(slideshows, qtbot):
     assert [item[2] for item in made[-1].items] == ["g4", "g5"]
 
 
-def test_a_side_let_go_gets_its_next_opening_ready(slideshows, monkeypatch):
-    gallery_pane = FakeGalleryPane(collections={ALL_PORTRAIT: [_row("g4")]})
-    director, _host, _made = slideshows(gallery_pane=gallery_pane,
-                                        fun_time=FakeSession(funestras={PORTRAIT: object()}))
-    director.fill_the_region(PORTRAIT)
-    asked = []
-    monkeypatch.setattr(director._openings, "make_ready", asked.append)
-
-    director.close_the_slideshow(PORTRAIT)
-
-    assert asked == [PORTRAIT]
 
 
 def test_nothing_is_made_ready_for_a_side_with_a_slideshow_up_or_no_funestra(

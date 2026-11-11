@@ -14,7 +14,6 @@ from PyQt6.QtCore import QCoreApplication, QObject, QTimer, pyqtSignal
 
 from origenerator.config import RADIO_DIR
 from origenerator.fun_time_mode import (
-    CLOSE_SLIDESHOW,
     CLOSE_SLIDESHOWS,
     CORE_READY,
     FILTER_ENHANCED,
@@ -46,10 +45,6 @@ ORIGENERATOR_MODE = "origenerator_activate"
 
 def ask_for_omnipause(dashboard_cmd_file) -> None:
     append_command(dashboard_cmd_file, "omnipause_toggle")
-
-
-def ask_for_the_funestra(dashboard_cmd_file, shape: str) -> None:
-    append_command(dashboard_cmd_file, spelled_for(shape, ORIGENERATOR_MODE))
 
 
 def ask_for_origenerator_mode(dashboard_cmd_file) -> None:
@@ -104,7 +99,6 @@ class FunTimeBridge(QObject):
         }
         self._shape_verbs = {
             OPEN_SLIDESHOW: self._gallery.fill_the_region,
-            CLOSE_SLIDESHOW: self._close_the_slideshow,
         }
         self._request_shape: str | None = None
         self._released = False
@@ -204,10 +198,6 @@ class FunTimeBridge(QObject):
         self._request_shape = shape if taking_a_request else None
         self._tell_the_room(spelled_for(shape, REQUEST_OPEN if taking_a_request
                                         else REQUEST_CLOSED))
-
-    def _close_the_slideshow(self, shape: str) -> None:
-        self._drop_the_request_said_to(shape)
-        self._gallery.close_the_slideshow(shape)
 
     def _close_the_slideshows(self) -> None:
         self._drop_the_request_said_to(self._request_shape)

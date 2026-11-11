@@ -781,7 +781,8 @@ def test_taskbar_identity_override_skips_the_pinned_shortcut_stamp():
         _init_windows_taskbar_identity("FunTime.App", None)
 
     mock_set_id.assert_called_once_with("FunTime.App")
-    mock_stamp.assert_not_called()
+    assert mock_stamp.call_args_list == [], (
+        "the pinned shortcut belongs to the standalone launch and must keep activating that one")
 
 
 def test_a_taskbar_identity_windows_refuses_still_stamps_the_pin():
@@ -1579,8 +1580,10 @@ class TestACopyThatWouldStartALibraryOfItsOwn:
         }):
             code = main([])
 
+        assert opened.call_args_list == [], (
+            "a database opened from here would be one of its own, beside the library's shared "
+            "thumbnails and Trash")
         assert code != 0
-        opened.assert_not_called()
 
     def test_it_says_where_it_runs_from_and_how_a_branch_is_started(self, qapp, monkeypatch):
         monkeypatch.setattr(config, "STARTS_A_LIBRARY_OF_ITS_OWN", True)

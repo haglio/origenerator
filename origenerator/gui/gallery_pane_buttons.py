@@ -31,6 +31,7 @@ def _lit(color: str) -> str:
 _LIT = _lit(as_hex(BLUE))
 _LIT_WHILE_THE_ROOM_IS_PAUSED = _lit(as_hex(YELLOW))
 
+GROUP_TIP = "Group the selected folders into a collection of your own"
 POPULATE_ELSEWHERE_TIP = (
     "Populate is running in another folder<br>"
     f"{link('populate', 'Go to it')} · click the switch to stop it"
@@ -136,8 +137,7 @@ class GalleryPaneButtons(QWidget):
         self.favorite = _tool_button(icons.star_icon(filled=True), "Favorite", handlers.favorite)
         self.enhance = _tool_button(icons.enhance_icon(), "Enhance", handlers.enhance)
         self.group = _tool_button(
-            icons.custom_collection_icon(),
-            "Group the selected folders into a collection of your own", handlers.group)
+            icons.custom_collection_icon(), GROUP_TIP, handlers.group)
         self.group.hide()
         self.delete = _tool_button(icons.delete_icon(), "Delete", handlers.delete)
         self.radio = None

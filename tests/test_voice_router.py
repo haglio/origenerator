@@ -12,6 +12,7 @@ from origenerator.animate_command import AnimateRequest
 from origenerator.gallery.collection import LATEST_KEY
 from origenerator.gallery.voice_commands import said_in
 from origenerator.gui import voice_router as module
+from origenerator.gui.gallery_pane_buttons import GROUP_TIP
 from origenerator.gui.message import ERROR, INFO, WARNING
 from origenerator.gui.starting_rows import StartingRows
 from origenerator.gui.voice_router import VoiceRouter, VoiceSources, VoiceSwitches
@@ -599,9 +600,7 @@ def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(router):
 def test_a_bank_word_whose_button_is_dead_says_why(router):
     voice, _host, slideshows = router(
         buttons={"actions": {AppCommand.GROUP: (
-            FakeButton(tip="Group the selected folders into a collection of your own",
-                       enabled=False),
-            lambda: None)}})
+            FakeButton(tip=GROUP_TIP, enabled=False), lambda: None)}})
 
     voice.on_command(AppCommand.GROUP)
 

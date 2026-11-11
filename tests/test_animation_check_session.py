@@ -191,10 +191,10 @@ def test_assigning_saves_the_prompts_the_user_typed_with_nothing_else_to_go_on()
         "it: assign should still save those prompts, that's not nothing")
 
 
-def test_an_animation_he_has_assigned_opens_on_what_he_assigned():
+def test_an_animation_the_user_has_assigned_opens_on_what_was_assigned():
     store = _Store()
-    store.accepted[_ORDER[0]] = ("wan22_i2v", {"positive_prompt": "what he typed"})
+    store.accepted[_ORDER[0]] = ("wan22_i2v", {"positive_prompt": "what the user typed"})
     session = AnimationCheckSession(_ORDER, {_ORDER[0]: [_video("kept")]}, store)
 
     assert session.starting_point == {
-        "workflow": "wan22_i2v", "params": {"positive_prompt": "what he typed"}}
+        "workflow": "wan22_i2v", "params": {"positive_prompt": "what the user typed"}}

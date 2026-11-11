@@ -7,8 +7,8 @@ from PyQt6.QtCore import Qt
 
 from origenerator.gui import queue_thumbs
 from origenerator.gui.combination import Combination
+from origenerator.gui.inflight import FOLDER_CELLS
 from origenerator.gui.queue_thumbs import (
-    FOLDER_CELLS,
     QueueThumbs,
     block_width,
     fitted_cell,

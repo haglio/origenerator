@@ -9,6 +9,8 @@ from origenerator.gallery import JobKind
 from origenerator.gui.generation_job import JobState
 from origenerator.timing import RunTiming, clock_duration, elapsed_since, queue_estimate_label
 
+FOLDER_CELLS = 4
+
 
 @dataclass
 class InFlightItem:

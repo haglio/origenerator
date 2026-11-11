@@ -54,6 +54,7 @@ from origenerator.gui.inflight import (
     CANCEL_TEXT,
     CLEAR_TEXT,
     EMPTY_QUEUE_TEXT,
+    FOLDER_CELLS,
     MOVE_DOWN_TIP,
     MOVE_UP_TIP,
     SHIELD_ALL_TEXT,
@@ -75,7 +76,6 @@ from origenerator.gui.inflight import (
     shield_every_job,
     starting_row_text,
 )
-from origenerator.gui.queue_thumbs import FOLDER_CELLS
 from origenerator.workflows.derived_size import resolve_input_image_path
 
 UP = "queue_up"

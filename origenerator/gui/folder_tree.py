@@ -82,12 +82,34 @@ def _holds(folder, row) -> bool:
     return False
 
 
+_DIGIT_WIDE_SPACE = " "
+
+
 class _CountBeforeName(QStyledItemDelegate):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self._widest_among_siblings: dict = {}
+
+    def forget_the_widest_counts(self, *_changed) -> None:
+        self._widest_among_siblings.clear()
+
     def initStyleOption(self, option, index):
         super().initStyleOption(option, index)
         count = index.data(COUNT_ROLE)
         if count:
-            option.text = f"({count}) {option.text}"
+            digits = str(count)
+            padding = _DIGIT_WIDE_SPACE * (self._widest_count(index) - len(digits))
+            option.text = f"{padding}({digits}) {option.text}"
+
+    def _widest_count(self, index) -> int:
+        parent = index.parent()
+        place = (parent.row(), parent.column(), parent.internalId()) if parent.isValid() else None
+        if place not in self._widest_among_siblings:
+            model = index.model()
+            self._widest_among_siblings[place] = max(
+                len(str(model.index(row, 0, parent).data(COUNT_ROLE) or ""))
+                for row in range(model.rowCount(parent)))
+        return self._widest_among_siblings[place]
 
 
 class FolderTree(QTreeWidget):
@@ -109,7 +131,12 @@ class FolderTree(QTreeWidget):
         self._hover_key = None
         self._delete_on_picked_rows = True
         self._pressed_on_frozen = False
-        self.setItemDelegate(_CountBeforeName(self))
+        counts = _CountBeforeName(self)
+        self.setItemDelegate(counts)
+        for changed in (self.model().dataChanged, self.model().rowsInserted,
+                        self.model().rowsRemoved, self.model().layoutChanged,
+                        self.model().modelReset):
+            changed.connect(counts.forget_the_widest_counts)
         self.setIconSize(QSize(_ICON, _ICON))
         # Qt's default 20px indentation leaves a six-level tree in the narrowest column too little room for the label
         self.setIndentation(_ICON)

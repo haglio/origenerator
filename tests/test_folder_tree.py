@@ -232,6 +232,30 @@ def test_a_row_leads_with_how_many_items_it_holds(qtbot):
     assert _shown(leaf) == "(3) A folder"
 
 
+def test_a_smaller_count_is_padded_to_its_siblings_widest_so_counts_and_names_line_up(qtbot):
+    _tree, leaf = _tree_with_an_indented_leaf(qtbot)
+    sibling = _folder_row("Another folder", "m/w/mo/other")
+    leaf.parent().addChild(sibling)
+    leaf.setData(0, COUNT_ROLE, 3)
+    sibling.setData(0, COUNT_ROLE, 120)
+
+    assert (_shown(leaf), _shown(sibling)) == ("  (3) A folder", "(120) Another folder"), \
+        "a figure space is as wide as a digit, so the padded counts end, and the names start, at one place"
+
+
+def test_the_padding_follows_a_siblings_count_as_it_changes(qtbot):
+    _tree, leaf = _tree_with_an_indented_leaf(qtbot)
+    sibling = _folder_row("Another folder", "m/w/mo/other")
+    leaf.parent().addChild(sibling)
+    leaf.setData(0, COUNT_ROLE, 3)
+    sibling.setData(0, COUNT_ROLE, 120)
+    _shown(leaf)
+
+    sibling.setData(0, COUNT_ROLE, 9)
+
+    assert _shown(leaf) == "(3) A folder"
+
+
 def test_a_row_holding_nothing_shows_its_name_alone(qtbot):
     _tree, leaf = _tree_with_an_indented_leaf(qtbot)
     leaf.setData(0, COUNT_ROLE, 0)

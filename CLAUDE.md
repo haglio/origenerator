@@ -138,7 +138,7 @@ for one thing cost four. So:
   Funestra draws over what it plays, a slideshow's included; the **Job
   Queue** is the list of jobs in flight or waiting, in Core and at the foot
   of a slideshow's HUD; **Core** is this app's main window, which a Fun Time
-  session shows in the place of its Random Favs Browser (the **RFB**), one
+  session shows in the place of its Random Faves Browser (the **RFB**), one
   of the two hidden while the other shows; and
   **Standalone** is this app run on its own, outside a Fun Time session.
   The code says the same four: `hud` (`gui/slideshow_hud.py`, `Hud`), the

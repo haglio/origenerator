@@ -203,7 +203,7 @@ def test_a_headset_gallery_keeps_the_standalone_panes_side_by_side(qtbot):
     qtbot.addWidget(view)
 
     assert view._arrangement.stack is None, (
-        "the headset got the upright fold, which is the Random Favs Browser's rect asking for it")
+        "the headset got the upright fold, which is the Random Faves Browser's rect asking for it")
     assert view._arrangement.panes.widget(0) is view._arrangement.left_column
     assert view._arrangement.folder_panes.count() == 2
 
@@ -1232,7 +1232,7 @@ def test_a_portrait_image_stands_beside_the_form_when_hosted(qtbot):
     tab._reflow_for_the_media()
 
     assert tab._media_split.orientation() == Qt.Orientation.Horizontal, (
-        "stacked in the Random Favs Browser's upright region, a portrait preview pushes every prompt "
+        "stacked in the Random Faves Browser's upright region, a portrait preview pushes every prompt "
         "field off the foot")
     assert tab._media_split.indexOf(tab._settings_pane) == 0, (
         "settings left, image right: the order they are read in")

@@ -65,6 +65,10 @@ def _group_by_creation(newest_first, key):
     return [(k, rows[::-1]) for k, rows in reversed(oldest_first.items())]
 
 
+def in_alphabetical_order(folders: list) -> list:
+    return sorted(folders, key=lambda folder: (folder.label.startswith("("), folder.label.casefold()))
+
+
 def settings_folder_key(row: dict, image_index: dict | None = None) -> str:
     media_type = media_type_of_row(row)
     workflow_name = row.get("workflow_name") or "unknown"
@@ -364,23 +368,23 @@ def _folder_at(tier: _Tier, level: _Level, key, rows: list[dict]):
 
 
 def _build_model_groups(tier: _Tier, rows: list[dict]) -> list[ModelGroup]:
-    return _grouped_folders(tier, rows, _Level(
+    return in_alphabetical_order(_grouped_folders(tier, rows, _Level(
         cls=ModelGroup,
         signature=lambda r: model_signature(tier.workflow_name, r.get("params_json")),
         key_for=lambda sig: model_key(tier.media_type, tier.workflow_name, sig),
         label_for=lambda params: model_label(tier.workflow_name, params),
         children_for=lambda sub: _build_lora_groups(tier, sub),
-    ))
+    )))
 
 
 def _build_lora_groups(tier: _Tier, rows: list[dict]) -> list[LoraGroup]:
-    return _grouped_folders(tier, rows, _Level(
+    return in_alphabetical_order(_grouped_folders(tier, rows, _Level(
         cls=LoraGroup,
         signature=lambda r: _lora_place(tier.workflow_name, r.get("params_json")),
         key_for=lambda sig: lora_key(tier.media_type, tier.workflow_name, sig),
         label_for=lambda params: lora_label(tier.workflow_name, params),
         children_for=lambda sub: _build_leaves(tier, sub),
-    ))
+    )))
 
 
 def _build_leaves(tier: _Tier, rows: list[dict]) -> list:
@@ -471,7 +475,7 @@ def _media_folder(media_type, rows, folder_meta, image_index, name_of, kept) -> 
         tier = _Tier(media_type, wf_name, folder_meta, image_index, name_of, kept)
         workflows.append(tier.kept_folder(wf_key, wf_rows, _workflow_folder,
                                           tier, wf_key, wf_label, wf_rows, wf_favorite))
-    workflows.sort(key=lambda workflow: workflow.label.casefold())
+    workflows = in_alphabetical_order(workflows)
     return kept.kept(str(media_type), workflows, MediaGroup, str(media_type), label, workflows,
                      favorite)
 

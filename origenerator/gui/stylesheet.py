@@ -80,6 +80,7 @@ def _drawn_arrow_rules(arrows=arrow_paths) -> str:
 
 
 def build_stylesheet() -> str:
+    # Qt lets the later of two rules of equal weight win.
     return f"""
 {family_stylesheet()}
     QLabel {{

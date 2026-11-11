@@ -9,6 +9,7 @@ from origenerator.gui.link_listener import LinkListener
 
 
 def _click(channel: str, generation: str) -> threading.Thread:
+    # A write to a Windows named pipe waits until the other end reads it.
     handler = threading.Thread(
         target=app_link.hand_over, args=(generation,), kwargs={"channel": channel})
     handler.start()

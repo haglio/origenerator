@@ -34,7 +34,8 @@ def test_the_published_document_is_what_this_module_says():
 
     assert published.read_text(encoding="utf-8") == contract.published_text(), (
         "the agreement is a file because neither app may import the other: a host builds its "
-        "command line from this document alone")
+        "command line from this document alone; run origenerator.fun_time_mode when this fails: "
+        "it writes the document")
 
 
 def test_the_parser_accepts_exactly_the_flags_the_document_names():

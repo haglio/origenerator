@@ -33,7 +33,9 @@ def _top_level_boxes(data: bytes):
 def write_mp4_with_a_comment_tag(path: Path, comment: str) -> Path:
     data = bytearray(write_mp4(path).read_bytes())
     moov_at, moov_size, last_kind = list(_top_level_boxes(bytes(data)))[-1]
-    assert last_kind == b"moov", f"cv2 wrote {last_kind!r} last, not moov"
+    assert last_kind == b"moov", (
+        f"cv2 wrote {last_kind!r} last, not moov: the tag is appended to the last box, which "
+        "moves no offset the frames depend on only when that box is moov")
     text = comment.encode("utf-8")
     user_data = _box(b"udta", _box(b"\xa9cmt", struct.pack(">HH", len(text), 0) + text))
     struct.pack_into(">I", data, moov_at, moov_size + len(user_data))

@@ -685,6 +685,7 @@ class SlideshowDirector:
         )
         view.set_audio_muted(True)
         rect = self._fun_time.region_rect(shape)
+        # Windows: in a process it does not scale, a window's logical rect is its device rect.
         view.setGeometry(rect.x, rect.y, rect.width, rect.height)
         view.show()
         # Win32: in a scaled process the screens' logical rects overlap, so only device pixels reach a

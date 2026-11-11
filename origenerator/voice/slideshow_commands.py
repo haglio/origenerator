@@ -26,6 +26,7 @@ _MAX_COMMAND_WORDS = 6
 
 
 def _names_the_slideshow(words: list) -> bool:
+    # Whisper writes the word as two, "slide show", about as often as one.
     return "slideshow" in words or any(
         first == "slide" and second == "show"
         for first, second in pairwise(words)

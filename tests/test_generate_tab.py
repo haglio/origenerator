@@ -1819,12 +1819,15 @@ def test_an_unenhanced_image_still_shows_its_original_and_the_add_tile(saved_pan
     assert tab._versions._host.findChildren(_AddRow)
 
 
+_WELL_BEFORE_ITS_UPSCALE = (1_000_000, 1_000_000)
+
+
 def _evolver_upscaled_video(db, monkeypatch, tmp_path, prompt_id="vid1"):
     output = tmp_path / "out"
     video = output / "video" / f"{prompt_id}.mp4"
     video.parent.mkdir(parents=True)
     video.write_bytes(b"video")
-    os.utime(video, (1_000_000, 1_000_000))
+    os.utime(video, _WELL_BEFORE_ITS_UPSCALE)
     library = tmp_path / "upscaled_by_orientation"
     upscale = library / "portrait" / EVOLVER_SOURCE / f"{prompt_id}_topaz.mp4"
     upscale.parent.mkdir(parents=True)

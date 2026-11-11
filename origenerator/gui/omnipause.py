@@ -29,6 +29,7 @@ def freeze(on: bool) -> None:
         try:
             _tell(thing, on)
         except RuntimeError:
+            # PyQt raises RuntimeError on a wrapper whose C++ object is gone.
             _held.discard(thing)
 
 

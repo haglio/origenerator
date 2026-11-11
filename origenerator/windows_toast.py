@@ -180,6 +180,7 @@ def _as(interface, iid: str):
 
 
 def _release(interface) -> None:
+    # Windows runtime objects are reference-counted: one never released stays alive for the life of the process.
     _call(interface, _RELEASE, restype=ctypes.c_uint32)
 
 

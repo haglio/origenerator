@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QPoint, Qt
-from PyQt6.QtGui import QColor, QImage, QMouseEvent
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import QEvent, QPoint, Qt
+from PyQt6.QtGui import QColor, QHelpEvent, QImage, QMouseEvent
+from PyQt6.QtWidgets import QApplication, QToolTip
 from shared_ui.spacing import GAP_DIALOG
 
 from origenerator.generation_state import GenerationSource
@@ -533,6 +533,23 @@ def test_hovering_batch_modified_into_shows_this_image_before_the_one_made_of_it
 
     tip = _tip_of(related._batch_modified, "img2")
     assert tip.index(before["thumbnail_path"]) < tip.index(after["thumbnail_path"]) < tip.index("cap")
+
+
+def test_resting_the_mouse_on_a_batch_modified_thumbnail_opens_its_tooltip(make_related, tmp_path):
+    before = _with_thumbnail(_image_row(), tmp_path)
+    after = _with_thumbnail(_image_row("img2", "sdxl_t2i_img2.png"), tmp_path)
+    related = make_related(rows=[before, after], requests=[_batch_modified("img2", "img1")])
+    related.show()
+    related.show_row(after, [])
+    thumbnail = next(tile for tile in related._batch_modified.findChildren(SourceTile)
+                     if tile.prompt_id == "img1")._thumb
+    place = thumbnail.rect().center()
+
+    QApplication.sendPostedEvents()
+    QApplication.sendEvent(thumbnail, QHelpEvent(QEvent.Type.ToolTip, place,
+                                                 thumbnail.mapToGlobal(place)))
+
+    assert "cap" in QToolTip.text()
 
 
 def test_every_kind_of_link_sits_in_the_one_section_headed_links(make_related):

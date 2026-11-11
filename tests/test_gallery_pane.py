@@ -434,6 +434,18 @@ def test_latest_redraws_its_tiles_when_the_line_changes_order(qtbot):
         "or taking any away")
 
 
+def test_a_pane_with_no_live_tiles_off_latest_asks_the_database_nothing(qtbot):
+    pane, _scroll = _pane(qtbot, [_waiting("j1", 1)])
+    pane.show_folder_tiles([])
+    asked = []
+    pane._db.list_generations = lambda: asked.append("rows") or []
+    pane._db.list_requests = lambda: asked.append("requests") or []
+
+    pane.refresh_inflight()
+
+    assert asked == [], "a pane holding no live tiles has nothing to bring up to date"
+
+
 def test_latest_puts_work_started_long_after_the_newest_item_in_a_now_section(qtbot):
     finished = [_row("g1", 1, _ago(hours=5))]
     pane, scroll = _pane(qtbot, [_running("j1", 2), *finished])

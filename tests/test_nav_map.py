@@ -292,6 +292,19 @@ def test_an_enhanced_version_belongs_to_its_run_like_any_other_item():
     assert _ids(one_per_stretch(newest_first, image_index={})) == ["g4"]
 
 
+def test_the_stretches_are_read_by_when_each_item_was_made_not_where_it_is_listed():
+    enhanced_later = {**_image("g1", "a red fox", seed=1), "id": 1}
+    enhanced_later["params_json"] = json.dumps(
+        {**json.loads(enhanced_later["params_json"]), "enhance": True})
+    latest = [enhanced_later, {**_image("g4", "a blue car", seed=4), "id": 4},
+              {**_image("g3", "a red fox", seed=3), "id": 3},
+              {**_image("g2", "a red fox", seed=2), "id": 2}]
+
+    assert _ids(one_per_stretch(latest, image_index={})) == ["g4", "g3"], (
+        "Latest moves an image to where its enhancement falls, which would break a sitting's "
+        "run into pieces, so a stretch is read off when its items were made")
+
+
 
 def test_the_column_opens_on_the_same_seed_under_other_configurations():
     current = _image("g1", "a red fox in snow", seed=7)

@@ -809,6 +809,20 @@ def test_a_landed_image_ends_the_wait_it_was_standing_on(tabs, monkeypatch):
     tab._viewport.show_media.assert_called_once_with("cat.png", "image", cat["prompt_id"])
 
 
+def test_a_resting_tab_following_a_run_stays_blank_for_the_next_click(tabs, monkeypatch):
+    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
+    cat, dog = _two_generations(tabs)
+    resting = tabs.currentWidget()
+    resting.watch_folder("k", None)
+
+    resting.show_finished_media(cat)
+    tabs.load_selection(dog, [cat, dog])
+
+    assert (tabs.generate_tabs(), resting.displayed_row()) == ([resting], dog), (
+        "a tab only following a run shows what landed without taking it on, so the blank "
+        "resting tab stays blank and the next click fills it rather than opening a tab beside it")
+
+
 def test_a_finished_result_keeps_a_prompt_typed_while_it_ran(tabs):
     row = _complete_gen(tabs._db, "g1", _sdxl_full(positive_prompt="a cat", seed=1),
                         "sdxl_g1.png")

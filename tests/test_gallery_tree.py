@@ -93,6 +93,28 @@ def test_no_section_of_the_toc_is_the_main_one(qtbot):
     assert shares == {1}, no_main_one
 
 
+def test_a_right_click_says_the_row_the_screen_position_and_the_section_it_landed_in(qtbot):
+    pane, _tree = _gallery_tree(qtbot, [_image("i1", "scene one")])
+    pane.resize(300, 900)
+    with qtbot.waitExposed(pane):
+        pane.show()
+    asked = []
+    pane.context_menu_requested.connect(lambda *request: asked.append(request))
+    landscape, portrait = pane._trees[LANDSCAPE], pane._trees[PORTRAIT]
+    row = landscape.topLevelItem(0)
+    on_the_row = landscape.visualItemRect(row).center()
+    empty_space = portrait.viewport().rect().center()
+
+    landscape.customContextMenuRequested.emit(on_the_row)
+    portrait.customContextMenuRequested.emit(empty_space)
+
+    assert asked == [
+        (row, landscape.viewport().mapToGlobal(on_the_row), LANDSCAPE),
+        (None, portrait.viewport().mapToGlobal(empty_space), PORTRAIT)], (
+        "the pane's coordinates are no one section's and empty space has no row to ask, so a "
+        "right-click carries the row, a screen position and the section it landed in")
+
+
 def _table_of_contents(qtbot, rows, collections_of_your_own=(), folder_meta=None):
     pane, _tree = _gallery_tree(qtbot, rows, collections_of_your_own, folder_meta)
     pane.resize(500, 1600)

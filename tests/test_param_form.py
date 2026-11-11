@@ -1380,9 +1380,7 @@ def test_hidden_params_get_no_field(qtbot):
     form = ParamForm(wf.param_definitions(), WorkflowTraits(hidden_keys=wf.enhance_keys()))
     qtbot.addWidget(form)
     shown = set(form._keys_in_order())
-    assert shown.isdisjoint(set(wf.enhance_keys())), (
-        "the enhance params stay off the form: everything laid out here decides which gallery "
-        "folder a run lands in, and an enhancement does not")
+    assert shown.isdisjoint(set(wf.enhance_keys()))
     assert "enhance" not in form._widgets
 
 

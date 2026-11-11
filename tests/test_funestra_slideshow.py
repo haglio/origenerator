@@ -106,6 +106,14 @@ def _the_whole_lock_on(prompt_id: str) -> list[tuple[str, str]]:
     return [("star", prompt_id), ("enhance", prompt_id), ("lock", prompt_id)]
 
 
+def _lists_handed_to_a_funestra(monkeypatch) -> list[int]:
+    written = []
+    write = FunestraChannel.write_playlist
+    monkeypatch.setattr(FunestraChannel, "write_playlist",
+                        lambda channel, items: written.append(len(items)) or write(channel, items))
+    return written
+
+
 def _slideshow_with_the_funestra_on(qtbot, tmp_path, **status) -> FunestraSlideshow:
     slideshow = _slideshow(qtbot, tmp_path)
     _says(slideshow, **status)
@@ -2316,14 +2324,6 @@ def test_an_image_goes_to_the_funestra_with_the_places_its_fixes_found(qtbot, tm
     handed = {str(item.path): item.points_of_interest
               for item in read_playlist(slideshow.channel.playlist)}
     assert handed == {"one.png": FACE, "two.png": (), "three.png": ()}
-
-
-def _lists_handed_to_a_funestra(monkeypatch) -> list[int]:
-    written = []
-    write = FunestraChannel.write_playlist
-    monkeypatch.setattr(FunestraChannel, "write_playlist",
-                        lambda channel, items: written.append(len(items)) or write(channel, items))
-    return written
 
 
 def test_a_slideshow_opened_with_its_versions_hands_the_funestra_its_list_once(

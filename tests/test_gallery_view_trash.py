@@ -530,6 +530,22 @@ def test_an_item_in_the_trash_is_left_alone_by_each_action_that_changes_an_item(
         "an item reads its row from the database, which has none for a deleted one")
 
 
+def test_an_item_in_the_trash_gets_none_of_an_ordinary_items_right_click_menu(
+        qtbot, monkeypatch):
+    view = GalleryView(_emptied_db())
+    _in_the_trash(view, qtbot)
+    opened = []
+    monkeypatch.setattr("origenerator.gui.gallery_view.QMenu.exec",
+                        lambda menu, *at: opened.append([act.text() for act in menu.actions()]))
+    assert view.row_for("d1") is not None
+
+    view.generation_menu(["d1"], QPoint())
+
+    assert opened == [], (
+        "a deleted item has no folder to go to, no star and no enhance, so the menu that offers "
+        "them reads its rows from the database, which has none for it")
+
+
 def _restore_button(view):
     return view._gallery_pane._thumb_widgets["d1"]._controls.buttons()[0]
 

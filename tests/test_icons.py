@@ -166,7 +166,9 @@ def test_a_corner_control_reports_its_state_hollow_or_filled(qtbot):
 
 def test_an_image_that_can_take_another_enhancement_shows_both_at_once(qtbot):
     more = _corner_image(icons.corner_enhance_icon(icons.ENHANCE_MORE, armed=False))
-    assert more.pixelColor(24, 24).alpha() < 32
+    assert more.pixelColor(24, 24).alpha() < 32, (
+        "the clear cuts only the icon's own pixmap, where the shadow is all that lies under the "
+        "plus, so the button's ground shows through the hollow")
     yellows = [
         (x, y)
         for y in range(48) for x in range(48)

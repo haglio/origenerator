@@ -5,7 +5,7 @@ import json
 from origenerator.animation_names import item_actions_named
 from origenerator.gallery import media_type_of_row
 from origenerator.gallery.source_image import image_actions_row, start_images_among
-from origenerator.item_actions import ItemActions, actions_of, combined_actions
+from origenerator.item_actions import ItemActions, actions_if_any, actions_of, combined_actions
 from origenerator.media import MediaType
 
 PUBLISHED = "combined_labels"
@@ -32,12 +32,44 @@ def publish(db) -> int:
     return len(changed)
 
 
-def set_actions(db, prompt_id: str, side: str, item_actions: ItemActions | None) -> None:
-    db.set_actions(prompt_id, side, item_actions)
+def combined_from(rows: list[dict], prompt_id: str) -> list[str]:
+    found, sources = [], {prompt_id}
+    while sources:
+        made = [row["prompt_id"] for row in rows
+                if row.get("source_video") in sources and row["prompt_id"] not in found]
+        found += made
+        sources = set(made)
+    return found
+
+
+Replaced = dict[str, ItemActions | None]
+
+
+def set_actions(db, prompt_id: str, side: str, item_actions: ItemActions | None) -> Replaced:
+    rows = db.list_generations()
+    given = [prompt_id, *(combined_from(rows, prompt_id) if side == MediaType.VIDEO else ())]
+    row_of = {row["prompt_id"]: row for row in rows}
+    replaced = {each: actions_if_any(row_of.get(each) or {}, side) for each in given}
+    for each in given:
+        db.set_actions(each, side, item_actions)
+    publish(db)
+    return replaced
+
+
+def put_back(db, side: str, replaced: Replaced) -> None:
+    for prompt_id, item_actions in replaced.items():
+        db.set_actions(prompt_id, side, item_actions)
     publish(db)
 
 
+def _source_videos_actions(db, prompt_id: str) -> ItemActions:
+    source = (db.get_generation(prompt_id) or {}).get("source_video")
+    return actions_of(db.get_generation(source) or {}, MediaType.VIDEO) if source else ItemActions()
+
+
 def give_the_launch_its_actions(db, prompt_id: str, name: str = "", checked=()) -> None:
-    item_actions = item_actions_named(name) if name else ItemActions((), tuple(checked))
+    item_actions = (item_actions_named(name) if name
+                    else ItemActions((), tuple(checked)) if checked
+                    else _source_videos_actions(db, prompt_id))
     if item_actions.actions or item_actions.checked:
         set_actions(db, prompt_id, MediaType.VIDEO, item_actions)

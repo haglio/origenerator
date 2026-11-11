@@ -7,16 +7,9 @@ from origenerator.gallery.enhance import enhance_file_stem
 from origenerator.generation_state import GenerationSource
 from origenerator.item_actions import ItemActions, stored
 from origenerator.media import MediaType
+from tests.action_store_fake import ActionStore
 
 _SET = ItemActions(("alpha", "beta"), ("first box",))
-
-
-class _Store:
-    def __init__(self):
-        self.item_actions = {}
-
-    def set_actions(self, prompt_id, side, item_actions):
-        self.item_actions[prompt_id] = (side, item_actions)
 
 
 def _items(*prompt_ids, before=None):
@@ -24,17 +17,17 @@ def _items(*prompt_ids, before=None):
 
 
 def test_a_press_saves_its_actions_on_the_item_on_screen_and_the_next_one_comes_up():
-    store = _Store()
+    store = ActionStore()
     session = SetterSession(_items("first", "second"), store, MediaType.IMAGE)
 
     session.set_as("two", _SET)
 
-    assert store.item_actions == {"first": (MediaType.IMAGE, _SET)}
+    assert (store.item_actions, store.sides) == ({"first": _SET}, [MediaType.IMAGE])
     assert (session.current["prompt_id"], session.remaining) == ("second", 1)
 
 
 def test_a_press_with_nothing_on_screen_does_nothing():
-    store = _Store()
+    store = ActionStore()
     session = SetterSession([], store, MediaType.VIDEO)
 
     session.set_as("two", _SET)
@@ -43,7 +36,7 @@ def test_a_press_with_nothing_on_screen_does_nothing():
 
 
 def test_skipping_sends_the_item_to_the_back_of_the_line_without_actions():
-    store = _Store()
+    store = ActionStore()
     session = SetterSession(_items("first", "second"), store, MediaType.IMAGE)
 
     session.skip()
@@ -52,30 +45,30 @@ def test_skipping_sends_the_item_to_the_back_of_the_line_without_actions():
     assert (session.current["prompt_id"], session.remaining) == ("second", 2)
 
 
-def test_undo_puts_back_the_actions_the_item_had_and_puts_it_on_screen_again():
-    store = _Store()
+def test_undo_puts_back_every_action_the_press_replaced_and_puts_the_item_on_screen_again():
     before = ItemActions(("gamma",))
-    session = SetterSession(_items("first", "second", before=before), store, MediaType.IMAGE)
+    store = ActionStore({"first": before})
+    session = SetterSession(_items("first", "second"), store, MediaType.IMAGE)
     session.set_as("two", _SET)
 
     session.undo()
 
-    assert store.item_actions == {"first": (MediaType.IMAGE, before)}
+    assert store.item_actions == {"first": before}
     assert (session.current["prompt_id"], session.remaining) == ("first", 2)
 
 
 def test_undo_takes_an_item_nobody_had_given_actions_back_to_none():
-    store = _Store()
+    store = ActionStore()
     session = SetterSession(_items("first"), store, MediaType.VIDEO)
     session.set_as("two", _SET)
 
     session.undo()
 
-    assert store.item_actions == {"first": (MediaType.VIDEO, None)}
+    assert (store.item_actions, store.sides) == ({"first": None}, [MediaType.VIDEO] * 2)
 
 
 def test_undo_with_nothing_pressed_yet_changes_nothing():
-    store = _Store()
+    store = ActionStore()
     session = SetterSession(_items("first"), store, MediaType.IMAGE)
 
     session.undo()
@@ -84,7 +77,7 @@ def test_undo_with_nothing_pressed_yet_changes_nothing():
 
 
 def test_the_session_says_what_the_last_press_was_and_whether_it_can_be_undone():
-    session = SetterSession(_items("first", "second"), _Store(), MediaType.IMAGE)
+    session = SetterSession(_items("first", "second"), ActionStore(), MediaType.IMAGE)
     before = (session.last, session.can_undo)
 
     session.set_as("two", _SET)
@@ -108,7 +101,7 @@ class _Bin:
 
 def test_trash_throws_the_item_on_screen_away_and_the_next_one_comes_up():
     rubbish = _Bin()
-    session = SetterSession(_items("first", "second"), _Store(), MediaType.IMAGE, rubbish)
+    session = SetterSession(_items("first", "second"), ActionStore(), MediaType.IMAGE, rubbish)
 
     session.trash()
 
@@ -119,7 +112,7 @@ def test_trash_throws_the_item_on_screen_away_and_the_next_one_comes_up():
 def test_trash_throws_away_the_item_shown_where_its_actions_live_on_another():
     rubbish = _Bin()
     session = SetterSession([{"prompt_id": "frame", "shown_id": "video", "actions": None}],
-                            _Store(), MediaType.IMAGE, rubbish)
+                            ActionStore(), MediaType.IMAGE, rubbish)
 
     session.trash()
 
@@ -128,7 +121,7 @@ def test_trash_throws_away_the_item_shown_where_its_actions_live_on_another():
 
 def test_undo_brings_a_trashed_item_back_and_puts_it_on_screen_again():
     rubbish = _Bin()
-    store = _Store()
+    store = ActionStore()
     session = SetterSession(_items("first", "second"), store, MediaType.IMAGE, rubbish)
     session.trash()
 
@@ -139,7 +132,7 @@ def test_undo_brings_a_trashed_item_back_and_puts_it_on_screen_again():
 
 
 def test_same_as_last_goes_by_the_last_press_past_an_item_trashed_since():
-    session = SetterSession(_items("first", "second", "third"), _Store(), MediaType.IMAGE,
+    session = SetterSession(_items("first", "second", "third"), ActionStore(), MediaType.IMAGE,
                             _Bin())
     session.set_as("two", _SET)
 
@@ -149,7 +142,7 @@ def test_same_as_last_goes_by_the_last_press_past_an_item_trashed_since():
 
 
 def test_with_no_trash_to_throw_into_nothing_is_thrown_away():
-    session = SetterSession(_items("first"), _Store(), MediaType.IMAGE)
+    session = SetterSession(_items("first"), ActionStore(), MediaType.IMAGE)
 
     session.trash()
 

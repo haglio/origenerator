@@ -5,7 +5,13 @@ import json
 from origenerator.db import Database, NewGeneration
 from origenerator.item_actions import ItemActions
 from origenerator.media import MediaType
-from origenerator.published_actions import PUBLISHED, published, set_actions
+from origenerator.published_actions import (
+    PUBLISHED,
+    give_the_launch_its_actions,
+    published,
+    put_back,
+    set_actions,
+)
 
 
 def _item(db, prompt_id, filename, params=None):
@@ -70,3 +76,52 @@ def test_a_box_checked_on_both_the_image_and_the_video_is_named_once():
     video = {"video_actions": json.dumps(["alpha"]), "video_checked": json.dumps(["box"])}
 
     assert published(video, image) == ("alpha", "box")
+
+
+def _combined_from(db, prompt_id, source, number):
+    _item(db, prompt_id, f"{prompt_id}_{number:05d}_.mp4")
+    db.set_settings_source(prompt_id, category="", video_prompt_id=source)
+
+
+def test_a_videos_actions_go_to_every_video_combined_from_it_and_on_down(tmp_path):
+    db = Database(tmp_path / "gallery.db")
+    _item(db, "source", "source_00001_.mp4")
+    _combined_from(db, "combined", "source", 2)
+    _combined_from(db, "combined again", "combined", 3)
+    _item(db, "other", "other_00004_.mp4")
+    set_actions(db, "combined", MediaType.VIDEO, ItemActions(("gamma",)))
+
+    set_actions(db, "source", MediaType.VIDEO, ItemActions(("alpha",), ("first box",)))
+
+    assert {prompt_id: db.get_generation(prompt_id)["video_actions"]
+            for prompt_id in ("source", "combined", "combined again", "other")} == {
+        "source": '["alpha"]', "combined": '["alpha"]', "combined again": '["alpha"]',
+        "other": None}
+
+
+def test_putting_back_what_a_videos_actions_replaced_gives_each_video_its_own_again(tmp_path):
+    db = Database(tmp_path / "gallery.db")
+    _item(db, "source", "source_00001_.mp4")
+    _combined_from(db, "combined", "source", 2)
+    set_actions(db, "combined", MediaType.VIDEO, ItemActions(("gamma",), ("third box",)))
+
+    put_back(db, MediaType.VIDEO,
+             set_actions(db, "source", MediaType.VIDEO, ItemActions(("alpha",))))
+
+    assert [(db.get_generation(prompt_id)["video_actions"],
+             db.get_generation(prompt_id)["video_checked"])
+            for prompt_id in ("source", "combined")] == [
+        (None, None), ('["gamma"]', '["third box"]')]
+    assert _published(db, "combined") == ["gamma", "third box"]
+
+
+def test_a_combine_started_from_a_video_with_no_action_picked_takes_the_videos_actions(tmp_path):
+    db = Database(tmp_path / "gallery.db")
+    _item(db, "source", "source_00001_.mp4")
+    set_actions(db, "source", MediaType.VIDEO, ItemActions(("alpha",), ("first box",)))
+    _combined_from(db, "combined", "source", 2)
+
+    give_the_launch_its_actions(db, "combined")
+
+    assert (db.get_generation("combined")["video_actions"],
+            db.get_generation("combined")["video_checked"]) == ('["alpha"]', '["first box"]')

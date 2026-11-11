@@ -173,6 +173,13 @@ def _paired(old: list[str], new: list[str]) -> list[tuple[str, str]]:
     return _with_a_rewording_kept_whole(pairs)
 
 
+def _the_parts_it_adds(changed: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    removed = [before for before, after in changed if not after]
+    added = [pair for pair in changed if not pair[0]]
+    rewrites = _each_new_part_with_the_old_one_it_rewrites(removed, [after for _before, after in added])
+    return [pair for place, pair in enumerate(added) if place not in rewrites]
+
+
 def _with_a_rewording_kept_whole(pairs: list[tuple[str, str]]) -> list[tuple[str, str]]:
     whole: list[tuple[str, str]] = []
     for before, after in pairs:
@@ -447,7 +454,9 @@ class _Applying:
         pairs = _paired(_parts(old), _parts(new))
         changed = [pair for pair in pairs if pair[0] != pair[1]]
         named = [pair for pair in changed if self._names_what_he_asked(" ".join(pair))]
-        asked_for = ([pair for pair in changed if pair in named or _only_the_form_changed(*pair)]
+        added = _the_parts_it_adds(changed)
+        asked_for = ([pair for pair in changed
+                      if pair in named or pair in added or _only_the_form_changed(*pair)]
                      if named else [pair for pair in changed if pair[1]])
         if len(changed) <= 1 or (not named and len(asked_for) == len(changed)):
             return new, []

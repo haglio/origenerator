@@ -45,7 +45,7 @@ def _client():
 
 
 def _spoken_params():
-    return dict(I2V.default_params(), frame_count=161, scene_frames=[161], scene_lines=["Come in."])
+    return dict(I2V.default_params(), frame_count=161, scene_frames=[161], scene_lines=["Come in."], enable_audio=True)
 
 
 def test_a_story_with_lines_is_spoken_before_it_is_submitted(qtbot, tmp_path):

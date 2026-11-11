@@ -145,9 +145,13 @@ class _Scene(QFrame):
 
     def speaking(self) -> bool:
         field = self.fields.get("scene_lines")
-        return field is not None and bool(diff_text.live_text(field).strip())
+        return (field is not None and not self._shut_down.get("scene_lines")
+                and bool(diff_text.live_text(field).strip()))
 
     def reflect_use(self) -> None:
+        if "scene_lines" in self.fields:
+            set_in_use(self.fields["scene_lines"], self.captions["scene_lines"],
+                       self._shut_down.get("scene_lines"), param_help("scene_lines"))
         speaking = self.speaking()
         for key in SPOKEN_OVER:
             set_in_use(self.fields[key], self.captions[key],

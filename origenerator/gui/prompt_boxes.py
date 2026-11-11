@@ -234,7 +234,7 @@ class PromptBoxes(QWidget):
         if self._in_use and len(self._boxes) > 1:
             tip = "\n\n".join(filter(None, [tip, MORE_THAN_ONE_BOX]))
         for box in self._boxes:
-            _mark_in_use(box, self._in_use, tip)
+            mark_in_use(box, self._in_use, tip)
 
     def _flows(self) -> bool:
         return self._reading is not None and self._reading.past_it == READ_IN_PIECES
@@ -393,14 +393,14 @@ def _put(box: QPlainTextEdit, text: str, share: str | None) -> None:
 def set_in_use(field: QPlainTextEdit | PromptBoxes, label: QLabel, unused_because: str | None,
                help_text: str) -> None:
     in_use, tip = not unused_because, unused_because or help_text
-    _mark_in_use(label, in_use, tip)
+    mark_in_use(label, in_use, tip)
     if isinstance(field, PromptBoxes):
         field.set_in_use(in_use, tip)
     else:
-        _mark_in_use(field, in_use, tip)
+        mark_in_use(field, in_use, tip)
 
 
-def _mark_in_use(widget: QWidget, in_use: bool, tip: str) -> None:
+def mark_in_use(widget: QWidget, in_use: bool, tip: str) -> None:
     if widget.property("inert") != (not in_use):
         widget.setProperty("inert", not in_use)
         # Qt reads a stylesheet's property selector again only on a repolish.

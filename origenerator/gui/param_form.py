@@ -53,7 +53,7 @@ from origenerator.gui.param_help import (
     with_training_date,
 )
 from origenerator.gui.preset_dropdown import PresetDropdown
-from origenerator.gui.prompt_boxes import PromptBoxes, set_in_use
+from origenerator.gui.prompt_boxes import PromptBoxes, mark_in_use, set_in_use
 from origenerator.gui.request_exchange import RequestExchange
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
@@ -78,7 +78,7 @@ def _speaks(values) -> bool:
 
 
 def _all_speak(values) -> bool:
-    lines = values.get("scene_lines") or []
+    lines = (values.get("scene_lines") or []) if _audio_on(values) else []
     return bool(lines) and all(str(line).strip() for line in lines)
 
 
@@ -95,6 +95,17 @@ EVERY_SCENE_SPEAKS_HELP = ("Every scene has a line, so the audio is her speaking
                            "prompt is not used. Clear Her Lines on a scene to use it.")
 
 
+AUDIO_OFF_HELP = "Enable Audio is off, so this is not used. Turn on Enable Audio to use it."
+
+
+def _audio_on(values) -> bool:
+    return bool(values.get("enable_audio", True))
+
+
+def _audio_prompt_help(values) -> str:
+    return AUDIO_OFF_HELP if not _audio_on(values) else EVERY_SCENE_SPEAKS_HELP
+
+
 def _strength_one_help(values) -> str:
     return STRENGTH_ONE_HELP if "cfg" in values else BOTH_STRENGTHS_ONE_HELP
 
@@ -106,11 +117,13 @@ _SHOWN_WHILE = {
     "unet_s2v": _speaks,
 }
 
-_AUDIO_IN_USE = (lambda values: not _all_speak(values), lambda values: EVERY_SCENE_SPEAKS_HELP)
+_AUDIO_PROMPT_IN_USE = (lambda values: _audio_on(values) and not _all_speak(values), _audio_prompt_help)
+_WITH_AUDIO_ON = (_audio_on, lambda values: AUDIO_OFF_HELP)
 _IN_USE_WHILE = {
     "negative_prompt": (_pushes_the_prompt, _strength_one_help),
-    "audio_prompt": _AUDIO_IN_USE,
-    "audio_negative_prompt": _AUDIO_IN_USE,
+    "audio_prompt": _AUDIO_PROMPT_IN_USE,
+    "audio_negative_prompt": _AUDIO_PROMPT_IN_USE,
+    **dict.fromkeys(("scene_lines", "audio_seed", "voice", "voice_sample", "voice_sample_text"), _WITH_AUDIO_ON),
 }
 
 _DIMENSION_MAX = 8192
@@ -335,6 +348,12 @@ class ParamForm(QWidget):
         help_text, label, widget = self._help(key), self._labels[key], self._widgets.get(key)
         if isinstance(widget, PromptBoxes):
             set_in_use(widget, label, self._shut_down.get(key), help_text)
+            return
+        if key in _IN_USE_WHILE and widget is not None:
+            unused_because = self._shut_down.get(key)
+            mark_in_use(label, not unused_because, unused_because or help_text)
+            widget.setEnabled(not unused_because)
+            widget.setToolTip(unused_because or help_text)
             return
         label.setToolTip(help_text or label.text())
         if widget is not None and help_text and not isinstance(widget, DropZone):

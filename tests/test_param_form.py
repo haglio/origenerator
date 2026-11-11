@@ -38,6 +38,7 @@ from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.param_fields import NO_TRAITS, FormHelpers, WorkflowTraits
 from origenerator.gui.param_form import (
+    AUDIO_OFF_HELP,
     BOTH_STRENGTHS_ONE_HELP,
     EVERY_SCENE_SPEAKS_HELP,
     STRENGTH_ONE_HELP,
@@ -2765,3 +2766,42 @@ def test_slack_collects_at_the_foot_of_the_form(qtbot):
     foot = max(section.geometry().bottom() for section in shown)
     assert foot < form.height() // 2, (
         "any slack collects at the foot of the form, never between its sections")
+
+
+def _audio_form(qtbot):
+    form = ParamForm([
+        *_scene_defs(), *_voice_defs(),
+        ParamDef("enable_audio", "Enable Audio", "bool", False, switch=True),
+        ParamDef("audio_prompt", "Positive Prompt", "str", "", multiline=True),
+        ParamDef("audio_negative_prompt", "Negative Prompt", "str", "", multiline=True),
+        ParamDef("audio_seed", "Audio Seed", "seed", 0),
+    ])
+    qtbot.addWidget(form)
+    form._widgets["scene_frames"].fields("scene_lines")[0].setPlainText("Come in.")
+    return form
+
+
+def test_with_audio_off_every_other_audio_setting_and_her_lines_are_grayed(qtbot):
+    form = _audio_form(qtbot)
+    lines = form._widgets["scene_frames"].fields("scene_lines")[0]
+
+    assert _shut_down_with(form, "audio_prompt", AUDIO_OFF_HELP)
+    assert _shut_down_with(form, "audio_negative_prompt", AUDIO_OFF_HELP)
+    for key in ("audio_seed", "voice"):
+        assert not form._widgets[key].isEnabled()
+        assert form._labels[key].property("inert") is True
+        assert form._widgets[key].toolTip() == AUDIO_OFF_HELP
+    assert (lines.isReadOnly(), lines.toolTip()) == (True, AUDIO_OFF_HELP)
+
+
+def test_turning_audio_on_brings_the_audio_settings_and_her_lines_back(qtbot):
+    form = _audio_form(qtbot)
+    lines = form._widgets["scene_frames"].fields("scene_lines")[0]
+
+    form._widgets["enable_audio"].setChecked(True)
+
+    assert _shut_down_with(form, "audio_prompt", EVERY_SCENE_SPEAKS_HELP), (
+        "her line is the whole audio now, so the audio prompt is shut down for that reason instead")
+    assert form._widgets["audio_seed"].isEnabled()
+    assert form._labels["voice"].property("inert") is False
+    assert not lines.isReadOnly()

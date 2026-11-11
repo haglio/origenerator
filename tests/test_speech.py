@@ -13,7 +13,7 @@ from tools import speech_worker
 
 
 def _params(**overrides):
-    return {"frame_count": 81, "scene_frames": [81], "scene_lines": [""],
+    return {"enable_audio": True, "frame_count": 81, "scene_frames": [81], "scene_lines": [""],
             "audio_seed": 7, "voice": "Vivian", "voice_sample": "", "voice_sample_text": "",
             **overrides}
 

@@ -447,7 +447,7 @@ def test_a_scene_that_speaks_hides_its_prompts_countdowns(qtbot):
     qtbot.addWidget(form)
     form.show_readings({"positive_prompt": word_reading(511, READ_WHOLE),
                         "negative_prompt": word_reading(511, READ_WHOLE)})
-    form.set_values({"positive_prompt": _words(500)})
+    form.set_values({"enable_audio": True, "positive_prompt": _words(500)})
 
     form._scenes.fields("scene_lines")[0].setPlainText("hello")
 

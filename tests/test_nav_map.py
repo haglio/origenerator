@@ -24,7 +24,7 @@ def _image(prompt_id, prompt, *, seed, **given):
         "seed": seed,
         "params_json": json.dumps({"positive_prompt": prompt, "seed": seed,
                                    "steps": steps, "checkpoint": checkpoint,
-                                   "lora": given.get("lora", "none")}),
+                                   **({"lora": given["lora"]} if "lora" in given else {})}),
         "output_files": json.dumps([{"filename": f"{prompt_id}.png"}]),
     }
 
@@ -244,7 +244,8 @@ def test_beyond_a_videos_row_lie_videos_of_its_action_from_the_images_most_like_
     beyond = beyond_the_row(current, [own, alike, unlike, current, far, near, another_action],
                             image_index=index)
 
-    assert _ids(beyond) == ["v3", "v2"]
+    assert _ids(beyond) == ["v3", "v2"], (
+        "the action is a bound, not a preference: another action is what the column is for")
 
 
 def test_no_more_than_six_lie_beyond_a_row_however_many_are_near():
@@ -252,7 +253,9 @@ def test_no_more_than_six_lie_beyond_a_row_however_many_are_near():
     alike = [_image(f"n{n}", "a red fox in snow at dawn", seed=n, steps=20 + n)
              for n in range(9)]
 
-    assert len(beyond_the_row(current, [current, *alike], image_index={})) == 6
+    assert len(beyond_the_row(current, [current, *alike], image_index={})) == 6, (
+        "six fills the HUD's seed row, and widening must never dump a whole model's worth of "
+        "images into a row meant to show close kin")
 
 
 def test_nothing_lies_beyond_a_row_when_the_model_holds_nothing_else():

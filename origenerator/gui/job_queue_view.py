@@ -93,6 +93,7 @@ class OpensAFolder:
     def mouseDoubleClickEvent(self, event):
         # Qt delivers the second press of a double-click as this event, not as a press.
         if event.button() == Qt.MouseButton.LeftButton:
+            self._press_at = None
             self._open_folder(event.position().toPoint())
 
     def _open_folder(self, position):

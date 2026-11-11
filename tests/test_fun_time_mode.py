@@ -107,6 +107,8 @@ def test_a_session_that_names_no_funestra_hands_over_none():
 
     assert args.fun_time.funestra("portrait") is None
     assert args.fun_time.funestra("landscape") is None
+
+
 def test_a_hosted_launch_naming_a_flag_this_app_does_not_know_is_refused_with_a_message(capsys):
     with pytest.raises(SystemExit):
         parse_app_args([*hosted_launch(), "--a-flag-the-host-renamed", "st/made_up.txt"])

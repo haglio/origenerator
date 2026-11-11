@@ -57,6 +57,3 @@ _.textVisible  # origenerator/gui/progress_bar.py:127, the QStyleOptionProgressB
 _.features  # origenerator/gui/thumbnail_dropdown.py:144, the QStyleOptionViewItem the item delegate paints from
 _.decorationSize
 _.showDecorationSelected
-
-# --- vulture: reachable from nothing yet ---
-_.to_logical_rect

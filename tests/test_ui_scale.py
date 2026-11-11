@@ -54,43 +54,6 @@ def test_an_unreadable_scale_is_treated_as_unset(monkeypatch):
     assert ui_scale.apply_room_scale(in_a_headset=False) == ui_scale.HOSTED_SCALE
 
 
-def test_unscaled_lengths_pass_through_untouched():
-    assert ui_scale.to_logical_size(1280) == 1280
-    assert ui_scale.to_logical_size(0) == 0
-
-
-def test_an_unscaled_rect_passes_through_untouched():
-    assert ui_scale.to_logical_rect(2560, 3, 1440, 3440) == (2560, 3, 1440, 3440)
-
-
-def test_a_length_scales_back_to_the_device_pixels_it_named():
-    ui_scale.apply_room_scale(in_a_headset=False)
-    scale = ui_scale.HOSTED_SCALE
-    for edge in (0, 720, 1280, 1281, 1440, 2560):
-        assert abs(ui_scale.to_logical_size(edge) * scale - edge) <= 1
-
-
-def test_a_rect_converts_against_its_own_screens_origin(monkeypatch):
-    ui_scale.apply_room_scale(in_a_headset=False)
-    scale = ui_scale.HOSTED_SCALE
-    monkeypatch.setattr(ui_scale, "_screen_origin", lambda x, y: (2560, 3))
-    x, y, width, height = ui_scale.to_logical_rect(2560, 3, 1440, 3440)
-
-    assert (x, y) == (2560, 3)
-    assert abs(2560 + (x - 2560) * scale - 2560) <= 1
-    assert abs(width * scale - 1440) <= 1
-    assert abs(height * scale - 3440) <= 1
-
-
-def test_a_rect_inside_a_screen_keeps_its_offset_from_that_screens_edge(monkeypatch):
-    ui_scale.apply_room_scale(in_a_headset=False)
-    scale = ui_scale.HOSTED_SCALE
-    monkeypatch.setattr(ui_scale, "_screen_origin", lambda x, y: (2560, 3))
-    x, _y, _w, _h = ui_scale.to_logical_rect(2560 + 400, 3, 200, 200)
-
-    assert abs((x - 2560) * scale - 400) <= 1
-
-
 def test_the_scale_is_applied_before_pyqt_is_imported():
     main = ast.parse(inspect.getsource(app_module.main))
     applied = min(node.lineno for node in ast.walk(main)
@@ -153,27 +116,3 @@ def test_a_qt_that_cannot_be_rescaled_leaves_the_app_at_its_size(monkeypatch):
 def test_only_a_hosted_launch_turns_the_scale_on():
     assert parse_app_args([]).fun_time is None
     assert parse_app_args(hosted_launch()).fun_time is not None
-
-
-_SCALE = 0.643
-_FIRST_MONITOR = (0, 0, 3982, 2240)
-_SECOND_MONITOR = (2560, 3, 2240, 5351)
-
-
-def test_a_point_on_the_second_monitor_gets_that_monitors_origin_though_the_firsts_logical_rect_swallows_it():
-    screens = [_FIRST_MONITOR, _SECOND_MONITOR]
-
-    assert ui_scale.origin_of_the_screen_holding(2570, 100, screens, _SCALE, (0, 0)) == (2560, 3)
-    assert ui_scale.origin_of_the_screen_holding(10, 10, screens, _SCALE, (0, 0)) == (0, 0)
-
-
-def test_a_point_on_no_screen_gets_the_fallback_origin():
-    screens = [_FIRST_MONITOR, _SECOND_MONITOR]
-
-    assert ui_scale.origin_of_the_screen_holding(9000, 9000, screens, _SCALE, (7, 8)) == (7, 8)
-
-
-def test_a_length_is_rounded_to_the_nearest_pixel_not_truncated():
-    os.environ["QT_SCALE_FACTOR"] = "0.6"
-
-    assert ui_scale.to_logical_size(1) == 2

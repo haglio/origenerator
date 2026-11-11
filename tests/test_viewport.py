@@ -542,6 +542,32 @@ def test_the_corners_follow_the_item_when_the_timeline_takes_its_room(qtbot, tmp
                for b in w._controls.buttons())
 
 
+def test_the_corners_move_to_the_item_once_a_videos_resolution_arrives(qtbot, tmp_path):
+    known = {}
+    player = MagicMock()
+    player.metaData.return_value.value.side_effect = known.get
+    w = Viewport(player=player, show_scrubber=True)
+    qtbot.addWidget(w)
+    w.resize(480, 320)
+    w.show()
+    w.layout().activate()
+    w.show_video(_scripted_video(tmp_path))
+    w.set_actions("gen-1")
+    w.layout().activate()
+    over_the_whole_pane = [b.geometry() for b in w._controls.buttons()]
+    the_resolution_arrived = player.metaDataChanged.connect.call_args.args[0]
+
+    known[QMediaMetaData.Key.Resolution] = QSize(480, 864)
+    the_resolution_arrived()
+
+    assert w.media_rect().width() < w.width()
+    assert [b.geometry() for b in w._controls.buttons()] != over_the_whole_pane, (
+        "until a video's resolution arrives the item can only be taken for the whole pane, so "
+        "the corners are placed again when it does")
+    assert all(w.media_rect().contains(b.geometry()) for b in w._controls.buttons()
+               if not b.isHidden())
+
+
 def test_a_video_without_a_funscript_still_gets_its_timeline(qtbot, tmp_path):
     w = _scrubber_preview(qtbot)
     w.show_video(tmp_path / "unscripted.mp4")

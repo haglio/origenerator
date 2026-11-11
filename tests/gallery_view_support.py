@@ -356,17 +356,20 @@ def _i2v_video(prompt_id, lora, prompt="dance", seed=1):
                 f"wan22_i2v_{prompt_id}.mp4")
 
 
-def _shape(tree, shape=LANDSCAPE):
+_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE = LANDSCAPE
+
+
+def _shape(tree, shape=_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE):
     return tree._trees[shape]
 
 
-def _top_level(tree, shape=LANDSCAPE):
+def _top_level(tree, shape=_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE):
     half = _shape(tree, shape)
     return {half.topLevelItem(i).text(0): half.topLevelItem(i)
             for i in range(half.topLevelItemCount())}
 
 
-def _alls(tree, shape=LANDSCAPE):
+def _alls(tree, shape=_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE):
     all_row = _top_level(tree, shape)["All"]
     return {all_row.child(i).text(0): all_row.child(i) for i in range(all_row.childCount())}
 
@@ -375,7 +378,7 @@ def _selected_folder(view):
     return base_of(view.selected_folder_key())
 
 
-def _collection(view, key, shape=LANDSCAPE):
+def _collection(view, key, shape=_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE):
     return view._tree_item_for(shaped_key(key, shape))
 
 
@@ -399,7 +402,7 @@ def _at(item, *path):
     return item
 
 
-def _workflow_rows(tree, media=None, shape=LANDSCAPE):
+def _workflow_rows(tree, media=None, shape=_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE):
     all_row = _top_level(tree, shape).get("All")
     if all_row is None:
         return {}
@@ -407,7 +410,7 @@ def _workflow_rows(tree, media=None, shape=LANDSCAPE):
     return {row.text(0): row for kind in kinds for row in _subs(kind)}
 
 
-def _image_workflow(tree, shape=LANDSCAPE):
+def _image_workflow(tree, shape=_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE):
     (row,) = _workflow_rows(tree, "image", shape).values()
     return row
 
@@ -622,7 +625,7 @@ def _tile_kinds_in_order(view):
     return [type(layout.itemAt(index).widget()) for index in range(layout.count())]
 
 
-def _select_first_leaf(view, shape=LANDSCAPE):
+def _select_first_leaf(view, shape=_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE):
     leaf = _at(_image_workflow(view._tree, shape), 0, 0, 0)
     view._tree.setCurrentItem(leaf)
     return leaf.data(0, _GROUP_ROLE).key
@@ -670,7 +673,7 @@ def _in_view(view, prompt_id) -> bool:
     return viewport.rect().contains(QRect(tile.mapTo(viewport, QPoint(0, 0)), tile.size()))
 
 
-def _running_reroll(view, shape=LANDSCAPE):
+def _running_reroll(view, shape=_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE):
     key = _select_first_leaf(view, shape)
     _new_tile(view).add_requested.emit()
     return key, view._live_jobs[key]
@@ -1062,7 +1065,7 @@ def _below_the_last_row(tree) -> QPoint:
     return below
 
 
-def _tree_menu(view, key=None, shape=LANDSCAPE):
+def _tree_menu(view, key=None, shape=_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE):
     _tall_on_screen(view)
     if key is None:
         tree = view._tree._trees[shape]

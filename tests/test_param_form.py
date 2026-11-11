@@ -867,6 +867,22 @@ def test_unlocking_swaps_the_plain_value_for_an_editable_field(qtbot):
         assert stack.currentWidget() is form._widgets[key]
 
 
+def test_unlocking_leaves_each_size_row_where_and_as_tall_as_it_was(qtbot):
+    form = _sized_form(qtbot)
+    form.setStyleSheet(build_stylesheet())
+    form._sections["Size"].set_collapsed(False)
+    form.resize(420, 380)
+    with qtbot.waitExposed(form):
+        form.show()
+    locked = {key: stack.geometry() for key, stack in form._dim_stacks.items()}
+
+    form._unlock_btn.setChecked(True)
+    QApplication.processEvents()
+
+    assert {key: stack.geometry() for key, stack in form._dim_stacks.items()} == locked, (
+        "the plain value and the field are two pages of one stack, so the swap happens in place")
+
+
 def test_unlock_toggle_carries_a_padlock_icon_that_flips(qtbot):
     form = _sized_form(qtbot)
     assert form._unlock_btn.isCheckable()

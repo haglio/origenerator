@@ -1526,17 +1526,31 @@ def test_a_new_generation_in_an_older_folder_leaves_the_folder_where_it_was():
         == [["dog"], ["cat2", "cat1"]]
 
 
-def test_each_kinds_workflow_folders_keep_the_order_each_was_made_in():
+def _made_with(workflow_name: str) -> dict:
+    return _row(prompt_id=workflow_name, workflow_name=workflow_name,
+                params_json=json.dumps({"positive_prompt": "a cat", "seed": 1}),
+                output_files=json.dumps([{"filename": f"{workflow_name}.png"}]))
+
+
+def test_each_kinds_workflow_folders_are_in_alphabetical_order():
     newest_first = [
-        _row(prompt_id="flux", workflow_name="flux_t2i_upscaled",
-             params_json=json.dumps({"positive_prompt": "a cat", "seed": 1}),
-             output_files=json.dumps([{"filename": "flux_t2i_upscaled_flux.png"}])),
-        _i2v("v1", "styleA"),
         _img("i1", "a cat", 50, 1),
+        _i2v("v1", "styleA"),
+        _made_with("krea2_t2i"),
+        _made_with("flux_t2i_upscaled"),
     ]
 
-    assert [[w.key for w in kind.children] for kind in build_gallery_tree(newest_first)] \
-        == [["image/flux_t2i_upscaled", "image/sdxl_t2i"], ["video/wan22_i2v"]]
+    assert [[w.label for w in kind.children] for kind in build_gallery_tree(newest_first)] \
+        == [["Flux T2I", "Krea 2 T2I", "SDXL T2I"], [workflow_label("wan22_i2v")]]
+
+
+def test_a_workflow_folder_given_a_name_is_placed_by_that_name():
+    newest_first = [_made_with("flux_t2i_upscaled"), _img("i1", "a cat", 50, 1)]
+    renamed = {"image/sdxl_t2i": {"custom_name": "alpha stills"}}
+
+    images = build_gallery_tree(newest_first, renamed)[0]
+
+    assert [w.label for w in images.children] == ["alpha stills", "Flux T2I"]
 
 
 def test_a_name_given_a_folder_finds_every_row_beneath_it_at_any_depth():

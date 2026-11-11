@@ -23,7 +23,7 @@ _LANE_SPELLING = {VIDEO: "Kino", GENAU: "Genau"}
 
 def lane_said_as(lane: str) -> str:
     return _LANE_SPELLING.get(lane, lane)
-_GENAU_AS_SAID = "go now"
+GENAU_SAID_WHEN_NOT_HEARD = "go now"
 
 
 @dataclass(frozen=True)
@@ -88,7 +88,7 @@ def match_animate_command(text: str, actions=None) -> AnimateRequest | None:
 def animate_command_phrases(actions=None) -> frozenset[str]:
     actions = spoken_actions() if actions is None else actions
     said = []
-    for lane in ("", _GENAU_AS_SAID):
+    for lane in ("", GENAU_SAID_WHEN_NOT_HEARD):
         opening = f"animate as {lane}".strip()
         said.append(opening)
         said.extend(f"{opening} {spoken}" for spoken in _heard_as(actions))

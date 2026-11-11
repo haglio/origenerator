@@ -587,6 +587,22 @@ def test_a_folder_draws_its_runs_back_of_the_line_first_and_the_one_in_front_las
     assert list(pane._inflight_tiles) == ["r3", "r2"]
 
 
+def test_a_folder_holding_runs_is_not_redrawn_as_latest_when_the_line_changes(qtbot):
+    finished = _row("g1", 1, _ago(minutes=5))
+    rows = [_running("r1", 2), _waiting("r2", 3), _waiting("r3", 4), finished]
+    tiles = LeadTiles(reroll=QLabel("new"), generating=QLabel("generating"))
+    jobs = _StubJobQueue(order=["r1", "r2", "r3"], leading="r1")
+    pane, scroll = _pane(qtbot, rows, jobs=jobs, host=_pane_host(lead_tiles=lambda group: tiles))
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+    drawn = _shown_in_order(scroll)
+    jobs.queue_order = ["r1", "r3", "r2"]
+
+    pane.refresh_inflight()
+
+    assert _shown_in_order(scroll) == drawn, (
+        "a folder is rebuilt by the database fingerprint, so it is never redrawn here as Latest")
+
+
 def test_work_running_in_a_folder_made_a_long_while_ago_goes_in_the_now_section(qtbot):
     running = _running("r1", 2, _ago(minutes=1))
     finished = _row("g1", 1, _ago(hours=5))

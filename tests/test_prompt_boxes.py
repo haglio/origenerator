@@ -362,6 +362,21 @@ def test_the_left_arrow_steps_over_a_word_struck_through_in_its_box(qtbot, typed
     assert typed_into.value() == " c"
 
 
+@pytest.mark.parametrize("measured_next", ["a b c", None])
+def test_the_caret_stays_where_he_is_typing_when_the_prompt_is_measured_against_something_else(
+        qtbot, typed_into, measured_next):
+    typed_into.set_value("a b c")
+    typed_into.track("a b")
+    _type(qtbot, typed_into, 0, 3, "")
+
+    if measured_next is None:
+        typed_into.untrack()
+    else:
+        typed_into.track(measured_next)
+
+    assert tracked_prompt.caret_in_prompt(typed_into.boxes()[0]) == 3
+
+
 def test_untracking_takes_every_boxs_marks_off(qtbot, typed_into):
     typed_into.set_value(f"a b c{BOX_BREAK}d")
     typed_into.track("a b c e")

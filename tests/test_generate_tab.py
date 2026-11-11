@@ -66,7 +66,7 @@ from origenerator.gallery.keys import folder_id, settings_key
 from origenerator.gallery.tree import settings_folder_key
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import corner_buttons, diff_text, icons
+from origenerator.gui import corner_buttons, diff_text, icons, tracked_prompt
 from origenerator.gui import generate_tab as generate_tab_module
 from origenerator.gui import modify_batch as modify_batch_module
 from origenerator.gui.action_row import SIDE_LABELS, action_checkbox, action_pills
@@ -2967,6 +2967,22 @@ def test_the_red_and_green_come_back_only_when_the_last_press_has_ended(saved_pa
 
     tab.forget_launched({"run 0"})
     assert "cat" in _struck_and_lit(field)[0]
+
+
+def test_a_run_ending_leaves_the_caret_where_he_is_typing(saved_panel, qtbot):
+    tab, db = saved_panel
+    _each_press_launches_a_run(tab)
+    image = _image_row(db, "img1", prompt="a cat on a couch")
+    tab.show_saved_generation(image, [image])
+    field = _positive_field(tab)
+    field.setPlainText("a dog on a couch")
+    tab._on_generate()
+    qtbot.keyClicks(field, " and")
+    typed_to = tracked_prompt.caret_in_prompt(field)
+
+    tab.forget_launched()
+
+    assert tracked_prompt.caret_in_prompt(field) == typed_to
 
 
 def test_a_run_the_tab_only_took_up_leaves_the_red_and_green(saved_panel, qtbot):

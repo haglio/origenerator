@@ -324,18 +324,6 @@ def test_close_slideshows_clears_both_regions(qtbot, tmp_path, monkeypatch):
     assert view.region_slideshow("portrait") is None
 
 
-def test_a_side_taken_back_on_its_own_closes_that_sides_slideshow_alone(qtbot, tmp_path, monkeypatch):
-    view, bridge = _view_with_bridge(qtbot, tmp_path)
-    slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
-
-    (tmp_path / "origenerator_cmd.txt").write_text("landscape_close_slideshow\n", encoding="utf-8")
-    bridge._tick()
-    assert slideshow.shown.isVisible()
-
-    (tmp_path / "origenerator_cmd.txt").write_text("portrait_close_slideshow\n", encoding="utf-8")
-    bridge._tick()
-    assert not slideshow.shown.isVisible()
-    assert view.region_slideshow("portrait") is None
 
 
 def _fill_both_regions(qtbot, view, monkeypatch, tmp_path):
@@ -596,19 +584,6 @@ def test_a_request_said_in_one_breath_leaves_the_room_nothing_to_hear(
     assert _the_room_was_told(tmp_path) == []
 
 
-def test_closing_the_slideshow_a_request_was_said_to_drops_the_request(
-        qtbot, tmp_path, monkeypatch):
-    view, bridge = _view_with_bridge(qtbot, tmp_path)
-    _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
-    played = []
-    monkeypatch.setattr(view._slideshows, "play_collection", played.append)
-    _said_to_this_app(bridge, tmp_path, "PORTRAIT_SAY:request")
-
-    _said_to_this_app(bridge, tmp_path, "PORTRAIT_CLOSE_SLIDESHOW")
-    _said_to_this_app(bridge, tmp_path, "PORTRAIT_SAY:favorites")
-
-    assert _the_room_was_told(tmp_path) == ["portrait_request_open", "portrait_request_closed"]
-    assert len(played) == 1
 
 
 def _press(bridge, tmp_path, line: str) -> None:

@@ -2969,6 +2969,38 @@ def test_the_red_and_green_come_back_only_when_the_last_press_has_ended(saved_pa
     assert "cat" in _struck_and_lit(field)[0]
 
 
+def test_clicking_generate_leaves_the_caret_where_he_is_typing(saved_panel, qtbot):
+    tab, _db = saved_panel
+    _each_press_launches_a_run(tab)
+    with qtbot.waitExposed(tab):
+        tab.show()
+    field = _positive_field(tab)
+    field.setPlainText("a dog on a couch")
+    field.setFocus()
+    tracked_prompt.put_caret_in_prompt(field, len("a dog"))
+
+    qtbot.mouseClick(tab._generate_btn, Qt.MouseButton.LeftButton)
+
+    assert field.hasFocus()
+    assert tracked_prompt.caret_in_prompt(field) == len("a dog")
+
+
+def test_clicking_generate_makes_the_tidied_prompt_and_leaves_the_box_as_typed(saved_panel, qtbot):
+    tab, _db = saved_panel
+    pressed = []
+    tab.generate_requested.connect(lambda _key, batch: pressed.extend(batch))
+    with qtbot.waitExposed(tab):
+        tab.show()
+    field = _positive_field(tab)
+    field.setFocus()
+    qtbot.keyClicks(field, "a dog  on a couch, ")
+
+    qtbot.mouseClick(tab._generate_btn, Qt.MouseButton.LeftButton)
+
+    assert [press["positive_prompt"] for press in pressed] == ["a dog on a couch"]
+    assert diff_text.live_text(field) == "a dog  on a couch, "
+
+
 def test_a_run_ending_leaves_the_caret_where_he_is_typing(saved_panel, qtbot):
     tab, db = saved_panel
     _each_press_launches_a_run(tab)

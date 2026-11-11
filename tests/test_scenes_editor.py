@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QTextCursor
 from PyQt6.QtWidgets import QApplication, QPushButton
 
 from origenerator.gui.prompt_marks import RESOLVE_IN_BOTH_PROMPTS, problem_to_resolve
@@ -19,6 +20,20 @@ def _editor(qtbot, scenes=3):
     for _ in range(scenes - 1):
         editor.add_scene()
     return editor
+
+
+def test_the_story_as_left_tidies_only_the_scene_being_typed_in(qtbot):
+    editor = _editor(qtbot, scenes=2)
+    editor.set_story("positive_prompt", "red  cat\n---\nblue dog")
+    with qtbot.waitExposed(editor):
+        editor.show()
+    typed_in = editor.fields("positive_prompt")[1]
+    typed_in.setFocus()
+    typed_in.moveCursor(QTextCursor.MoveOperation.End)
+    qtbot.keyClicks(typed_in, ",  ")
+
+    assert editor.story_as_left("positive_prompt") == "red  cat\n---\nblue dog"
+    assert typed_in.toPlainText() == "blue dog,  "
 
 
 def test_a_scene_is_refused_over_a_thing_in_both_of_its_own_prompts(qtbot):

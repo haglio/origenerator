@@ -89,6 +89,7 @@ class _Scene(QFrame):
         self.captions: dict[str, ElidingLabel] = {}
         self._countdowns: dict[str, Countdown] = {}
         self._readings: dict[str, PromptReading | None] = {}
+        self._leaving: dict[str, TidiesOnLeaving] = {}
         for key, caption in TEXT_CAPTIONS.items():
             if key == "scene_lines" and not lines:
                 continue
@@ -105,7 +106,8 @@ class _Scene(QFrame):
                 self._countdowns[key] = Countdown()
                 column.addWidget(self._countdowns[key])
                 field.textChanged.connect(lambda key=key: self._count_down(key))
-                TidiesOnLeaving(field, lambda changed, key=key: self._left_a_prompt(key, changed))
+                self._leaving[key] = TidiesOnLeaving(
+                    field, lambda changed, key=key: self._left_a_prompt(key, changed))
         if lines:
             self.fields["scene_lines"].setPlaceholderText(LINES_PLACEHOLDER)
             self.fields["scene_lines"].textChanged.connect(self.reflect_use)
@@ -133,10 +135,21 @@ class _Scene(QFrame):
     def _reading_of(self, key: str) -> PromptReading | None:
         return self._readings.get(key)
 
+    def text_as_left(self, key: str) -> str:
+        text = diff_text.live_text(self.fields[key])
+        leaving = self._leaving.get(key)
+        if leaving is None or not (self.fields[key].hasFocus()
+                                   and leaving.typed_in_since_entering()):
+            return text
+        return self._tidied(key, text)
+
+    def _tidied(self, key: str, text: str) -> str:
+        return tidied(text, reads_numbers=reads_numbers(self._reading_of(key)))
+
     def _left_a_prompt(self, key: str, changed: bool) -> None:
         field = self.fields[key]
         text = diff_text.live_text(field)
-        tidy = tidied(text, reads_numbers=reads_numbers(self._reading_of(key)))
+        tidy = self._tidied(key, text)
         if changed and tidy != text:
             field.setPlainText(tidy)
 
@@ -263,6 +276,10 @@ class ScenesEditor(QWidget):
 
     def story(self, key: str) -> str:
         return story_of([diff_text.live_text(field) for field in self.fields(key)])
+
+    def story_as_left(self, key: str) -> str:
+        return story_of([scene.text_as_left(key) for scene in self._scenes
+                         if key in scene.fields])
 
     def set_story(self, key: str, text: str) -> None:
         texts = scene_prompts(str(text))

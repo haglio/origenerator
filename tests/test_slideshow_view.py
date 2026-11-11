@@ -413,6 +413,16 @@ def test_esc_leaves_the_slideshow_up(qtbot):
     assert view.isVisible()
 
 
+def test_closing_the_funestra_closes_nothing_in_the_window(qtbot):
+    view = _view(qtbot)
+    view.show()
+
+    view._pane.close_engine()
+
+    assert view.isVisible(), (
+        "the window is the slideshow's own, so closing the Funestra closes nothing here")
+
+
 def test_shift_esc_leaves_the_slideshow_as_a_double_click_does_and_leaves_the_room_playing(qtbot):
     view = _view(qtbot)
     closes = []

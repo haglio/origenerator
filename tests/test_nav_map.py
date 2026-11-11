@@ -23,7 +23,8 @@ def _image(prompt_id, prompt, *, seed, **given):
         "image_actions": json.dumps([given["shows"]]) if given.get("shows") else None,
         "seed": seed,
         "params_json": json.dumps({"positive_prompt": prompt, "seed": seed,
-                                   "steps": steps, "checkpoint": checkpoint}),
+                                   "steps": steps, "checkpoint": checkpoint,
+                                   "lora": given.get("lora", "none")}),
         "output_files": json.dumps([{"filename": f"{prompt_id}.png"}]),
     }
 
@@ -72,6 +73,20 @@ def test_beyond_an_images_row_lie_the_nearest_other_configurations_of_its_model(
                             image_index={})
 
     assert _ids(beyond) == ["g4", "g3", "g5"]
+
+
+def test_beyond_an_images_row_its_own_lora_comes_before_a_likelier_prompt():
+    current = _image("g1", "a red fox sleeping in deep snow", seed=1, lora="look_a.safetensors")
+    likelier_prompt = _image("g2", "a red fox sleeping in snow", seed=2,
+                             lora="look_b.safetensors")
+    same_lora = _image("g3", "a blue car parked by the harbor", seed=3,
+                       lora="look_a.safetensors")
+
+    beyond = beyond_the_row(current, [current, likelier_prompt, same_lora], image_index={})
+
+    assert _ids(beyond) == ["g3", "g2"], (
+        "beyond an image lie the other configurations of its own model, the same LoRA first, "
+        "then the prompt that reads most like this one")
 
 
 

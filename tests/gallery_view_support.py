@@ -38,7 +38,6 @@ from origenerator.db import Database, NewGeneration
 from origenerator.gallery.collection import (
     TRASH_KEY,
 )
-from origenerator.gallery.shapes import LANDSCAPE
 from origenerator.gallery_edits import GalleryEdits
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.folder_tree import _action_rects
@@ -46,7 +45,7 @@ from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView, Shared
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.new_tile import NewTile
 from origenerator.item_actions import ItemActions
-from origenerator.item_shape import base_of, shaped_key
+from origenerator.item_shape import UNMEASURABLE_SHAPE, base_of, shaped_key
 from origenerator.media import MediaType
 from origenerator.motion_engine import Motion
 from origenerator.output_places import OutputPlaces
@@ -356,20 +355,17 @@ def _i2v_video(prompt_id, lora, prompt="dance", seed=1):
                 f"wan22_i2v_{prompt_id}.mp4")
 
 
-_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE = LANDSCAPE
-
-
-def _shape(tree, shape=_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE):
+def _shape(tree, shape=UNMEASURABLE_SHAPE):
     return tree._trees[shape]
 
 
-def _top_level(tree, shape=_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE):
+def _top_level(tree, shape=UNMEASURABLE_SHAPE):
     half = _shape(tree, shape)
     return {half.topLevelItem(i).text(0): half.topLevelItem(i)
             for i in range(half.topLevelItemCount())}
 
 
-def _alls(tree, shape=_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE):
+def _alls(tree, shape=UNMEASURABLE_SHAPE):
     all_row = _top_level(tree, shape)["All"]
     return {all_row.child(i).text(0): all_row.child(i) for i in range(all_row.childCount())}
 
@@ -378,7 +374,7 @@ def _selected_folder(view):
     return base_of(view.selected_folder_key())
 
 
-def _collection(view, key, shape=_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE):
+def _collection(view, key, shape=UNMEASURABLE_SHAPE):
     return view._tree_item_for(shaped_key(key, shape))
 
 
@@ -402,7 +398,7 @@ def _at(item, *path):
     return item
 
 
-def _workflow_rows(tree, media=None, shape=_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE):
+def _workflow_rows(tree, media=None, shape=UNMEASURABLE_SHAPE):
     all_row = _top_level(tree, shape).get("All")
     if all_row is None:
         return {}
@@ -410,7 +406,7 @@ def _workflow_rows(tree, media=None, shape=_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_F
     return {row.text(0): row for kind in kinds for row in _subs(kind)}
 
 
-def _image_workflow(tree, shape=_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE):
+def _image_workflow(tree, shape=UNMEASURABLE_SHAPE):
     (row,) = _workflow_rows(tree, "image", shape).values()
     return row
 
@@ -625,7 +621,7 @@ def _tile_kinds_in_order(view):
     return [type(layout.itemAt(index).widget()) for index in range(layout.count())]
 
 
-def _select_first_leaf(view, shape=_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE):
+def _select_first_leaf(view, shape=UNMEASURABLE_SHAPE):
     leaf = _at(_image_workflow(view._tree, shape), 0, 0, 0)
     view._tree.setCurrentItem(leaf)
     return leaf.data(0, _GROUP_ROLE).key
@@ -673,7 +669,7 @@ def _in_view(view, prompt_id) -> bool:
     return viewport.rect().contains(QRect(tile.mapTo(viewport, QPoint(0, 0)), tile.size()))
 
 
-def _running_reroll(view, shape=_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE):
+def _running_reroll(view, shape=UNMEASURABLE_SHAPE):
     key = _select_first_leaf(view, shape)
     _new_tile(view).add_requested.emit()
     return key, view._live_jobs[key]
@@ -1065,7 +1061,7 @@ def _below_the_last_row(tree) -> QPoint:
     return below
 
 
-def _tree_menu(view, key=None, shape=_WHERE_ROWS_WITH_NOTHING_TO_MEASURE_FILE):
+def _tree_menu(view, key=None, shape=UNMEASURABLE_SHAPE):
     _tall_on_screen(view)
     if key is None:
         tree = view._tree._trees[shape]

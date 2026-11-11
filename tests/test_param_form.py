@@ -876,7 +876,9 @@ def test_unlock_toggle_carries_a_padlock_icon_that_flips(qtbot):
 
     assert wears("lock")
     form._unlock_btn.setChecked(True)
-    assert wears("unlock")
+    assert wears("unlock"), (
+        "the glyphs themselves, not the constants that set them: read back through those, a "
+        "toggle wearing the same padlock in both states passes")
 
 
 def test_unlock_toggle_floats_free_and_never_shrinks_a_dimension_field(qtbot):
@@ -1516,8 +1518,10 @@ def test_the_presets_a_model_can_reach_are_all_left_alone(qtbot):
     form = ParamForm(_video_defs())
     qtbot.addWidget(form)
 
-    assert all(_preset_states(form._widgets["frame_count"]).values())
-    assert all(_preset_states(form._widgets["frame_rate"]).values())
+    assert all(_preset_states(form._widgets["frame_count"]).values()), (
+        "161 frames is 10.06 s, so every offered length is real here")
+    assert all(_preset_states(form._widgets["frame_rate"]).values()), (
+        "and every frame rate is, since none is past what the video writer accepts")
 
 
 def test_a_frame_count_is_shown_and_edited_as_seconds_at_the_models_own_rate(qtbot):

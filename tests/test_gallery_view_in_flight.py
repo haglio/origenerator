@@ -634,7 +634,9 @@ def test_selecting_a_reroll_before_any_frame_avoids_the_idle_placeholder(qtbot, 
 
     _generating_tile(view).selected.emit()
 
-    assert painted[-1] == "Waiting for preview…"
+    assert painted[-1] == "Waiting for preview…", (
+        "seeding the landing tab from the run's settings may pass through the placeholder; what "
+        "the pane ends on is the point")
     assert _viewport_of(view).show_message.call_args == (("Waiting for preview…",), {"live": True})
 
 

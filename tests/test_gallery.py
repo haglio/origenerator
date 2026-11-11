@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from origenerator import output_files
+from origenerator import display_names, output_files
 from origenerator.gallery import (
     ALL_KEY,
     CustomCollection,
@@ -68,9 +68,11 @@ from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
 from origenerator.gallery.signatures import canonical_settings
 from origenerator.gallery.tree import folder_chain
 from origenerator.generation_config import prepared_params
+from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.model_files import NO_LORA
+from origenerator.workflows.outside import VideoKind, outside_workflow
 
 
 def _workflows(tree, kind=None):
@@ -1144,6 +1146,23 @@ def test_a_retired_workflows_folder_keeps_the_name_it_had():
 
     assert _workflow_labels([retired]) == {
         "video/wan21_ati_i2v": "WAN 2.1 I2V (Motion-Tracked)"}
+
+
+def test_a_workflow_or_site_the_overlay_names_shows_the_overlays_name(monkeypatch):
+    monkeypatch.setattr(display_names, "load_content", lambda: {"display_names": {
+        "alpha_beta_i2v": "Alpha Beta (I2V)", "samplesite": "SampleSite"}})
+    site = outside_workflow("samplesite", MediaType.VIDEO, VideoKind.IMAGE_TO_VIDEO)
+    rows = [dict(_LOOP_VIDEO, prompt_id="paused", workflow_name="alpha_beta_i2v"),
+            dict(_LOOP_VIDEO, prompt_id="outside", workflow_name=site)]
+
+    assert _workflow_labels(rows) == {
+        "video/alpha_beta_i2v": "Alpha Beta (I2V)", f"video/{site}": "SampleSite I2V"}
+
+
+def test_items_no_workflow_is_known_for_are_under_unknown_workflow_in_parentheses():
+    unrecorded = dict(_LOOP_VIDEO, prompt_id="found", workflow_name="unknown")
+
+    assert _workflow_labels([unrecorded]) == {"video/unknown": "(unknown workflow)"}
 
 
 def test_a_workflow_that_made_both_kinds_has_a_folder_of_each_by_the_workflows_own_name():

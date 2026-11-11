@@ -4,6 +4,7 @@ from enum import StrEnum
 
 from app_support.gallery_records import PLACES
 
+from origenerator.display_names import shown_name
 from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
 
@@ -61,9 +62,14 @@ class OutsideWorkflow(WorkflowTemplate):
     def __init__(self, source: str, made: MediaType = MediaType.VIDEO,
                  kind: VideoKind | None = None):
         self.name = outside_workflow(source, made, kind)
-        self.display_name = f"{source} {kind}" if kind else source
+        self.source = source
         self.output_type = made
         self.kind = kind
+
+    @property
+    def display_name(self) -> str:
+        site = shown_name(self.source)
+        return f"{site} {self.kind}" if self.kind else site
 
     def default_params(self) -> dict:
         return {pd.key: pd.default for pd in self.param_definitions()}

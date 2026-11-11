@@ -685,6 +685,21 @@ def test_with_nothing_to_start_comfyui_a_story_it_never_heard_fails_like_any_ref
     assert db.get_generation(job.prompt_id)["status"] == "error"
 
 
+def test_a_story_speaking_its_lines_holds_the_line_until_it_is_sent(
+        qtbot, tmp_path, monkeypatch):
+    voices = voices_asked_for(monkeypatch)
+    client = _client()
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    _launch_story(queue, "k1", seed=1)
+    _launch_video(queue, "k2", seed=2)
+
+    assert client.submit_job.call_count == 0, (
+        "the machine is busy with the story's voice, which is that job's own work, so the line "
+        "takes the job as started and hands ComfyUI nothing else meanwhile")
+    voices[0].done()
+    assert client.submit_job.call_count == 1
+
+
 def test_a_storys_row_says_running_only_once_its_voice_is_done_and_comfyui_has_it(
         qtbot, tmp_path, monkeypatch):
     voices = voices_asked_for(monkeypatch)

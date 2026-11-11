@@ -1674,6 +1674,24 @@ def test_a_loop_button_for_a_row_of_one_image_locks_it_instead(qtbot, tmp_path):
     assert slideshow.locked is True
 
 
+def _seeds_and_no_other_action(prompt_id):
+    if prompt_id != "id-1":
+        return NavMapNeighbors()
+    return NavMapNeighbors(seeds=(Slide("one-b.png", "image", "id-1b"),), label="fox")
+
+
+def test_a_loop_asked_of_a_row_of_one_drops_the_loop_that_was_running(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path,
+                           actions=SlideshowActions(neighbors=_seeds_and_no_other_action))
+    slideshow.slideshow_loop("seed")
+
+    slideshow.slideshow_loop("action")
+
+    assert (slideshow.locked, slideshow.hud_map().loop) == (True, ""), (
+        "a row of one is the item itself, so the press locks it, and a lock is not a loop, so "
+        "the loop that was running is dropped")
+
+
 def test_the_loop_keys_first_press_locks_the_item_on_screen(qtbot, tmp_path):
     said = []
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=_around), say=_into(said))

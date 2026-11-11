@@ -465,6 +465,19 @@ class TestThePointerOnTheBlock:
         assert host.moved == [("j2", None)]
         assert pointer.drop is None
 
+    def test_a_row_let_go_where_it_already_was_asks_for_nothing(self):
+        pointer, host = _pointer_over([_item("j1", status="running", typical_seconds=30),
+                                       _item("j2", typical_seconds=30),
+                                       _item("j3", typical_seconds=30)])
+
+        pointer.press(*_middle_of(pointer, f"{OPEN}|j2"))
+        x, y, width, _height = pointer.where(f"{OPEN}|j3")
+        pointer.drag(x + width // 2, y + 2)
+        assert pointer.drop is not None
+        pointer.release(x + width // 2, y + 2)
+
+        assert host.moved == [], "a row let go where it already was asks for nothing"
+
     def test_a_row_let_go_above_the_job_being_made_asks_for_the_top(self):
         pointer, host = _pointer_over([_item("j1", status="running", movable=True,
                                              typical_seconds=30),

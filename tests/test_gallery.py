@@ -861,6 +861,34 @@ def test_a_workflows_keys_are_read_off_it_once(monkeypatch, keys_of):
         "cached because seed_keys walks param_definitions, which scans the model directories")
 
 
+def test_a_seed_a_workflow_declares_splits_no_folders(monkeypatch):
+    class Workflow:
+        loras_keyed_only_when_named = keyed_only_when_on = ()
+
+        def seed_keys(self):
+            return ["variation_seed"]
+
+        def enhance_keys(self):
+            return []
+
+        def default_params(self):
+            return {"steps": 30, "variation_seed": 0}
+
+    monkeypatch.setattr(signatures_module, "workflow_named", lambda name: Workflow())
+    signatures_module._workflow_instance_keys.cache_clear()
+    signatures_module._workflow_enhance_keys.cache_clear()
+    try:
+        first, second = (canonical_settings("a workflow", {"steps": 30, "variation_seed": seed})
+                         for seed in (1, 2))
+    finally:
+        signatures_module._workflow_instance_keys.cache_clear()
+        signatures_module._workflow_enhance_keys.cache_clear()
+
+    assert first == second, (
+        "a known workflow's seeds are read off its own declarations, so a workflow growing a "
+        "seed cannot start splitting folders by it")
+
+
 def test_a_start_frame_many_videos_share_is_looked_for_once(monkeypatch):
     looked_for = []
     find = source_image_module._image_named

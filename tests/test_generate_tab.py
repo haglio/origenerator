@@ -3812,6 +3812,18 @@ def test_showing_a_generation_ends_the_modify_batch(modify_batch_tab, tmp_path):
     assert modify_batch_tab._generate_btn.text() == "Generate"
 
 
+def test_a_tab_pointed_at_another_item_lets_go_of_the_runs_it_launched(tab):
+    tab.note_launched("a run of its own")
+    row = {"prompt_id": "p1", "workflow_name": "sdxl_t2i",
+           "params_json": json.dumps(_folder_params()), "output_files": "[]"}
+
+    tab.show_saved_generation(row, [])
+
+    assert tab.launched_runs() == [], (
+        "held on to, the tab's bar would sit mid-run over an unrelated item and its Cancel "
+        "would stop something off screen")
+
+
 def test_ending_the_modify_batch_leaves_the_prompts_their_undo(modify_batch_tab, qtbot):
     modify_batch_tab._end_modify_batch()
     field = _positive_field(modify_batch_tab)

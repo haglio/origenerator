@@ -16,13 +16,7 @@ from origenerator.config import (
 from origenerator.db_requests import Turn
 from origenerator.prompt_terms import without_nothing_weighted
 from origenerator.prompts import REQUEST_SYSTEM_PROMPT
-from origenerator.request_changes import (
-    SHORTEST_ROOT,
-    Prompts,
-    apply_changes,
-    forms_of,
-    words_of_his,
-)
+from origenerator.request_changes import Prompts, apply_changes, words_of_his
 from origenerator.workflows.base import scene_prompts, scene_text, story_of
 
 logger = logging.getLogger(__name__)
@@ -225,6 +219,7 @@ def _his_words(told: WhatIsKnown) -> frozenset:
     return words_of_his([positive for positive, _negative in told.examples] + [notes])
 
 
+_SHORTEST_ROOT = 3
 _NAMING_NOTHING = _FILLER | _ADD_WORDS | _REMOVE_WORDS | _TRAILING | _both_spellings({
     "she", "he", "him", "they", "in", "into", "at", "for", "from", "by", "to", "is", "are",
     "was", "isn't", "wasn't", "aren't", "did", "didn't", "does", "do", "doing", "get", "gets",
@@ -233,10 +228,28 @@ _NAMING_NOTHING = _FILLER | _ADD_WORDS | _REMOVE_WORDS | _TRAILING | _both_spell
 })
 
 
+def _roots(word: str) -> set[str]:
+    roots = {word}
+    for ending in ("s", "es", "ing", "ed"):
+        if word.endswith(ending) and len(word) - len(ending) >= _SHORTEST_ROOT:
+            root = word[:-len(ending)]
+            roots |= {root, root + "e"}
+    return roots
+
+
+def _forms(word: str) -> set[str]:
+    forms = set()
+    for root in _roots(word):
+        stem = root.removesuffix("e")
+        forms |= {root, root + "s", root + "es", root + "d", stem + "ing", stem + "ed",
+                  stem + stem[-1] + "ing", stem + stem[-1] + "ed"}
+    return forms
+
+
 def _asked_about(request: str) -> list[set[str]]:
     words = dict.fromkeys(word for word, *_ in _tokens(request))
-    return [forms_of(word) for word in words
-            if len(word) >= SHORTEST_ROOT and word not in _NAMING_NOTHING]
+    return [_forms(word) for word in words
+            if len(word) >= _SHORTEST_ROOT and word not in _NAMING_NOTHING]
 
 
 def _touches(asked: list[set[str]], prompt: str) -> int:

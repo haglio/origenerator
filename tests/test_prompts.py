@@ -169,16 +169,29 @@ def test_more_of_something_is_taught_as_his_stronger_words_and_its_opposite_with
     assert "an opposite does not fight it" in rule
 
 
-def test_words_he_gives_to_put_in_are_taught_as_used_exactly_with_none_added():
+def test_words_that_say_more_about_what_he_asked_for_are_wanted_and_words_that_settle_what_he_left_open_never():
     prompt = _request_prompt()
-    rule = prompt[prompt.index("When he gives the words to put in"):].split("\n")[0]
+    rule = prompt[prompt.index("Two kinds of words go beyond his"):].split("\n")[0]
 
-    assert "exactly those words" in rule
-    assert "adds none" in rule
-    assert "PROMPTS OF HIS" in rule
-    example = prompt[prompt.index('- "sitting instead of standing"'):].split("\n")[0]
-    assert '"replace": "standing", "with": "sitting"' in example
-    assert "never" in example
+    assert "say more about the thing he asked for" in rule
+    assert "generously, in both prompts" in rule
+    assert "settles something he left open" in rule
+    assert "never prone, supine or on his side" in rule
+    assert "exactly those words" not in prompt
+    sitting = prompt[prompt.index('- "sitting instead of standing"'):].split("\n")[0]
+    assert '"replace": "standing", "with": "sitting"' in sitting
+    assert "never" in sitting
+    hat = prompt[prompt.index('- "add a hat"'):].split("\n")[0]
+    assert '"add": "a wide straw hat, frayed brim"' in hat
+    assert '"prompt": "negative", "add": "bare head"' in hat
+
+
+def test_his_prompts_lend_the_details_of_the_thing_asked_for_never_a_pose_setting_or_camera():
+    prompt = _request_prompt()
+    rule = prompt[prompt.index("When PROMPTS OF HIS THAT TOUCH"):].split("\n")[0]
+
+    assert "(the pose, the setting, the camera" not in rule
+    assert "never a pose, setting, camera or person he did not ask for" in rule
 
 
 def test_one_person_of_several_taken_out_is_taught_as_the_count_coming_down_never_as_gone():

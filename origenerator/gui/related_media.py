@@ -14,6 +14,7 @@ from origenerator.gallery import (
     was_made_from,
     was_taken_from,
 )
+from origenerator.gui.change_tip import change_tip
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.source_tile import SourceTile
@@ -25,6 +26,12 @@ from origenerator.voice.dictation import words_of
 
 def _is_request(record: dict | None) -> bool:
     return bool(words_of(record))
+
+
+def _change_tip(record: dict, before: dict | None, after: dict | None) -> str:
+    return change_tip((before or {}).get("thumbnail_path"), (after or {}).get("thumbnail_path"),
+                      tuple(record.get(side) or "" for side in (
+                          "old_positive", "old_negative", "new_positive", "new_negative")))
 
 
 LINKS = "Links"
@@ -48,20 +55,23 @@ class _LinkRow(QWidget):
         self.hide()
 
     def show_links(self, links: list[tuple[str, dict]], name_of: Callable[[str], str],
-                   in_trash: frozenset[str] = frozenset()) -> None:
+                   in_trash: frozenset[str] = frozenset(),
+                   tips: dict[str, str] | None = None) -> None:
         while self._flow.count():
             placed = self._flow.takeAt(0).widget()
             placed.setParent(None)
             placed.deleteLater()
-        tiles = [(self._tile(heading, row, name_of), row["prompt_id"] in in_trash)
+        tiles = [(self._tile(heading, row, name_of, (tips or {}).get(row["prompt_id"], "")),
+                  row["prompt_id"] in in_trash)
                  for heading, row in links]
         place_tiles(tiles, self._flow.addWidget)
         for tile, _held in tiles:
             tile.show()
         self.setVisible(bool(links))
 
-    def _tile(self, heading: str, row: dict, name_of) -> SourceTile:
+    def _tile(self, heading: str, row: dict, name_of, tip: str) -> SourceTile:
         tile = SourceTile()
+        tile.setToolTip(tip)
         tile.activated.connect(self.activated)
         tile.show_source(row, name_of(row["prompt_id"]), heading=heading,
                          media_type=media_type_of_row(row), movie=self._movie_of(row),
@@ -190,15 +200,20 @@ class RelatedMedia(QWidget):
         made_into = [(record, made)
                      for record in (self._requests_about(prompt_id) if prompt_id else [])
                      if (made := self._item(record["prompt_id"])) is not None]
+        shown = self._item(prompt_id) if made_from is not None or made_into else None
         for links, is_request, from_heading, into_heading in (
                 (self._requests, True, "Requested from", "Requested into"),
                 (self._batch_modified, False, "Batch-modified from", "Batch-modified into")):
+            here = ([(from_heading, made_from, request, (made_from, shown))]
+                    if made_from is not None and _is_request(request) == is_request else [])
+            here += [(into_heading, made, record, (shown, made)) for record, made in made_into
+                     if _is_request(record) == is_request]
             links.show_links(
-                ([(from_heading, made_from)]
-                 if made_from is not None and _is_request(request) == is_request else [])
-                + [(into_heading, made) for record, made in made_into
-                   if _is_request(record) == is_request],
-                self._name_of, self._trashed())
+                [(heading, row) for heading, row, _record, _pair in here],
+                self._name_of, self._trashed(),
+                tips=None if is_request else {
+                    row["prompt_id"]: _change_tip(record, *pair)
+                    for _heading, row, record, pair in here})
         self._follow_the_rows()
 
     def _trashed(self) -> frozenset[str]:

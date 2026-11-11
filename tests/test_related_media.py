@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QPoint, Qt
-from PyQt6.QtGui import QMouseEvent
+from PyQt6.QtGui import QColor, QImage, QMouseEvent
 from PyQt6.QtWidgets import QApplication
 from shared_ui.spacing import GAP_DIALOG
 
@@ -489,6 +489,50 @@ def test_an_image_a_folders_modify_batch_made_points_at_the_one_it_was_batch_mod
     assert _links(section) == [("Batch-modified from", "img1")]
     assert no_sources(related)
     assert related._requests.isHidden()
+
+
+def _with_thumbnail(row, tmp_path):
+    image = QImage(40, 20, QImage.Format.Format_RGB32)
+    image.fill(QColor("gray"))
+    path = tmp_path / f"{row['prompt_id']}.png"
+    image.save(str(path))
+    return {**row, "thumbnail_path": str(path)}
+
+
+def _batch_modified(prompt_id, source_prompt_id):
+    return {**_request(prompt_id, source_prompt_id),
+            "old_positive": "a hat", "new_positive": "a cap",
+            "old_negative": "", "new_negative": ""}
+
+
+def _tip_of(section, prompt_id):
+    return next(tile.toolTip() for tile in section.findChildren(SourceTile)
+                if tile.prompt_id == prompt_id)
+
+
+def test_hovering_batch_modified_from_shows_the_image_before_then_this_one_then_the_change(
+        make_related, tmp_path):
+    before = _with_thumbnail(_image_row(), tmp_path)
+    after = _with_thumbnail(_image_row("img2", "sdxl_t2i_img2.png"), tmp_path)
+    related = make_related(rows=[before, after], requests=[_batch_modified("img2", "img1")])
+
+    related.show_row(after, [])
+
+    tip = _tip_of(related._batch_modified, "img1")
+    assert tip.index(before["thumbnail_path"]) < tip.index(after["thumbnail_path"]) < tip.index("cap")
+    assert "hat" in tip
+
+
+def test_hovering_batch_modified_into_shows_this_image_before_the_one_made_of_it(
+        make_related, tmp_path):
+    before = _with_thumbnail(_image_row(), tmp_path)
+    after = _with_thumbnail(_image_row("img2", "sdxl_t2i_img2.png"), tmp_path)
+    related = make_related(rows=[before, after], requests=[_batch_modified("img2", "img1")])
+
+    related.show_row(before, [])
+
+    tip = _tip_of(related._batch_modified, "img2")
+    assert tip.index(before["thumbnail_path"]) < tip.index(after["thumbnail_path"]) < tip.index("cap")
 
 
 def test_every_kind_of_link_sits_in_the_one_section_headed_links(make_related):

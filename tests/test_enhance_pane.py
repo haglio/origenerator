@@ -169,7 +169,9 @@ def test_the_switch_draws_at_both_states(qtbot):
     on = switch.grab().toImage()
     assert not off.isNull()
     assert not on.isNull()
-    assert off != on
+    assert off != on, (
+        "it paints itself, since a Qt stylesheet cannot move a tick's indicator, so the paint path "
+        "is worth exercising in both positions")
 
 
 def test_loading_a_folders_settings_writes_nothing_back(qtbot):
@@ -1239,7 +1241,8 @@ def test_delete_and_backspace_trash_the_picked_versions(qtbot):
 
         row = _rows(versions)[0]
         _click(qtbot, row)
-        assert row.focusPolicy() == Qt.FocusPolicy.ClickFocus
+        assert row.focusPolicy() == Qt.FocusPolicy.ClickFocus, (
+            "the key is sent to the row, not to the list: a click leaves the focus on the row it picked")
         qtbot.keyClick(row, key)
 
         assert asked == [[0]]

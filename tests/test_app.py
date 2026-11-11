@@ -1048,7 +1048,10 @@ def test_the_launch_dresses_the_application_in_the_stylesheet(qapp, library):
     try:
         _boot(library)
 
-        assert qapp.styleSheet() == build_stylesheet()
+        assert qapp.styleSheet() == build_stylesheet(), (
+            "read back off the application, because the same call sitting in a comment reads "
+            "identically to anything that only greps app.py for the line; and cleared first, so a "
+            "sheet an earlier launch left on cannot answer for this one")
     finally:
         qapp.setStyleSheet(prior)
 

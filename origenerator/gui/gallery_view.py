@@ -869,7 +869,9 @@ class GalleryView(QWidget):
         key = self.library.folder_key_for(workflow_name, batch[0])
         if key in self._live_jobs:
             return None
-        if not keeps_its_seed and self.would_reproduce_a_completed_run(wf, batch[0]):
+        if self.would_reproduce_a_completed_run(wf, batch[0]):
+            if keeps_its_seed:
+                return None
             batch[0] = randomize_seeds(batch[0], wf.seed_keys())
             if launching is not None:
                 launching.use_random_seed()

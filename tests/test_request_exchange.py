@@ -373,6 +373,15 @@ def test_a_turn_that_changed_something_and_made_nothing_offers_generate_under_it
     assert asked == [2]
 
 
+def test_a_turn_that_left_the_prompts_and_settings_as_they_were_offers_no_generate(qtbot):
+    exchange = _shown_at(qtbot, 400)
+
+    exchange.show_exchange([Turn("red", "It was already red.", "a red hat", "", "a red hat", ""),
+                            _changed("a cap")])
+
+    assert len(_placed(exchange, GenerateButton)) == 1
+
+
 def test_generate_sits_under_its_turns_answer_on_a_line_of_its_own(qtbot):
     exchange = _shown_at(qtbot, 400)
 

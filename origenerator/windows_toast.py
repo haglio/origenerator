@@ -98,6 +98,7 @@ def take_back(app_id: str, *, tag: str, group: str) -> None:
 def document_of(xml: str):
     document = _activate(_XML_DOCUMENT)
     reader = _as(document, _XML_DOCUMENT_IO)
+    # Windows shows nothing for a toast whose document it cannot parse, and says nothing about it.
     try:
         with _text(xml) as raw:
             _call(reader, _LOAD_XML, raw, types=(ctypes.c_void_p,))

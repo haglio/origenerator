@@ -2029,7 +2029,11 @@ def test_a_landed_generation_tells_an_open_tab_its_seed_is_now_a_duplicate(qtbot
     qtbot.waitUntil(lambda: tab._generate_btn.text() == "Generate with Random seed")
 
 
-def test_the_random_seed_survives_a_cancel_so_re_generate_is_another_variation(qtbot, tmp_path):
+def test_the_random_seed_survives_a_cancel_so_re_generate_is_another_variation(
+        qtbot, tmp_path, monkeypatch):
+    asked = []
+    for question in ("question", "information", "warning"):
+        monkeypatch.setattr(QMessageBox, question, staticmethod(lambda *a, **kw: asked.append(a)))
     db = _seeded_db(tmp_path, seed=42)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -2038,6 +2042,7 @@ def test_the_random_seed_survives_a_cancel_so_re_generate_is_another_variation(q
     tab.prefill("sdxl_t2i", dict(_SDXL.default_params(), seed=42, positive_prompt="a cat"))
 
     tab._on_generate()
+    assert asked == [], "a Generate over a duplicate takes a fresh seed, no question asked"
     first = next(iter(view._live_jobs.values())).params["seed"]
     key = next(iter(view._live_jobs))
     view._cancel_reroll(key)

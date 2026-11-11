@@ -38,7 +38,7 @@ def test_a_hosting_session_hears_the_word_that_opens_a_request():
 
 
 @pytest.mark.parametrize("phrase", [
-    "favorites", "experiments", "start slideshow", "fix hands", "enhance", "undo", "lock",
+    "favorites", "recents", "fix hands", "enhance", "undo", "lock",
     "enhanced only", "original only", "enhanced and original", "original and enhanced",
     "clear filter", "populate on",
 ])
@@ -58,3 +58,11 @@ def test_a_hosting_session_is_told_every_action_a_video_can_have_and_how_each_is
     assert _told()["labels_heard_as"] == {
         "alpha": ["alpha"], "beta": ["beta", "bait a"], "gamma": ["gamma"],
         "first box": ["first box"], "second box": ["second box"], "third box": ["third box", "bird box"]}
+
+
+@pytest.mark.parametrize("phrase", [
+    "experiments", "experiment", "show experiments", "experiments collection",
+    "play slideshow", "start slideshow", "pause slideshow", "stop slideshow", "stop slide show",
+])
+def test_a_hosting_session_does_not_hear_the_experiments_or_the_slideshows_play_pause_and_stop(phrase):
+    assert phrase not in hosted_phrases()

@@ -304,9 +304,27 @@ def test_several_hits_in_one_folder_come_back_as_that_folder(controller):
     _type(found, "tabby")
 
     tiles, _ = host.shown[-1]
-    assert len(tiles) == 1
+    assert len(tiles) == 1, (
+        "every row in a settings folder shares a prompt and settings and differs only by seed, "
+        "so a prompt match hits all of them, and drawing near-copies of one item buries the "
+        "other places the query reached: the folder stands for them instead")
     assert tiles[0].group is host.groups[key]
     assert {tile["prompt_id"] for tile in tiles[0].rows} == {"g1", "g2"}
+
+
+def test_a_folder_of_hits_stands_where_its_first_hit_was(controller):
+    rows = [_row("g1", "a tabby on a wall", seed=1),
+            _row("g2", "a tabby asleep", seed=1),
+            _row("g3", "a tabby on a wall", seed=2)]
+    host = FakeHost()
+    found = controller(rows, host=host)
+    host.groups[_folder_key(rows[0])] = object()
+
+    _type(found, "tabby")
+
+    tiles, _ = host.shown[-1]
+    assert [[row["prompt_id"] for row in tile.rows] for tile in tiles] == [["g1", "g3"], ["g2"]], (
+        "order is by first hit, so the newest thing found still leads")
 
 
 def test_a_folder_the_tree_has_no_row_for_falls_back_to_its_own_items(controller):

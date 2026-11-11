@@ -290,6 +290,7 @@ def starting(qtbot):
 @pytest.fixture
 def router(qtbot, monkeypatch, starting):
     monkeypatch.setattr(module, "CommandAndRequestListener", FakeListener)
+    # A QObject whose parent PyQt collects goes with it, and takes its timers down too.
     built = []
 
     def build(host=None, *, slideshows=None, db=None, buttons=None, setters=None, **parts):

@@ -44,8 +44,8 @@ def test_the_clip_beside_the_frame_is_drained_of_color(qtbot, tmp_path):
     right = image.pixelColor(image.width() - side // 2, side // 2)
     assert left.blue() > left.red()
     assert right.red() == right.green() == right.blue(), (
-        "gray because it is not what is being made: in full color beside the frame it reads as a "
-        "second subject")
+        "gray because it is not what is being made, lending the settings and not the result: in "
+        "full color beside the frame it reads as a second subject")
 
 
 def _columns_of(image, color):

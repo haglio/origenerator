@@ -29,8 +29,12 @@ def test_the_pane_holds_no_view():
         | {a.name for n in ast.walk(tree) if isinstance(n, (ast.Import, ast.ImportFrom))
            for a in n.names}
     assert "GalleryView" not in named_by_the_code_itself
-    assert "_v" not in named_by_the_code_itself
+    assert "_v" not in named_by_the_code_itself, (
+        "_v was the pane's handle back on the view, and it stays deleted: one re-added that "
+        "only called public attributes would get past a count of private reaches, so the handle "
+        "itself is banned")
     init = next(n for n in _class_def(PANE, "GalleryPane").body
                 if isinstance(n, ast.FunctionDef) and n.name == "__init__")
     assert [a.arg for a in init.args.args] == [
-        "self", "scroll", "db", "jobs", "populate", "host"]
+        "self", "scroll", "db", "jobs", "populate", "host"], (
+        "the constructor's parameters are exactly the collaborators the split ended on")

@@ -1344,11 +1344,12 @@ def test_lora_folders_get_stable_keys_and_apply_custom_names_and_favorites():
     assert a.key != b.key
 
     meta = {b.key: {"custom_name": "Style B", "starred": True}}
-    loras = _workflows(build_gallery_tree(rows, meta))[0].children[0].children
-    assert [lora.key for lora in loras] == [a.key, b.key]
-    assert loras[1].label == "Style B"
-    assert loras[1].favorite is True
-    assert loras[0].favorite is False
+    loras = {lora.key: lora for lora in
+             _workflows(build_gallery_tree(rows, meta))[0].children[0].children}
+    assert set(loras) == {a.key, b.key}
+    assert loras[b.key].label == "Style B"
+    assert loras[b.key].favorite is True
+    assert loras[a.key].favorite is False
 
 
 def test_build_gallery_tree_nests_workflow_then_model_then_settings():
@@ -1561,6 +1562,39 @@ def test_each_kinds_workflow_folders_are_in_alphabetical_order():
 
     assert [[w.label for w in kind.children] for kind in build_gallery_tree(newest_first)] \
         == [["Flux T2I", "Krea 2 T2I", "SDXL T2I"], [workflow_label("wan22_i2v")]]
+
+
+def test_a_workflow_folder_named_in_parentheses_comes_last():
+    newest_first = [_img("i1", "a cat", 50, 1), _row(
+        prompt_id="found", workflow_name="unknown",
+        output_files=json.dumps([{"filename": "found.png"}]))]
+
+    assert [w.label for w in build_gallery_tree(newest_first)[0].children] \
+        == ["SDXL T2I", "(unknown workflow)"]
+
+
+def test_a_workflows_model_folders_are_in_alphabetical_order_with_the_unknown_model_last():
+    newest_first = [
+        _img_model("z", "a cat", "zeta_model.safetensors", 50, 1),
+        _row(prompt_id="none", params_json=json.dumps({"positive_prompt": "a cat"}),
+             output_files=json.dumps([{"filename": "none.png"}])),
+        _img_model("a", "a cat", "alpha_model.safetensors", 50, 1),
+    ]
+
+    models = _workflows(build_gallery_tree(newest_first))[0].children
+    assert [m.label for m in models] == ["alpha_model", "zeta_model", "(unknown model)"]
+
+
+def test_a_models_lora_folders_are_in_alphabetical_order_with_no_lora_last():
+    newest_first = [_i2v("v1", "zeta_look"), _i2v("v2", "alpha_look"), _row(
+        prompt_id="bare", workflow_name="wan22_i2v",
+        params_json=json.dumps({"positive_prompt": "dance", "unet_high": "wan_high.safetensors",
+                                "unet_low": "wan_low.safetensors"}),
+        output_files=json.dumps([{"filename": "bare.mp4"}]))]
+
+    loras = _workflows(build_gallery_tree(newest_first))[0].children[0].children
+    assert [lora.label.split(" / ")[0] for lora in loras] \
+        == ["alpha_look_high", "zeta_look_high", "(no LoRA)"]
 
 
 def test_a_workflow_folder_given_a_name_is_placed_by_that_name():

@@ -1549,7 +1549,7 @@ class TestAnOverlayShortOfAKey:
         printed = capsys.readouterr().err
         for key in self.SHORT:
             assert key in printed, (
-                "said on the console, since nothing is logged yet: logging is configured from "
+                "said on the console the launcher redirects, since nothing is logged yet: logging is configured from "
                 "config, which is what a missing key stops from importing")
 
     def test_a_complete_overlay_says_nothing_and_boots(self, qapp):

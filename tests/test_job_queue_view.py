@@ -682,11 +682,13 @@ def test_double_clicking_a_row_opens_that_folder_too(queue, qtbot):
     queue.set_items([_item(key="a", status="queued",
                            reveal=lambda: revealed.append("a"))])
     row = queue.rows()[0]
+    qtbot.mouseClick(row, Qt.MouseButton.LeftButton)
+    qtbot.mousePress(row, Qt.MouseButton.LeftButton)
     qtbot.mouseDClick(row, Qt.MouseButton.LeftButton)
     qtbot.mouseRelease(row, Qt.MouseButton.LeftButton)
-    assert revealed == ["a"], (
-        "the double-click is answered as it arrives, so letting the button go after it does "
-        "not open the folder a second time")
+    assert revealed == ["a", "a"], (
+        "once for the click and once for the double-click, which answers the press still "
+        "pending: letting the button go after it does not open the folder again")
 
 
 def test_the_live_frame_opens_the_running_jobs_folder_too(queue, qtbot):

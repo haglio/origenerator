@@ -179,14 +179,16 @@ def test_an_animation_with_neither_a_sample_nor_pinned_action_settings_starts_fr
     assert made.starting_point is None
 
 
-def test_assigning_saves_the_prompts_he_typed_with_nothing_else_to_go_on():
+def test_assigning_saves_the_prompts_the_user_typed_with_nothing_else_to_go_on():
     store = _Store()
     session = AnimationCheckSession(_ORDER, {}, store)
 
     session.accept(positive="a scene", negative="its flaws")
 
-    assert store.accepted[_ORDER[0]] == (
-        "", {"positive_prompt": "a scene", "negative_prompt": "its flaws"})
+    assert store.accepted.get(_ORDER[0]) == (
+        "", {"positive_prompt": "a scene", "negative_prompt": "its flaws"}), (
+        "the user's decision, for an animation with no kept video and no action settings behind "
+        "it: assign should still save those prompts, that's not nothing")
 
 
 def test_an_animation_he_has_assigned_opens_on_what_he_assigned():

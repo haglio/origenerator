@@ -134,7 +134,9 @@ def test_a_session_that_may_not_drive_cannot_be_switched_on():
 
 
 def test_a_saved_state_is_put_back_and_anything_but_driving_comes_back_off():
-    for saved, state in ((OSR2_DRIVING, OSR2_DRIVING), (True, OSR2_DRIVING),
+    saved_while_this_was_an_on_off_switch = True
+    for saved, state in ((OSR2_DRIVING, OSR2_DRIVING),
+                         (saved_while_this_was_an_on_off_switch, OSR2_DRIVING),
                          (OSR2_PARKED, OSR2_PARKED), ("retracted", OSR2_PARKED),
                          ("control_off", OSR2_PARKED), (False, OSR2_PARKED),
                          (None, OSR2_PARKED), ("sideways", OSR2_PARKED)):

@@ -1717,11 +1717,16 @@ def test_answering_a_toast_brings_the_window_forward_and_opens_the_item(
 
 
 def test_answering_a_toast_for_an_item_that_has_since_gone_still_comes_forward(
-        qtbot, tmp_path):
+        qtbot, tmp_path, monkeypatch):
     win = _window(qtbot, tmp_path)
+    fronted = []
+    monkeypatch.setattr(core, "bring_to_front", fronted.append)
 
     win.go_to_generation("no-such-generation")
 
+    assert fronted == [win], (
+        "a toast waits in Windows' notification center until it is answered, which can be after "
+        "the item it announced was deleted")
     assert win._gallery_view.selected_prompt_id() is None
 
 

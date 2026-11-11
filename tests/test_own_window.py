@@ -44,9 +44,14 @@ def a_library_of_its_own(tmp_path, monkeypatch):
     return tmp_path
 
 
+_WHY_THE_LAUNCH_IS_RUN = (
+    "main() itself is run, as far as what it puts on screen, which is what a user meets: the "
+    "tests of the window and of what it works from run none of the launch")
+
+
 def test_the_action_setter_tool_says_so_when_every_image_already_has_its_actions(
         qapp, a_library_of_its_own, said):
-    assert action_setter_tool.main() == 0
+    assert action_setter_tool.main() == 0, _WHY_THE_LAUNCH_IS_RUN
 
     assert said == ["Every image already has its actions."]
 
@@ -62,7 +67,7 @@ def test_checking_animations_opens_on_the_first_of_them(
 
     monkeypatch.setattr(QApplication, "exec", what_is_up)
 
-    assert check_animations.main() == 0
+    assert check_animations.main() == 0, _WHY_THE_LAUNCH_IS_RUN
 
     assert len(up) == 1
     assert up[0].isVisible()

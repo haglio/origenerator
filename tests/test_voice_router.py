@@ -598,12 +598,16 @@ def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(router):
 
 def test_a_bank_word_whose_button_is_dead_says_why(router):
     voice, _host, slideshows = router(
-        buttons={"actions": {AppCommand.GROUP: (FakeButton(tip="Group", enabled=False),
-                                             lambda: None)}})
+        buttons={"actions": {AppCommand.GROUP: (
+            FakeButton(tip="Group the selected folders into a collection of your own",
+                       enabled=False),
+            lambda: None)}})
 
     voice.on_command(AppCommand.GROUP)
 
-    assert slideshows.answers == ["pick some folders first"]
+    assert slideshows.answers == ["pick some folders first"], (
+        "Group's tooltip explains the button rather than refusing it, so read back it would not "
+        "say why the button cannot run")
     assert slideshows.answer_kinds == [WARNING]
 
 

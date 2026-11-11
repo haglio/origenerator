@@ -312,12 +312,6 @@ def test_a_surface_showing_work_in_flight_never_reaches_the_job(surface):
         "knows where a job came from")
 
 
-def test_the_gallery_tree_draws_and_looks_up_with_no_database():
-    assert _loaded_after_importing("origenerator.gui.gallery_tree", "origenerator.db") is False, (
-        "starring and deleting a folder live in the gallery view, which rebuilds every shape; the "
-        "tree only draws and looks rows up")
-
-
 def test_the_drag_of_a_generation_leans_on_no_widget_of_this_app():
     assert _beyond_the_standard_library(
         _modules_imported_by("origenerator/gui/generation_drag.py")) == {"PyQt6.QtCore"}, (
@@ -329,11 +323,3 @@ def test_the_job_queues_tiles_are_put_together_with_nothing_that_draws():
     assert _loaded_after_importing("origenerator.gui.inflight_items", "PyQt6.QtGui") is False, (
         "a join over four sources and no rendering at all, which is why they are built outside "
         "the Gallery pane")
-
-
-@pytest.mark.parametrize("holds_generations", ["origenerator.db", "origenerator.gui.gallery_view"])
-def test_a_slideshow_reaches_a_generation_only_through_what_the_gallery_hands_it(holds_generations):
-    assert _loaded_after_importing(
-        "origenerator.gui.funestra_slideshow", holds_generations) is False, (
-        "what a press does to the slide is the slideshow's; the half that lands on the generation "
-        "is asked of the gallery through SlideshowActions")

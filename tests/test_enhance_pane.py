@@ -170,7 +170,7 @@ def test_the_switch_draws_at_both_states(qtbot):
     assert not off.isNull()
     assert not on.isNull()
     assert off != on, (
-        "it paints itself, since a Qt stylesheet cannot move a tick's indicator, so the paint path "
+        "the switch paints itself, since a Qt stylesheet cannot move a tick's indicator, so the paint path "
         "is worth exercising in both positions")
 
 
@@ -1179,23 +1179,18 @@ def test_the_arrows_are_the_lists_only_while_a_version_was_the_last_thing_clicke
     assert shown == [0, 1]
 
 
-def test_a_picked_version_is_filled_with_the_familys_blue(qtbot):
-    app = QApplication.instance()
-    prior = app.styleSheet()
-    app.setStyleSheet(build_stylesheet())
-    try:
-        versions = EnhanceVersions()
-        qtbot.addWidget(versions)
-        versions.show_versions(_items(_versions(1)))
-        with qtbot.waitExposed(versions):
-            versions.show()
-        row = _rows(versions)[0]
-        _click(qtbot, row)
+def test_a_picked_version_is_filled_with_the_familys_blue(qtbot, sheet_put_back_for_later_tests):
+    sheet_put_back_for_later_tests.setStyleSheet(build_stylesheet())
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_versions(_items(_versions(1)))
+    with qtbot.waitExposed(versions):
+        versions.show()
+    row = _rows(versions)[0]
+    _click(qtbot, row)
 
-        edge = row.mapTo(versions, QPoint(1, row.height() // 2))
-        assert versions.grab().toImage().pixelColor(edge).name() == BLUE.name()
-    finally:
-        app.setStyleSheet(prior)
+    edge = row.mapTo(versions, QPoint(1, row.height() // 2))
+    assert versions.grab().toImage().pixelColor(edge).name() == BLUE.name()
 
 
 def _ink(label) -> str:

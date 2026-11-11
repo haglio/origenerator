@@ -832,8 +832,8 @@ def test_favoriting_a_folder_persists_without_reordering(qtbot):
     assert _at(lora, 1).data(0, _GROUP_ROLE).favorite is True
     assert _at(lora, 0).data(0, _GROUP_ROLE).favorite is False
     assert not _at(lora, 1).text(0).startswith("★"), (
-        "favorite state rides on the group, whose star icon reads it, not on a star in front of the "
-        "text, so the labels stay the plain folder names")
+        "favorite state rides on the group, which the row's star icon reads, not on a star in front of "
+        "the text, so the labels stay the plain folder names")
 
 
 def test_favoriting_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):

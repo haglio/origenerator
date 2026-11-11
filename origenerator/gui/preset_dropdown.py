@@ -8,9 +8,9 @@ from PyQt6.QtWidgets import QComboBox, QStyle, QStyleOptionComboBox
 
 from origenerator.gui.no_wheel import NoWheelDropdown
 
-_EITHER_SIDE_OF_THE_TEXT = 2
-_FOR_THE_CURSOR_AT_ITS_END = 1
-_WHAT_THE_LINE_EDIT_KEEPS_FOR_ITSELF = 2 * _EITHER_SIDE_OF_THE_TEXT + _FOR_THE_CURSOR_AT_ITS_END
+_PIXELS_EITHER_SIDE_OF_THE_TEXT = 2
+_PIXEL_FOR_THE_CURSOR = 1
+_WHAT_THE_LINE_EDIT_KEEPS_FOR_ITSELF = 2 * _PIXELS_EITHER_SIDE_OF_THE_TEXT + _PIXEL_FOR_THE_CURSOR
 
 
 class PresetDropdown(NoWheelDropdown):

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtWidgets import QApplication, QComboBox, QLabel, QPushButton
+from PyQt6.QtWidgets import QComboBox, QLabel, QPushButton
 
 from origenerator.gui.eliding import (
     ElidingButton,
@@ -14,13 +14,9 @@ _LONG = "Show in Explorer"
 
 
 @pytest.fixture(autouse=True)
-def _wearing_the_apps_own_chrome():
+def _wearing_the_apps_own_chrome(sheet_put_back_for_later_tests):
     """A Qt stylesheet moves both widths of every comparison, so measure under the app's own."""
-    app = QApplication.instance()
-    prior = app.styleSheet()
-    app.setStyleSheet(build_stylesheet())
-    yield
-    app.setStyleSheet(prior)
+    sheet_put_back_for_later_tests.setStyleSheet(build_stylesheet())
 
 
 def test_it_does_not_hold_a_pane_open_at_its_label(qtbot):

@@ -764,7 +764,7 @@ def _menu_offering(monkeypatch, module, pick=None):
         raised.append(labels)
         if pick is None:
             return None
-        return next(a for a in menu.actions() if a.text().startswith(pick))
+        return next((a for a in menu.actions() if a.text().startswith(pick)), None)
 
     monkeypatch.setattr(f"origenerator.gui.{module}.QMenu.exec", fake_exec)
     return raised

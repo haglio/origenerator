@@ -157,9 +157,10 @@ def test_the_voice_is_a_preset_or_a_sample_and_only_the_one_shot_workflow_speaks
     assert "scene_lines" not in {pd.key for pd in loop.param_definitions()}
 
 
-def test_with_audio_off_her_lines_still_move_her_mouth_and_the_video_is_saved_silent():
+def test_with_audio_off_her_lines_are_not_used_and_the_video_is_saved_silent():
     payload = Wan22I2vWorkflow().build_api_payload(_spoken_params(enable_audio=False))
 
-    assert _nodes(payload, "WanSoundImageToVideo")
+    assert not _nodes(payload, "WanSoundImageToVideo")
+    assert scene_speech(_spoken_params(enable_audio=False)) == [None, None, None]
     assert not _nodes(payload, "HunyuanFoleySampler")
     assert "audio" not in _nodes(payload, "VHS_VideoCombine")[0]["inputs"]

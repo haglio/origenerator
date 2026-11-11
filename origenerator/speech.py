@@ -55,6 +55,8 @@ def scene_speech(params: dict, *, version: int = SPEECH_VERSION) -> list[SceneSp
     frames = [int(n) for n in (params.get("scene_frames") or [])]
     if len(frames) <= 1:
         frames = [int(params["frame_count"])]
+    if not params.get("enable_audio"):
+        return [None] * len(frames)
     lines = list(params.get("scene_lines") or [])
     voice = voice_request(params)
     seed = int(params.get("audio_seed") or 0)

@@ -4639,14 +4639,14 @@ def test_a_tab_offers_to_retrain_a_lora_the_app_can_train_only_while_it_is_picke
     assert blank_panel.pick_lora("seed", "example_look.safetensors") is False
 
 
-def test_a_sound_prompt_grays_the_words_past_where_its_reader_stops(
+def test_an_audio_prompt_grays_the_words_past_where_its_reader_stops(
         blank_panel, tmp_path, monkeypatch):
     monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path / "hub"))
     clap_reader(tmp_path / "hub")
     blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "wan22_i2v"))
     read = " ".join(["rain"] * 76)
 
-    blank_panel._param_form.set_values({"audio_prompt": f"{read} on a tin roof"})
+    blank_panel._param_form.set_values({"enable_audio": True, "audio_prompt": f"{read} on a tin roof"})
 
     (field,) = blank_panel._param_form._widgets["audio_prompt"].boxes()
     assert [(span.start, span.format.foreground().color().name())

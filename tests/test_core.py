@@ -473,7 +473,9 @@ def test_the_app_opens_listening(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
     assert win._gallery_view.mic_enabled() is True, (
         "spoken commands are worth nothing unheard, and a switch to remember before speaking is one "
-        "found out about by talking to an app that was not listening")
+        "found out about by talking to an app that was not listening; the other switches open off "
+        "because each of them spends something: the GPU, the device, the room's sound. Listening "
+        "spends nothing until it hears something")
 
 
 def test_restores_a_closed_mic_from_app_state(qtbot, tmp_path):

@@ -194,16 +194,30 @@ def test_his_prompts_lend_the_details_of_the_thing_asked_for_never_a_pose_settin
     assert "never a pose, setting, camera or person he did not ask for" in rule
 
 
-def test_one_person_of_several_taken_out_is_taught_as_the_count_coming_down_never_as_gone():
+def test_one_person_of_several_the_positive_prompt_describes_is_taken_out_by_the_count_coming_down():
     prompt = _request_prompt()
-    rule = prompt[prompt.index("To take one person out of several"):].split("\n")[0]
+    rule = prompt[prompt.index("To take out one of several people the positive prompt describes"):].split("\n")[0]
 
     assert "count" in rule
     assert "every part" in rule
-    assert '"gone" change is for a thing' in rule
-    example = prompt[prompt.index('- "remove the second smaller man'):].split("\n")[0]
+    assert 'never a "gone" change' in rule
+    example = prompt[prompt.index('- "remove the second smaller man holding the umbrella", positive "two men'):]
+    example = example.split("\n")[0]
     assert '"with": "a man on a pier, fog"' in example
     assert '"gone"' not in example
+
+
+def test_a_person_the_image_shows_and_the_prompt_never_says_is_kept_out_through_the_negative_prompt():
+    prompt = _request_prompt()
+    rule = prompt[prompt.index("A request describes what he sees in the image"):].split("\n")[0]
+
+    assert "neither prompt says" in rule
+    assert '"it is not in the prompt" is never a reason to change nothing' in rule
+    assert "negative prompt" in rule
+    assert "only one" in rule
+    example = prompt[prompt.index('- "remove the second smaller man holding the umbrella", positive "a man'):]
+    example = example.split("\n")[0]
+    assert '"gone": "second man, umbrella", "in_positive": ""' in example
 
 
 def test_a_request_that_asks_for_no_change_is_answered_with_why():

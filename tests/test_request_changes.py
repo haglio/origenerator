@@ -796,3 +796,13 @@ def test_taking_nothing_out_of_the_negative_prompt_says_it_named_no_words():
                        asked=("blurry is fine",))
 
     assert outcome.line == "The model's change named no words, so nothing changed."
+
+
+def test_a_second_man_the_positive_prompt_never_described_is_kept_out_through_the_negative_prompt():
+    asked = "remove the second smaller man holding the umbrella"
+
+    outcome = _applied([{"gone": "second man, umbrella", "in_positive": "", "instead": "",
+                         "for": asked}], pair=("a man on a pier, fog", "blurry"), asked=(asked,))
+
+    assert (outcome.positive, outcome.negative) == ("a man on a pier, fog", "blurry, second man, umbrella")
+    assert outcome.line == 'Added "second man, umbrella" to the Negative Prompt.'

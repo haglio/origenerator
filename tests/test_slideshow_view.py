@@ -1294,10 +1294,7 @@ def test_double_clicking_the_slide_leaves_the_slideshow(qtbot):
 
     gestures.double_click(view._pane._window, _on_the_slide_clear_of_the_hud(view))
 
-    def left():
-        assert not view.isVisible(), "the way out of every other fullscreen view here"
-
-    qtbot.waitUntil(left)
+    qtbot.waitUntil(lambda: not view.isVisible())
     assert closes == [True], "the dismissal reaches the gallery, like Escape's"
 
 

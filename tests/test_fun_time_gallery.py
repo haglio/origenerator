@@ -1110,7 +1110,10 @@ def test_reset_puts_a_region_back_on_the_library_not_on_its_own_folder(
 
     slideshow.shown.press("portrait_reset")
 
-    assert slideshow.pass_size() == len(base)
+    assert slideshow.pass_size() == len(base), (
+        "the opening helper's stand-in hands back the folder's two items whatever rows it is "
+        "given, so the items are stood in for again before the reset, or the library's rows "
+        "would turn back into those two")
     assert slideshow.hud_order_label == "Shuffle"
     assert [where for _slideshow, where in view._slideshows._live_slideshows] == ["__all__::portrait"]
 

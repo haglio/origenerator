@@ -90,6 +90,8 @@ def test_the_genau_lane_is_said_in_german_and_nothing_else_is():
     naming_the_lane = {phrase for phrase in heard if "go now" in phrase}
 
     assert naming_the_lane
-    assert {voice_commands.said_in(phrase) for phrase in naming_the_lane} == {"de"}
+    assert {voice_commands.said_in(phrase) for phrase in naming_the_lane} == {"de"}, (
+        "a phrase naming the Genau lane is marked German, so a mangled hearing of it is read "
+        "once more in German before it is doubted")
     assert {voice_commands.said_in(phrase)
             for phrase in heard - naming_the_lane} == {None}

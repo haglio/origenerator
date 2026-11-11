@@ -243,6 +243,23 @@ def test_a_collection_scopes_the_search_like_any_other_row(qtbot):
     assert "Favorites" in view._folder_path.display_text()
 
 
+def test_a_second_search_in_a_collection_is_still_over_the_whole_collection(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2), _image("i3", "a dog", 50, 3)]
+    rows[1]["starred"] = rows[2]["starred"] = 1
+    view = GalleryView(FakeDB(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
+    _search_for(view, "cat")
+    assert view.listed_prompt_ids() == ["i2"]
+
+    _search_for(view, "dog")
+
+    assert view.listed_prompt_ids() == ["i3"], (
+        "during a search the tiles on screen are the earlier results, so a collection's rows are "
+        "read off the TOC's selection and never off what is drawn")
+
+
 def test_a_folders_collection_scopes_the_search_and_names_its_path(qtbot):
     rows = [_image("i1", "a cat", 50, 1),
             _row("v1", "wan22_i2v", {"positive_prompt": "a cat", "seed": 5},

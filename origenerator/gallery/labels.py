@@ -5,6 +5,7 @@ from enum import StrEnum
 
 from app_support.comfy_file_refs import frame_name, reference_basename, unannotated
 
+from origenerator.display_names import shown_name
 from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.gallery.keys import folder_id, settings_key
 from origenerator.gallery.signatures import (
@@ -25,7 +26,9 @@ def workflow_label(workflow_name: str | None) -> str:
     wf = workflow_named(workflow_name)
     if wf:
         return wf.display_name
-    return RETIRED_WORKFLOW_NAMES.get(workflow_name or "") or workflow_name or "unknown"
+    if workflow_name in (None, "", "unknown"):
+        return "(unknown workflow)"
+    return RETIRED_WORKFLOW_NAMES.get(workflow_name) or shown_name(workflow_name)
 
 
 def _joined_file_label(keys: tuple[str, ...], params: dict, fallback: str) -> str:

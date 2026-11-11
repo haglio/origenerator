@@ -2496,7 +2496,9 @@ def test_the_items_name_heads_the_column_in_line_with_the_sections_under_it(save
     assert corner(name).y() == body.layout().contentsMargins().top()
     actions = tab._action.form().parentWidget().findChild(
         QWidget, action_pills(MediaType.IMAGE)).parentWidget()
-    assert name.content().isAncestorOf(actions)
+    assert name.content().isAncestorOf(actions), (
+        "what the item shows sits with its name: it is a fact about the finished item rather "
+        "than a setting that made it")
 
 
 def _message(tab):

@@ -1384,6 +1384,33 @@ def test_a_cull_that_leaves_one_image_in_the_row_locks_it(qtbot, tmp_path):
     assert (asked, starred, opened) == ([], [], [])
 
 
+def test_the_cull_that_ends_a_loop_of_one_hands_the_funestra_its_list_once(
+        qtbot, tmp_path, monkeypatch):
+    slideshow = _slideshow(qtbot, tmp_path,
+                           actions=SlideshowActions(neighbors=_around, delete=lambda prompt_id: None))
+    slideshow.slideshow_loop("seed")
+    written = _lists_handed_to_a_funestra(monkeypatch)
+
+    slideshow.slideshow_cull()
+
+    assert len(written) == 1, (
+        "ending the loop deals the pass again, and that pass change has already handed the "
+        "Funestra the set")
+
+
+def test_a_reset_that_drops_a_switch_hands_the_funestra_its_list_once(
+        qtbot, tmp_path, monkeypatch):
+    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(favorite_ids={"id-1", "id-2"}))
+    slideshow.set_favorites_filter(True)
+    written = _lists_handed_to_a_funestra(monkeypatch)
+
+    slideshow.reset_in_place()
+
+    assert len(written) == 1, (
+        "dropping a switch deals the pass again, and that pass change has already handed the "
+        "Funestra the fresh pass")
+
+
 def test_a_forward_step_in_a_row_down_to_one_image_hands_the_set_back(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=_around))
     slideshow.slideshow_loop("seed")
@@ -2291,12 +2318,17 @@ def test_an_image_goes_to_the_funestra_with_the_places_its_fixes_found(qtbot, tm
     assert handed == {"one.png": FACE, "two.png": (), "three.png": ()}
 
 
-def test_a_slideshow_opened_with_its_versions_hands_the_funestra_its_list_once(
-        qtbot, tmp_path, monkeypatch):
+def _lists_handed_to_a_funestra(monkeypatch) -> list[int]:
     written = []
     write = FunestraChannel.write_playlist
     monkeypatch.setattr(FunestraChannel, "write_playlist",
                         lambda channel, items: written.append(len(items)) or write(channel, items))
+    return written
+
+
+def test_a_slideshow_opened_with_its_versions_hands_the_funestra_its_list_once(
+        qtbot, tmp_path, monkeypatch):
+    written = _lists_handed_to_a_funestra(monkeypatch)
 
     slideshow = _slideshow(qtbot, tmp_path, versions=_PLACED)
 

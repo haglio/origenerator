@@ -857,7 +857,8 @@ def test_i2v_folder_item_carries_both_seed_reroll_hovers(qtbot, tmp_path):
     view.refresh()
     _select_leaf_of(view, "vid")
 
-    assert _tooltips(view, "vid") == ["Randomize video seed", "Randomize image seed"]
+    assert _tooltips(view, "vid") == ["Randomize video seed", "Randomize image seed"], (
+        "its start frame is an image that can be made again, so both seeds are offered")
 
 
 def test_image_folder_item_has_no_seed_reroll_hovers(qtbot, tmp_path):
@@ -887,7 +888,8 @@ def test_i2v_item_with_a_handpicked_frame_offers_only_the_video_seed(qtbot, tmp_
     view.refresh()
     _select_leaf_of(view, "vid")
 
-    assert _tooltips(view, "vid") == ["Randomize video seed"]
+    assert _tooltips(view, "vid") == ["Randomize video seed"], (
+        "a hand-picked frame cannot be made again, so only the video's seed is offered")
 
 
 def test_i2v_item_made_from_a_hidden_starting_frame_offers_only_the_video_seed(qtbot, tmp_path):

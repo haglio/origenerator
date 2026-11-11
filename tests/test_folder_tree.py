@@ -683,7 +683,9 @@ def test_the_picked_folder_is_marked_by_its_blue_ground_alone(qtbot):
 
 def test_a_folder_lately_worked_in_wears_a_mark_at_the_start_of_its_row(qtbot):
     tree, leaf = _tree_with_an_indented_leaf(qtbot)
-    assert not any(_is_blue(color) for _x, color in _row_pixels(tree, leaf))
+    assert not any(_is_blue(color) for _x, color in _row_pixels(tree, leaf)), (
+        "a pixel counts as the family's blue only well clear of a gray and of the colored edge "
+        "a letter picks up where it is drawn against one, so a label alone is no mark")
 
     leaf.setData(0, RECENT_ROLE, True)
 

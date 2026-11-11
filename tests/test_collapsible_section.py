@@ -48,7 +48,8 @@ def test_the_headers_chevron_is_drawn_before_its_title(qtbot):
     header.initStyleOption(opt)
     chevron = header.fold_rect()
 
-    assert chevron.right() < header._title_rect(opt).left()
+    assert chevron.right() < header._title_rect(opt).left(), (
+        "drawn before the header's title so the fold state reads at a glance")
     image = header.grab().toImage()
     assert any(image.pixelColor(x, y).lightness() > 150
                for y in range(chevron.top(), chevron.bottom())

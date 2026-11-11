@@ -831,6 +831,7 @@ def test_frames_of_the_item_itself_leave_the_message_up(make_preview, tmp_path):
 
 def test_a_kept_message_rides_over_the_frame_that_lands_under_it(make_preview, tmp_path):
     w = make_preview()
+    # A QStackedLayout does nothing when told to show the page it is already showing.
     w.show_video(tmp_path / "clip.mp4")
     w.set_message("modified")
 

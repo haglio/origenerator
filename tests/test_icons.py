@@ -149,7 +149,8 @@ def test_corner_controls_wear_the_star_green_and_the_enhance_yellow(qtbot):
     star = _corner_image(icons.corner_star_icon(favorite=True, armed=False))
     plus = _corner_image(icons.corner_enhance_icon(icons.ENHANCE_HELD, armed=False))
     assert star.pixelColor(24, 25) == GREEN, (
-        "the star's green is Fun Time's, so one color means favorited in both apps")
+        "the star's green is Fun Time's, so one color means favorited in both apps; both marks "
+        "are solid at their center, so the middle pixel is the color")
     assert plus.pixelColor(24, 24) == YELLOW, (
         "the plus is yellow: green is the star's and the two can sit on one tile, and blue is "
         "Genau's across the family")

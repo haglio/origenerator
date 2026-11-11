@@ -1093,13 +1093,45 @@ def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbo
         "two cats", _TWO_CATS_SAID, "a cat", "two cats")
 
 
-def _tab_asked_for_two_cats(qtbot, tmp_path):
-    view, exchange = _asking_for_two_cats(qtbot, tmp_path)
+def test_the_tabs_own_generate_running_a_request_keeps_the_seed_of_the_item_it_was_asked_of(
+        qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path)
+
+    view._on_generate_requested("sdxl_t2i", [{"seed": 9, "positive_prompt": "two cats"}])
+
+    (job,) = view._live_jobs.values()
+    assert job.params["seed"] == 7
+
+
+def test_a_batch_generated_with_a_request_pending_makes_the_one_image_it_asks_for(qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path)
+
+    view._on_generate_requested("sdxl_t2i", [{"seed": 9, "positive_prompt": "two cats"},
+                                             {"seed": 10, "positive_prompt": "two cats"}])
+
+    (job,) = view._live_jobs.values()
+    assert job.params["seed"] == 7
+
+
+def test_generate_under_a_turn_asked_with_random_ticked_keeps_the_seed_of_the_item_asked_of(
+        qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path, random_seed=True)
+    tab = view._generate_pane.current_generate_tab()
+
+    tab._param_form.request_exchange().generate_asked.emit(0)
+
+    (job,) = view._live_jobs.values()
+    assert job.params["seed"] == 7
+    assert tab._param_form.seed_is_random()
+
+
+def _tab_asked_for_two_cats(qtbot, tmp_path, *, random_seed=False):
+    view, exchange = _asking_for_two_cats(qtbot, tmp_path, random_seed=random_seed)
     qtbot.waitUntil(lambda: exchange.turns() == [("two cats", _TWO_CATS_SAID)], timeout=5000)
     return view
 
 
-def _asking_for_two_cats(qtbot, tmp_path, answer_once=None, *, unanswered=False):
+def _asking_for_two_cats(qtbot, tmp_path, answer_once=None, *, unanswered=False, random_seed=False):
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -1117,6 +1149,8 @@ def _asking_for_two_cats(qtbot, tmp_path, answer_once=None, *, unanswered=False)
             {"prompt": "positive", "replace": "a cat", "with": "two cats", "for": "two cats"}]})
 
     view._voice.requests._work_out = two_cats
+    if random_seed:
+        tab._param_form._randomize_checks["seed"].click()
     exchange = tab._param_form.request_exchange()
     qtbot.keyClicks(exchange._line, "two cats")
     qtbot.keyClick(exchange._line, Qt.Key.Key_Return)

@@ -389,6 +389,41 @@ def test_a_restored_query_comes_back_without_searching_again(controller):
     assert host.shown == []
 
 
+def test_a_restored_query_already_widened_comes_back_widened_from_its_first_draw(
+        controller, qtbot):
+    host = FakeHost()
+    expander = SearchExpander(expand=lambda query: {"kitten": ("tabby",)})
+    found = controller([_row("g1", "a tabby on a wall")], host=host, expander=expander)
+    _type(found, "kitten")
+    _let_the_widening_land(qtbot, found)
+    _type(found, "a box")
+
+    found.restore("kitten")
+    found.run()
+
+    tiles, _terms = host.shown[-1]
+    assert [tile.row["prompt_id"] for tile in tiles] == ["g1"], (
+        "a query the local model has already widened is read from its answers when put back, "
+        "so it is not drawn narrow first")
+
+
+def test_a_query_typed_again_after_its_widening_landed_is_widened_from_its_first_draw(
+        controller, qtbot):
+    host = FakeHost()
+    expander = SearchExpander(expand=lambda query: {"kitten": ("tabby",)})
+    found = controller([_row("g1", "a tabby on a wall")], host=host, expander=expander)
+    _type(found, "kitten")
+    _let_the_widening_land(qtbot, found)
+    _type(found, "a box")
+
+    _type(found, "kitten")
+
+    tiles, _terms = host.shown[-1]
+    assert [tile.row["prompt_id"] for tile in tiles] == ["g1"], (
+        "a query the local model has already widened is read from its answers when typed "
+        "again, so it is not drawn narrow first")
+
+
 def test_the_count_line_says_a_capped_search_is_showing_a_slice(controller):
     host = FakeHost()
     found = controller(

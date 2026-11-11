@@ -382,6 +382,24 @@ def test_a_batch_lands_under_the_folder_its_settings_shape(enhance, monkeypatch)
     assert db.targets == [("run-1", "i1"), ("run-1", "i2")]
 
 
+def test_each_enhance_launched_rolls_its_own_seed(enhance, monkeypatch):
+    monkeypatch.setattr(module.gallery, "enhance_params_for",
+                        lambda row, settings: {"input_image": f"{row['prompt_id']}.png",
+                                               "seed": 1})
+    monkeypatch.setattr(module.gallery, "settings_folder_key",
+                        lambda row, index: "image/image_enhance/abc")
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
+    jobs = FakeReroll()
+    controller, _host = enhance(db=FakeDB([_image("i1"), _image("i2")]), jobs=jobs)
+
+    controller.enhance_items(["i1", "i2"])
+
+    seeds = [params["seed"] for _key, params in jobs.prepared]
+    assert (1 in seeds, len(set(seeds))) == (False, 2), (
+        "the seed is neither the image's nor a folder setting: each launch rolls a fresh one, "
+        "like any variation")
+
+
 def test_a_batch_is_asked_for_once_per_folder_it_lands_in(enhance, monkeypatch):
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: {"input_image": f"{row['prompt_id']}.png"})

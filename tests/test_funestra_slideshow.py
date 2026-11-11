@@ -1443,6 +1443,28 @@ def test_a_map_cell_the_set_never_held_is_played_by_the_one_verb_that_splices(qt
     assert slideshow.hud_prompt_id == "id-1x"
 
 
+def test_a_jump_out_of_a_loop_hands_the_funestra_its_list_before_the_jump(
+        qtbot, tmp_path, monkeypatch):
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=_around))
+    slideshow.slideshow_loop("seed")
+    _sent(slideshow)
+    play_already_sent = []
+    write = FunestraChannel.write_playlist
+
+    def noting_what_was_sent(channel, items):
+        command = channel.command_file
+        play_already_sent.append(command.exists() and "PLAY_FILE" in command.read_text())
+        return write(channel, items)
+
+    monkeypatch.setattr(FunestraChannel, "write_playlist", noting_what_was_sent)
+
+    slideshow.show_item("one-x.png")
+
+    assert (play_already_sent, _sent(slideshow)[-1:]) == ([False], ["PLAY_FILE one-x.png"]), (
+        "a jump off the loop deals the pass again, which hands the Funestra the list, and only "
+        "then may the one PLAY_FILE land in it")
+
+
 _WATCHED_MOST = {"one.png": 1.0, "two.png": 1.0, "three.png": 1e12}
 
 
@@ -1971,6 +1993,18 @@ def test_an_item_being_enhanced_is_held_for_half_the_pace_on_the_funestra(qtbot,
     slideshow = _being_enhanced_on_screen(qtbot, tmp_path)
 
     assert "HOLD_PICTURE 2" in _sent(slideshow)
+
+
+def test_a_locked_item_being_enhanced_holds_for_the_whole_pace(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(enhancing={"id-1": "running"}),
+                           locked=True)
+
+    _says(slideshow, video="one.png", locked=True)
+    slideshow.tick()
+
+    assert [verb for verb in _sent(slideshow) if verb.startswith("HOLD_PICTURE")] == [], (
+        "the half hold has the Funestra move on early from an item being made, and a locked "
+        "item is one it must not move on from")
 
 
 def test_an_item_being_made_makes_its_move_at_the_ordinary_pace(qtbot, tmp_path):

@@ -1690,6 +1690,22 @@ def test_a_small_move_on_a_version_is_a_click_not_a_drag(qtbot, tmp_path, versio
         "that wobbles a pixel picks the row up in place of selecting it")
 
 
+def test_a_version_with_no_settings_moved_far_while_pressed_is_still_a_click(
+        qtbot, tmp_path, version_drags):
+    thumbnail = _VersionRow(_versions(1, {})[0], 0, _an_image(tmp_path / "e1.png"))
+    qtbot.addWidget(thumbnail)
+    clicks = []
+    thumbnail.clicked.connect(lambda position, _modifiers: clicks.append(position))
+
+    qtbot.mousePress(thumbnail, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
+    qtbot.mouseMove(thumbnail, QPoint(90, 90))
+    qtbot.mouseRelease(thumbnail, Qt.MouseButton.LeftButton, pos=QPoint(90, 90))
+
+    assert (version_drags, clicks) == ([], [0]), (
+        "a row refuses a drag of its own (no settings to take) before asking the gesture, since "
+        "the gesture forgets a press it says yes to, and the press is still the row's click")
+
+
 def test_a_big_versions_thumbnail_drags_at_the_shared_size(qtbot, tmp_path, version_drags):
     thumbnail = _VersionRow(_versions(1, {"enhance_scale": 2.0})[0], 0,
                      _an_image(tmp_path / "big.png", (1024, 768)))

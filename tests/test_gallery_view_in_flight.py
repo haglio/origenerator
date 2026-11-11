@@ -390,6 +390,27 @@ def test_selecting_a_thumbnail_stops_the_reroll_from_driving_the_generate_pane(q
     assert view._selected_reroll_key is None
 
 
+def test_a_selected_runs_tile_drawn_over_by_another_pane_is_let_go_of_quietly(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _running_reroll(view)
+    tile = _generating_tile(view)
+    tile.selected.emit()
+    view._gallery_pane.show_empty()
+    assert sip.isdeleted(tile)
+
+    try:
+        view._on_thumbnail_clicked("orig")
+        reached_a_deleted_tile = False
+    except RuntimeError:
+        reached_a_deleted_tile = True
+
+    assert not reached_a_deleted_tile, (
+        "the run's tile is drawn inside the pane and is deleted with it, so the view must not "
+        "go on unselecting the tile it held")
+
+
 def test_selecting_the_reroll_highlights_its_tile_and_drops_thumbnail_picks(qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)

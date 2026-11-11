@@ -171,6 +171,25 @@ def test_a_stop_that_had_a_query_comes_back_with_it_running(trail):
     assert search.runs == 1
 
 
+def test_a_stops_query_takes_the_pane_back_from_the_folder_shown_under_it(trail):
+    search = FakeSearch()
+    nav, host = trail(FakeHost(folders={"workflow/a", "workflow/b"}), search)
+    host.folder, search.query = "workflow/a", "tabby"
+    nav.record()
+    host.folder, search.query = "workflow/b", ""
+    nav.record()
+    in_the_pane = []
+    show_folder, run = host.show_folder, search.run
+    host.show_folder = lambda key: in_the_pane.append(key) or show_folder(key)
+    search.run = lambda: in_the_pane.append("tabby") or run()
+
+    nav.go_back()
+
+    assert in_the_pane[-1] == "tabby", (
+        "showing the folder puts the folder in the pane, so the stop's search is run after it "
+        "to take the pane back")
+
+
 def test_a_search_redrawing_itself_is_not_another_stop(trail):
     search = FakeSearch("tabby")
     nav, host = trail(search=search)

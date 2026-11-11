@@ -734,6 +734,17 @@ def test_an_action_filter_narrows_the_pass_to_what_is_named_for_that_action():
     assert dealt == [True]
 
 
+def test_an_action_filter_asks_the_library_about_the_whole_set_at_once():
+    asked = []
+    slideshow_set, _dealt = _set(actions_of=lambda ids: asked.append(list(ids)) or _actions_of(ids))
+
+    slideshow_set.set_action_filter("alpha")
+
+    assert len(asked) == 1, (
+        "each answer costs a walk of the library and a filter asks it of every item, so the "
+        "whole set is asked about at once")
+
+
 def test_a_filter_that_would_leave_nothing_is_refused_and_the_pass_left_alone():
     slideshow_set, dealt = _filterable()
 

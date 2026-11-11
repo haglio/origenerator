@@ -373,9 +373,11 @@ def put_caret_in_prompt(edit: QPlainTextEdit, offset: int) -> None:
 
 
 def untrack(edit: QPlainTextEdit) -> None:
+    caret = caret_in_prompt(edit)
     for tracker in edit.findChildren(_Tracker):
         tracker.detach()
     diff_text.clear_diff(edit)
+    put_caret_in_prompt(edit, caret)
     _unmark(edit)
     # Qt: text written into a field takes the format under the caret, so reset it
     edit.setCurrentCharFormat(_plain_format())

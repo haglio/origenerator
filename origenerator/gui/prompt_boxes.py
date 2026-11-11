@@ -383,9 +383,12 @@ class PromptBoxes(QWidget):
 
 
 def _put(box: QPlainTextEdit, text: str, share: str | None) -> None:
-    tracked_prompt.untrack(box)
-    box.setPlainText(text)
-    if share is not None:
+    if diff_text.live_text(box) != text:
+        tracked_prompt.untrack(box)
+        box.setPlainText(text)
+    if share is None:
+        tracked_prompt.untrack(box)
+    else:
         tracked_prompt.track(box, share, undo=False)
     box.setUndoRedoEnabled(False)
 

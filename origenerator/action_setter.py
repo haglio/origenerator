@@ -55,6 +55,7 @@ class Answer(NamedTuple):
     item: dict
     said: str
     item_actions: ItemActions
+    replaced: dict
 
 
 class Thrown(NamedTuple):
@@ -98,8 +99,8 @@ class SetterSession:
         if not self._line:
             return
         item = self._line.popleft()
-        self._store.set_actions(item["prompt_id"], self._side, item_actions)
-        self._done.append(Answer(item, said, item_actions))
+        replaced = self._store.set_actions(item["prompt_id"], self._side, item_actions)
+        self._done.append(Answer(item, said, item_actions, replaced))
 
     def skip(self) -> None:
         self._line.rotate(-1)
@@ -118,7 +119,7 @@ class SetterSession:
         if isinstance(done, Thrown):
             self._rubbish.back(_shown_id(done.item))
         else:
-            self._store.set_actions(done.item["prompt_id"], self._side, done.item.get("actions"))
+            self._store.put_back(self._side, done.replaced)
         self._line.appendleft(done.item)
 
 

@@ -40,6 +40,10 @@ def has_actions(row: dict, side: str) -> bool:
     return row.get(columns(side)[0]) is not None
 
 
+def actions_if_any(row: dict, side: str) -> ItemActions | None:
+    return actions_of(row, side) if has_actions(row, side) else None
+
+
 def stored(item_actions: ItemActions) -> tuple[str, str]:
     return json.dumps(list(item_actions.actions)), json.dumps(list(item_actions.checked))
 

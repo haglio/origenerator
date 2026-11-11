@@ -49,17 +49,10 @@ from origenerator.gui.action_setter_window import (
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.item_actions import ItemActions
 from origenerator.media import MediaType
+from tests.action_store_fake import ActionStore
 
 _BUTTONS = {"button one": ("alpha",), "button two": ("alpha", "beta"), "button three": ("gamma",)}
 _TILES = (Tile("button one", 0, 0), Tile("button two", 0, 1), Tile("button three", 1, 0))
-
-
-class _Store:
-    def __init__(self):
-        self.item_actions = {}
-
-    def set_actions(self, prompt_id, side, item_actions):
-        self.item_actions[prompt_id] = item_actions
 
 
 class _Stage(QWidget):
@@ -106,7 +99,7 @@ def _said(made, name) -> str:
 def window(qtbot, tmp_path):
     def build(*prompt_ids, items=None, drawings=None, tiles=None, checkboxes=(),
               side=MediaType.IMAGE, locks=None, keep_going=None, rubbish=None):
-        store = _Store()
+        store = ActionStore()
         listed = items or [{"prompt_id": p, "name": "3FA9C0D2 000", "path": None}
                            for p in prompt_ids]
         stage = _Stage()
@@ -125,7 +118,7 @@ def test_the_window_is_called_the_action_setter_tool_for_its_kind(window, qtbot,
     made, _store, _stage = window("first")
     for_videos = ActionSetterWindow(
         SetterSession([{"prompt_id": "vid", "name": "3FA9C0D2 000", "actions": None}],
-                      _Store(), MediaType.VIDEO),
+                      ActionStore(), MediaType.VIDEO),
         Vocabulary(_BUTTONS, _TILES, ("third box",), {}, {}, {}, {}), {},
         Locks(tmp_path / "locks.json"), stage=_Stage())
     qtbot.addWidget(for_videos)
@@ -730,7 +723,7 @@ def _as_it_opens(qtbot, tmp_path, side, tiles, *, set_before: bool):
     named = vocabulary(side, _the_example_overlay())
     named = Vocabulary(named.buttons, tiles or named.tiles, named.checkboxes, {}, {}, {}, {})
     item_actions = ItemActions(next(iter(named.buttons.values())), named.checkboxes) if set_before else None
-    made = ActionSetterWindow(SetterSession(_set_before(("first", item_actions)), _Store(), side),
+    made = ActionSetterWindow(SetterSession(_set_before(("first", item_actions)), ActionStore(), side),
                               named, {}, Locks(tmp_path / f"{set_before}.json"), stage=_Stage())
     qtbot.addWidget(made)
     made.setStyleSheet(build_stylesheet())

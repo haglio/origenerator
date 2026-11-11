@@ -94,6 +94,19 @@ def test_each_answer_is_saved_and_then_told_to_whoever_asked_to_hear_it(tmp_path
                       ItemActions(("alpha",), ("first box",)))]
 
 
+
+def test_an_answer_taken_back_is_told_too(tmp_path):
+    db = Database(tmp_path / "gallery.db")
+    _a_finished_image(db, "gen-one", 1)
+    heard = []
+    store = AnswersTold(db, lambda prompt_id, side, item_actions: heard.append(
+        (prompt_id, item_actions, actions_of(db.get_generation(prompt_id), side))))
+
+    store.put_back(MediaType.IMAGE, store.set_actions("gen-one", MediaType.IMAGE,
+                                                      ItemActions(("alpha",))))
+
+    assert heard[-1] == ("gen-one", None, ItemActions())
+
 def test_each_item_in_line_carries_the_actions_it_has_now_and_one_never_given_any_carries_none(
         tmp_path):
     db = Database(tmp_path / "gallery.db")

@@ -21,12 +21,6 @@ def _shown_from(row: dict, places, side: str):
     return row.get("thumbnail_path") if side == MediaType.IMAGE else None
 
 
-def _actions_now(row: dict, side: str):
-    from origenerator.item_actions import actions_of, has_actions
-
-    return actions_of(row, side) if has_actions(row, side) else None
-
-
 def _opened_on(first: str, rows: list[dict], line: list):
     from origenerator.action_setter import Waiting
 
@@ -41,6 +35,7 @@ def _opened_on(first: str, rows: list[dict], line: list):
 
 def waiting_items(db, places, side: str, first: str = "", *, returned=None) -> list[dict]:
     from origenerator.action_setter import waiting
+    from origenerator.item_actions import actions_if_any
     from origenerator.item_names import ItemNames
     from origenerator.sent_back import to_the_library
 
@@ -55,7 +50,7 @@ def waiting_items(db, places, side: str, first: str = "", *, returned=None) -> l
     return [{"prompt_id": entry.holder["prompt_id"], "shown_id": entry.shown["prompt_id"],
              "name": names.of(entry.shown["prompt_id"]),
              "path": _shown_from(entry.holder, places, side),
-             "actions": _actions_now(entry.holder, side)}
+             "actions": actions_if_any(entry.holder, side)}
             for entry in line]
 
 
@@ -63,11 +58,20 @@ class AnswersTold:
     def __init__(self, db, heard):
         self._db, self._heard = db, heard
 
-    def set_actions(self, prompt_id: str, side: str, item_actions) -> None:
+    def set_actions(self, prompt_id: str, side: str, item_actions) -> dict:
         from origenerator.published_actions import set_actions
 
-        set_actions(self._db, prompt_id, side, item_actions)
-        self._heard(prompt_id, side, item_actions)
+        replaced = set_actions(self._db, prompt_id, side, item_actions)
+        for each in replaced:
+            self._heard(each, side, item_actions)
+        return replaced
+
+    def put_back(self, side: str, replaced: dict) -> None:
+        from origenerator.published_actions import put_back
+
+        put_back(self._db, side, replaced)
+        for prompt_id, item_actions in replaced.items():
+            self._heard(prompt_id, side, item_actions)
 
 
 def _nobody_listening(_prompt_id: str, _side: str, _item_actions) -> None:

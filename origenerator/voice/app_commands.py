@@ -106,6 +106,7 @@ for _words, (_toggle, _on, _off) in (
         _say(_on, f"{_word} on")
         _say(_off, f"{_word} off")
 _say(AppCommand.MIC_OFF, "mic off", "voice off")
+# Whisper writes the letters either way: "osr two" or "o s r two".
 _say(AppCommand.DRIVE_OFF, "osr two off", "o s r two off")
 for _osr2 in ("osr two", "o s r two"):
     _say(AppCommand.DRIVE_OFF, f"{_osr2} control off")

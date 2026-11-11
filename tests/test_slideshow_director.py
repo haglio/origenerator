@@ -1074,7 +1074,10 @@ def test_a_region_opens_armed_with_the_versions_of_the_library_it_plays(slidesho
 
     open_both_shapes(director)
 
-    assert director.region_slideshow(PORTRAIT).versions == {"g4.png": ["newer", "older"]}
+    assert director.region_slideshow(PORTRAIT).versions == {"g4.png": ["newer", "older"]}, (
+        "versions read off the Gallery pane's rows name none of the slides on screen, and every "
+        "versions button on the HUD is then drawn faded however many enhancements the library "
+        "holds")
     assert director.region_slideshow(LANDSCAPE).versions == {"g5.png": ["newer", "older"]}
 
 
@@ -1350,12 +1353,15 @@ def test_a_landed_enhancement_hands_every_slideshow_its_new_thumbnail(
         "along with the new file")
 
 
+_WELL_BEFORE_ITS_UPSCALE = (1_000_000, 1_000_000)
+
+
 def _evolver_upscaled_video(tmp_path, monkeypatch):
     output = tmp_path / "output"
     video = output / "clip.mp4"
     video.parent.mkdir()
     video.write_bytes(b"video")
-    os.utime(video, (1_000_000, 1_000_000))
+    os.utime(video, _WELL_BEFORE_ITS_UPSCALE)
     library = tmp_path / "upscaled_by_orientation"
     upscale = library / "landscape" / "origenerator" / "clip_topaz.mp4"
     upscale.parent.mkdir(parents=True)

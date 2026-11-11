@@ -214,6 +214,8 @@ def test_right_click_requests_a_menu_for_this_tile(qtbot):
     qtbot.addWidget(tile)
     received = []
     tile.context_requested.connect(lambda key, pos: received.append(key))
+    assert tile.contextMenuPolicy() == Qt.ContextMenuPolicy.CustomContextMenu, (
+        "only under this policy is the signal emitted below what a right-click on the tile raises")
 
     tile.customContextMenuRequested.emit(QPoint(5, 5))
 

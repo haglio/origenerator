@@ -402,13 +402,10 @@ def test_a_selected_runs_tile_drawn_over_by_another_pane_is_let_go_of_quietly(qt
 
     try:
         view._on_thumbnail_clicked("orig")
-        reached_a_deleted_tile = False
-    except RuntimeError:
-        reached_a_deleted_tile = True
-
-    assert not reached_a_deleted_tile, (
-        "the run's tile is drawn inside the pane and is deleted with it, so the view must not "
-        "go on unselecting the tile it held")
+    except RuntimeError as error:
+        raise AssertionError(
+            "the run's tile is drawn inside the pane and is deleted with it, so the view must "
+            "not go on unselecting the tile it held") from error
 
 
 def test_selecting_the_reroll_highlights_its_tile_and_drops_thumbnail_picks(qtbot, tmp_path):

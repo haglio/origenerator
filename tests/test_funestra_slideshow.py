@@ -1460,7 +1460,8 @@ def test_a_jump_out_of_a_loop_hands_the_funestra_its_list_before_the_jump(
 
     slideshow.show_item("one-x.png")
 
-    assert (play_already_sent, _sent(slideshow)[-1:]) == ([False], ["PLAY_FILE one-x.png"]), (
+    plays = [verb for verb in _sent(slideshow) if verb.startswith("PLAY_FILE")]
+    assert (play_already_sent, plays) == ([False], ["PLAY_FILE one-x.png"]), (
         "a jump off the loop deals the pass again, which hands the Funestra the list, and only "
         "then may the one PLAY_FILE land in it")
 

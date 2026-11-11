@@ -389,14 +389,19 @@ def test_a_restored_query_comes_back_without_searching_again(controller):
     assert host.shown == []
 
 
-def test_a_restored_query_already_widened_comes_back_widened_from_its_first_draw(
-        controller, qtbot):
+def _typed_past_a_widened_query(controller, qtbot):
     host = FakeHost()
     expander = SearchExpander(expand=lambda query: {"kitten": ("tabby",)})
     found = controller([_row("g1", "a tabby on a wall")], host=host, expander=expander)
     _type(found, "kitten")
     _let_the_widening_land(qtbot, found)
     _type(found, "a box")
+    return host, found
+
+
+def test_a_restored_query_already_widened_comes_back_widened_from_its_first_draw(
+        controller, qtbot):
+    host, found = _typed_past_a_widened_query(controller, qtbot)
 
     found.restore("kitten")
     found.run()
@@ -409,12 +414,7 @@ def test_a_restored_query_already_widened_comes_back_widened_from_its_first_draw
 
 def test_a_query_typed_again_after_its_widening_landed_is_widened_from_its_first_draw(
         controller, qtbot):
-    host = FakeHost()
-    expander = SearchExpander(expand=lambda query: {"kitten": ("tabby",)})
-    found = controller([_row("g1", "a tabby on a wall")], host=host, expander=expander)
-    _type(found, "kitten")
-    _let_the_widening_land(qtbot, found)
-    _type(found, "a box")
+    host, found = _typed_past_a_widened_query(controller, qtbot)
 
     _type(found, "kitten")
 

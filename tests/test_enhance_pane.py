@@ -1702,8 +1702,8 @@ def test_a_version_with_no_settings_moved_far_while_pressed_is_still_a_click(
     qtbot.mouseRelease(thumbnail, Qt.MouseButton.LeftButton, pos=QPoint(90, 90))
 
     assert (version_drags, clicks) == ([], [0]), (
-        "a row refuses a drag of its own (no settings to take) before asking the gesture, since "
-        "the gesture forgets a press it says yes to, and the press is still the row's click")
+        "a row with no settings to take refuses the drag before asking the gesture, so the "
+        "press is still there to be its click")
 
 
 def test_a_big_versions_thumbnail_drags_at_the_shared_size(qtbot, tmp_path, version_drags):

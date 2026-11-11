@@ -716,6 +716,23 @@ def test_a_video_with_no_frame_yet_drags_bare(make_preview, tmp_path, drags):
     assert drag.pixmap is None
 
 
+def test_a_press_held_while_the_preview_is_disarmed_drags_once_it_is_armed_again(
+        make_preview, tmp_path, drags):
+    w = make_preview()
+    image = _make_png(tmp_path / "p.png")
+    w.show_image(image, "gen1")
+    _press(w, 0, 0)
+    w.show_frame(_png_bytes())
+    _move(w, 200, 200)
+
+    w.show_image(image, "gen1")
+    _move(w, 210, 210)
+
+    assert len(drags) == 1, (
+        "a caller refuses for its own reason before asking the gesture, since the gesture "
+        "forgets a press it says yes to, so the press is still waiting if the reason goes away")
+
+
 def test_an_unarmed_preview_does_not_drag(make_preview, tmp_path, drags):
     w = make_preview()
     w.show_image(_make_png(tmp_path / "p.png"))

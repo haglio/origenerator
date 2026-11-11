@@ -460,10 +460,14 @@ def test_one_folder_picked_on_both_shapes_stays_two_folders(qtbot):
     qtbot.addWidget(pane)
     GalleryTree(pane).populate([ShapeModel(LANDSCAPE, model), ShapeModel(PORTRAIT, model)])
 
-    for shape in (LANDSCAPE, PORTRAIT):
-        next(item for _depth, item in _rows_by_depth(pane._trees[shape])
-             if isinstance(item.data(0, GROUP_ROLE), gallery.SettingsGroup)).setSelected(True)
+    picked = [next(item for _depth, item in _rows_by_depth(pane._trees[shape])
+                   if isinstance(item.data(0, GROUP_ROLE), gallery.SettingsGroup))
+              for shape in (LANDSCAPE, PORTRAIT)]
+    for row in picked:
+        row.setSelected(True)
+    folder = picked[0].data(0, GROUP_ROLE).key
 
-    assert len(set(pane.selected_folder_keys())) == 2, (
+    assert sorted(pane.selected_folder_keys()) == sorted(
+        shaped_key(folder, shape) for shape in (LANDSCAPE, PORTRAIT)), (
         "a row's key carries the shape it is drawn on, so a pick across both shapes stays two "
         "folders")

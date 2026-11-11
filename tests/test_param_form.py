@@ -1824,7 +1824,7 @@ def test_a_scene_with_a_line_shuts_its_prompts_down_and_says_why(qtbot):
         assert scene.captions[key].toolTip() == SPEAKING_HELP
 
 
-def test_settings_loaded_with_a_line_shut_the_scenes_prompts_down_as_typing_one_does(qtbot):
+def test_a_line_loaded_alone_shuts_the_scenes_prompts_down(qtbot):
     form = ParamForm(_scene_defs())
     qtbot.addWidget(form)
     scene = form._widgets["scene_frames"]._scenes[0]

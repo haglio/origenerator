@@ -1294,8 +1294,11 @@ def test_double_clicking_the_slide_leaves_the_slideshow(qtbot):
 
     gestures.double_click(view._pane._window, _on_the_slide_clear_of_the_hud(view))
 
-    qtbot.waitUntil(lambda: not view.isVisible())
-    assert closes == [True]
+    def left():
+        assert not view.isVisible(), "the way out of every other fullscreen view here"
+
+    qtbot.waitUntil(left)
+    assert closes == [True], "the dismissal reaches the gallery, like Escape's"
 
 
 def test_double_clicking_a_thumbnail_on_the_map_gives_it_the_lock_buttons_whole_lock(qtbot):
@@ -2239,7 +2242,9 @@ def test_a_reopened_slideshow_shows_the_version_that_was_on_screen(qtbot, tmp_pa
     reopened.slideshow.resume(closed.slideshow.state())
     _settle(reopened)
 
-    assert _media_on_screen(reopened) == original
+    assert _media_on_screen(reopened) == original, (
+        "the versions are armed before the resume, as the gallery does: the resume steps to the "
+        "version that was on screen through the versions the slideshow already holds")
 
 
 def test_a_slideshow_following_a_running_generation_resumes_nothing(qtbot):

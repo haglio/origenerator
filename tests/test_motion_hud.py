@@ -11,7 +11,8 @@ class _Motion:
         self.asked = []
 
     def __getattr__(self, name):
-        if name.startswith("_"):
+        python_looking_around = name.startswith("_")
+        if python_looking_around:
             raise AttributeError(name)
         return lambda *args: self.asked.append((name, *args))
 
@@ -39,7 +40,9 @@ def test_each_motion_key_asks_the_driver_for_its_own_move(key, asked):
     assert motion.asked == [asked], (
         "the driver belongs to the whole app, since the device should not care which window is "
         "in front, so every surface that can drive it answers the same keys through this one "
-        "helper, and the keys are Genau's own so the habit carries")
+        "helper, and the keys are Genau's own so the habit carries; the signs are the point: J "
+        "and L are the same call in opposite directions, as are 7/9 and U/O, and a pair that "
+        "agreed would leave one of the two keys doing nothing a user could see")
 
 
 @pytest.mark.parametrize("key", [Qt.Key.Key_K, Qt.Key.Key_Slash],

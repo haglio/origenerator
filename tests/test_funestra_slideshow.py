@@ -487,7 +487,8 @@ def test_a_step_off_a_lock_the_funestra_has_not_said_it_took_takes_the_lock_back
     slideshow.tick()
 
     assert sent == ["LOCK_OFF", "NEXT"]
-    assert asked == []
+    assert asked == [], (
+        "the Funestra says two.png is locked, as it would had the lock gone with the step")
 
 
 def test_locking_an_item_whose_enhancement_is_waiting_still_asks_so_it_goes_first(

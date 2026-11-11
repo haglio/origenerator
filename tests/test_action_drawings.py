@@ -10,8 +10,10 @@ from origenerator.action_drawings import (
 
 def test_a_states_drawing_sits_under_the_librarys_own_folder_named_for_it():
     assert drawing_path("state one") == DRAWINGS_DIR / "state-one.png"
-    assert drawing_path("Alpha, Beta") == DRAWINGS_DIR / "alpha-beta.png"
-    assert drawing_path("no-hands gamma") == DRAWINGS_DIR / "no-hands-gamma.png"
+    assert drawing_path("Alpha, Beta") == DRAWINGS_DIR / "alpha-beta.png", (
+        "a shape the real names come in: two states in one")
+    assert drawing_path("no-hands gamma") == DRAWINGS_DIR / "no-hands-gamma.png", (
+        "a shape the real names come in: a hyphen")
 
 
 def test_a_state_with_no_drawing_installed_answers_with_none(tmp_path, monkeypatch):

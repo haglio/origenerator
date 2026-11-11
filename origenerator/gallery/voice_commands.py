@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from origenerator.animate_command import (
+    GENAU_SAID_WHEN_NOT_HEARD,
     animate_command_phrases,
     animate_command_spelling,
     match_animate_command,
@@ -49,7 +50,7 @@ def recognized_spelling(text: str) -> str | None:
     return " ".join([ENHANCE_COMMAND, *trailing])
 
 
-GENAU_SAID: tuple[str, ...] = ("genau", "go now")
+GENAU_SAID: tuple[str, ...] = ("genau", GENAU_SAID_WHEN_NOT_HEARD)
 
 
 def said_in(phrase: str) -> str | None:

@@ -788,7 +788,9 @@ def test_the_target_is_taken_at_the_opening_step_and_kept(router):
 
     voice.on_spoken_request(Spoken("no hat"))
 
-    assert begun == ["g1"]
+    assert begun == ["g1"], (
+        "the working-out itself goes to a pool thread, whose answer would land whenever it landed; "
+        "what this is about is which image it is begun on")
     assert voice._request_target is None
 
 

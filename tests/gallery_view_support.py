@@ -1089,14 +1089,16 @@ def _requestable_db(tmp_path, prompt="a woman, a hat, soft light"):
     return db
 
 
+def _from_the_words_alone_with_no_local_model(positive, negative, words, *, in_scenes=False, **_):
+    return request_applier(in_scenes)(positive, negative, words)
+
+
 def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, places: ("orig.png", "image"))
     view = GalleryView(_requestable_db(tmp_path, **kw), client=_reroll_client())
     qtbot.addWidget(view)
-    view._voice.requests._work_out = (
-        lambda positive, negative, words, *, in_scenes=False, **_:
-            request_applier(in_scenes)(positive, negative, words))
+    view._voice.requests._work_out = _from_the_words_alone_with_no_local_model
     view._voice.requests._wait_for_the_graphics_card = lambda comfyui, holder, **settings: True
     view._buttons.mic.setChecked(True)
     view.refresh()

@@ -1102,7 +1102,8 @@ def test_the_launch_recovers_generation_times_from_comfyuis_logs(qapp, library):
 
     db = _boot(library)
 
-    assert db.get_generation("p1")["duration_seconds"] == 15.26
+    assert db.get_generation("p1")["duration_seconds"] == 15.26, (
+        "so estimates have history to draw on before any new run is timed live")
 
 
 def _held_trashed(library_path, prompt_id, *, days_ago):

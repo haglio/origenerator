@@ -11,7 +11,7 @@ CONTRACT = Path("broker") / "broker_contract.json"
 
 
 def _broker_contract_found_by_walking_up_from_here() -> dict:
-    # git leaves an ignored file out of a worktree, so the content overlay there is only the placeholder.
+    # git leaves ignored files out of a new worktree, and the content overlay is ignored.
     for parent in Path(__file__).resolve().parents:
         published = parent / CONTRACT
         if published.is_file():

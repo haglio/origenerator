@@ -207,6 +207,14 @@ def test_each_fold_adds_a_version_naming_the_settings_that_made_it(tmp_path):
     assert versions[1].settings == "2x · 20 steps · 0.15 redraw"
     assert versions[2].settings == ""
     assert versions[2].is_original
+    places = OutputPlaces.in_one_folder(tmp_path / "output")
+    for version in versions:
+        on_disk = gallery.output_file_path(version.file, places)
+        on_disk.parent.mkdir(parents=True, exist_ok=True)
+        on_disk.write_bytes(b"")
+    opened, _kind = gallery.resolve_preview(db.get_generation("src"), places)
+    assert opened.name == versions[0].file["filename"], (
+        "the versions are listed most-enhanced first, which is also what the preview opens on")
 
 
 def test_each_enhancement_is_counted_out_of_the_enhancements_and_the_original_is_not(tmp_path):

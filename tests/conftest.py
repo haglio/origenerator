@@ -459,15 +459,19 @@ def _deliver_the_deletions_already_scheduled():
         QCoreApplication.sendPostedEvents()
 
 
+def _widgets_something_still_holds() -> int:
+    _deliver_the_deletions_already_scheduled()
+    gc.collect()
+    return len(QApplication.allWidgets())
+
+
 @pytest.fixture(autouse=True, scope="session")
 def _the_live_widget_count_stays_flat():
     before = len(QApplication.allWidgets()) if QApplication.instance() else 0
     yield
     if QApplication.instance() is None:
         return
-    _deliver_the_deletions_already_scheduled()
-    gc.collect()
-    grown = len(QApplication.allWidgets()) - before
+    grown = _widgets_something_still_holds() - before
     assert grown <= _WIDGET_TAIL_ALLOWANCE_TWICE_THE_26_TO_27_MEASURED, (
         f"{grown} more live widgets at session end than at start: the "
         f"per-test reap is no longer keeping the live object count flat"

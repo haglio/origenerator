@@ -1526,7 +1526,9 @@ class TestAnOverlayShortOfAKey:
 
         said = " ".join(str(arg) for arg in told.call_args.args)
         for key in self.SHORT:
-            assert key in said
+            assert key in said, (
+                "the overlay is git-ignored and kept by hand, so it does not gain a key when the "
+                "app does: every missing one is named")
         assert "content.local.json" in said
         assert "content.example.json" in said
         assert "can be left empty to switch that feature off" in said
@@ -1541,10 +1543,14 @@ class TestAnOverlayShortOfAKey:
             code = main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"}))
 
         assert code != 0
-        told.assert_not_called()
+        assert told.call_args_list == [], (
+            "hosted, nobody is at this window to dismiss a dialog, and it would sit over one of "
+            "the session's Funestras")
         printed = capsys.readouterr().err
         for key in self.SHORT:
-            assert key in printed
+            assert key in printed, (
+                "said on the console, since nothing is logged yet: logging is configured from "
+                "config, which is what a missing key stops from importing")
 
     def test_a_complete_overlay_says_nothing_and_boots(self, qapp):
         told = MagicMock()

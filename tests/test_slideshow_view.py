@@ -2156,7 +2156,9 @@ def test_a_reopened_slideshow_carries_on_in_the_order_it_was_playing(qtbot):
     _settle(reopened)
 
     _press(reopened, Qt.Key.Key_Right)
-    assert reopened.slideshow._set.playlist.current()[2] == "id-a"
+    assert reopened.slideshow._set.playlist.current()[2] == "id-a", (
+        "a fresh shuffle would lead with a and step on to b; only the pass carried over comes "
+        "to a here")
 
 
 def test_a_slide_closed_under_a_lock_reopens_locked(qtbot):

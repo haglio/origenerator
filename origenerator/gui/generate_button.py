@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QMessageBox, QPlainTextEdit, QPushButton
 
 from origenerator.gui.prompt_marks import only_unread_emphasis_to_resolve, problem_to_resolve
@@ -19,6 +19,7 @@ class GenerateButton(QPushButton):
     def __init__(self, parent=None):
         super().__init__(DEFAULT_CAPTION, parent)
         self.setObjectName("generateBtn")
+        self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
         self._caption = DEFAULT_CAPTION
         self._guard_timer = QTimer(self)
         self._guard_timer.setSingleShot(True)

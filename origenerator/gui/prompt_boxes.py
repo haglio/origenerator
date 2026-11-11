@@ -99,16 +99,20 @@ class TidiesOnLeaving(QObject):
 
     def __init__(self, field: QPlainTextEdit, on_left: Callable[[bool], None]):
         super().__init__(field)
+        self._field = field
         self._on_left = on_left
         self._on_entering = diff_text.live_text(field)
         field.installEventFilter(self)
+
+    def typed_in_since_entering(self) -> bool:
+        return diff_text.live_text(self._field) != self._on_entering
 
     def eventFilter(self, watched, event) -> bool:
         if event.type() == QEvent.Type.FocusIn:
             self._on_entering = diff_text.live_text(watched)
         elif (event.type() == QEvent.Type.FocusOut
               and event.reason() not in self._STILL_BEING_TYPED_IN):
-            self._on_left(diff_text.live_text(watched) != self._on_entering)
+            self._on_left(self.typed_in_since_entering())
         return False
 
 
@@ -363,12 +367,16 @@ class PromptBoxes(QWidget):
             tracked_prompt.put_caret_in_prompt(target, len(diff_text.live_text(target)))
         self.textChanged.emit()
 
+    def value_as_left(self) -> str:
+        if self._as_made:
+            return self.value()
+        return tidied(BOX_BREAK.join(self._texts), reads_numbers=reads_numbers(self._reading))
+
     def _left_a_box(self, _changed: bool) -> None:
-        if self._as_made or QApplication.focusWidget() in self._boxes:
+        if QApplication.focusWidget() in self._boxes:
             return
-        value = BOX_BREAK.join(self._texts)
-        tidy = tidied(value, reads_numbers=reads_numbers(self._reading))
-        if tidy != value:
+        tidy = self.value_as_left()
+        if tidy != self.value():
             self.edit(tidy)
 
     def _count_down(self) -> None:

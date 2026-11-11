@@ -55,7 +55,7 @@ from origenerator.gui.param_help import (
 from origenerator.gui.preset_dropdown import PresetDropdown
 from origenerator.gui.prompt_boxes import PromptBoxes, mark_in_use, set_in_use
 from origenerator.gui.request_exchange import RequestExchange
-from origenerator.gui.scenes_editor import ScenesEditor
+from origenerator.gui.scenes_editor import SPOKEN_OVER, ScenesEditor
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.gui.training_controls import TrainingRows
 from origenerator.gui.warning_mark import WarningMark
@@ -740,6 +740,15 @@ class ParamForm(QWidget):
 
     def get_values(self) -> dict:
         return self._collect()
+
+    def values_as_left(self) -> dict:
+        values = self._collect()
+        for key, widget in self._widgets.items():
+            if isinstance(widget, PromptBoxes):
+                values[key] = widget.value_as_left()
+            elif widget is self._scenes and key in SPOKEN_OVER:
+                values[key] = widget.story_as_left(key)
+        return values
 
     def folds(self) -> dict[str, bool]:
         return {title: section.is_collapsed() for title, section in self._sections.items()}

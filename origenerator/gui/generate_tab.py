@@ -763,7 +763,7 @@ class GenerateTab(DropZones):
                 self._generate_btn.flash_guard(_MODIFY_BATCH_GUARD)
                 return
             self.modify_batch_requested.emit(self._modify_batch.folder_key, key,
-                                             self._param_form.get_values())
+                                             self._param_form.values_as_left())
             return
         if self._would_remake_what_it_shows():
             self.use_random_seed()
@@ -771,13 +771,13 @@ class GenerateTab(DropZones):
         self._param_form.roll_random_seeds()
 
     def _batch_of(self, how_many: int) -> list[dict]:
-        batch = [self._param_form.get_values()]
+        batch = [self._param_form.values_as_left()]
         while len(batch) < how_many:
             if self._param_form.random_seed_keys():
                 self._param_form.roll_random_seeds()
             else:
                 self.use_random_seed()
-            batch.append(self._param_form.get_values())
+            batch.append(self._param_form.values_as_left())
         return batch
 
     def set_settings_source(self, category: str, video_prompt_id: str | None,

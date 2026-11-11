@@ -99,7 +99,8 @@ def spoken_phrases() -> frozenset[str]:
 
 
 def hosted_phrases() -> frozenset[str]:
-    return phrases_answered_when_hosted() | _what_is_said_to_a_surface() | {LEAD_WORDS[0]}
+    return (phrases_answered_when_hosted() | command_phrases()
+            | frozenset(COLLECTION_KEYS.keys() - {EXPERIMENTS_LABEL.lower()}) | {LEAD_WORDS[0]})
 
 
 def _what_is_said_to_a_surface() -> frozenset[str]:

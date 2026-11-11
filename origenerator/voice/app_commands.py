@@ -190,7 +190,7 @@ def spoken_phrases() -> frozenset[str]:
 
 
 def _answered_when_hosted(command: AppCommand | BarSetting) -> bool:
-    if isinstance(command, BarSetting) or command in MOTION_MOVES:
+    if isinstance(command, BarSetting) or command in MOTION_MOVES or command is AppCommand.EXPERIMENTS:
         return False
     return command not in SWITCHES or SWITCHES[command][0] not in SWITCHES_A_HOST_HOLDS
 

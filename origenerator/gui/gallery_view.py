@@ -103,6 +103,7 @@ from origenerator.gui.gallery_pane import (
     TreeNavigation,
 )
 from origenerator.gui.gallery_pane_buttons import (
+    GROUP_TIP,
     POPULATE_ELSEWHERE_TIP,
     Button,
     ButtonHandlers,
@@ -1863,7 +1864,7 @@ class GalleryView(QWidget):
             redo=Button(enabled=self._edits.can_redo(),
                         tip=f"Redo: {redo_label}" if redo_label else "Nothing to redo"),
             group=Button(visible=self._selection_group is not None,
-                         tip="Group the selected folders into a collection of your own"),
+                         tip=GROUP_TIP),
             favorite=self._favorite_offer(),
             enhance=Button(enabled=enhance.available, tip=enhance.tip),
             delete=self._delete_offer(),

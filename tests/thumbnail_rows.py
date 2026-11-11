@@ -36,6 +36,7 @@ def painted_row(field, row, *, under_the_mouse=False):
     canvas.fill(QColor("black"))
     option = QStyleOptionViewItem()
     option.initFrom(view)
+    # A Qt view gives State_HasFocus to its current row alone.
     option.state &= ~QStyle.StateFlag.State_HasFocus
     option.rect = QRect(QPoint(0, 0), size)
     option.widget = view

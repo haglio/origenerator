@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from app_support import kino_folder
+from app_support.gallery_records import PLACES, recorded_block
 from app_support.gallery_rows import VideoRows
 from app_support.win32 import mutex_name
 from funestra.video_families import seed_group_and_seed
@@ -32,13 +33,7 @@ from origenerator.thumbnail import (
     generate_animated_thumbnail,
     generate_thumbnail,
 )
-from origenerator.workflows.outside import (
-    PLACES,
-    VideoKind,
-    outside_source,
-    outside_workflow,
-    recorded_block,
-)
+from origenerator.workflows.outside import VideoKind, outside_source, outside_workflow
 
 FRAME_PIXELS = 2_000_000
 VIDEOS_PER_WRITE = 100

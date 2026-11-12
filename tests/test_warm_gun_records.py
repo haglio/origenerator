@@ -53,7 +53,8 @@ def test_the_phone_gets_each_ai_videos_record_under_the_place_it_plays_from(tmp_
     records = records_for_the_phone(db.list_generations(), played_from, length_of=_seconds(5.0))
 
     assert records == {"videos/videos/kino/2D/AI/portrait/scene one.mp4": {
-        "video": {"prompt": "a slow walk", "seed": "7", "action": "alpha", "type": "excerpt"},
+        "video": {"prompt": "a slow walk", "seed": "7", "action": "alpha",
+                  "orientation": "portrait", "type": "excerpt"},
         "favorite": True,
         "watch": {"completions": 3, "skips": 0, "locks": 0, "weight": 2.0}}}
 

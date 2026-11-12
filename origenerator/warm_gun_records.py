@@ -8,16 +8,13 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import NamedTuple
 
+from app_support.gallery_records import GalleryReading
 from app_support.kino_folder import is_ai_video
-from app_support.video_kind import classify
-from app_support.watch_weights import WATCH_BLOCK, WEIGHT_KEY, weight_for
 
 from origenerator import config
-from origenerator.db_generations import WATCH_COLUMNS
 from origenerator.evolver_agreement import evolver_checkout, records_folder
 from origenerator.evolver_export import PARTIAL_MARKER
 from origenerator.media import MediaType, media_type_from_filename, video_header
-from origenerator.video_records import GalleryReading
 
 FILE_NAME = "gallery_records.json"
 
@@ -37,15 +34,9 @@ def records_for_the_phone(rows: list[dict], played_from: PlayedFrom, *,
             row = reading.row_of(video)
             if row is None:
                 continue
-            record = reading.record_of(row)
-            counts = {field: int(row.get(column) or 0) for field, column in WATCH_COLUMNS}
             genau = folder == played_from.genau
-            kind = classify(genau=genau, excerpt=False,
-                            duration_seconds=None if genau else length_of(video, row))
-            records[video.relative_to(played_from.library_root).as_posix()] = {
-                **record, "video": {**record["video"], "type": kind},
-                "favorite": bool(row.get("starred")),
-                WATCH_BLOCK: {**counts, WEIGHT_KEY: weight_for(counts)}}
+            records[video.relative_to(played_from.library_root).as_posix()] = reading.record_of(
+                row, where=video, genau=genau, seconds=None if genau else length_of(video, row))
     return records
 
 

@@ -24,6 +24,7 @@ def _monitors_by_shape() -> dict:
 
 class TwoScreens(QObject):
     switched = Signal()
+    core_is_up = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)

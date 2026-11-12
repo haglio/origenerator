@@ -27,6 +27,7 @@ class SlideshowActions:
     start_now: Callable[[], None] | None = None
     cancel_all: Callable[[], None] | None = None
     core_window: Callable[[], object] | None = None
+    leave_for_core: Callable[[str | None], bool] | None = None
     drive_toggle: Callable[[], None] | None = None
     omnipause: Callable[[], None] | None = None
     move_hud: Callable[[str], None] | None = None

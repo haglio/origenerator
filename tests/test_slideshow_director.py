@@ -1019,6 +1019,103 @@ def test_a_switch_moves_the_slideshow_up_to_the_monitor_core_left(slideshows, mo
         LANDSCAPE_MONITOR.getRect(), True)
 
 
+def _core_showing_a_folder(slideshows, monkeypatch, *, monitors=HIS_TWO_MONITORS, **kwargs):
+    monkeypatch.setattr(two_screens, "screens", lambda: monitors)
+    monkeypatch.setattr(module, "bring_to_front", lambda window: None)
+    host = FakeHost(location="workflow/a", rows=[_row("g1"), _row("g2")])
+    return slideshows(host, **kwargs)
+
+
+def test_once_core_is_up_a_slideshow_of_what_core_shows_is_up_on_the_other_monitor(
+        slideshows, monkeypatch):
+    director, _host, made = _core_showing_a_folder(slideshows, monkeypatch)
+
+    director.two_screens.core_is_up.emit()
+
+    (slideshow,) = made
+    assert ([item[2] for item in slideshow.items], slideshow.shown.geometry) == (
+        ["g1", "g2"], PORTRAIT_MONITOR.getRect())
+
+
+def test_the_slideshow_core_brings_up_leaves_core_on_the_monitor_it_was_left_on(
+        slideshows, monkeypatch):
+    director, _host, _made = _core_showing_a_folder(slideshows, monkeypatch)
+
+    director.two_screens.core_is_up.emit()
+
+    assert director.two_screens.core_on() == LANDSCAPE
+
+
+def test_core_coming_up_again_leaves_the_slideshow_that_is_up_playing(slideshows, monkeypatch):
+    director, _host, made = _core_showing_a_folder(slideshows, monkeypatch)
+    director.two_screens.core_is_up.emit()
+
+    director.two_screens.core_is_up.emit()
+
+    assert len(made) == 1
+
+
+def test_core_coming_up_on_the_only_monitor_opens_no_slideshow(slideshows, monkeypatch):
+    director, _host, made = _core_showing_a_folder(
+        slideshows, monkeypatch, monitors=HIS_TWO_MONITORS[:1])
+
+    director.two_screens.core_is_up.emit()
+
+    assert made == []
+
+
+def test_core_coming_up_in_a_session_opens_no_slideshow_of_its_own(slideshows, monkeypatch):
+    director, _host, made = _core_showing_a_folder(slideshows, monkeypatch,
+                                                   fun_time=FakeSession())
+
+    director.two_screens.core_is_up.emit()
+
+    assert made == []
+
+
+def test_leaving_a_slideshow_that_has_its_own_monitor_shows_its_item_in_core_and_keeps_it_up(
+        slideshows, monkeypatch):
+    director, host, made = _core_showing_a_folder(slideshows, monkeypatch)
+    fronted = []
+    monkeypatch.setattr(module, "bring_to_front", fronted.append)
+    director.two_screens.core_is_up.emit()
+
+    stayed = made[0].actions.leave_for_core("g2")
+
+    assert (stayed, host.revealed, made[0].closes, fronted) == (True, ["g2"], 0, [host.core])
+
+
+def test_leaving_a_slideshow_for_an_item_core_does_not_list_follows_it_to_its_folder(
+        slideshows, monkeypatch):
+    director, host, made = _core_showing_a_folder(slideshows, monkeypatch)
+    director.two_screens.core_is_up.emit()
+
+    made[0].actions.leave_for_core("elsewhere")
+
+    assert host.followed == ["elsewhere"]
+
+
+def test_leaving_a_slideshow_that_shares_cores_monitor_is_left_to_close(slideshows, monkeypatch):
+    director, host, made = _core_showing_a_folder(
+        slideshows, monkeypatch, monitors=HIS_TWO_MONITORS[:1])
+    director.start()
+
+    stayed = made[0].actions.leave_for_core("g2")
+
+    assert (stayed, host.revealed) == (False, [])
+
+
+def test_the_spoken_close_leaves_a_slideshow_on_its_own_monitor_up_and_shows_its_item_in_core(
+        slideshows, monkeypatch):
+    director, host, made = _core_showing_a_folder(slideshows, monkeypatch)
+    director.two_screens.core_is_up.emit()
+    made[0].hud_prompt_id = "g1"
+
+    director.run_slideshow_command(SlideshowCommand.STOP, None)
+
+    assert (made[0].closes, host.revealed, host.said) == (0, ["g1"], [])
+
+
 def test_asked_to_switch_sides_on_its_own_it_trades_the_monitors(slideshows):
     director, _host, _made = slideshows()
 

@@ -470,6 +470,29 @@ def test_enter_leaves_for_the_shown_items_folder(qtbot):
     assert is_closed(view)
 
 
+@pytest.mark.parametrize("key", [(Qt.Key.Key_Return,),
+                                 (Qt.Key.Key_Escape, Qt.KeyboardModifier.ShiftModifier)])
+def test_a_slideshow_with_a_monitor_of_its_own_stays_up_and_hands_core_its_item(qtbot, key):
+    left_for = []
+    view = _view(qtbot, [("a.png", "image", "id-a"), ("b.png", "image", "id-b")],
+                 on_leave_for_core=lambda prompt_id: left_for.append(prompt_id) or True)
+    view.show()
+    _settle(view)
+
+    _press(view, *key)
+
+    assert (left_for, view.isVisible(), view.slideshow.is_showing()) == (["id-a"], True, True)
+
+
+def test_a_slideshow_core_will_not_take_from_closes_as_it_always_did(qtbot):
+    view = _view(qtbot, on_leave_for_core=lambda prompt_id: False)
+    view.show()
+
+    _press(view, Qt.Key.Key_Return)
+
+    assert is_closed(view)
+
+
 def _collection_view(qtbot):
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
     view = SlideshowView(items, ViewShow(shuffle=lambda order: None), ViewWiring(engine=FakeEngine()))

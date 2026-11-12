@@ -457,6 +457,24 @@ def test_a_folder_you_named_is_found_by_that_name(qtbot):
     assert view.listed_prompt_ids() == ["i2"]
 
 
+def test_a_folder_of_your_own_made_since_the_last_rebuild_is_found_by_its_name(qtbot):
+    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    beach_trip = db.create_custom_collection("Beach trip")
+    db.add_items_to_custom_collection(beach_trip, ["i2"])
+    view.refresh()
+
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
+    _search_for(view, "beach trip")
+
+    assert view.listed_prompt_ids() == ["i2"], (
+        "a row is indexed under the names of the folders it sits in, so the indexing waits "
+        "until this rebuild has read the user's own folders; indexed earlier it would carry the "
+        "last rebuild's folder names")
+
+
 def test_a_folder_is_found_by_the_code_the_tree_shows_for_it(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)

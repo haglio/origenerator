@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import NamedTuple
 
+import shiboken6
 from funestra.hud_title import F_MODE_LABEL
 from funestra.main_hud import OSR2_PARKED, OSR2_RETRACTED
 from PIL import Image
@@ -33,6 +34,7 @@ from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.commands import CollectionCommand, SurfaceCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import part_table
+from tests.closed_windows import is_closed
 from tests.gallery_view_support import (
     FakeDB,
     _FakeRadio,
@@ -378,7 +380,7 @@ def test_a_new_slideshow_replaces_the_regions_current_occupant(qtbot, tmp_path, 
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("second", 90, 200))
     second = view._slideshows._region_slideshows["portrait"]
     assert second is not first
-    assert not first.shown.isVisible()
+    assert is_closed(first.shown)
     assert second.shown.isVisible()
     for slideshow in (first, second):
         qtbot.addWidget(slideshow.shown)
@@ -984,8 +986,19 @@ def test_closing_the_gallery_closes_the_slideshow_it_opened(qtbot, tmp_path, mon
 
     view.close()
 
-    assert not slideshow.shown.isVisible()
+    assert is_closed(slideshow.shown)
     assert view._slideshows._live_slideshows == []
+
+
+def test_a_closed_slideshows_window_is_deleted(qtbot, tmp_path, monkeypatch):
+    view = GalleryView(FakeDB([_image("id-tall-0", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200))
+    window = view._slideshows.showing.shown
+
+    window.close()
+
+    qtbot.waitUntil(lambda: not shiboken6.isValid(window))
 
 
 def test_reset_on_a_slideshow_puts_the_side_back_how_it_started(qtbot, tmp_path, monkeypatch):

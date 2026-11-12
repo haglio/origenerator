@@ -105,6 +105,7 @@ class FunestraPane(QWidget):
         self._tick.setInterval(_TICK_MS)
         self._tick.timeout.connect(self.tick)
         self._stop_moving = threading.Event()
+        self.destroyed.connect(self._stop_moving.set)
         self._mover: threading.Thread | None = None
         self._running_ahead = ExitStack()
         channel.on_a_list = self._open_if_ready

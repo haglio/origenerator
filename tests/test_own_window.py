@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import pytest
+import shiboken6
 from PySide6.QtWidgets import (
     QApplication,
     QLabel,
     QMessageBox,
     QPlainTextEdit,
+    QWidget,
 )
 from shared_ui.preview import Preview
 
@@ -171,3 +173,16 @@ def test_a_window_is_not_opened_when_the_content_overlay_lacks_a_key(qapp, said)
         "Check", build, launcher="x", find_missing_overlay_keys=lambda: ["alpha", "beta"])
     assert opened == 1
     assert said == ["The content overlay is missing: alpha, beta"]
+
+
+def test_a_window_shown_on_its_own_is_deleted_once_closed_and_no_longer_open(qtbot, monkeypatch):
+    window = QWidget()
+    monkeypatch.setattr(window, "showMaximized", window.show)
+    own_window.show_or_say("Action setter tool", window)
+    assert own_window.still_open(window)
+
+    window.close()
+
+    qtbot.waitUntil(lambda: not shiboken6.isValid(window))
+    assert not own_window.still_open(window)
+    assert not own_window.still_open(None)

@@ -27,6 +27,7 @@ from origenerator.gui.slideshow_view import HudWear, SlideshowView, ViewShow, Vi
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.slideshow import in_order
 from tests import gestures
+from tests.closed_windows import is_closed
 from tests.motion_doubles import FakeMotion
 from tests.slideshow_hud_support import button_on_screen, hud_targets
 
@@ -749,5 +750,5 @@ class TestASlideshowOverASessionsRegion:
 
         gestures.double_click(window, QPoint(window.width() * 3 // 4, window.height() * 3 // 4))
 
-        qtbot.waitUntil(lambda: not window.isVisible())
+        qtbot.waitUntil(lambda: is_closed(window))
         assert asked == ["the room's pause"] * 2

@@ -31,6 +31,7 @@ from origenerator.gui import (
 )
 from origenerator.gui.gallery_view import GalleryView, Shared
 from tests import gestures
+from tests.closed_windows import is_closed
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import (
     _REROLL_HISTORY,
@@ -522,6 +523,7 @@ def test_double_clicking_a_generating_preview_opens_it_fullscreen(qtbot, monkeyp
 def test_a_slideshow_closed_before_it_became_active_asks_for_no_keyboard_focus(qtbot, monkeypatch):
     _view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch)
     window = slideshow.shown
+    window.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
 
     window.close()
     QApplication.processEvents()
@@ -641,7 +643,7 @@ def test_leaving_a_paused_slideshow_leaves_the_room_paused(qtbot, monkeypatch, l
     _click_the_slide(slideshow)
 
     leave(slideshow)
-    qtbot.waitUntil(lambda: not slideshow.shown.isVisible())
+    qtbot.waitUntil(lambda: is_closed(slideshow.shown))
 
     assert (motion.frozen, radio.frozen, omnipause.frozen()) == (True, True, True)
 
@@ -881,7 +883,7 @@ def test_shift_esc_at_a_standalone_slideshow_closes_it_and_leaves_the_room_playi
 
     gestures.press_key(slideshow.shown, Qt.Key.Key_Escape, Qt.KeyboardModifier.ShiftModifier)
 
-    qtbot.waitUntil(lambda: not slideshow.shown.isVisible())
+    qtbot.waitUntil(lambda: is_closed(slideshow.shown))
     assert not omnipause.frozen()
     assert not radio.frozen
 

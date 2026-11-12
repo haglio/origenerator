@@ -23,5 +23,6 @@ class ReferenceWindow(QObject):
             self._dialog = ReferenceDialog(reference_sections(),
                                            icon=self._button.window().windowIcon())
             self._dialog.finished.connect(lambda _result: self._button.setChecked(False))
+            self.destroyed.connect(self._dialog.deleteLater)
         self._dialog.show()
         self._dialog.raise_()

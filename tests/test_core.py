@@ -56,6 +56,7 @@ from origenerator.run_toast import RunOutcome
 from origenerator.slideshow import SlideshowFilters, SlideshowState
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests import gestures
+from tests.closed_windows import is_closed
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import _collection, _select_first_leaf, _selected_folder
 from tests.test_combine import _listed_under_recent
@@ -250,7 +251,7 @@ def test_ctrl_alt_q_in_a_slideshow_takes_the_slideshow_down_with_the_app(
     gestures.press_key(slideshow.shown, Qt.Key.Key_Q, _CTRL_ALT)
 
     assert not win.isVisible()
-    assert not slideshow.shown.isVisible()
+    assert is_closed(slideshow.shown)
 
 
 def test_closing_it_takes_down_the_action_setter_tool_it_opened(qtbot, tmp_path, monkeypatch):

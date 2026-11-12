@@ -32,6 +32,7 @@ from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.hud_queue import CANCEL
 from origenerator.gui.slideshow_pace import DEFAULT_S
 from origenerator.slideshow_buttons import answer
+from tests.closed_windows import is_closed
 from tests.gallery_view_support import (
     _REROLL_HISTORY,
     FakeActions,
@@ -322,7 +323,7 @@ def test_close_slideshows_clears_both_regions(qtbot, tmp_path, monkeypatch):
     (tmp_path / "origenerator_cmd.txt").write_text("CLOSE_SLIDESHOWS\n", encoding="utf-8")
     bridge._tick()
 
-    assert not slideshow.shown.isVisible()
+    assert is_closed(slideshow.shown)
     assert view.region_slideshow("portrait") is None
 
 

@@ -89,9 +89,9 @@ class CombineController(QObject):
             self.widget.hide()
 
     def _on_animation_settings(self) -> None:
-        from origenerator.own_window import show_or_say  # noqa: PLC0415 -- Qt only
+        from origenerator.own_window import show_or_say, still_open  # noqa: PLC0415 -- Qt only
 
-        if self._animation_settings is not None and self._animation_settings.isVisible():
+        if still_open(self._animation_settings):
             self._animation_settings.raise_()
             self._animation_settings.activateWindow()
             return

@@ -82,7 +82,7 @@ def test_a_launch_that_finds_the_library_held_says_so_once_its_screen_is_down_an
     _a_loading_screen_saying_when_it_goes_down(boot, events)
     told = MagicMock(side_effect=lambda *said: events.append(said[-1]))
 
-    with patch("PyQt6.QtWidgets.QMessageBox.information", told):
+    with patch("PySide6.QtWidgets.QMessageBox.information", told):
         assert boot.claim_the_library(_copies(None)) == 1
 
     assert events == ["loading screen down", "Another copy of Origenerator is already running."]
@@ -93,7 +93,7 @@ def test_a_click_on_a_toast_while_another_copy_runs_is_left_to_that_copy_without
     monkeypatch.setenv(app_link.CARRIED_IN, "alpha-1")
     told = MagicMock()
 
-    with patch("PyQt6.QtWidgets.QMessageBox.information", told):
+    with patch("PySide6.QtWidgets.QMessageBox.information", told):
         assert boot.claim_the_library(_copies(None)) == 0
 
     told.assert_not_called()
@@ -102,7 +102,7 @@ def test_a_click_on_a_toast_while_another_copy_runs_is_left_to_that_copy_without
 def test_the_copy_fun_time_opens_goes_on_without_the_library(hosted):
     told = MagicMock()
 
-    with patch("PyQt6.QtWidgets.QMessageBox.information", told):
+    with patch("PySide6.QtWidgets.QMessageBox.information", told):
         assert hosted.claim_the_library(_copies(None)) is None
 
     assert hosted.claim is None

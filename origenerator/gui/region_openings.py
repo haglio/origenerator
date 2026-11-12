@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 
-from PyQt6.QtCore import QObject
+from PySide6.QtCore import QObject
 
 from origenerator.gui.hud_nav_map import NavMapNeighbors
 from origenerator.gui.off_thread import run_off_thread

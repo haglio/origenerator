@@ -4,9 +4,9 @@ from contextlib import contextmanager
 from typing import NamedTuple
 
 import pytest
-from PyQt6.QtCore import QPoint, QPointF, Qt
-from PyQt6.QtGui import QWheelEvent
-from PyQt6.QtWidgets import QApplication, QWidget
+from PySide6.QtCore import QPoint, QPointF, Qt
+from PySide6.QtGui import QWheelEvent
+from PySide6.QtWidgets import QApplication, QWidget
 
 from origenerator import gallery
 from origenerator.gui.gallery_pane import SEARCH_DRAW_LIMIT

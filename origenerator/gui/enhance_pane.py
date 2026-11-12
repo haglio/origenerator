@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, QPoint, QRect, QSize, Qt, pyqtSignal
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, Signal
+from PySide6.QtWidgets import (
     QDialog,
     QFrame,
     QGridLayout,
@@ -211,10 +211,10 @@ class _SettingsScroll(QScrollArea):
 
 
 class EnhancePane(QWidget):
-    enhance_requested = pyqtSignal()
-    fix_training_requested = pyqtSignal(str)
-    preset_saved = pyqtSignal(str)
-    preset_renamed = pyqtSignal(int, str)
+    enhance_requested = Signal()
+    fix_training_requested = Signal(str)
+    preset_saved = Signal(str)
+    preset_renamed = Signal(int, str)
 
     def __init__(self, on_change, parent=None, *, trash=trashed):
         super().__init__(parent)
@@ -633,7 +633,7 @@ class EnhancePane(QWidget):
 
 
 class FixPromptsDialog(QDialog):
-    trash_requested = pyqtSignal()
+    trash_requested = Signal()
 
     def __init__(self, parent, part, current: dict, loras: list[str]):
         super().__init__(parent, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)

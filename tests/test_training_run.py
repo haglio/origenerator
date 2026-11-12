@@ -6,6 +6,7 @@ import types
 from pathlib import Path
 
 import pytest
+from shared_ui.testing import appending_to
 
 from origenerator import config, fix_training
 from origenerator.gui import training_run
@@ -20,7 +21,7 @@ class _Queue:
 
     def watch_training(self, training) -> None:
         self.held.append(training)
-        training.ended.connect(self.ended.append)
+        training.ended.connect(appending_to(self.ended))
 
 class _Trainer:
     def __init__(self):
@@ -221,7 +222,7 @@ def test_a_looks_training_reads_its_own_stages_from_its_first(
            "log": str(tmp_path / "training.log")}
     run = TrainingRun(job, queue, _yielding_kind(started), reveal=lambda: None)
     words = []
-    run.progress.connect(words.append)
+    run.progress.connect(appending_to(words))
 
     run.begin()
 

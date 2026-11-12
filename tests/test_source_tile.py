@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QPixmap
-from PyQt6.QtWidgets import QLabel
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QPixmap
+from PySide6.QtWidgets import QLabel
+from shared_ui.testing import appending_to
 
 from origenerator.gui.looping_preview import what_plays_in
 from origenerator.gui.source_tile import SourceTile
@@ -50,7 +51,7 @@ def test_clicking_the_tile_emits_activated_with_the_source_id(tile, qtbot):
     with qtbot.waitExposed(tile):
         tile.show()
     got = []
-    tile.activated.connect(got.append)
+    tile.activated.connect(appending_to(got))
 
     qtbot.mouseClick(tile, Qt.MouseButton.LeftButton)
 

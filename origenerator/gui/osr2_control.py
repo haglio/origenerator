@@ -5,14 +5,14 @@ import logging
 from funestra.main_hud import OSR2_DRIVING, OSR2_PARKED
 from funestra.osr2_visualizer import DRIVEN_BY_FUNSCRIPT, DRIVEN_BY_ROBOT_HAND
 from funestra.robot_hand import FULL_INTENSITY
-from PyQt6.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 
 logger = logging.getLogger(__name__)
 
 
 class Osr2Control(QObject):
-    changed = pyqtSignal()
-    settled = pyqtSignal()
+    changed = Signal()
+    settled = Signal()
 
     def __init__(self, motion=None, *, script=None, parent=None) -> None:
         super().__init__(parent)

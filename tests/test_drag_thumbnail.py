@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from PIL import Image
-from PyQt6.QtCore import QPointF, QSize, Qt
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QApplication, QLabel
+from PySide6.QtCore import QPointF, QSize, Qt
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import QApplication, QLabel
 
 from origenerator.gui.drag_thumbnail import (
     THUMBNAIL_MAX,

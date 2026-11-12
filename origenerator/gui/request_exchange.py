@@ -4,13 +4,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from math import ceil
 
-from PyQt6.QtCore import QEvent, QPoint, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import (
+from PySide6.QtCore import QEvent, QPoint, QSize, Qt, Signal
+from PySide6.QtGui import (
     QTextBlockFormat,
     QTextCharFormat,
     QTextCursor,
 )
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -101,7 +101,7 @@ class _Made:
 
 
 class _Conversation(QTextEdit):
-    generate_asked = pyqtSignal(int)
+    generate_asked = Signal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -204,9 +204,9 @@ class _Conversation(QTextEdit):
 
 
 class RequestExchange(QWidget):
-    asked = pyqtSignal(str)
-    generate_asked = pyqtSignal(int)
-    auto_generate_chosen = pyqtSignal(bool)
+    asked = Signal(str)
+    generate_asked = Signal(int)
+    auto_generate_chosen = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)

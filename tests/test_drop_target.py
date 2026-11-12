@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent
-from PyQt6.QtWidgets import QApplication, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent
+from PySide6.QtWidgets import QApplication, QWidget
 
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import AIMED, EDGE, LIT

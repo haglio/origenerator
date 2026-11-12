@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QFrame, QHBoxLayout, QPushButton, QSizePolicy
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QPushButton, QSizePolicy
 
 from origenerator.gui.no_wheel import NoWheelDropdown
 
@@ -10,7 +10,7 @@ _HOW_MANY_TIP = "How many to make at once, each with its own seed"
 
 
 class HowManyDropdown(NoWheelDropdown):
-    chosen = pyqtSignal(int)
+    chosen = Signal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)

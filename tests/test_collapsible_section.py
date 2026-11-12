@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QPixmap
-from PyQt6.QtWidgets import QFormLayout, QLineEdit, QStyleOptionButton
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QPixmap
+from PySide6.QtWidgets import QFormLayout, QLineEdit, QStyleOptionButton
 
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.stylesheet import build_stylesheet

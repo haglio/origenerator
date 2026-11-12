@@ -7,7 +7,7 @@ from app_support.funscript import read_actions
 from app_support.osr2_hold import PARK, RESUME
 from funestra.funscript import Funscript
 from funestra.robot_hand import FULL_INTENSITY
-from PyQt6.QtCore import QObject, QTimer
+from PySide6.QtCore import QObject, QTimer
 
 from origenerator.config import OUTPUT_PLACES
 from origenerator.funscript import funscript_of

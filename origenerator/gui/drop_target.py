@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, QObject, Qt
-from PyQt6.QtWidgets import QAbstractScrollArea
+from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtWidgets import QAbstractScrollArea
 
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import AIMED, LIT, DropEdge, light

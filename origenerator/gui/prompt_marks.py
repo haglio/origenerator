@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import NamedTuple
 
-from PyQt6.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat
-from PyQt6.QtWidgets import QPlainTextEdit
+from PySide6.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat
+from PySide6.QtWidgets import QPlainTextEdit
 from shared_ui.colors import BG_PRIMARY, TEXT_MUTED, YELLOW
 
 from origenerator.gui.tracked_prompt import prompt_ranges_from

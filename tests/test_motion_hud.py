@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtCore import Qt
+from PySide6.QtCore import Qt
 
 from origenerator.gui.motion_hud import apply_motion_key
 

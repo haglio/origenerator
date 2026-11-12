@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtGui import QImage, QPainter, QPixmap
+from PySide6.QtGui import QImage, QPainter, QPixmap
 
 
 def grayscale_pixmap(pixmap: QPixmap) -> QPixmap:

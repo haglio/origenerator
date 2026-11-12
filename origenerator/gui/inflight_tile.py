@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtCore import QPoint, QRect, QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from shared_ui.spacing import BUTTON_RADIUS
 
 from origenerator.gui import palette, tile_shape
@@ -18,8 +18,8 @@ _BORDER = f"{_BORDER_PX}px solid {palette.IN_FLIGHT_BORDER}"
 
 
 class InFlightTile(QWidget):
-    clicked = pyqtSignal(str)
-    context_requested = pyqtSignal(str, QPoint)
+    clicked = Signal(str)
+    context_requested = Signal(str, QPoint)
 
     def __init__(self, item: InFlightItem, parent=None):
         super().__init__(parent)

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from PyQt6.QtCore import QRect, QSize, Qt
-from PyQt6.QtGui import QFont, QPainter, QPixmap
+from PySide6.QtCore import QRect, QSize, Qt
+from PySide6.QtGui import QFont, QPainter, QPixmap
 from shared_ui.colors import TEXT_MUTED
 from shared_ui.icons import draw_icon
 

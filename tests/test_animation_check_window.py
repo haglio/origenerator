@@ -4,9 +4,9 @@ import json
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QMovie
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QMovie
+from PySide6.QtWidgets import (
     QLabel,
     QPlainTextEdit,
     QPushButton,

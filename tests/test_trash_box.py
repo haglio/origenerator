@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from itertools import groupby
 
-from PyQt6.QtCore import QPoint
-from PyQt6.QtGui import QImage, QRegion
-from PyQt6.QtWidgets import QApplication, QWidget
+from PySide6.QtCore import QPoint
+from PySide6.QtGui import QImage, QRegion
+from PySide6.QtWidgets import QApplication, QWidget
 
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.trash_box import place_tiles

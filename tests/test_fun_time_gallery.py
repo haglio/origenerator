@@ -9,9 +9,9 @@ from typing import NamedTuple
 from funestra.hud_title import F_MODE_LABEL
 from funestra.main_hud import OSR2_PARKED, OSR2_RETRACTED
 from PIL import Image
-from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
-from PyQt6.QtGui import QKeyEvent, QMovie, QPixmap
-from PyQt6.QtWidgets import QLabel, QSplitter, QWidget
+from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
+from PySide6.QtGui import QKeyEvent, QMovie, QPixmap
+from PySide6.QtWidgets import QLabel, QSplitter, QWidget
 
 from origenerator import gallery
 from origenerator.db import Database

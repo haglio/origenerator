@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QPoint, QRect, QSize, Qt
-from PyQt6.QtWidgets import QGridLayout, QLabel, QLayout, QWidget, QWidgetItem
+from PySide6.QtCore import QPoint, QRect, QSize, Qt
+from PySide6.QtWidgets import QGridLayout, QLabel, QLayout, QWidget, QWidgetItem
 from shared_ui.spacing import GAP_SMALL
 
 from origenerator.gui.warning_mark import WarningMark

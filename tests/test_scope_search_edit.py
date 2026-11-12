@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtGui import QResizeEvent
-from PyQt6.QtWidgets import QToolButton
+from PySide6.QtGui import QResizeEvent
+from PySide6.QtWidgets import QToolButton
 
 from origenerator.gui.scope_search_edit import ScopeSearchEdit
 

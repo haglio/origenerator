@@ -5,8 +5,8 @@ import struct
 
 import pytest
 from app_support.loading_screen import AppWindow
-from PyQt6.QtCore import QRect
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtCore import QRect
+from PySide6.QtWidgets import QWidget
 
 from origenerator.gui.window_monitor import the_screen_it_was_saved_on, the_window_on
 

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QSize
-from PyQt6.QtGui import QFont, QFontMetrics, QPainter
-from PyQt6.QtWidgets import QLabel
+from PySide6.QtCore import QSize
+from PySide6.QtGui import QFont, QFontMetrics, QPainter
+from PySide6.QtWidgets import QLabel
 from shared_ui import colors
 from shared_ui.fonts import FONT_UI, SIZE_TINY, make_font
 from shared_ui.icons import draw_icon

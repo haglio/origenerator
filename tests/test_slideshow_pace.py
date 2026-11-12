@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from shared_ui.testing import appending_to
+
 from origenerator.gui.slideshow_pace import DEFAULT_S, MAX_S, MIN_S, STEP_S, SlideshowPace
 
 
@@ -30,7 +32,7 @@ def test_stepping_walks_the_pace_by_the_given_amount_and_stops_at_the_ends():
 def test_a_change_is_announced_with_the_new_seconds_and_a_repeat_is_not():
     pace = SlideshowPace(seconds=5)
     heard = []
-    pace.changed.connect(heard.append)
+    pace.changed.connect(appending_to(heard))
 
     pace.set_seconds(7)
     pace.set_seconds(7)

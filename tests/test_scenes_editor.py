@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QTextCursor
-from PyQt6.QtWidgets import QApplication, QPushButton
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QTextCursor
+from PySide6.QtWidgets import QApplication, QPushButton
 
 from origenerator.gui.prompt_marks import RESOLVE_IN_BOTH_PROMPTS, problem_to_resolve
 from origenerator.gui.scenes_editor import ScenesEditor

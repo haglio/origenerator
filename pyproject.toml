@@ -25,16 +25,15 @@ dependencies = [
     "funestra @ git+https://github.com/haglio/funestra@v0.1.891",
     "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.418",
     "voice-core @ git+https://github.com/haglio/voice_core@v0.1.179",
-    # PyQt6 and Qt stay at 6.11, the version production Origenerator runs on, until
-    # the family moves on purpose: 6.12.0 (out 2026-10-28) fails
+    # PySide6 and the Qt it ships stay at 6.11, the version production Origenerator
+    # runs on, until the family moves on purpose: Qt 6.12.0 (out 2026-10-28) fails
     # test_work_deferred_by_a_dead_owner_never_runs and
     # test_show_videos_replaces_the_previous_tiles, which check that a widget handed
-    # deleteLater() is gone by the point each one names.
-    "PyQt6>=6,<6.12",
-    # Qt itself, which PyQt6 takes at any 6.11. 6.11.1 handed its wildcard-disconnect
-    # warning to the Python message handler holding a signal/slot lock (QTBUG-145216);
-    # 6.11.2 lets go of the lock first.
-    "PyQt6-Qt6>=6.11.2,<6.12",
+    # deleteLater() is gone by the point each one names. And not below 6.11.2: Qt
+    # 6.11.1 handed its wildcard-disconnect warning to the Python message handler
+    # holding a signal/slot lock (QTBUG-145216); 6.11.2 lets go of the lock first.
+    "PySide6>=6.11.2,<6.12",
+    "shiboken6>=6.11.2,<6.12",
     "pillow>=12,<13",
     "opencv-python>=4.8,<6",
     "websockets>=17,<18",
@@ -72,7 +71,7 @@ voice = ["faster-whisper>=1,<2"]
 # app_support.gates holds all three halves of it.
 addopts = "-p app_support.sanitize.pytest_plugin -p app_support.gates.pytest_plugin -p app_support.coverage_gate --cov --cov-report= --timeout=240 --timeout-method=thread --durations=30"
 testpaths = ["tests"]
-qt_api = "pyqt6"
+qt_api = "pyside6"
 
 # The family checkouts this one is installed beside. All three were imported and
 # named nowhere in this file, so the only record of what a checkout needs was

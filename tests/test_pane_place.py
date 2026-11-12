@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtCore import QPoint
-from PyQt6.QtWidgets import QScrollArea, QVBoxLayout, QWidget
+from PySide6.QtCore import QPoint
+from PySide6.QtWidgets import QScrollArea, QVBoxLayout, QWidget
 
 from origenerator.gui.pane_place import REVEAL_MARGIN, bring_into_view
 

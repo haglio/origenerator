@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from PyQt6.QtCore import QtMsgType, qInstallMessageHandler
+from PySide6.QtCore import QtMsgType, qInstallMessageHandler
 from shared_ui.qt_messages import silence_the_ffmpeg_format_dump
 
 _LEVELS = {

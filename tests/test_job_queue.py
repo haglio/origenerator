@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import gc
 import json
 import threading
 import time
 import urllib.error
+import weakref
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from PySide6.QtCore import QObject, QTimer, Signal
+from shared_ui.testing import appending_to
 
 from origenerator import config, gallery
 from origenerator.comfyui_client import ComfyUIClient
@@ -837,7 +840,7 @@ def test_a_background_experiment_never_jumps_the_line_whatever_it_makes(qtbot, t
 
 
 class _Training(QObject):
-    ended = pyqtSignal(object)
+    ended = Signal(object)
 
     def __init__(self, running=True):
         super().__init__()
@@ -1319,7 +1322,7 @@ def test_a_finished_run_says_what_it_came_to(qtbot, tmp_path):
     queue = JobQueue(db, client)
     queue.start_prepared("k", _I2V, _params())
     ended = []
-    queue.run_ended.connect(ended.append)
+    queue.run_ended.connect(appending_to(ended))
 
     made = queue.job_for("k").prompt_id
 
@@ -1338,7 +1341,7 @@ def test_an_enhance_reports_the_image_it_improved_rather_than_itself(qtbot, tmp_
     job = queue.job_for("k")
     db.set_enhance_target(job.prompt_id, "the-image-it-improved")
     ended = []
-    queue.run_ended.connect(ended.append)
+    queue.run_ended.connect(appending_to(ended))
 
     job.finished.emit([{"filename": "out.png"}], None, 252.0)
 
@@ -1355,7 +1358,7 @@ def test_an_enhance_whose_row_is_folded_away_as_it_finishes_still_names_its_imag
     db.set_enhance_target(job.prompt_id, "the-image-it-improved")
     queue.finished.connect(lambda key, prompt_id, origin: db.delete_generation(prompt_id))
     ended = []
-    queue.run_ended.connect(ended.append)
+    queue.run_ended.connect(appending_to(ended))
 
     job.finished.emit([{"filename": "out.png"}], None, 252.0)
 
@@ -1372,7 +1375,7 @@ def test_a_failed_run_is_timed_by_the_clock_it_ran_under(qtbot, tmp_path):
     job = queue.job_for("k")
     job._started_at = time.time() - 200
     ended = []
-    queue.run_ended.connect(ended.append)
+    queue.run_ended.connect(appending_to(ended))
 
     job.failed.emit("the sampler ran out of memory")
 
@@ -1386,7 +1389,7 @@ def test_a_job_that_fails_while_still_waiting_in_the_job_queue_is_given_no_time(
     queue = JobQueue(db, client)
     queue.start_prepared("k", _I2V, _params())
     ended = []
-    queue.run_ended.connect(ended.append)
+    queue.run_ended.connect(appending_to(ended))
 
     queue.job_for("k").failed.emit("ComfyUI turned it away")
 
@@ -1400,7 +1403,7 @@ def test_a_background_experiment_reports_itself_as_one(qtbot, tmp_path):
     queue = JobQueue(db, client)
     queue.start_prepared("k", _I2V, _params(), source=GenerationSource.EXPERIMENT)
     ended = []
-    queue.run_ended.connect(ended.append)
+    queue.run_ended.connect(appending_to(ended))
 
     queue.job_for("k").finished.emit([{"filename": "out.mp4"}], None, 252.0)
 
@@ -2417,3 +2420,16 @@ def test_a_closed_queue_submits_on_the_calling_thread(qtbot, tmp_path):
     assert sent_on
     assert set(sent_on) == {threading.current_thread()}, (
         "a closed queue has no window left to keep answering, so it makes the plain blocking call")
+
+
+def test_a_queue_let_go_of_with_a_job_in_flight_is_freed_with_the_job(qtbot, tmp_path):
+    queue = JobQueue(Database(tmp_path / "test.db"), _client())
+    queue.start_prepared("video/wf/deadbeef", _I2V, _params(seed=3, noise_seed=9))
+    job = weakref.ref(queue.jobs["video/wf/deadbeef"])
+
+    del queue
+    gc.collect()
+
+    assert job() is None, (
+        "a job's own signals hold what is connected to them where the cycle collector cannot "
+        "see, so a handler holding the job or its queue keeps both for the rest of the session")

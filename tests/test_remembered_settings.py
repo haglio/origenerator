@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 
+import shiboken6
 from funestra.main_hud import BROKER_PRESS
-from PyQt6 import sip
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QAbstractButton,
     QAbstractSlider,
     QAbstractSpinBox,
@@ -111,7 +111,7 @@ def _a_window_with_every_control_built(qtbot, tmp_path):
 
 
 def _address(widget: QWidget) -> int:
-    return sip.unwrapinstance(widget)
+    return shiboken6.getCppPointer(widget)[0]
 
 
 def _described(widget: QWidget) -> str:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QLabel, QPushButton, QWidget
+from PySide6.QtWidgets import QLabel, QPushButton, QWidget
 
 from origenerator.gui.flow_layout import FlowLayout
 

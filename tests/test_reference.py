@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtGui import QKeySequence
+from PySide6.QtGui import QKeySequence
 
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.reference import reference_sections

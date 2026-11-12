@@ -5,9 +5,9 @@ import inspect
 import os
 
 import pytest
-from PyQt6.QtCore import QSize, Qt
-from PyQt6.QtGui import QIcon, QPixmap
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtWidgets import QWidget
 from shared_ui.spacing import BUTTON_SIZE, BUTTON_SIZE_HUD
 
 from origenerator import app as app_module
@@ -54,14 +54,14 @@ def test_an_unreadable_scale_is_treated_as_unset(monkeypatch):
     assert ui_scale.apply_room_scale(in_a_headset=False) == ui_scale.HOSTED_SCALE
 
 
-def test_the_scale_is_applied_before_pyqt_is_imported():
+def test_the_scale_is_applied_before_qt_is_imported():
     main = ast.parse(inspect.getsource(app_module.main))
     applied = min(node.lineno for node in ast.walk(main)
                   if isinstance(node, ast.Call)
                   and ast.unparse(node.func).endswith("apply_room_scale"))
     imported = min(node.lineno for node in ast.walk(main)
                    if isinstance(node, ast.ImportFrom)
-                   and (node.module or "").startswith(("PyQt6", "origenerator.gui", "shared_ui")))
+                   and (node.module or "").startswith(("PySide6", "origenerator.gui", "shared_ui")))
     assert applied < imported
 
 

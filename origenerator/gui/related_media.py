@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QVBoxLayout, QWidget
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QVBoxLayout, QWidget
 from shared_ui.spacing import GAP_MEDIUM
 
 from origenerator.gallery import (
@@ -46,7 +46,7 @@ TRIMMED_INTO = "Trimmed into"
 
 
 class _LinkRow(QWidget):
-    activated = pyqtSignal(str)
+    activated = Signal(str)
 
     def __init__(self, movie_of: Callable[[dict], str | None]):
         super().__init__()
@@ -91,7 +91,7 @@ class RelatedLookups:
 
 
 class RelatedMedia(QWidget):
-    link_clicked = pyqtSignal(str)
+    link_clicked = Signal(str)
 
     def __init__(self, lookups: RelatedLookups, parent=None):
         super().__init__(parent)

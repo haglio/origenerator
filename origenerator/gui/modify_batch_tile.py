@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QFrame, QLabel, QVBoxLayout
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 
 from origenerator.gui import tile_shape
 from origenerator.gui.modify_batch import CAPTION
@@ -17,7 +17,7 @@ _TOOLTIP = (
 
 
 class ModifyBatchTile(QFrame):
-    clicked = pyqtSignal()
+    clicked = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)

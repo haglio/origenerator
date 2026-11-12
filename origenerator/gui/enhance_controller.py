@@ -6,7 +6,7 @@ from collections import namedtuple
 from typing import NamedTuple, Protocol
 
 from app_support.comfy_file_refs import frame_name
-from PyQt6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox
 
 from origenerator import config, enhance_presets, fix_training, gallery, lora_training
 from origenerator.gallery.enhance_settings import basic_enhance_settings

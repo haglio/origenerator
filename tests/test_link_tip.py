@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, QPointF, Qt
-from PyQt6.QtGui import QEnterEvent
-from PyQt6.QtWidgets import QApplication, QPushButton
+import shiboken6
+from PySide6.QtCore import QEvent, QPointF, Qt
+from PySide6.QtGui import QEnterEvent
+from PySide6.QtWidgets import QApplication, QPushButton
+from shared_ui.testing import appending_to
 
 from origenerator.gui.link_tip import LinkTip, link
 
@@ -56,7 +58,7 @@ def test_following_a_link_reports_its_href_and_closes_the_tip(qtbot):
     _enter(button)
     tip._appear.timeout.emit()
     followed = []
-    tip.link_activated.connect(followed.append)
+    tip.link_activated.connect(appending_to(followed))
 
     tip._popup.label.linkActivated.emit("go")
 
@@ -128,3 +130,12 @@ def test_a_links_color_is_set_so_it_reads_as_a_link(qtbot):
     assert "color:" in link("go", "Go to it"), (
         "Qt's default link color is the desktop's, which on this app's dark surfaces can come out all "
         "but unreadable, and a link nobody sees is the same as no link")
+
+
+def test_the_tip_goes_with_the_widget_it_watches(qtbot):
+    button = QPushButton("watch me")
+    popup = LinkTip(button)._popup
+
+    shiboken6.delete(button)
+
+    qtbot.waitUntil(lambda: not shiboken6.isValid(popup))

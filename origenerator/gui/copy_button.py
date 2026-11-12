@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QSize, Qt
-from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QApplication, QPushButton
+from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QApplication, QPushButton
 from shared_ui.colors import TEXT_SECONDARY
 from shared_ui.icons import CANVAS, icon_pixmap
 from shared_ui.spacing import BUTTON_ICON_INSET, BUTTON_PAD_H_TIGHT

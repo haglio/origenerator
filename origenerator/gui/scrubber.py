@@ -11,9 +11,9 @@ from funestra.scrubber_bar import (
     SCRUBBER_HEIGHT,
     bar_x,
 )
-from PyQt6.QtCore import QSize
-from PyQt6.QtGui import QColor, QPainter
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtCore import QSize
+from PySide6.QtGui import QColor, QPainter
+from PySide6.QtWidgets import QWidget
 
 from origenerator.funscript import heatmap_colors
 

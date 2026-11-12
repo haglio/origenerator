@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QPoint, QRect, Qt
-from PyQt6.QtWidgets import QApplication, QFrame, QLabel
+from PySide6.QtCore import QPoint, QRect, Qt
+from PySide6.QtWidgets import QApplication, QFrame, QLabel
 from shared_ui.colors import BORDER_SUBTLE
 
 from origenerator import gallery, item_shape

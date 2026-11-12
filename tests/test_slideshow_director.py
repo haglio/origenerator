@@ -12,7 +12,7 @@ import pytest
 from funestra.hud_placement import HudCorner
 from funestra.hud_title import LATEST_LABEL
 from PIL import Image
-from PyQt6.QtCore import QRect, Qt
+from PySide6.QtCore import QRect, Qt
 
 from origenerator import gallery, library_views
 from origenerator.gallery.collection import (

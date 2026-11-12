@@ -3,9 +3,9 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
-from PyQt6.QtCore import QRect, Qt
-from PyQt6.QtGui import QPainter, QPixmap
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtCore import QRect, Qt
+from PySide6.QtGui import QPainter, QPixmap
+from PySide6.QtWidgets import QWidget
 
 
 def rows_for(count: int, width: int, height: int, *, shape: float) -> int:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from PyQt6.QtWidgets import QMessageBox, QWidget
+from PySide6.QtWidgets import QMessageBox, QWidget
 
 from origenerator.gui.generation_failed import GenerationFailed, worded
 

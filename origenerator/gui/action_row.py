@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 from shared_ui.spacing import GAP_MEDIUM
 from shared_ui.tick_control import TickControl
 
@@ -105,7 +105,7 @@ class _Side(QWidget):
 
 
 class ActionRow(QWidget):
-    changed = pyqtSignal(str, str, object)
+    changed = Signal(str, str, object)
 
     def __init__(self, form: LabelForm, *, checkboxes: dict[str, tuple[str, ...]] | None = None,
                  actions: dict[str, tuple[str, ...]] | None = None, open_setter=the_setter_tool):
@@ -125,6 +125,7 @@ class ActionRow(QWidget):
                        for side in sides}
         self._names = {side: ElidingLabel(SIDE_LABELS[side]) for side in self._sides}
         self._form = form
+        form.destroyed.connect(self.deleteLater)
         for side, shown in self._sides.items():
             form.addRow(LabelCell(WarningMark(), self._names[side], form.label_column), shown)
             form.setRowVisible(shown, False)

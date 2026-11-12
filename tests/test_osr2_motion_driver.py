@@ -11,6 +11,7 @@ from funestra.learned_model import LearnedModel, Phrase, classify
 from funestra.main_hud import OSR2_PARKED, OSR2_RETRACTED
 from funestra.robot_hand import RobotHandState, set_max_intensity
 from funestra.tcode import POSITION_MAX, format_tcode_command
+from shared_ui.testing import appending_to
 
 from origenerator import motion_engine
 from origenerator.osr2 import format_position
@@ -62,7 +63,7 @@ def _driver(qtbot):
 def test_starting_takes_the_device(qtbot):
     driver, broker, _clock = _driver(qtbot)
     handovers = []
-    driver.active_changed.connect(handovers.append)
+    driver.active_changed.connect(appending_to(handovers))
     assert driver.toggle() is True
     assert driver.active
     assert broker.asked == [RESUME]
@@ -161,7 +162,7 @@ def test_stopping_parks_the_device(qtbot):
     driver, broker, _clock = _driver(qtbot)
     driver.start()
     handovers = []
-    driver.active_changed.connect(handovers.append)
+    driver.active_changed.connect(appending_to(handovers))
     assert driver.toggle() is False
     assert driver.tickers[0].stopped == 1
     assert broker.parked == 1

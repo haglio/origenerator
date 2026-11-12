@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 
 from PIL import Image
-from PyQt6.QtCore import Qt
+from PySide6.QtCore import Qt
 from shared_ui.spacing import HAIRLINE
 
 from origenerator.gui import queue_thumbs

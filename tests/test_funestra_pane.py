@@ -12,9 +12,9 @@ from funestra.pointer import OMNIPAUSE_TOGGLE
 from funestra.satellite_hud import HudModel
 from funestra.testing import FakeEngine, engine_will_not_open
 from funestra.volume import VolumeHud
-from PyQt6.QtCore import QPoint, QPointF, Qt
-from PyQt6.QtGui import QWheelEvent
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtCore import QPoint, QPointF, Qt
+from PySide6.QtGui import QWheelEvent
+from PySide6.QtWidgets import QApplication
 
 from origenerator import running_ahead
 from origenerator.gui.frame_files import FrameFiles

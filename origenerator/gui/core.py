@@ -6,9 +6,9 @@ import logging
 from dataclasses import dataclass, replace
 
 from app_support.loading_screen import MeetingPlace
-from PyQt6.QtCore import QByteArray, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QKeySequence, QShortcut
-from PyQt6.QtWidgets import QMainWindow
+from PySide6.QtCore import QByteArray, Qt, QTimer, Signal
+from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtWidgets import QMainWindow
 from shared_ui.application import close_the_windows_it_opened
 from shared_ui.foreground import bring_to_front
 from shared_ui.hard_to_miss import sure
@@ -86,7 +86,7 @@ class Launch:
 
 
 class Core(QMainWindow):
-    handed_back = pyqtSignal()
+    handed_back = Signal()
 
     def __init__(self, client: ComfyUIClient, db: Database, app_state: AppState,
                  *, fun_time: FunTimeSession | None = None, launch: Launch | None = None):

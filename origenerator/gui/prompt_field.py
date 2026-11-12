@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QObject, Qt, pyqtSignal
-from PyQt6.QtGui import QPainter, QPen
-from PyQt6.QtWidgets import QPlainTextEdit
+from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtGui import QPainter, QPen
+from PySide6.QtWidgets import QPlainTextEdit
 from shared_ui.colors import BORDER_SUBTLE
 
 DEFAULT_HEIGHT = 100
@@ -12,7 +12,7 @@ _MARK_WIDTH = 24
 
 
 class PromptHeights(QObject):
-    changed = pyqtSignal(str, int)
+    changed = Signal(str, int)
 
     def __init__(self, parent=None):
         super().__init__(parent)

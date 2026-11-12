@@ -3,7 +3,7 @@ from __future__ import annotations
 from funestra.main_hud import OSR2_CONTROL_UNANSWERED
 from funestra.main_hud_painter import MainHudPainter
 from funestra.osr2_controls_host import Osr2ControlsHost
-from PyQt6.QtCore import QTimer
+from PySide6.QtCore import QTimer
 from shared_ui.pressable_drawing import PressableDrawing
 
 from origenerator import osr2

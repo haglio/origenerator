@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 
 import pytest
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QWidget
 
 from origenerator import gallery
 from origenerator.action_settings import GENAU, VIDEO

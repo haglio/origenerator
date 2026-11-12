@@ -17,9 +17,9 @@ from funestra.file_channel import append_command
 from funestra.hud_placement import HudCorner
 from funestra.main_hud import OSR2_DRIVING, OSR2_PARKED
 from funestra.robot_hand import WaveformShape
-from PyQt6.QtCore import QEvent, QObject, Qt
-from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
-from PyQt6.QtWidgets import QApplication, QMessageBox, QWidget
+from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
+from PySide6.QtWidgets import QApplication, QMessageBox, QWidget
 from shared_ui.hard_to_miss import FadedBackground
 from shared_ui.preview import Preview
 

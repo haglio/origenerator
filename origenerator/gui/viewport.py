@@ -4,18 +4,18 @@ import os
 from pathlib import Path
 
 from app_support.funscript import read_actions
-from PyQt6.QtCore import (
+from PySide6.QtCore import (
     QEvent,
     QPoint,
     QRect,
     QSize,
     Qt,
     QUrl,
-    pyqtSignal,
+    Signal,
 )
-from PyQt6.QtGui import QImageReader, QMovie, QPixmap
-from PyQt6.QtMultimedia import QMediaMetaData, QMediaPlayer
-from PyQt6.QtWidgets import (
+from PySide6.QtGui import QImageReader, QMovie, QPixmap
+from PySide6.QtMultimedia import QMediaMetaData, QMediaPlayer
+from PySide6.QtWidgets import (
     QApplication,
     QLabel,
     QSizePolicy,
@@ -60,9 +60,9 @@ def _lets_the_mouse_through(widget):
 
 
 class Viewport(QWidget):
-    media_resized = pyqtSignal()
-    action_triggered = pyqtSignal(str, str)
-    context_requested = pyqtSignal(str, QPoint)
+    media_resized = Signal()
+    action_triggered = Signal(str, str)
+    context_requested = Signal(str, QPoint)
 
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
                  show_scrubber: bool = False):

@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 
 import pytest
-from PyQt6.QtCore import QPoint
-from PyQt6.QtGui import QPalette
-from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QToolTip, QWidget
+from PySide6.QtCore import QPoint
+from PySide6.QtGui import QPalette
+from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QToolTip, QWidget
 from shared_ui.colors import TEXT_MUTED
 
 import origenerator.gui.metadata_section as metadata_section_module

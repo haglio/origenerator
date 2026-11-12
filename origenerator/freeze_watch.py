@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 from typing import NamedTuple
 
-from PyQt6.QtCore import QObject, QTimer
+from PySide6.QtCore import QObject, QTimer
 
 logger = logging.getLogger(__name__)
 

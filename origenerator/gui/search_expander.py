@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import threading
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 
 from origenerator import search
 from origenerator.config import LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
@@ -21,7 +21,7 @@ def _expand(query: str) -> dict:
 
 
 class SearchExpander(QObject):
-    expanded = pyqtSignal(str, object)
+    expanded = Signal(str, object)
 
     def __init__(self, parent=None, *, expand=None):
         super().__init__(parent)

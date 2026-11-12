@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PyQt6.QtCore import QSize, Qt
-from PyQt6.QtGui import QPixmap
+from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QPixmap
 from shared_ui.hard_to_miss import blurred_and_dimmed
 
 _CACHE: dict[tuple, QPixmap | None] = {}

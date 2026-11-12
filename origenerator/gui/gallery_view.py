@@ -4,8 +4,8 @@ import logging
 from functools import partial
 from typing import NamedTuple
 
-from PyQt6.QtCore import QEvent, QPoint, Qt, QTimer, pyqtSignal
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QEvent, QPoint, Qt, QTimer, Signal
+from PySide6.QtWidgets import (
     QAbstractSpinBox,
     QApplication,
     QHBoxLayout,
@@ -281,8 +281,8 @@ def _press_for_the_gallery(event, *, delete, copy_names, undo, redo):
 
 
 class GalleryView(QWidget):
-    run_ended = pyqtSignal(object)
-    quit_asked = pyqtSignal()
+    run_ended = Signal(object)
+    quit_asked = Signal()
 
     def __init__(self, db: Database, *,
                  client: ComfyUIClient | None = None,

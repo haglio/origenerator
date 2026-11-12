@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QRect, QRectF, Qt, QTimer
-from PyQt6.QtGui import QFontMetrics, QPainterPath
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QRect, QRectF, Qt, QTimer
+from PySide6.QtGui import QFontMetrics, QPainterPath
+from PySide6.QtWidgets import (
     QProgressBar,
     QStyle,
     QStyleOptionProgressBar,

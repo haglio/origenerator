@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from PyQt6.QtCore import QObject, Qt, QTimer
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
+from PySide6.QtCore import QObject, Qt, QTimer
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 from shared_ui.spacing import GAP_SMALL
 
 from origenerator import gallery, search

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PIL import Image
-from PyQt6.QtGui import QColor
+from PySide6.QtGui import QColor
 
 from origenerator.spin_arrows import arrow_paths
 

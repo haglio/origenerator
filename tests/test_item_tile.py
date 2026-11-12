@@ -4,9 +4,10 @@ import time
 from io import BytesIO
 
 from PIL import Image
-from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
-from PyQt6.QtGui import QEnterEvent, QMovie
+from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
+from PySide6.QtGui import QEnterEvent, QMovie
 from shared_ui.colors import BLUE, TEXT_PRIMARY
+from shared_ui.testing import appending_to
 
 from origenerator.gui import corner_buttons, drag_thumbnail, icons, omnipause
 from origenerator.gui.corner_buttons import CORNER_INSET
@@ -134,7 +135,7 @@ def test_a_left_click_picks_and_opens_the_image_and_a_right_click_does_neither(q
     qtbot.addWidget(tw)
     picked, opened = [], []
     tw.pressed.connect(lambda prompt_id, _keys: picked.append(prompt_id))
-    tw.clicked.connect(opened.append)
+    tw.clicked.connect(appending_to(opened))
 
     qtbot.mouseClick(tw, Qt.MouseButton.RightButton)
     assert picked == opened == []
@@ -158,7 +159,7 @@ def test_double_click_emits_double_clicked_for_left_button_only(qtbot):
     tw = ItemTile("p1", None, "label")
     qtbot.addWidget(tw)
     dbl = []
-    tw.double_clicked.connect(dbl.append)
+    tw.double_clicked.connect(appending_to(dbl))
 
     qtbot.mouseDClick(tw, Qt.MouseButton.RightButton)
     assert dbl == []
@@ -512,7 +513,9 @@ def test_the_bar_sits_along_the_foot_of_the_thumbnail(qtbot):
 
     assert area.contains(bar)
     assert bar.top() > area.center().y()
-    assert tw.size() == ItemTile("p2", None, "label").size()
+    plain = ItemTile("p2", None, "label")
+    qtbot.addWidget(plain)
+    assert tw.size() == plain.size()
 
 
 def test_an_enhancing_tiles_bar_leaves_its_lower_corners_clear(qtbot):

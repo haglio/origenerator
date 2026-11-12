@@ -4,9 +4,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QMovie, QPixmap
-from PyQt6.QtWidgets import QApplication, QLabel, QMenu, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QMovie, QPixmap
+from PySide6.QtWidgets import QApplication, QLabel, QMenu, QVBoxLayout, QWidget
 from shared_ui.colors import TEXT_PRIMARY
 from shared_ui.icons import icon_pixmap
 from shared_ui.spacing import GAP_SMALL
@@ -90,8 +90,8 @@ class ZoneLookups:
 
 
 class DropZone(DropZones):
-    changed = pyqtSignal()
-    activated = pyqtSignal(str)
+    changed = Signal()
+    activated = Signal(str)
 
     def __init__(
         self,

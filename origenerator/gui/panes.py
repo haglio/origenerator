@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, Qt
-from PyQt6.QtWidgets import QFrame, QLayout, QSplitter, QVBoxLayout, QWidget
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtWidgets import QFrame, QLayout, QSplitter, QVBoxLayout, QWidget
 from shared_ui.spacing import GAP_SMALL, MARGIN_STANDARD
 
 BORDER_WIDTH = 6

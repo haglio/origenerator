@@ -7,13 +7,13 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+import shiboken6
 from PIL import Image
-from PyQt6 import sip
-from PyQt6.QtCore import (
+from PySide6.QtCore import (
     QPoint,
     Qt,
 )
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QMessageBox,
 )
 
@@ -84,6 +84,7 @@ from tests.gallery_view_support import (
     _tab_with_prompts,
     _viewport_of,
 )
+from tests.qt_exec import faking_exec
 from tests.slideshow_hud_support import engine_of, funestra_of
 
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
@@ -151,9 +152,9 @@ def test_a_training_being_watched_stops_with_the_gallery_that_watches_it(
     view.reconnect_running_jobs()
     run = view._jobs.training
 
-    sip.delete(view)
+    shiboken6.delete(view)
 
-    assert sip.isdeleted(run)
+    assert not shiboken6.isValid(run)
 
 
 def test_reconnected_reroll_shows_live_tile_then_finalizes(qtbot, tmp_path):
@@ -398,7 +399,7 @@ def test_a_selected_runs_tile_drawn_over_by_another_pane_is_let_go_of_quietly(qt
     tile = _generating_tile(view)
     tile.selected.emit()
     view._gallery_pane.show_empty()
-    assert sip.isdeleted(tile)
+    assert not shiboken6.isValid(tile)
 
     try:
         view._on_thumbnail_clicked("orig")
@@ -1089,7 +1090,7 @@ def test_right_clicking_an_inflight_tile_offers_to_cancel_the_run(
     view.refresh()
     _open_latest(view)
     assert job.prompt_id in view._gallery_pane._inflight_tiles
-    labels = _menu_offering(monkeypatch, "gallery_pane", pick="Cancel")
+    labels = _menu_offering(monkeypatch, pick="Cancel")
 
     view._gallery_pane._inflight_context_menu(job.prompt_id, QPoint(0, 0))
 
@@ -1110,7 +1111,7 @@ def test_an_populating_folders_tile_offers_a_cancel_and_a_real_stop(
     (job,) = view._jobs.all_jobs
     view.refresh()
     _open_latest(view)
-    labels = _menu_offering(monkeypatch, "gallery_pane")
+    labels = _menu_offering(monkeypatch)
 
     view._gallery_pane._inflight_context_menu(job.prompt_id, QPoint(0, 0))
 
@@ -1127,7 +1128,7 @@ def test_canceling_from_an_populating_folders_tile_ends_populate_too(
     (job,) = view._jobs.all_jobs
     view.refresh()
     _open_latest(view)
-    _menu_offering(monkeypatch, "gallery_pane", pick="Cancel and stop")
+    _menu_offering(monkeypatch, pick="Cancel and stop")
 
     view._gallery_pane._inflight_context_menu(job.prompt_id, QPoint(0, 0))
 
@@ -1145,7 +1146,7 @@ def test_a_tile_with_no_live_job_behind_it_raises_no_menu(qtbot, monkeypatch):
     view.refresh()
     _open_latest(view)
     assert "gen1" in view._gallery_pane._inflight_tiles
-    labels = _menu_offering(monkeypatch, "gallery_pane")
+    labels = _menu_offering(monkeypatch)
 
     view._gallery_pane._inflight_context_menu("gen1", QPoint(0, 0))
 
@@ -1158,7 +1159,7 @@ def test_right_clicking_a_folders_live_tile_offers_to_cancel_the_run(
     qtbot.addWidget(view)
     view.refresh()
     key, _job = _running_reroll(view)
-    labels = _menu_offering(monkeypatch, "gallery_view", pick="Cancel")
+    labels = _menu_offering(monkeypatch, pick="Cancel")
 
     view._generating_tile_menu(key, QPoint(0, 0))
 
@@ -1175,7 +1176,7 @@ def test_an_populating_folders_live_tile_offers_the_stop_its_button_cannot(
     view.refresh()
     key = _select_first_leaf(view)
     view._toggle_populate(True)
-    labels = _menu_offering(monkeypatch, "gallery_view", pick="Cancel and stop")
+    labels = _menu_offering(monkeypatch, pick="Cancel and stop")
 
     view._generating_tile_menu(key, QPoint(0, 0))
 
@@ -2121,7 +2122,7 @@ def test_the_random_seed_survives_a_cancel_so_re_generate_is_another_variation(
     asked = []
     for question in ("question", "information", "warning", "critical"):
         monkeypatch.setattr(QMessageBox, question, staticmethod(lambda *a, **kw: asked.append(a)))
-    monkeypatch.setattr(QMessageBox, "exec", lambda box: asked.append(box.text()))
+    faking_exec(monkeypatch, QMessageBox, lambda box: asked.append(box.text()))
     db = _seeded_db(tmp_path, seed=42)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)

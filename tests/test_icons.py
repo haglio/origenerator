@@ -4,8 +4,8 @@ import ast
 from collections import Counter
 from pathlib import Path
 
-from PyQt6.QtCore import QSize
-from PyQt6.QtGui import QColor, QIcon, QPalette
+from PySide6.QtCore import QSize
+from PySide6.QtGui import QColor, QIcon, QPalette
 from shared_ui.colors import GREEN, RED, TEXT_MUTED, TEXT_PRIMARY, WHITE, YELLOW, family_palette
 from shared_ui.icon_geometry import icon_names
 from shared_ui.icons import icon_pixmap, qt_icon

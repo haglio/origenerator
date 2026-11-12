@@ -4,12 +4,12 @@ from dataclasses import replace
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QMimeData, QPoint, QPointF, Qt
-from PyQt6.QtGui import QColor, QDragEnterEvent, QDragLeaveEvent, QDropEvent, QMovie
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtCore import QMimeData, QPoint, QPointF, Qt
+from PySide6.QtGui import QColor, QDragEnterEvent, QDragLeaveEvent, QDropEvent, QMovie
+from PySide6.QtWidgets import QApplication
 from shared_ui.colors import hovered
 from shared_ui.spacing import GAP_SMALL
-from shared_ui.testing import ground
+from shared_ui.testing import appending_to, ground
 
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import AIMED, LIT
@@ -139,7 +139,7 @@ def test_clicking_a_filled_zone_goes_to_its_item_and_keeps_it(qtbot):
     zone = _zone(qtbot)
     _drop(zone, "img1")
     went = []
-    zone.activated.connect(went.append)
+    zone.activated.connect(appending_to(went))
 
     qtbot.mouseClick(zone, Qt.MouseButton.LeftButton)
 
@@ -150,7 +150,7 @@ def test_clicking_a_filled_zone_goes_to_its_item_and_keeps_it(qtbot):
 def test_a_click_goes_to_the_gallery_item_the_held_file_belongs_to(qtbot):
     zone = _zone(qtbot, lookups=replace(_NO_LOOKUPS, leads_to={"image/scene_00001_.png [output]": "gen-pic"}.get))
     went = []
-    zone.activated.connect(went.append)
+    zone.activated.connect(appending_to(went))
     zone.set_item("image/scene_00001_.png [output]")
 
     qtbot.mouseClick(zone, Qt.MouseButton.LeftButton)
@@ -163,7 +163,7 @@ def test_a_click_goes_to_the_gallery_item_the_held_file_belongs_to(qtbot):
 def test_a_held_file_from_outside_the_gallery_offers_no_way_there(qtbot, name, tip):
     zone = _zone(qtbot, lookups=replace(_NO_LOOKUPS, leads_to=lambda held: None, name_of=lambda held: name))
     went = []
-    zone.activated.connect(went.append)
+    zone.activated.connect(appending_to(went))
     zone.set_item("C:/elsewhere/scene one.png")
 
     qtbot.mouseClick(zone, Qt.MouseButton.LeftButton)

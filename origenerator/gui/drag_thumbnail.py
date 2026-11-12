@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QObject, QPoint, Qt
-from PyQt6.QtGui import QDrag, QPixmap
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtCore import QObject, QPoint, Qt
+from PySide6.QtGui import QDrag, QPixmap
+from PySide6.QtWidgets import QApplication
 
 from origenerator.gui.drags import carry
 

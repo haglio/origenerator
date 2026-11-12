@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, QObject, QPoint, Qt, QTimer, pyqtSignal
-from PyQt6.QtWidgets import QFrame, QLabel, QVBoxLayout
+from PySide6.QtCore import QEvent, QObject, QPoint, Qt, QTimer, Signal
+from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 from shared_ui.colors import BG_SECONDARY, BLUE, BORDER_PANEL, TEXT_PRIMARY
 from shared_ui.spacing import BUTTON_RADIUS, GAP_SMALL, MARGIN_STANDARD
 
@@ -15,13 +15,14 @@ _GAP = GAP_SMALL
 
 
 class LinkTip(QObject):
-    link_activated = pyqtSignal(str)
+    link_activated = Signal(str)
 
     def __init__(self, widget, parent=None):
         super().__init__(parent or widget)
         self._widget = widget
         self._html = ""
         self._popup = _TipPopup()
+        self.destroyed.connect(self._popup.deleteLater)
         self._popup.label.linkActivated.connect(self._on_link)
         self._popup.entered.connect(self._cancel_hide)
         self._popup.left.connect(self._start_hide)
@@ -83,8 +84,8 @@ class LinkTip(QObject):
 
 
 class _TipPopup(QFrame):
-    entered = pyqtSignal()
-    left = pyqtSignal()
+    entered = Signal()
+    left = Signal()
 
     def __init__(self):
         # Qt: the ToolTip window type is frameless and focus-free yet, unlike QToolTip's window, receives the mouse.

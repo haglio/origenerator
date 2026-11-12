@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6 import sip
-from PyQt6.QtCore import QCoreApplication, QEvent
-from PyQt6.QtWidgets import QPlainTextEdit, QScrollArea, QVBoxLayout, QWidget
+import shiboken6
+from PySide6.QtCore import QCoreApplication, QEvent
+from PySide6.QtWidgets import QPlainTextEdit, QScrollArea, QVBoxLayout, QWidget
 
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.prompt_reveal import reveal_prompt
@@ -49,6 +49,6 @@ def test_a_field_gone_before_the_second_scroll_leaves_nothing_to_fail(qtbot):
 
     field.deleteLater()
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
-    assert sip.isdeleted(field)
+    assert not shiboken6.isValid(field)
 
     qtbot.wait(50)

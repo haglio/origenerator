@@ -4,8 +4,9 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PyQt6.QtCore import QPoint, Qt
-from PyQt6.QtWidgets import QApplication, QInputDialog, QLabel, QMenu, QTabBar
+from PySide6.QtCore import QPoint, Qt
+from PySide6.QtWidgets import QApplication, QInputDialog, QLabel, QMenu, QTabBar
+from shared_ui.testing import appending_to
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
@@ -20,6 +21,7 @@ from origenerator.item_names import ItemNames
 from origenerator.library_views import TabViews
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.comfyui_folders import SUITE_FOLDERS
+from tests.qt_exec import faking_exec
 
 
 @pytest.fixture
@@ -284,7 +286,7 @@ def test_go_to_folder_asks_for_the_tab_it_was_raised_over(tabs):
     tab = _loaded_tab(tabs)
     tabs._add_subtab()
     asked = []
-    tabs.folder_requested.connect(asked.append)
+    tabs.folder_requested.connect(appending_to(asked))
 
     tabs._tab_menu(0).actions()[0].trigger()
 
@@ -311,11 +313,12 @@ def test_close_all_leaves_the_pane_on_its_resting_tab(tabs):
     assert tabs.currentWidget().is_blank()
 
 
-def test_the_only_tab_has_no_menu_at_all(tabs):
+def test_the_only_tab_has_no_menu_at_all(tabs, monkeypatch):
     assert tabs._tab_menu(0).actions() == []
-    with patch.object(QMenu, "exec") as spy:
-        tabs._open_tab_menu(QPoint(5, 5))
-    spy.assert_not_called()
+    opened = []
+    faking_exec(monkeypatch, QMenu, lambda menu, *_: opened.append(menu))
+    tabs._open_tab_menu(QPoint(5, 5))
+    assert opened == []
 
 
 def test_a_right_click_off_the_tabs_opens_no_menu(tabs):

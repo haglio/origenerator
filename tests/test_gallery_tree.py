@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 
-from PyQt6.QtCore import QSize
-from PyQt6.QtWidgets import QStyle, QStyleOptionViewItem
+from PySide6.QtCore import QSize
+from PySide6.QtWidgets import QStyle, QStyleOptionViewItem
 from shared_ui.colors import TEXT_PRIMARY
 from shared_ui.icons import icon_pixmap
 

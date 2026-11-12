@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, QPoint, Qt
-from PyQt6.QtGui import QColor, QHelpEvent, QImage, QTextCursor, QTextDocument
-from PyQt6.QtWidgets import QApplication, QToolTip
+from PySide6.QtCore import QEvent, QPoint, Qt
+from PySide6.QtGui import QColor, QHelpEvent, QImage, QTextCursor, QTextDocument
+from PySide6.QtWidgets import QApplication, QToolTip
 from shared_ui.colors import BG_TERTIARY, BLUE_LIGHT, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.spacing import MARGIN_STANDARD
+from shared_ui.testing import appending_to
 
 from origenerator.db_requests import Turn
 from origenerator.gui.generate_button import GenerateButton
@@ -33,7 +34,7 @@ def _shown_at(qtbot, width):
 
 def _asked(qtbot, exchange):
     asked = []
-    exchange.asked.connect(asked.append)
+    exchange.asked.connect(appending_to(asked))
     return asked
 
 
@@ -364,7 +365,7 @@ def _placed(exchange, kind):
 def test_a_turn_that_changed_something_and_made_nothing_offers_generate_under_it(qtbot):
     exchange = _shown_at(qtbot, 400)
     asked = []
-    exchange.generate_asked.connect(asked.append)
+    exchange.generate_asked.connect(appending_to(asked))
 
     exchange.show_exchange([("hello", "Hi."), _changed("a cap"), _changed("red")])
 
@@ -434,7 +435,7 @@ def test_auto_generate_sits_at_the_end_of_the_line_and_starts_off(qtbot):
 def test_with_auto_generate_on_each_answer_that_changes_something_is_generated(qtbot):
     exchange = _shown_at(qtbot, 400)
     asked = []
-    exchange.generate_asked.connect(asked.append)
+    exchange.generate_asked.connect(appending_to(asked))
     exchange.set_auto_generate(True)
     exchange.show_exchange([_changed("a cap", made="first")])
 
@@ -449,7 +450,7 @@ def test_with_auto_generate_on_each_answer_that_changes_something_is_generated(q
 def test_with_auto_generate_off_an_answer_waits_for_generate(qtbot):
     exchange = _shown_at(qtbot, 400)
     asked = []
-    exchange.generate_asked.connect(asked.append)
+    exchange.generate_asked.connect(appending_to(asked))
 
     exchange.add_turn("red")
     exchange.answered(_changed("red"))
@@ -460,7 +461,7 @@ def test_with_auto_generate_off_an_answer_waits_for_generate(qtbot):
 def test_flipping_auto_generate_says_so(qtbot):
     exchange = _shown_at(qtbot, 400)
     chosen = []
-    exchange.auto_generate_chosen.connect(chosen.append)
+    exchange.auto_generate_chosen.connect(appending_to(chosen))
 
     qtbot.mouseClick(exchange._auto_generate, Qt.MouseButton.LeftButton)
 

@@ -5,10 +5,10 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
-from PyQt6 import sip
-from PyQt6.QtCore import QPoint, Qt
-from PyQt6.QtGui import QMovie
-from PyQt6.QtWidgets import QLabel, QWidget
+import shiboken6
+from PySide6.QtCore import QPoint, Qt
+from PySide6.QtGui import QMovie
+from PySide6.QtWidgets import QLabel, QWidget
 
 from origenerator import gallery, search
 from origenerator.gallery.collection import (
@@ -169,7 +169,7 @@ def test_the_second_look_for_a_place_goes_with_the_canvas_it_was_for(qtbot):
     pane.show_empty()
     pane.return_to(pane.place())
 
-    sip.delete(scroll)
+    shiboken6.delete(scroll)
 
     qtbot.wait(10)
 
@@ -876,7 +876,7 @@ def test_a_redraw_of_the_latest_collection_keeps_the_tiles_it_already_drew(qtbot
     _open_latest(pane, [dict(row) for row in rows])
 
     assert pane._thumb_widgets == drawn
-    assert all(not sip.isdeleted(tile) and tile.parent() is not None for tile in drawn.values())
+    assert all(shiboken6.isValid(tile) and tile.parent() is not None for tile in drawn.values())
 
 
 def test_a_kept_tile_takes_the_star_its_row_now_wears(qtbot):

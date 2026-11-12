@@ -4,8 +4,8 @@ import random
 from collections.abc import Sequence
 from pathlib import Path
 
-from PyQt6.QtCore import QEvent, QSize, Qt, pyqtSignal
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QEvent, QSize, Qt, Signal
+from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QLabel,
@@ -131,10 +131,10 @@ _DIMENSION_STEP = 16
 _PADLOCK = {False: "lock", True: "unlock"}
 
 class ParamForm(QWidget):
-    changed = pyqtSignal()
-    text_fields_changed = pyqtSignal()
-    seed_drawn = pyqtSignal(str, object)
-    item_activated = pyqtSignal(str)
+    changed = Signal()
+    text_fields_changed = Signal()
+    seed_drawn = Signal(str, object)
+    item_activated = Signal(str)
 
     def __init__(
         self,

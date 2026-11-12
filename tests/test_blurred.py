@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PIL import Image
-from PyQt6.QtCore import QSize
+from PySide6.QtCore import QSize
 
 from origenerator.gui.blurred import blurred_backdrop
 

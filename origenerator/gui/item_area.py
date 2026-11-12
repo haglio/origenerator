@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, QObject, QTimer
-from PyQt6.QtWidgets import QSplitter, QWidget
+from PySide6.QtCore import QEvent, QObject, QTimer
+from PySide6.QtWidgets import QSplitter, QWidget
 
 _SHOWN_OR_HIDDEN = (QEvent.Type.ShowToParent, QEvent.Type.HideToParent)
 
@@ -23,7 +23,7 @@ class ItemArea(QObject):
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         if watched is self._splitter:
             if event.type() == QEvent.Type.Show:
-                QTimer.singleShot(0, self._share)
+                QTimer.singleShot(0, self, self._share)
         elif event.type() in _SHOWN_OR_HIDDEN:
             self._follow()
         return False
@@ -33,7 +33,7 @@ class ItemArea(QObject):
         appearing = showing and self._area.isHidden()
         self._area.setVisible(showing)
         if appearing:
-            QTimer.singleShot(0, self._share)
+            QTimer.singleShot(0, self, self._share)
 
     def _share(self) -> None:
         if self._sharing or self._dragged() or self._area.isHidden():

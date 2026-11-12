@@ -9,9 +9,9 @@ from funestra.funestra_verbs import SPEED_DOWN, SPEED_UP
 from funestra.hud_placement import HudCorner
 from funestra.main_hud import ModeHud
 from funestra.pointer import OMNIPAUSE_TOGGLE
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QPalette
-from PyQt6.QtWidgets import QVBoxLayout, QWidget
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QPalette
+from PySide6.QtWidgets import QVBoxLayout, QWidget
 from shared_ui.colors import BLACK
 
 from origenerator import osr2 as osr2_device

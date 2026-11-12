@@ -4,8 +4,8 @@ from collections.abc import Callable
 from itertools import groupby
 from operator import attrgetter
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QLabel
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QLabel
 
 from origenerator.gui.thumbnail_dropdown import (
     THUMBNAILS_ROLE,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtGui import QFontMetrics
-from PyQt6.QtWidgets import QApplication, QLabel
+from PySide6.QtGui import QFontMetrics
+from PySide6.QtWidgets import QApplication, QLabel
 from shared_ui.fonts import FONT_UI, SIZE_TINY
 
 from origenerator.gui import tile_shape

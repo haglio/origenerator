@@ -68,6 +68,6 @@ class Copies:
 
 
 def say_another_copy_is_running() -> None:
-    from PyQt6.QtWidgets import QMessageBox  # noqa: PLC0415
+    from PySide6.QtWidgets import QMessageBox  # noqa: PLC0415
 
     QMessageBox.information(None, "Origenerator", "Another copy of Origenerator is already running.")

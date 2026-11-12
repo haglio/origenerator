@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from PyQt6.QtCore import QObject
+from PySide6.QtCore import QObject
 
 from origenerator.boot_passes import Library
 from origenerator.db import Database, NewGeneration

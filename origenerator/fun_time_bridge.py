@@ -10,7 +10,7 @@ from funestra.file_channel import (
     publish_whole,
     read_paused_state,
 )
-from PyQt6.QtCore import QCoreApplication, QObject, QTimer, pyqtSignal
+from PySide6.QtCore import QCoreApplication, QObject, QTimer, Signal
 
 from origenerator.config import RADIO_DIR
 from origenerator.fun_time_mode import (
@@ -77,9 +77,9 @@ def _without_when_said(said: str) -> tuple[str, float | None]:
 
 
 class FunTimeBridge(QObject):
-    released = pyqtSignal()
-    hand_over_asked = pyqtSignal(Path, Path)
-    take_back_asked = pyqtSignal()
+    released = Signal()
+    hand_over_asked = Signal(Path, Path)
+    take_back_asked = Signal()
 
     def __init__(self, session: FunTimeSession, gallery, parent=None, *, radio_dir=RADIO_DIR,
                  core_ready: bool = True):

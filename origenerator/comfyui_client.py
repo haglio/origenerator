@@ -5,7 +5,7 @@ import contextlib
 import json
 import logging
 
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 from origenerator.comfyui_api import ComfyUIApi, ForeignQueue
 from origenerator.comfyui_inputs import ComfyFolders
@@ -19,14 +19,14 @@ _WHAT_THREW_AND_WHERE = ("node_id", "node_type", "exception_type", "exception_me
                          "traceback")
 
 class ComfyUIClient(QThread):
-    connected = pyqtSignal()
-    disconnected = pyqtSignal()
-    progress = pyqtSignal(str, str, int, int)
-    node_executing = pyqtSignal(str, str)
-    job_completed = pyqtSignal(str, dict)
-    job_error = pyqtSignal(str, str)
-    queue_status = pyqtSignal(int)
-    preview_image = pyqtSignal(str, bytes)
+    connected = Signal()
+    disconnected = Signal()
+    progress = Signal(str, str, int, int)
+    node_executing = Signal(str, str)
+    job_completed = Signal(str, dict)
+    job_error = Signal(str, str)
+    queue_status = Signal(int)
+    preview_image = Signal(str, bytes)
 
     def __init__(self, host: str = "127.0.0.1", port: int = 8188,
                  client_id: str | None = None, parent=None, *, folders: ComfyFolders):

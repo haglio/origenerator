@@ -4,6 +4,7 @@ import logging
 from unittest.mock import Mock
 
 import pytest
+from shared_ui.testing import appending_to
 
 from origenerator.voice.dictation import RequestDictation
 from origenerator.voice.listener import CommandAndRequestListener, Phrases
@@ -51,8 +52,8 @@ def test_commands_open_the_mic_and_execute_what_they_match(qtbot):
 def test_words_that_are_no_command_and_no_request_do_nothing(qtbot):
     listener, hearing = _listener(says="make it a dog")
     ran, requests, errors = [], [], []
-    listener.request.connect(requests.append)
-    listener.error.connect(errors.append)
+    listener.request.connect(appending_to(requests))
+    listener.error.connect(appending_to(errors))
     listener.start_commands(_into(ran))
 
     hearing.hear()
@@ -65,7 +66,7 @@ def test_a_sound_with_no_words_in_it_is_answered_as_not_caught(qtbot, noise):
     # Whisper writes '. . . .' for noise.
     listener, hearing = _listener(says=noise)
     ran, errors = [], []
-    listener.error.connect(errors.append)
+    listener.error.connect(appending_to(errors))
     listener.start_commands(_into(ran))
 
     hearing.hear()
@@ -114,7 +115,7 @@ def test_words_that_miss_every_command_go_to_the_screen_and_only_their_count_to_
     listener, hearing = _listener(says="put the kettle on")
     listener.start_commands(_ignore)
     shown = []
-    listener.heard.connect(shown.append)
+    listener.heard.connect(appending_to(shown))
 
     with caplog.at_level(logging.DEBUG):
         hearing.hear()
@@ -161,7 +162,7 @@ def _request_listener(says="Request, no hat, over."):
 def test_a_request_is_re_emitted(qtbot):
     listener, hearing = _request_listener()
     spoken = []
-    listener.request.connect(spoken.append)
+    listener.request.connect(appending_to(spoken))
     listener.start_commands(_ignore)
 
     hearing.hear()
@@ -172,7 +173,7 @@ def test_a_request_is_re_emitted(qtbot):
 def test_a_request_keeps_the_time_the_mic_heard_its_first_step_said(qtbot):
     listener, hearing = _request_listener()
     spoken = []
-    listener.request.connect(spoken.append)
+    listener.request.connect(appending_to(spoken))
     listener.start_commands(_ignore)
 
     hearing.hear(spoken_at=7.5)
@@ -192,7 +193,7 @@ def test_an_open_request_swallows_what_would_be_a_command(qtbot):
     listener, hearing = _request_listener(says="Request.")
     ran = []
     spoken = []
-    listener.request.connect(spoken.append)
+    listener.request.connect(appending_to(spoken))
     listener.start_commands(_into(ran))
 
     hearing.hear()
@@ -206,7 +207,7 @@ def test_an_open_request_swallows_what_would_be_a_command(qtbot):
 def test_a_request_is_logged_by_where_it_stands_and_never_by_its_words(qtbot, caplog):
     listener, hearing = _request_listener(says="Request, no example lantern, over.")
     spoken = []
-    listener.request.connect(spoken.append)
+    listener.request.connect(appending_to(spoken))
     listener.start_commands(_ignore)
 
     with caplog.at_level(logging.INFO, logger="origenerator.voice"):
@@ -247,7 +248,7 @@ def _bare_listener(says):
 def test_a_word_a_request_opens_on_opens_one_whatever_else_it_matches(qtbot):
     listener, hearing = _bare_listener("requests")
     ran, spoken = [], []
-    listener.request.connect(spoken.append)
+    listener.request.connect(appending_to(spoken))
     listener.start_commands(_into(ran))
 
     hearing.hear()
@@ -260,7 +261,7 @@ def test_a_word_a_request_opens_on_opens_one_whatever_else_it_matches(qtbot):
 def test_a_bare_command_word_is_the_command(qtbot):
     listener, hearing = _bare_listener("trash")
     ran, spoken = [], []
-    listener.request.connect(spoken.append)
+    listener.request.connect(appending_to(spoken))
     listener.start_commands(_into(ran))
 
     hearing.hear()
@@ -272,7 +273,7 @@ def test_a_bare_command_word_is_the_command(qtbot):
 def test_an_open_request_takes_the_word_back(qtbot):
     listener, hearing = _bare_listener("Request.")
     ran, spoken = [], []
-    listener.request.connect(spoken.append)
+    listener.request.connect(appending_to(spoken))
     listener.start_commands(_into(ran))
 
     hearing.hear()
@@ -316,7 +317,7 @@ def test_the_suites_stand_in_routes_what_it_hears_as_the_listener_does(qtbot, ut
 def test_a_mic_that_will_not_open_says_what_stopped_it(qtbot):
     listener, hearing = _listener()
     errors = []
-    listener.error.connect(errors.append)
+    listener.error.connect(appending_to(errors))
     listener.start_commands(_ignore)
 
     hearing.failed.emit("No module named 'sounddevice'")

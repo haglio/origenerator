@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from shared_ui.testing import appending_to
+
 from origenerator.gui.populate_controller import PopulateController
 
 
@@ -53,7 +55,7 @@ def test_cancelling_a_variation_keeps_populate_on_and_tries_another_seed(qtbot):
     launcher = FakeLauncher()
     populate = PopulateController(launcher)
     stopped = []
-    populate.stopped.connect(stopped.append)
+    populate.stopped.connect(appending_to(stopped))
     populate.start("k")
 
     populate.note_canceled("k")
@@ -81,7 +83,7 @@ def test_a_cancel_whose_relaunch_cannot_run_ends_populate(qtbot):
     launcher = FakeLauncher(results=[True, False])
     populate = PopulateController(launcher)
     stopped = []
-    populate.stopped.connect(stopped.append)
+    populate.stopped.connect(appending_to(stopped))
     populate.start("k")
 
     populate.note_canceled("k")
@@ -94,7 +96,7 @@ def test_a_failed_variation_ends_populate_and_signals_stopped(qtbot):
     launcher = FakeLauncher()
     populate = PopulateController(launcher)
     stopped = []
-    populate.stopped.connect(stopped.append)
+    populate.stopped.connect(appending_to(stopped))
     populate.start("k")
 
     populate.note_failed("k")
@@ -109,7 +111,7 @@ def test_manual_stop_also_signals_stopped(qtbot):
     launcher = FakeLauncher()
     populate = PopulateController(launcher)
     stopped = []
-    populate.stopped.connect(stopped.append)
+    populate.stopped.connect(appending_to(stopped))
     populate.start("k")
 
     populate.stop("k")
@@ -121,7 +123,7 @@ def test_start_does_not_activate_when_the_launch_cannot_run(qtbot):
     launcher = FakeLauncher(started=False)
     populate = PopulateController(launcher)
     stopped = []
-    populate.stopped.connect(stopped.append)
+    populate.stopped.connect(appending_to(stopped))
 
     populate.start("k")
 
@@ -134,7 +136,7 @@ def test_a_relaunch_that_cannot_run_ends_populate(qtbot):
     launcher = FakeLauncher(results=[True, False])
     populate = PopulateController(launcher)
     stopped = []
-    populate.stopped.connect(stopped.append)
+    populate.stopped.connect(appending_to(stopped))
     populate.start("k")
 
     populate.note_finished("k")
@@ -158,7 +160,7 @@ def test_stop_all_ends_populate_wherever_it_runs(qtbot):
     launcher = FakeLauncher()
     populate = PopulateController(launcher)
     stopped = []
-    populate.stopped.connect(stopped.append)
+    populate.stopped.connect(appending_to(stopped))
     populate.start("a")
 
     populate.stop_all()
@@ -172,7 +174,7 @@ def test_populating_in_a_new_folder_ends_it_in_the_old_one(qtbot):
     launcher = FakeLauncher()
     populate = PopulateController(launcher)
     stopped = []
-    populate.stopped.connect(stopped.append)
+    populate.stopped.connect(appending_to(stopped))
     populate.start("a")
 
     populate.start("b")
@@ -211,7 +213,7 @@ def test_a_new_folder_that_cannot_start_leaves_populate_where_it_was(qtbot):
     launcher = FakeLauncher(results=[True, False])
     populate = PopulateController(launcher)
     stopped = []
-    populate.stopped.connect(stopped.append)
+    populate.stopped.connect(appending_to(stopped))
     populate.start("a")
 
     populate.start("b")

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from PyQt6.QtCore import QEvent, QObject, Qt, QTimer, pyqtSignal
-from PyQt6.QtWidgets import QApplication, QLabel, QPlainTextEdit, QVBoxLayout, QWidget
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer, Signal
+from PySide6.QtWidgets import QApplication, QLabel, QPlainTextEdit, QVBoxLayout, QWidget
 from shared_ui.colors import RED, YELLOW
 from shared_ui.fonts import SIZE_BODY, make_font
 from shared_ui.spacing import GAP_SMALL
@@ -117,8 +117,8 @@ class TidiesOnLeaving(QObject):
 
 
 class PromptBoxes(QWidget):
-    textChanged = pyqtSignal()
-    boxes_changed = pyqtSignal()
+    textChanged = Signal()
+    boxes_changed = Signal()
 
     def __init__(self, make_box: Callable[[], QPlainTextEdit], parent=None):
         super().__init__(parent)

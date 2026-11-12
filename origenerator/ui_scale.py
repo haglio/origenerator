@@ -26,7 +26,7 @@ def room_scale(*, in_a_headset: bool) -> float:
 
 
 def apply_room_scale(*, in_a_headset: bool) -> float:
-    """Qt reads QT_SCALE_FACTOR when the platform plugin initializes, so this must run before the first PyQt6 import."""
+    """Qt reads QT_SCALE_FACTOR when the platform plugin initializes, so this must run before the first PySide6 import."""
     scale = room_scale(in_a_headset=in_a_headset)
     if scale != 1.0:
         os.environ[_ENV_VAR] = repr(scale)

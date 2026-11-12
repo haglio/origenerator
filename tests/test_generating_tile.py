@@ -5,9 +5,10 @@ from dataclasses import dataclass
 from io import BytesIO
 
 from PIL import Image
-from PyQt6.QtCore import QObject, QPoint, Qt, pyqtSignal
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtCore import QObject, QPoint, Qt, Signal
+from PySide6.QtWidgets import QWidget
 from shared_ui.colors import BLUE, TEXT_PRIMARY
+from shared_ui.testing import appending_to
 
 from origenerator.gui.combination import Combination
 from origenerator.gui.generating_tile import GeneratingTile
@@ -29,9 +30,9 @@ class FakeJob(QObject):
     last_pass_progress: tuple | None = None
     last_stage: str = ""
 
-    started = pyqtSignal()
-    progress = pyqtSignal(int, int)
-    preview = pyqtSignal(bytes)
+    started = Signal()
+    progress = Signal(int, int)
+    preview = Signal(bytes)
 
     def __post_init__(self):
         super().__init__()
@@ -248,7 +249,7 @@ def test_right_clicking_the_tile_asks_for_its_menu(qtbot):
     tile = GeneratingTile(FakeJob(state="running"))
     qtbot.addWidget(tile)
     asked = []
-    tile.context_requested.connect(asked.append)
+    tile.context_requested.connect(appending_to(asked))
 
     tile.customContextMenuRequested.emit(QPoint(5, 5))
 

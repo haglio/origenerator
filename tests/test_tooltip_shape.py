@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, QPoint
-from PyQt6.QtGui import QHelpEvent
-from PyQt6.QtWidgets import QApplication, QLabel, QListWidget, QListWidgetItem, QToolTip
+from PySide6.QtCore import QEvent, QPoint
+from PySide6.QtGui import QHelpEvent
+from PySide6.QtWidgets import QApplication, QLabel, QListWidget, QListWidgetItem, QToolTip
 from shared_ui.tooltip_shape import shaped
 
 from origenerator.gui.stylesheet import dress_application

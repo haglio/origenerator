@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from PIL import Image
-from PyQt6.QtCore import QPoint, QRect, Qt
-from PyQt6.QtGui import QColor, QImage, QPainter
-from PyQt6.QtWidgets import QStyle, QStyleOptionViewItem
+from PySide6.QtCore import QPoint, QRect, Qt
+from PySide6.QtGui import QColor, QImage, QPainter
+from PySide6.QtWidgets import QStyle, QStyleOptionViewItem
 
 
 def square(tmp_path, color):

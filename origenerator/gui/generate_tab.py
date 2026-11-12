@@ -6,9 +6,9 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QAction, QIcon, QPixmap
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QPoint, Qt, QTimer, Signal
+from PySide6.QtGui import QAction, QIcon, QPixmap
+from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -205,25 +205,25 @@ def _pick_installed_ones_first(names: list[str]) -> str:
 
 
 class GenerateTab(DropZones):
-    title_changed = pyqtSignal(str)
-    form_edited = pyqtSignal()
-    user_edited = pyqtSignal()
-    prompt_fields_changed = pyqtSignal()
-    link_clicked = pyqtSignal(str)
-    item_action_requested = pyqtSignal(str, str)
-    context_menu_requested = pyqtSignal(str, QPoint)
-    go_to_folder_requested = pyqtSignal(str)
-    generate_requested = pyqtSignal(str, list)
-    turn_generate_requested = pyqtSignal(str, dict, dict)
-    modify_batch_requested = pyqtSignal(str, str, dict)
-    cancel_requested = pyqtSignal()
-    how_many_chosen = pyqtSignal(int)
-    request_auto_generate_chosen = pyqtSignal(bool)
-    displayed_changed = pyqtSignal()
-    enhance_requested = pyqtSignal(str)
-    versions_delete_requested = pyqtSignal(str, list)
-    train_requested = pyqtSignal(str)
-    trash_requested = pyqtSignal(str)
+    title_changed = Signal(str)
+    form_edited = Signal()
+    user_edited = Signal()
+    prompt_fields_changed = Signal()
+    link_clicked = Signal(str)
+    item_action_requested = Signal(str, str)
+    context_menu_requested = Signal(str, QPoint)
+    go_to_folder_requested = Signal(str)
+    generate_requested = Signal(str, list)
+    turn_generate_requested = Signal(str, dict, dict)
+    modify_batch_requested = Signal(str, str, dict)
+    cancel_requested = Signal()
+    how_many_chosen = Signal(int)
+    request_auto_generate_chosen = Signal(bool)
+    displayed_changed = Signal()
+    enhance_requested = Signal(str)
+    versions_delete_requested = Signal(str, list)
+    train_requested = Signal(str)
+    trash_requested = Signal(str)
 
     def __init__(self, client: ComfyUIClient | None, db: Database,
                  *, fun_time=None, inbox: evolver_export.EvolverInbox | None = None,
@@ -449,7 +449,7 @@ class GenerateTab(DropZones):
         super().showEvent(event)
         if not self._media_shared:
             self._media_shared = True
-            QTimer.singleShot(0, self._give_the_preview_five_eighths)
+            QTimer.singleShot(0, self, self._give_the_preview_five_eighths)
 
     def _give_the_preview_five_eighths(self) -> None:
         split = self._media_split

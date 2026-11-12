@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6 import sip
-from PyQt6.QtCore import (
+import shiboken6
+from PySide6.QtCore import (
     QCoreApplication,
     QEvent,
     Qt,
 )
-from PyQt6.QtGui import (
+from PySide6.QtGui import (
     QKeyEvent,
 )
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
@@ -969,7 +969,7 @@ def test_ctrl_f_after_the_searched_prompts_are_gone_opens_over_the_ones_in_front
     view.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, _NO_MOD))
     view._generate_pane._close_subtab(view._generate_pane.currentIndex())
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
-    assert all(sip.isdeleted(field) for field in searched)
+    assert all(not shiboken6.isValid(field) for field in searched)
     in_front = _tab_with_prompts(view)
     in_front.prompt_fields()[0].setPlainText("a cat")
 
@@ -986,7 +986,7 @@ def test_picking_another_workflow_points_an_open_find_at_its_prompts(qtbot, tmp_
 
     tab = _tab_with_prompts(view, "flux_t2i_upscaled")
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
-    assert all(sip.isdeleted(field) for field in searched)
+    assert all(not shiboken6.isValid(field) for field in searched)
     tab.prompt_fields()[0].setPlainText("a cat and a cat")
 
     _find_query(view).setText("cat")

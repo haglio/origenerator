@@ -26,7 +26,7 @@ from funestra.loop_cycle import ACTION, LOCK, SEED
 from funestra.on_screen_history import OnScreenHistory
 from funestra.playlist import PlaylistItem
 from funestra.status import parse_status
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from PySide6.QtCore import QObject, QTimer, Signal
 
 from origenerator.gui.action_presses import ActionPresses
 from origenerator.gui.funestra_transport import FunestraTransport
@@ -68,9 +68,9 @@ _CYCLES_TOWARD = {SEED: "right", ACTION: "down"}
 
 
 class FunestraSlideshow(QObject):
-    open_requested = pyqtSignal(str)
-    closed = pyqtSignal()
-    media_changed = pyqtSignal()
+    open_requested = Signal(str)
+    closed = Signal()
+    media_changed = Signal()
 
     def __init__(self, playing: Playing, seat: Seat, hosting: Hosting = NO_HOSTING, parent=None):
         super().__init__(parent)
@@ -115,7 +115,7 @@ class FunestraSlideshow(QObject):
             self._on_funestra = _heard(self.channel.status())
         self._publish()
         self._hand_over(land=opened_on_a_slide)
-        QTimer.singleShot(0, self._look_for_scripts_from_now_on)
+        QTimer.singleShot(0, self, self._look_for_scripts_from_now_on)
         self._timer = QTimer(self)
         self._timer.setInterval(_POLL_MS)
         self._timer.timeout.connect(self.tick)

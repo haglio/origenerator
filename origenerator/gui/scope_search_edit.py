@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QRectF, Qt, QVariantAnimation
-from PyQt6.QtGui import QPainter
-from PyQt6.QtWidgets import QLineEdit, QToolButton
+from PySide6.QtCore import QRectF, Qt, QVariantAnimation
+from PySide6.QtGui import QPainter
+from PySide6.QtWidgets import QLineEdit, QToolButton
 from shared_ui.colors import TEXT_SECONDARY
 from shared_ui.icons import draw_icon
 from shared_ui.spacing import BUTTON_ICON, GAP_SMALL

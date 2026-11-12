@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QPoint
+from PySide6.QtCore import QPoint
 
 from origenerator.gui.drop_style import AIMED, EDGE, GROUNDS, LIT
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from PyQt6.QtWidgets import QApplication, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QVBoxLayout, QWidget
 from shared_ui import folder_path as shared_folder_path
 from shared_ui.spacing import GAP_MEDIUM
 

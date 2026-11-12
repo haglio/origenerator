@@ -5,7 +5,7 @@ import urllib.request
 
 import pytest
 from PIL import Image
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtWidgets import QWidget
 
 from origenerator import (
     action_settings,

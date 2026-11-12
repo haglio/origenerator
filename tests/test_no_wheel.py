@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QPoint, QPointF, Qt
-from PyQt6.QtGui import QWheelEvent
-from PyQt6.QtWidgets import QComboBox
+from PySide6.QtCore import QPoint, QPointF, Qt
+from PySide6.QtGui import QWheelEvent
+from PySide6.QtWidgets import QComboBox
 
 from origenerator.gui.no_wheel import (
     NoWheelDoubleSpinBox,

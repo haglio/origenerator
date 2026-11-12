@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
 
-from PyQt6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QCursor, QIcon, QPixmap
-from PyQt6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QCursor, QIcon, QPixmap
+from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 from shared_ui.palette import BLUE, as_rgba
 from shared_ui.spacing import BUTTON_RADIUS
 
@@ -72,12 +72,12 @@ def restore_offer_of(item: dict) -> RestoreOffer:
 
 
 class ItemTile(QWidget):
-    pressed = pyqtSignal(str, Qt.KeyboardModifier)
-    clicked = pyqtSignal(str)
-    double_clicked = pyqtSignal(str)
-    context_requested = pyqtSignal(str, QPoint)
-    corner_button_triggered = pyqtSignal(str, str)
-    control_triggered = pyqtSignal(str, str)
+    pressed = Signal(str, Qt.KeyboardModifier)
+    clicked = Signal(str)
+    double_clicked = Signal(str)
+    context_requested = Signal(str, QPoint)
+    corner_button_triggered = Signal(str, str)
+    control_triggered = Signal(str, str)
 
     def __init__(self, prompt_id: str, thumb_path: str | None, label_text: str,
                  appearance: TileAppearance = PLAIN_APPEARANCE, parent=None):

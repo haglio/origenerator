@@ -146,7 +146,7 @@ def test_a_window_stuck_in_a_slot_leaves_that_slot_in_the_crash_log(tmp_path):
     child = textwrap.dedent(f"""
         import sys, time
         sys.path.insert(0, {str(Path.cwd())!r})
-        from PyQt6.QtCore import QCoreApplication, QTimer
+        from PySide6.QtCore import QCoreApplication, QTimer
         from origenerator.freeze_watch import FreezeWatch, Timing
         app = QCoreApplication([])
         watch = FreezeWatch(open({str(crash_log)!r}, "a", encoding="utf-8"),
@@ -171,8 +171,8 @@ def _close_a_window_whose_teardown_takes(seconds, *, closed_within_s, crash_log)
         import os, sys, time
         os.environ["QT_QPA_PLATFORM"] = "offscreen"
         sys.path.insert(0, {str(Path.cwd())!r})
-        from PyQt6.QtCore import QTimer
-        from PyQt6.QtWidgets import QApplication, QWidget
+        from PySide6.QtCore import QTimer
+        from PySide6.QtWidgets import QApplication, QWidget
         from origenerator.freeze_watch import Timing, watch_the_window
         app = QApplication([])
         window = QWidget()
@@ -203,8 +203,8 @@ def test_a_hand_over_longer_than_the_closes_deadline_runs_to_its_end(tmp_path):
         import os, sys, time
         os.environ["QT_QPA_PLATFORM"] = "offscreen"
         sys.path.insert(0, {str(Path.cwd())!r})
-        from PyQt6.QtCore import QTimer
-        from PyQt6.QtWidgets import QApplication, QWidget
+        from PySide6.QtCore import QTimer
+        from PySide6.QtWidgets import QApplication, QWidget
         from origenerator.freeze_watch import Timing, watch_the_window
         app = QApplication([])
         window = QWidget()

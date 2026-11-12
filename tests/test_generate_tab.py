@@ -10,10 +10,10 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+import shiboken6
 from PIL import Image
-from PyQt6 import sip
-from PyQt6.QtCore import QPoint, QPointF, QSize, Qt
-from PyQt6.QtGui import (
+from PySide6.QtCore import QPoint, QPointF, QSize, Qt
+from PySide6.QtGui import (
     QColor,
     QDropEvent,
     QImage,
@@ -23,7 +23,7 @@ from PyQt6.QtGui import (
     QTextDocument,
     QTextDocumentFragment,
 )
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication,
     QFormLayout,
     QLabel,
@@ -35,6 +35,7 @@ from PyQt6.QtWidgets import (
 from shared_ui.colors import BG_PRIMARY, BG_SECONDARY, BLUE, TEXT_MUTED, TEXT_PRIMARY, YELLOW
 from shared_ui.icons import inline_icon
 from shared_ui.spacing import GAP_MEDIUM
+from shared_ui.testing import appending_to
 from shared_ui.tick_control import TickControl
 
 import origenerator.setting_advice as advice_module
@@ -100,6 +101,7 @@ from tests import drops
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import _struck_and_lit
 from tests.marked_words import words_shown
+from tests.qt_exec import faking_exec
 from tests.related_links import settings_tile, source_tile
 from tests.text_readers import clap_reader, clip_reader, word_reader, word_reading
 from tests.thumbnail_rows import looping_video, painted_row, where_the_thumbnail_is
@@ -702,7 +704,7 @@ def test_the_generate_caption_is_re_read_on_a_timer_not_on_each_cue(tab):
 def test_the_outgoing_form_is_still_alive_when_the_prompt_fields_change_is_announced(tab):
     outgoing = tab._param_form
     alive_when_announced = []
-    tab.prompt_fields_changed.connect(lambda: alive_when_announced.append(not sip.isdeleted(outgoing)))
+    tab.prompt_fields_changed.connect(lambda: alive_when_announced.append(shiboken6.isValid(outgoing)))
 
     other = next(i for i in range(tab._workflow_dropdown.count())
                  if tab._workflow_dropdown.itemData(i) not in (None, "", "sdxl_t2i"))
@@ -877,7 +879,7 @@ def _press_in_the_popup(monkeypatch, caption):
         asked.append(box.text())
         next(button for button in box.buttons() if button.text() == caption).click()
 
-    monkeypatch.setattr(QMessageBox, "exec", press)
+    faking_exec(monkeypatch, QMessageBox, press)
     return asked
 
 
@@ -1182,7 +1184,7 @@ def test_a_start_image_from_outside_the_gallery_is_named_by_its_file_and_goes_no
     Image.new("RGB", (8, 8)).save(outside)
     tab._param_form.set_values({"input_image": str(outside)})
     went = []
-    tab.link_clicked.connect(went.append)
+    tab.link_clicked.connect(appending_to(went))
 
     qtbot.mouseClick(start_image, Qt.MouseButton.LeftButton)
 
@@ -1581,7 +1583,7 @@ def test_title_changed_when_the_shown_item_changes(tab):
     name = _named(tab, row)
     tab._viewport.show_media = MagicMock()
     titles = []
-    tab.title_changed.connect(titles.append)
+    tab.title_changed.connect(appending_to(titles))
 
     tab.show_saved_generation(row, [row])
 
@@ -2106,7 +2108,7 @@ def test_up_onto_the_enhance_row_and_enter_asks_for_an_enhance_of_the_image(save
     tab.set_enhance_settings(gallery.EnhanceSettings(params={"enhance_scale": 3.0}))
     tab.show_saved_generation(image, [image])
     asked = []
-    tab.enhance_requested.connect(asked.append)
+    tab.enhance_requested.connect(appending_to(asked))
     newest = _version_rows(tab)[0]
     qtbot.mouseClick(newest, Qt.MouseButton.LeftButton)
 
@@ -2283,7 +2285,7 @@ def test_a_click_on_an_image_s_animation_is_a_link_clicked(saved_panel, monkeypa
     _video_row(db, "vid1", input_image="sdxl_img1.png")
     tab.show_saved_generation(image, [image])
     got = []
-    tab.link_clicked.connect(got.append)
+    tab.link_clicked.connect(appending_to(got))
 
     tab._related._animations.activated.emit("vid1")
 
@@ -2336,7 +2338,7 @@ def test_a_click_on_a_video_s_start_frame_is_a_link_clicked(saved_panel, monkeyp
                         lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
     tab.show_saved_generation(video, [image])
     got = []
-    tab.link_clicked.connect(got.append)
+    tab.link_clicked.connect(appending_to(got))
 
     source_tile(tab._related).activated.emit("img1")
 
@@ -4024,7 +4026,7 @@ def _lane_video(db, lane, prompt_id="vid1"):
 def _lane_offers(tab):
     names = tuple(f" {lane.name}" for lane in _lanes())
     return [re.sub(r"^<img[^>]*>&nbsp;", "\u2713 ", widget.text())
-            for widget in tab.findChildren((QPushButton, QLabel))
+            for widget in tab.findChildren(QWidget) if isinstance(widget, (QPushButton, QLabel))
             if widget.isVisibleTo(tab) and widget.text().endswith(names)]
 
 
@@ -4737,7 +4739,7 @@ def test_the_image_zone_holds_a_dropped_item_and_leads_back_to_it(qtbot, tmp_pat
     tab._workflow_dropdown.setCurrentIndex(_dropdown_index(tab, "wan22_i2v"))
     zone = tab._param_form._widgets["input_image"]
     led_to = []
-    tab.link_clicked.connect(led_to.append)
+    tab.link_clicked.connect(appending_to(led_to))
 
     mime = generation_mime("img1")
     zone.dropEvent(QDropEvent(QPointF(1, 1), Qt.DropAction.CopyAction, mime,
@@ -4802,7 +4804,7 @@ def test_a_tab_offers_to_retrain_a_lora_the_app_can_train_only_while_it_is_picke
     controls = blank_panel._param_form.training.controls["lora"]
     assert controls.isHidden()
     asked = []
-    blank_panel.train_requested.connect(asked.append)
+    blank_panel.train_requested.connect(appending_to(asked))
 
     blank_panel._param_form.set_values({"lora": "example_look.safetensors"})
 

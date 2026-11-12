@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from PyQt6 import sip
-from PyQt6.QtCore import QMimeData, QPoint, QSize, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QPainter, QPen, QPixmap, QPolygon
-from PyQt6.QtWidgets import (
-    QWIDGETSIZE_MAX,
+import shiboken6
+from PySide6.QtCore import QMimeData, QPoint, QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QPainter, QPen, QPixmap, QPolygon
+from PySide6.QtWidgets import (
     QApplication,
     QFrame,
     QHBoxLayout,
@@ -55,6 +54,7 @@ from origenerator.gui.inflight import (
 from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
 from origenerator.gui.queue_thumbs import QueueThumbs
 from origenerator.gui.stylesheet import CHOSEN
+from origenerator.gui.widget_size import QWIDGETSIZE_MAX
 from origenerator.workflows.derived_size import resolve_input_image_path
 
 _ROW_HEIGHT = 88
@@ -103,7 +103,7 @@ class OpensAFolder:
 
 
 class RunningPreview(OpensAFolder, QWidget):
-    start_now_requested = pyqtSignal()
+    start_now_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -349,7 +349,7 @@ class QueueRow(OpensAFolder, QWidget):
         try:
             self._drag_out.start(mime, self.grab(), action=Qt.DropAction.MoveAction)
         finally:
-            if not sip.isdeleted(self):
+            if shiboken6.isValid(self):
                 self.set_dragging(False)
 
 
@@ -368,10 +368,10 @@ class _Rules(QWidget):
 
 
 class JobQueueView(QWidget):
-    move_requested = pyqtSignal(str, object)
-    clear_queue_requested = pyqtSignal()
-    start_now_requested = pyqtSignal()
-    cancel_all_requested = pyqtSignal()
+    move_requested = Signal(str, object)
+    clear_queue_requested = Signal()
+    start_now_requested = Signal()
+    cancel_all_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)

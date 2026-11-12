@@ -4,8 +4,8 @@ from pathlib import Path
 from xml.etree import ElementTree
 
 from PIL import Image
-from PyQt6.QtGui import QIcon, QImage
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtGui import QIcon, QImage
+from PySide6.QtWidgets import QWidget
 from shared_ui.alert import Level, icon_pixmap_for
 from shared_ui.app_icon import CANVAS
 from shared_ui.palette import PREVIEW_INK

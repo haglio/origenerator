@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 
-from PyQt6.QtCore import QEventLoop, Qt
-from PyQt6.QtGui import QCursor
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtCore import QEventLoop, Qt
+from PySide6.QtGui import QCursor
+from PySide6.QtWidgets import QApplication
 
 
 @contextmanager

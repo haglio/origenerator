@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from PySide6.QtCore import QObject, QTimer, Signal
 
 from origenerator import lora_training
 from origenerator.gui.generation_job import JobState
@@ -23,11 +23,11 @@ STAGES = {
 
 
 class TrainingRun(QObject):
-    progress = pyqtSignal(str)
-    finished = pyqtSignal(str)
-    failed = pyqtSignal(str)
-    canceled = pyqtSignal()
-    ended = pyqtSignal(object)
+    progress = Signal(str)
+    finished = Signal(str)
+    failed = Signal(str)
+    canceled = Signal()
+    ended = Signal(object)
 
     def __init__(self, job: dict, queue, kind, *, reveal, parent=None):
         super().__init__(parent)

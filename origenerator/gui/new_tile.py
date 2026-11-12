@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QFrame, QLabel, QVBoxLayout
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 
 from origenerator.gui import tile_shape
 from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP
@@ -10,7 +10,7 @@ _MARK_PX = 56
 
 
 class NewTile(QFrame):
-    add_requested = pyqtSignal()
+    add_requested = Signal()
 
     def __init__(self, parent=None, *, making_one=False):
         super().__init__(parent)

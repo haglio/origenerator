@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 
 STEP_S = 1
 MIN_S, MAX_S = 1, 60
@@ -8,7 +8,7 @@ DEFAULT_S = 4
 
 
 class SlideshowPace(QObject):
-    changed = pyqtSignal(int)
+    changed = Signal(int)
 
     def __init__(self, seconds: int = DEFAULT_S, parent=None):
         super().__init__(parent)

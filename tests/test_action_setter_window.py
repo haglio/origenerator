@@ -4,9 +4,9 @@ import json
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QPoint, QSize, Qt, QTimer
-from PyQt6.QtGui import QColor, QPalette, QPixmap
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QPoint, QSize, Qt, QTimer
+from PySide6.QtGui import QColor, QPalette, QPixmap
+from PySide6.QtWidgets import (
     QApplication,
     QGridLayout,
     QLabel,

@@ -3,9 +3,9 @@ from __future__ import annotations
 from functools import partial
 
 import pytest
-from PyQt6.QtCore import QEvent, Qt
-from PyQt6.QtGui import QFocusEvent, QTextCursor
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtGui import QFocusEvent, QTextCursor
+from PySide6.QtWidgets import QApplication
 from shared_ui.colors import BG_PRIMARY, RED, TEXT_MUTED, YELLOW
 from shared_ui.fonts import FONT_UI, SIZE_BODY
 from shared_ui.spacing import GAP_SMALL

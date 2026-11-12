@@ -19,10 +19,10 @@ from funestra.main_hud_painter import MainHudPainter, hud_xy
 from funestra.modes import MainMode, Osr2State
 from funestra.osr2_visualizer import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
 from funestra.robot_hand import POSITION_MAX
-from PyQt6.QtCore import QEvent, QObject, QPoint, QPointF, Qt, pyqtSignal
-from PyQt6.QtGui import QMouseEvent
-from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, Qt, Signal
+from PySide6.QtGui import QMouseEvent
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication
 
 from origenerator import motion_engine
 from origenerator.gui.osr2_controls import Osr2Controls
@@ -207,8 +207,8 @@ def test_each_press_on_the_waveform_button_changes_the_face_it_wears(qtbot):
 
 
 class FakeControl(QObject):
-    changed = pyqtSignal()
-    settled = pyqtSignal()
+    changed = Signal()
+    settled = Signal()
 
     def __init__(self, state=OSR2_DRIVING, script=None):
         super().__init__()

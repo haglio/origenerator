@@ -2,9 +2,9 @@
 deletion the tests before it left queued; no test may inherit them."""
 from __future__ import annotations
 
-from PyQt6 import sip
-from PyQt6.QtCore import QObject
-from PyQt6.QtWidgets import QWidget
+import shiboken6
+from PySide6.QtCore import QObject
+from PySide6.QtWidgets import QWidget
 
 from tests.conftest import _deliver_deferred_deletes, _deliver_the_deletions_already_scheduled
 
@@ -12,11 +12,11 @@ from tests.conftest import _deliver_deferred_deletes, _deliver_the_deletions_alr
 def test_a_widget_asked_to_go_is_gone_once_the_deletions_are_drained(qapp):
     widget = QWidget()
     widget.deleteLater()
-    assert not sip.isdeleted(widget), "deleteLater is not supposed to be immediate"
+    assert shiboken6.isValid(widget), "deleteLater is not supposed to be immediate"
 
     _deliver_the_deletions_already_scheduled()
 
-    assert sip.isdeleted(widget)
+    assert not shiboken6.isValid(widget)
 
 
 def test_the_deletions_a_drain_sets_off_are_carried_out_too(qapp):

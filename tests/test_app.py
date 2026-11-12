@@ -29,8 +29,8 @@ from app_support.testing import (
 )
 from app_support.win32 import TaskbarApp
 from PIL import Image
-from PyQt6.QtGui import QColor, QPalette
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtGui import QColor, QPalette
+from PySide6.QtWidgets import QWidget
 from shared_ui.colors import BLUE
 from shared_ui.preview import Preview
 from shared_ui.testing import brought_to_front
@@ -126,8 +126,8 @@ def test_an_error_nothing_catches_is_logged_and_the_app_keeps_running(tmp_path):
     child = textwrap.dedent(f"""
         import sys
         from pathlib import Path
-        from PyQt6.QtCore import QTimer
-        from PyQt6.QtWidgets import QApplication
+        from PySide6.QtCore import QTimer
+        from PySide6.QtWidgets import QApplication
         from origenerator.app import _configure_logging
         app = QApplication(sys.argv[:1])
         _configure_logging(Path({str(state)!r}))
@@ -190,9 +190,9 @@ def test_a_video_the_app_opens_leaves_none_of_its_tags_in_its_output_or_its_log(
     child = textwrap.dedent(f"""
         import sys
         from pathlib import Path
-        from PyQt6.QtCore import QTimer, QUrl
-        from PyQt6.QtMultimedia import QMediaPlayer
-        from PyQt6.QtWidgets import QApplication
+        from PySide6.QtCore import QTimer, QUrl
+        from PySide6.QtMultimedia import QMediaPlayer
+        from PySide6.QtWidgets import QApplication
         from origenerator.app import _configure_logging
         app = QApplication(sys.argv[:1])
         _configure_logging(Path({str(state)!r}))
@@ -364,7 +364,7 @@ def test_main_shows_loading_screen_during_boot_and_takes_it_down_after_window(qa
          patch("origenerator.importer.backfill_import_workflows", return_value=0), \
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
-         patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
+         patch("PySide6.QtWidgets.QApplication.exec", return_value=0):
         assert main([]) == 0
 
     assert events == ["loading opened", "window.show", "loading.accept"]
@@ -677,7 +677,7 @@ def test_handing_comfyui_its_work_after_the_window_goes_has_a_deadline_of_its_ow
 def test_the_loop_run_only_to_quit_lets_go_of_everything_that_waits_on_a_quit():
     child = textwrap.dedent("""
         import sys
-        from PyQt6.QtWidgets import QApplication
+        from PySide6.QtWidgets import QApplication
         from origenerator.app import _run_the_loop_only_to_quit
         app = QApplication(sys.argv[:1])
         app.aboutToQuit.connect(lambda: print("the Funestra let go", flush=True))
@@ -714,7 +714,7 @@ def test_main_fronts_the_window_after_the_splash_is_gone(qapp):
          patch("origenerator.importer.backfill_import_workflows", return_value=0), \
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
-         patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
+         patch("PySide6.QtWidgets.QApplication.exec", return_value=0):
         assert main([]) == 0
 
     assert events == ["window.show", "loading.accept", "front:window"]
@@ -770,7 +770,7 @@ def test_the_window_is_watched_before_the_app_runs(qapp, monkeypatch):
 
     with _a_faked_boot([], **{
         "origenerator.freeze_watch.watch_the_window": watch_the_window,
-        "PyQt6.QtWidgets.QApplication.exec": MagicMock(
+        "PySide6.QtWidgets.QApplication.exec": MagicMock(
             side_effect=lambda: events.append("running") or 0),
     }):
         assert main([]) == 0
@@ -793,7 +793,7 @@ def test_main_connects_the_client_under_the_persisted_id(qapp):
          patch("origenerator.importer.backfill_import_workflows", return_value=0), \
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient") as mock_client, \
-         patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
+         patch("PySide6.QtWidgets.QApplication.exec", return_value=0):
         assert main([]) == 0
 
     assert mock_client.call_args.kwargs["client_id"] == "persisted-id"
@@ -874,7 +874,7 @@ def test_main_in_fun_time_mode_parks_the_window_and_threads_the_session(qapp):
          patch("origenerator.importer.backfill_import_workflows", return_value=0), \
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
-         patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
+         patch("PySide6.QtWidgets.QApplication.exec", return_value=0):
         assert main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"})) == 0
 
     session = mock_window.call_args.kwargs["fun_time"]
@@ -914,7 +914,7 @@ def test_main_in_fun_time_mode_shows_no_splash(qapp):
          patch("origenerator.importer.backfill_import_workflows", return_value=0), \
          patch("origenerator.importer.backfill_shared_thumbnails", return_value=0), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
-         patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
+         patch("PySide6.QtWidgets.QApplication.exec", return_value=0):
         assert main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"})) == 0
 
     assert mock_loading.call_count == 0, (
@@ -1066,7 +1066,7 @@ def _boot(library_path, argv=()):
          patch("origenerator.gui.core.Core"), \
          patch("origenerator.comfyui_launcher.ensure_comfyui_server"), \
          patch("origenerator.comfyui_client.ComfyUIClient"), \
-         patch("PyQt6.QtWidgets.QApplication.exec", return_value=0):
+         patch("PySide6.QtWidgets.QApplication.exec", return_value=0):
         assert main(list(argv)) == 0
     return Database(library_path)
 
@@ -1221,7 +1221,7 @@ def _a_faked_boot(record, *, passes=None, **patches):
         "origenerator.db.Database": DEFAULT,
         "origenerator.trash.Trash": DEFAULT,
         "origenerator.comfyui_client.ComfyUIClient": DEFAULT,
-        "PyQt6.QtWidgets.QApplication.exec": 0,
+        "PySide6.QtWidgets.QApplication.exec": 0,
     }
     passes = passes or {}
     with ExitStack() as stack:
@@ -1429,7 +1429,7 @@ def test_the_entry_point_hands_the_process_whatever_main_gives_back():
 
 
 def test_a_real_boot_exits_with_the_code_the_qt_loop_returned(qapp):
-    with _a_faked_boot([], **{"PyQt6.QtWidgets.QApplication.exec": MagicMock(return_value=3)}), \
+    with _a_faked_boot([], **{"PySide6.QtWidgets.QApplication.exec": MagicMock(return_value=3)}), \
          patch.object(sys, "argv", ["origenerator"]), \
          pytest.raises(SystemExit) as exit_:
         runpy.run_module("origenerator", run_name="__main__")
@@ -1567,7 +1567,7 @@ class TestAnOverlayShortOfAKey:
         with _a_faked_boot([], **{
             "origenerator.gui.core.Core": MagicMock(return_value=window),
             "origenerator.content.missing_overlay_keys": MagicMock(return_value=self.SHORT),
-            "PyQt6.QtWidgets.QMessageBox.critical": MagicMock(),
+            "PySide6.QtWidgets.QMessageBox.critical": MagicMock(),
         }):
             code = main([])
 
@@ -1582,7 +1582,7 @@ class TestAnOverlayShortOfAKey:
 
         with _a_faked_boot([], **{
             "origenerator.content.missing_overlay_keys": MagicMock(return_value=self.SHORT),
-            "PyQt6.QtWidgets.QMessageBox.critical": told,
+            "PySide6.QtWidgets.QMessageBox.critical": told,
         }):
             main([])
 
@@ -1600,7 +1600,7 @@ class TestAnOverlayShortOfAKey:
 
         with _a_faked_boot([], **{
             "origenerator.content.missing_overlay_keys": MagicMock(return_value=self.SHORT),
-            "PyQt6.QtWidgets.QMessageBox.critical": told,
+            "PySide6.QtWidgets.QMessageBox.critical": told,
         }):
             code = main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"}))
 
@@ -1620,7 +1620,7 @@ class TestAnOverlayShortOfAKey:
 
         with _a_faked_boot([], **{
             "origenerator.gui.core.Core": MagicMock(return_value=window),
-            "PyQt6.QtWidgets.QMessageBox.critical": told,
+            "PySide6.QtWidgets.QMessageBox.critical": told,
         }):
             assert main([]) == 0
 
@@ -1635,7 +1635,7 @@ class TestACopyThatWouldStartALibraryOfItsOwn:
 
         with _a_faked_boot([], **{
             "origenerator.db.Database": opened,
-            "PyQt6.QtWidgets.QMessageBox.critical": MagicMock(),
+            "PySide6.QtWidgets.QMessageBox.critical": MagicMock(),
         }):
             code = main([])
 
@@ -1648,7 +1648,7 @@ class TestACopyThatWouldStartALibraryOfItsOwn:
         monkeypatch.setattr(config, "STARTS_A_LIBRARY_OF_ITS_OWN", True)
         told = MagicMock()
 
-        with _a_faked_boot([], **{"PyQt6.QtWidgets.QMessageBox.critical": told}):
+        with _a_faked_boot([], **{"PySide6.QtWidgets.QMessageBox.critical": told}):
             main([])
 
         said = " ".join(str(arg) for arg in told.call_args.args)
@@ -1666,7 +1666,7 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
         with _a_faked_boot([], **{
             "origenerator.gui.core.Core": MagicMock(return_value=window),
             "origenerator.evolver_agreement.disagreements": MagicMock(return_value=self.SAID),
-            "PyQt6.QtWidgets.QMessageBox.warning": told,
+            "PySide6.QtWidgets.QMessageBox.warning": told,
         }):
             assert main([]) == 0, (
                 "said, not refused: nothing else about this app is wrong, and a launch declined "
@@ -1685,7 +1685,7 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
 
         with _a_faked_boot([], **{
             "origenerator.evolver_agreement.disagreements": MagicMock(return_value=self.SAID),
-            "PyQt6.QtWidgets.QMessageBox.warning": told,
+            "PySide6.QtWidgets.QMessageBox.warning": told,
         }):
             main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"}))
 
@@ -1701,7 +1701,7 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
 
         with _a_faked_boot([], **{
             "origenerator.gui.core.Core": MagicMock(),
-            "PyQt6.QtWidgets.QMessageBox.warning": told,
+            "PySide6.QtWidgets.QMessageBox.warning": told,
         }):
             assert main([]) == 0
 
@@ -1720,7 +1720,7 @@ class TestASecondCopy:
         window = MagicMock()
 
         with _a_faked_boot([], **{
-            "PyQt6.QtWidgets.QMessageBox.information": told,
+            "PySide6.QtWidgets.QMessageBox.information": told,
             "origenerator.comfyui_launcher.ensure_comfyui_server": comfyui,
             "origenerator.gui.core.Core": window,
         }):
@@ -1739,7 +1739,7 @@ class TestASecondCopy:
         window = MagicMock()
 
         with _a_faked_boot([], **{
-            "PyQt6.QtWidgets.QMessageBox.information": told,
+            "PySide6.QtWidgets.QMessageBox.information": told,
             "origenerator.gui.core.Core": window,
         }):
             code = main([])
@@ -1753,7 +1753,7 @@ class TestASecondCopy:
         window = MagicMock()
 
         with _a_faked_boot([], **{
-            "PyQt6.QtWidgets.QMessageBox.information": told,
+            "PySide6.QtWidgets.QMessageBox.information": told,
             "origenerator.gui.core.Core": window,
         }):
             code = main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"}))
@@ -1826,7 +1826,7 @@ def test_a_launch_that_waited_in_vain_takes_its_loading_screen_down_before_sayin
         "screen up" if screens[0].isVisible() else "screen down"))
 
     with _a_faked_boot([], **_real_loading_screens(screens), **{
-        "PyQt6.QtWidgets.QMessageBox.information": told,
+        "PySide6.QtWidgets.QMessageBox.information": told,
     }):
         assert main([]) == 1
 
@@ -1840,7 +1840,7 @@ def test_a_click_that_waited_in_vain_for_a_closing_copy_is_told_why_nothing_open
     copies.claim_the_library_once_the_closing_one_lets_go.return_value = None
     told = MagicMock()
 
-    with _a_faked_boot([], **{"PyQt6.QtWidgets.QMessageBox.information": told}):
+    with _a_faked_boot([], **{"PySide6.QtWidgets.QMessageBox.information": told}):
         assert main([]) == 1
 
     told.assert_called_once()
@@ -1915,7 +1915,7 @@ os.environ[haglio_settings.SETTINGS_ENV] = haglio_settings.THE_EXAMPLE
 from origenerator import content
 content.LOCAL_CONTENT = content.EXAMPLE_CONTENT
 from unittest.mock import MagicMock, patch
-from PyQt6.QtCore import QTimer
+from PySide6.QtCore import QTimer
 from origenerator import app
 
 def built(*args, **kwargs):
@@ -1939,9 +1939,9 @@ with patch.object(app, "MAINTENANCE", ()), \\
         patch("origenerator.gui.core.Core", built), \\
         patch("origenerator.freeze_watch.watch_the_window",
               lambda app, crash_log: QTimer.singleShot(0, app.quit)), \\
-        patch("PyQt6.QtWidgets.QMessageBox.information",
+        patch("PySide6.QtWidgets.QMessageBox.information",
               lambda *said: print("MARK refused", flush=True)), \\
-        patch("PyQt6.QtWidgets.QMessageBox.warning"):
+        patch("PySide6.QtWidgets.QMessageBox.warning"):
     app.main([])
 print("MARK main returned", flush=True)
 sys.stdin.readline()

@@ -1,6 +1,6 @@
 """Which modules may need Qt.
 
-Each module is imported in a fresh interpreter, because PyQt6 is already loaded in this process.
+Each module is imported in a fresh interpreter, because PySide6 is already loaded in this process.
 """
 from __future__ import annotations
 
@@ -99,11 +99,11 @@ def _loaded_after_importing(module: str, what: str) -> bool:
 
 @pytest.mark.parametrize("module", QT_FREE)
 def test_a_module_that_claims_to_be_qt_free_is(module):
-    assert _loaded_after_importing(module, "PyQt6") is False
+    assert _loaded_after_importing(module, "PySide6") is False
 
 
 def test_what_windows_runs_on_a_toast_click_loads_no_qt():
-    assert _loaded_after_importing("origenerator.app_link", "PyQt6") is False, (
+    assert _loaded_after_importing("origenerator.app_link", "PySide6") is False, (
         "Qt-free, because this is what runs on a click: a fresh process every time, whose whole"
         " job is over before the app it starts has drawn anything")
 
@@ -113,7 +113,7 @@ def test_what_windows_runs_on_a_toast_click_loads_no_qt():
                                     "origenerator.windows_toast",
                                     "origenerator.single_instance"])
 def test_what_a_closing_copy_starts_to_wait_out_its_runs_loads_no_qt(module):
-    assert _loaded_after_importing(module, "PyQt6") is False, (
+    assert _loaded_after_importing(module, "PySide6") is False, (
         "Qt-free, because a closing copy starts a process of its own to wait out its runs in"
         " flight, which raises the toast when one lands and asks the one-copy rule whether the"
         " app is back")
@@ -221,7 +221,7 @@ def test_timing_loads_no_database():
 
 @pytest.mark.parametrize("module", NEEDS_QT)
 def test_the_modules_that_do_need_qt_are_only_these(module):
-    assert _loaded_after_importing(module, "PyQt6") is True, (
+    assert _loaded_after_importing(module, "PySide6") is True, (
         "the control: without it the Qt-free lists could pass by importing nothing at all, and"
         " the boundary would be decorative")
 
@@ -346,12 +346,12 @@ def test_a_surface_showing_work_in_flight_never_reaches_the_job(surface):
 
 def test_the_drag_of_a_generation_leans_on_no_widget_of_this_app():
     assert _beyond_the_standard_library(
-        _modules_imported_by("origenerator/gui/generation_drag.py")) == {"PyQt6.QtCore"}, (
+        _modules_imported_by("origenerator/gui/generation_drag.py")) == {"PySide6.QtCore"}, (
         "in a module of its own so a plain media widget does not have to depend on the item tile "
         "just for the type")
 
 
 def test_the_job_queues_tiles_are_put_together_with_nothing_that_draws():
-    assert _loaded_after_importing("origenerator.gui.inflight_items", "PyQt6.QtGui") is False, (
+    assert _loaded_after_importing("origenerator.gui.inflight_items", "PySide6.QtGui") is False, (
         "a join over four sources and no rendering at all, which is why they are built outside "
         "the Gallery pane")

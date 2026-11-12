@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from PIL import Image
-from PyQt6.QtCore import QObject
-from PyQt6.QtGui import QMovie
+from PySide6.QtCore import QObject
+from PySide6.QtGui import QMovie
 
 from origenerator.gui import omnipause
 

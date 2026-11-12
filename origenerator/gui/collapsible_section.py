@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QPoint, QRect, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QPoint, QRect, QSize, Qt, Signal
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import (
     QStyle,
     QStyleOptionButton,
     QStylePainter,
@@ -111,7 +111,7 @@ class FoldHeader(ElidingButton):
 
 
 class CollapsibleSection(QWidget):
-    toggled = pyqtSignal()
+    toggled = Signal()
 
     def __init__(self, title: str, collapsed: bool = False, parent=None):
         super().__init__(parent)

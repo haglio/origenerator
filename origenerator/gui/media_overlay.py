@@ -1,7 +1,7 @@
 """Qt widgets never paint over the native window a video plays on, however they are stacked; an overlay made native itself stacks against the video by Z-order."""
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from PySide6.QtCore import Qt
 
 from origenerator.win32 import raise_window_without_activating
 

@@ -4,8 +4,8 @@ from collections.abc import Callable
 from functools import cache, lru_cache
 from pathlib import Path
 
-from PyQt6.QtCore import QMargins, QPoint, QPointF, QRect, QRectF, QSize, Qt
-from PyQt6.QtGui import (
+from PySide6.QtCore import QMargins, QPoint, QPointF, QRect, QRectF, QSize, Qt
+from PySide6.QtGui import (
     QColor,
     QImageReader,
     QMovie,
@@ -15,7 +15,7 @@ from PyQt6.QtGui import (
     QPen,
     QPixmap,
 )
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QStyle,

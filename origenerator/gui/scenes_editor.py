@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from PyQt6.QtCore import QSize, Qt, pyqtSignal
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QPushButton,
@@ -57,8 +57,8 @@ TEXT_CAPTIONS = {
 
 
 class _Scene(QFrame):
-    changed = pyqtSignal()
-    remove_requested = pyqtSignal(object)
+    changed = Signal()
+    remove_requested = Signal(object)
 
     def __init__(self, pd: ParamDef, prepare_length: Callable[[PresetDropdown], None],
                  shut_down: dict[str, str], lines: bool = True, parent=None):
@@ -185,7 +185,7 @@ class _Scene(QFrame):
 
 
 class ScenesEditor(QWidget):
-    changed = pyqtSignal()
+    changed = Signal()
 
     def __init__(self, frames_def: ParamDef,
                  prepare_length: Callable[[PresetDropdown], None], shut_down: dict[str, str],

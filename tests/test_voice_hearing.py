@@ -4,6 +4,7 @@ import array
 from unittest.mock import Mock
 
 import pytest
+from shared_ui.testing import appending_to
 from voice_core.speech import HearsSpeech
 from voice_core.testing import said, scripted_engines
 from voice_core.whisper_reader import WhisperReader
@@ -75,7 +76,7 @@ def test_a_quiet_sound_with_no_words_in_it_is_not_worth_a_caption(qtbot):
                                frames=[QUIET] * 15 + [faint] * 8 + [QUIET] * 20 + ONE_UTTERANCE[15:])
     hearing = Hearing({"undo"}, engines=engines)
     arrived = []
-    hearing.said.connect(arrived.append)
+    hearing.said.connect(appending_to(arrived))
 
     with qtbot.waitSignal(hearing.said, timeout=PATIENCE_MS):
         hearing.start()

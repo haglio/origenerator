@@ -63,20 +63,22 @@ def test_a_copy_of_a_video_made_here_carries_that_videos_record_and_genaus_copie
     db, played_from = Database(tmp_path / "gallery.db"), _played_from(tmp_path)
     _made_here(db, "m1", "wan22_i2v_00001_.mp4")
     _filed(played_from.kino, "wan22_i2v_00001__topaz.mp4")
-    _filed(played_from.genau, "wan22_i2v_00001_-audio.mp4")
+    _filed(played_from.genau / "loops" / "2D" / "AI", "wan22_i2v_00001_-audio.mp4")
+    _filed(played_from.genau / "loops" / "VR", "wan22_i2v_00001_-audio.mp4")
 
     records = records_for_the_phone(db.list_generations(), played_from, length_of=_seconds(60.0))
 
     assert {place: record["video"]["type"] for place, record in records.items()} == {
         "videos/videos/kino/2D/AI/portrait/wan22_i2v_00001__topaz.mp4": "full_length",
-        "videos/videos/genau/portrait/wan22_i2v_00001_-audio.mp4": "genau_flick"}
+        "videos/videos/genau/loops/2D/AI/portrait/wan22_i2v_00001_-audio.mp4": "genau_flick"}
     assert {record["favorite"] for record in records.values()} == {False}
 
 
-def test_a_non_ai_video_a_file_being_written_and_a_video_with_no_row_are_left_off(tmp_path):
+def test_a_non_ai_video_a_vr_one_a_file_being_written_and_a_video_with_no_row_are_left_off(tmp_path):
     db, played_from = Database(tmp_path / "gallery.db"), _played_from(tmp_path)
     _made_here(db, "m1", "wan22_i2v_00001_.mp4")
-    _filed(played_from.genau / "non_AI", "wan22_i2v_00001_.mp4")
+    _filed(played_from.genau / "loops" / "2D" / "non_AI", "wan22_i2v_00001_.mp4")
+    _filed(played_from.genau / "loops" / "VR", "wan22_i2v_00001_.mp4")
     _filed(played_from.kino, "wan22_i2v_00001_.partial.mp4")
     _filed(played_from.kino, "no row of its own.mp4")
     _filed(played_from.kino, "notes.txt")
@@ -177,7 +179,7 @@ def test_a_running_time_the_gallery_holds_is_never_measured_and_a_genau_copy_nev
     db, played_from = Database(tmp_path / "gallery.db"), _played_from(tmp_path)
     _outside(db, "o1", _filed(played_from.kino, "scene one.mp4"), video_seconds=600.0)
     _made_here(db, "m1", "wan22_i2v_00001_.mp4")
-    _filed(played_from.genau, "wan22_i2v_00001_-audio.mp4")
+    _filed(played_from.genau / "loops" / "2D" / "AI", "wan22_i2v_00001_-audio.mp4")
 
     def never(video):
         raise AssertionError(f"{video.name} has no need to be measured")

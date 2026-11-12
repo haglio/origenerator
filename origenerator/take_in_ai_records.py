@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from app_support.json_store import read_json
+from app_support.kino_folder import is_ai_video
 from app_support.mirrored_tree import library_roots_beside, mirrored_source
 from app_support.video_ids import VIDEO_SUFFIXES
 from app_support.watch_weights import WATCH_BLOCK, add_counts
@@ -23,9 +24,8 @@ from origenerator.outside_videos import library_record, made_of, seed_number
 from origenerator.video_rows import VideoRows
 from origenerator.workflows.outside import PLACES
 
-AI_RECORDS = (("kino", "2D", "AI"), ("origenerator", "video"), ("genau",))
-TOP_FOLDERS = tuple(parts[0] for parts in AI_RECORDS)
-NON_AI_FOLDER = "non_AI"
+ORIGENERATORS_OWN = ("origenerator", "video")
+TOP_FOLDERS = ("kino", ORIGENERATORS_OWN[0], "genau")
 COUNTED = ("records read", "unreadable", "no video", "no row", "left out of the gallery",
            "matched", "stars added",
            "counts written", "library records written", "actions added", "settings filled in")
@@ -129,9 +129,10 @@ def _block(record: dict, name: str) -> dict:
 
 
 def _ai_sidecars(records_folder: Path) -> list[Path]:
-    return [sidecar for parts in AI_RECORDS
-            for sidecar in sorted(records_folder.joinpath(*parts).rglob("*.json"))
-            if NON_AI_FOLDER not in sidecar.relative_to(records_folder).parts]
+    own = sorted(records_folder.joinpath(*ORIGENERATORS_OWN).rglob("*.json"))
+    return [*(sidecar for top in ("kino", "genau")
+              for sidecar in sorted(records_folder.joinpath(top).rglob("*.json"))
+              if is_ai_video(sidecar.relative_to(records_folder))), *own]
 
 
 def main(argv: list[str] | None = None, *,

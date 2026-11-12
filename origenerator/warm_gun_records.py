@@ -8,6 +8,7 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import NamedTuple
 
+from app_support.kino_folder import is_ai_video
 from app_support.video_kind import classify
 from app_support.watch_weights import WATCH_BLOCK, WEIGHT_KEY, weight_for
 
@@ -19,7 +20,6 @@ from origenerator.media import MediaType, media_type_from_filename, video_header
 from origenerator.video_records import GalleryReading
 
 FILE_NAME = "gallery_records.json"
-NON_AI_FOLDER = "non_AI"
 
 
 class PlayedFrom(NamedTuple):
@@ -33,7 +33,7 @@ def records_for_the_phone(rows: list[dict], played_from: PlayedFrom, *,
     reading = GalleryReading(rows)
     records = {}
     for folder in (played_from.kino, played_from.genau):
-        for video in _videos_in(folder):
+        for video in _videos_in(folder, played_from.library_root):
             row = reading.row_of(video)
             if row is None:
                 continue
@@ -49,11 +49,11 @@ def records_for_the_phone(rows: list[dict], played_from: PlayedFrom, *,
     return records
 
 
-def _videos_in(folder: Path) -> Iterator[Path]:
+def _videos_in(folder: Path, library_root: Path) -> Iterator[Path]:
     for video in sorted(folder.rglob("*")) if folder.is_dir() else ():
         if (media_type_from_filename(video.name) == MediaType.VIDEO
                 and PARTIAL_MARKER not in video.name
-                and NON_AI_FOLDER not in video.relative_to(folder).parts and video.is_file()):
+                and is_ai_video(video.relative_to(library_root)) and video.is_file()):
             yield video
 
 

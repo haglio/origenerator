@@ -160,7 +160,9 @@ def test_a_tick_asks_comfyui_only_inside_the_read_it_hands_off(qtbot, tmp_path):
     comfyui.foreign_backlog.return_value = None
     comfyui.executing_prompts.return_value = []
     comfyui.foreign_queue.return_value = ForeignQueue(running=[], pending=[])
-    view._client = comfyui
+    view._client = view._jobs._client = comfyui
+    for job in view._jobs.all_jobs:
+        job._client = comfyui
     hops = []
     view.off_thread = lambda work, done: hops.append((work, done))
     asked = {"on the window's thread": [], "in the read handed off": []}

@@ -826,22 +826,6 @@ def test_right_clicking_the_pane_background_keeps_the_selection(qtbot):
         "aim it at nothing")
 
 
-def test_delete_on_a_settings_folder_with_no_pick_deletes_the_whole_folder(
-        qtbot, monkeypatch):
-    actions = FakeActions()
-    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    view = GalleryView(FakeDB(rows), actions=actions)
-    qtbot.addWidget(view)
-    view.refresh()
-    _open_leaf(view)
-    _click_off(view)
-    _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
-
-    view._delete_selection()
-
-    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i2"}
-
-
 def test_deleting_a_folder_can_be_cancelled_at_the_prompt(qtbot, monkeypatch):
     actions = FakeActions()
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)

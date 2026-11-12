@@ -18,6 +18,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import (
     QApplication,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QToolButton,
 )
@@ -54,6 +55,7 @@ from tests.gallery_view_support import (
     FakeActions,
     FakeDB,
     _alls,
+    _answer_confirmation,
     _answer_menu,
     _at,
     _click_off,
@@ -614,21 +616,6 @@ def test_favorite_button_aims_at_the_picked_thumbnails_and_toggles(qtbot):
     assert not db.get_generation("i1")["starred"]
 
 
-def test_favorite_button_falls_back_to_the_folder_on_screen(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
-    qtbot.addWidget(view)
-    view.refresh()
-    _select_first_leaf(view)
-    _click_off(view)
-    assert view._buttons.favorite.isEnabled()
-    assert "folder" in view._buttons.favorite.toolTip()
-
-    view._buttons.favorite.click()
-
-    key = _selected_folder(view)
-    assert view._db.folder_meta_map()[key]["starred"]
-
-
 def test_favorite_button_is_dark_where_a_favorite_means_nothing(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
@@ -653,19 +640,43 @@ def test_enhance_button_takes_the_picked_thumbnails_over_the_folder(qtbot, tmp_p
     assert queued == [["g0"]]
 
 
-def test_enhance_button_with_nothing_picked_enhances_the_folder_on_screen(qtbot, tmp_path):
-    view = GalleryView(_enhanceable_db(tmp_path, count=2), client=_reroll_client())
+def _starred(view, _actions):
+    return bool(view._db.folder_meta_map().get(_selected_folder(view), {}).get("starred"))
+
+
+def _enhanced_inputs(view, _actions):
+    return sorted(job.params["input_image"] for job in view._jobs.all_jobs)
+
+
+def _deleted_batches(_view, actions):
+    return [{row["prompt_id"] for row in batch} for batch in actions.deleted]
+
+
+@pytest.mark.parametrize(("button", "outcome", "expected"), [
+    ("favorite", _starred, True),
+    ("enhance", _enhanced_inputs,
+     ["image/sdxl_t2i_g0.png [output]", "image/sdxl_t2i_g1.png [output]"]),
+    ("delete", _deleted_batches, [{"g0", "g1"}]),
+])
+def test_with_nothing_picked_each_of_the_three_buttons_acts_on_the_folder_on_screen(
+        qtbot, tmp_path, monkeypatch, button, outcome, expected):
+    actions = FakeActions()
+    view = GalleryView(_enhanceable_db(tmp_path, count=2), client=_reroll_client(),
+                       actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
     _click_off(view)
+    _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
+    pressed = getattr(view._buttons, button)
+    assert pressed.isEnabled()
+    assert "folder" in pressed.toolTip()
 
-    view._buttons.enhance.click()
+    pressed.click()
 
-    assert sorted(j.params["input_image"] for j in view._jobs.all_jobs) == [
-        "image/sdxl_t2i_g0.png [output]", "image/sdxl_t2i_g1.png [output]"], (
-        "with nothing picked, a press of Enhance acts on the folder on screen, as a press of "
-        "Favorite or Delete does")
+    assert outcome(view, actions) == expected, (
+        "Favorite, Enhance and Delete act on one target, the picked thumbnails or else the "
+        "folder on screen, so with nothing picked each of them acts on the folder")
 
 
 def _video_leaf(view):

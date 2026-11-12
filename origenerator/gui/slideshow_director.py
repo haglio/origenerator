@@ -523,6 +523,7 @@ class SlideshowDirector:
             move_hud=partial(self.move_the_hud, shape=shape),
             filters_changed=self._note_filters,
             volume_moved=self._volume_moved if self._fun_time is None else None,
+            name_of=self._names.of,
         )
 
     def _the_audio_standing_on_its_own(self) -> dict:
@@ -733,7 +734,7 @@ class SlideshowDirector:
     def _wear_the_hud(self, view, shape: str) -> None:
         corner, minimized = self.hud_place(shape)
         view.wear_the_hud(shape, HudWear(
-            dashboard_cmd_file=self._session_channel, label_for=self._names.of,
+            dashboard_cmd_file=self._session_channel,
             corner=corner, minimized=minimized,
             collapse=partial(self.collapse_the_hud, shape=shape),
             open_in=partial(self.open_the_hud_in, shape=shape)))

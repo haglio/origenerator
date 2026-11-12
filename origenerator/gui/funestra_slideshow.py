@@ -579,6 +579,16 @@ class FunestraSlideshow(QObject):
         return self._set.is_favorite
 
     @property
+    def hud_item_name(self) -> str:
+        name_of, prompt_id = self._actions.name_of, self.hud_prompt_id
+        if name_of is None or not prompt_id:
+            return ""
+        try:
+            return name_of(prompt_id) or ""
+        except Exception:
+            return ""
+
+    @property
     def hud_item_note(self) -> str:
         return item_note(self._set, versions=self._versions_of_the_slide(),
                          version_index=self._version_index())

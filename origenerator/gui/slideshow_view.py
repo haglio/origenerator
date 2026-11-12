@@ -92,7 +92,6 @@ USUAL_WIRING = ViewWiring()
 @dataclass(frozen=True)
 class HudWear:
     dashboard_cmd_file: object = None
-    label_for: object = None
     corner: HudCorner = HudCorner.UPPER_LEFT
     minimized: bool = False
     collapse: object = None
@@ -113,7 +112,6 @@ class SlideshowView(QWidget):
         self._clock = wiring.clock
         self._hud_shape = shape
         self._dashboard_cmd_file = None
-        self._label_for = None
         self._corner = HudCorner.UPPER_LEFT
         self._minimized = False
         self._collapse = None
@@ -161,7 +159,6 @@ class SlideshowView(QWidget):
     def wear_the_hud(self, shape: str, wear: HudWear = NO_WEAR) -> None:
         self._hud_shape = shape
         self._dashboard_cmd_file = wear.dashboard_cmd_file
-        self._label_for = wear.label_for
         self._corner, self._minimized = wear.corner, wear.minimized
         self._collapse = wear.collapse
         self._open_in = wear.open_in
@@ -203,15 +200,6 @@ class SlideshowView(QWidget):
     def _hud_moving(self) -> bool:
         drive = self._last_hud_model.drive if self._last_hud_model is not None else None
         return drive is not None and drive.live
-
-    def item_label(self) -> str:
-        prompt_id = self.slideshow.hud_prompt_id
-        if not prompt_id or self._label_for is None:
-            return ""
-        try:
-            return self._label_for(prompt_id) or ""
-        except Exception:
-            return ""
 
     def press(self, command: str) -> bool:
         if not self._route(command):
@@ -403,7 +391,7 @@ class _TheWindowsPresses:
         return {}
 
     def top_block(self) -> ModeHud:
-        return ModeHud(video=self._window.item_label())
+        return ModeHud()
 
     def set_showing(self, showing: bool) -> None:
         pass

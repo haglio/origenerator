@@ -51,7 +51,7 @@ def _window(qtbot, items=(("scene one.png", "image"), ("scene two.png", "image")
 
 def _dressed(qtbot, items=(("scene one.png", "image"), ("scene two.png", "image")),
              shape="portrait", **kw):
-    wear = {name: kw.pop(name) for name in ("dashboard_cmd_file", "collapse", "open_in", "label_for")
+    wear = {name: kw.pop(name) for name in ("dashboard_cmd_file", "collapse", "open_in")
             if name in kw}
     window = _window(qtbot, items, **kw)
     window.wear_the_hud(shape, HudWear(**wear))
@@ -137,10 +137,16 @@ def test_a_slideshow_with_nothing_to_map_has_no_hud(qtbot, monkeypatch):
 
 
 def test_the_hud_names_the_item_the_way_this_app_names_it(qtbot):
-    window = _dressed(qtbot, [("scene one.png", "image", "id-one")],
-                         label_for=lambda prompt_id: f"Example folder / {prompt_id}")
+    window = _dressed(qtbot, [("scene one.png", "image", "id-one")], actions=SlideshowActions(
+        name_of=lambda prompt_id: f"Example folder / {prompt_id}"))
 
-    assert window.item_label() == "Example folder / id-one"
+    assert slideshow_hud_model("portrait", window.slideshow).item_name == "Example folder / id-one"
+
+
+def test_a_hud_with_no_one_to_name_its_items_names_none(qtbot):
+    window = _dressed(qtbot, [("scene one.png", "image", "id-one")])
+
+    assert slideshow_hud_model("portrait", window.slideshow).item_name == ""
 
 
 class TestTheOneHudASlideshowWears:

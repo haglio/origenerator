@@ -60,7 +60,8 @@ def test_the_poll_says_how_much_it_has_handled_while_the_room_has_it(
         headset.close()
 
     assert beats == 0, "it spoke before the first heartbeat was due"
-    assert caplog.text.count("Still publishing") == 1
+    assert caplog.text.count("Still publishing") == 1, (
+        "a line at a steady beat puts the moment the room stopped taking presses in the log")
     assert "(1 published, 0 presses taken)" in caplog.text
 
 
@@ -77,7 +78,8 @@ def test_presses_the_channel_cannot_read_name_themselves(tmp_path, qtbot, caplog
     finally:
         headset.close()
 
-    assert "input.txt" in caplog.text
+    assert "input.txt" in caplog.text, (
+        "a room whose presses go nowhere looks exactly like one whose screen is dead")
 
 
 def test_the_frame_a_preview_is_playing_is_in_the_frame_the_room_gets(tmp_path, qtbot):

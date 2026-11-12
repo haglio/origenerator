@@ -28,7 +28,8 @@ SENT_COLUMNS = ("evolver_exported_at", "genau_exported_at")
 
 WATCH_COLUMNS = tuple((field, f"watch_{field}") for field in COUNT_FIELDS)
 LIBRARY_RECORD_COLUMNS = frozenset({"web_url", "library_id", "upscale_provenance",
-                                    "video_seconds", "genau_flipped"})
+                                    "video_seconds", "genau_flipped", "video_resolution",
+                                    "video_aspect_ratio"})
 
 _KNOWN_SOURCES = tuple(GenerationSource)
 _OF_A_KNOWN_SOURCE = f"source IN ({', '.join('?' * len(_KNOWN_SOURCES))})"

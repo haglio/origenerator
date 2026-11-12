@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass, field, replace
 from functools import lru_cache
 
-from app_support.video_names import stem_as_made
+from app_support.video_names import stem_of_either_copy
 
 from origenerator import gallery, local_llm
 from origenerator.content import load_content
@@ -327,7 +327,7 @@ class GallerySearch:
         return any(_starts_the_name(word, entry.name) for entry in self._entries.values())
 
     def _made_as(self, query: str) -> list[str]:
-        named = stem_as_made(query.strip())
+        named = stem_of_either_copy(query.strip())
         return [prompt_id for prompt_id in self._order
                 if named and named in self._entries[prompt_id].files]
 

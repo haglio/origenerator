@@ -168,6 +168,15 @@ class TestAGenauVideo:
         assert (library.genau_trash / "2D" / "AI" / "kept aside" / IN_GENAU).read_bytes() == (
             b"genau video")
 
+    def test_a_flick_made_from_its_sound_copy_goes_to_genaus_trash_with_it(self, tmp_path):
+        library = Library(tmp_path)
+        library.made_here()
+        flick = library.in_genau("AI", IN_GENAU.replace("__topaz", "_-audio_topaz"))
+
+        library.edits.delete_rows([library.db.get_generation("v1")])
+
+        assert not flick.exists()
+
     def test_undoing_that_puts_it_back_in_genau(self, tmp_path):
         library = Library(tmp_path)
         library.made_here()

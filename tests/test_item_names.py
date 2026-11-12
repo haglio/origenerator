@@ -146,7 +146,7 @@ def test_names_taken_again_work_out_the_folder_of_only_the_rows_that_changed(db,
 
 
 def test_each_name_is_found_by_the_name_of_the_file_its_item_was_made_as(db):
-    made = _image("gen-one", 1, output_files=json.dumps([{"filename": "Wan_Loop_00042_.mp4"}]))
+    made = _image("gen-one", 1, output_files=json.dumps([{"filename": "Wan_Loop_00042_-audio.mp4"}]))
     brought_in = _image("gen-two", 2, output_files=json.dumps(
         [{"filename": "", "library_path": "C:/library/videos/an example clip (2).mp4"}]))
     names = ItemNames(db)

@@ -237,8 +237,8 @@ def test_only_the_far_right_of_the_job_queue_is_held_off_the_window_edge(queue):
     far_right = queue._for_all.geometry().right()
 
     assert queue.width() - 1 - far_right == GAP_SMALL, (
-        "the Job Queue goes without the family's standard pane margin so its thumbnail fills "
-        "the corner; only its far right is held off the window edge")
+        "only the far right of the Job Queue is held off the window edge, by the small gap and "
+        "not the family's standard pane margin")
 
 
 def test_the_strip_can_be_dragged_taller_but_not_shorter_than_a_bar(queue):

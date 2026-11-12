@@ -69,7 +69,7 @@ def test_the_voice_is_a_preset_unless_the_custom_one_is_chosen():
     assert voice_request(_params(voice=speech.CUSTOM_VOICE, voice_sample=" C:/v/her.wav ",
                                  voice_sample_text=" Hello. ")) == {
         "mode": "clone", "sample": "C:/v/her.wav", "sample_text": "Hello."}, (
-        "the copy of a recording is a close one only when it is told what the recording says")
+        "a recording is copied closely only when the model is told what the recording says")
 
 
 def test_a_custom_voice_without_a_recording_is_a_plain_error(tmp_path):

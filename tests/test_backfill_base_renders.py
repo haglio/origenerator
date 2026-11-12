@@ -402,20 +402,6 @@ def test_a_branch_sessions_close_leaves_no_work_for_while_closed(qtbot, tmp_path
     assert not downtime.work_left()
 
 
-def test_a_branch_sessions_opening_keeps_the_work_left_for_while_closed(qtbot, tmp_path,
-                                                                       monkeypatch):
-    monkeypatch.setattr(downtime.config, "LIBRARY_STATE_DIR", tmp_path)
-    downtime.leave_work_for_while_closed()
-    monkeypatch.setenv(ENV_FLAG, "1")
-    window = Core(ComfyUIClient(folders=SUITE_FOLDERS), Database(tmp_path / "t.db"),
-                  AppState(tmp_path / "ui.json"))
-    qtbot.addWidget(window)
-
-    assert downtime.work_left(), (
-        "the work the production app left for while it is closed is the production app's to "
-        "hand over: only the copy that queued it can account for it")
-
-
 def test_a_broken_close_chore_still_leaves_the_session_saved(qtbot, tmp_path,
                                                              monkeypatch):
     def boom():

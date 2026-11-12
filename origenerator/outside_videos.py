@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from app_support import kino_folder
+from app_support.gallery_rows import VideoRows
 from app_support.win32 import mutex_name
 from funestra.video_families import seed_group_and_seed
 from PIL import Image
@@ -31,7 +32,6 @@ from origenerator.thumbnail import (
     generate_animated_thumbnail,
     generate_thumbnail,
 )
-from origenerator.video_rows import VideoRows
 from origenerator.workflows.outside import (
     PLACES,
     VideoKind,

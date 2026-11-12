@@ -6,6 +6,7 @@ import logging
 from collections.abc import Callable
 from pathlib import Path
 
+from app_support.gallery_rows import VideoRows
 from app_support.json_store import read_json
 from app_support.logging_utils import configure_logging, install_exception_logging
 
@@ -13,7 +14,6 @@ from origenerator import config
 from origenerator.db import Database
 from origenerator.outside_videos import Places, places_here, take_record
 from origenerator.thumbnail import first_frame_of
-from origenerator.video_rows import VideoRows
 from origenerator.warm_gun_records import PhoneRecords
 
 logger = logging.getLogger(__name__)

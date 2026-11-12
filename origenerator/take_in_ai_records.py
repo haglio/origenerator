@@ -8,6 +8,7 @@ from functools import partial
 from pathlib import Path
 from typing import NamedTuple
 
+from app_support.gallery_rows import VideoRows
 from app_support.json_store import read_json
 from app_support.kino_folder import is_ai_video
 from app_support.mirrored_tree import library_roots_beside, mirrored_source
@@ -21,7 +22,6 @@ from origenerator.gallery.signatures import parse_params
 from origenerator.generation_state import GenerationSource, source_of
 from origenerator.media import MediaType
 from origenerator.outside_videos import library_record, made_of, seed_number
-from origenerator.video_rows import VideoRows
 from origenerator.workflows.outside import PLACES
 
 ORIGENERATORS_OWN = ("origenerator", "video")

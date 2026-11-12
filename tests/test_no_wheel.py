@@ -83,6 +83,35 @@ def test_a_placeholder_does_not_hold_the_form_open_either(qtbot):
     assert w.minimumSizeHint().width() == bare.minimumSizeHint().width()
 
 
+
+def _long_dropdown(qtbot):
+    w = NoWheelDropdown()
+    w.addItems(_MODELS)
+    qtbot.addWidget(w)
+    return w
+
+
+def test_a_dropdowns_floor_grows_with_its_font(qtbot):
+    w = _long_dropdown(qtbot)
+    floor = w.minimumSizeHint().width()
+    font = w.font()
+    font.setPointSizeF(font.pointSizeF() * 2)
+
+    w.setFont(font)
+
+    assert w.minimumSizeHint().width() > floor + w.floor_chars * 4, (
+        "the floor is the sum Qt makes for a full-length value, so it tracks the font")
+
+
+def test_a_dropdowns_floor_grows_with_its_stylesheets_padding(qtbot):
+    w = _long_dropdown(qtbot)
+    floor = w.minimumSizeHint().width()
+
+    w.setStyleSheet("QComboBox { padding-left: 40px; }")
+
+    assert w.minimumSizeHint().width() > floor + 20, (
+        "the floor is the sum Qt makes for a full-length value, so it tracks the stylesheet")
+
 def test_a_dropdown_with_nothing_picked_shows_its_placeholder(qtbot):
     w = NoWheelDropdown()
     w.addItems(_MODELS)

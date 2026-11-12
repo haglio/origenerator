@@ -1810,7 +1810,8 @@ def test_each_box_on_a_tile_says_what_it_is(qtbot):
     qtbot.addWidget(form)
     scene = form._widgets["scene_frames"]._scenes[0]
     captions = {label.text() for label in scene.findChildren(ElidingLabel)}
-    assert {"Positive Prompt", "Negative Prompt", "Her Lines"} <= captions
+    assert {"Positive Prompt", "Negative Prompt", "Her Lines"} <= captions, (
+        "three boxes in a row say nothing about which is which once they hold text")
     assert scene.fields["negative_prompt"].toolTip() == param_help("negative_prompt")
     assert "spoken" in scene.fields["scene_lines"].placeholderText().lower()
 

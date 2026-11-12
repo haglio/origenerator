@@ -129,3 +129,14 @@ def test_showing_a_pair_with_no_video_leaves_no_last_frame_of_the_one_before(qtb
     view.show_pair(Combination(frame))
 
     assert view.video_label.pixmap().isNull()
+
+
+def test_a_frame_the_library_has_moved_leaves_the_source_video_alone(qtbot, tmp_path):
+    moved = str(tmp_path / "moved.png")
+    clip = _image(tmp_path / "clip.png")
+
+    view = _view(qtbot, Combination(moved, clip))
+
+    assert view.image_label.isHidden(), (
+        "a frame the library has since moved is an ordinary absence, not an error")
+    assert not view.video_label.isHidden()

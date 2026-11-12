@@ -1278,6 +1278,9 @@ def test_the_player_is_torn_down_before_the_surface_it_renders_to(qapp):
     # Qt destroys a widget's children in the order they were parented; the real player must be parented before the video surface it renders to
 
     w = Viewport()
+    assert w._player.parent() is w, (
+        "only a player the pane makes itself is its child, so a handed-in one says nothing "
+        "about the order the pane's children are taken down in")
     order = []
     w._player.destroyed.connect(lambda *_: order.append("player"))
     w._video.destroyed.connect(lambda *_: order.append("surface"))

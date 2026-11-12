@@ -256,7 +256,7 @@ def test_the_media_size_is_the_items_own_not_the_size_it_is_drawn_at(make_previe
     w.show_image(_make_png(tmp_path / "p.png"))
 
     assert w.media_size() == (32, 24), (
-        "a caller lays out around the item, so its size is read off the unscaled picture, "
+        "a caller lays out around the item, so its size is read off the unscaled image, "
         "never off the pane it is fitted into")
 
 
@@ -264,13 +264,34 @@ def test_a_video_or_animation_shown_into_a_frozen_room_opens_held(make_preview, 
     w = make_preview()
     omnipause.freeze(True)
 
-    w.show_video(tmp_path / "clip.mp4")
+    w.show_video(tmp_path / "video.mp4")
+    assert _told_last(w._player) == "pause", (
+        "every new video starts playing, so each one shown in a frozen room asks the room and "
+        "is held")
     w.show_image(_make_animated_gif(tmp_path / "loop.gif"))
+    assert w._image_label.movie().state() == QMovie.MovieState.Paused, (
+        "every new animation starts playing, so each one shown in a frozen room asks the room "
+        "and is held")
 
-    told = [name for name, *_ in w._player.method_calls if name in ("play", "pause")]
-    assert (told[-1], w._image_label.movie().state()) == ("pause", QMovie.MovieState.Paused), (
-        "every new video or animation starts playing, so each one shown in a frozen room asks "
-        "the room and is held")
+
+def _told_last(player):
+    return [name for name, *_ in player.method_calls if name in ("play", "pause")][-1]
+
+
+def test_a_video_or_animation_already_showing_is_held_when_the_room_freezes(make_preview, tmp_path):
+    playing_a_video = make_preview()
+    playing_a_video.show_video(tmp_path / "video.mp4")
+    playing_an_animation = make_preview()
+    playing_an_animation.show_image(_make_animated_gif(tmp_path / "loop.gif"))
+
+    omnipause.freeze(True)
+
+    assert _told_last(playing_a_video._player) == "pause", (
+        "the pane joins the room as it is built, so a video it is already playing is held "
+        "when the room freezes")
+    assert playing_an_animation._image_label.movie().state() == QMovie.MovieState.Paused, (
+        "the pane joins the room as it is built, so an animation it is already playing is "
+        "held when the room freezes")
 
 
 def test_show_static_image_uses_no_movie(make_preview, tmp_path):

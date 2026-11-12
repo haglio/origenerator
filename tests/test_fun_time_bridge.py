@@ -326,7 +326,7 @@ def test_close_slideshows_clears_both_regions(qtbot, tmp_path, monkeypatch):
 
 
 
-def _fill_both_regions(qtbot, view, monkeypatch, tmp_path):
+def _fill_both_regions_from_library_rows(qtbot, view, monkeypatch, tmp_path):
     tall, wide = tmp_path / "tall.png", tmp_path / "wide.png"
     Image.new("RGB", (100, 200)).save(tall)
     Image.new("RGB", (200, 100)).save(wide)
@@ -355,7 +355,7 @@ def test_filter_enhanced_narrows_both_regions_and_widens_them_again(
     view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
         _image("p1", "a cat", 50, 1), _enhanced_image("p2", "a cat", 50, 2),
         _image("l1", "a boat", 40, 3), _enhanced_image("l2", "a boat", 40, 4)])
-    portrait, landscape = _fill_both_regions(qtbot, view, monkeypatch, tmp_path)
+    portrait, landscape = _fill_both_regions_from_library_rows(qtbot, view, monkeypatch, tmp_path)
 
     _press_filter_enhanced(bridge, tmp_path)
 
@@ -373,7 +373,7 @@ def test_filter_enhanced_takes_a_split_pair_of_regions_the_same_way(
     view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
         _image("p1", "a cat", 50, 1), _enhanced_image("p2", "a cat", 50, 2),
         _image("l1", "a boat", 40, 3), _enhanced_image("l2", "a boat", 40, 4)])
-    portrait, landscape = _fill_both_regions(qtbot, view, monkeypatch, tmp_path)
+    portrait, landscape = _fill_both_regions_from_library_rows(qtbot, view, monkeypatch, tmp_path)
     portrait.toggle_enhanced_mode()
 
     _press_filter_enhanced(bridge, tmp_path)
@@ -388,7 +388,7 @@ def test_filter_enhanced_leaves_a_region_with_nothing_enhanced_playing_it_all(
     view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
         _image("p1", "a cat", 50, 1), _enhanced_image("p2", "a cat", 50, 2),
         _image("l1", "a boat", 40, 3), _image("l2", "a boat", 40, 4)])
-    portrait, landscape = _fill_both_regions(qtbot, view, monkeypatch, tmp_path)
+    portrait, landscape = _fill_both_regions_from_library_rows(qtbot, view, monkeypatch, tmp_path)
 
     _press_filter_enhanced(bridge, tmp_path)
 

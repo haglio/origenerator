@@ -76,7 +76,9 @@ def test_the_hud_facts_travel_as_one_record(qtbot):
     assert view.slideshow.hud_is_favorite is False
     view.slideshow.slideshow_step(1)
     view.slideshow.tick()
-    assert view.slideshow.hud_is_favorite is True
+    assert view.slideshow.hud_is_favorite is True, (
+        "the slideshow learns the favorite from its Funestra on its poll, so the star is read "
+        "after a tick")
 
 
 def test_the_hud_facts_default_to_a_shuffled_set_of_nothing_favorite(qtbot):

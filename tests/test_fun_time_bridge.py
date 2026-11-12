@@ -907,7 +907,7 @@ def test_a_verb_said_to_neither_side_is_dropped_on_the_log(qtbot, tmp_path, capl
     assert "Unknown Fun Time verb dropped: sideways_next" in caplog.text
 
 
-def _told_on_a_fresh_bridge(tmp_path, line: str) -> None:
+def _told_on_a_bridge_over_a_gallery_that_answers_everything(tmp_path, line: str) -> None:
     session = _session(tmp_path)
     bridge = FunTimeBridge(session, MagicMock())
     session.command_file.write_text(f"{line}\n", encoding="utf-8")
@@ -929,7 +929,7 @@ def test_every_line_the_published_document_names_is_answered_here(qtbot, tmp_pat
     for template in document["command_lines"]:
         line = _a_line_like(template, tmp_path)
         for spelled in (line.lower(), line.upper()):
-            _told_on_a_fresh_bridge(tmp_path, spelled)
+            _told_on_a_bridge_over_a_gallery_that_answers_everything(tmp_path, spelled)
 
     assert "dropped" not in caplog.text
 
@@ -955,7 +955,8 @@ def _said_aloud(template: str, tmp_path) -> str:
 def test_every_line_said_aloud_is_answered_with_when_it_was_said_on_its_end(
         qtbot, tmp_path, caplog):
     for template in contract.declaration()["command_lines"]:
-        _told_on_a_fresh_bridge(tmp_path, _said_aloud(template, tmp_path))
+        _told_on_a_bridge_over_a_gallery_that_answers_everything(
+            tmp_path, _said_aloud(template, tmp_path))
 
     assert "dropped" not in caplog.text
 

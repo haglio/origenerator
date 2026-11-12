@@ -557,10 +557,10 @@ def test_the_stand_in_row_comes_off_however_the_launch_ends(combine, starting):
     controller, _host = combine(db=FakeDB([_image("img")]))
 
     controller.widget.combine_requested.emit(CombineRequest(
-        image_id="img", video_id="clip", intent=action_settings.VIDEO))
+        image_id="img", video_id="a-video-gone-from-the-database",
+        intent=action_settings.VIDEO))
 
     assert starting.rows() == []
-
 
 
 def test_a_dropped_pair_runs_the_videos_settings_on_the_image(combine, monkeypatch):

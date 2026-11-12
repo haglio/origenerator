@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import cv2
 import pytest
 from app_support import origenerator_handoff as handoff
 from PIL import Image
@@ -240,3 +241,23 @@ def test_the_probe_only_runs_when_nothing_else_measured(tmp_path):
         (str(tmp_path / "also-gone.mp4"), "video", "b", None),
     ]
     assert region_for_items(items) == "landscape"
+
+
+def test_the_probe_stops_at_the_first_video_that_opens(tmp_path, monkeypatch):
+    tall = write_mp4(tmp_path / "tall.mp4", width=64, height=128)
+    wide = write_mp4(tmp_path / "wide.mp4", width=128, height=64)
+    opened = []
+    open_for_real = cv2.VideoCapture
+
+    def capture(path):
+        opened.append(Path(path).name)
+        return open_for_real(path)
+
+    monkeypatch.setattr(cv2, "VideoCapture", capture)
+    items = [(str(tmp_path / "gone.mp4"), "video", "a", None),
+             (str(tall), "video", "b", None), (str(wide), "video", "c", None)]
+
+    region_for_items(items)
+
+    assert opened == ["gone.mp4", "tall.mp4"], (
+        "a decode of HEVC costs seconds, so the probe measures only the first video that opens")

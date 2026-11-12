@@ -24,6 +24,13 @@ def _wheel():
     )
 
 
+def _long_dropdown(qtbot):
+    w = NoWheelDropdown()
+    w.addItems(_MODELS)
+    qtbot.addWidget(w)
+    return w
+
+
 def test_a_dropdown_ignores_the_wheel(qtbot):
     w = NoWheelDropdown()
     w.addItems(["a", "b", "c"])
@@ -64,31 +71,18 @@ def test_a_double_spinner_ignores_the_wheel(qtbot):
 
 
 def test_a_long_item_does_not_hold_the_form_open(qtbot):
-    w = NoWheelDropdown()
-    w.addItems(_MODELS)
-    qtbot.addWidget(w)
+    w = _long_dropdown(qtbot)
 
     assert w.minimumSizeHint().width() < w.fontMetrics().horizontalAdvance(_MODELS[0]) / 3
 
 
 def test_a_placeholder_does_not_hold_the_form_open_either(qtbot):
-    bare = NoWheelDropdown()
-    bare.addItems(_MODELS)
-    qtbot.addWidget(bare)
-    w = NoWheelDropdown()
-    w.addItems(_MODELS)
+    bare = _long_dropdown(qtbot)
+    w = _long_dropdown(qtbot)
     w.setPlaceholderText("Select a workflow…")
-    qtbot.addWidget(w)
 
     assert w.minimumSizeHint().width() == bare.minimumSizeHint().width()
 
-
-
-def _long_dropdown(qtbot):
-    w = NoWheelDropdown()
-    w.addItems(_MODELS)
-    qtbot.addWidget(w)
-    return w
 
 
 def test_a_dropdowns_floor_grows_with_its_font(qtbot):
@@ -103,30 +97,30 @@ def test_a_dropdowns_floor_grows_with_its_font(qtbot):
         "the floor is the sum Qt makes for a full-length value, so it tracks the font")
 
 
-def test_a_dropdowns_floor_grows_with_its_stylesheets_padding(qtbot):
-    w = _long_dropdown(qtbot)
-    floor = w.minimumSizeHint().width()
+def test_a_dropdowns_floor_grows_with_its_stylesheets_padding(
+        qtbot, sheet_put_back_for_later_tests):
+    app = sheet_put_back_for_later_tests
+    sheet = app.styleSheet()
+    app.setStyleSheet(sheet + " QComboBox { padding: 4px 8px; }")
+    floor = _long_dropdown(qtbot).minimumSizeHint().width()
 
-    w.setStyleSheet("QComboBox { padding-left: 40px; }")
+    app.setStyleSheet(sheet + " QComboBox { padding: 4px 8px 4px 48px; }")
 
-    assert w.minimumSizeHint().width() > floor + 20, (
+    assert _long_dropdown(qtbot).minimumSizeHint().width() > floor + 20, (
         "the floor is the sum Qt makes for a full-length value, so it tracks the stylesheet")
 
+
 def test_a_dropdown_with_nothing_picked_shows_its_placeholder(qtbot):
-    w = NoWheelDropdown()
-    w.addItems(_MODELS)
+    w = _long_dropdown(qtbot)
     w.setPlaceholderText("Select a workflow…")
     w.setCurrentIndex(-1)
-    qtbot.addWidget(w)
 
     assert w.display_text(1000) == "Select a workflow…"
 
 
 def test_a_squeezed_value_elides_rather_than_cuts_off(qtbot):
-    w = NoWheelDropdown()
-    w.addItems(_MODELS)
+    w = _long_dropdown(qtbot)
     w.setCurrentIndex(0)
-    qtbot.addWidget(w)
     whole = w.fontMetrics().horizontalAdvance(_MODELS[0])
 
     assert w.display_text(whole) == _MODELS[0]

@@ -452,7 +452,6 @@ def test_finishing_a_reroll_loads_its_result_into_the_tab_that_launched_it(qtbot
     assert tab._displayed_row["prompt_id"] == job.prompt_id
 
 
-
 def test_a_run_ending_behind_another_tab_leaves_the_tab_in_front_as_it_was(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
@@ -470,6 +469,7 @@ def test_a_run_ending_behind_another_tab_leaves_the_tab_in_front_as_it_was(qtbot
         "what a tab's preview shows is only ever that tab's own run: nothing paints the tab "
         "in front from outside")
     assert launcher.displayed_row()["prompt_id"] == job.prompt_id
+
 
 def test_the_tiles_run_lands_in_the_tab_standing_on_its_folder(qtbot, tmp_path):
     client = _reroll_client()

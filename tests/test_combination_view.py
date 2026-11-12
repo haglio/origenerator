@@ -133,9 +133,9 @@ def test_showing_a_pair_with_no_video_leaves_no_last_frame_of_the_one_before(qtb
 
 def test_a_frame_the_library_has_moved_leaves_the_source_video_alone(qtbot, tmp_path):
     moved = str(tmp_path / "moved.png")
-    clip = _image(tmp_path / "clip.png")
+    video = _image(tmp_path / "video.png")
 
-    view = _view(qtbot, Combination(moved, clip))
+    view = _view(qtbot, Combination(moved, video))
 
     assert view.image_label.isHidden(), (
         "a frame the library has since moved is an ordinary absence, not an error")

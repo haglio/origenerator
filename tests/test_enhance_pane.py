@@ -1774,11 +1774,10 @@ def test_a_new_frame_updates_the_tile_without_a_rebuild(qtbot):
     versions.show_versions(_items(_versions(1)), RunningEnhancement("running", None, "2x"))
     thumbnail = versions._pending
 
-    fed = versions.update_pending(RunningEnhancement("running", b"not a real png", "2x"))
-    assert fed is True, (
+    assert versions.update_pending(RunningEnhancement("running", b"not a real png", "2x")) is True
+    assert versions._pending is thumbnail, (
         "a run streams frames several times a second, and rebuilding the strip on each "
         "would thrash its layout under the cursor mid-drag")
-    assert versions._pending is thumbnail
 
     assert versions.update_pending(None) is False, (
         "a run starting or ending changes the strip's shape, which only a rebuild can do, so the "
@@ -1849,12 +1848,11 @@ def _in_the_app(qtbot, pane):
 def _drop_styles_worn(pane) -> set:
     heading = next(label for label in pane.findChildren(QLabel) if label.text() == "Enhance")
     settings = pane.findChild(QScrollArea).geometry()
-    bare_beside_the_heading = QPoint(heading.geometry().right() + 10,
-                                     heading.geometry().center().y())
-    bare_under_the_settings = QPoint(settings.left() + 5, settings.bottom() - 5)
+    beside_heading = QPoint(heading.geometry().right() + 10, heading.geometry().center().y())
+    under_settings = QPoint(settings.left() + 5, settings.bottom() - 5)
     image = pane.grab().toImage()
     return {worn(image, pane.rect(), bare_ground)
-            for bare_ground in (bare_beside_the_heading, bare_under_the_settings)}
+            for bare_ground in (beside_heading, under_settings)}
 
 
 def test_the_panel_lights_while_a_version_it_would_take_is_dragged(qtbot):

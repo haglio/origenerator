@@ -65,7 +65,10 @@ def test_the_carrier_is_held_from_a_root_until_it_delivers(qtbot, owner):
     before = len(_in_flight)
 
     run_off_thread(lambda: 1, got.append, owner=owner)
-    assert len(_in_flight) == before + 1
+    assert len(_in_flight) == before + 1, (
+        "the set is the whole of what keeps the carrier and its handler alive: a reference cycle"
+        " alone let the collector free the handler while the pool thread's emit was still queued,"
+        " an access violation and not an exception")
 
     _wait_for(qtbot, got)
     assert len(_in_flight) == before

@@ -1568,7 +1568,10 @@ def test_an_image_that_takes_an_input_is_still_placed_by_its_folder(qtbot):
 
     item = view._inflight_items()[0]
     assert item.job_kind == "Image"
-    assert item.source_image is None
+    assert item.source_image is None, (
+        "an image workflow that takes an input, as the pose transfer takes its structure image, is"
+        " still an image being made: a start frame is what a run is of only for a video animating"
+        " an image or an enhancement of one")
 
 
 def test_a_job_started_from_words_alone_names_no_frame(qtbot):

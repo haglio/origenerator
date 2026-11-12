@@ -705,7 +705,7 @@ def test_starring_a_folder_marks_its_row_where_it_stands(qtbot):
         "out from under the mouse")
 
 
-def test_starring_a_folder_marks_it_on_both_sides_of_the_list(qtbot):
+def _a_folder_drawn_on_both_sides(qtbot):
     shapes = {"i1": (1280, 720), "i2": (720, 1280)}
     view = GalleryView(FakeDB([
         _row(pid, "sdxl_t2i", {"positive_prompt": f"prompt {pid}", "steps": 50,
@@ -717,6 +717,11 @@ def test_starring_a_folder_marks_it_on_both_sides_of_the_list(qtbot):
     rows = [view._tree_item_for(tree_key)
             for tree_key in view._tree_view.keys_for_folder(key)]
     assert len(rows) == 2
+    return view, key, rows
+
+
+def test_starring_a_folder_marks_it_on_both_sides_of_the_list(qtbot):
+    view, key, rows = _a_folder_drawn_on_both_sides(qtbot)
 
     view._toggle_favorite(key)
 
@@ -2131,6 +2136,18 @@ def test_history_spans_folder_navigation(qtbot):
     view._navigation.go_back()
     assert view._tree.currentItem() is view._leaf_by_id["v1"]
     assert view._selected["prompt_id"] == "v1"
+
+
+def test_back_returns_to_the_side_of_the_list_the_folder_was_opened_on(qtbot):
+    view, _key_of_both, (first_side, second_side) = _a_folder_drawn_on_both_sides(qtbot)
+    view._tree.setCurrentItem(second_side)
+    view._tree.setCurrentItem(first_side)
+
+    view._navigation.go_back()
+
+    assert view._tree.currentItem() is second_side, (
+        "a folder's place in the TOC is where the user is standing, shape and all, so that and"
+        " not the folder's own key is what Back records")
 
 
 def test_back_returns_to_the_latest_collection_then_forward_reopens_the_folder(qtbot):

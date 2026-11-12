@@ -535,6 +535,21 @@ def test_hovering_batch_modified_into_shows_this_image_before_the_one_made_of_it
     assert tip.index(before["thumbnail_path"]) < tip.index(after["thumbnail_path"]) < tip.index("cap")
 
 
+def test_hovering_requested_from_and_into_shows_the_same_before_and_after(make_related, tmp_path):
+    before = _with_thumbnail(_image_row(), tmp_path)
+    after = _with_thumbnail(_image_row("img2", "sdxl_t2i_img2.png"), tmp_path)
+    request = {**_batch_modified("img2", "img1"), "asked": "a cap instead"}
+    related = make_related(rows=[before, after], requests=[request])
+
+    related.show_row(after, [])
+    from_tip = _tip_of(related._requests, "img1")
+    related.show_row(before, [])
+    into_tip = _tip_of(related._requests, "img2")
+
+    for tip in (from_tip, into_tip):
+        assert tip.index(before["thumbnail_path"]) < tip.index(after["thumbnail_path"]) < tip.index("cap")
+
+
 def test_resting_the_mouse_on_a_batch_modified_thumbnail_opens_its_tooltip(make_related, tmp_path):
     before = _with_thumbnail(_image_row(), tmp_path)
     after = _with_thumbnail(_image_row("img2", "sdxl_t2i_img2.png"), tmp_path)

@@ -211,9 +211,8 @@ class RelatedMedia(QWidget):
             links.show_links(
                 [(heading, row) for heading, row, _record, _pair in here],
                 self._name_of, self._trashed(),
-                tips=None if is_request else {
-                    row["prompt_id"]: _change_tip(record, *pair)
-                    for _heading, row, record, pair in here})
+                tips={row["prompt_id"]: _change_tip(record, *pair)
+                      for _heading, row, record, pair in here})
         self._follow_the_rows()
 
     def _trashed(self) -> frozenset[str]:

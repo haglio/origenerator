@@ -452,6 +452,25 @@ def test_finishing_a_reroll_loads_its_result_into_the_tab_that_launched_it(qtbot
     assert tab._displayed_row["prompt_id"] == job.prompt_id
 
 
+
+def test_a_run_ending_behind_another_tab_leaves_the_tab_in_front_as_it_was(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    launcher = view._generate_pane.current_generate_tab()
+    key = _generate_in_current_tab(view, positive_prompt="a cat", seed=9)
+    job = view._live_jobs[key]
+    in_front = view._generate_pane._add_subtab()
+
+    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
+
+    assert view._generate_pane.current_generate_tab() is in_front
+    assert in_front.displayed_row() is None, (
+        "what a tab's preview shows is only ever that tab's own run: nothing paints the tab "
+        "in front from outside")
+    assert launcher.displayed_row()["prompt_id"] == job.prompt_id
+
 def test_the_tiles_run_lands_in_the_tab_standing_on_its_folder(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)

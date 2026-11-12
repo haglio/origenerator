@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication, QPushButton
 
 from origenerator.gui.prompt_marks import RESOLVE_IN_BOTH_PROMPTS, problem_to_resolve
 from origenerator.gui.scenes_editor import ScenesEditor
+from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES
 from origenerator.workflows.base import ParamDef
 from tests.text_readers import word_reading
@@ -96,3 +98,31 @@ def test_removing_emphasis_from_a_scene_can_be_undone(qtbot):
     qtbot.keyClick(field, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
 
     assert field.toPlainText() == "(a:1.2), b"
+
+
+def test_a_long_scene_title_gives_way_rather_than_widening_the_scene(qtbot):
+    editor = _editor(qtbot, scenes=1)
+    editor.show()
+    scene = editor._scenes[0]
+    floor = scene.minimumSizeHint().width()
+
+    scene.title.setText("Scene " + "with a very long name " * 6)
+    QApplication.processEvents()
+
+    assert scene.minimumSizeHint().width() == floor, (
+        "a scene's header sits beside the form's label column, so a title that held its "
+        "width would push the pane's floor past its cap: the title gives way first")
+
+
+def test_a_scenes_remove_mark_is_under_half_a_dressed_buttons_width(qtbot):
+    editor = _editor(qtbot, scenes=1)
+    editor.setStyleSheet(build_stylesheet())
+    scene = editor._scenes[0]
+    dressed = QPushButton()
+    qtbot.addWidget(dressed)
+    dressed.setStyleSheet(build_stylesheet())
+    dressed.setIcon(scene.remove.icon())
+
+    assert scene.remove.sizeHint().width() * 2 < dressed.sizeHint().width(), (
+        "the header is kept narrow, so its remove press is the tabs' flat mark "
+        "rather than a dressed button")

@@ -183,3 +183,23 @@ def test_they_land_one_to_a_corner_of_the_rectangle_they_are_given(qtbot):
     assert trash.top() == plus.top(), (
         "top-left is left free: the item type icon has always lived there, and a control that "
         "landed on it would move depending on which collection is open")
+
+
+def test_a_corner_controls_line_art_stands_out_from_its_ground_over_a_white_thumbnail(qtbot):
+    host, controls = _controls(qtbot)
+    host.setStyleSheet("background: white")
+    host.setAutoFillBackground(True)
+    controls.show_for(favorite=False, enhance=icons.ENHANCE_OPEN)
+    controls.place(host.rect())
+    host.show()
+    trash = controls.buttons()[1].geometry()
+
+    seen = host.grab().toImage()
+
+    ground = seen.pixelColor(trash.center().x(), trash.top() + 2).lightness()
+    brightest = max(seen.pixelColor(x, y).lightness()
+                    for x in range(trash.left(), trash.right() + 1)
+                    for y in range(trash.top(), trash.bottom() + 1))
+    assert brightest - ground > 100, (
+        "every corner control sits on a dark ground, so its line art reads over a "
+        "thumbnail of any color")

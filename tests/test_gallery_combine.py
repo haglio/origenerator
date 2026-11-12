@@ -272,7 +272,9 @@ def test_an_overlay_carrying_no_words_leaves_the_prompt_exactly_as_it_was(monkey
 
     shaped = gallery.cycle_shaped(params, _LOOP)
 
-    assert shaped["positive_prompt"] == "alpha"
+    assert (shaped["positive_prompt"], shaped["negative_prompt"]) == ("alpha", ""), (
+        "an overlay with no cycle words leaves both prompts exactly as the settings wrote them, "
+        "without even a stray space added")
     assert shaped["frame_count"] == combine.CYCLE_FRAMES
 
 

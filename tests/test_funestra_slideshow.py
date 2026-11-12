@@ -316,6 +316,17 @@ def test_the_osr2_follows_nothing_on_a_session_s_funestra(qtbot, tmp_path, monke
         "on a session's Funestra the OSR2 is the Main Funestra's, so this app's switch drives nothing")
 
 
+def test_a_pause_of_the_room_sends_a_session_s_funestra_nothing(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path)
+    _sent(slideshow)
+
+    slideshow.set_paused(True)
+
+    assert _sent(slideshow) == [], (
+        "the session pauses its own Funestras, so a slideshow on one of them leaves the pause "
+        "to the session")
+
+
 def test_the_funestra_is_told_how_long_an_image_holds_that_nothing_holds_it_and_to_read_the_list(
         qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path, hosting=Hosting(pace=SlideshowPace(seconds=6)))
@@ -1340,7 +1351,9 @@ def test_the_hud_maps_the_item_on_screen_against_the_library(qtbot, tmp_path):
 
     model = parse_hud(slideshow.channel.hud_file.read_text(encoding="utf-8"))
 
-    assert [cell.path for cell in model.seeds] == ["one-b.png"]
+    assert [cell.path for cell in model.seeds] == ["one-b.png"], (
+        "the HUD hands the Funestra the item's other seeds as its row and its other actions as "
+        "its column, as a Fun Time satellite maps a video, so the two maps read alike")
     assert [(cell.path, cell.label) for cell in model.actions] == [("one-x.png", "dawn")]
     assert (model.current_action, model.seed_count, model.action_count) == ("fox", 2, 2)
 

@@ -96,10 +96,12 @@ def test_a_failing_widening_is_silence_rather_than_a_crash(qtbot):
         raise RuntimeError("endpoint down")
 
     expander = SearchExpander(expand=explode)
-    with qtbot.waitSignal(expander.expanded, timeout=2000) as blocker:
+    with qtbot.waitSignal(expander.expanded, timeout=2000, raising=False) as blocker:
         expander.request("two women")
 
-    assert blocker.args == ["two women", {}]
+    assert blocker.args == ["two women", {}], (
+        "a widening only improves results the search has already drawn, so its failure is "
+        "silence: an empty widening, never an error")
 
 
 def test_a_wordless_query_is_never_sent(qtbot):

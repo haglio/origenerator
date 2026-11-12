@@ -26,6 +26,7 @@ from origenerator.gui.generation_drag import GENERATION_MIME
 from origenerator.gui.viewport import Viewport
 from origenerator.output_places import OutputPlaces
 from tests.heard_drags import HeardDrags
+from tests.slideshow_support import stop_the_poll_to_tick_by_hand
 
 
 def _scripted_video(tmp_path, name="clip.mp4"):
@@ -484,7 +485,7 @@ def _slideshow_on_a_sessions_funestra(tmp_path):
     slideshow = FunestraSlideshow(
         Playing([(str(tmp_path / "a.png"), "image", "id-a")]),
         Seat("landscape", channel, FrameFiles(tmp_path / "frames")))
-    slideshow._timer.stop()
+    stop_the_poll_to_tick_by_hand(slideshow)
     return slideshow
 
 

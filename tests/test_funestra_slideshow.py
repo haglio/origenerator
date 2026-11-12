@@ -32,7 +32,7 @@ from origenerator.one_look import one_look
 from origenerator.output_places import OutputPlaces
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState, in_order
 from origenerator.slideshow_buttons import answer
-from tests.slideshow_support import slides_named
+from tests.slideshow_support import slides_named, stop_the_poll_to_tick_by_hand
 from tests.test_slideshow_hud import _inflight
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
@@ -76,7 +76,7 @@ def _slideshow(qtbot, tmp_path, items=_ITEMS, *, say=None, hosting=_NO_HOSTING,
                **playing) -> FunestraSlideshow:
     slideshow = FunestraSlideshow(Playing(items, shuffle=in_order, **playing), _seat(tmp_path),
                                   replace(hosting, say=say or hosting.say))
-    slideshow._timer.stop()
+    stop_the_poll_to_tick_by_hand(slideshow)
     return slideshow
 
 
@@ -1494,7 +1494,7 @@ def test_a_shuffled_slideshow_deals_what_he_watches_most_first_and_still_plays_e
         qtbot, tmp_path):
     slideshow = FunestraSlideshow(Playing(_ITEMS, actions=_weighing_what_he_watches()),
                                   _seat(tmp_path), _NO_HOSTING)
-    slideshow._timer.stop()
+    stop_the_poll_to_tick_by_hand(slideshow)
 
     played = _handed_to_the_funestra(slideshow)
 
@@ -2434,7 +2434,7 @@ def test_a_ready_opening_hands_over_its_scripts_without_looking_on_disk(
     slideshow = FunestraSlideshow(
         Playing(items, opening=_ready_opening(items, scripts={"clip.mp4": script, "other.mp4": None})),
         _seat(tmp_path))
-    slideshow._timer.stop()
+    stop_the_poll_to_tick_by_hand(slideshow)
 
     assert {item.path.name: item.funscript for item in read_playlist(slideshow.channel.playlist)} == {
         "clip.mp4": script, "other.mp4": None}
@@ -2446,7 +2446,7 @@ def test_after_opening_a_slideshow_looks_on_disk_for_a_script_again(
     slideshow = FunestraSlideshow(
         Playing(items, opening=_ready_opening(items, scripts={"clip.mp4": None})),
         _seat(tmp_path))
-    slideshow._timer.stop()
+    stop_the_poll_to_tick_by_hand(slideshow)
     scripts = _scripted(monkeypatch, tmp_path, "clip.mp4")
 
     qtbot.waitUntil(lambda: not slideshow._scripts_on_opening)
@@ -2466,7 +2466,7 @@ def test_a_ready_opening_leads_with_the_slide_whose_map_it_already_has(qtbot, tm
         Playing(items, actions=SlideshowActions(neighbors=walked),
                 opening=_ready_opening(items, lead=1, lead_neighbors=neighbors)),
         _seat(tmp_path))
-    slideshow._timer.stop()
+    stop_the_poll_to_tick_by_hand(slideshow)
 
     assert read_playlist(slideshow.channel.playlist)[0].path.name == "two.png"
 
@@ -2513,7 +2513,7 @@ def _shuffled_by_animal(qtbot, tmp_path, *, shuffle=None) -> FunestraSlideshow:
         Playing(_TWO_GROUPS, shuffle=shuffle,
                 actions=SlideshowActions(group_of=lambda slide, _seed: _BY_ANIMAL[slide.prompt_id])),
         _seat(tmp_path), _NO_HOSTING)
-    slideshow._timer.stop()
+    stop_the_poll_to_tick_by_hand(slideshow)
     return slideshow
 
 

@@ -11,7 +11,7 @@ _VIEWPORT = 500
 
 
 @pytest.fixture
-def pane(qtbot):
+def scroll_without_the_gallerys_furniture(qtbot):
     scroll = QScrollArea()
     content = QWidget()
     column = QVBoxLayout(content)
@@ -42,8 +42,9 @@ def _room_under(scroll, tile) -> int:
             - _room_over(scroll, tile) - tile.size().height())
 
 
-def test_a_tile_under_the_view_comes_up_with_the_margin_under_it(pane, qtbot):
-    scroll, tiles = pane
+def test_a_tile_under_the_view_comes_up_with_the_margin_under_it(
+        scroll_without_the_gallerys_furniture, qtbot):
+    scroll, tiles = scroll_without_the_gallerys_furniture
     assert scroll.verticalScrollBar().value() == 0
 
     bring_into_view(scroll, tiles[15])
@@ -51,8 +52,9 @@ def test_a_tile_under_the_view_comes_up_with_the_margin_under_it(pane, qtbot):
     assert _room_under(scroll, tiles[15]) == REVEAL_MARGIN
 
 
-def test_a_tile_over_the_view_comes_down_with_the_margin_over_it(pane, qtbot):
-    scroll, tiles = pane
+def test_a_tile_over_the_view_comes_down_with_the_margin_over_it(
+        scroll_without_the_gallerys_furniture, qtbot):
+    scroll, tiles = scroll_without_the_gallerys_furniture
     scroll.verticalScrollBar().setValue(scroll.verticalScrollBar().maximum())
 
     bring_into_view(scroll, tiles[2])
@@ -60,8 +62,9 @@ def test_a_tile_over_the_view_comes_down_with_the_margin_over_it(pane, qtbot):
     assert _room_over(scroll, tiles[2]) == REVEAL_MARGIN
 
 
-def test_a_tile_already_clear_of_both_edges_is_left_where_it_is(pane, qtbot):
-    scroll, tiles = pane
+def test_a_tile_already_clear_of_both_edges_is_left_where_it_is(
+        scroll_without_the_gallerys_furniture, qtbot):
+    scroll, tiles = scroll_without_the_gallerys_furniture
     scroll.verticalScrollBar().setValue(200)
 
     bring_into_view(scroll, tiles[3])
@@ -69,8 +72,9 @@ def test_a_tile_already_clear_of_both_edges_is_left_where_it_is(pane, qtbot):
     assert scroll.verticalScrollBar().value() == 200
 
 
-def test_a_pane_too_short_for_the_margins_shares_out_what_room_it_has(pane, qtbot):
-    scroll, tiles = pane
+def test_a_pane_too_short_for_the_margins_shares_out_what_room_it_has(
+        scroll_without_the_gallerys_furniture, qtbot):
+    scroll, tiles = scroll_without_the_gallerys_furniture
     scroll.resize(230, _TILE + 20)
     qtbot.wait(1)
 

@@ -15,13 +15,22 @@ class SqliteFile:
         self._own: sqlite3.Connection | None = None
         self._owning = threading.RLock()
         self._seen_others_at: int | None = None
+        self._told_of_writes: list = []
 
     @contextmanager
-    def connect(self):
+    def connect(self, *, tells_of_writes: bool = True):
         with self._owning:
             conn = self._own_connection()
+            before = conn.total_changes
             with conn:
                 yield conn
+            written = conn.total_changes != before
+        if written and tells_of_writes:
+            for told in list(self._told_of_writes):
+                told()
+
+    def when_written(self, told) -> None:
+        self._told_of_writes.append(told)
 
     def _own_connection(self) -> sqlite3.Connection:
         if self._own is None:
@@ -64,7 +73,7 @@ class ChangeLog:
             """)
 
     def changed_since_last_asked(self) -> set[str] | None:
-        with self._file.connect() as conn:
+        with self._file.connect(tells_of_writes=False) as conn:
             others_wrote = self._file.others_wrote_since_last_asked(conn)
             changed = {row[0] for row in conn.execute(f"SELECT * FROM {self._log}")}
             conn.execute(f"DELETE FROM {self._log}")

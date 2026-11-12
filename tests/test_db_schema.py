@@ -110,6 +110,7 @@ SCHEMA = {
         ("web_url", "TEXT", 0, None, 0),
         ("library_id", "TEXT", 0, None, 0),
         ("upscale_provenance", "TEXT", 0, None, 0),
+        ("video_seconds", "REAL", 0, None, 0),
     ),
     "requests": (
         ("prompt_id", "TEXT", 0, None, 1),

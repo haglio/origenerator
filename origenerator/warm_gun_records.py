@@ -21,37 +21,37 @@ FILE_NAME = "gallery_records.json"
 NON_AI_FOLDER = "non_AI"
 
 
-class Shelves(NamedTuple):
+class PlayedFrom(NamedTuple):
     library_root: Path
     kino: Path
     genau: Path
 
 
-def records_for_the_phone(rows: list[dict], shelves: Shelves, *,
+def records_for_the_phone(rows: list[dict], played_from: PlayedFrom, *,
                           length_of: Callable[[Path], float | None]) -> dict[str, dict]:
     reading = GalleryReading(rows)
     records = {}
-    for shelf in (shelves.kino, shelves.genau):
-        for video in _videos_on(shelf):
+    for folder in (played_from.kino, played_from.genau):
+        for video in _videos_in(folder):
             row = reading.row_of(video)
             if row is None:
                 continue
             record = reading.record_of(row)
             counts = {field: int(row.get(column) or 0) for field, column in WATCH_COLUMNS}
-            kind = classify(genau=shelf == shelves.genau, clip=False,
+            kind = classify(genau=folder == played_from.genau, excerpt=False,
                             duration_seconds=length_of(video))
-            records[video.relative_to(shelves.library_root).as_posix()] = {
+            records[video.relative_to(played_from.library_root).as_posix()] = {
                 **record, "video": {**record["video"], "type": kind},
                 "favorite": bool(row.get("starred")),
                 WATCH_BLOCK: {**counts, WEIGHT_KEY: weight_for(counts)}}
     return records
 
 
-def _videos_on(shelf: Path) -> Iterator[Path]:
-    for video in sorted(shelf.rglob("*")) if shelf.is_dir() else ():
+def _videos_in(folder: Path) -> Iterator[Path]:
+    for video in sorted(folder.rglob("*")) if folder.is_dir() else ():
         if (media_type_from_filename(video.name) == MediaType.VIDEO
                 and PARTIAL_MARKER not in video.name
-                and NON_AI_FOLDER not in video.relative_to(shelf).parts and video.is_file()):
+                and NON_AI_FOLDER not in video.relative_to(folder).parts and video.is_file()):
             yield video
 
 
@@ -70,10 +70,10 @@ class _Lengths:
 class PhoneRecords:
     QUIET_SECONDS = 30.0
 
-    def __init__(self, db, *, write_to: Path | None, shelves: Shelves,
+    def __init__(self, db, *, write_to: Path | None, played_from: PlayedFrom,
                  clock: Callable[[], float] = time.monotonic,
                  length_of: Callable[[Path], float | None] | None = None) -> None:
-        self._db, self._write_to, self._shelves, self._clock = db, write_to, shelves, clock
+        self._db, self._write_to, self._played_from, self._clock = db, write_to, played_from, clock
         self._length_of = length_of or _Lengths()
         self._written: object = None
         self._seen: object = None
@@ -84,7 +84,7 @@ class PhoneRecords:
     def of_this_library(cls, db, *, preview: bool) -> PhoneRecords:
         records = None if preview else records_folder(evolver_checkout(), config.LIBRARY_ROOT)
         return cls(db, write_to=records / FILE_NAME if records is not None else None,
-                   shelves=Shelves(config.LIBRARY_ROOT, config.KINO_UPSCALES_DIR,
+                   played_from=PlayedFrom(config.LIBRARY_ROOT, config.KINO_UPSCALES_DIR,
                                    config.GENAU_DIR))
 
     def write_when_due(self, off_thread: Callable[[Callable, Callable], None]) -> None:
@@ -108,7 +108,7 @@ class PhoneRecords:
 
     def write(self) -> int:
         version = self._db.library_version()
-        records = records_for_the_phone(self._db.list_generations(), self._shelves,
+        records = records_for_the_phone(self._db.list_generations(), self._played_from,
                                         length_of=self._length_of)
         self._write_to.parent.mkdir(parents=True, exist_ok=True)
         partial = self._write_to.with_name(f"{self._write_to.stem}{PARTIAL_MARKER}json")

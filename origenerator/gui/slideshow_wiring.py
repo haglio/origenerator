@@ -102,7 +102,7 @@ class DirectorSources:
 
     @classmethod
     def of_this_library(cls, **sources) -> DirectorSources:
-        return cls(**sources, **video_records.of_this_library())
+        return cls(**sources, **video_records.of_this_library(sources["db"]))
 
 
 @dataclass(frozen=True)

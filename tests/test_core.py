@@ -1796,7 +1796,7 @@ def test_a_long_run_ending_reaches_the_desktop(qtbot, tmp_path, monkeypatch):
                         lambda app_id, xml, **_filing: said.append(xml))
 
     win._gallery_view._jobs.run_ended.emit(
-        RunOutcome(kind="Video", display_name="WAN 2.2 I2V", seconds=252.0,
+        RunOutcome(kind="Video", display_name="I2V WAN 2.2", seconds=252.0,
                    ok=True, source=GenerationSource.GENERATED, generation="alpha-1"))
 
     assert len(said) == 1, (
@@ -1805,7 +1805,7 @@ def test_a_long_run_ending_reaches_the_desktop(qtbot, tmp_path, monkeypatch):
         "shows it wherever the user has got to")
     toast = ElementTree.fromstring(said[0])
     assert [text.text for text in toast.findall("./visual/binding/text")] == \
-        ["Video ready", "WAN 2.2 I2V · 4:12"]
+        ["Video ready", "I2V WAN 2.2 · 4:12"]
     assert app_link.generation_in(toast.get("launch")) == "alpha-1"
 
 
@@ -1819,7 +1819,7 @@ def test_a_video_watched_in_the_window_takes_its_toast_back(qtbot, tmp_path, mon
     monkeypatch.setattr(toasts, "app_in_front", lambda: True)
     monkeypatch.setattr(toasts, "seconds_since_input", lambda: 0.0)
     win._gallery_view._jobs.run_ended.emit(
-        RunOutcome(kind="Video", display_name="WAN 2.2 I2V", seconds=252.0,
+        RunOutcome(kind="Video", display_name="I2V WAN 2.2", seconds=252.0,
                    ok=True, source=GenerationSource.GENERATED, generation="alpha-1"))
     front_tab = win._gallery_view._generate_pane.current_generate_tab()
     monkeypatch.setattr(front_tab, "video_on_screen", lambda: "alpha-1")

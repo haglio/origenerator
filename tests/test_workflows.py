@@ -1010,6 +1010,15 @@ def test_every_workflow_name_says_t2i_i2v_and_t2v_rather_than_spelling_them_out(
             if spelled_out.search(name)] == []
 
 
+def test_a_workflow_name_that_says_what_it_makes_from_what_says_it_first():
+    names = [wf.display_name for wf in WORKFLOW_REGISTRY.values()]
+    names += [workflow_named(outside_workflow("a-site", MediaType.VIDEO, kind)).display_name
+              for kind in VideoKind]
+    kinds = re.compile(r"\b(T2I|I2I|I2V|T2V)\b")
+    assert [name for name in [*names, *RETIRED_WORKFLOW_NAMES.values()]
+            if kinds.search(name) and not kinds.match(name)] == []
+
+
 def test_enhance_keys_cover_every_param_only_the_tail_reads():
     for name in ("sdxl_t2i", "sdxl_pose_transfer", "wan22_t2i", "krea2_t2i"):
         wf = WORKFLOW_REGISTRY[name]

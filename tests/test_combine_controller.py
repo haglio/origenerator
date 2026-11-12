@@ -829,7 +829,7 @@ def test_an_action_with_no_settings_assigned_opens_the_lanes_workflow_as_it_star
 
     (name, params), = tabs.opened
     workflow = WORKFLOW_REGISTRY[name]
-    assert workflow.display_name == "WAN 2.2 I2V"
+    assert workflow.display_name == "I2V WAN 2.2"
     assert params["input_image"] == "one.png [output]"
     assert (params["positive_prompt"], params["negative_prompt"]) == ("", ""), (
         "a past video of the action is there, and its settings are not what opens")

@@ -31,7 +31,7 @@ class Wan22Flf2vLoopWorkflow(WorkflowTemplate):
 
     name = "wan22_flf2v_loop"
     version = "v009"
-    display_name = "WAN 2.2 I2V (Looping)"
+    display_name = "I2V WAN 2.2 (Looping)"
     output_type = MediaType.VIDEO
     looping = True
     derives_size_from_input = True

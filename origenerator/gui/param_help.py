@@ -294,11 +294,11 @@ RECOMMENDED: dict[str, str] = {
     ),
     "width": (
         "Good sizes: about one megapixel in all for SDXL, such as 832\u00d71216, 1024\u00d71024 "
-        "or 1216\u00d7832; up to about two for Flux and WAN 2.2 T2I."
+        "or 1216\u00d7832; up to about two for Flux and T2I WAN 2.2."
     ),
     "height": (
         "Good sizes: about one megapixel in all for SDXL, such as 832\u00d71216, 1024\u00d71024 "
-        "or 1216\u00d7832; up to about two for Flux and WAN 2.2 T2I."
+        "or 1216\u00d7832; up to about two for Flux and T2I WAN 2.2."
     ),
     "frame_count": (
         "A longer video is made in pieces, each starting on the last frame of the one "

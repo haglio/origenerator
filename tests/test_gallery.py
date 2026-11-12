@@ -115,12 +115,12 @@ def test_folder_level_names_the_folder_levels_and_nothing_else():
 
 def test_generate_tab_title_leads_with_model_then_prompt():
     title = generate_tab_title("sdxl_t2i", {"positive_prompt": "a cat in a hat", "seed": 5})
-    assert title == "SDXL T2I \u203a a cat in a hat", (
+    assert title == "T2I SDXL \u203a a cat in a hat", (
         "the model leads, so tabs of one pipeline sit together")
 
 
 def test_generate_tab_title_is_just_the_model_without_a_prompt():
-    assert generate_tab_title("sdxl_t2i", {"seed": 5}) == "SDXL T2I"
+    assert generate_tab_title("sdxl_t2i", {"seed": 5}) == "T2I SDXL"
 
 
 def test_generate_tab_title_handles_unknown_workflow():
@@ -1145,18 +1145,18 @@ def test_a_retired_workflows_folder_keeps_the_name_it_had():
     retired = dict(_LOOP_VIDEO, prompt_id="old", workflow_name="wan21_ati_i2v")
 
     assert _workflow_labels([retired]) == {
-        "video/wan21_ati_i2v": "WAN 2.1 I2V (Motion-Tracked)"}
+        "video/wan21_ati_i2v": "I2V WAN 2.1 (Motion-Tracked)"}
 
 
 def test_a_workflow_or_site_the_overlay_names_shows_the_overlays_name(monkeypatch):
     monkeypatch.setattr(display_names, "load_content", lambda: {"display_names": {
-        "alpha_beta_i2v": "Alpha Beta (I2V)", "samplesite": "SampleSite"}})
+        "alpha_beta_i2v": "I2V Alpha Beta", "samplesite": "SampleSite"}})
     site = outside_workflow("samplesite", MediaType.VIDEO, VideoKind.IMAGE_TO_VIDEO)
     rows = [dict(_LOOP_VIDEO, prompt_id="paused", workflow_name="alpha_beta_i2v"),
             dict(_LOOP_VIDEO, prompt_id="outside", workflow_name=site)]
 
     assert _workflow_labels(rows) == {
-        "video/alpha_beta_i2v": "Alpha Beta (I2V)", f"video/{site}": "SampleSite I2V"}
+        "video/alpha_beta_i2v": "I2V Alpha Beta", f"video/{site}": "I2V SampleSite"}
 
 
 def test_items_no_workflow_is_known_for_are_under_unknown_workflow_in_parentheses():
@@ -1561,7 +1561,7 @@ def test_each_kinds_workflow_folders_are_in_alphabetical_order():
     ]
 
     assert [[w.label for w in kind.children] for kind in build_gallery_tree(newest_first)] \
-        == [["Flux T2I", "Krea 2 T2I", "SDXL T2I"], [workflow_label("wan22_i2v")]]
+        == [["T2I Flux", "T2I Krea 2", "T2I SDXL"], [workflow_label("wan22_i2v")]]
 
 
 def test_a_workflow_folder_named_in_parentheses_comes_last():
@@ -1570,7 +1570,7 @@ def test_a_workflow_folder_named_in_parentheses_comes_last():
         output_files=json.dumps([{"filename": "found.png"}]))]
 
     assert [w.label for w in build_gallery_tree(newest_first)[0].children] \
-        == ["SDXL T2I", "(unknown workflow)"]
+        == ["T2I SDXL", "(unknown workflow)"]
 
 
 def test_a_workflows_model_folders_are_in_alphabetical_order_with_the_unknown_model_last():
@@ -1603,7 +1603,7 @@ def test_a_workflow_folder_given_a_name_is_placed_by_that_name():
 
     images = build_gallery_tree(newest_first, renamed)[0]
 
-    assert [w.label for w in images.children] == ["alpha stills", "Flux T2I"]
+    assert [w.label for w in images.children] == ["alpha stills", "T2I Flux"]
 
 
 def test_a_name_given_a_folder_finds_every_row_beneath_it_at_any_depth():
@@ -1897,7 +1897,7 @@ def test_child_groups_and_rows_under_walk_the_tree():
 def test_build_gallery_tree_labels_workflow_with_display_name():
     tree = build_gallery_tree([_img("i1", "a cat", 50, 1)])
     (wf,) = _workflows(tree)
-    assert wf.label == "SDXL T2I"
+    assert wf.label == "T2I SDXL"
 
 
 def test_settings_folders_are_named_by_a_code_not_by_their_prompt():

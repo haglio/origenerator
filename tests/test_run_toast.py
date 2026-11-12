@@ -5,34 +5,34 @@ from origenerator.run_toast import RunOutcome, outcome_of_row, toast_for
 
 
 def test_a_video_over_in_seconds_is_not_worth_interrupting_for():
-    outcome = RunOutcome(kind="Video", display_name="WAN 2.2 I2V", seconds=40.0, ok=True,
+    outcome = RunOutcome(kind="Video", display_name="I2V WAN 2.2", seconds=40.0, ok=True,
                          source=GenerationSource.GENERATED, generation="alpha-1")
     assert toast_for(outcome) is None
 
 
 def test_a_run_past_the_minute_says_what_landed_and_how_long_it_took():
-    outcome = RunOutcome(kind="Video", display_name="WAN 2.2 I2V",
+    outcome = RunOutcome(kind="Video", display_name="I2V WAN 2.2",
                          seconds=252.0, ok=True, source=GenerationSource.GENERATED,
                          generation="alpha-1")
     toast = toast_for(outcome)
     assert toast.title == "Video ready"
-    assert toast.body == "WAN 2.2 I2V · 4:12"
+    assert toast.body == "I2V WAN 2.2 · 4:12"
     assert toast.ok
 
 
 def test_a_long_run_that_died_says_so_rather_than_claiming_a_result():
-    outcome = RunOutcome(kind="Video", display_name="WAN 2.2 I2V",
+    outcome = RunOutcome(kind="Video", display_name="I2V WAN 2.2",
                          seconds=220.0, ok=False, source=GenerationSource.GENERATED,
                          generation="alpha-1")
     toast = toast_for(outcome)
     assert toast.title == "Video failed"
-    assert toast.body == "WAN 2.2 I2V · stopped after 3:40"
+    assert toast.body == "I2V WAN 2.2 · stopped after 3:40"
     assert not toast.ok
 
 
 def test_the_apps_own_background_work_interrupts_nobody():
     for source in (GenerationSource.EXPERIMENT, GenerationSource.BASE_RENDER):
-        outcome = RunOutcome(kind="Video", display_name="WAN 2.2 I2V",
+        outcome = RunOutcome(kind="Video", display_name="I2V WAN 2.2",
                              seconds=600.0, ok=True, source=source,
                              generation="alpha-1")
         assert toast_for(outcome) is None
@@ -46,20 +46,20 @@ def test_an_enhancement_interrupts_nobody_however_long_it_ran():
 
 
 def test_an_image_interrupts_nobody_however_long_it_ran():
-    outcome = RunOutcome(kind="Image", display_name="SDXL T2I", seconds=180.0, ok=True,
+    outcome = RunOutcome(kind="Image", display_name="T2I SDXL", seconds=180.0, ok=True,
                          source=GenerationSource.GENERATED, generation="alpha-1")
     assert toast_for(outcome) is None
 
 
 def test_a_toast_carries_the_item_a_click_on_it_should_open():
-    outcome = RunOutcome(kind="Video", display_name="WAN 2.2 I2V", seconds=252.0,
+    outcome = RunOutcome(kind="Video", display_name="I2V WAN 2.2", seconds=252.0,
                          ok=True, source=GenerationSource.GENERATED,
                          generation="7f0c9b2e-1111-4444-8888-aaaabbbbcccc")
     assert toast_for(outcome).generation == "7f0c9b2e-1111-4444-8888-aaaabbbbcccc"
 
 
 def test_a_failed_run_points_at_the_item_too():
-    outcome = RunOutcome(kind="Video", display_name="WAN 2.2 I2V", seconds=220.0,
+    outcome = RunOutcome(kind="Video", display_name="I2V WAN 2.2", seconds=220.0,
                          ok=False, source=GenerationSource.GENERATED, generation="beta-2")
     assert toast_for(outcome).generation == "beta-2"
 

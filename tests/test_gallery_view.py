@@ -158,10 +158,10 @@ def test_refresh_builds_workflow_model_settings_tree(qtbot):
     top = _top_level(view._tree)
     assert set(top) == {"All"}
     assert _collection_names(top["All"]) == _COLLECTION_NAMES
-    assert set(_workflow_rows(view._tree)) == {"SDXL T2I", "WAN 2.2 I2V"}
+    assert set(_workflow_rows(view._tree)) == {"T2I SDXL", "I2V WAN 2.2"}
 
     workflow_node = _image_workflow(view._tree)
-    assert workflow_node.text(0) == "SDXL T2I"
+    assert workflow_node.text(0) == "T2I SDXL"
     assert len(_subs(workflow_node)) == 1
     assert len(_subs(_at(workflow_node, 0))) == 1
     assert len(_subs(_at(workflow_node, 0, 0))) == 1, (
@@ -306,7 +306,7 @@ def test_selecting_a_folder_shows_its_full_name_as_a_title(qtbot):
 
     workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow)
-    assert "SDXL T2I" in view._folder_path.display_text(), (
+    assert "T2I SDXL" in view._folder_path.display_text(), (
         "the folder path is shown in full here, which the narrow TOC cuts short")
     assert "All" in view._folder_path.display_text()
 
@@ -528,7 +528,7 @@ def test_images_shows_its_collections_then_its_workflow_folders_as_squares(qtbot
 
     view._tree.setCurrentItem(_alls(view._tree)["Images"])
 
-    assert _square_names(view) == [*_COLLECTION_NAMES, "SDXL T2I"]
+    assert _square_names(view) == [*_COLLECTION_NAMES, "T2I SDXL"]
 
 
 def test_videos_once_favorited_is_a_square_in_alls_favorites(qtbot, monkeypatch):
@@ -961,14 +961,14 @@ def test_keeping_an_experiment_clears_it_from_the_review_queue(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    assert "SDXL T2I" in _workflow_rows(view._tree)
+    assert "T2I SDXL" in _workflow_rows(view._tree)
 
     view._on_experiment_verdict("e1", "keep")
 
     assert db.get_generation("e1")["experiment_verdict"] == "up"
     view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
     assert view.listed_prompt_ids() == []
-    assert "SDXL T2I" in _workflow_rows(view._tree)
+    assert "T2I SDXL" in _workflow_rows(view._tree)
 
 
 def test_rejecting_an_experiment_goes_through_the_undoable_action(qtbot):
@@ -1480,12 +1480,12 @@ def test_new_generations_appear_without_manual_refresh(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     assert set(_top_level(view._tree)) == {"All"}
-    assert set(_workflow_rows(view._tree)) == {"SDXL T2I"}
+    assert set(_workflow_rows(view._tree)) == {"T2I SDXL"}
 
     db.add(_row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5},
                 "wan22_i2v_00001_.mp4"))
     view._poll()
-    assert set(_workflow_rows(view._tree)) == {"SDXL T2I", "WAN 2.2 I2V"}
+    assert set(_workflow_rows(view._tree)) == {"T2I SDXL", "I2V WAN 2.2"}
 
 
 def test_the_gallery_polls_on_a_timer_of_its_own(qtbot):

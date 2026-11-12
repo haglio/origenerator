@@ -22,7 +22,7 @@ def _tabs_with(qtbot, n, width=600):
     tabs.setTabBar(ElidingTabBar())
     qtbot.addWidget(tabs)
     for i in range(n):
-        tabs.addTab(QWidget(), f"SDXL T2I \u203a prompt {i}")
+        tabs.addTab(QWidget(), f"T2I SDXL \u203a prompt {i}")
     tabs.resize(width, 400)
     tabs.show()
     QApplication.processEvents()
@@ -36,7 +36,7 @@ def _widest_name(bar) -> str:
 def test_a_long_title_gets_only_the_room_the_widest_item_name_needs(qtbot):
     bar = ElidingTabBar()
     qtbot.addWidget(bar)
-    bar.addTab("SDXL T2I \u203a " + "an extremely long prompt " * 8)
+    bar.addTab("T2I SDXL \u203a " + "an extremely long prompt " * 8)
     bar.addTab(_widest_name(bar))
     assert bar.tabSizeHint(0).width() == bar.tabSizeHint(1).width()
 

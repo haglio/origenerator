@@ -29,7 +29,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
     """
     name = "flux_t2i_upscaled"
     version = "v002"
-    display_name = "Flux T2I"
+    display_name = "T2I Flux"
     output_type = MediaType.IMAGE
     model_keys = ("unet",)
     lora_keys = LORA_KEYS

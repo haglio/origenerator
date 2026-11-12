@@ -23,7 +23,7 @@ _SDXL_MEGAPIXELS = 1.0
 
 
 class SdxlPoseTransferWorkflow(WorkflowTemplate):
-    """SDXL T2I steered by the structure of an input image.
+    """T2I SDXL steered by the structure of an input image.
 
     ComfyUI's SetUnionControlNetType is added only for union ControlNets: a plain single-purpose one crashes on the extra argument.
     ComfyUI's DWPose preprocessor loses the person on close-ups and overlapping bodies.

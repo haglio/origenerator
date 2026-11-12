@@ -88,7 +88,7 @@ def test_an_ai_video_from_a_site_of_both_kinds_shows_its_settings_under_its_site
 
     tab.show_saved_generation(video, [image])
 
-    assert tab._workflow_dropdown.currentText() == "a-site I2V"
+    assert tab._workflow_dropdown.currentText() == "I2V a-site"
 
 
 def test_the_image_an_ai_video_was_made_from_shows_its_own_settings(library):

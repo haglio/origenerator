@@ -19,6 +19,22 @@ def _filings(monkeypatch):
     return raised, taken_back
 
 
+def test_a_toast_a_test_raises_never_reaches_windows(monkeypatch):
+    reached = []
+
+    def windows_notifier(app_id):
+        reached.append(app_id)
+        raise OSError("no notifier in a test")
+
+    monkeypatch.setattr(windows_toast, "_notifier_for", windows_notifier)
+
+    toast_raising.raise_toast("Example.App", _toast())
+
+    assert reached == [], (
+        "a toast a test raises would be a toast on the user's screen, so what Windows is"
+        " handed is caught at its door")
+
+
 def test_the_toast_a_run_raised_is_the_one_taken_back_for_that_run(monkeypatch):
     raised, taken_back = _filings(monkeypatch)
 

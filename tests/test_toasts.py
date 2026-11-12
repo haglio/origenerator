@@ -4,8 +4,10 @@ from pathlib import Path
 from xml.etree import ElementTree
 
 from PIL import Image
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QImage
 from PyQt6.QtWidgets import QWidget
+from shared_ui.alert import Level, icon_pixmap_for
+from shared_ui.app_icon import CANVAS
 from shared_ui.palette import PREVIEW_INK
 from shared_ui.preview import Preview
 
@@ -39,6 +41,32 @@ def _lines(said):
     return [text.text for text in _toast(said).findall("./visual/binding/text")]
 
 
+def _marks_beside_a_toast(toasts, monkeypatch):
+    said = _raised(monkeypatch)
+    marks = {}
+    for ok in (True, False):
+        toasts.note(_outcome(ok=ok))
+        marks[ok] = Path(_toast(said).find("./visual/binding/image").get("src")[len("file:///"):])
+        said.clear()
+    return marks
+
+
+def _named_to_windows(monkeypatch):
+    registered = []
+    monkeypatch.setattr(toasts_module, "register_toast_identity",
+                        lambda app_id, **named: registered.append((app_id, named)))
+    return registered
+
+
+def _drawn_size(mark):
+    with Image.open(mark) as drawn:
+        return drawn.size
+
+
+def _as_drawn(image):
+    return image.convertToFormat(QImage.Format.Format_ARGB32)
+
+
 def test_a_long_run_reaches_the_desktop_as_a_windows_notification(qapp, monkeypatch):
     toasts = Toasts(QIcon())
     said = _raised(monkeypatch)
@@ -59,16 +87,35 @@ def test_a_run_nobody_left_the_room_for_says_nothing(qapp, monkeypatch):
 
 
 def test_a_failed_run_wears_the_warning_mark(qapp, monkeypatch):
-    toasts = Toasts(QIcon())
-    said = _raised(monkeypatch)
+    marks = _marks_beside_a_toast(Toasts(QIcon()), monkeypatch)
 
-    toasts.note(_outcome(ok=False))
-    failed = _toast(said).find("./visual/binding/image").get("src")
-    said.clear()
-    toasts.note(_outcome(ok=True))
+    assert marks[False].name == "toast-failed.png"
+    assert marks[True].name == "toast-ready.png"
 
-    assert failed.endswith("toast-failed.png")
-    assert _toast(said).find("./visual/binding/image").get("src").endswith("toast-ready.png")
+
+def test_the_marks_beside_a_toast_are_the_ones_the_familys_alert_dialogs_wear(
+        qapp, monkeypatch, tmp_path):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    marks = _marks_beside_a_toast(Toasts(QIcon()), monkeypatch)
+
+    worn = {ok: _as_drawn(QImage(str(mark))) for ok, mark in marks.items()}
+    assert worn == {
+        True: _as_drawn(icon_pixmap_for(Level.INFO, CANVAS).toImage()),
+        False: _as_drawn(icon_pixmap_for(Level.WARNING, CANVAS).toImage()),
+    }, ("a ready run's mark is the information mark and a failed run's the warning mark,"
+        " the ones the family's alert dialogs wear for the same two answers")
+
+
+def test_every_mark_is_drawn_at_the_size_the_apps_icon_is_cut_from(
+        qapp, monkeypatch, tmp_path):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    registered = _named_to_windows(monkeypatch)
+    marks = _marks_beside_a_toast(Toasts(QIcon()), monkeypatch)
+
+    drawn = [registered[0][1]["icon"], marks[True], marks[False]]
+    assert [_drawn_size(mark) for mark in drawn] == [(CANVAS, CANVAS)] * 3, (
+        "each mark is drawn at the size the app's icon is cut from, so Windows only ever"
+        " scales it down to what a toast draws")
 
 
 def test_a_toast_carries_the_way_back_to_what_it_is_about(qapp, monkeypatch):
@@ -153,9 +200,7 @@ def test_windows_refusing_the_heading_over_a_toast_costs_the_launch_nothing(
 
 def test_it_tells_windows_what_to_call_this_app_and_what_mark_to_draw(qapp, monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
-    registered = []
-    monkeypatch.setattr(toasts_module, "register_toast_identity",
-                        lambda app_id, **named: registered.append((app_id, named)))
+    registered = _named_to_windows(monkeypatch)
 
     Toasts(QIcon())
 
@@ -191,13 +236,14 @@ def test_each_launch_writes_the_toast_heading_and_the_link_handler_again(
 def test_a_previews_toasts_are_headed_by_the_feature_it_demos_beside_the_yellow_letter(
         qapp, monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
-    registered = []
-    monkeypatch.setattr(toasts_module, "register_toast_identity",
-                        lambda app_id, **named: registered.append((app_id, named)))
+    registered = _named_to_windows(monkeypatch)
 
     toasts = Toasts(QIcon(), shown_as=Preview(feature="the new seed row"))
 
     app_id, named = registered[0]
+    assert named["name"] != app_id, (
+        "Windows heads a toast with this name, never with the id the taskbar groups its"
+        " windows by")
     assert app_id == f"{APP_USER_MODEL_ID}.Preview"
     assert named["name"] == toasts._tray.toolTip() == "Origenerator \u2014 preview of the new seed row"
     with Image.open(named["icon"]) as mark:
@@ -207,12 +253,8 @@ def test_a_previews_toasts_are_headed_by_the_feature_it_demos_beside_the_yellow_
 def test_the_marks_beside_a_toast_outlive_the_copy_that_wrote_them(
         qapp, monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
-    toasts = Toasts(QIcon())
-    said = _raised(monkeypatch)
+    mark = _marks_beside_a_toast(Toasts(QIcon()), monkeypatch)[True]
 
-    toasts.note(_outcome())
-
-    mark = Path(_toast(said).find("./visual/binding/image").get("src")[len("file:///"):])
     assert mark.read_bytes().startswith(b"\x89PNG")
     assert tmp_path in mark.parents
 

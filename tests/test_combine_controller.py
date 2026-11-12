@@ -756,18 +756,22 @@ def test_an_opened_combination_prefills_a_tab_with_both_its_halves(combine,
     assert tab.combination == Combination("img-thumb.png", "clip.webp")
 
 
-def test_a_curated_action_opened_shows_the_frame_alone(combine, monkeypatch):
-    workflow = FakeWorkflow()
+def _a_curated_action_opened(combine, monkeypatch):
     monkeypatch.setattr(module.action_settings, "pinned_settings",
                         lambda c, i: {"workflow": VIDEO_WORKFLOW})
-    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "written_params", lambda s, r, wf: {"seed": 3})
-    monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
     tab = FakeGenerateTab()
     controller, _host = combine(db=FakeDB([_image("img")]), tabs=FakeTabs(tab))
-
     controller._open_category("img", "alpha")
+    return tab
+
+
+def test_a_curated_action_opened_shows_the_frame_alone(combine, monkeypatch):
+    monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
+
+    tab = _a_curated_action_opened(combine, monkeypatch)
 
     assert tab.combination == Combination("img-thumb.png")
 
@@ -778,15 +782,8 @@ def test_a_curated_action_opened_shows_the_images_full_size_file_over_its_thumbn
     output.mkdir()
     (output / "one.png").write_bytes(b"pixels")
     monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
-    monkeypatch.setattr(module.action_settings, "pinned_settings",
-                        lambda c, i: {"workflow": VIDEO_WORKFLOW})
-    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
-    monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
-    monkeypatch.setattr(module.gallery, "written_params", lambda s, r, wf: {"seed": 3})
-    tab = FakeGenerateTab()
-    controller, _host = combine(db=FakeDB([_image("img")]), tabs=FakeTabs(tab))
 
-    controller._open_category("img", "alpha")
+    tab = _a_curated_action_opened(combine, monkeypatch)
 
     assert tab.combination == Combination(str(output / "one.png")), (
         "a pane this big would be enlarging the stored thumbnail, so the full-size output is "

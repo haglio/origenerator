@@ -136,10 +136,10 @@ def test_an_image_whose_thumbnail_and_file_disagree_goes_by_its_thumbnail(tmp_pa
     monkeypatch.setattr(item_shape, "OUTPUT_PLACES", places)
     image = _row("i1", "image_enhance", {"positive_prompt": "scene seven"}, "image_enhance_i1.png")
     places.comfyui.mkdir()
-    Image.new("RGB", (90, 160)).save(places.comfyui / "image_enhance_i1.png")
-    _thumbed(image, tmp_path, 160, 90)
+    Image.new("RGB", (160, 90)).save(places.comfyui / "image_enhance_i1.png")
+    _thumbed(image, tmp_path, 90, 160)
 
-    assert row_shape(image) == "landscape", (
+    assert row_shape(image) == "portrait", (
         "the thumbnail is read before the file: a header read of a small file that keeps "
         "the item's aspect")
 

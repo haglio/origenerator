@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from app_support.watch_weights import COUNT_FIELDS
@@ -26,7 +27,8 @@ LIFECYCLE_COLUMNS = frozenset({
 SENT_COLUMNS = ("evolver_exported_at", "genau_exported_at")
 
 WATCH_COLUMNS = tuple((field, f"watch_{field}") for field in COUNT_FIELDS)
-LIBRARY_RECORD_COLUMNS = frozenset({"web_url", "library_id", "upscale_provenance"})
+LIBRARY_RECORD_COLUMNS = frozenset({"web_url", "library_id", "upscale_provenance",
+                                    "video_seconds"})
 
 _KNOWN_SOURCES = tuple(GenerationSource)
 _OF_A_KNOWN_SOURCE = f"source IN ({', '.join('?' * len(_KNOWN_SOURCES))})"
@@ -75,6 +77,7 @@ class GenerationStore(Store):
     def __init__(self, file: SqliteFile):
         super().__init__(file)
         self._version = file.version
+        self._file = file
         self._own_changes = file.log_own_changes("generations", "prompt_id")
         self._listed: list[dict] | None = None
         self._listing = threading.Lock()
@@ -320,6 +323,9 @@ class GenerationStore(Store):
 
     def library_version(self) -> int:
         return self._version()
+
+    def when_changed(self, told: Callable[[], None]) -> None:
+        self._file.when_written(told)
 
     def list_generations(self) -> list[dict]:
         with self._listing:

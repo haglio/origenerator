@@ -61,5 +61,19 @@ def test_what_the_library_records_of_a_video_is_kept_on_its_row(tmp_path):
 def test_the_library_record_writes_only_its_own_columns(tmp_path):
     db = _video(tmp_path)
 
+    db.set_library_record("vid-001", video_seconds=4.5)
+    assert db.get_generation("vid-001")["video_seconds"] == 4.5
     with pytest.raises(ValueError, match="starred"):
         db.set_library_record("vid-001", starred=1)
+
+
+def test_a_write_to_the_gallery_tells_whoever_asked_and_a_read_tells_no_one(tmp_path):
+    db, told = _video(tmp_path), []
+    db.when_changed(lambda: told.append("changed"))
+
+    db.get_generation("vid-001")
+    db.list_generations()
+    reads = list(told)
+    db.set_watch_counts("vid-001", {"completions": 1})
+
+    assert (reads, told) == ([], ["changed"])

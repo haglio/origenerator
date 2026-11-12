@@ -138,7 +138,8 @@ CREATE TABLE IF NOT EXISTS generations (
     watch_locks INTEGER NOT NULL DEFAULT 0,
     web_url TEXT,
     library_id TEXT,
-    upscale_provenance TEXT
+    upscale_provenance TEXT,
+    video_seconds REAL
 );
 
 CREATE INDEX IF NOT EXISTS idx_generations_status ON generations(status);
@@ -315,6 +316,7 @@ ADDED_COLUMNS = {
         "web_url": "TEXT",
         "library_id": "TEXT",
         "upscale_provenance": "TEXT",
+        "video_seconds": "REAL",
     },
     "folder_meta": {
         "level": "TEXT",
@@ -358,7 +360,7 @@ GENERATION_COLUMNS = (
     "image_actions", "image_checked", "video_actions", "video_checked", "combined_labels",
     "why_it_cannot_be_made_again", "evolver_upscale", "evolver_upscaled_at", "finale_id",
     "watch_completions", "watch_skips", "watch_locks", "web_url", "library_id",
-    "upscale_provenance",
+    "upscale_provenance", "video_seconds",
 )
 
 

@@ -149,6 +149,9 @@ class Database:
     def library_version(self) -> int:
         return self.generations.library_version()
 
+    def when_changed(self, told):
+        return self.generations.when_changed(told)
+
     def rows_made_by(self, workflow_name: str) -> list[dict]:
         return self.generations.rows_made_by(workflow_name)
 

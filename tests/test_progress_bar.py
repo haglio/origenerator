@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QVBoxLayout, QWidget
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import QVBoxLayout, QWidget
 from shared_ui.colors import BG_PRIMARY, BLUE, BLUE_LIGHT
 
 from origenerator.gui import progress_bar

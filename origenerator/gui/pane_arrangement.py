@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QBoxLayout, QSplitter, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QBoxLayout, QSplitter, QWidget
 
 from origenerator.gui.panes import PaneSplitter
 

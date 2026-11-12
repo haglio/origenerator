@@ -5,8 +5,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
 
-from PyQt6.QtCore import QSignalBlocker, Qt
-from PyQt6.QtWidgets import QComboBox, QLineEdit, QWidget
+from PySide6.QtCore import QSignalBlocker, Qt
+from PySide6.QtWidgets import QComboBox, QLineEdit, QWidget
 from shared_ui.tick_control import TickControl
 from shared_ui.toggle_switch import ToggleSwitch
 

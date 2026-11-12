@@ -7,7 +7,8 @@ import threading
 import urllib.error
 from unittest.mock import MagicMock
 
-from PyQt6.QtCore import QTimer
+from PySide6.QtCore import QTimer
+from shared_ui.testing import appending_to
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.gui import generation_job, job_speaker
@@ -99,7 +100,7 @@ def test_a_voice_that_fails_fails_the_job_before_comfyui_hears_of_it(qtbot, tmp_
     client, speaker = _client(), _Speaker()
     job = GenerationJob(client, JobSpec(I2V, _spoken_params()), JobFolders(input_dir=tmp_path), speaker=speaker)
     failed = []
-    job.failed.connect(failed.append)
+    job.failed.connect(appending_to(failed))
     job.start(_from_a_window)
     (_params, _done, fail), = speaker.asked
     fail("No voice is set up")
@@ -115,8 +116,8 @@ def test_a_story_spoken_while_comfyui_is_down_says_so_and_can_be_sent_again(qtbo
         "comfy-A"])
     job = GenerationJob(client, JobSpec(I2V, _spoken_params()), JobFolders(input_dir=tmp_path), speaker=speaker)
     said = []
-    job.unreachable.connect(said.append)
-    job.failed.connect(said.append)
+    job.unreachable.connect(appending_to(said))
+    job.failed.connect(appending_to(said))
     job.start(_from_a_window)
     (params, done, _failed), = speaker.asked
 
@@ -270,7 +271,7 @@ def test_a_refused_send_after_speaking_fails_the_job(qtbot, tmp_path):
     client.submit_job = MagicMock(side_effect=RuntimeError("the graph was refused"))
     job = GenerationJob(client, JobSpec(I2V, _spoken_params()), JobFolders(input_dir=tmp_path), speaker=speaker)
     failed = []
-    job.failed.connect(failed.append)
+    job.failed.connect(appending_to(failed))
     job.start(_from_a_window)
     (params, done, _failed), = speaker.asked
     _spoken_file(params, tmp_path)

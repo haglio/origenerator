@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from PyQt6.QtCore import QObject, QRect, QSize, Qt, pyqtSignal
-from PyQt6.QtWidgets import QPushButton, QWidget
+from PySide6.QtCore import QObject, QRect, QSize, Qt, Signal
+from PySide6.QtWidgets import QPushButton, QWidget
 from shared_ui.palette import BLACK, as_rgba
 from shared_ui.spacing import BUTTON_GAP, BUTTON_RADIUS, BUTTON_SIZE, GAP_SMALL
 
@@ -84,7 +84,7 @@ class _CornerButtonFace(QPushButton):
 
 
 class CornerButtons(QObject):
-    triggered = pyqtSignal(str)
+    triggered = Signal(str)
 
     def __init__(self, host: QWidget, *, restore: RestoreOffer | None = None):
         super().__init__(host)

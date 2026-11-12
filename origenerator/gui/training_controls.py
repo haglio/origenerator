@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 from shared_ui.spacing import GAP_SMALL
 
 from origenerator.gui import icons
@@ -23,8 +23,8 @@ def _shown_with_tip(button, shown: bool, tip: str) -> None:
 
 
 class TrainingControls(QWidget):
-    train_requested = pyqtSignal()
-    trash_requested = pyqtSignal()
+    train_requested = Signal()
+    trash_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)

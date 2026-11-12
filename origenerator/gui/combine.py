@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import (
     QButtonGroup,
     QComboBox,
     QHBoxLayout,
@@ -87,12 +87,12 @@ class CombineParts:
 
 
 class Combine(QWidget):
-    combine_requested = pyqtSignal(object)
-    animation_settings_requested = pyqtSignal()
-    intent_changed = pyqtSignal(str)
-    checked_changed = pyqtSignal()
-    item_activated = pyqtSignal(str)
-    video_used = pyqtSignal(str, str)
+    combine_requested = Signal(object)
+    animation_settings_requested = Signal()
+    intent_changed = Signal(str)
+    checked_changed = Signal()
+    item_activated = Signal(str)
+    video_used = Signal(str, str)
 
     def __init__(
         self,

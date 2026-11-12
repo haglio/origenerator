@@ -4,11 +4,11 @@ import json
 from types import SimpleNamespace
 
 import pytest
-from PyQt6.QtCore import (
+from PySide6.QtCore import (
     QEvent,
     Qt,
 )
-from PyQt6.QtGui import (
+from PySide6.QtGui import (
     QKeyEvent,
 )
 

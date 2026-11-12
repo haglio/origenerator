@@ -10,8 +10,8 @@ from funestra.funestra import Channels, Funestra
 from funestra.funestra_setup import FunestraSetup
 from funestra.funestra_verbs import RELOAD_PLAYLIST
 from funestra.playlist import PlaylistItem
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtWidgets import (
     QApplication,
     QLabel,
     QSizePolicy,

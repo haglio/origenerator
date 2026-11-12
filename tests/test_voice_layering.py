@@ -14,5 +14,5 @@ def _modules_loaded_by(module: str) -> set[str]:
 
 def test_the_vocabulary_pulls_in_no_widgets():
     loaded = _modules_loaded_by("origenerator.voice.commands")
-    assert not [name for name in loaded if name.startswith("PyQt6")]
+    assert not [name for name in loaded if name.startswith("PySide6")]
     assert not [name for name in loaded if name.startswith("origenerator.gui")]

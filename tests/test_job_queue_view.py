@@ -4,12 +4,12 @@ import time
 from itertools import pairwise
 
 import pytest
+import shiboken6
 from PIL import Image
-from PyQt6 import sip
-from PyQt6.QtCore import QBuffer, QCoreApplication, QEvent, QMimeData, QPoint, QPointF, QRect, Qt
-from PyQt6.QtGui import QDrag, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QMouseEvent, QPixmap
-from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtCore import QBuffer, QCoreApplication, QEvent, QMimeData, QPoint, QPointF, QRect, Qt
+from PySide6.QtGui import QDrag, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QMouseEvent, QPixmap
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication
 from shared_ui.colors import BLUE, BORDER_SUBTLE
 from shared_ui.spacing import GAP_SMALL
 
@@ -23,6 +23,7 @@ from origenerator.gui.job_queue_view import (
 )
 from origenerator.gui.stylesheet import build_stylesheet
 from tests.marked_words import words
+from tests.qt_exec import faking_exec
 
 
 @pytest.fixture
@@ -927,7 +928,7 @@ def _press_and_drag(row, monkeypatch, *, watch=None):
             watch.append(row.property("dragging"))
         carried.append(bytes(self.mimeData().data(QUEUE_ROW_MIME)).decode())
 
-    monkeypatch.setattr(QDrag, "exec", fake_exec)
+    faking_exec(monkeypatch, QDrag, fake_exec)
     row.mousePressEvent(_mouse(QEvent.Type.MouseButtonPress, 5, 5))
     row.mouseMoveEvent(_mouse(QEvent.Type.MouseMove, 5, 80))
     return carried
@@ -952,7 +953,7 @@ def test_the_dragged_row_lights_up_while_it_is_being_dragged(queue, monkeypatch)
 
 def test_a_press_on_a_row_outlives_a_poll_that_changes_the_line(queue, monkeypatch):
     carried = []
-    monkeypatch.setattr(QDrag, "exec", lambda self, *a: carried.append(
+    faking_exec(monkeypatch, QDrag, lambda self, *a: carried.append(
         bytes(self.mimeData().data(QUEUE_ROW_MIME)).decode()))
     queue.resize(800, 200)
     _four(queue)
@@ -980,13 +981,13 @@ def test_a_row_the_line_redraws_away_mid_drag_lets_the_drag_finish(queue, monkey
         queue.set_items([_item(key="a"), _item(key="b", status="queued"),
                          _item(key="d", status="queued")])
         QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
-        drag_alive.append(not sip.isdeleted(drag))
+        drag_alive.append(shiboken6.isValid(drag))
 
-    monkeypatch.setattr(QDrag, "exec", drag_loop_through_a_redraw)
+    faking_exec(monkeypatch, QDrag, drag_loop_through_a_redraw)
     row.mousePressEvent(_mouse(QEvent.Type.MouseButtonPress, 5, 5))
     row.mouseMoveEvent(_mouse(QEvent.Type.MouseMove, 5, 80))
 
-    assert sip.isdeleted(row)
+    assert not shiboken6.isValid(row)
     assert drag_alive == [True]
 
 
@@ -1013,7 +1014,7 @@ def test_a_row_takes_up_its_jobs_moves_as_they_change(queue, monkeypatch):
 
 def test_a_press_that_stays_put_is_a_click_not_a_drag(queue, monkeypatch):
     dragged = []
-    monkeypatch.setattr(QDrag, "exec", lambda self, *a: dragged.append(True))
+    faking_exec(monkeypatch, QDrag, lambda self, *a: dragged.append(True))
     _four(queue)
 
     row = queue.rows()[1]

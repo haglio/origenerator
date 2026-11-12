@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from PIL import Image
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QImage, QMovie, QPixmap
-from PyQt6.QtWidgets import QLabel
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QImage, QMovie, QPixmap
+from PySide6.QtWidgets import QLabel
 
 from origenerator.gui.grayscale import grayscale_pixmap, play_grayscale
 

@@ -4,20 +4,21 @@ import json
 from unittest.mock import MagicMock
 
 import pytest
-from PyQt6.QtCore import (
+from PySide6.QtCore import (
     QEvent,
     QPoint,
     QSize,
     Qt,
 )
-from PyQt6.QtGui import (
+from PySide6.QtGui import (
     QDrag,
     QKeyEvent,
     QMovie,
 )
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication,
     QLineEdit,
+    QMenu,
     QMessageBox,
     QPushButton,
     QToolButton,
@@ -84,6 +85,7 @@ from tests.gallery_view_support import (
     _video_workflow,
     _write_looping_webp,
 )
+from tests.qt_exec import faking_exec
 from tests.related_links import source_tile
 from tests.test_enhance_pane import _dropped_on
 from tests.test_folder_tree import _shown
@@ -104,7 +106,7 @@ def test_dragging_an_image_lights_the_tabs_start_image_until_it_is_let_go(qtbot,
     tab._workflow_dropdown.setCurrentIndex(tab._workflow_dropdown.findData("wan22_i2v"))
     well = tab._param_form._widgets["input_image"]._label
     lit_while_dragged = []
-    monkeypatch.setattr(QDrag, "exec", lambda drag, *args: lit_while_dragged.append(
+    faking_exec(monkeypatch, QDrag, lambda drag, *args: lit_while_dragged.append(
         well.property(LIT)) or Qt.DropAction.IgnoreAction)
     at = tile.rect().center()
 
@@ -180,8 +182,7 @@ def test_enhance_is_grayed_for_an_image_that_already_has_that_enhancement(qtbot,
     monkeypatch.setattr("origenerator.gui.enhance_controller.gallery.version_matching_settings",
                         lambda row, settings: 0)
     offered = {}
-    monkeypatch.setattr(
-        "origenerator.gui.gallery_view.QMenu.exec",
+    faking_exec(monkeypatch, QMenu,
         lambda menu, *a: offered.update(
             {act.text(): (act.isEnabled(), act.toolTip(), menu.toolTipsVisible())
              for act in menu.actions()}),
@@ -410,8 +411,8 @@ def test_right_click_delete_on_the_latest_collection_removes_the_item(qtbot, mon
     view.refresh()
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    monkeypatch.setattr(
-        "origenerator.gui.gallery_view.QMenu.exec", lambda menu, *a: menu.actions()[-1]
+    faking_exec(monkeypatch, QMenu,
+        lambda menu, *a: menu.actions()[-1]
     )
 
     _right_click(view, "i1")

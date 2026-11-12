@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 
 
 class PopulateController(QObject):
-    stopped = pyqtSignal(str)
+    stopped = Signal(str)
 
     def __init__(self, launch, parent=None):
         super().__init__(parent)

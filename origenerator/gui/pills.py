@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QPoint, QRectF, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QPainter, QPen
-from PyQt6.QtWidgets import QFrame, QToolButton, QWidget
+from PySide6.QtCore import QPoint, QRectF, QSize, Qt, Signal
+from PySide6.QtGui import QPainter, QPen
+from PySide6.QtWidgets import QFrame, QToolButton, QWidget
 from shared_ui.colors import (
     BG_BUTTON,
     BG_PRIMARY,
@@ -43,8 +43,8 @@ def _round(side: int) -> str:
 
 
 class Pill(QWidget):
-    removed = pyqtSignal(str)
-    picked = pyqtSignal(str)
+    removed = Signal(str)
+    picked = Signal(str)
 
     def __init__(self, text: str, *, removable: bool = False, pickable: bool = False, parent=None):
         super().__init__(parent)
@@ -131,7 +131,7 @@ class _Offer(QFrame):
 
 
 class PillRow(QWidget):
-    changed = pyqtSignal(tuple)
+    changed = Signal(tuple)
 
     def __init__(self, offered: tuple[str, ...], *, adder_name: str, parent=None):
         super().__init__(parent)

@@ -12,9 +12,9 @@ import tests.conftest as suite
 from tests.children import say_where_it_hangs
 
 # isort: split
-from PyQt6 import sip
-from PyQt6.QtCore import QCoreApplication, QObject, QThread, QTimer
-from PyQt6.QtWidgets import QApplication
+import shiboken6
+from PySide6.QtCore import QCoreApplication, QObject, QThread, QTimer
+from PySide6.QtWidgets import QApplication
 
 from origenerator import app, config, landed_while_away
 
@@ -43,7 +43,7 @@ def _owned_by_python() -> dict[str, int]:
                 continue
         except ReferenceError:
             continue
-        if not sip.isdeleted(found) and sip.ispyowned(found):
+        if shiboken6.isValid(found) and shiboken6.ownedByPython(found):
             kinds[type(found).__name__] += 1
     return dict(sorted(kinds.items()))
 

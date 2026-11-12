@@ -5,12 +5,12 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 
+import shiboken6
 from app_support.frame_channel import FrameWriter
 from funestra.file_channel import consume_command_file
-from PyQt6 import sip
-from PyQt6.QtCore import QObject, QPoint, QPointF, Qt, QTimer
-from PyQt6.QtGui import QContextMenuEvent, QImage, QMouseEvent, QPainter, QWheelEvent
-from PyQt6.QtWidgets import QApplication, QWidget
+from PySide6.QtCore import QObject, QPoint, QPointF, Qt, QTimer
+from PySide6.QtGui import QContextMenuEvent, QImage, QMouseEvent, QPainter, QWheelEvent
+from PySide6.QtWidgets import QApplication, QWidget
 
 from origenerator.fun_time_mode import (
     HEADSET_DRAG,
@@ -117,6 +117,7 @@ class HeadsetWindow(QObject):
         self._frames = FrameWriter(session.frames_file, max_pixels=CAP_PX * CAP_PX)
         self._pointer = QPoint(0, 0)
         self._pressed: QWidget | None = None
+        self._windows_pointed_into: list[QWidget] = []
         self._sent: bytes | None = None
         self._published: tuple[int, int] | None = None
         self._looked_at: float | None = None
@@ -207,7 +208,9 @@ class HeadsetWindow(QObject):
 
     def _under_the_pointer(self) -> QWidget:
         at = self._window.mapToGlobal(self._pointer)
-        for top in reversed(opened_over(self._window)):
+        # Qt for Python marks a window's child widgets deleted once that window's own wrapper is freed, though they live on, so the windows are held while what they hold is pointed at.
+        self._windows_pointed_into = opened_over(self._window)
+        for top in reversed(self._windows_pointed_into):
             local = top.mapFromGlobal(at)
             if top.windowType() != Qt.WindowType.ToolTip and top.rect().contains(local):
                 return top.childAt(local) or top
@@ -220,7 +223,7 @@ class HeadsetWindow(QObject):
                 top.close()
 
     def _mouse(self, target: QWidget | None, kind, buttons: Qt.MouseButton) -> None:
-        if target is None or sip.isdeleted(target) or _held_off(target):
+        if target is None or not shiboken6.isValid(target) or _held_off(target):
             return
         at = QPointF(self._window.mapToGlobal(self._pointer))
         with _no_drag_can_start():
@@ -229,7 +232,7 @@ class HeadsetWindow(QObject):
                 Qt.KeyboardModifier.NoModifier))
 
     def _ask_for_the_menu(self, target: QWidget | None) -> None:
-        if target is None or sip.isdeleted(target) or _held_off(target):
+        if target is None or not shiboken6.isValid(target) or _held_off(target):
             return
         at = self._window.mapToGlobal(self._pointer)
         QApplication.postEvent(target, QContextMenuEvent(
@@ -261,7 +264,7 @@ class HeadsetWindow(QObject):
         grabbed = self._window.grab().toImage().convertToFormat(QImage.Format.Format_RGBA8888)
         image = within_the_cap(painted_over(grabbed, windows_opened_over(
             self._window, scale=pixels_per_coordinate(grabbed, self._window))))
-        pixels = image.constBits().asstring(image.sizeInBytes())
+        pixels = bytes(image.constBits())
         if pixels == self._sent:
             return
         self._frames.write(0, image.width(), image.height(), pixels)

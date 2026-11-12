@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import logging
 import time
 import uuid
@@ -9,7 +8,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from app_support.comfy_file_refs import frame_name
-from PyQt6.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 
 from origenerator import comfyui_api, speech
 from origenerator.completion import animate_before_filing, extract_completion
@@ -60,18 +59,19 @@ _NO_OUTPUT_MESSAGE = "The run ended without producing an output file (interrupte
 
 
 class GenerationJob(QObject):
-    started = pyqtSignal()
-    sent = pyqtSignal()
-    progress = pyqtSignal(int, int)
-    preview = pyqtSignal(bytes)
-    finished = pyqtSignal(list, object, object)
-    failed = pyqtSignal(str)
-    unreachable = pyqtSignal(str)
+    started = Signal()
+    sent = Signal()
+    progress = Signal(int, int)
+    preview = Signal(bytes)
+    finished = Signal(list, object, object)
+    failed = Signal(str)
+    unreachable = Signal(str)
 
     def __init__(self, client, spec: JobSpec, folders: JobFolders = NO_FOLDERS, *,
                  speaker=None, run=None):
         super().__init__()
         self._client = client
+        self._attached = False
         self._run = run or run_off_thread
         self.workflow = spec.workflow
         self.params = dict(spec.params)
@@ -288,6 +288,7 @@ class GenerationJob(QObject):
             self._complete(history)
 
     def _attach(self):
+        self._attached = True
         self._client.progress.connect(self._on_progress)
         self._client.node_executing.connect(self._on_node_executing)
         self._client.preview_image.connect(self._on_preview)
@@ -295,6 +296,9 @@ class GenerationJob(QObject):
         self._client.job_error.connect(self._on_error)
 
     def _detach(self):
+        if not self._attached:
+            return
+        self._attached = False
         for signal, handler in (
             (self._client.progress, self._on_progress),
             (self._client.node_executing, self._on_node_executing),
@@ -302,8 +306,7 @@ class GenerationJob(QObject):
             (self._client.job_completed, self._on_completed),
             (self._client.job_error, self._on_error),
         ):
-            with contextlib.suppress(TypeError):
-                signal.disconnect(handler)
+            signal.disconnect(handler)
 
     def _is_mine(self, prompt_id: str) -> bool:
         return prompt_id == self.prompt_id

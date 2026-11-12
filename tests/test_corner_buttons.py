@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 
-from PyQt6.QtCore import QEvent, QPointF, QRect
-from PyQt6.QtGui import QEnterEvent
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtCore import QEvent, QPointF, QRect
+from PySide6.QtGui import QEnterEvent
+from PySide6.QtWidgets import QWidget
+from shared_ui.testing import appending_to
 
 from origenerator import gallery
 from origenerator.gui import icons
@@ -124,7 +125,7 @@ def test_each_control_names_the_act_it_carries(qtbot):
     _host, controls = _controls(qtbot)
     controls.show_for(favorite=False, enhance=icons.ENHANCE_OPEN)
     fired = []
-    controls.triggered.connect(fired.append)
+    controls.triggered.connect(appending_to(fired))
 
     for button in controls.buttons():
         button.click()

@@ -6,9 +6,9 @@ import sys
 from pathlib import Path
 
 import pytest
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QTextCursor
-from PyQt6.QtWidgets import QPlainTextEdit, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QTextCursor
+from PySide6.QtWidgets import QPlainTextEdit, QVBoxLayout, QWidget
 
 from origenerator.gui import diff_text, tracked_prompt
 from tests.children import a_child_no_run_can_starve
@@ -314,7 +314,7 @@ def test_untracking_leaves_an_ordinary_field_holding_its_prompt(pair, qtbot):
 
 _FORMS_FREED_WHILE_A_REDRAW_WAITS = """
 import gc, sys
-from PyQt6.QtWidgets import QApplication, QPlainTextEdit, QWidget
+from PySide6.QtWidgets import QApplication, QPlainTextEdit, QWidget
 from origenerator.gui import tracked_prompt
 
 app = QApplication(sys.argv)

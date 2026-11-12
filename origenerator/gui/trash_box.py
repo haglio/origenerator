@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from PyQt6.QtCore import QRectF, QSize
-from PyQt6.QtGui import QPainter, QPen
-from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtCore import QRectF, QSize
+from PySide6.QtGui import QPainter, QPen
+from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from shared_ui.colors import BORDER_PANEL, TEXT_MUTED
 from shared_ui.spacing import BUTTON_RADIUS, GAP_DIALOG, GAP_SMALL, MARGIN_STANDARD
 

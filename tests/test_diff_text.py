@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtGui import QTextCursor, QTextDocument
-from PyQt6.QtWidgets import QPlainTextEdit
+from PySide6.QtGui import QTextCursor, QTextDocument
+from PySide6.QtWidgets import QPlainTextEdit
 from shared_ui.colors import GREEN, RED
 
 from origenerator.gui import diff_text

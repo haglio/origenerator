@@ -5,10 +5,11 @@ import logging
 import math
 import threading
 import time
+import weakref
 from itertools import pairwise
 from types import SimpleNamespace
 
-from PyQt6.QtCore import QCoreApplication, QEventLoop, QObject, QTimer, pyqtSignal
+from PySide6.QtCore import QCoreApplication, QEventLoop, QObject, QTimer, Signal
 
 from origenerator import comfyui_api, comfyui_launcher, gallery, queue_line
 from origenerator.completion import mark_generation_completed
@@ -99,13 +100,25 @@ def _parse_progress_state(raw):
     return state if isinstance(state, dict) else None
 
 
+def _holding_neither(queue: JobQueue, key: str, job: GenerationJob, handler):
+    """A job's Qt signal holds what it calls where Python's cycle collector cannot see it, so a call holding the job or its queue keeps both alive for good."""
+    queue_ref, job_ref = weakref.ref(queue), weakref.ref(job)
+
+    def relay(*args):
+        held_queue, held_job = queue_ref(), job_ref()
+        if held_queue is not None and held_job is not None:
+            handler(held_queue, key, held_job, *args)
+
+    return relay
+
+
 class JobQueue(QObject):
-    changed = pyqtSignal()
-    preview = pyqtSignal(str, str, bytes)
-    finished = pyqtSignal(str, str, str)
-    failed = pyqtSignal(str, str)
-    run_ended = pyqtSignal(object)
-    reordered = pyqtSignal()
+    changed = Signal()
+    preview = Signal(str, str, bytes)
+    finished = Signal(str, str, str)
+    failed = Signal(str, str)
+    run_ended = Signal(object)
+    reordered = Signal()
 
     def __init__(self, db, client, parent=None, *, clock=JOB_QUEUE_CLOCK, bring_up_comfyui=None):
         super().__init__(parent)
@@ -119,6 +132,7 @@ class JobQueue(QObject):
         self._videos_wait.setSingleShot(True)
         self._videos_wait.timeout.connect(self._pump)
         self._jobs: dict[str, list[GenerationJob]] = {}
+        self._finishing: weakref.WeakKeyDictionary[GenerationJob, object] = weakref.WeakKeyDictionary()
         self._progress_persist_at: dict[str, float] = {}
         self._on_server: list[GenerationJob] = []
         self._waiting: list[GenerationJob] = []
@@ -478,17 +492,25 @@ class JobQueue(QObject):
 
     def _register(self, key, job, on_finished):
         self._jobs.setdefault(key, []).append(job)
-        job.finished.connect(
-            lambda files, thumb, dur, k=key, j=job: on_finished(k, j, files, thumb, dur)
-        )
-        job.sent.connect(lambda j=job: self._db.update_generation(
-            j.prompt_id, status=GenerationStatus.RUNNING))
-        job.failed.connect(lambda msg, k=key, j=job: self._on_failed(k, j, msg))
-        job.unreachable.connect(lambda msg, k=key, j=job: self._comfyui_unreachable(k, j, msg))
-        job.preview.connect(
-            lambda data, k=key, j=job: self.preview.emit(k, j.prompt_id, data)
-        )
-        job.progress.connect(lambda *_, j=job: self._persist_progress(j))
+        self._finishing[job] = on_finished
+        for signal, handler in (
+            (job.finished, JobQueue._job_finished), (job.sent, JobQueue._job_sent),
+            (job.failed, JobQueue._on_failed), (job.unreachable, JobQueue._comfyui_unreachable),
+            (job.preview, JobQueue._job_preview), (job.progress, JobQueue._job_progress),
+        ):
+            signal.connect(_holding_neither(self, key, job, handler))
+
+    def _job_finished(self, key, job, files, thumb_path, duration):
+        self._finishing[job](key, job, files, thumb_path, duration)
+
+    def _job_sent(self, _key, job):
+        self._db.update_generation(job.prompt_id, status=GenerationStatus.RUNNING)
+
+    def _job_preview(self, key, job, data):
+        self.preview.emit(key, job.prompt_id, data)
+
+    def _job_progress(self, _key, job, *_progress):
+        self._persist_progress(job)
 
     def _persist_progress(self, job: GenerationJob):
         now = time.monotonic()

@@ -3,8 +3,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from PyQt6.QtCore import QSize, Qt, pyqtSignal
-from PyQt6.QtGui import (
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import (
     QFontMetrics,
     QIcon,
     QKeySequence,
@@ -12,7 +12,7 @@ from PyQt6.QtGui import (
     QPixmap,
     QShortcut,
 )
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -126,7 +126,7 @@ def on_a_white_square(source: QPixmap, side: int, scale: float,
 
 
 class ActionSetterWindow(QWidget):
-    closed = pyqtSignal()
+    closed = Signal()
 
     NOTHING_LEFT = "Nothing left to set."
     MISSING = "(this one's file is missing)"

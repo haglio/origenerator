@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtCore import QPoint, QRect, QSize
-from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QApplication, QToolButton
+from PySide6.QtCore import QPoint, QRect, QSize
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QApplication, QToolButton
 from shared_ui.colors import BG_PRIMARY
 from shared_ui.reference import REFERENCE_WINDOW_TITLE, ReferenceDialog
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ICON_INSET, BUTTON_ROW_GAP, BUTTON_SIZE_HUD

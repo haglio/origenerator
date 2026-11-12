@@ -3,15 +3,15 @@ from __future__ import annotations
 import json
 
 import pytest
-from PyQt6.QtCore import (
+from PySide6.QtCore import (
     QEvent,
     QPoint,
     Qt,
 )
-from PyQt6.QtGui import (
+from PySide6.QtGui import (
     QKeyEvent,
 )
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QPushButton,
 )
 
@@ -495,7 +495,7 @@ def test_right_clicking_an_enhancing_tile_offers_to_cancel_the_enhancement(
     view.enhance_items(["g0"])
     (_job,) = view._jobs.all_jobs
     assert view._gallery_pane._thumb_widgets["g0"]._enhancing is not None
-    labels = _menu_offering(monkeypatch, "gallery_view", pick="Cancel")
+    labels = _menu_offering(monkeypatch, pick="Cancel")
 
     view._gallery_pane._thumbnail_context_menu("g0", QPoint(0, 0))
 
@@ -516,7 +516,7 @@ def test_canceling_one_enhancement_leaves_the_others_alone(
     _select_first_leaf(view)
     view.enhance_items(["g0", "g1"])
     leader, follower = view._jobs.all_jobs
-    _menu_offering(monkeypatch, "gallery_view", pick="Cancel")
+    _menu_offering(monkeypatch, pick="Cancel")
 
     view._gallery_pane._thumbnail_context_menu("g1", QPoint(0, 0))
 
@@ -530,7 +530,7 @@ def test_a_tile_with_nothing_in_flight_offers_no_cancel(qtbot, tmp_path, monkeyp
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    labels = _menu_offering(monkeypatch, "gallery_view")
+    labels = _menu_offering(monkeypatch)
 
     view._gallery_pane._thumbnail_context_menu("g0", QPoint(0, 0))
 

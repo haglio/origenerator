@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import logging
 
-from PyQt6 import sip
-from PyQt6.QtCore import QObject
+import shiboken6
+from PySide6.QtCore import QObject
 
 from origenerator import collection_notes, config, graphics_card, prompt_edit
 from origenerator.gui.off_thread import run_off_thread
@@ -62,7 +62,7 @@ class RequestAnswerer(QObject):
     def _deliver(self, owner: QObject, then, revision) -> None:
         if self._hold is not None:
             self._hold.let_go()
-        if sip.isdeleted(owner):
+        if not shiboken6.isValid(owner):
             logger.info("A request's answer came back after what asked for it was gone")
             return
         then(revision)

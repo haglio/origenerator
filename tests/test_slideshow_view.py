@@ -8,13 +8,14 @@ import pytest
 from funestra.testing import FakeEngine
 from funestra.volume import VolumeHud
 from PIL import Image
-from PyQt6.QtCore import QPoint, QPointF, Qt
-from PyQt6.QtGui import QIcon, QKeyEvent
-from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtCore import QPoint, QPointF, Qt
+from PySide6.QtGui import QIcon, QKeyEvent
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QWidget
 from shared_ui.colors import GREEN, RED, TEXT_PRIMARY, YELLOW
 from shared_ui.icons import icon_then_text
 from shared_ui.message_shape import MESSAGE_TOP_MARGIN
+from shared_ui.testing import appending_to
 
 from origenerator.funscript import (
     synthesize_actions,
@@ -460,7 +461,7 @@ def test_enter_leaves_for_the_shown_items_folder(qtbot):
     qtbot.addWidget(view)
     view.show()
     opened = []
-    view.slideshow.open_requested.connect(opened.append)
+    view.slideshow.open_requested.connect(appending_to(opened))
 
     _press(view, Qt.Key.Key_Return)
 
@@ -474,7 +475,7 @@ def _collection_view(qtbot):
     qtbot.addWidget(view)
     _on_screen_wearing_its_hud(qtbot, view)
     opened = []
-    view.slideshow.open_requested.connect(opened.append)
+    view.slideshow.open_requested.connect(appending_to(opened))
     return view, opened
 
 
@@ -530,7 +531,7 @@ def test_culling_the_last_slide_hands_nothing_over(qtbot):
     qtbot.addWidget(view)
     view.show()
     opened = []
-    view.slideshow.open_requested.connect(opened.append)
+    view.slideshow.open_requested.connect(appending_to(opened))
     _press(view, Qt.Key.Key_Down)
 
     _press(view, Qt.Key.Key_Up)

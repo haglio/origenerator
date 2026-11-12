@@ -86,7 +86,7 @@ def _init_windows_taskbar_identity(identity: str | None, preview: Preview | None
 
 
 def _warm_voice_runtimes() -> None:
-    """ctranslate2 and onnxruntime fail with an access violation or DLL init error when imported after PyQt6; a broken install raises OSError."""
+    """ctranslate2 and onnxruntime fail with an access violation or DLL init error when imported after Qt; a broken install raises OSError."""
     for module in ("onnxruntime", "ctranslate2"):
         with contextlib.suppress(Exception):
             __import__(module)
@@ -231,7 +231,7 @@ def _refuse_an_incomplete_overlay(missing: tuple[str, ...], fun_time) -> int:
     )
     print(f"Origenerator: {message}", file=sys.stderr)
     if fun_time is None:
-        from PyQt6.QtWidgets import QMessageBox
+        from PySide6.QtWidgets import QMessageBox
         QMessageBox.critical(None, "Origenerator: incomplete content overlay", message)
     return 1
 
@@ -245,7 +245,7 @@ def _refuse_a_library_of_its_own(checkout: Path, fun_time) -> int:
     )
     print(f"Origenerator: {message}", file=sys.stderr)
     if fun_time is None:
-        from PyQt6.QtWidgets import QMessageBox
+        from PySide6.QtWidgets import QMessageBox
         QMessageBox.critical(None, "Origenerator: not the production copy", message)
     return 1
 
@@ -262,7 +262,7 @@ def _say_what_evolver_no_longer_agrees_with(fun_time) -> None:
                + "\n".join(f"    {line}" for line in said))
     print(f"Origenerator: {message}", file=sys.stderr)
     if fun_time is None:
-        from PyQt6.QtWidgets import QMessageBox
+        from PySide6.QtWidgets import QMessageBox
         QMessageBox.warning(None, "Origenerator: Evolver has moved", message)
 
 

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QSize
-from PyQt6.QtGui import QMovie
-from PyQt6.QtWidgets import QLabel
+from PySide6.QtCore import QSize
+from PySide6.QtGui import QMovie
+from PySide6.QtWidgets import QLabel
 
 from origenerator.gui import omnipause
 from origenerator.gui.looping_preview import (

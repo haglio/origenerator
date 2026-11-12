@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QObject, QSize, Qt
-from PyQt6.QtGui import QImageReader, QMovie
+from PySide6.QtCore import QObject, QSize, Qt
+from PySide6.QtGui import QImageReader, QMovie
 
 from origenerator.gui import omnipause
 from origenerator.gui.grayscale import play_grayscale

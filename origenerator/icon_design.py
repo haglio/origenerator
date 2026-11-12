@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from PIL import Image
-from PyQt6.QtCore import QRectF, Qt
-from PyQt6.QtGui import QGuiApplication, QImage, QPainter, QPainterPath
+from PySide6.QtCore import QRectF, Qt
+from PySide6.QtGui import QGuiApplication, QImage, QPainter, QPainterPath
 from shared_ui.app_icon import CANVAS, GRID, INSET, UNIT
 from shared_ui.colors import MAGENTA
 
@@ -41,9 +41,7 @@ def render_icon(size: int = CANVAS) -> Image.Image:
 def _to_pillow(qimg: QImage) -> Image.Image:
     qimg = qimg.convertToFormat(QImage.Format.Format_RGBA8888)
     width, height, stride = qimg.width(), qimg.height(), qimg.bytesPerLine()
-    buffer = qimg.constBits()
-    buffer.setsize(height * stride)
-    raw = bytes(buffer)
+    raw = bytes(qimg.constBits())
     tight = b"".join(raw[y * stride : y * stride + width * 4] for y in range(height))
     return Image.frombytes("RGBA", (width, height), tight)
 

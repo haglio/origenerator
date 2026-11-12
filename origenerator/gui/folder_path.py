@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QHBoxLayout, QWidget
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import QHBoxLayout, QWidget
 from shared_ui import folder_path as shared_folder_path
 from shared_ui.spacing import GAP_MEDIUM, GAP_SMALL
 from shared_ui.type_scale import SIZE_BODY, in_pixels
@@ -14,7 +14,7 @@ from origenerator.gui.gallery_tree import PATH_SEPARATOR, PathStep
 
 
 class FolderPath(QWidget):
-    folder_chosen = pyqtSignal(str)
+    folder_chosen = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)

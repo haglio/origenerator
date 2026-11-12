@@ -4,8 +4,8 @@ import logging
 from collections.abc import Callable
 
 from app_support.win32 import TaskbarApp
-from PyQt6.QtCore import QEvent, QObject
-from PyQt6.QtWidgets import QApplication, QWidget
+from PySide6.QtCore import QEvent, QObject
+from PySide6.QtWidgets import QApplication, QWidget
 
 logger = logging.getLogger(__name__)
 

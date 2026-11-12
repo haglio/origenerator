@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import NamedTuple
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 
 from origenerator.voice.dictation import SpokenRequest
 from origenerator.voice.hearing import Hearing
@@ -18,9 +18,9 @@ class Phrases(NamedTuple):
 
 
 class CommandAndRequestListener(QObject):
-    error = pyqtSignal(str)
-    heard = pyqtSignal(str)
-    request = pyqtSignal(object)
+    error = Signal(str)
+    heard = Signal(str)
+    request = Signal(object)
 
     def __init__(self, *, hearing=None, command_matcher=None, bare_matcher=None,
                  dictation=None, phrases: Phrases | None = None):

@@ -3,9 +3,9 @@ from __future__ import annotations
 import os
 from collections import OrderedDict
 
-from PyQt6.QtCore import QSize, Qt
-from PyQt6.QtGui import QColor, QPainter, QPixmap
-from PyQt6.QtWidgets import QLabel
+from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QColor, QPainter, QPixmap
+from PySide6.QtWidgets import QLabel
 from shared_ui.colors import BORDER_SUBTLE
 from shared_ui.spacing import HAIRLINE
 

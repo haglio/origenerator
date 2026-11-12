@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Collection
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 from voice_core.commands import CommandRules
 from voice_core.listener import (
     CommandListener,
@@ -22,8 +22,8 @@ LOUD_ENOUGH_TO_ANSWER = 1000
 
 
 class Hearing(QObject):
-    said = pyqtSignal(str, float)
-    failed = pyqtSignal(str)
+    said = Signal(str, float)
+    failed = Signal(str)
 
     def __init__(self, phrases: Collection[str], *, never_repaired: Collection[str] = (),
                  said_in: Callable[[str], str | None] | None = None,

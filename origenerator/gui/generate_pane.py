@@ -4,8 +4,8 @@ import time
 from dataclasses import replace
 from typing import NamedTuple
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QApplication, QMenu, QTabWidget
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import QApplication, QMenu, QTabWidget
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
@@ -55,11 +55,11 @@ def parse_tabs_state(state) -> tuple[list[SavedTab], int]:
 
 
 class GeneratePane(QTabWidget):
-    tab_added = pyqtSignal(object)
-    generate_requested = pyqtSignal(str, list)
-    turn_generate_requested = pyqtSignal(object, str, dict, dict)
-    modify_batch_requested = pyqtSignal(str, str, dict)
-    folder_requested = pyqtSignal(str)
+    tab_added = Signal(object)
+    generate_requested = Signal(str, list)
+    turn_generate_requested = Signal(object, str, dict, dict)
+    modify_batch_requested = Signal(str, str, dict)
+    folder_requested = Signal(str)
 
     def __init__(self, client: ComfyUIClient | None, db: Database,
                  *, fun_time=None, views: TabViews = NO_VIEWS):

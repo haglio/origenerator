@@ -4,11 +4,11 @@ import logging
 import struct
 from unittest.mock import MagicMock
 
-from PyQt6 import sip
-from PyQt6.QtCore import QEvent, QPoint, Qt
-from PyQt6.QtGui import QColor, QImage
-from PyQt6.QtMultimedia import QVideoFrame
-from PyQt6.QtWidgets import QApplication, QComboBox, QDialog, QLabel, QMenu, QWidget
+import shiboken6
+from PySide6.QtCore import QEvent, QPoint, Qt
+from PySide6.QtGui import QColor, QImage
+from PySide6.QtMultimedia import QVideoFrame
+from PySide6.QtWidgets import QApplication, QComboBox, QDialog, QLabel, QMenu, QWidget
 
 from origenerator.fun_time_mode import parse_app_args
 from origenerator.gui import headset_window
@@ -241,7 +241,7 @@ class TestTheRoomsPressesReachTheWindow:
         finally:
             headset.close()
 
-        assert sip.isdeleted(label)
+        assert not shiboken6.isValid(label)
 
     def test_a_press_with_no_pixel_is_dropped_rather_than_guessed(self, tmp_path, qtbot, caplog):
         window = self._window(qtbot)

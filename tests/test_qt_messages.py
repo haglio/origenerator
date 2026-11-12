@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from packaging.requirements import Requirement
-from PyQt6.QtCore import qCritical, qInstallMessageHandler, qWarning
+from PySide6.QtCore import qCritical, qInstallMessageHandler, qWarning
 
 from origenerator.qt_messages import (
     RepeatCollapser,
@@ -81,7 +81,7 @@ def test_the_qt_this_app_asks_for_says_a_wildcard_disconnect_after_letting_go_of
     # The wildcard-disconnect message has no category, so no filter rule keeps it from the handler; Qt 6.11.1 says it holding the signal/slot lock (QTBUG-145216), 6.11.2 after letting go.
     project = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     qt = [Requirement(line) for line in project["dependencies"]
-          if Requirement(line).name == "PyQt6-Qt6"]
+          if Requirement(line).name == "PySide6"]
 
     assert [(r.specifier.contains("6.11.1"), r.specifier.contains("6.11.2")) for r in qt] == [
         (False, True)]

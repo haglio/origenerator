@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtCore import QPoint, Qt
-from PyQt6.QtGui import QIcon, QPainter, QPixmap
-from PyQt6.QtWidgets import QApplication, QStyle, QTabBar, QTabWidget, QWidget
+from PySide6.QtCore import QPoint, Qt
+from PySide6.QtGui import QIcon, QPainter, QPixmap
+from PySide6.QtWidgets import QApplication, QStyle, QTabBar, QTabWidget, QWidget
+from shared_ui.testing import appending_to
 
 from origenerator.gallery.item_numbers import widest_item_name
 from origenerator.gui.eliding_tab_bar import (
@@ -150,7 +151,7 @@ def test_the_same_mark_whichever_tab_is_in_front(qtbot):
 def test_clicking_a_close_button_asks_for_that_tab(qtbot):
     bar = _closable_bar(qtbot, count=3)
     asked = []
-    bar.tabCloseRequested.connect(asked.append)
+    bar.tabCloseRequested.connect(appending_to(asked))
 
     _close_button(bar, 1).click()
 
@@ -161,7 +162,7 @@ def test_a_close_button_follows_its_tab_as_neighbors_close(qtbot):
     bar = _closable_bar(qtbot, count=3)
     last = _close_button(bar, 2)
     asked = []
-    bar.tabCloseRequested.connect(asked.append)
+    bar.tabCloseRequested.connect(appending_to(asked))
     bar.removeTab(0)
 
     last.click()
@@ -173,7 +174,7 @@ def test_a_close_button_follows_its_tab_when_it_is_dragged(qtbot):
     bar = _closable_bar(qtbot, count=3)
     first = _close_button(bar, 0)
     asked = []
-    bar.tabCloseRequested.connect(asked.append)
+    bar.tabCloseRequested.connect(appending_to(asked))
     bar.moveTab(0, 2)
 
     first.click()
@@ -188,7 +189,7 @@ def _middle_press(qtbot, widget, pos):
 def test_a_middle_click_asks_for_the_tab_under_it_on_the_press(qtbot):
     bar = _closable_bar(qtbot, count=3)
     asked = []
-    bar.tabCloseRequested.connect(asked.append)
+    bar.tabCloseRequested.connect(appending_to(asked))
 
     _middle_press(qtbot, bar, bar.tabRect(1).center())
 
@@ -198,7 +199,7 @@ def test_a_middle_click_asks_for_the_tab_under_it_on_the_press(qtbot):
 def test_the_release_ending_a_middle_click_asks_for_nothing_more(qtbot):
     bar = _closable_bar(qtbot, count=3)
     asked = []
-    bar.tabCloseRequested.connect(asked.append)
+    bar.tabCloseRequested.connect(appending_to(asked))
     middle = bar.tabRect(1).center()
 
     _middle_press(qtbot, bar, middle)
@@ -212,7 +213,7 @@ def test_a_middle_click_on_the_close_mark_closes_that_tab_too(qtbot):
     bar.resize(bar.sizeHint())
     mark = _close_button(bar, 1)
     asked = []
-    bar.tabCloseRequested.connect(asked.append)
+    bar.tabCloseRequested.connect(appending_to(asked))
 
     _middle_press(qtbot, mark, mark.rect().center())
 
@@ -226,7 +227,7 @@ def test_a_middle_click_beside_the_tabs_closes_nothing(qtbot):
     beside = QPoint(bar.tabRect(1).right() + 40, bar.tabRect(1).center().y())
     assert bar.tabAt(beside) == -1
     asked = []
-    bar.tabCloseRequested.connect(asked.append)
+    bar.tabCloseRequested.connect(appending_to(asked))
 
     _middle_press(qtbot, bar, beside)
 
@@ -239,7 +240,7 @@ def test_a_middle_click_closes_nothing_in_a_row_that_offers_no_close(qtbot):
     bar.addTab("tab 0")
     bar.addTab("tab 1")
     asked = []
-    bar.tabCloseRequested.connect(asked.append)
+    bar.tabCloseRequested.connect(appending_to(asked))
 
     _middle_press(qtbot, bar, bar.tabRect(1).center())
 

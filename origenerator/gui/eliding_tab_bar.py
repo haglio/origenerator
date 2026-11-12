@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QSize, Qt
-from PyQt6.QtGui import QIcon, QPainter, QPixmap
-from PyQt6.QtWidgets import QProxyStyle, QStyle, QTabBar, QToolButton
+from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QIcon, QPainter, QPixmap
+from PySide6.QtWidgets import QProxyStyle, QStyle, QTabBar, QToolButton
 from shared_ui.spacing import GAP_MEDIUM, MARGIN_STANDARD
 
 from origenerator.gallery.item_numbers import widest_item_name

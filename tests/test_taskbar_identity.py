@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 from app_support.win32 import TaskbarApp
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtWidgets import QWidget
 
 from origenerator.gui.taskbar_identity import TaskbarIdentity
 

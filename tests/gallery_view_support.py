@@ -7,21 +7,22 @@ from unittest.mock import MagicMock
 
 from PIL import Image
 from PIL import Image as _Image
-from PyQt6.QtCore import (
+from PySide6.QtCore import (
     QEvent,
     QObject,
     QPoint,
     QRect,
     Qt,
-    pyqtSignal,
+    Signal,
 )
-from PyQt6.QtGui import (
+from PySide6.QtGui import (
     QImage,
     QKeyEvent,
     QTextCursor,
 )
-from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import (
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import (
+    QMenu,
     QMessageBox,
     QSplitter,
 )
@@ -54,6 +55,7 @@ from origenerator.trash import Trash
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests import gestures
 from tests.comfyui_folders import SUITE_FOLDERS
+from tests.qt_exec import faking_exec
 from tests.slideshow_hud_support import funestra_of
 
 _SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
@@ -546,7 +548,7 @@ def _answer_menu(monkeypatch, label):
         act.trigger()
         return act
 
-    monkeypatch.setattr("origenerator.gui.gallery_view.QMenu.exec", pick)
+    faking_exec(monkeypatch, QMenu, pick)
 
 
 def _answer_confirmation(monkeypatch, button):
@@ -554,8 +556,7 @@ def _answer_confirmation(monkeypatch, button):
 
 
 def _menu_labels(monkeypatch, labels):
-    monkeypatch.setattr(
-        "origenerator.gui.gallery_view.QMenu.exec",
+    faking_exec(monkeypatch, QMenu,
         lambda menu, *a: labels.extend(act.text() for act in menu.actions()),
     )
 
@@ -755,7 +756,7 @@ def _running_row(prompt_id, prompt="a cat", workflow="sdxl_t2i"):
                 status="running", output_files="[]")
 
 
-def _menu_offering(monkeypatch, module, pick=None):
+def _menu_offering(monkeypatch, pick=None):
     raised = []
 
     def fake_exec(menu, *_args):
@@ -765,7 +766,7 @@ def _menu_offering(monkeypatch, module, pick=None):
             return None
         return next((a for a in menu.actions() if a.text().startswith(pick)), None)
 
-    monkeypatch.setattr(f"origenerator.gui.{module}.QMenu.exec", fake_exec)
+    faking_exec(monkeypatch, QMenu, fake_exec)
     return raised
 
 
@@ -913,7 +914,7 @@ class _FakeRadio:
 
 
 class _SignalMotion(QObject):
-    active_changed = pyqtSignal(bool)
+    active_changed = Signal(bool)
 
     def __init__(self):
         super().__init__()

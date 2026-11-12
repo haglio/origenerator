@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QByteArray, QMimeData
+from PySide6.QtCore import QByteArray, QMimeData
 
 GENERATION_MIME = "application/x-origenerator-generation"
 

@@ -14,6 +14,7 @@ from funestra.playback_rate import NORMAL_RATE
 from funestra.playlist import PlaylistItem, read_playlist
 from funestra.satellite_hud import parse_hud
 from funestra.status import FunestraStatus, status_fields
+from shared_ui.testing import appending_to
 
 from origenerator import osr2_driver
 from origenerator.fun_time_mode import FunestraChannel
@@ -142,7 +143,8 @@ def _held_open_for(path: Path, seconds: float):
 
 
 def _public(cls) -> set[str]:
-    return {name for name in vars(cls) if not name.startswith("_") and not name.endswith("Event")}
+    return {name for name in vars(cls)
+            if not name.startswith("_") and not name.endswith("Event") and name != "staticMetaObject"}
 
 
 def test_the_window_answers_only_what_a_window_has_and_the_slideshow_in_it_the_rest():
@@ -887,7 +889,7 @@ def test_a_slideshow_that_is_over_takes_its_hud_down_though_the_funestra_is_read
 def test_a_slideshow_on_the_funestras_hands_its_slide_over_as_it_closes(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path)
     handed = []
-    slideshow.open_requested.connect(handed.append)
+    slideshow.open_requested.connect(appending_to(handed))
     on_screen = slideshow.state().current
 
     slideshow.close()

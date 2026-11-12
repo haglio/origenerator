@@ -1,15 +1,24 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtCore import QEvent, QItemSelectionModel, QMimeData, QObject, QPoint, QPointF, QRect, Qt
-from PyQt6.QtGui import (
+from PySide6.QtCore import (
+    QEvent,
+    QItemSelectionModel,
+    QMimeData,
+    QObject,
+    QPoint,
+    QPointF,
+    QRect,
+    Qt,
+)
+from PySide6.QtGui import (
     QContextMenuEvent,
     QDragEnterEvent,
     QDragLeaveEvent,
     QDragMoveEvent,
     QDropEvent,
 )
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QStyle,
@@ -17,6 +26,7 @@ from PyQt6.QtWidgets import (
     QTreeWidgetItem,
 )
 from shared_ui.colors import BLUE, BORDER_SUBTLE
+from shared_ui.testing import appending_to
 
 from origenerator.gallery.collection import COLLECTION_LABELS, FAVORITES_KEY, LATEST_KEY
 from origenerator.gallery.shapes import LANDSCAPE
@@ -84,7 +94,7 @@ def _tree_with_an_indented_leaf(qtbot, *, favorite=False):
 def test_clicking_the_delete_icon_on_a_leaf_emits_delete_clicked(qtbot):
     tree, leaf = _tree_with_an_indented_leaf(qtbot)
     fired = []
-    tree.delete_clicked.connect(fired.append)
+    tree.delete_clicked.connect(appending_to(fired))
 
     _, delete_rect = _action_rects(tree.visualRect(tree.indexFromItem(leaf)))
     qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=delete_rect.center())
@@ -95,7 +105,7 @@ def test_clicking_the_delete_icon_on_a_leaf_emits_delete_clicked(qtbot):
 def test_clicking_the_favorite_icon_on_a_leaf_emits_favorite_clicked(qtbot):
     tree, leaf = _tree_with_an_indented_leaf(qtbot)
     fired = []
-    tree.favorite_clicked.connect(fired.append)
+    tree.favorite_clicked.connect(appending_to(fired))
 
     star_rect, _ = _action_rects(tree.visualRect(tree.indexFromItem(leaf)))
     qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=star_rect.center())
@@ -127,7 +137,7 @@ def test_a_picked_row_can_be_told_to_offer_no_delete(qtbot):
     tree, leaf = _tree_with_an_indented_leaf(qtbot)
     tree.setCurrentItem(leaf)
     fired = []
-    tree.delete_clicked.connect(fired.append)
+    tree.delete_clicked.connect(appending_to(fired))
     _, delete_rect = _action_rects(tree.visualRect(tree.indexFromItem(leaf)))
     qtbot.mouseMove(tree.viewport(), delete_rect.center())
     assert _wears_within(tree, leaf, delete_rect, _is_red)
@@ -143,8 +153,8 @@ def test_a_parent_row_offers_no_actions(qtbot):
     tree, leaf = _tree_with_an_indented_leaf(qtbot)
     parent = leaf.parent()
     fired = []
-    tree.favorite_clicked.connect(fired.append)
-    tree.delete_clicked.connect(fired.append)
+    tree.favorite_clicked.connect(appending_to(fired))
+    tree.delete_clicked.connect(appending_to(fired))
 
     star_rect, delete_rect = _action_rects(tree.visualRect(tree.indexFromItem(parent)))
     qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=star_rect.center())
@@ -197,8 +207,8 @@ def test_hovering_tracks_the_leaf_under_the_mouse(qtbot):
 def test_clicking_a_leafs_label_still_selects_without_firing_actions(qtbot):
     tree, leaf = _tree_with_an_indented_leaf(qtbot)
     fired = []
-    tree.favorite_clicked.connect(fired.append)
-    tree.delete_clicked.connect(fired.append)
+    tree.favorite_clicked.connect(appending_to(fired))
+    tree.delete_clicked.connect(appending_to(fired))
 
     row = tree.visualRect(tree.indexFromItem(leaf))
     label_pos = QPoint(row.center().x(), row.center().y())
@@ -867,8 +877,8 @@ def test_a_folder_of_your_own_offers_no_star_or_delete_beside_its_mark(qtbot):
     tree.addTopLevelItem(own)
     tree.show()
     clicked = []
-    tree.favorite_clicked.connect(clicked.append)
-    tree.delete_clicked.connect(clicked.append)
+    tree.favorite_clicked.connect(appending_to(clicked))
+    tree.delete_clicked.connect(appending_to(clicked))
     star, delete = _action_rects(tree.visualRect(tree.indexFromItem(own)))
 
     for spot in (star.center(), delete.center()):
@@ -1004,7 +1014,7 @@ def test_right_clicking_a_frozen_folder_offers_no_menu_for_the_row_under_it(qtbo
     tree, rows = _long_tree(qtbot)
     tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
     asked = []
-    tree.customContextMenuRequested.connect(asked.append)
+    tree.customContextMenuRequested.connect(appending_to(asked))
     _scroll_to_the_top(tree, rows["a/i/3"])
 
     at = QPoint(100, 2)

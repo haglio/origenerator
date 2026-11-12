@@ -3,9 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 
 import pytest
-from PyQt6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, Qt
-from PyQt6.QtGui import QColor, QDropEvent, QFocusEvent, QImage
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, Qt
+from PySide6.QtGui import QColor, QDropEvent, QFocusEvent, QImage
+from PySide6.QtWidgets import (
     QAbstractSlider,
     QApplication,
     QFormLayout,
@@ -18,6 +18,7 @@ from shared_ui.colors import BORDER_DEFAULT, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.fonts import FONT_UI, SIZE_HEADING, make_font
 from shared_ui.icons import qt_icon
 from shared_ui.spacing import BUTTON_ICON
+from shared_ui.testing import appending_to
 from shared_ui.tick_control import TickControl
 from shared_ui.tooltip_shape import shaped
 
@@ -2595,7 +2596,7 @@ def test_clicking_a_held_item_leads_back_to_it(qtbot):
     form = ParamForm([ParamDef("input_image", "Image", "image", "")], helpers=FormHelpers(items=_Lends()))
     qtbot.addWidget(form)
     led_to = []
-    form.item_activated.connect(led_to.append)
+    form.item_activated.connect(appending_to(led_to))
     zone = form._widgets["input_image"]
 
     form.set_values({"input_image": "C:/elsewhere/photo.png"})
@@ -2782,7 +2783,7 @@ def test_the_story_is_set_before_the_per_scene_values(qtbot):
 def test_showing_the_derived_size_is_no_edit_of_it(qtbot):
     form = _sized_form(qtbot)
     edited = []
-    form._widgets["width"].valueChanged.connect(edited.append)
+    form._widgets["width"].valueChanged.connect(appending_to(edited))
 
     form.set_values({"input_image": "a.png"})
 

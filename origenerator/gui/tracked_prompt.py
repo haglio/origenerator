@@ -3,9 +3,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from contextlib import contextmanager
 
-from PyQt6.QtCore import QEvent, QObject, Qt, QTimer
-from PyQt6.QtGui import QBrush, QKeySequence, QTextCharFormat, QTextCursor, QTextDocument
-from PyQt6.QtWidgets import QPlainTextEdit
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer
+from PySide6.QtGui import QBrush, QKeySequence, QTextCharFormat, QTextCursor, QTextDocument
+from PySide6.QtWidgets import QPlainTextEdit
 
 from origenerator.gui import diff_text
 from origenerator.prompt_diff import ADDED, REMOVED, SAME, diff_spans

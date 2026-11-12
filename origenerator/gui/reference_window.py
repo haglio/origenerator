@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QObject
-from PyQt6.QtWidgets import QToolButton
+from PySide6.QtCore import QObject
+from PySide6.QtWidgets import QToolButton
 from shared_ui.reference import ReferenceDialog
 
 from origenerator.reference import reference_sections

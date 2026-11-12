@@ -5,7 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from app_support import origenerator_handoff as handoff
-from PyQt6.QtCore import QObject, QTimer
+from PySide6.QtCore import QObject, QTimer
 
 from origenerator.fun_time_mode import FunTimeSession, take_the_takeover
 

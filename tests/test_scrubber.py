@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from funestra.scrubber_bar import BAR_BORDER, BAR_INSET_Y, BORDER_W, CURSOR_W
-from PyQt6.QtGui import QColor
+from PySide6.QtGui import QColor
 
 from origenerator.funscript import synthesize_actions
 from origenerator.gui.scrubber import Scrubber

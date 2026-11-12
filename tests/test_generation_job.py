@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
+from shared_ui.testing import appending_to
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
@@ -198,7 +199,7 @@ def test_node_executing_for_our_id_marks_started(qtbot, tmp_path):
 def test_preview_for_our_id_is_forwarded_and_cached(qtbot, tmp_path):
     job, client = _started_job(tmp_path)
     previews = []
-    job.preview.connect(previews.append)
+    job.preview.connect(appending_to(previews))
 
     client.preview_image.emit("comfy-OTHER", b"nope")
     assert previews == []
@@ -333,7 +334,7 @@ def test_a_completion_with_no_output_files_fails_instead(qtbot, tmp_path):
     job, client = _started_job(tmp_path)
     finished, failed = [], []
     job.finished.connect(lambda *a: finished.append(a))
-    job.failed.connect(failed.append)
+    job.failed.connect(appending_to(failed))
 
     client.job_completed.emit("comfy-A", {"outputs": {}})
 
@@ -395,7 +396,7 @@ def test_reconcile_does_nothing_once_the_job_has_finished(qtbot, tmp_path):
 def test_error_for_our_id_emits_failed(qtbot, tmp_path):
     job, client = _started_job(tmp_path)
     failed = []
-    job.failed.connect(failed.append)
+    job.failed.connect(appending_to(failed))
 
     client.job_error.emit("comfy-OTHER", "boom")
     assert failed == []

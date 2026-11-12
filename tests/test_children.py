@@ -11,8 +11,8 @@ from tests.children import run_python, run_python_timed_from
 
 _MAKES_A_SOUND_OUTPUT_THEN_ENDS = textwrap.dedent("""
     import sys
-    from PyQt6.QtMultimedia import QAudioOutput
-    from PyQt6.QtWidgets import QApplication
+    from PySide6.QtMultimedia import QAudioOutput
+    from PySide6.QtWidgets import QApplication
     from tests.children import end_outright
     app = QApplication(sys.argv[:1])
     output = QAudioOutput()

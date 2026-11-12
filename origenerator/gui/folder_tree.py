@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, QItemSelectionModel, QMimeData, QRect, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QDrag, QDragLeaveEvent, QIcon, QPainter
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QEvent, QItemSelectionModel, QMimeData, QRect, QSize, Qt, Signal
+from PySide6.QtGui import QDrag, QDragLeaveEvent, QIcon, QPainter
+from PySide6.QtWidgets import (
     QAbstractItemView,
     QMenu,
     QStyle,
@@ -92,9 +92,9 @@ class _CountBeforeName(QStyledItemDelegate):
 
 
 class FolderTree(QTreeWidget):
-    favorite_clicked = pyqtSignal(object)
-    delete_clicked = pyqtSignal(object)
-    dropped = pyqtSignal(str, list, list)
+    favorite_clicked = Signal(object)
+    delete_clicked = Signal(object)
+    dropped = Signal(str, list, list)
 
     def __init__(self, group_role, takes_item=lambda _row_key, _prompt_id: False,
                  takes_folder=lambda _row_key, _folder_key: True, parent=None):
@@ -234,7 +234,7 @@ class FolderTree(QTreeWidget):
             event.accept()
             return
         super().mouseMoveEvent(event)
-        index = self.indexAt(event.pos())
+        index = self.indexAt(event.position().toPoint())
         hovered = index.data(TREE_KEY_ROLE) if self._group_with_actions(index) else None
         self._set_hover(hovered)
 
@@ -295,8 +295,8 @@ class FolderTree(QTreeWidget):
     def _frozen_at(self, point):
         return next((row for row, place in self._frozen_places() if place.contains(point)), None)
 
-    def _swallowed_by_frozen(self, event) -> bool:
-        if self._frozen_at(event.pos()) is None:
+    def _swallowed_by_frozen(self, event, point) -> bool:
+        if self._frozen_at(point) is None:
             return False
         event.accept()
         return True
@@ -328,7 +328,7 @@ class FolderTree(QTreeWidget):
             bar.setValue(bar.value() - 1)
 
     def mouseDoubleClickEvent(self, event):
-        if not self._swallowed_by_frozen(event):
+        if not self._swallowed_by_frozen(event, event.position().toPoint()):
             super().mouseDoubleClickEvent(event)
 
     def mouseReleaseEvent(self, event):
@@ -336,16 +336,16 @@ class FolderTree(QTreeWidget):
             self._pressed_on_frozen = False
             event.accept()
             return
-        if not self._swallowed_by_frozen(event):
+        if not self._swallowed_by_frozen(event, event.position().toPoint()):
             super().mouseReleaseEvent(event)
 
     def viewportEvent(self, event):
-        if event.type() == QEvent.Type.ContextMenu and self._swallowed_by_frozen(event):
+        if event.type() == QEvent.Type.ContextMenu and self._swallowed_by_frozen(event, event.pos()):
             return True
         return super().viewportEvent(event)
 
     def mousePressEvent(self, event):
-        frozen = self._frozen_at(event.pos())
+        frozen = self._frozen_at(event.position().toPoint())
         if frozen is not None:
             event.accept()
             self._pressed_on_frozen = True
@@ -355,14 +355,14 @@ class FolderTree(QTreeWidget):
             # Qt: QTreeView toggles the caret under any button's press; QAbstractItemView's press only picks the row, so a right-click never shuts a folder
             QAbstractItemView.mousePressEvent(self, event)
             return
-        index = self.indexAt(event.pos())
+        index = self.indexAt(event.position().toPoint())
         group = self._group_with_actions(index)
         if group is not None:
             star_rect, delete_rect = _action_rects(self.visualRect(index))
-            if delete_rect.contains(event.pos()) and self._offers_delete(index):
+            if delete_rect.contains(event.position().toPoint()) and self._offers_delete(index):
                 self.delete_clicked.emit(group.key)
                 return
-            if star_rect.contains(event.pos()):
+            if star_rect.contains(event.position().toPoint()):
                 self.favorite_clicked.emit(group.key)
                 return
         super().mousePressEvent(event)

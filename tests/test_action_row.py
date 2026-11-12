@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 
 import pytest
-from PyQt6.QtCore import QPoint, Qt
-from PyQt6.QtWidgets import (
+import shiboken6
+from PySide6.QtCore import QPoint, Qt
+from PySide6.QtWidgets import (
     QAbstractButton,
     QComboBox,
     QLabel,
@@ -442,3 +443,12 @@ def test_the_plus_is_gone_once_every_action_is_set(action):
     action.show_row(_row(image=ItemActions(("gamma", "alpha", "beta"))))
 
     assert _adder(action, MediaType.IMAGE).isHidden()
+
+
+def test_the_row_goes_with_the_form_it_fills(qtbot):
+    host = QWidget()
+    row = ActionRow(LabelForm(host), checkboxes=_BOXES, actions=_ACTIONS)
+
+    shiboken6.delete(host)
+
+    qtbot.waitUntil(lambda: not shiboken6.isValid(row))

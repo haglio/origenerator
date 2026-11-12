@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QPainter
-from PyQt6.QtWidgets import QLabel
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import QPainter
+from PySide6.QtWidgets import QLabel
 from shared_ui.colors import YELLOW
 from shared_ui.icons import draw_icon
 
 
 class WarningMark(QLabel):
-    pressed = pyqtSignal()
+    pressed = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)

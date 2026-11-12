@@ -3,9 +3,9 @@ handed a widget skips whatever lies on top of it, and its double-click is the
 double-click event alone, without the press and release a mouse sends first."""
 from __future__ import annotations
 
-from PyQt6.QtCore import QPoint, Qt
-from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtCore import QPoint, Qt
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QWidget
 
 
 def _where_the_mouse_lands(widget: QWidget, at: QPoint):

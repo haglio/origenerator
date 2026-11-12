@@ -4,7 +4,7 @@ import json
 import logging
 from typing import Protocol
 
-from PyQt6.QtCore import QObject
+from PySide6.QtCore import QObject
 
 from origenerator import (
     action_settings,

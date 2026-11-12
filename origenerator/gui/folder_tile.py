@@ -3,9 +3,9 @@ from __future__ import annotations
 import html
 from dataclasses import dataclass
 
-from PyQt6.QtCore import QPoint, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QPoint, QSize, Qt, Signal
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -39,8 +39,8 @@ NO_MARKS = FolderMarks()
 
 
 class FolderTile(QFrame):
-    clicked = pyqtSignal(str)
-    context_requested = pyqtSignal(str, QPoint)
+    clicked = Signal(str)
+    context_requested = Signal(str, QPoint)
 
     _KIND_ICON = BUTTON_ICON
 

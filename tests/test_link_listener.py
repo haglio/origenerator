@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import threading
 
-from PyQt6.QtNetwork import QLocalServer
+from PySide6.QtNetwork import QLocalServer
 
 from origenerator import app_link
 from origenerator.gui.link_listener import LinkListener

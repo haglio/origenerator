@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from PyQt6.QtCore import pyqtSignal
+from PySide6.QtCore import Signal
 
 from origenerator.gui.thumbnail_dropdown import THUMBNAILS_ROLE, ThumbnailDropdown
 
@@ -16,7 +16,7 @@ class RecentVideo:
 
 
 class RecentVideos(ThumbnailDropdown):
-    picked = pyqtSignal(str)
+    picked = Signal(str)
 
     def __init__(self, recent: Callable[[], list[RecentVideo]],
                  looping_preview: Callable[[str], str | None], parent=None):

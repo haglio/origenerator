@@ -101,7 +101,7 @@ def _comfyui_busy(client) -> bool:
 
 
 def _handed_over(db, client, queue: Callable[[object], int]) -> int:
-    from PyQt6.QtCore import QCoreApplication  # noqa: PLC0415
+    from PySide6.QtCore import QCoreApplication  # noqa: PLC0415
 
     from origenerator.gui.job_queue import JobQueue  # noqa: PLC0415
 

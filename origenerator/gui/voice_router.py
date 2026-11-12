@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Protocol
 
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
-from PyQt6.QtWidgets import QLabel, QWidget
+from PySide6.QtCore import QObject, QTimer, Signal
+from PySide6.QtWidgets import QLabel, QWidget
 from shared_ui import colors
 from shared_ui.palette import BG_PRIMARY, WHITE, as_hex, as_rgba
 from shared_ui.spacing import BUTTON_RADIUS, MARGIN_STANDARD
@@ -125,7 +125,7 @@ class VoiceHost(Protocol):
 
 
 class VoiceRouter(QObject):
-    caption_shown = pyqtSignal(bool)
+    caption_shown = Signal(bool)
 
     def __init__(self, host: VoiceHost, sources: VoiceSources, *, parent: QObject, motion):
         super().__init__(parent)

@@ -7,7 +7,7 @@ from contextlib import ExitStack
 
 from app_support.osr2_hold import PARK, RESUME
 from funestra.main_hud import HOLD_VERB
-from PyQt6.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 
 from origenerator import motion_engine
 from origenerator.motion_engine import Motion
@@ -57,7 +57,7 @@ class _TickThread:
 
 
 class Osr2MotionDriver(QObject):
-    active_changed = pyqtSignal(bool)
+    active_changed = Signal(bool)
 
     def __init__(self, broker=None, *, interval_ms: int = _TICK_MS,
                  now_source=time.monotonic, ticker_factory=None, parent=None):

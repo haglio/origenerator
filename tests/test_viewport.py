@@ -6,10 +6,10 @@ from unittest.mock import MagicMock, call
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QEvent, QPoint, QPointF, QSize, Qt, QUrl
-from PyQt6.QtGui import QColor, QImage, QMouseEvent, QMovie, QResizeEvent
-from PyQt6.QtMultimedia import QMediaMetaData, QMediaPlayer, QVideoFrame
-from PyQt6.QtWidgets import QApplication, QWidget
+from PySide6.QtCore import QEvent, QPoint, QPointF, QSize, Qt, QUrl
+from PySide6.QtGui import QColor, QImage, QMouseEvent, QMovie, QResizeEvent
+from PySide6.QtMultimedia import QMediaMetaData, QMediaPlayer, QVideoFrame
+from PySide6.QtWidgets import QApplication, QWidget
 
 from origenerator.fun_time_mode import FunestraChannel
 from origenerator.funscript import (

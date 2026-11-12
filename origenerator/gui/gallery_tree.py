@@ -4,8 +4,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import NamedTuple
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QTreeWidgetItem
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QTreeWidgetItem
 
 from origenerator import gallery
 from origenerator.gallery.collection import (

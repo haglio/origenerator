@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QPoint, Qt
-from PyQt6.QtGui import QMouseEvent
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtCore import QPoint, Qt
+from PySide6.QtGui import QMouseEvent
+from PySide6.QtWidgets import QApplication
 
 from origenerator.gui import tile_shape
 from origenerator.gui.modify_batch_tile import ModifyBatchTile
@@ -11,7 +11,7 @@ from origenerator.gui.new_tile import NewTile
 
 def _click(tile):
     QApplication.sendEvent(tile, QMouseEvent(
-        QMouseEvent.Type.MouseButtonPress, QPoint(10, 10).toPointF(),
+        QMouseEvent.Type.MouseButtonPress, QPoint(10, 10).toPointF(), QPoint(10, 10).toPointF(),
         Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
         Qt.KeyboardModifier.NoModifier,
     ))

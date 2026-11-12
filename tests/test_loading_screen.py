@@ -5,8 +5,8 @@ from unittest.mock import patch
 
 import pytest
 from app_support.win32 import TaskbarApp
-from PyQt6.QtCore import Qt
-from PyQt6.QtTest import QTest
+from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
 
 from origenerator.app import (
     BUILDING_THE_INTERFACE,

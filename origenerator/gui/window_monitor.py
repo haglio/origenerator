@@ -5,7 +5,7 @@ import struct
 from collections.abc import Callable, Sequence
 
 from app_support.loading_screen import AppWindow
-from PyQt6.QtGui import QGuiApplication, QScreen
+from PySide6.QtGui import QGuiApplication, QScreen
 
 _QT_SAVE_GEOMETRY_HEAD = struct.Struct(">IHH4i4ii")
 _QT_SAVE_GEOMETRY_MAGIC = 0x1D9D0CB

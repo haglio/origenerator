@@ -4,7 +4,7 @@ from __future__ import annotations
 import gc
 import weakref
 
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtWidgets import QWidget
 
 
 def test_a_registered_widget_in_a_reference_cycle_outlives_a_collection(qtbot):

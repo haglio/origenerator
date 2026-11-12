@@ -4,8 +4,8 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 from funestra.testing import FakeEngine
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QKeyEvent
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QKeyEvent
 
 from origenerator.gui.slideshow_view import SlideshowView, ViewShow, ViewWiring
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions

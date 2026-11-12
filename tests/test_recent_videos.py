@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, QObject, QSize, Qt
-from PyQt6.QtGui import QColor, QImage, QMovie
-from PyQt6.QtWidgets import QProxyStyle, QStyle, QStyleOptionViewItem
+from PySide6.QtCore import QEvent, QObject, QSize, Qt
+from PySide6.QtGui import QColor, QImage, QMovie
+from PySide6.QtWidgets import QProxyStyle, QStyle, QStyleOptionViewItem
+from shared_ui.testing import appending_to
 
 from origenerator.gui.recent_videos import RecentVideo, RecentVideos
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX
@@ -48,7 +49,7 @@ def test_a_video_with_no_thumbnail_shows_a_blank_square(qtbot):
 def test_picking_a_video_names_it_and_the_field_reads_recent_again(qtbot):
     dropdown = _dropdown(qtbot, [RecentVideo("vid2", None), RecentVideo("vid1", None)])
     picked = []
-    dropdown.picked.connect(picked.append)
+    dropdown.picked.connect(appending_to(picked))
     dropdown.showPopup()
     view = dropdown.view()
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PIL import Image
-from PyQt6.QtCore import QSize, Qt
+from PySide6.QtCore import QSize, Qt
 from shared_ui.spacing import MARGIN_STANDARD
 
 from origenerator.gui.combination import Combination

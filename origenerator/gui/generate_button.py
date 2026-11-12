@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import QMessageBox, QPlainTextEdit, QPushButton
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtWidgets import QMessageBox, QPlainTextEdit, QPushButton
 
 from origenerator.gui.prompt_marks import only_unread_emphasis_to_resolve, problem_to_resolve
 

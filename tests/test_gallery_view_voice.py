@@ -8,7 +8,7 @@ import pytest
 from funestra.main_hud import (
     OSR2_PARKED,
 )
-from PyQt6.QtCore import (
+from PySide6.QtCore import (
     QPoint,
     QRect,
 )

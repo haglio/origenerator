@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 import threading
 
-from PyQt6 import sip
-from PyQt6.QtWidgets import QWidget
+import shiboken6
+from PySide6.QtWidgets import QWidget
 
 from origenerator import collection_notes
 from origenerator.collection_notes import CollectionNotes
@@ -129,7 +129,7 @@ def test_the_line_is_let_go_even_when_the_one_who_asked_is_gone(qtbot, tmp_path)
     answers = []
     answerer.ask("g1", ("a woman", ""), "a hat", owner=owner, then=answers.append)
     owner.deleteLater()
-    sip.delete(owner)
+    shiboken6.delete(owner)
 
     qtbot.waitUntil(lambda: jobs.let_go == 1, timeout=5000)
 

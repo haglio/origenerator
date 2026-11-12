@@ -7,18 +7,19 @@ from itertools import pairwise
 from unittest.mock import MagicMock
 
 import pytest
-from PyQt6 import sip
-from PyQt6.QtCore import (
+import shiboken6
+from PySide6.QtCore import (
     QEvent,
     QMargins,
     QPoint,
     Qt,
     QTimer,
 )
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QLabel,
+    QMenu,
     QScrollArea,
     QSplitter,
     QWidget,
@@ -109,6 +110,7 @@ from tests.gallery_view_support import (
     _video_workflow,
     _workflow_rows,
 )
+from tests.qt_exec import faking_exec
 from tests.test_folder_tree import _shown
 
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
@@ -834,8 +836,7 @@ def test_favoriting_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
     caret = QPoint(row.left() - half.indentation() // 2, row.center().y())
 
     qtbot.mouseClick(half.viewport(), Qt.MouseButton.RightButton, pos=caret)
-    monkeypatch.setattr(
-        "origenerator.gui.gallery_view.QMenu.exec",
+    faking_exec(monkeypatch, QMenu,
         lambda menu, *a: next(act for act in menu.actions() if act.text() == "Favorite"),
     )
     view._on_tree_context_menu(images, caret, LANDSCAPE)
@@ -1576,7 +1577,7 @@ def test_a_poll_answer_that_lands_after_its_gallery_is_gone_is_dropped(qtbot, mo
     view._poll()
     db.add(_image("new", "a dog", 50, 2))
     view.close()
-    sip.delete(view)
+    shiboken6.delete(view)
     library_reads, list_generations = [], db.list_generations
     monkeypatch.setattr(db, "list_generations",
                         lambda: library_reads.append(1) or list_generations())
@@ -2809,7 +2810,7 @@ def test_an_event_about_an_object_already_gone_does_not_take_the_app_down(qtbot)
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
     doomed = QTimer()
-    sip.delete(doomed)
+    shiboken6.delete(doomed)
 
     assert view.eventFilter(doomed, QEvent(QEvent.Type.Timer)) is False
 

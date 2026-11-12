@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from collections import Counter
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QMessageBox, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QMessageBox, QWidget
 
 TITLE = "Generation failed"
 

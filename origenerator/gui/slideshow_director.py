@@ -10,8 +10,8 @@ from typing import Protocol
 from funestra.hud_placement import HudCorner
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.volume import VolumeHud
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import QApplication, QWidget
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtWidgets import QApplication, QWidget
 from shared_ui.orientation import orientation_of_size as shape_of_size
 
 from origenerator import gallery

@@ -52,7 +52,7 @@ def _dress_the_taskbar_button(app, title: str, launcher: str, preview) -> None:
 
 
 def open_on_its_own(title: str, build, *, launcher: str, find_missing_overlay_keys=None) -> int:
-    from PyQt6.QtWidgets import QApplication, QMessageBox
+    from PySide6.QtWidgets import QApplication, QMessageBox
 
     app = QApplication.instance() or QApplication(sys.argv[:1])
 
@@ -79,7 +79,7 @@ def open_on_its_own(title: str, build, *, launcher: str, find_missing_overlay_ke
 
 
 def show_or_say(title: str, built, *, parent=None) -> bool:
-    from PyQt6.QtWidgets import QMessageBox
+    from PySide6.QtWidgets import QMessageBox
 
     if isinstance(built, str):
         QMessageBox.information(parent, title, built)

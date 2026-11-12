@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from functools import cache
 
-from PyQt6.QtCore import QRectF, Qt
-from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
+from PySide6.QtCore import QRectF, Qt
+from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 from shared_ui import palette
 from shared_ui.colors import (
     BG_PRIMARY,

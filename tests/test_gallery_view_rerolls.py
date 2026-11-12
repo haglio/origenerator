@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import (
+from PySide6.QtCore import (
     Qt,
 )
 

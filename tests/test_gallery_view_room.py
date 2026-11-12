@@ -9,12 +9,12 @@ from funestra.main_hud import (
 )
 from funestra.modes import Osr2State
 from funestra.volume import VolumeHud
-from PyQt6.QtCore import (
+from PySide6.QtCore import (
     QPoint,
     Qt,
 )
-from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import (
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import (
     QApplication,
     QLineEdit,
     QWidget,

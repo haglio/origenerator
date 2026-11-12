@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtWidgets import QWidget
 
 from origenerator.gui import media_overlay
 from origenerator.gui.message import Message, time_to_read_ms

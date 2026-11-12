@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QSplitter,
     QTabWidget,
 )

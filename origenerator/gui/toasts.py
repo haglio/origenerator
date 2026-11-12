@@ -6,9 +6,9 @@ import tempfile
 from pathlib import Path
 
 from app_support.win32 import seconds_since_input
-from PyQt6.QtCore import QObject, Qt, QTimer
-from PyQt6.QtGui import QGuiApplication, QIcon
-from PyQt6.QtWidgets import QSystemTrayIcon
+from PySide6.QtCore import QObject, Qt, QTimer
+from PySide6.QtGui import QGuiApplication, QIcon
+from PySide6.QtWidgets import QSystemTrayIcon
 from shared_ui.alert import Level, icon_pixmap_for
 from shared_ui.app_icon import CANVAS
 from shared_ui.preview import Preview, taskbar_identity, window_title

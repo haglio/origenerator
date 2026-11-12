@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import re
 
-from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QToolButton
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import QToolButton
 
 
 def lit_in(switch: QToolButton) -> str:

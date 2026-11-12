@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
-from PyQt6.QtGui import QColor, QMouseEvent
-from PyQt6.QtWidgets import QLabel, QWidget
+from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
+from PySide6.QtGui import QColor, QMouseEvent
+from PySide6.QtWidgets import QLabel, QWidget
 from shared_ui.colors import BORDER_SUBTLE
 
 from origenerator.gui.prompt_boxes import set_in_use

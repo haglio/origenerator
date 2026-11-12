@@ -166,8 +166,8 @@ def test_a_copy_quitting_says_it_is_closing_until_it_lets_go_while_its_process_l
         [sys.executable, "-c", textwrap.dedent(f"""
             import sys
             sys.path.insert(0, {str(REPO_ROOT)!r})
-            from PyQt6.QtCore import QTimer
-            from PyQt6.QtWidgets import QApplication
+            from PySide6.QtCore import QTimer
+            from PySide6.QtWidgets import QApplication
             from origenerator.single_instance import Copies
             app = QApplication(sys.argv[:1])
             claim = Copies({str(tmp_path / "state")!r}).claim_the_library()

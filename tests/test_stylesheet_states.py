@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtGui import QColor
+from PySide6.QtGui import QColor
 from shared_ui.colors import BG_BUTTON, BG_BUTTON_ACTIVE, BLUE
 
 from origenerator.gui.stylesheet import CHOSEN, build_stylesheet

@@ -6,8 +6,8 @@ from datetime import datetime
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QEvent, QMimeData, QPoint, QPointF, QRect, QSize, Qt
-from PyQt6.QtGui import (
+from PySide6.QtCore import QEvent, QMimeData, QPoint, QPointF, QRect, QSize, Qt
+from PySide6.QtGui import (
     QDragEnterEvent,
     QDragLeaveEvent,
     QDragMoveEvent,
@@ -16,8 +16,8 @@ from PyQt6.QtGui import (
     QFocusEvent,
     QPixmap,
 )
-from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import (
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import (
     QApplication,
     QDialogButtonBox,
     QLabel,
@@ -32,6 +32,7 @@ from PyQt6.QtWidgets import (
 from shared_ui.colors import BG_PRIMARY, BLUE, BORDER_SUBTLE, TEXT_MUTED, TEXT_PRIMARY, YELLOW
 from shared_ui.icons import CANVAS
 from shared_ui.spacing import BUTTON_SIZE_HUD
+from shared_ui.testing import appending_to
 from shared_ui.toggle_switch import ToggleSwitch
 
 import origenerator.gui.enhance_pane as enhance_pane_module
@@ -73,6 +74,7 @@ from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE, part_table
 from origenerator.workflows.model_files import NO_LORA
 from tests import gestures
 from tests.drop_style_seen import worn
+from tests.qt_exec import faking_exec
 from tests.text_readers import clip_reader
 
 _FOUND_DETECTORS = ("face_finder.pt", "hand_finder.pt")
@@ -152,7 +154,7 @@ def test_the_switch_flips_and_reports(qtbot):
     switch = ToggleSwitch("Auto-enhance new images")
     qtbot.addWidget(switch)
     flips = []
-    switch.toggled.connect(flips.append)
+    switch.toggled.connect(appending_to(flips))
 
     switch.setChecked(True)
     assert flips == [True]
@@ -661,7 +663,7 @@ def test_save_asks_for_a_name_and_saves_the_settings_on_the_panel_under_it(qtbot
     pane.show_presets(_presets())
     asked = _answering_the_name_box(monkeypatch, "  Bright  ")
     saved = []
-    pane.preset_saved.connect(saved.append)
+    pane.preset_saved.connect(appending_to(saved))
 
     qtbot.mouseClick(pane._preset_button, Qt.MouseButton.LeftButton)
 
@@ -689,7 +691,7 @@ def test_a_blank_name_or_a_cancel_names_nothing(qtbot, monkeypatch, name, ok):
     pane.show_presets(_presets())
     _answering_the_name_box(monkeypatch, name, ok)
     named = []
-    pane.preset_saved.connect(named.append)
+    pane.preset_saved.connect(appending_to(named))
 
     qtbot.mouseClick(pane._preset_button, Qt.MouseButton.LeftButton)
 
@@ -770,7 +772,7 @@ def _mean_ink_without_fonts(widget) -> float:
     """Mean brightness over the app's background, rendered onto a filled pixmap since a bare Qt ``grab`` leaves unpainted pixels uninitialized."""
     pixmap = QPixmap(widget.size())
     pixmap.fill(BG_PRIMARY)
-    widget.render(pixmap, QPoint(), flags=QWidget.RenderFlag.DrawChildren)
+    widget.render(pixmap, QPoint(), renderFlags=QWidget.RenderFlag.DrawChildren)
     image = pixmap.toImage()
     total = 0
     for y in range(image.height()):
@@ -883,7 +885,7 @@ def test_clicking_a_version_reports_its_position(qtbot):
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(2)))
     picked = []
-    versions.version_selected.connect(picked.append)
+    versions.version_selected.connect(appending_to(picked))
 
     row = _rows(versions)[2]
     qtbot.mousePress(row, Qt.MouseButton.LeftButton)
@@ -993,7 +995,7 @@ def test_ctrl_click_adds_to_the_picking(qtbot):
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(2)))
     shown = []
-    versions.version_selected.connect(shown.append)
+    versions.version_selected.connect(appending_to(shown))
 
     _click(qtbot, _rows(versions)[0])
     _click(qtbot, _rows(versions)[1], Qt.KeyboardModifier.ControlModifier)
@@ -1012,7 +1014,7 @@ def test_shift_click_picks_the_run_from_the_version_last_clicked(qtbot, clicked,
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(3)))
     shown = []
-    versions.version_selected.connect(shown.append)
+    versions.version_selected.connect(appending_to(shown))
 
     _click(qtbot, _rows(versions)[clicked])
     _click(qtbot, _rows(versions)[shift_clicked], Qt.KeyboardModifier.ShiftModifier)
@@ -1028,7 +1030,7 @@ def test_an_arrow_after_a_shift_click_steps_on_from_the_version_shift_clicked(qt
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(3)))
     shown = []
-    versions.version_selected.connect(shown.append)
+    versions.version_selected.connect(appending_to(shown))
 
     _click(qtbot, _rows(versions)[0])
     _click(qtbot, _rows(versions)[2], Qt.KeyboardModifier.ShiftModifier)
@@ -1043,7 +1045,7 @@ def _clicked_into(qtbot, position, count=2):
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(count)))
     shown = []
-    versions.version_selected.connect(shown.append)
+    versions.version_selected.connect(appending_to(shown))
     row = _rows(versions)[position]
     _click(qtbot, row)
     return versions, row, shown
@@ -1146,7 +1148,7 @@ def test_enter_on_a_dimmed_enhance_row_enhances_nothing_as_a_click_would_not(qtb
 def test_down_from_the_enhance_row_picks_and_shows_the_top_version_again(qtbot):
     versions, row, enhance_row = _clicked_under_the_enhance_row(qtbot)
     shown = []
-    versions.version_selected.connect(shown.append)
+    versions.version_selected.connect(appending_to(shown))
     qtbot.keyClick(row, Qt.Key.Key_Up)
 
     qtbot.keyClick(row, Qt.Key.Key_Down)
@@ -1168,7 +1170,7 @@ def test_the_arrows_are_the_lists_only_while_a_version_was_the_last_thing_clicke
     window.activateWindow()
     QTest.qWaitForWindowActive(window)
     shown = []
-    versions.version_selected.connect(shown.append)
+    versions.version_selected.connect(appending_to(shown))
     row = _rows(versions)[0]
 
     gestures.click(row, row.rect().center())
@@ -1232,7 +1234,7 @@ def test_delete_and_backspace_trash_the_picked_versions(qtbot):
         qtbot.addWidget(versions)
         versions.show_versions(_items(_versions(2)))
         asked = []
-        versions.delete_requested.connect(asked.append)
+        versions.delete_requested.connect(appending_to(asked))
 
         row = _rows(versions)[0]
         _click(qtbot, row)
@@ -1250,7 +1252,7 @@ def test_deleting_the_only_version_is_refused(qtbot):
         EnhanceVersion(1, "Enhance 1", {"filename": "img.png"}, {"enhance_scale": 2.0}),
     ]))
     asked = []
-    versions.delete_requested.connect(asked.append)
+    versions.delete_requested.connect(appending_to(asked))
 
     _rows(versions)[0].set_selected(True)
     qtbot.keyClick(versions, Qt.Key.Key_Delete)
@@ -1265,7 +1267,7 @@ def test_delete_with_only_the_original_picked_trashes_nothing(qtbot):
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(2)))
     asked = []
-    versions.delete_requested.connect(asked.append)
+    versions.delete_requested.connect(appending_to(asked))
     original = _rows(versions)[2]
     _click(qtbot, original)
 
@@ -1279,7 +1281,7 @@ def test_delete_with_the_original_picked_trashes_only_the_other_picked_versions(
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(2)))
     asked = []
-    versions.delete_requested.connect(asked.append)
+    versions.delete_requested.connect(appending_to(asked))
     newest, _, original = _rows(versions)
     _click(qtbot, newest)
     _click(qtbot, original, Qt.KeyboardModifier.ControlModifier)
@@ -1294,7 +1296,7 @@ def test_a_list_shown_as_not_deletable_ignores_the_delete_key(qtbot):
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(1)), deletable=False)
     asked = []
-    versions.delete_requested.connect(asked.append)
+    versions.delete_requested.connect(appending_to(asked))
 
     row = _rows(versions)[0]
     _click(qtbot, row)
@@ -1308,7 +1310,7 @@ def test_the_context_menu_deletes_what_it_opened_over(qtbot, monkeypatch):
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(2)))
     asked = []
-    versions.delete_requested.connect(asked.append)
+    versions.delete_requested.connect(appending_to(asked))
     chosen = {}
 
     def _exec(self, _pos):
@@ -1317,7 +1319,7 @@ def test_the_context_menu_deletes_what_it_opened_over(qtbot, monkeypatch):
         chosen["enabled"] = action.isEnabled()
         return action
 
-    monkeypatch.setattr(QMenu, "exec", _exec)
+    faking_exec(monkeypatch, QMenu, _exec)
 
     versions._on_row_menu(1, QPoint(0, 0))
 
@@ -1331,7 +1333,7 @@ def test_the_menu_over_picks_that_include_the_original_deletes_the_others(qtbot,
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(2)))
     asked = []
-    versions.delete_requested.connect(asked.append)
+    versions.delete_requested.connect(appending_to(asked))
     chosen = {}
 
     def _exec(self, _pos):
@@ -1339,7 +1341,7 @@ def test_the_menu_over_picks_that_include_the_original_deletes_the_others(qtbot,
         chosen["text"] = action.text()
         return action
 
-    monkeypatch.setattr(QMenu, "exec", _exec)
+    faking_exec(monkeypatch, QMenu, _exec)
     newest, _, original = _rows(versions)
     _click(qtbot, newest)
     _click(qtbot, original, Qt.KeyboardModifier.ControlModifier)
@@ -1355,7 +1357,7 @@ def test_right_clicking_the_original_opens_no_menu(qtbot, monkeypatch):
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(2)))
     opened = []
-    monkeypatch.setattr(QMenu, "exec", lambda self, _pos: opened.append(self))
+    faking_exec(monkeypatch, QMenu, lambda self, _pos: opened.append(self))
 
     versions._on_row_menu(2, QPoint(0, 0))
 
@@ -1369,7 +1371,7 @@ def test_the_menus_delete_grays_out_when_it_would_empty_the_image(qtbot, monkeyp
         EnhanceVersion(1, "Enhance 1", {"filename": "img.png"}, {"enhance_scale": 2.0}),
     ]))
     asked = []
-    versions.delete_requested.connect(asked.append)
+    versions.delete_requested.connect(appending_to(asked))
     seen = {}
 
     def _exec(self, _pos):
@@ -1378,7 +1380,7 @@ def test_the_menus_delete_grays_out_when_it_would_empty_the_image(qtbot, monkeyp
         seen["enabled"] = action.isEnabled() if action else None
         return action
 
-    monkeypatch.setattr(QMenu, "exec", _exec)
+    faking_exec(monkeypatch, QMenu, _exec)
 
     versions._on_row_menu(0, QPoint(0, 0))
 
@@ -1401,7 +1403,7 @@ def test_the_menu_says_a_videos_versions_are_not_deleted_from_here(qtbot, monkey
         seen["enabled"] = action.isEnabled()
         return action
 
-    monkeypatch.setattr(QMenu, "exec", _exec)
+    faking_exec(monkeypatch, QMenu, _exec)
 
     versions._on_row_menu(0, QPoint(0, 0))
 
@@ -1420,7 +1422,7 @@ def test_pressing_a_versions_trash_can_deletes_that_level(qtbot):
     with qtbot.waitExposed(versions):
         versions.show()
     asked = []
-    versions.delete_requested.connect(asked.append)
+    versions.delete_requested.connect(appending_to(asked))
 
     qtbot.mouseClick(_trash(_rows(versions)[1]), Qt.MouseButton.LeftButton)
 
@@ -1432,7 +1434,7 @@ def test_a_versions_trash_can_deletes_only_its_own_version_whatever_is_picked(qt
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(2)))
     asked = []
-    versions.delete_requested.connect(asked.append)
+    versions.delete_requested.connect(appending_to(asked))
     _click(qtbot, _rows(versions)[0])
     _click(qtbot, _rows(versions)[1], Qt.KeyboardModifier.ControlModifier)
 
@@ -1528,7 +1530,7 @@ def test_the_add_tile_leads_the_strip_and_reports_its_press(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(1)), add=EnhanceOffer("2x · 20 steps", None))
-    tiles = versions._host.findChildren((_VersionRow, _AddRow))
+    tiles = [tile for tile in versions._host.findChildren(QWidget) if isinstance(tile, (_VersionRow, _AddRow))]
     assert isinstance(tiles[0], _AddRow)
 
     pressed = []
@@ -1542,7 +1544,8 @@ def test_a_running_enhance_takes_the_add_tiles_slot_rather_than_sitting_beside_i
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(1)), pending=RunningEnhancement("running", None, "2x"),
                          add=EnhanceOffer("2x", None))
-    tiles = versions._host.findChildren((_PendingRow, _AddRow, _VersionRow))
+    tiles = [tile for tile in versions._host.findChildren(QWidget)
+             if isinstance(tile, (_PendingRow, _AddRow, _VersionRow))]
     assert isinstance(tiles[0], _PendingRow)
     assert not versions._host.findChildren(_AddRow)
 
@@ -1745,7 +1748,7 @@ def test_a_running_enhance_leads_the_strip(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(1)), RunningEnhancement("running", None, "2x"))
-    tiles = versions._host.findChildren((_PendingRow, _VersionRow))
+    tiles = [tile for tile in versions._host.findChildren(QWidget) if isinstance(tile, (_PendingRow, _VersionRow))]
     assert isinstance(tiles[0], _PendingRow)
 
 

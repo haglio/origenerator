@@ -3,9 +3,9 @@ from __future__ import annotations
 from unittest.mock import MagicMock, call
 
 import pytest
-from PyQt6.QtCore import QEvent, Qt
-from PyQt6.QtGui import QKeyEvent
-from PyQt6.QtWidgets import QApplication, QWidget
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtGui import QKeyEvent
+from PySide6.QtWidgets import QApplication, QWidget
 
 from origenerator.comfyui_api import ForeignQueue
 from origenerator.comfyui_client import ComfyUIClient

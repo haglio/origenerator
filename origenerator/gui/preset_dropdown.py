@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import re
 
-from PyQt6.QtCore import QRegularExpression, QSize, pyqtSignal
-from PyQt6.QtGui import QRegularExpressionValidator
-from PyQt6.QtWidgets import QComboBox, QStyle, QStyleOptionComboBox
+from PySide6.QtCore import QRegularExpression, QSize, Signal
+from PySide6.QtGui import QRegularExpressionValidator
+from PySide6.QtWidgets import QComboBox, QStyle, QStyleOptionComboBox
 
 from origenerator.gui.no_wheel import NoWheelDropdown
 
@@ -14,7 +14,7 @@ _WHAT_THE_LINE_EDIT_KEEPS_FOR_ITSELF = 2 * _PIXELS_EITHER_SIDE_OF_THE_TEXT + _PI
 
 
 class PresetDropdown(NoWheelDropdown):
-    edited = pyqtSignal()
+    edited = Signal()
 
     def __init__(self, presets, unit: str = "", parent=None):
         super().__init__(parent)

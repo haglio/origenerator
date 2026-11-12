@@ -5,16 +5,16 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-from PyQt6.QtCore import (
+from PySide6.QtCore import (
     QEvent,
     QPoint,
     Qt,
 )
-from PyQt6.QtGui import (
+from PySide6.QtGui import (
     QIcon,
     QKeyEvent,
 )
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication,
     QLineEdit,
     QMainWindow,
@@ -73,6 +73,7 @@ from tests.gallery_view_support import (
     _video_workflow,
     _workflow_rows,
 )
+from tests.qt_exec import faking_exec
 from tests.test_folder_tree import _shown
 
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
@@ -535,8 +536,7 @@ def test_an_item_in_the_trash_gets_none_of_an_ordinary_items_right_click_menu(
     view = GalleryView(_emptied_db())
     _in_the_trash(view, qtbot)
     opened = []
-    monkeypatch.setattr("origenerator.gui.gallery_view.QMenu.exec",
-                        lambda menu, *at: opened.append([act.text() for act in menu.actions()]))
+    faking_exec(monkeypatch, QMenu, lambda menu, *at: opened.append([act.text() for act in menu.actions()]))
     assert view.row_for("d1") is not None
 
     view.generation_menu(["d1"], QPoint())
@@ -882,7 +882,7 @@ def test_right_clicking_an_unpicked_thumbnail_selects_it(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    monkeypatch.setattr("origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: None)
+    faking_exec(monkeypatch, QMenu, lambda self, *a: None)
 
     view._gallery_pane._thumbnail_context_menu("i2", QPoint(0, 0))
 
@@ -896,8 +896,8 @@ def test_right_click_delete_removes_the_picked_thumbnails(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    monkeypatch.setattr(
-        "origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: self.actions()[-1]
+    faking_exec(monkeypatch, QMenu,
+        lambda self, *a: self.actions()[-1]
     )
 
     view._gallery_pane._thumbnail_context_menu("i1", QPoint(0, 0))
@@ -915,8 +915,8 @@ def test_right_click_delete_acts_on_the_whole_multi_selection(qtbot, monkeypatch
     _open_leaf(view)
     view._gallery_pane.apply_selection("i1", _NO_MOD)
     view._gallery_pane.apply_selection("i3", _CTRL)
-    monkeypatch.setattr(
-        "origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: self.actions()[-1]
+    faking_exec(monkeypatch, QMenu,
+        lambda self, *a: self.actions()[-1]
     )
 
     view._gallery_pane._thumbnail_context_menu("i3", QPoint(0, 0))
@@ -933,7 +933,7 @@ def test_right_clicking_a_selected_tile_preserves_the_multi_selection(qtbot, mon
     _open_leaf(view)
     view._gallery_pane.apply_selection("i1", _NO_MOD)
     view._gallery_pane.apply_selection("i3", _CTRL)
-    monkeypatch.setattr("origenerator.gui.gallery_view.QMenu.exec", lambda self, *a: None)
+    faking_exec(monkeypatch, QMenu, lambda self, *a: None)
 
     qtbot.mouseClick(view._gallery_pane._thumb_widgets["i3"], Qt.MouseButton.RightButton)
 

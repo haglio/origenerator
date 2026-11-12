@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import weakref
 
-from PyQt6.QtGui import QMovie
+from PySide6.QtGui import QMovie
 
 
 class _TheRoom:

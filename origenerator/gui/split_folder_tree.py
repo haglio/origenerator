@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import (
     QButtonGroup,
     QFrame,
     QHBoxLayout,
@@ -96,13 +96,13 @@ def _rule() -> QFrame:
 
 
 class SplitFolderTree(QWidget):
-    shapes_changed = pyqtSignal()
-    currentItemChanged = pyqtSignal(object, object)
-    itemSelectionChanged = pyqtSignal()
-    favorite_clicked = pyqtSignal(object)
-    delete_clicked = pyqtSignal(object)
-    dropped = pyqtSignal(str, list, list)
-    context_menu_requested = pyqtSignal(object, object, str)
+    shapes_changed = Signal()
+    currentItemChanged = Signal(object, object)
+    itemSelectionChanged = Signal()
+    favorite_clicked = Signal(object)
+    delete_clicked = Signal(object)
+    dropped = Signal(str, list, list)
+    context_menu_requested = Signal(object, object, str)
 
     def __init__(self, group_role, takes_item=lambda _row_key, _prompt_id: False,
                  takes_folder=lambda _row_key, _folder_key: True, parent=None):

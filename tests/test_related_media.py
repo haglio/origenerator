@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import pytest
 from PIL import Image
-from PyQt6.QtCore import QEvent, QPoint, Qt
-from PyQt6.QtGui import QColor, QHelpEvent, QImage, QMouseEvent
-from PyQt6.QtWidgets import QApplication, QToolTip
+from PySide6.QtCore import QEvent, QPoint, Qt
+from PySide6.QtGui import QColor, QHelpEvent, QImage, QMouseEvent
+from PySide6.QtWidgets import QApplication, QToolTip
 from shared_ui.spacing import GAP_DIALOG
+from shared_ui.testing import appending_to
 
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.looping_preview import what_plays_in
@@ -447,7 +448,7 @@ def test_a_request_whose_image_is_gone_leaves_no_link_to_it(make_related):
 
 def _left_press():
     return QMouseEvent(
-        QMouseEvent.Type.MouseButtonPress, QPoint(1, 1).toPointF(),
+        QMouseEvent.Type.MouseButtonPress, QPoint(1, 1).toPointF(), QPoint(1, 1).toPointF(),
         Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
         Qt.KeyboardModifier.NoModifier)
 
@@ -457,7 +458,7 @@ def test_a_click_on_a_requested_into_link_names_that_image(make_related):
                            requests=[_request("img2", "img1", asked="two dogs")])
     related.show_row(_image_row(), [])
     named = []
-    related.link_clicked.connect(named.append)
+    related.link_clicked.connect(appending_to(named))
 
     tile, = related._requests.findChildren(SourceTile)
     tile.mousePressEvent(_left_press())
@@ -594,11 +595,11 @@ def test_a_click_on_an_animation_names_the_video_that_was_clicked(make_related):
     related = make_related(_video_row())
     related.show_row(image, [image])
     named = []
-    related.link_clicked.connect(named.append)
+    related.link_clicked.connect(appending_to(named))
 
     tile, = related._animations.findChildren(SourceTile)
     tile.mousePressEvent(QMouseEvent(
-        QMouseEvent.Type.MouseButtonPress, QPoint(1, 1).toPointF(),
+        QMouseEvent.Type.MouseButtonPress, QPoint(1, 1).toPointF(), QPoint(1, 1).toPointF(),
         Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
         Qt.KeyboardModifier.NoModifier))
 
@@ -667,7 +668,7 @@ def test_a_click_on_the_source_tile_names_the_item_it_points_at(related):
     image = _image_row()
     related.show_row(_video_row(), [image])
     named = []
-    related.link_clicked.connect(named.append)
+    related.link_clicked.connect(appending_to(named))
 
     source_tile(related).activated.emit("img1")
 
@@ -708,7 +709,7 @@ def test_a_click_on_the_source_video_names_that_video(make_related):
     related = make_related(_video_row("vid0"))
     related.show_row(_combined_row(), [_image_row()])
     named = []
-    related.link_clicked.connect(named.append)
+    related.link_clicked.connect(appending_to(named))
 
     settings_tile(related).activated.emit("vid0")
 

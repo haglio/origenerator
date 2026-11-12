@@ -1,9 +1,9 @@
 """Qt passes a drop up to the first widget that takes drops and stops only where the drag was taken."""
 from __future__ import annotations
 
-from PyQt6.QtCore import QPointF, Qt
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent
-from PyQt6.QtWidgets import QApplication, QWidget
+from PySide6.QtCore import QPointF, Qt
+from PySide6.QtGui import QDragEnterEvent, QDropEvent
+from PySide6.QtWidgets import QApplication, QWidget
 
 from origenerator.gui.generation_drag import generation_mime
 

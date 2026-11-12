@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from shared_ui.colors import BORDER_SUBTLE
 from shared_ui.spacing import BUTTON_RADIUS, GAP_SMALL
 
@@ -29,7 +29,7 @@ def _in_lines(heading: str, width_of) -> str:
 
 
 class SourceTile(QWidget):
-    activated = pyqtSignal(str)
+    activated = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)

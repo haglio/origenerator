@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QSize
-from PyQt6.QtGui import QColor, QImage
+from PySide6.QtCore import QSize
+from PySide6.QtGui import QColor, QImage
 
 from origenerator.gallery.enhance import EnhanceVersion
 from origenerator.gui.drop_zone import DropZone, ZoneLookups

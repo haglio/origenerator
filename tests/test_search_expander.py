@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import threading
 
-from PyQt6 import sip
-from PyQt6.QtCore import QThreadPool
+import shiboken6
+from PySide6.QtCore import QThreadPool
 
 from origenerator.gui.search_expander import SearchExpander
 
@@ -117,7 +117,7 @@ def test_a_widening_that_lands_after_its_expander_is_gone_is_dropped(qtbot):
     release = threading.Event()
     expander = SearchExpander(expand=lambda q: release.wait(3) and {"cat": ("kitten",)})
     expander.request("cat")
-    sip.delete(expander)
+    shiboken6.delete(expander)
 
     release.set()
     assert QThreadPool.globalInstance().waitForDone(3000)

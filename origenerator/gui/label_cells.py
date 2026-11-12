@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from PyQt6 import sip
-from PyQt6.QtCore import QRect, QSize
-from PyQt6.QtWidgets import QWIDGETSIZE_MAX, QFormLayout, QHBoxLayout, QWidget
+import shiboken6
+from PySide6.QtCore import QRect, QSize
+from PySide6.QtWidgets import QFormLayout, QHBoxLayout, QWidget
 
 from origenerator.gui.warning_mark import WarningMark
+from origenerator.gui.widget_size import QWIDGETSIZE_MAX
 
 
 class LabelColumn:
@@ -20,7 +21,7 @@ class LabelColumn:
         return max((cell.natural_width() for cell in self._living()), default=0)
 
     def _living(self) -> list[LabelCell]:
-        self._cells = [cell for cell in self._cells if not sip.isdeleted(cell)]
+        self._cells = [cell for cell in self._cells if shiboken6.isValid(cell)]
         return self._cells
 
     def width(self) -> int:

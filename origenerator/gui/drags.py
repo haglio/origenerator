@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 
 
 class _UnderWay(QObject):
-    started = pyqtSignal(object, object)
-    ended = pyqtSignal()
+    started = Signal(object, object)
+    ended = Signal()
 
 
 under_way = _UnderWay()

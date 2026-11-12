@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
+from PySide6.QtCore import QPoint, QRect, QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
 from shared_ui.palette import TEXT_MUTED, as_hex
 from shared_ui.spacing import BUTTON_RADIUS
 
@@ -22,9 +22,9 @@ _MADE_FROM_NOTHING = Combination()
 
 
 class GeneratingTile(QFrame):
-    cancel_requested = pyqtSignal()
-    selected = pyqtSignal()
-    context_requested = pyqtSignal(QPoint)
+    cancel_requested = Signal()
+    selected = Signal()
+    context_requested = Signal(QPoint)
 
     def __init__(self, job, parent=None, *, populating=False,
                  typical_seconds=None, made_from=_MADE_FROM_NOTHING):

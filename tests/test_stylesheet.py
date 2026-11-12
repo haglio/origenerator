@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from PIL import Image
-from PyQt6.QtCore import QPoint
-from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QPoint
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import (
     QApplication,
     QLabel,
     QMenu,

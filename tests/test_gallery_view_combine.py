@@ -4,13 +4,13 @@ import json
 from unittest.mock import MagicMock
 
 import pytest
+import shiboken6
 from PIL import Image
-from PyQt6 import sip
-from PyQt6.QtCore import (
+from PySide6.QtCore import (
     QPoint,
     Qt,
 )
-from PyQt6.QtGui import (
+from PySide6.QtGui import (
     QDrag,
     QPixmap,
 )
@@ -51,6 +51,7 @@ from tests.gallery_view_support import (
     _selected_folder,
     _write_looping_webp,
 )
+from tests.qt_exec import faking_exec
 from tests.related_links import settings_tile, source_tile
 from tests.test_combine import _listed_under_recent
 
@@ -1024,7 +1025,7 @@ def _lit_while_dragging(monkeypatch, drag_out, mime, zones) -> dict:
     def drag_loop(_drag, _action):
         lit.update({name: zone._label.property("dragActive") for name, zone in zones.items()})
 
-    monkeypatch.setattr(QDrag, "exec", drag_loop)
+    faking_exec(monkeypatch, QDrag, drag_loop)
     drag_out.start(mime, QPixmap())
     return lit
 
@@ -1101,15 +1102,15 @@ def test_a_thumbnail_redrawn_away_mid_drag_still_puts_its_combine_slot_out(
         view._db.update_generation("vid", thumbnail_path="moved.jpg")
         view.refresh()
         in_flight["zone lit"] = zone.property("dragActive")
-        in_flight["drag alive"] = not sip.isdeleted(drag)
+        in_flight["drag alive"] = shiboken6.isValid(drag)
 
-    monkeypatch.setattr(QDrag, "exec", drag_loop_through_a_grid_redraw)
+    faking_exec(monkeypatch, QDrag, drag_loop_through_a_grid_redraw)
 
     qtbot.mousePress(tile, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
     qtbot.mouseMove(tile, QPoint(120, 120))
     qtbot.mouseRelease(view, Qt.MouseButton.LeftButton)
 
-    assert sip.isdeleted(tile)
+    assert not shiboken6.isValid(tile)
     assert in_flight == {"zone lit": True, "drag alive": True}
     assert zone.property("dragActive") is False
 

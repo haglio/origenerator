@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtCore import QPoint, QPointF, Qt
-from PyQt6.QtGui import QColor, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent
-from PyQt6.QtWidgets import QApplication, QHBoxLayout, QLabel, QStyle, QVBoxLayout, QWidget
+from PySide6.QtCore import QPoint, QPointF, Qt
+from PySide6.QtGui import QColor, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent
+from PySide6.QtWidgets import QApplication, QHBoxLayout, QLabel, QStyle, QVBoxLayout, QWidget
 from shared_ui.colors import BG_SECONDARY, BLUE, hovered
 from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP
-from shared_ui.testing import ground
+from shared_ui.testing import appending_to, ground
 from shared_ui.tick_control import TickControl
 
 from origenerator import action_settings
@@ -181,7 +181,7 @@ def test_clicking_generate_asks_for_the_dropped_pair(qtbot):
     combine.image_zone.set_item("img1")
     combine.video_zone.set_item("vid1")
     got = []
-    combine.combine_requested.connect(got.append)
+    combine.combine_requested.connect(appending_to(got))
 
     combine._generate_btn.click()
 
@@ -288,7 +288,7 @@ def test_clicking_open_emits_the_dropped_video_for_the_generator(qtbot):
     combine.image_zone.set_item("img1")
     combine.video_zone.set_item("vid1")
     opened = []
-    combine.combine_requested.connect(opened.append)
+    combine.combine_requested.connect(appending_to(opened))
 
     combine._open_btn.click()
 
@@ -301,7 +301,7 @@ def test_clicking_open_with_a_picked_action_emits_the_category(qtbot):
     combine.image_zone.set_item("img1")
     _pick_action(combine, "alpha + beta")
     opened = []
-    combine.combine_requested.connect(opened.append)
+    combine.combine_requested.connect(appending_to(opened))
 
     combine._open_btn.click()
 
@@ -314,7 +314,7 @@ def test_a_checkbox_beside_the_action_list_rides_on_what_combine_asks_for(qtbot)
     combine.image_zone.set_item("img1")
     _pick_action(combine, "beta")
     asked = []
-    combine.combine_requested.connect(asked.append)
+    combine.combine_requested.connect(appending_to(asked))
     box = combine.findChild(TickControl, combine_checkbox("third box"))
 
     box.click()
@@ -780,7 +780,7 @@ def test_generate_emits_the_picked_action(qtbot):
     combine.image_zone.set_item("img1")
     _pick_action(combine, "alpha + beta")
     cats = []
-    combine.combine_requested.connect(cats.append)
+    combine.combine_requested.connect(appending_to(cats))
 
     combine._generate_btn.click()
 
@@ -829,7 +829,7 @@ def test_generate_carries_the_chosen_lane(qtbot):
     _pick_action(combine, "alpha")
     _pick_lane(combine, action_settings.GENAU)
     cats = []
-    combine.combine_requested.connect(cats.append)
+    combine.combine_requested.connect(appending_to(cats))
 
     combine._generate_btn.click()
 
@@ -840,7 +840,7 @@ def test_generate_carries_the_chosen_lane(qtbot):
 def test_switching_the_lane_announces_it_once(qtbot):
     combine = _panel(qtbot)
     heard = []
-    combine.intent_changed.connect(heard.append)
+    combine.intent_changed.connect(appending_to(heard))
 
     _pick_lane(combine, action_settings.GENAU)
     assert heard == [action_settings.GENAU], (

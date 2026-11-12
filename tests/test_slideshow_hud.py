@@ -14,8 +14,8 @@ from funestra.modes import Osr2State
 from funestra.satellite_hud import MARGIN
 from funestra.scrubber_bar import SCRUBBER_HEIGHT
 from funestra.testing import FakeEngine
-from PyQt6.QtCore import QEvent, QPoint, QPointF
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtCore import QEvent, QPoint, QPointF
+from PySide6.QtWidgets import QApplication
 
 from origenerator.gui.hud_queue import CANCEL, OPEN
 from origenerator.gui.inflight import EMPTY_QUEUE_TEXT, InFlightItem, RunReading

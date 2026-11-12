@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QObject, QTimer
-from PyQt6.QtWidgets import QWidget
+import shiboken6
+from PySide6.QtCore import QObject, QTimer
+from PySide6.QtWidgets import QWidget
 
 from origenerator.gui.deferred import defer
 
@@ -27,8 +28,7 @@ def test_work_deferred_by_a_dead_owner_never_runs(qtbot):
     ran = []
     defer(owner, lambda: ran.append("stale"))
 
-    owner.deleteLater()
-    del owner
+    shiboken6.delete(owner)
     _pump(qtbot)
 
     assert ran == []

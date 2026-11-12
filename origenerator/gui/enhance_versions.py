@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from typing import NamedTuple
 
-from PyQt6.QtCore import QByteArray, QMimeData, QPoint, Qt, pyqtSignal
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QByteArray, QMimeData, QPoint, Qt, Signal
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import (
     QGraphicsOpacityEffect,
     QGridLayout,
     QHBoxLayout,
@@ -189,9 +189,9 @@ class _Row(QWidget):
 
 
 class _VersionRow(_Row):
-    clicked = pyqtSignal(int, Qt.KeyboardModifier)
-    context_requested = pyqtSignal(int, QPoint)
-    delete_pressed = pyqtSignal(int)
+    clicked = Signal(int, Qt.KeyboardModifier)
+    context_requested = Signal(int, QPoint)
+    delete_pressed = Signal(int)
 
     def __init__(self, version, position: int, image_path, dating: Dating = UNDATED,
                  deletable: bool = False):
@@ -279,8 +279,8 @@ class _PendingRow(_Row):
 
 
 class _AddRow(_Row):
-    clicked = pyqtSignal()
-    hovered = pyqtSignal(bool)
+    clicked = Signal()
+    hovered = Signal(bool)
 
     def __init__(self, settings: str, duplicate_of: int | None, parent=None):
         super().__init__("Enhance", parent)
@@ -319,9 +319,9 @@ class _AddRow(_Row):
 
 
 class EnhanceVersions(QWidget):
-    version_selected = pyqtSignal(int)
-    enhance_requested = pyqtSignal()
-    delete_requested = pyqtSignal(list)
+    version_selected = Signal(int)
+    enhance_requested = Signal()
+    delete_requested = Signal(list)
 
     def __init__(self, parent=None):
         super().__init__(parent)

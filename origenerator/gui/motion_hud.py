@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from PySide6.QtCore import Qt
 
 
 def apply_motion_key(motion, key, *, on_drive_toggle=None) -> bool:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import html
 import re
 
-from PyQt6.QtCore import Qt
+from PySide6.QtCore import Qt
 
 _LEADING_MARK = re.compile(r"^<img[^>]*>&nbsp;")
 

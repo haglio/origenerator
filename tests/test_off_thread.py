@@ -4,8 +4,8 @@ import gc
 import threading
 
 import pytest
-from PyQt6 import sip
-from PyQt6.QtCore import QObject
+import shiboken6
+from PySide6.QtCore import QObject
 
 from origenerator.gui.off_thread import _in_flight, _Result, _Task, run_off_thread
 
@@ -76,7 +76,7 @@ def test_the_carrier_is_held_from_a_root_until_it_delivers(qtbot, owner):
 
 def test_an_answer_whose_carrier_the_app_took_on_its_way_out_is_let_go_of(qtbot):
     result = _Result()
-    sip.delete(result)
+    shiboken6.delete(result)
 
     _Task(lambda: "too late", result).run()
 
@@ -87,7 +87,7 @@ def test_an_answer_that_lands_after_its_owner_is_gone_is_dropped(qtbot, owner):
 
     run_off_thread(lambda: release.wait(5) and "late", got.append, owner=owner)
     carrier = _in_flight - before
-    sip.delete(owner)
+    shiboken6.delete(owner)
     release.set()
     qtbot.waitUntil(lambda: not carrier & _in_flight, timeout=5000)
 

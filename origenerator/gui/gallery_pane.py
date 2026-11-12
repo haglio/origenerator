@@ -6,9 +6,9 @@ from functools import partial
 from pathlib import Path
 from typing import NamedTuple
 
-from PyQt6 import sip
-from PyQt6.QtCore import QObject, QPoint, Qt, pyqtSignal
-from PyQt6.QtWidgets import (
+import shiboken6
+from PySide6.QtCore import QObject, QPoint, Qt, Signal
+from PySide6.QtWidgets import (
     QLabel,
     QMenu,
     QScrollArea,
@@ -80,7 +80,7 @@ SEARCH_DRAW_LIMIT = 200
 
 
 class GalleryPaneScrollArea(QScrollArea):
-    background_clicked = pyqtSignal()
+    background_clicked = Signal()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -119,7 +119,7 @@ class _KeptTiles:
 
     def take(self, prompt_id: str, look: tuple, wiring: str):
         tile = self._tiles.pop(prompt_id, None)
-        if (tile is None or sip.isdeleted(tile) or tile.look != look
+        if (tile is None or not shiboken6.isValid(tile) or tile.look != look
                 or self._wiring.get(prompt_id) != wiring):
             return None
         return tile
@@ -260,22 +260,22 @@ class PaneHost:
 
 
 class GalleryPane(QObject):
-    thumbnail_activated = pyqtSignal(str)
-    tab_pin_requested = pyqtSignal()
-    slideshow_requested = pyqtSignal(str)
-    item_jump_requested = pyqtSignal(str)
-    folder_open_requested = pyqtSignal(str)
-    reveal_reroll_requested = pyqtSignal(str)
-    folder_menu_requested = pyqtSignal(str, QPoint)
-    menu_requested = pyqtSignal(list, QPoint)
-    trash_menu_requested = pyqtSignal(QPoint)
-    item_action_triggered = pyqtSignal(str, str)
-    seed_reroll_requested = pyqtSignal(str, str)
-    experiment_verdict = pyqtSignal(str, str)
-    trash_action_triggered = pyqtSignal(str, str)
-    cancel_requested = pyqtSignal(str)
-    selection_changed = pyqtSignal()
-    pane_reset = pyqtSignal()
+    thumbnail_activated = Signal(str)
+    tab_pin_requested = Signal()
+    slideshow_requested = Signal(str)
+    item_jump_requested = Signal(str)
+    folder_open_requested = Signal(str)
+    reveal_reroll_requested = Signal(str)
+    folder_menu_requested = Signal(str, QPoint)
+    menu_requested = Signal(list, QPoint)
+    trash_menu_requested = Signal(QPoint)
+    item_action_triggered = Signal(str, str)
+    seed_reroll_requested = Signal(str, str)
+    experiment_verdict = Signal(str, str)
+    trash_action_triggered = Signal(str, str)
+    cancel_requested = Signal(str)
+    selection_changed = Signal()
+    pane_reset = Signal()
 
     def __init__(self, scroll, db, jobs, populate, host: PaneHost):
         super().__init__()

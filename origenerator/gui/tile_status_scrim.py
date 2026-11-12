@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QLabel
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QLabel
 from shared_ui.palette import BLACK, WHITE, as_hex, as_rgba
 from shared_ui.spacing import BUTTON_RADIUS
 

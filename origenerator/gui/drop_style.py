@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, QRectF, Qt
-from PyQt6.QtGui import QPainter, QPen
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtCore import QEvent, QRectF, Qt
+from PySide6.QtGui import QPainter, QPen
+from PySide6.QtWidgets import QWidget
 from shared_ui.colors import BG_TERTIARY, BLUE, hovered
 from shared_ui.spacing import BUTTON_RADIUS
 

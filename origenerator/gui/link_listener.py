@@ -5,7 +5,7 @@ import os
 from collections.abc import Callable
 from pathlib import Path
 
-from PyQt6.QtCore import QObject
+from PySide6.QtCore import QObject
 from shared_ui import running_copy
 
 from origenerator import app_link

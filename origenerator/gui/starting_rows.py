@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.inflight import InFlightItem, RunReading
 
 
 class StartingRows(QObject):
-    changed = pyqtSignal()
+    changed = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)

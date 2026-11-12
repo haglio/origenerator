@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PyQt6.QtGui import QColor, QImage
-from PyQt6.QtMultimedia import QVideoFrame
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtGui import QColor, QImage
+from PySide6.QtMultimedia import QVideoFrame
+from PySide6.QtWidgets import QApplication
 
 from origenerator.gui.video_surface import VideoSurface
 

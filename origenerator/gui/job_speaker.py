@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from PyQt6.QtCore import QObject, QThread
+from PySide6.QtCore import QObject, QThread
 
 from origenerator import speech
 from origenerator.config import COMFYUI_INPUT_DIR, SPEECH_PYTHON

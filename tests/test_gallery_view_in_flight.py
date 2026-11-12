@@ -2062,6 +2062,23 @@ def test_a_generate_that_lands_leaves_the_prompt_plain_under_what_it_made(qtbot,
     assert _struck_and_lit(field) == ("", "")
 
 
+def test_a_run_lands_after_the_tab_that_launched_it_is_closed(qtbot, tmp_path):
+    db = _seeded_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel, _ = _edited_tab_showing_the_saved_image(view, qtbot)
+    panel._on_generate()
+    job = next(iter(view._live_jobs.values()))
+    view._generate_pane._close_subtab(view._generate_pane.indexOf(panel))
+
+    _finish_reroll(view, job)
+
+    assert db.get_generation(job.prompt_id) is not None, (
+        "the gallery owns every job and a tab keeps only the ids of the runs it started, so a "
+        "run goes on and lands once the tab that launched it is closed")
+
+
 def test_a_duplicate_generate_switches_the_front_tab_to_a_random_seed(qtbot, tmp_path):
     db = _seeded_db(tmp_path, seed=42)
     view = GalleryView(db, client=_reroll_client())
@@ -2345,6 +2362,28 @@ def test_the_prompt_says_how_many_jobs_go(qtbot):
     assert asked == [3]
 
 
+def _questions_asked(monkeypatch):
+    asked = []
+    monkeypatch.setattr(QMessageBox, "question", staticmethod(
+        lambda _parent, title, text, *_a, **_kw: asked.append((title, text))
+        or QMessageBox.StandardButton.No))
+    return asked
+
+
+def test_the_prompt_says_what_the_user_queued_is_left_alone(qtbot, monkeypatch):
+    client = _QueueClient(ForeignQueue(running=["r"], pending=["a"]))
+    view = _queue_view(qtbot, client)
+    view._poll()
+    asked = _questions_asked(monkeypatch)
+
+    view._queue._clear.click()
+
+    [(_title, text)] = asked
+    assert "Anything you queued from here is left alone" in text, (
+        "the button sits beside a caption that is often the user's own running job, so the "
+        "question says the user's own jobs are not among those it drops")
+
+
 def test_a_failed_clear_is_surfaced_not_swallowed(qtbot, monkeypatch):
     client = _QueueClient(ForeignQueue(running=[], pending=["a"]),
                           fail=OSError("ComfyUI is not responding"))
@@ -2414,10 +2453,7 @@ def test_cancel_all_cancels_every_job_from_the_back_of_the_line_forward(qtbot, m
 
 
 def test_cancel_all_asks_about_the_jobs_it_would_cancel(qtbot, monkeypatch):
-    asked = []
-    monkeypatch.setattr(QMessageBox, "question", staticmethod(
-        lambda _parent, title, text, *_a, **_kw: asked.append((title, text))
-        or QMessageBox.StandardButton.No))
+    asked = _questions_asked(monkeypatch)
     for held in ([_cancelable("a", []), _cancelable("b", []),
                   InFlightItem(key="c", caption="Alpha Workflow \u203a a paper kite",
                                reading=RunReading(status="queued"), reveal=lambda: None)],

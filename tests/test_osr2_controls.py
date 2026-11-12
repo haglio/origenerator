@@ -591,6 +591,24 @@ def test_no_state_draws_the_osr2_controls_outside_the_room_kept_for_them():
         assert height <= room_height, fit
 
 
+def test_the_readouts_trace_is_what_the_device_is_sent_from_the_playhead_on(qtbot):
+    live = FakeMotion().state
+    live.state.playing = True
+    motion_engine.set_amplitude(live.state, 40)
+    motion_engine.set_center(live.state, 60)
+    motion_engine.cycle_shape(live.state)
+    motion_engine.advance(live, 0.37)
+
+    hud = drive_hud(live, active=True)
+
+    knot_s = hud.trace_seconds / (len(hud.waveform) - 1)
+    sent = [motion_engine.position_ahead(live, (knot - hud.slide) * knot_s) / 100
+            for knot in range(len(hud.waveform))]
+    assert hud.waveform == pytest.approx(sent), (
+        "the trace draws the samples the device is being sent, so the readout is the motion "
+        "rather than a drawing of it")
+
+
 def test_the_readout_holds_the_waves_drawing_still_between_knots(qtbot):
     motion = FakeMotion()
     live = motion.state

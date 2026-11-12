@@ -1064,7 +1064,9 @@ def test_dropping_a_row_onto_the_lower_half_puts_it_after(queue):
 
     _drop(queue, "b", at_row=2, on_top_half=False)
 
-    assert asked == [("b", "d")]
+    assert asked == [("b", "d")], (
+        "the hint that fills an empty line shares the rows' column and is no row, so a drop or a "
+        "reorder reckons only with the jobs")
 
 
 def test_a_row_let_go_past_the_last_one_asks_for_the_end_of_the_line(queue):

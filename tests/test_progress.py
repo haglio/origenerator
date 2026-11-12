@@ -76,10 +76,10 @@ def test_every_video_workflow_costs_its_audio_pass_against_its_video_one():
         assert audio / total < 0.1, name
 
 
-def test_a_still_workflow_is_costed_flat_having_no_clip_to_measure():
+def test_a_still_workflow_costs_its_enhance_tail_like_its_base_render():
     costs = sampler_costs(_payload("sdxl_t2i", steps=50, enhance=True, enhance_steps=20))
     assert {cost for _, cost in costs.values()} == {0.5}, (
-        "the enhance tail re-samples the base render at twice the width and is still costed "
+        "the enhance tail re-samples the base render larger and is still costed "
         "like it: a couple of seconds misplaced, left as a known flat spot rather than a walk "
         "back through the graph for a scale factor")
 

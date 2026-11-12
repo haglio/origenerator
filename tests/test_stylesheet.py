@@ -203,9 +203,10 @@ def test_a_step_button_sits_one_step_lighter_under_the_pointer(qtbot, pointer):
 def test_the_drawn_arrow_is_narrower_than_the_step_button_it_sits_in(qtbot, tmp_path):
     up, _ = arrow_paths(TEXT_PRIMARY, tmp_path)
 
-    assert Image.open(up).width < _spin_down_rect(_styled_spinner(qtbot)).width(), (
-        "the arrow is a small triangle sized to sit inside the step button the stylesheet gives "
-        "the spinner")
+    with Image.open(up) as arrow:
+        assert arrow.width < _spin_down_rect(_styled_spinner(qtbot)).width(), (
+            "the arrow is a small triangle sized to sit inside the step button the stylesheet "
+            "gives the spinner")
 
 
 def _tab_bar_image(qtbot):

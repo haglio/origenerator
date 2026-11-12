@@ -4,6 +4,8 @@ import json
 import threading
 from dataclasses import dataclass
 
+from app_support.watch_weights import COUNT_FIELDS
+
 from origenerator.box_breaks import unboxed
 from origenerator.db_connection import SqliteFile, Store
 from origenerator.db_schema import GENERATION_COLUMNS, as_read, as_stored
@@ -22,6 +24,9 @@ LIFECYCLE_COLUMNS = frozenset({
 })
 
 SENT_COLUMNS = ("evolver_exported_at", "genau_exported_at")
+
+WATCH_COLUMN_OF = {field: f"watch_{field}" for field in COUNT_FIELDS}
+LIBRARY_RECORD_COLUMNS = frozenset({"web_url", "library_id", "upscale_provenance"})
 
 _KNOWN_SOURCES = tuple(GenerationSource)
 _OF_A_KNOWN_SOURCE = f"source IN ({', '.join('?' * len(_KNOWN_SOURCES))})"
@@ -81,6 +86,16 @@ class GenerationStore(Store):
                 (value, prompt_id),
             )
 
+    def _set_columns(self, prompt_id: str, fields: dict):
+        if not fields:
+            return
+        with self._connect() as conn:
+            conn.execute(
+                f"UPDATE generations SET {', '.join(f'{k} = ?' for k in fields)}"
+                " WHERE prompt_id = ?",
+                (*fields.values(), prompt_id),
+            )
+
     def _stamp(self, prompt_id: str, column: str):
         with self._connect() as conn:
             conn.execute(
@@ -119,15 +134,7 @@ class GenerationStore(Store):
                 f"update_generation does not write {', '.join(sorted(refused))}; "
                 f"it writes a job's lifecycle ({', '.join(sorted(LIFECYCLE_COLUMNS))}). "
                 "Provenance and the user's own marks have their own methods.")
-        if not fields:
-            return
-        set_clause = ", ".join(f"{k} = ?" for k in fields)
-        values = [*list(fields.values()), prompt_id]
-        with self._connect() as conn:
-            conn.execute(
-                f"UPDATE generations SET {set_clause} WHERE prompt_id = ?",
-                values,
-            )
+        self._set_columns(prompt_id, fields)
 
     def set_workflow_name(self, prompt_id: str, workflow_name: str):
         self._set(prompt_id, "workflow_name", workflow_name)
@@ -216,6 +223,18 @@ class GenerationStore(Store):
                 "WHERE prompt_id = ?",
                 (path, upscaled_at, prompt_id),
             )
+
+    def set_watch_counts(self, prompt_id: str, counts: dict):
+        self._set_columns(prompt_id, {column: int(counts.get(field) or 0)
+                                      for field, column in WATCH_COLUMN_OF.items()})
+
+    def set_library_record(self, prompt_id: str, **fields):
+        refused = set(fields) - LIBRARY_RECORD_COLUMNS
+        if refused:
+            raise ValueError(
+                f"set_library_record does not write {', '.join(sorted(refused))}; it writes "
+                f"{', '.join(sorted(LIBRARY_RECORD_COLUMNS))}.")
+        self._set_columns(prompt_id, fields)
 
     def mark_evolver_exported(self, prompt_id: str):
         self._record_send(prompt_id, "evolver_exported_at", "evolver_unsent_at",

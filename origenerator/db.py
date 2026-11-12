@@ -93,6 +93,12 @@ class Database:
     def set_evolver_upscale(self, prompt_id: str, path: str, upscaled_at: str | None):
         return self.generations.set_evolver_upscale(prompt_id, path, upscaled_at)
 
+    def set_watch_counts(self, prompt_id: str, counts: dict):
+        return self.generations.set_watch_counts(prompt_id, counts)
+
+    def set_library_record(self, prompt_id: str, **fields):
+        return self.generations.set_library_record(prompt_id, **fields)
+
     def mark_evolver_exported(self, prompt_id: str):
         return self.generations.mark_evolver_exported(prompt_id)
 

@@ -132,7 +132,13 @@ CREATE TABLE IF NOT EXISTS generations (
     why_it_cannot_be_made_again TEXT,
     evolver_upscale TEXT,
     evolver_upscaled_at TEXT,
-    finale_id TEXT
+    finale_id TEXT,
+    watch_completions INTEGER NOT NULL DEFAULT 0,
+    watch_skips INTEGER NOT NULL DEFAULT 0,
+    watch_locks INTEGER NOT NULL DEFAULT 0,
+    web_url TEXT,
+    library_id TEXT,
+    upscale_provenance TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_generations_status ON generations(status);
@@ -303,6 +309,12 @@ ADDED_COLUMNS = {
         "evolver_upscale": "TEXT",
         "evolver_upscaled_at": "TEXT",
         "finale_id": "TEXT",
+        "watch_completions": "INTEGER NOT NULL DEFAULT 0",
+        "watch_skips": "INTEGER NOT NULL DEFAULT 0",
+        "watch_locks": "INTEGER NOT NULL DEFAULT 0",
+        "web_url": "TEXT",
+        "library_id": "TEXT",
+        "upscale_provenance": "TEXT",
     },
     "folder_meta": {
         "level": "TEXT",
@@ -345,6 +357,8 @@ GENERATION_COLUMNS = (
     "backfill_of", "fun_time_favorite_owed", "remade_at", "old_version_of", "shape",
     "image_actions", "image_checked", "video_actions", "video_checked", "combined_labels",
     "why_it_cannot_be_made_again", "evolver_upscale", "evolver_upscaled_at", "finale_id",
+    "watch_completions", "watch_skips", "watch_locks", "web_url", "library_id",
+    "upscale_provenance",
 )
 
 

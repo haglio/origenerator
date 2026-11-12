@@ -5,11 +5,29 @@ from functools import cache
 from pathlib import Path
 from typing import Any
 
-from app_support import haglio_settings
+from app_support import haglio_settings, siblings
 from app_support import overlay as _overlay
 
+from origenerator.branch_session import is_branch_session
+
 PROJECT_DIR = Path(__file__).resolve().parent.parent
-LOCAL_CONTENT = PROJECT_DIR / "content.local.json"
+_OVERLAY_NAME = "content.local.json"
+
+
+def local_overlay(checkout: Path, production_checkout: Path | None) -> Path:
+    own = checkout / _OVERLAY_NAME
+    if own.exists() or production_checkout is None:
+        return own
+    return production_checkout / _OVERLAY_NAME
+
+
+def _production_checkout() -> Path | None:
+    if not is_branch_session():
+        return None
+    return siblings.project_dir("origenerator", haglio_settings.project_roots())
+
+
+LOCAL_CONTENT = local_overlay(PROJECT_DIR, _production_checkout())
 EXAMPLE_CONTENT = PROJECT_DIR / "content.example.json"
 
 

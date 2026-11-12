@@ -1403,7 +1403,8 @@ def test_qt_is_handed_none_of_the_launch_contracts_flags(qapp):
         handed.append(list(argv))
         yield qapp
 
-    with _a_faked_boot([], **{"shared_ui.application.application": application}),          patch.object(sys, "argv", ["origenerator", TASKBAR_IDENTITY_FLAG, "Sample.Identity"]):
+    with _a_faked_boot([], **{"shared_ui.application.application": application}), \
+         patch.object(sys, "argv", ["origenerator", TASKBAR_IDENTITY_FLAG, "Sample.Identity"]):
         main()
 
     assert handed == [["origenerator"]], (

@@ -20,6 +20,7 @@ from origenerator import running_ahead
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_pane import FunestraPane, PaneAudio, PaneChannel
 from origenerator.gui.funestra_slideshow import FunestraSlideshow, Hosting, Playing, Seat
+from origenerator.slideshow import in_order
 from tests import gestures
 from tests.running_ahead_support import record_the_app_running_ahead
 from tests.slideshow_hud_support import speaker_on_screen
@@ -114,7 +115,7 @@ def test_a_pass_is_handed_over_here_the_way_a_slideshow_hands_its_funestra_one(q
     slides = [(str(tmp_path / f"{name}.png"), "image", f"id-{name}") for name in ("one", "two")]
     from_the_slideshow = _RecordingChannel()
     seat = Seat("landscape", from_the_slideshow, FrameFiles(tmp_path / "frames"))
-    slideshow = FunestraSlideshow(Playing(slides, start=1, shuffle=lambda order: None), seat,
+    slideshow = FunestraSlideshow(Playing(slides, start=1, shuffle=in_order), seat,
                                   Hosting(shown=_NoWindow()))
     stop_the_poll_to_tick_by_hand(slideshow)
     pane, _engine, _running = _pane(qtbot, channel=_RecordingChannel())
@@ -122,6 +123,7 @@ def test_a_pass_is_handed_over_here_the_way_a_slideshow_hands_its_funestra_one(q
 
     _hand_over(pane, items, land=items[1].path)
 
+    assert from_the_slideshow.hand_over_steps() == ["list written", PLAY_FILE, RELOAD_PLAYLIST]
     assert pane.channel.hand_over_steps() == from_the_slideshow.hand_over_steps(), (
         "the pane is tested on the sequence a slideshow really hands it: the list written, the "
         "item to stand on played, then the list taken up")

@@ -540,6 +540,15 @@ def test_the_learned_motion_takes_over_from_where_the_wave_has_the_device():
         "the first phrase begins where the wave already has the device, so the takeover cannot be felt")
 
 
+def test_a_wave_at_the_top_of_full_travel_is_at_the_top_of_the_devices_scale():
+    motion = motion_engine.Motion()
+    motion_engine.set_bars(motion.state, speed=50, amplitude=100, center=50)
+    motion.phase = 0.5
+
+    assert motion_engine.position(motion) == pytest.approx(100.0), (
+        "the motion answers on the 0 to 100 scale osr2.format_position turns into the device's command")
+
+
 def test_a_wave_with_no_amplitude_stands_at_the_floor_of_its_bars():
     motion = motion_engine.Motion()
     motion_engine.set_bars(motion.state, speed=50, amplitude=0, center=50)

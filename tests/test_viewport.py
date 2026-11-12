@@ -655,7 +655,8 @@ def test_dragging_the_armed_preview_carries_its_generation(make_preview, tmp_pat
 
     _drag_out(w)
 
-    assert heard.generations() == ["gen1"]
+    assert heard.generations() == ["gen1"], (
+        "a drag needs only something to carry, so it is armed without the row the corners act on")
     assert heard.ended == 1
     (drag,) = drags
     assert bytes(drag.mime.data(GENERATION_MIME)).decode() == "gen1"
@@ -1009,7 +1010,8 @@ def test_an_armed_preview_wears_the_same_corners_a_thumbnail_does(make_preview,
 
     w.set_actions("p1", favorite=True, enhance=icons.ENHANCE_HELD)
 
-    assert all(not b.isHidden() for b in _corners(w))
+    assert all(not b.isHidden() for b in _corners(w)), (
+        "the corners need only a row to act on, so they are armed without anything to drag")
 
 
 def test_a_new_item_takes_the_last_one_s_corners_away(make_preview, tmp_path):

@@ -187,6 +187,21 @@ def test_item_type_icon_appears_only_when_a_type_is_given(qtbot):
     assert len(typed.findChildren(ItemTypeIcon)) == 1
 
 
+def test_the_item_type_icon_keeps_to_the_one_corner_no_control_takes(qtbot):
+    tile = ItemTile("p1", None, "label", TileAppearance(
+        media_type=MediaType.VIDEO, favorite=True, enhance=icons.ENHANCE_OPEN))
+    qtbot.addWidget(tile)
+    with qtbot.waitExposed(tile):
+        tile.show()
+    (mark,) = tile.findChildren(ItemTypeIcon)
+    at = mark.geometry()
+
+    on_its_corner = (at.center().x() < tile.width() // 2, at.center().y() < tile.height() // 2)
+    under_a_control = any(at.intersects(corner.geometry()) for corner in _corners(tile))
+    assert (on_its_corner, under_a_control) == ((True, True), False), (
+        "top-left is the one corner the star, the trash can and the plus leave free")
+
+
 def test_no_corner_buttons_by_default(qtbot):
     tw = ItemTile("p1", None, "label")
     qtbot.addWidget(tw)

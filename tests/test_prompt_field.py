@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt6.QtGui import QMouseEvent
-from PyQt6.QtWidgets import QLabel
+from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator.gui.prompt_boxes import set_in_use
 from origenerator.gui.prompt_field import (
@@ -47,6 +47,27 @@ def test_dragging_the_lower_edge_makes_the_field_taller(qtbot):
     field = _field(qtbot)
     _drag_edge(qtbot, field, 80)
     assert field.height() == DEFAULT_HEIGHT + 80
+
+
+def test_a_field_that_moves_under_the_pointer_mid_drag_still_follows_the_pointer(qtbot):
+    holder = QWidget()
+    qtbot.addWidget(holder)
+    holder.resize(400, 600)
+    field = PromptField("positive_prompt", holder)
+    field.resize(300, field.height())
+    with qtbot.waitExposed(holder):
+        holder.show()
+    grab = QPoint(field.viewport().width() // 2, field.viewport().height() - 1)
+    qtbot.mousePress(field.viewport(), Qt.MouseButton.LeftButton, pos=grab)
+
+    field.move(0, 50)
+    drop = grab + QPoint(0, 80 - 50)
+    qtbot.mouseMove(field.viewport(), drop)
+    qtbot.mouseRelease(field.viewport(), Qt.MouseButton.LeftButton, pos=drop)
+
+    assert field.height() == DEFAULT_HEIGHT + 80, (
+        "the field moves under the pointer as it grows, so a drag measured in its own "
+        "coordinates shifts mid-drag")
 
 
 def test_dragging_the_lower_edge_up_makes_it_shorter(qtbot):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
@@ -22,6 +23,7 @@ from origenerator.db import Database, NewGeneration
 from origenerator.gallery.collection import (
     LATEST_KEY,
 )
+from origenerator.generation_state import GenerationStatus
 from origenerator.gui import (
     combine_controller,
 )
@@ -845,14 +847,20 @@ def test_a_combine_left_running_comes_back_after_a_restart_in_its_folder(qtbot, 
     view.refresh()
     view._combine._generate_combination("img", "vid")
     (key,) = view._live_jobs
-    reopened = GalleryView(db, client=_reroll_client())
+    prompt_id = view._live_jobs[key].prompt_id
+    assert db.get_generation(prompt_id)["status"] == GenerationStatus.RUNNING
+    client = _reroll_client()
+    client.executing_prompts = MagicMock(return_value={prompt_id})
+    reopened = GalleryView(db, client=client)
     qtbot.addWidget(reopened)
 
     reopened.reconnect_running_jobs()
 
+    client.submit_job.assert_not_called()
     assert list(reopened._live_jobs) == [key], (
         "a combine is kept under its settings folder, so after a restart it reconnects and lands "
         "in that folder exactly as a re-roll does")
+    assert reopened._live_jobs[key].prompt_id == prompt_id
 
 
 def test_combine_slot_predicates_gate_by_kind(qtbot, tmp_path):

@@ -104,6 +104,12 @@ SCHEMA = {
         ("evolver_upscale", "TEXT", 0, None, 0),
         ("evolver_upscaled_at", "TEXT", 0, None, 0),
         ("finale_id", "TEXT", 0, None, 0),
+        ("watch_completions", "INTEGER", 1, "0", 0),
+        ("watch_skips", "INTEGER", 1, "0", 0),
+        ("watch_locks", "INTEGER", 1, "0", 0),
+        ("web_url", "TEXT", 0, None, 0),
+        ("library_id", "TEXT", 0, None, 0),
+        ("upscale_provenance", "TEXT", 0, None, 0),
     ),
     "requests": (
         ("prompt_id", "TEXT", 0, None, 1),

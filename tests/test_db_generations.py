@@ -1,3 +1,5 @@
+import pytest
+
 from origenerator.db import Database, NewGeneration
 
 
@@ -34,3 +36,30 @@ def test_the_two_lanes_keep_their_own_stamps(tmp_path):
     row = db.get_generation("vid-001")
     assert row["evolver_exported_at"] is not None
     assert row["evolver_unsent_at"] is None
+
+
+def test_a_videos_watch_counts_are_kept_on_its_row(tmp_path):
+    db = _video(tmp_path)
+
+    db.set_watch_counts("vid-001", {"completions": 3, "skips": 1, "locks": 2})
+
+    row = db.get_generation("vid-001")
+    assert (row["watch_completions"], row["watch_skips"], row["watch_locks"]) == (3, 1, 2)
+
+
+def test_what_the_library_records_of_a_video_is_kept_on_its_row(tmp_path):
+    db = _video(tmp_path)
+
+    db.set_library_record("vid-001", web_url="https://example.com/watch/101",
+                          library_id="made-up-id", upscale_provenance='{"tool": "Example Upscaler"}')
+
+    row = db.get_generation("vid-001")
+    assert (row["web_url"], row["library_id"], row["upscale_provenance"]) == (
+        "https://example.com/watch/101", "made-up-id", '{"tool": "Example Upscaler"}')
+
+
+def test_the_library_record_writes_only_its_own_columns(tmp_path):
+    db = _video(tmp_path)
+
+    with pytest.raises(ValueError, match="starred"):
+        db.set_library_record("vid-001", starred=1)

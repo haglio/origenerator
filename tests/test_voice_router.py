@@ -450,14 +450,33 @@ def test_only_that_requests_own_answer_takes_its_promise_down(router):
     assert voice._working_status == ""
 
 
+def test_an_answer_given_on_a_slideshow_opened_meanwhile_ends_the_captions_promise(router):
+    voice, _host, _slideshows = router()
+    voice.sync()
+    mine = Spoken("no hat")
+    voice._answer_request(None, "working out “no hat”…", mine, working=True)
+    slideshow = FakeSlideshow()
+
+    voice._answer_request(slideshow, "no hat — generating", mine)
+    voice.say("heard: “something else”")
+    voice._revert()
+
+    assert slideshow.requests == [("no hat — generating", False, INFO)]
+    assert words(voice.status) == "Listening…", (
+        "a slideshow can open while the request is worked out, so the answer that goes to it "
+        "ends the caption's promise too, and nothing flashed later falls back to it")
+
+
 def test_what_was_heard_reaches_the_caption_and_the_center_top_of_the_slideshow(router):
     slideshow = FakeSlideshow()
     voice, _host, slideshows = router(slideshows=FakeSlideshows(showing=slideshow))
 
     voice.listener.heard.emit("start slideshow")
 
-    assert words(voice.status).startswith("heard:")
-    assert len(slideshows.said) == 1
+    assert words(voice.status) == "heard: “start slideshow”"
+    assert slideshows.said == ["heard: “start slideshow”"], (
+        "what was heard is said on the slideshow too: someone watching a slideshow sees nothing "
+        "of this window")
 
 
 def test_words_that_are_no_command_show_for_a_moment_and_are_logged_nowhere(router, caplog):

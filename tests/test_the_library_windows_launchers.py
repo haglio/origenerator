@@ -31,7 +31,9 @@ def test_both_library_windows_run_on_the_primary_checkouts_venv():
 def test_a_library_window_reads_the_live_library(file: str, module: str):
     report = dry_run(REPO_ROOT / file)
 
-    assert report.value("arguments") == f"-m {module}"
+    assert report.value("arguments") == f"-m {module}", (
+        "each library window is a window of its own: it wants the library and nothing else the "
+        "app holds, and is run beside the app or instead of it")
     assert report.values("environment") == ["ORIGENERATOR_BRANCH_SESSION=1"], (
         "the flag opens the production library from whichever checkout starts the window, "
         "since a branch's own database is one nobody animates from, so sorting or settling "

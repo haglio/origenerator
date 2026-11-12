@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QComboBox, QLabel, QPushButton
 
 from origenerator.gui.eliding import (
@@ -78,6 +79,19 @@ def test_a_squeezed_label_elides_but_keeps_its_text(qtbot):
     assert label.display_text(whole) == _PHRASE
     assert label.display_text(whole // 3).endswith("…")
     assert label.text() == _PHRASE
+
+
+def test_a_label_with_room_keeps_the_colors_and_alignment_qts_own_label_would(qtbot):
+    def painted(label):
+        qtbot.addWidget(label)
+        label.setStyleSheet("color: rgb(220, 40, 40); background: rgb(30, 60, 200);")
+        label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom)
+        label.resize(label.sizeHint().width() * 2, label.sizeHint().height() * 2)
+        return label.grab().toImage()
+
+    assert painted(ElidingLabel(_PHRASE)) == painted(QLabel(_PHRASE)), (
+        "the label paints through the style as QLabel does, so it keeps the colors and the "
+        "alignment its stylesheet and its owner give it")
 
 
 def test_a_dropdowns_list_keeps_room_for_its_longest_entry_and_a_scroll_bar(qtbot):

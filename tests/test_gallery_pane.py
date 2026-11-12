@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 from PyQt6 import sip
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QMovie
 from PyQt6.QtWidgets import QLabel, QWidget
 
@@ -978,6 +978,41 @@ def test_a_shut_search_section_still_holds_its_tiles_in_the_shown_order(qtbot):
 
     assert [row["prompt_id"] for row in pane.collection_rows()] == ["a", "b"], (
         "a shut section's tiles are still built and still counted, so unfolding it is instant")
+
+
+def _what_a_click_a_double_click_and_a_right_click_ask_of(qtbot, pane, scroll, prompt_id):
+    heard = []
+    pane.thumbnail_activated.connect(lambda chosen: heard.append(("shown", chosen)))
+    pane.item_jump_requested.connect(lambda chosen: heard.append(("jumped to", chosen)))
+    pane.slideshow_requested.connect(lambda chosen: heard.append(("slideshow", chosen)))
+    pane.menu_requested.connect(lambda chosen, _at: heard.append(("menu", chosen)))
+    with qtbot.waitExposed(scroll):
+        scroll.show()
+    tile = pane._thumb_widgets[prompt_id]
+
+    qtbot.mouseClick(tile, Qt.MouseButton.LeftButton)
+    qtbot.mouseDClick(tile, Qt.MouseButton.LeftButton)
+    tile.customContextMenuRequested.emit(QPoint(0, 0))
+    return heard
+
+
+def test_a_search_hit_answers_the_mouse_as_it_does_in_latest(qtbot):
+    rows = [_row("a", 1)]
+    in_latest, latest_scroll = _pane(qtbot, rows)
+    _open_latest(in_latest, rows)
+    found, found_scroll = _pane(qtbot, rows)
+    found.show_search_results([search.SearchTile(row=rows[0])], search.SearchTerms(
+        sort_mode=search.SORT_MODEL_LORA, query="scene", outcome=None, collapsed=set()))
+
+    asked_in_latest = _what_a_click_a_double_click_and_a_right_click_ask_of(
+        qtbot, in_latest, latest_scroll, "a")
+    asked_of_the_hit = _what_a_click_a_double_click_and_a_right_click_ask_of(
+        qtbot, found, found_scroll, "a")
+
+    assert {kind for kind, _ in asked_in_latest} >= {"shown", "jumped to", "menu"}
+    assert asked_of_the_hit == asked_in_latest, (
+        "a result is the same thing wherever it was found, so its tile answers a click, a "
+        "double-click and a right-click as it does in Latest")
 
 
 def test_search_results_are_listed_in_the_order_their_sections_are_laid_out(qtbot):

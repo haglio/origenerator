@@ -9,6 +9,7 @@ from PySide6.QtCore import (
     QPoint,
     QPointF,
     QRect,
+    QRectF,
     Qt,
 )
 from PySide6.QtGui import (
@@ -17,6 +18,8 @@ from PySide6.QtGui import (
     QDragLeaveEvent,
     QDragMoveEvent,
     QDropEvent,
+    QImage,
+    QPainter,
 )
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -218,42 +221,88 @@ def test_clicking_a_leafs_label_still_selects_without_firing_actions(qtbot):
     assert tree.currentItem() is leaf
 
 
-def _shown(item):
+def _text_of(item):
     tree = item.treeWidget()
     option = QStyleOptionViewItem()
     tree.itemDelegate().initStyleOption(option, tree.indexFromItem(item))
     return option.text
 
 
-def test_a_row_leads_with_how_many_items_it_holds(qtbot):
-    _tree, leaf = _tree_with_an_indented_leaf(qtbot)
-    leaf.setData(0, COUNT_ROLE, 3)
+def _shown(item):
+    count = item.treeWidget().itemDelegate().count_shown(item.treeWidget().indexFromItem(item))
+    return f"{count} {item.text(0)}" if count else item.text(0)
+
+
+def _drawn_counts(monkeypatch, tree) -> dict:
+    drawn = {}
+    monkeypatch.setattr(folder_tree, "_draw_count",
+                        lambda _painter, option, place, count: drawn.update({count: place}))
+    tree.viewport().grab()
+    return drawn
+
+
+def _siblings_counting(qtbot, *counts):
+    tree, leaf = _tree_with_an_indented_leaf(qtbot)
+    rows = [leaf]
+    for number in range(1, len(counts)):
+        rows.append(_folder_row(f"Folder {number}", f"m/w/mo/{number}"))
+        leaf.parent().addChild(rows[-1])
+    for row, count in zip(rows, counts, strict=True):
+        row.setData(0, COUNT_ROLE, count)
+    return tree, rows
+
+
+def test_a_row_leads_with_how_many_items_it_holds(qtbot, monkeypatch):
+    tree, (leaf,) = _siblings_counting(qtbot, 3)
+
+    place = _drawn_counts(monkeypatch, tree)["(3)"]
 
     assert _shown(leaf) == "(3) A folder"
+    assert tree.visualRect(tree.indexFromItem(leaf)).contains(place.center().toPoint())
 
 
-def test_a_smaller_count_is_padded_to_its_siblings_widest_so_counts_and_names_line_up(qtbot):
-    _tree, leaf = _tree_with_an_indented_leaf(qtbot)
-    sibling = _folder_row("Another folder", "m/w/mo/other")
-    leaf.parent().addChild(sibling)
-    leaf.setData(0, COUNT_ROLE, 3)
-    sibling.setData(0, COUNT_ROLE, 120)
+def test_siblings_names_start_after_one_column_wide_enough_for_the_widest_count(qtbot):
+    _tree, rows = _siblings_counting(qtbot, 3, 120, 0)
 
-    assert (_shown(leaf), _shown(sibling)) == ("  (3) A folder", "(120) Another folder"), \
-        "a figure space is as wide as a digit, so the padded counts end, and the names start, at one place"
+    reserved = {_text_of(row)[:-len(row.text(0))] for row in rows}
+
+    assert len(reserved) == 1
+    assert set(reserved.pop()) == {"\u2007"}, \
+        "a figure space is as wide as a digit, so the same run of them puts every name in one place"
 
 
-def test_the_padding_follows_a_siblings_count_as_it_changes(qtbot):
-    _tree, leaf = _tree_with_an_indented_leaf(qtbot)
-    sibling = _folder_row("Another folder", "m/w/mo/other")
-    leaf.parent().addChild(sibling)
-    leaf.setData(0, COUNT_ROLE, 3)
-    sibling.setData(0, COUNT_ROLE, 120)
-    _shown(leaf)
+def test_a_smaller_count_is_centered_in_its_siblings_column(qtbot, monkeypatch):
+    tree, _rows = _siblings_counting(qtbot, 3, 12000)
+
+    drawn = _drawn_counts(monkeypatch, tree)
+
+    assert drawn["(3)"].center().x() == pytest.approx(drawn["(12000)"].center().x())
+    assert drawn["(3)"].width() == drawn["(12000)"].width()
+
+
+def test_a_count_is_drawn_in_the_middle_of_its_place(qtbot):
+    tree, (leaf,) = _siblings_counting(qtbot, 3)
+    option = QStyleOptionViewItem()
+    tree.itemDelegate().initStyleOption(option, tree.indexFromItem(leaf))
+    image = QImage(200, 40, QImage.Format.Format_ARGB32)
+    image.fill(Qt.GlobalColor.magenta)
+    painter = QPainter(image)
+    folder_tree._draw_count(painter, option, QRectF(40, 0, 120, 40), "(3)")
+    painter.end()
+
+    ground = image.pixelColor(0, 0)
+    inked = [x for x in range(200) for y in range(40) if image.pixelColor(x, y) != ground]
+
+    assert (min(inked) + max(inked)) / 2 == pytest.approx(100, abs=1.5)
+
+
+def test_the_column_follows_a_siblings_count_as_it_changes(qtbot):
+    _tree, (leaf, sibling) = _siblings_counting(qtbot, 3, 12000)
+    wide = _text_of(leaf)
 
     sibling.setData(0, COUNT_ROLE, 9)
 
-    assert _shown(leaf) == "(3) A folder"
+    assert len(_text_of(leaf)) < len(wide)
 
 
 def test_a_row_holding_nothing_shows_its_name_alone(qtbot):

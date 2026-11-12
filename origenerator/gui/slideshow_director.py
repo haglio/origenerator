@@ -687,7 +687,8 @@ class SlideshowDirector:
         view.setGeometry(rect.x, rect.y, rect.width, rect.height)
         view.show()
         # Win32: in a scaled process the screens' logical rects overlap, so only device pixels reach a
-        # second monitor's edge; after show(), since an unrealized window has no handle.
+        # second monitor's edge; after show(), since an unrealized window has no handle and Qt
+        # gives the window it creates the widget's own geometry.
         place_window_in_device_pixels(int(view.winId()),
                                       rect.x, rect.y, rect.width, rect.height)
         # Windows: activation alone does not lift a window over the topmost Funestras sharing its region.

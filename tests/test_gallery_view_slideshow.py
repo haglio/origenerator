@@ -11,6 +11,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import (
     QKeyEvent,
 )
+from PySide6.QtTest import QTest
 
 from origenerator import (
     gallery,
@@ -23,6 +24,7 @@ from origenerator.gallery.collection import (
     LATEST_KEY,
 )
 from origenerator.gallery.shapes import LANDSCAPE
+from origenerator.gui import slideshow_director, two_screens
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.osr2_controls import Osr2Controls
@@ -68,6 +70,7 @@ from tests.gallery_view_support import (
     _set_enhance,
     _top_level,
 )
+from tests.his_monitors import HIS_TWO_MONITORS, PORTRAIT_MONITOR
 from tests.marked_words import words
 from tests.real_db import (
     database_of,
@@ -1598,3 +1601,42 @@ def test_closing_the_gallery_closes_the_slideshow_up(qtbot, monkeypatch):
     view.close()
 
     assert view._slideshows.showing is None
+
+
+def test_once_core_is_up_on_two_monitors_the_folder_it_shows_plays_full_screen_on_the_other(
+        qtbot, monkeypatch):
+    monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    view._two_screens.core_is_up.emit()
+
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow.shown)
+    assert (len(slideshow._set.playlist), slideshow.shown.geometry(),
+            slideshow.shown.isFullScreen(), view._two_screens.core_on()) == (
+        2, PORTRAIT_MONITOR, True, "landscape")
+    slideshow.close()
+
+
+def test_enter_in_a_slideshow_on_its_own_monitor_picks_its_item_in_core_and_plays_on(
+        qtbot, monkeypatch):
+    monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)
+    monkeypatch.setattr(slideshow_director, "bring_to_front", lambda window: None)
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._two_screens.core_is_up.emit()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow.shown)
+    playing = slideshow._set.playlist.current().prompt_id
+
+    QTest.keyClick(slideshow.shown, Qt.Key.Key_Return)
+
+    assert (slideshow.is_showing(), view.selected_generation()) == (True, playing)
+    slideshow.close()

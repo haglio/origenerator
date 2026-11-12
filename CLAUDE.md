@@ -732,6 +732,28 @@ list per shape, its own borders held still, Fun Time's device and sound --
 and leaves the standalone choices it overrides as it found them, so a window
 handed back, or the next launch in Standalone, is where he left it.
 
+## Standalone is a two-screen program
+
+On a computer with a Landscape and a Portrait monitor, Standalone fills both:
+Core takes one above the taskbar with no title bar, and a slideshow takes the
+other, full screen, for as long as Core is up (his decision, 2026-11-11: "like
+Fun Time"). `gui/two_screens.TwoScreens` is the one place that says which
+monitor Core is on; Core, the slideshow director and the button row ask it,
+and the side is saved as `core_on`. The switch is the last button of the row
+over the Gallery pane and the spoken "switch".
+
+- A slideshow he starts on an item of the shape of the monitor Core is on
+  sends Core to the other monitor (his answer, 2026-11-12). The slideshow the
+  app brings up by itself, at launch or handed back from a session, leaves
+  Core where it was left.
+- Nothing inside that slideshow closes it: Enter, Shift+Esc, a second press on
+  the slide and "stop slideshow" show its item in Core and leave it playing.
+- So Core draws no OSR2 controls, which are on the slideshow's HUD, and
+  Core's line for what was heard shows only while no slideshow is up.
+- With one monitor, or two of one shape, none of this applies: Core keeps its
+  title bar and its saved place, and a slideshow opens and closes on demand.
+- A Fun Time session places Core and its slideshows itself and has no switch.
+
 ## Judging a branch before it lands
 
 Every worktree carries `launch_preview_branch.vbs` (tracked). Double-clicking it

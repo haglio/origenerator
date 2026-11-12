@@ -135,6 +135,22 @@ def test_windows_refusing_the_notification_costs_the_app_nothing(qapp, monkeypat
     assert "not listening" in caplog.text
 
 
+def test_windows_refusing_the_heading_over_a_toast_costs_the_launch_nothing(
+        qapp, monkeypatch, caplog):
+    def refuse(app_id, **named):
+        raise OSError("the heading could not be registered")
+
+    monkeypatch.setattr(toasts_module, "register_toast_identity", refuse)
+    with caplog.at_level("WARNING", logger=toasts_module.__name__):
+        toasts = Toasts(QIcon())
+    said = _raised(monkeypatch)
+
+    toasts.note(_outcome())
+
+    assert "could not be registered" in caplog.text
+    assert _lines(said) == ["Video ready", "WAN 2.2 I2V · 4:12"]
+
+
 def test_it_tells_windows_what_to_call_this_app_and_what_mark_to_draw(qapp, monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     registered = []

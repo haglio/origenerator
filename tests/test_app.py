@@ -372,6 +372,24 @@ def test_main_shows_loading_screen_during_boot_and_takes_it_down_after_window(qa
     assert "ComfyUI server" in statuses
 
 
+def test_the_taskbar_identity_is_claimed_before_any_window_exists(qapp):
+    events = []
+
+    def built(event):
+        return MagicMock(side_effect=lambda *a, **k: events.append(event) or MagicMock())
+
+    with _a_faked_boot([], **{
+        "origenerator.app._init_windows_taskbar_identity": built("identity claimed"),
+        "origenerator.gui.loading_screen.loading_screen": built("loading screen opened"),
+        "origenerator.gui.core.Core": built("window built"),
+    }):
+        assert main([]) == 0
+
+    assert events == ["identity claimed", "loading screen opened", "window built"], (
+        "the launch claims the taskbar identity before any window exists, the loading screen "
+        "first among them")
+
+
 def test_the_loading_screen_wears_the_taskbar_button_the_apps_windows_wear(qapp, tmp_path):
     button = TaskbarApp("Origenerator - preview of the example", tmp_path / "preview.ico",
                         "example relaunch command")

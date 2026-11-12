@@ -86,8 +86,8 @@ def test_a_row_the_queue_is_still_holding_is_left_alone(tmp_path):
     summary = reconcile_in_flight(db, FakeComfy(), OutputFolders(OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs"))
 
     assert db.get_generation("p1") is not None, (
-        "ComfyUI has never heard of a job the app's own queue still holds, "
-        "so asking it would delete a run the user is waiting on")
+        "ComfyUI has never heard of a job the app's own queue still holds, and the queue takes "
+        "it back into its line itself, so asking ComfyUI would delete a run the user is waiting on")
     assert db.get_generation("p1")["status"] == "pending"
     assert summary == {"finalized": 0, "running": 0, "cleared": 0}
 

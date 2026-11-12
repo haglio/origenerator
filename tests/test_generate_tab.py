@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSplitter,
     QWidget,
 )
@@ -165,6 +166,15 @@ def test_the_column_reads_preview_then_generate_then_settings(tab):
         "Generate heads the settings rather than trailing them in the lower right corner, where "
         "Windows pops its messages up over whatever is there")
     assert preview_foot <= generate_top < generate_foot <= line_top < line_foot <= settings_top
+
+
+def test_generate_sits_in_no_scroll_so_it_can_always_be_pressed(tab):
+    holding = [scroll for scroll in tab.findChildren(QScrollArea)
+               if scroll.isAncestorOf(tab._generate_btn)]
+
+    assert holding == [], (
+        "Generate is held over the scrolls, so it can be pressed however far the settings or "
+        "the item are scrolled")
 
 
 def test_a_new_tab_gives_the_preview_five_eighths_and_the_settings_and_metadata_three_sixteenths_each(
@@ -327,7 +337,9 @@ def test_the_button_bank_wraps_rather_than_squeezing_its_labels(tab):
 
     for button in buttons:
         assert button.width() == button.sizeHint().width(), button
-    assert len({button.y() for button in buttons}) > 1
+    assert len({button.y() for button in buttons}) > 1, (
+        "too narrow for one line, the buttons wrap onto a second rather than each label being "
+        "squeezed down to an unreadable stub")
     lines = {}
     for button in buttons:
         lines[button.y()] = max(lines.get(button.y(), 0), button.x() + button.width())
@@ -3785,7 +3797,9 @@ def test_a_modify_batch_names_itself_after_the_folder_it_asks_about():
 
 
 def test_a_modify_batch_counts_its_runs_in_the_hover_rather_than_on_the_button():
-    assert _modify_batch(count=3).caption() == "Modify batch (all seeds)"
+    assert _modify_batch(count=3).caption() == _modify_batch(count=1).caption(), (
+        "the press does submit that many runs at once, but what the button asks for is one "
+        "thing, so the count is read in the hover")
     assert "all 3 images" in _modify_batch(count=3).tooltip()
 
 
@@ -3976,6 +3990,15 @@ def test_ending_the_modify_batch_leaves_the_prompts_their_undo(modify_batch_tab,
     qtbot.keyClick(field, Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier)
 
     assert modify_batch_tab._param_form._widgets["positive_prompt"].value() == "a cat on a couch"
+
+
+def test_ending_the_modify_batch_stops_its_prompts_measuring_against_the_folder(modify_batch_tab):
+    modify_batch_tab._end_modify_batch()
+
+    marked = [w for w in modify_batch_tab._param_form.text_fields() if w.findChildren(_Tracker)]
+    assert marked == [], (
+        "a marked field left over would go on measuring edits against a folder the tab is no "
+        "longer about")
 
 
 def test_picking_another_workflow_ends_the_modify_batch(modify_batch_tab):

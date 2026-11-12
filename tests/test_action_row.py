@@ -180,7 +180,8 @@ def test_the_button_opens_the_setter_tool_on_the_item_on_the_tab(action, opened)
 
     _setter(action, MediaType.IMAGE).click()
 
-    assert opened == [(MediaType.IMAGE, "img-seven")]
+    assert opened == [(MediaType.IMAGE, "img-seven")], (
+        "the user asked for the setter tool to start with the item on display")
 
 
 def test_the_setter_tool_opened_is_given_the_trash_and_the_ears_the_app_handed_the_row(action):

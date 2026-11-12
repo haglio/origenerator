@@ -740,6 +740,29 @@ def test_a_favorited_folder_wears_a_green_star_with_the_mouse_elsewhere(qtbot):
         "mouse elsewhere")
 
 
+def test_a_favorited_star_keeps_its_place_when_the_delete_appears_beside_it(qtbot):
+    tree, leaf = _tree_with_an_indented_leaf(qtbot, favorite=True)
+    star, _delete = _action_rects(tree.visualRect(tree.indexFromItem(leaf)))
+
+    qtbot.mouseMove(tree.viewport(), pos=tree.visualRect(tree.indexFromItem(leaf)).center())
+
+    assert _wears_within(tree, leaf, star, _is_green), (
+        "the star sits next to the mark whether or not the hover-only delete shows, so "
+        "revealing the delete never shifts it")
+
+
+def test_hovering_a_leaf_leaves_its_row_where_it_was(qtbot):
+    tree, leaf = _tree_with_an_indented_leaf(qtbot)
+    index = tree.indexFromItem(leaf)
+    before = tree.visualRect(index)
+
+    qtbot.mouseMove(tree.viewport(), pos=before.center())
+
+    assert tree.visualRect(index) == before, (
+        "the star and the delete appear in the row's own indentation, so a hover shows them "
+        "without moving the row")
+
+
 def test_a_picked_favorited_folders_star_is_ringed_in_white(qtbot):
     tree, leaf = _tree_with_an_indented_leaf(qtbot, favorite=True)
     tree.setStyleSheet(build_stylesheet())

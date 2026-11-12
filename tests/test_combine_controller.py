@@ -553,7 +553,7 @@ def test_a_picked_action_names_itself_rather_than_showing_a_video(combine, start
     assert row.source_video_thumbnail is None
 
 
-def test_the_stand_in_row_comes_off_however_the_launch_ends(combine, starting):
+def test_the_stand_in_row_comes_off_when_the_launch_finds_nothing_to_make(combine, starting):
     controller, _host = combine(db=FakeDB([_image("img")]))
 
     controller.widget.combine_requested.emit(CombineRequest(

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, call
 
 import pytest
 from PIL import Image
-from PySide6.QtCore import QEvent, QPoint, QPointF, QSize, Qt, QUrl
+from PySide6.QtCore import SIGNAL, QEvent, QPoint, QPointF, QSize, Qt, QUrl
 from PySide6.QtGui import QColor, QImage, QMouseEvent, QMovie, QResizeEvent
 from PySide6.QtMultimedia import QMediaMetaData, QMediaPlayer, QVideoFrame
 from PySide6.QtWidgets import QApplication, QWidget
@@ -1294,11 +1294,11 @@ def test_the_player_is_torn_down_before_the_surface_it_renders_to(qapp):
 
 def test_only_a_player_the_pane_made_itself_is_released_as_the_app_quits(qapp, qtbot):
     gc.collect()
-    before = qapp.receivers(qapp.aboutToQuit)
+    before = qapp.receivers(SIGNAL("aboutToQuit()"))
     qtbot.addWidget(Viewport(player=MagicMock()))
-    with_a_handed_in_player = qapp.receivers(qapp.aboutToQuit)
+    with_a_handed_in_player = qapp.receivers(SIGNAL("aboutToQuit()"))
     own = Viewport()
-    with_its_own_too = qapp.receivers(qapp.aboutToQuit)
+    with_its_own_too = qapp.receivers(SIGNAL("aboutToQuit()"))
     del own
     gc.collect()
 

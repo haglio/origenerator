@@ -58,7 +58,6 @@ class FakeListener:
         self.closed = False
         self.bare = None
         self.dictated = None
-        self.dictated_at = []
         self.dictation_fed = []
         self.on_command = None
 
@@ -77,8 +76,7 @@ class FakeListener:
         return self.bare
 
     def push_dictation(self, text, spoken_at=None):
-        self.dictated_at.append(spoken_at)
-        self.dictation_fed.append(text)
+        self.dictation_fed.append((text, spoken_at))
         return self.dictated
 
 
@@ -1026,7 +1024,7 @@ def test_a_requests_own_words_from_the_session_go_to_the_dictation(router):
 
     assert voice.run_spoken_command("portrait request no hat") is True
     assert words(voice.status) == "Request: no hat… — say “over” to submit"
-    assert voice.listener.dictation_fed == ["request no hat"], (
+    assert [text for text, _said_at in voice.listener.dictation_fed] == ["request no hat"], (
         "the shape is split off a spoken request too, so the dictation is not fed the shape word"
         " as if it were the request's first word")
 
@@ -1037,7 +1035,7 @@ def test_the_sessions_words_reach_the_dictation_with_when_they_were_said(router)
 
     voice.run_spoken_command("portrait request no hat", said_at=7.5)
 
-    assert voice.listener.dictated_at == [7.5]
+    assert [said_at for _text, said_at in voice.listener.dictation_fed] == [7.5]
 
 
 def test_words_that_match_nothing_here_are_handed_back_and_logged_only_by_count(

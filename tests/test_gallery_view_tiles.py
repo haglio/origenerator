@@ -653,6 +653,21 @@ def test_enhance_button_takes_the_picked_thumbnails_over_the_folder(qtbot, tmp_p
     assert queued == [["g0"]]
 
 
+def test_enhance_button_with_nothing_picked_enhances_the_folder_on_screen(qtbot, tmp_path):
+    view = GalleryView(_enhanceable_db(tmp_path, count=2), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    _click_off(view)
+
+    view._buttons.enhance.click()
+
+    assert sorted(j.params["input_image"] for j in view._jobs.all_jobs) == [
+        "image/sdxl_t2i_g0.png [output]", "image/sdxl_t2i_g1.png [output]"], (
+        "with nothing picked, a press of Enhance acts on the folder on screen, as a press of "
+        "Favorite or Delete does")
+
+
 def _video_leaf(view):
     item = _video_workflow(view._tree)
     while item.childCount():

@@ -2052,6 +2052,20 @@ def test_a_video_asked_for_while_its_image_is_enhanced_is_made_from_the_enhancem
     assert json.loads(row["workflow_json"]) == payload
 
 
+def test_a_video_waits_out_the_minute_after_an_enhancement_as_after_an_image(qtbot, tmp_path):
+    now = [1000.0]
+    queue = JobQueue(Database(tmp_path / "test.db"), _client(), clock=lambda: now[0])
+    enhance = _launch_enhance(queue, "e")
+    video = _launch_video(queue, "v", input_image=_IMAGE)
+    now[0] = 1010.0
+
+    enhance.finished.emit([_ENHANCED], None, 1.0)
+
+    assert queue.starts_at(video.prompt_id) == 1060.0, (
+        "a video waits out the minute after the last image asked for, and an enhancement "
+        "asked for is one")
+
+
 def test_the_video_waiting_on_an_enhancement_is_sent_after_the_enhancement_is_announced(
         qtbot, tmp_path):
     client = _client()

@@ -7,7 +7,7 @@ import pytest
 
 from origenerator.voice.dictation import RequestDictation
 from origenerator.voice.listener import CommandAndRequestListener, Phrases
-from tests.conftest import FakeHearing
+from tests.conftest import FakeCommandAndRequestListener, FakeHearing
 
 
 def _listener(says="fix teeth"):
@@ -228,15 +228,19 @@ def test_closing_the_mic_drops_a_half_said_request(qtbot):
 
 
 
+_BOTH_VOCABULARIES = {
+    "command_matcher": lambda text: "teeth" if "teeth" in text.lower() else None,
+    "bare_matcher": lambda text: (
+        text.strip().lower() if text.strip().lower() in ("requests", "trash", "fix teeth")
+        else None
+    ),
+}
+
+
 def _bare_listener(says):
     hearing = FakeHearing(says)
     listener = CommandAndRequestListener(
-        hearing=hearing, dictation=RequestDictation(),
-        command_matcher=lambda text: "teeth" if "teeth" in text.lower() else None,
-        bare_matcher=lambda text: (
-            text.strip().lower() if text.strip().lower() in ("requests", "trash") else None
-        ),
-    )
+        hearing=hearing, dictation=RequestDictation(), **_BOTH_VOCABULARIES)
     return listener, hearing
 
 
@@ -277,6 +281,36 @@ def test_an_open_request_takes_the_word_back(qtbot):
 
     assert ran == []
     assert len(spoken) == 2
+
+
+def _routes(listener, say, utterances):
+    taken = []
+    listener.request.connect(lambda spoken: taken.append(("request", spoken.state, spoken.text)))
+    listener.start_commands(lambda matched, *_said_at: taken.append(("command", matched)))
+    for utterance in utterances:
+        say(utterance)
+    return taken
+
+
+@pytest.mark.parametrize("utterances", [
+    ["requests"], ["trash"], ["fix teeth"], ["Request, fix teeth, over."],
+    ["Request.", "trash", "over"],
+])
+def test_the_suites_stand_in_routes_what_it_hears_as_the_listener_does(qtbot, utterances):
+    hearing = FakeHearing()
+    listener = CommandAndRequestListener(
+        hearing=hearing, dictation=RequestDictation(), **_BOTH_VOCABULARIES)
+    stand_in = FakeCommandAndRequestListener(dictation=RequestDictation(), **_BOTH_VOCABULARIES)
+
+    def into_the_mic(utterance):
+        hearing.says = utterance
+        hearing.hear()
+
+    assert _routes(stand_in, stand_in.speak, utterances) == _routes(
+        listener, into_the_mic, utterances), (
+        "the voice tests hear through the suite's stand-in listener, so it routes an utterance "
+        "in the listener's own order: an open or opening request first, then the "
+        "whole-utterance commands, then the looser matcher")
 
 
 def test_a_mic_that_will_not_open_says_what_stopped_it(qtbot):

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from unittest.mock import call
+from unittest.mock import MagicMock, call
 
 import pytest
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import QApplication, QWidget
 
+from origenerator.comfyui_api import ForeignQueue
+from origenerator.comfyui_client import ComfyUIClient
 from origenerator.gui.gallery_view import GalleryView
 from tests.gallery_view_support import (
     FakeDB,
@@ -146,6 +148,40 @@ def test_the_ticks_reads_are_handed_what_the_jobs_were_at_the_tick(qtbot, tmp_pa
     assert client.fetch_history.call_args_list == [call(job.prompt_id)], (
         "the tick's reads run off the window's thread, so they are handed the jobs' names and "
         "states as strings and touch nothing the window owns")
+
+
+def test_a_tick_asks_comfyui_only_inside_the_read_it_hands_off(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._start_reroll(_select_first_leaf(view))
+    comfyui = MagicMock(spec=ComfyUIClient)
+    comfyui.fetch_history.return_value = {}
+    comfyui.foreign_backlog.return_value = None
+    comfyui.executing_prompts.return_value = []
+    comfyui.foreign_queue.return_value = ForeignQueue(running=[], pending=[])
+    view._client = comfyui
+    hops = []
+    view.off_thread = lambda work, done: hops.append((work, done))
+    asked = {"on the window's thread": [], "in the read handed off": []}
+
+    def asked_since(where):
+        asked[where] += [name for name, _args, _kwargs in comfyui.mock_calls]
+        comfyui.reset_mock()
+
+    view._poll()
+    while hops:
+        work, done = hops.pop(0)
+        asked_since("on the window's thread")
+        facts = work()
+        asked_since("in the read handed off")
+        done(facts)
+    asked_since("on the window's thread")
+
+    assert asked == {"on the window's thread": [], "in the read handed off": [
+        "fetch_history", "foreign_backlog", "executing_prompts", "foreign_queue"]}, (
+        "every read a poll tick makes of ComfyUI is in the one read it hands off the window's "
+        "thread, so none of them blocks the window")
 
 
 def test_a_listing_that_could_not_be_read_draws_nothing_and_leaves_the_next_tick_free(qtbot):

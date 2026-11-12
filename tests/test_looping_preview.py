@@ -7,7 +7,13 @@ from PyQt6.QtGui import QMovie
 from PyQt6.QtWidgets import QLabel
 
 from origenerator.gui import omnipause
-from origenerator.gui.looping_preview import fit_size, looping_movie, play_in, set_in_sight
+from origenerator.gui.looping_preview import (
+    fit_size,
+    looping_movie,
+    play_gray_in,
+    play_in,
+    set_in_sight,
+)
 
 
 def _loop(path, color="gray"):
@@ -48,6 +54,14 @@ def test_the_clip_is_fit_into_the_space_it_is_given(label, tmp_path):
     movie = play_in(label, _loop(tmp_path / "one.webp"), QSize(20, 20))
 
     assert movie.scaledSize() == QSize(20, 15)
+
+
+def test_a_gray_video_is_turned_gray_at_the_size_it_is_shown(label, tmp_path):
+    play_gray_in(label, _loop(tmp_path / "one.webp"), QSize(20, 20))
+
+    assert label.pixmap().size() == QSize(20, 15), (
+        "each frame is turned gray on its way to the label, a cost that stays small next to "
+        "decoding it only because the frame is already at the size it is shown")
 
 
 def test_a_clip_out_of_sight_holds_still_until_it_is_back_in_sight(label, tmp_path):

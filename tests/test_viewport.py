@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, call
 import pytest
 from PIL import Image
 from PyQt6.QtCore import QEvent, QPoint, QPointF, QSize, Qt, QUrl
-from PyQt6.QtGui import QColor, QImage, QMouseEvent, QResizeEvent
+from PyQt6.QtGui import QColor, QImage, QMouseEvent, QMovie, QResizeEvent
 from PyQt6.QtMultimedia import QMediaMetaData, QMediaPlayer, QVideoFrame
 from PyQt6.QtWidgets import QApplication, QWidget
 
@@ -17,7 +17,7 @@ from origenerator.funscript import (
     synthesize_actions,
     write_funscript,
 )
-from origenerator.gui import corner_buttons, drag_thumbnail, icons, viewport
+from origenerator.gui import corner_buttons, drag_thumbnail, icons, omnipause, viewport
 from origenerator.gui.combination import Combination
 from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
 from origenerator.gui.frame_files import FrameFiles
@@ -247,6 +247,30 @@ def test_an_animated_preview_is_fitted_into_the_pane_without_being_stretched(
     w.show_image(_make_animated_gif(tmp_path / "loop.gif"))
 
     assert w._image_label.movie().scaledSize() == QSize(200, 150)
+
+
+def test_the_media_size_is_the_items_own_not_the_size_it_is_drawn_at(make_preview, tmp_path):
+    w = make_preview()
+    w._image_label.resize(200, 200)
+
+    w.show_image(_make_png(tmp_path / "p.png"))
+
+    assert w.media_size() == (32, 24), (
+        "a caller lays out around the item, so its size is read off the unscaled picture, "
+        "never off the pane it is fitted into")
+
+
+def test_a_video_or_animation_shown_into_a_frozen_room_opens_held(make_preview, tmp_path):
+    w = make_preview()
+    omnipause.freeze(True)
+
+    w.show_video(tmp_path / "clip.mp4")
+    w.show_image(_make_animated_gif(tmp_path / "loop.gif"))
+
+    told = [name for name, *_ in w._player.method_calls if name in ("play", "pause")]
+    assert (told[-1], w._image_label.movie().state()) == ("pause", QMovie.MovieState.Paused), (
+        "every new video or animation starts playing, so each one shown in a frozen room asks "
+        "the room and is held")
 
 
 def test_show_static_image_uses_no_movie(make_preview, tmp_path):

@@ -432,6 +432,25 @@ def test_reconnect_running_seeds_progress_from_the_row(qtbot, tmp_path):
         "comes back at what it last showed")
 
 
+def test_a_video_reconnected_at_startup_finds_its_folder_by_its_start_frames_settings(
+        qtbot, tmp_path):
+    db = Database(tmp_path / "test.db")
+    image = _image_row()
+    video = {**_video_row(prompt_id="vid-run"), "status": "running",
+             "workflow_version": _I2V.version, "workflow_json": "{}"}
+    db.restore_generation(image)
+    db.restore_generation(video)
+    queue = JobQueue(db, _client())
+
+    queue.reconnect_running()
+
+    by_its_frame = gallery.settings_folder_key(video, gallery.image_config_index_of([image]))
+    assert by_its_frame != gallery.settings_folder_key(video)
+    assert getattr(queue.job_for(by_its_frame), "prompt_id", None) == "vid-run", (
+        "at startup the gallery has not built its tree yet, so a run reconnected then reads "
+        "its start frame's settings from the database to find its folder")
+
+
 def _image_params(**over):
     params = dict(WORKFLOW_REGISTRY[_IMAGE_WF].default_params())
     params.update(over)

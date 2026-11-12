@@ -3452,16 +3452,11 @@ def test_a_second_request_builds_on_the_first_and_generate_records_every_turn(
         "on a beach", "img1", "a woman on a couch")
 
 
-class _NeverAnswers:
-    def ask(self, *args, **settings):
-        pass
-
-
 def test_the_line_waits_while_the_model_works_out_a_request(saved_panel, qtbot):
     tab, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
     tab.show_saved_generation(image, [image])
-    tab._requests = _NeverAnswers()
+    tab._requests = _AnswersHeldBack()
 
     exchange = _ask(tab, qtbot, "a hat")
 
@@ -3513,14 +3508,16 @@ def test_an_answer_to_a_request_made_of_an_image_since_left_is_dropped(qtbot, tm
     tab, db = _saved_panel(qtbot, tmp_path, TabViews(requests=answers))
     cat = _image_row(db, "img1", prompt="a cat")
     owl = _image_row(db, "img2", prompt="an owl", filename="sdxl_img2.png")
-    _request_made(db, "img2", source="img1")
+    _request_made(db, "img2")
     tab.show_saved_generation(cat, [cat, owl])
     _ask(tab, qtbot, "a dog instead")
 
     tab.show_saved_generation(owl, [cat, owl])
     answers.answer_the_first()
 
-    assert _positive(tab) == "an owl",         "the answer to a request made of the cat came back after the owl was shown, and rewrote the owl"
+    assert _positive(tab) == "an owl", (
+        "the answer to a request made of the cat came back after the owl was shown, "
+        "and rewrote the owl")
 
 
 def test_a_request_changes_each_scene_of_a_video_told_in_scenes(saved_panel, qtbot, monkeypatch):

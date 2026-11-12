@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
 from origenerator.app_state import AppState
 
 
@@ -61,3 +65,27 @@ def test_a_save_makes_the_folder_it_goes_in(tmp_path):
     state.save()
 
     assert AppState(path).get("gallery_folder") == "image/sdxl_t2i"
+
+
+def test_a_save_cut_off_part_way_leaves_the_last_state_file_whole(tmp_path, monkeypatch):
+    path = tmp_path / "ui_state.json"
+    state = AppState(path)
+    state.set("gallery_folder", "image/sdxl_t2i")
+    state.save()
+    last_saved = path.read_text(encoding="utf-8")
+    write_text = Path.write_text
+
+    def write_half_then_fail(self, text, *args, **kwargs):
+        write_text(self, text[: len(text) // 2], *args, **kwargs)
+        raise OSError("the disk filled part-way through the write")
+
+    monkeypatch.setattr(Path, "write_text", write_half_then_fail)
+    state.set("gallery_folder", "video/wan_i2v")
+
+    with pytest.raises(OSError, match="the disk filled"):
+        state.save()
+
+    assert path.read_text(encoding="utf-8") == last_saved, (
+        "the state is written to a .tmp file and then put in the real file's place, so a save "
+        "cut off part-way leaves the old file whole rather than a cut-off one"
+    )

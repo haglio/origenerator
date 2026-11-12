@@ -35,9 +35,9 @@ from shared_ui.colors import BLUE
 from shared_ui.preview import Preview
 from shared_ui.testing import brought_to_front
 
-from origenerator import app_link, config, content, gallery
+from origenerator import app_link, config, content, evolver_agreement, gallery
+from origenerator.app import _arm_the_crash_log as unpatched_arm_the_crash_log
 from origenerator.app import (
-    _arm_the_crash_log,
     _configure_logging,
     _init_windows_taskbar_identity,
     _open_the_loading,
@@ -211,7 +211,11 @@ def test_a_video_the_app_opens_leaves_none_of_its_tags_in_its_output_or_its_log(
 
     assert "finished with LoadedMedia" in ran.stdout, ran.stdout + ran.stderr
     written = ran.stdout + ran.stderr + (state / "origenerator.log").read_text(encoding="utf-8")
-    assert tag not in written
+    assert tag not in written, (
+        "the launcher keeps the app's stdout and stderr in its log, and Qt's Funestra had FFmpeg "
+        "print a readout of every video it opened there, each of its tags included, a "
+        "generated video's embedded prompt among them; run in a child, since FFmpeg writes to "
+        "the process's own stderr")
 
 
 @pytest.fixture(autouse=True)
@@ -721,17 +725,17 @@ def test_the_crash_log_keeps_what_earlier_runs_left(tmp_path):
     state.mkdir(parents=True)
     (state / "origenerator_crash.log").write_text("older run\n", encoding="utf-8")
 
-    _arm_the_crash_log(state, logging.getLogger("t"))
+    unpatched_arm_the_crash_log(state, logging.getLogger("t"))
 
     assert "older run" in (state / "origenerator_crash.log").read_text(encoding="utf-8")
 
 
 def test_an_unwritable_state_dir_costs_the_log_and_nothing_else(tmp_path):
-    assert _arm_the_crash_log(tmp_path / "nope" / "\0bad", logging.getLogger("t")) is None
+    assert unpatched_arm_the_crash_log(tmp_path / "nope" / "\0bad", logging.getLogger("t")) is None
 
 
 def test_arming_the_crash_log_hands_back_the_log_a_freeze_is_written_to(tmp_path):
-    crash_log = _arm_the_crash_log(tmp_path, logging.getLogger("t"))
+    crash_log = unpatched_arm_the_crash_log(tmp_path, logging.getLogger("t"))
 
     assert Path(crash_log.name) == tmp_path / "origenerator_crash.log"
     assert not crash_log.closed
@@ -1668,7 +1672,11 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
         told.assert_not_called()
         assert "the inbox a send lands in" in capsys.readouterr().err
 
-    def test_agreeing_says_nothing(self, qapp):
+    def test_with_no_evolver_beside_the_checkout_the_launch_says_nothing(self, qapp):
+        assert not (evolver_agreement.evolver_checkout() / evolver_agreement.CONTRACT).exists(), (
+            "the suite's example settings name no real checkouts, so no Evolver sits beside this "
+            "one and the launch has nothing to disagree with: this control never compares two "
+            "real apps, which is why it needs no stand-in")
         told = MagicMock()
 
         with _a_faked_boot([], **{

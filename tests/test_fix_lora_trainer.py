@@ -11,6 +11,7 @@ import pytest
 from PIL import Image
 
 from origenerator import card_claim
+from tests.children import run_python
 from tests.training_machine import AComfyUIJobComesOnceAStateIsSaved, TrainingMachine
 from tools import fix_lora_trainer
 
@@ -392,3 +393,15 @@ def test_fewer_images_are_each_seen_more_times_and_every_image_at_least_once():
     assert fix_lora_trainer.dataset_folder("C:/work", "hands", 10) == "C:/work/15_hands"
     assert fix_lora_trainer.dataset_folder("C:/work", "hands", 100) == "C:/work/2_hands"
     assert fix_lora_trainer.dataset_folder("C:/work", "hands", 400) == "C:/work/1_hands"
+
+
+def test_the_tool_imports_where_the_libraries_its_steps_need_are_missing():
+    ran = run_python(["-c", (
+        "import sys\n"
+        "sys.modules['ultralytics'] = sys.modules['PIL'] = None\n"
+        f"from {fix_lora_trainer.__name__} import dataset_folder\n"
+        "print(dataset_folder('C:/work', 'hands', 400))\n")])
+
+    assert ran.stdout.strip() == "C:/work/1_hands", (
+        "everything heavy is imported inside the step that needs it, so the app's tests can "
+        "import the tool's plain functions anywhere\n" + ran.stderr)

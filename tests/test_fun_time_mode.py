@@ -233,19 +233,7 @@ def test_videos_without_stills_are_probed_rather_than_defaulted(tmp_path):
     assert region_for_items(items) == "portrait"
 
 
-def test_the_probe_only_runs_when_nothing_else_measured(tmp_path):
-    wide_still = tmp_path / "wide.png"
-    Image.new("RGB", (200, 100)).save(wide_still)
-    items = [
-        (str(tmp_path / "gone.mp4"), "video", "a", str(wide_still)),
-        (str(tmp_path / "also-gone.mp4"), "video", "b", None),
-    ]
-    assert region_for_items(items) == "landscape"
-
-
-def test_the_probe_stops_at_the_first_video_that_opens(tmp_path, monkeypatch):
-    tall = write_mp4(tmp_path / "tall.mp4", width=64, height=128)
-    wide = write_mp4(tmp_path / "wide.mp4", width=128, height=64)
+def _videos_opened(monkeypatch) -> list[str]:
     opened = []
     open_for_real = cv2.VideoCapture
 
@@ -254,6 +242,30 @@ def test_the_probe_stops_at_the_first_video_that_opens(tmp_path, monkeypatch):
         return open_for_real(path)
 
     monkeypatch.setattr(cv2, "VideoCapture", capture)
+    return opened
+
+
+def test_the_probe_only_runs_when_nothing_else_measured(tmp_path, monkeypatch):
+    wide_still = tmp_path / "wide.png"
+    Image.new("RGB", (200, 100)).save(wide_still)
+    tall = write_mp4(tmp_path / "tall.mp4", width=64, height=128)
+    opened = _videos_opened(monkeypatch)
+    items = [
+        (str(tall), "video", "a", str(wide_still)),
+        (str(tall), "video", "b", None),
+    ]
+
+    shape = region_for_items(items)
+
+    assert opened == [], (
+        "a decode of HEVC costs seconds, so a video is decoded only when nothing else measures")
+    assert shape == "landscape"
+
+
+def test_the_probe_stops_at_the_first_video_that_opens(tmp_path, monkeypatch):
+    tall = write_mp4(tmp_path / "tall.mp4", width=64, height=128)
+    wide = write_mp4(tmp_path / "wide.mp4", width=128, height=64)
+    opened = _videos_opened(monkeypatch)
     items = [(str(tmp_path / "gone.mp4"), "video", "a", None),
              (str(tall), "video", "b", None), (str(wide), "video", "c", None)]
 

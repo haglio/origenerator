@@ -879,16 +879,21 @@ def test_a_folder_played_as_a_slideshow_opens_with_its_seed_loop_lit(qtbot):
     assert view.slideshow.hud_map().loop == ""
 
 
-def _seeds_and_no_column_to_stop_at(prompt_id):
+def _seeds_only(prompt_id):
     return (NavMapNeighbors(seeds=(Slide("b.png", "image", "id-b"),), label="fox")
             if prompt_id == "id-a" else NavMapNeighbors())
 
 
-def test_taking_the_loop_off_a_folder_slideshow_asks_the_gallery_for_the_library(qtbot):
+def _a_folder_slideshow_with_only_seeds_around(qtbot):
     widened = []
     view = _view(qtbot, _KEYED, actions=SlideshowActions(
-        neighbors=_seeds_and_no_column_to_stop_at,
+        neighbors=_seeds_only,
         browse_all=lambda slideshow: widened.append(slideshow) or True))
+    return view, widened
+
+
+def test_taking_the_loop_off_a_folder_slideshow_asks_the_gallery_for_the_library(qtbot):
+    view, widened = _a_folder_slideshow_with_only_seeds_around(qtbot)
 
     view.slideshow.slideshow_loop("")
     _settle(view)
@@ -897,11 +902,18 @@ def test_taking_the_loop_off_a_folder_slideshow_asks_the_gallery_for_the_library
     assert words(view._note) == "Loop off"
 
 
+def test_with_only_seeds_around_one_press_of_the_loop_key_leaves_the_folder(qtbot):
+    view, widened = _a_folder_slideshow_with_only_seeds_around(qtbot)
+
+    _press(view, Qt.Key.Key_E)
+
+    assert widened == [view.slideshow], (
+        "with only seeds around the slide, the loop key's stop after seeds is off rather than "
+        "the actions, so one press leaves the folder")
+
+
 def test_the_loop_key_off_a_folder_slideshow_leaves_the_folder_in_one_press(qtbot):
-    widened = []
-    view = _view(qtbot, _KEYED, actions=SlideshowActions(
-        neighbors=_seeds_and_no_column_to_stop_at,
-        browse_all=lambda slideshow: widened.append(slideshow) or True))
+    view, widened = _a_folder_slideshow_with_only_seeds_around(qtbot)
 
     _press(view, Qt.Key.Key_Home)
 

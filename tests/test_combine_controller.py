@@ -329,6 +329,7 @@ def _on_the_real_panel(qtbot, db=None):
     parts = CombineParts(jobs=FakeReroll(), client=_A_CLIENT, info_tabs_of=FakeTabs,
                          slideshows=FakeSlideshows(), starting=StartingRows())
     controller, _host = _assembled(qtbot, None, parts, db)
+    qtbot.addWidget(controller.widget)
     return controller
 
 

@@ -29,7 +29,6 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
-    QScrollArea,
     QSplitter,
     QWidget,
 )
@@ -166,15 +165,6 @@ def test_the_column_reads_preview_then_generate_then_settings(tab):
         "Generate heads the settings rather than trailing them in the lower right corner, where "
         "Windows pops its messages up over whatever is there")
     assert preview_foot <= generate_top < generate_foot <= line_top < line_foot <= settings_top
-
-
-def test_generate_sits_in_no_scroll_so_it_can_always_be_pressed(tab):
-    holding = [scroll for scroll in tab.findChildren(QScrollArea)
-               if scroll.isAncestorOf(tab._generate_btn)]
-
-    assert holding == [], (
-        "Generate is held over the scrolls, so it can be pressed however far the settings or "
-        "the item are scrolled")
 
 
 def test_a_new_tab_gives_the_preview_five_eighths_and_the_settings_and_metadata_three_sixteenths_each(

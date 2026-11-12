@@ -389,6 +389,18 @@ def test_a_collections_own_actions_keep_the_top_left_edge_to_themselves(qtbot):
             assert corner.geometry().intersected(button.geometry()).isEmpty()
 
 
+def test_a_tiles_seed_buttons_sit_in_one_row_with_its_star(qtbot):
+    tw = ItemTile("p1", None, "label", TileAppearance(favorite=True, enhance=icons.ENHANCE_OPEN,
+                         corner_buttons=_corner_button_specs()))
+    qtbot.addWidget(tw)
+    star = _corners(tw)[0].geometry()
+
+    assert [(b.geometry().size(), b.geometry().top()) for b in tw._corner_buttons] == [
+        (star.size(), star.top())] * 2, (
+        "a tile's seed buttons take its star's size and sit as high as it, so the star reads as "
+        "one row with them")
+
+
 def test_thumbnail_starts_unselected(qtbot):
     tw = ItemTile("p1", None, "label")
     qtbot.addWidget(tw)

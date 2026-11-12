@@ -1109,7 +1109,7 @@ class GenerateTab(DropZones):
     def show_running_generation(self, row: dict):
         self._point_elsewhere(row)
         self._hide_footer()
-        self._related.show_requests_and_batch_modified(row["prompt_id"])
+        self._show_what_is_known_of(row, self._image_rows())
         self._viewport.clear()
         self._note_displayed_config(being_made=row)
         self._emit_title()
@@ -1418,13 +1418,17 @@ class GenerateTab(DropZones):
 
     def _show_footer(self, row: dict, image_rows: list[dict], preview):
         self.reread_folder_buttons()
-        self._metadata_section.show_row(row, self._upscale_of(row), self._item_name())
+        self._show_what_is_known_of(row, image_rows)
+        self._refresh_versions()
+        self._update_lane_button(preview)
+
+    def _show_what_is_known_of(self, row: dict, image_rows: list[dict]) -> None:
+        self._metadata_section.show_row(row, self._upscale_of(row),
+                                        self._names.of(row.get("prompt_id")))
         start = start_images_among(image_rows)(row)
         self._action.show_row(row, self._db.get_generation(start["prompt_id"]) if start else None)
         self._reflect_metadata()
         self._related.show_row(row, image_rows)
-        self._refresh_versions()
-        self._update_lane_button(preview)
 
     def displayed_row(self) -> dict | None:
         return self._displayed_row

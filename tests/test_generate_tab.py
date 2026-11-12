@@ -99,7 +99,7 @@ from origenerator.workflows.model_files import NO_LORA
 from tests import drops
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import _struck_and_lit
-from tests.related_links import source_tile
+from tests.related_links import settings_tile, source_tile
 from tests.text_readers import clap_reader, clip_reader, word_reader, word_reading
 from tests.thumbnail_rows import looping_video, painted_row, where_the_thumbnail_is
 
@@ -3342,6 +3342,20 @@ def test_an_image_a_request_is_still_making_links_to_the_one_it_was_asked_of(sav
     assert not section.isHidden()
     assert [(tile.heading, tile._prompt_id)
             for tile in section.findChildren(SourceTile)] == [("Requested from", "src")]
+
+
+def test_a_video_combine_is_still_making_links_to_its_source_image_and_video(saved_panel):
+    tab, db = saved_panel
+    _image_row(db, "img1", filename="sdxl_img1.png")
+    _video_row(db, "vid0")
+    _video_row(db, "made1", input_image="sdxl_img1.png")
+    db.update_generation("made1", status="running", output_files="[]")
+    running = {**db.get_generation("made1"), "source_video": "vid0"}
+
+    tab.show_running_generation(running)
+
+    assert source_tile(tab._related)._prompt_id == "img1"
+    assert settings_tile(tab._related)._prompt_id == "vid0"
 
 
 def test_hovering_the_request_that_made_an_image_shows_the_whole_prompts_with_its_change(

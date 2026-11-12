@@ -3203,6 +3203,36 @@ def test_the_enhancement_landing_leaves_the_mark_standing(saved_panel, tmp_path,
         "afresh, the user's edits would read as what was generated")
 
 
+def _shown_again(tab, image, _tmp_path):
+    tab.refresh_displayed(image, [image])
+
+
+def _enhanced_to_the_end(tab, _image, tmp_path):
+    tab.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path), "2x"))
+    tab.set_pending_enhancement(None)
+
+
+def _a_version_picked(tab, _image, _tmp_path):
+    tab._show_version(1)
+
+
+@pytest.mark.parametrize("put_up_again", [_shown_again, _enhanced_to_the_end, _a_version_picked])
+def test_the_same_image_put_up_again_keeps_its_not_yet_generated_line(saved_panel, tmp_path,
+                                                                      monkeypatch, put_up_again):
+    tab, db = saved_panel
+    del tab._viewport.show_media
+    _levels_on_disk(tmp_path, monkeypatch)
+    image = _enhanced_image_row(db)
+    tab.show_saved_generation(image, [image])
+    _set_prompt(tab, "a dog")
+
+    put_up_again(tab, image, tmp_path)
+
+    assert _message(tab) == "(not yet generated with modifications)", (
+        "putting an image up in the preview takes the not yet generated line off with what was"
+        " shown before, so each place that puts the same image up again puts the line back")
+
+
 def test_a_live_frame_clears_the_mark_it_answers(saved_panel):
     tab, db = saved_panel
     image = _image_row(db, "img1", prompt="a cat")
@@ -3755,7 +3785,9 @@ def _positive_field(tab):
 
 
 def test_a_tab_asking_for_changes_to_a_folder_has_no_dropdown_of_how_many(modify_batch_tab):
-    assert modify_batch_tab._how_many.isHidden()
+    assert modify_batch_tab._how_many.isHidden(), (
+        "a prefill ends a modify batch, so opening one prefills first and sets the batch up"
+        " after, or the prefill undoes it")
 
     modify_batch_tab.prefill("sdxl_t2i", _folder_params())
 

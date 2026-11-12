@@ -415,6 +415,15 @@ def test_the_loop_key_steps_the_lock_then_seeds_then_configs_then_off_and_round_
     assert slideshow_set.step_loop(locked=False) == LOCK
 
 
+def test_a_lock_let_go_of_between_presses_is_the_loop_keys_first_stop_again():
+    slideshow_set, _dealt = _mapped()
+    assert slideshow_set.step_loop(locked=False) == LOCK
+
+    assert slideshow_set.step_loop(locked=False) == LOCK, (
+        "the loop key's lock stop is only reported: the lock belongs to the surface the"
+        " slideshow is drawn on, so the set is told `locked` at each press and never sets it")
+
+
 def test_a_loop_down_the_column_plays_the_whole_group_not_one_of_each_action():
     twin = Slide("one-y.png", "image", "id-1y")
     whole = lambda pid: NavMapNeighbors(  # noqa: E731

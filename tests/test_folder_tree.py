@@ -170,7 +170,7 @@ def test_left_clicking_the_caret_still_collapses_the_folder(qtbot):
 def test_hovering_tracks_the_leaf_under_the_mouse(qtbot):
     tree, leaf = _tree_with_an_indented_leaf(qtbot)
 
-    qtbot.mouseMove(tree.viewport(), pos=tree.visualRect(tree.indexFromItem(leaf)).center())
+    _hover_over(qtbot, tree, leaf)
     assert tree._hover_key == shaped_key("m/w/mo/key", LANDSCAPE)
 
     parent = leaf.parent()
@@ -667,6 +667,12 @@ def _row_pixels(tree, item) -> list:
             for x in range(tree.viewport().width())]
 
 
+def _hover_over(qtbot, tree, item) -> None:
+    row = tree.visualRect(tree.indexFromItem(item))
+    qtbot.mouseMove(tree.viewport(), pos=QPoint(row.center().x(), row.bottom() + row.height()))
+    qtbot.mouseMove(tree.viewport(), pos=row.center())
+
+
 def _pixels_from(tree, item, left: int) -> list:
     return [(x, color.name()) for x, color in _row_pixels(tree, item) if x >= left]
 
@@ -748,7 +754,7 @@ def test_a_favorited_star_keeps_its_place_when_the_delete_appears_beside_it(qtbo
     tree, leaf = _tree_with_an_indented_leaf(qtbot, favorite=True)
     star, delete = _action_rects(tree.visualRect(tree.indexFromItem(leaf)))
 
-    qtbot.mouseMove(tree.viewport(), pos=tree.visualRect(tree.indexFromItem(leaf)).center())
+    _hover_over(qtbot, tree, leaf)
 
     assert _wears_within(tree, leaf, delete, _is_red)
     assert _wears_within(tree, leaf, star, _is_green), (
@@ -761,7 +767,7 @@ def test_hovering_a_leaf_leaves_its_row_where_it_was(qtbot):
     row = tree.visualRect(tree.indexFromItem(leaf))
     before = _pixels_from(tree, leaf, row.left())
 
-    qtbot.mouseMove(tree.viewport(), pos=row.center())
+    _hover_over(qtbot, tree, leaf)
 
     assert _pixels_from(tree, leaf, row.left()) == before, (
         "the star and the delete appear in the row's own indentation, so a hover shows them "

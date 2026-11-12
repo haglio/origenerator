@@ -1626,6 +1626,19 @@ def test_fun_time_window_leaves_the_saved_geometry_alone(qtbot, tmp_path):
     assert AppState(path).get("window_geometry") == "c3RhbmRhbG9uZQ=="
 
 
+def test_a_window_launched_in_a_headset_comes_back_as_it_was_left(qtbot, tmp_path):
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first.showMaximized()
+    first.close()
+
+    in_the_headset = _window(qtbot, tmp_path, AppState(path), fun_time=_headset_session(tmp_path))
+
+    assert in_the_headset.isMaximized(), (
+        "a headset names no rect for the window, so the saved geometry is put back as it is "
+        "for a window of its own")
+
+
 def test_saving_the_session_tells_the_next_launchs_loading_screen_the_monitor_the_window_is_on(
         qtbot, tmp_path):
     next_launch = launchers_screen.MeetingPlace(tmp_path / "screen", ())

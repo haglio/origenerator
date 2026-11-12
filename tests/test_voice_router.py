@@ -717,6 +717,19 @@ def test_an_order_about_the_image_goes_to_the_slide_filling_the_screen(router):
     assert slideshow.runs == [("g7", "enhancing…", INFO)]
 
 
+def test_an_order_naming_a_shape_goes_to_that_regions_slideshow_over_the_one_showing(router):
+    portrait, landscape = FakeSlideshow(target="g3"), FakeSlideshow(target="g9")
+    voice, host, _slideshows = router(slideshows=FakeSlideshows(
+        showing=landscape, by_shape={"portrait": portrait, "landscape": landscape}))
+
+    voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND, "portrait"))
+
+    assert host.enhanced == ["g3"], (
+        "hosted, two slideshows run at once and neither is the active window, so naming one is "
+        "the only way to say which image is meant")
+    assert portrait.runs == [("g3", "enhancing…", INFO)]
+
+
 def test_an_order_said_over_an_image_since_left_is_about_that_image_put_back(router):
     slideshow = FakeSlideshow(target="g7", said_over={7.5: "g6"})
     voice, host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow))
@@ -770,6 +783,19 @@ def test_an_opening_request_pauses_the_slideshow_and_says_so(router):
     voice.on_spoken_request(Spoken("no hat", listening=True))
 
     assert slideshow.pauses == [(True, "Request: no hat… — say “over” to submit")]
+
+
+def test_a_request_said_to_a_named_region_is_about_that_regions_slide(router):
+    portrait, landscape = FakeSlideshow(target="g3"), FakeSlideshow(target="g9")
+    voice, _host, _slideshows = router(slideshows=FakeSlideshows(
+        showing=landscape, by_shape={"portrait": portrait, "landscape": landscape}))
+
+    voice.on_spoken_request(Spoken("no hat", listening=True, opened_at=4.0), "portrait")
+
+    assert (portrait.went_back_for, landscape.went_back_for) == ([4.0], []), (
+        "hosted, two slideshows run at once on the satellite regions and neither is the active "
+        "window, so the region named is what says which image the request is about")
+    assert portrait.pauses == [(True, "Request: no hat… — say “over” to submit")]
 
 
 def test_an_open_request_reminds_the_speaker_that_over_submits_it(router):

@@ -575,6 +575,25 @@ def test_a_model_lora_band_folds_shut_on_its_heading(qtbot):
     assert header.fold == "chevron_right"
 
 
+def test_a_bands_heading_reaches_across_the_whole_column(qtbot):
+    view = GalleryView(FakeDB([_i2v_video("v1", "styleA", prompt="a cat"),
+                               _i2v_video("v2", "styleB", prompt="a cat")]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _search_for(view, "cat")
+    view.set_search_sort(search.SORT_MODEL_LORA)
+    view.resize(3000, 600)
+    view.show()
+    column = view._scroll.widget()
+    column.layout().activate()
+    headers = _section_headers(view)
+
+    assert column.width() > max(header.sizeHint().width() for header in headers)
+    assert {header.width() for header in headers} == {column.width()}, (
+        "the whole row is the fold's target, which a fold control has to be when its sections "
+        "are tall enough that it is aimed at after a scroll")
+
+
 def test_a_folded_band_stays_folded_across_a_redraw(qtbot):
     db = FakeDB([_i2v_video("v1", "styleA", prompt="a cat"),
                  _i2v_video("v2", "styleB", prompt="a cat")])

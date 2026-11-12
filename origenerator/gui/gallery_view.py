@@ -834,7 +834,8 @@ class GalleryView(QWidget):
 
     def _on_radio_toggle(self, on: bool):
         if on:
-            self._radio.start()
+            if self.isVisible():
+                self._radio.start()
         else:
             self._radio.stop()
 
@@ -1010,6 +1011,8 @@ class GalleryView(QWidget):
         self._poll_timer.start()
         self._intercept_the_rooms_keys(True)
         self.refresh(only_if_moved=True)
+        if self.radio_enabled():
+            self._radio.start()
 
     def hideEvent(self, event):
         super().hideEvent(event)

@@ -1897,8 +1897,7 @@ def test_finishing_a_reroll_hides_the_front_tabs_cancel_button(qtbot, tmp_path):
     assert tab._generate_btn.isEnabled() is True
 
 
-def test_finishing_a_reroll_hides_the_cancel_button_of_its_tab_now_under_another(qtbot,
-                                                                                 tmp_path):
+def test_finishing_a_reroll_hides_the_cancel_button_of_a_tab_under_another(qtbot, tmp_path):
     client, view, launcher, job = _a_run_launched_from_the_front_tab(qtbot, tmp_path)
     in_front = view._generate_pane._add_subtab()
 

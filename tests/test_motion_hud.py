@@ -68,5 +68,5 @@ def test_space_reaches_the_switch_it_is_given_rather_than_the_motions_own():
 
     assert pressed == [1]
     assert motion.asked == [], (
-        "driving the OSR2 is one switch, which picks the funscript or the motion by what is "
-        "playing, so Space never starts the motion beside a script already streaming")
+        "driving the OSR2 is one switch, the one handed in, so Space never starts the motion "
+        "beside a script already streaming")

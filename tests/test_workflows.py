@@ -17,6 +17,7 @@ from origenerator.gui.param_fields import clamped_number
 from origenerator.gui.param_sections import section_title
 from origenerator.importer import _GRAPH_SIGNATURES, _workflow_from_nodes
 from origenerator.media import MediaType
+from origenerator.what_from_what import KINDS
 from origenerator.workflows import (
     RETIRED_WORKFLOW_NAMES,
     WORKFLOW_REGISTRY,
@@ -1014,9 +1015,8 @@ def test_a_workflow_name_that_says_what_it_makes_from_what_says_it_first():
     names = [wf.display_name for wf in WORKFLOW_REGISTRY.values()]
     names += [workflow_named(outside_workflow("a-site", MediaType.VIDEO, kind)).display_name
               for kind in VideoKind]
-    kinds = re.compile(r"\b(T2I|I2I|I2V|T2V)\b")
     assert [name for name in [*names, *RETIRED_WORKFLOW_NAMES.values()]
-            if kinds.search(name) and not kinds.match(name)] == []
+            if KINDS.search(name) and not KINDS.match(name)] == []
 
 
 def test_enhance_keys_cover_every_param_only_the_tail_reads():

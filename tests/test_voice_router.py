@@ -795,8 +795,7 @@ def test_a_request_said_to_a_named_region_is_about_that_regions_slide(router):
     voice.on_spoken_request(Spoken("no hat", listening=True, opened_at=4.0), "portrait")
 
     assert (portrait.went_back_for, landscape.went_back_for) == ([4.0], []), (
-        "hosted, two slideshows run at once on the satellite regions and neither is the active "
-        "window, so the region named is what says which image the request is about")
+        "the region named, not the slideshow showing, says which image the request is about")
     assert portrait.pauses == [(True, "Request: no hat… — say “over” to submit")]
 
 

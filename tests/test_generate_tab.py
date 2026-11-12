@@ -1815,6 +1815,26 @@ def test_a_levels_facts_sit_one_gap_after_their_longest_key_as_a_field_after_its
     assert {value.x() - (key.x() + longest) for key, value in zip(keys, values, strict=True)} == {GAP_MEDIUM}
 
 
+def test_a_levels_fact_that_wraps_keeps_its_key_level_with_the_values_first_line(saved_panel):
+    tab, db = saved_panel
+    image = _enhanced_image_row(db)
+    tab.show_saved_generation(image, [image])
+    tab.resize(300, 1400)
+    tab.show()
+    tab.layout().activate()
+    facts = next(row for row in _version_rows(tab) if "Enhancement" in _row_texts(row))._facts
+    line = max((line for line in range(1, facts.rowCount()) if facts.itemAtPosition(line, 1)),
+               key=lambda line: facts.itemAtPosition(line, 1).widget().height())
+    cells = [facts.itemAtPosition(line, column).widget() for column in range(facts.columnCount())
+             if facts.itemAtPosition(line, column) is not None]
+    value = facts.itemAtPosition(line, 1).widget()
+    beside = [cell for cell in cells if cell is not value]
+
+    assert value.height() > max(cell.sizeHint().height() for cell in beside)
+    assert {(cell.y(), cell.height() - cell.sizeHint().height()) for cell in beside} == {(value.y(), 0)}, (
+        "a key and a button sit at the top of a line the value has grown taller than")
+
+
 def test_an_unenhanced_image_still_shows_its_original_and_the_add_tile(saved_panel):
     tab, db = saved_panel
     image = _image_row(db, "img1")

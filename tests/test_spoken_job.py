@@ -7,6 +7,7 @@ import threading
 import urllib.error
 from unittest.mock import MagicMock
 
+import shiboken6
 from PySide6.QtCore import QTimer
 from shared_ui.testing import appending_to
 
@@ -282,3 +283,15 @@ def test_a_refused_send_after_speaking_fails_the_job(qtbot, tmp_path):
         "the send is made when the voice is done, with no caller above it to raise to, so a refusal "
         "fails the job the way a run that errors does")
     assert job.state == "failed"
+
+
+def test_a_speaker_let_go_of_while_its_lines_are_spoken_leaves_the_speaking_to_finish(qtbot):
+    let_it_finish = threading.Event()
+    spoken = []
+    speaker = job_speaker.Speaker(_client(), lines_on_disk=lambda params: let_it_finish.wait(_HANG_MS / 1000))
+    speaker.speak({}, lambda: spoken.append("done"), spoken.append)
+
+    shiboken6.delete(speaker)
+    let_it_finish.set()
+
+    qtbot.waitUntil(lambda: spoken == ["done"], timeout=_HANG_MS)

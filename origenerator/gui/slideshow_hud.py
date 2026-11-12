@@ -55,6 +55,7 @@ def slideshow_hud_model(shape: str, slideshow, placement: HudPlacement = USUAL_P
             f_mode=favorites_filter, enhanced=enhanced,
             filters=(ORIGINALS_LABEL if slideshow.hud_originals_mode else "", action_filter))),
         is_favorite=slideshow.hud_is_favorite,
+        item_name=slideshow.hud_item_name,
         item_note=slideshow.hud_item_note,
         rows=slideshow_rows(shape, SlideshowFacts(
             locked=locked, favorites_filter=favorites_filter, enhanced=enhanced,

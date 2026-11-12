@@ -2895,15 +2895,15 @@ def test_a_funestra_that_opens_after_the_pass_is_handed_over_takes_the_pace(qtbo
 def test_a_name_that_cannot_be_worked_out_leaves_the_item_line_blank(qtbot):
     view = _view(qtbot, _KEYED)
     _settle(view)
-    view._label_for = lambda prompt_id: f"name of {prompt_id}"
-    assert view.item_label() == "name of id-a"
+    view.slideshow._actions = SlideshowActions(name_of=lambda prompt_id: f"name of {prompt_id}")
+    assert view.slideshow.hud_item_name == "name of id-a"
 
     def cannot_name(prompt_id):
         raise RuntimeError("the gallery has no such row")
 
-    view._label_for = cannot_name
+    view.slideshow._actions = SlideshowActions(name_of=cannot_name)
 
-    assert view.item_label() == ""
+    assert view.slideshow.hud_item_name == ""
 
 
 def test_a_requests_line_stays_up_long_enough_to_be_read(qtbot):

@@ -1778,14 +1778,7 @@ def test_a_tab_coming_to_the_front_lays_out_for_its_own_image(qtbot):
 
 
 def _hud_label_for(view):
-    worn = {}
-
-    class _Slideshow:
-        def wear_the_hud(self, shape, wear):
-            worn.update(vars(wear))
-
-    view._slideshows._wear_the_hud(_Slideshow(), "landscape")
-    return worn["label_for"]
+    return view._slideshows._slideshow_actions("landscape").name_of
 
 
 def test_the_slideshows_hud_names_the_item_the_way_this_app_does(qtbot):

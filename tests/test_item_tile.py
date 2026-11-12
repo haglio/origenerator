@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import time
+from dataclasses import fields, replace
 from io import BytesIO
 
+import pytest
 from PIL import Image
 from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
-from PySide6.QtGui import QEnterEvent, QMovie
+from PySide6.QtGui import QEnterEvent, QIcon, QMovie
 from shared_ui.colors import BLUE, TEXT_PRIMARY
 from shared_ui.testing import appending_to
 
 from origenerator.gui import corner_buttons, drag_thumbnail, icons, omnipause
-from origenerator.gui.corner_buttons import CORNER_INSET
+from origenerator.gui.corner_buttons import CORNER_INSET, RestoreOffer
 from origenerator.gui.gallery_pane import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.inflight import RunReading
 from origenerator.gui.item_tile import CornerButton, ItemTile, TileAppearance
@@ -636,3 +638,31 @@ def test_a_tile_told_the_selection_it_already_has_is_not_styled_again(qtbot):
     tw.set_selected(True)
 
     assert styled == [], "a click that did not move the selection restyles no thumbnail"
+
+
+_A_CHANGE_TO = {
+    "caption": lambda: "another name",
+    "media_type": lambda: MediaType.VIDEO,
+    "movie_path": lambda: "moving.webp",
+    "favorite": lambda: True,
+    "enhance": lambda: "2x",
+    "enhancing": lambda: RunReading("running"),
+    "corner_buttons": lambda: [CornerButton("alpha", QIcon(), "Alpha")],
+    "restore": lambda: RestoreOffer("Restore"),
+}
+
+
+def _look(appearance):
+    return ItemTile.look_of("i1", "still.png", appearance.caption or "label", appearance)
+
+
+@pytest.mark.parametrize("field", [field.name for field in fields(TileAppearance)])
+def test_a_tiles_look_holds_exactly_the_fields_a_built_tile_has_no_setter_for(qtbot, field):
+    plain = TileAppearance()
+    changed = replace(plain, **{field: _A_CHANGE_TO[field]()})
+
+    kept = _look(changed) == _look(plain)
+
+    assert kept == hasattr(ItemTile, f"set_{field}"), (
+        "a redraw keeps a tile whose look is unchanged and sets what changed on it, so a field"
+        " goes into the look exactly when a built tile has no setter for it")

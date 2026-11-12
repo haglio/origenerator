@@ -47,7 +47,7 @@ from origenerator.gui.param_form import (
 from origenerator.gui.param_help import definition_help, option_help, param_help
 from origenerator.gui.preset_dropdown import PresetDropdown
 from origenerator.gui.prompt_boxes import PromptBoxes
-from origenerator.gui.prompt_field import PromptField
+from origenerator.gui.prompt_field import PROMPT_HEIGHTS, PromptField, PromptHeights
 from origenerator.gui.prompt_marks import (
     RESOLVE_IN_BOTH_PROMPTS,
     RESOLVE_UNPAIRED_PARENTHESES,
@@ -201,6 +201,19 @@ def test_prompt_fields_are_draggable_and_filed_under_their_param(qtbot):
     assert box._key == "positive_prompt"
     assert not isinstance(form._widgets["name"], PromptBoxes)
     assert form.text_fields() == [box]
+
+
+def test_a_form_hands_its_own_heights_on_to_its_prompt_fields(qtbot):
+    mine = PromptHeights()
+    mine.set_height("positive_prompt", 260)
+
+    form = ParamForm([ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True)],
+                     helpers=FormHelpers(heights=mine))
+    qtbot.addWidget(form)
+    (box,) = form._widgets["positive_prompt"].boxes()
+
+    assert box.height() == 260, "a form built with its own prompt heights hands them on to its fields"
+    assert PROMPT_HEIGHTS.height("positive_prompt") != 260
 
 
 def test_plain_scalar_and_single_line_fields_get_no_copy_button(qtbot):

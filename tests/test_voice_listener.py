@@ -301,6 +301,17 @@ def test_a_mic_that_will_not_open_is_logged_as_a_warning(qtbot, caplog):
         (logging.WARNING, "Voice: mic unavailable — No module named 'sounddevice'")]
 
 
+def test_a_request_opened_at_the_mic_is_finished_by_what_the_session_heard(qtbot):
+    listener, hearing = _request_listener(says="Request, a red scarf")
+    listener.start_commands(_ignore)
+
+    hearing.hear()
+    finished = listener.push_dictation("on a snowy hill, over")
+
+    assert getattr(finished, "text", None) == "a red scarf on a snowy hill", (
+        "the mic's half and the session's half of one request are one dictation")
+
+
 def test_it_says_a_request_is_being_taken_from_its_opening_word_until_over(qtbot):
     listener, _hearing = _bare_listener("unused")
 

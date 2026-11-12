@@ -63,6 +63,7 @@ from origenerator.config import STATE_DIR
 from origenerator.db import Database, NewGeneration
 from origenerator.evolver_export import EvolverInbox
 from origenerator.export_lane import GENAU
+from origenerator.fun_time_mode import TASKBAR_IDENTITY_FLAG
 from origenerator.gui.loading_screen import loading_screen
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.window_monitor import the_window_on
@@ -1392,6 +1393,21 @@ def test_a_real_boot_exits_with_the_code_the_qt_loop_returned(qapp):
         runpy.run_module("origenerator", run_name="__main__")
 
     assert exit_.value.code == 3
+
+
+def test_qt_is_handed_none_of_the_launch_contracts_flags(qapp):
+    handed: list[list[str]] = []
+
+    @contextmanager
+    def application(argv):
+        handed.append(list(argv))
+        yield qapp
+
+    with _a_faked_boot([], **{"shared_ui.application.application": application}),          patch.object(sys, "argv", ["origenerator", TASKBAR_IDENTITY_FLAG, "Sample.Identity"]):
+        main()
+
+    assert handed == [["origenerator"]], (
+        "the launch contract parses this app's flags, and Qt reading them again could collide")
 
 
 def test_what_a_run_left_in_its_folder_never_becomes_an_item_of_its_own(tmp_path):

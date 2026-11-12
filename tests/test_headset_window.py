@@ -114,6 +114,13 @@ class TestHowBigAPublishedFrameMayBe:
         assert within.format() == QImage.Format.Format_RGBA8888
 
 
+def _presses_on(label: QLabel) -> list[str]:
+    pressed: list[str] = []
+    label.mousePressEvent = (
+        lambda event: pressed.append(f"{event.position().x():.0f},{event.position().y():.0f}"))
+    return pressed
+
+
 class TestTheRoomsPressesReachTheWindow:
     def _window(self, qtbot) -> QWidget:
         window = QWidget()
@@ -126,10 +133,7 @@ class TestTheRoomsPressesReachTheWindow:
 
     def test_a_press_lands_on_the_widget_under_that_pixel(self, tmp_path, qtbot):
         window = self._window(qtbot)
-        pressed: list[str] = []
-        window.findChild(QLabel, "target").mousePressEvent = (
-            lambda event: pressed.append(
-                f"{event.position().x():.0f},{event.position().y():.0f}"))
+        pressed = _presses_on(window.findChild(QLabel, "target"))
         headset = HeadsetWindow(window, _hosted(tmp_path))
         try:
             headset._heard("press 25 35")
@@ -182,10 +186,7 @@ class TestTheRoomsPressesReachTheWindow:
         label.setObjectName("target")
         label.setGeometry(CAP_PX, 200, 400, 200)
         window.show()
-        pressed: list[str] = []
-        label.mousePressEvent = (
-            lambda event: pressed.append(
-                f"{event.position().x():.0f},{event.position().y():.0f}"))
+        pressed = _presses_on(label)
         headset = HeadsetWindow(window, _hosted(tmp_path))
         try:
             headset.publish(now=1.0)
@@ -240,14 +241,22 @@ class TestTheRoomsPressesReachTheWindow:
 
         assert sip.isdeleted(label)
 
-    def test_a_press_with_no_pixel_is_dropped_rather_than_guessed(self, tmp_path, qtbot):
+    def test_a_press_with_no_pixel_is_dropped_rather_than_guessed(self, tmp_path, qtbot, caplog):
         window = self._window(qtbot)
+        pressed = _presses_on(window.findChild(QLabel, "target"))
         headset = HeadsetWindow(window, _hosted(tmp_path))
         try:
-            headset._heard("press")
-            headset._heard("press 4")
+            headset._heard("press 25 35")
+            headset._heard("release")
+            with caplog.at_level(logging.WARNING):
+                headset._heard("press")
+                headset._heard("press 4")
         finally:
             headset.close()
+
+        assert pressed == ["5,5"], "a press with no pixel was aimed at the last place the pointer was"
+        assert caplog.text.count("A headset press with no pixel") == 2, (
+            "a line short of a pixel is a line to say something about")
 
     def test_the_window_is_published_once_for_each_way_it_looks(self, tmp_path, qtbot):
         def published() -> tuple[int, int, int]:

@@ -207,6 +207,7 @@ def test_a_video_the_app_opens_leaves_none_of_its_tags_in_its_output_or_its_log(
     rules_of_its_own = {"QT_LOGGING_RULES", "QT_LOGGING_CONF", "QT_FFMPEG_DEBUG"}
     env = {k: v for k, v in os.environ.items() if k not in rules_of_its_own} | {
         "QT_QPA_PLATFORM": "offscreen", "QT_MEDIA_BACKEND": "ffmpeg"}
+    # FFmpeg's default log callback prints to stderr, so the readout is read from a child.
     ran = run_python(["-c", child], env=env)
 
     assert "finished with LoadedMedia" in ran.stdout, ran.stdout + ran.stderr
@@ -214,8 +215,7 @@ def test_a_video_the_app_opens_leaves_none_of_its_tags_in_its_output_or_its_log(
     assert tag not in written, (
         "the launcher keeps the app's stdout and stderr in its log, and Qt's Funestra had FFmpeg "
         "print a readout of every video it opened there, each of its tags included, a "
-        "generated video's embedded prompt among them; run in a child, since FFmpeg writes to "
-        "the process's own stderr")
+        "generated video's embedded prompt among them")
 
 
 @pytest.fixture(autouse=True)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, QObject, QPoint, Qt, QTimer, Signal
+from PySide6.QtCore import QEvent, QObject, QPoint, QRect, Qt, QTimer, Signal
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 from shared_ui.colors import BG_SECONDARY, BLUE, BORDER_PANEL, TEXT_PRIMARY
 from shared_ui.spacing import BUTTON_RADIUS, GAP_SMALL, MARGIN_STANDARD
@@ -67,9 +67,18 @@ class LinkTip(QObject):
             return
         self._popup.label.setText(self._html)
         self._popup.adjustSize()
-        below = self._widget.rect().bottomLeft()
-        self._popup.move(self._widget.mapToGlobal(below) + self._popup.offset())
         self._popup.show()
+        self._popup.move(self._below_or_above_the_widget_on_its_screen())
+
+    def _below_or_above_the_widget_on_its_screen(self) -> QPoint:
+        widget = QRect(self._widget.mapToGlobal(QPoint(0, 0)), self._widget.size())
+        below = QPoint(widget.left(), widget.bottom() + 1 + _GAP)
+        screen = (self._widget.screen().virtualSiblingAt(below) or self._widget.screen()).availableGeometry()
+        size = self._popup.frameGeometry().size()
+        x = max(screen.left(), min(below.x(), screen.right() + 1 - size.width()))
+        if below.y() + size.height() <= screen.bottom() + 1:
+            return QPoint(x, below.y())
+        return QPoint(x, max(screen.top(), widget.top() - _GAP - size.height()))
 
     def _start_hide(self):
         if self._popup.isVisible():
@@ -103,9 +112,6 @@ class _TipPopup(QFrame):
         self.label.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
         self.label.setOpenExternalLinks(False)
         layout.addWidget(self.label)
-
-    def offset(self):
-        return QPoint(0, _GAP)
 
     def enterEvent(self, event):
         super().enterEvent(event)

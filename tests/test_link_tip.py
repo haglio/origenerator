@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import shiboken6
-from PySide6.QtCore import QEvent, QPointF, Qt
+from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
 from PySide6.QtGui import QEnterEvent
 from PySide6.QtWidgets import QApplication, QPushButton
 from shared_ui.testing import appending_to
@@ -139,3 +139,25 @@ def test_the_tip_goes_with_the_widget_it_watches(qtbot):
     shiboken6.delete(button)
 
     qtbot.waitUntil(lambda: not shiboken6.isValid(popup))
+
+
+def _shown_beside(qtbot, corner):
+    button, tip = _watched(qtbot, "a tip long enough to run well past the button it hangs from")
+    screen = button.screen().availableGeometry()
+    button.move(corner(screen) - button.rect().bottomRight())
+    _enter(button)
+    tip._appear.timeout.emit()
+    return screen, button, tip._popup.frameGeometry()
+
+
+def test_a_tip_beside_the_screens_right_edge_stays_on_that_screen(qtbot):
+    screen, _, shown = _shown_beside(qtbot, lambda screen: screen.topRight() + QPoint(0, 40))
+
+    assert screen.contains(shown)
+
+
+def test_a_tip_beside_the_screens_bottom_opens_above_its_widget(qtbot):
+    screen, button, shown = _shown_beside(qtbot, lambda screen: screen.bottomLeft() + QPoint(200, 0))
+
+    assert screen.contains(shown)
+    assert shown.bottom() < button.frameGeometry().top()

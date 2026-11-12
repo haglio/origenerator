@@ -10,6 +10,8 @@ from app_support.file_channel import read_key_values
 from shared_ui.preview import Preview
 
 from origenerator import fun_time_mode as contract
+from origenerator import gallery_names_file
+from origenerator.config import LIBRARY_STATE_DIR
 from origenerator.gui.core import Launch
 from origenerator.workflows import detail_parts
 from tests.children import run_python
@@ -88,6 +90,11 @@ def test_the_document_names_every_line_a_hosted_core_writes_in_its_status_file(
     qtbot.waitUntil(status_file.exists, timeout=3000)
 
     assert sorted(read_key_values(status_file)) == sorted(_document()["status_keys"])
+
+
+def test_the_document_names_where_the_gallery_names_are_kept_in_the_production_checkout():
+    assert _document()["gallery_names_file"] == f"state/{gallery_names_file.GALLERY_NAMES_FILE}"
+    assert gallery_names_file.GALLERY_NAMES_PATH.parent == LIBRARY_STATE_DIR
 
 
 def test_no_other_window_here_wears_that_caption():

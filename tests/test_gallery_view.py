@@ -132,6 +132,18 @@ def _collection_names(item):
     return names
 
 
+def test_reading_the_library_hands_fun_time_each_files_gallery_name(qtbot):
+    published = []
+    view = GalleryView(FakeDB([_row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5},
+                                    "wan22_i2v_00001_.mp4")]),
+                       shared=Shared(publish_names=published.append))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert published[-1] == {"wan22_i2v_00001_": view._item_names.of("v1")}
+    assert published[-1]["wan22_i2v_00001_"]
+
+
 def test_refresh_builds_workflow_model_settings_tree(qtbot):
     rows = [
         _image("i1", "a cat", 50, 1),

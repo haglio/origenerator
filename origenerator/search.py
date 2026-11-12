@@ -5,9 +5,12 @@ import re
 from dataclasses import dataclass, field, replace
 from functools import lru_cache
 
+from app_support.video_names import stem_as_made
+
 from origenerator import gallery, local_llm
 from origenerator.content import load_content
 from origenerator.gallery.item_numbers import name_starts_in, without_name_starts
+from origenerator.gallery.output import stems_made_as
 from origenerator.gallery.signatures import READINGS_KEPT
 from origenerator.generation_state import in_sight
 
@@ -176,6 +179,7 @@ class _Entry:
     name: str = ""
     tags: tuple[tuple[str, ...], ...] = ()
     folder_tags: tuple[tuple[str, ...], ...] = ()
+    files: frozenset[str] = frozenset()
 
 
 def query_words(query: str) -> tuple[str, ...]:
@@ -282,6 +286,7 @@ def _build_entry(row: dict) -> _Entry:
         tags=_tags(prompt),
         made_with=frozenset(_made_with_stems(row, params)),
         seeds=frozenset(seeds),
+        files=stems_made_as(row),
     )
 
 
@@ -314,12 +319,23 @@ class GallerySearch:
         self._order = order
 
     def widens(self, query: str) -> bool:
+        if self._made_as(query):
+            return False
         return any(not self._starts_a_name(word) for word in query_words(query))
 
     def _starts_a_name(self, word: str) -> bool:
         return any(_starts_the_name(word, entry.name) for entry in self._entries.values())
 
+    def _made_as(self, query: str) -> list[str]:
+        named = stem_as_made(query.strip())
+        return [prompt_id for prompt_id in self._order
+                if named and named in self._entries[prompt_id].files]
+
     def search(self, query: str, *, expansions=None, within=None) -> SearchOutcome:
+        if made_as := self._made_as(query):
+            return SearchOutcome(tuple(SearchResult(self._entries[prompt_id].row, _EXACT)
+                                       for prompt_id in made_as
+                                       if within is None or prompt_id in within), ())
         expansions = {word: related for word, related in (expansions or {}).items()
                       if not self._starts_a_name(word)}
         terms = parse_query(query, expansions=expansions, synonyms=self._synonyms)

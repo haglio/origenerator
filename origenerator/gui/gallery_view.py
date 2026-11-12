@@ -294,6 +294,7 @@ class GalleryView(QWidget):
         self._db = db
         self._prompt_heights = shared.prompt_heights
         self._inbox = shared.inbox or evolver_export.default_inbox()
+        self._publish_names = shared.publish_names
         self._client = client
         self._fun_time = fun_time
         self._radio = shared.radio if shared.radio is not None else OrigeneratorRadio()
@@ -1167,6 +1168,7 @@ class GalleryView(QWidget):
             self._lists_built_from = state
             self._item_names.take(library.rows, library.held_rows, library.image_index,
                                   library.readings)
+            self._publish_names(self._item_names.by_file(library.rows))
         return library
 
     def _build_sides(self, trees):

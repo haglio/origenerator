@@ -14,6 +14,7 @@ from funestra.file_channel import append_command
 from funestra.playlist import write_playlist
 from shared_ui.orientation import orientation_of_size as shape_of_size
 
+from origenerator.gallery_names_file import GALLERY_NAMES_FILE
 from origenerator.media import MediaType
 from origenerator.osr2_controls_commands import spelled_filter, spelled_for
 from origenerator.slideshow import Slide
@@ -166,6 +167,7 @@ def declaration() -> dict:
         "lock_lines": [f"{spelled_for(shape, LOCK_HELD)}|{{file}}" for shape in SHAPES],
         "fix_phrases": list(published_fix_phrases()),
         "status_keys": list(STATUS_KEYS),
+        "gallery_names_file": f"state/{GALLERY_NAMES_FILE}",
     }
 
 

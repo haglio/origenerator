@@ -294,5 +294,6 @@
   "status_keys": [
     "ready",
     "core_ready"
-  ]
+  ],
+  "gallery_names_file": "state/gallery_names.json"
 }

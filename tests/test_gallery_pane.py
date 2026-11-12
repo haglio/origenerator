@@ -260,67 +260,55 @@ def test_every_collection_is_both_gathered_and_drawn_on_every_shape(qtbot):
         "new collection is an entry in both and neither can answer for one the other does not")
 
 
-def test_latest_draws_a_page_at_a_time_of_everything_it_lists(qtbot):
-    rows = _sixty()
-    pane, scroll = _pane(qtbot, rows)
+def _latest_of(pane, rows):
     _open_latest(pane, rows)
 
-    assert [tile.prompt_id for tile in _drawn(scroll)] == [f"g{n}" for n in range(1, 51)]
-    assert pane.listed_prompt_ids() == [row["prompt_id"] for row in rows]
 
-
-def test_a_settings_folder_draws_a_page_at_a_time_of_everything_it_lists(qtbot):
-    rows = _sixty()
-    pane, scroll = _pane(qtbot, rows)
-
+def _settings_folder_of(pane, rows):
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
-    assert len(_drawn(scroll)) == gallery_pane._PAGE
-    assert pane.listed_prompt_ids() == [row["prompt_id"] for row in rows]
 
-
-def test_favorites_draws_a_page_at_a_time_of_everything_it_lists(qtbot):
-    rows = [dict(row, starred=1) for row in _sixty()]
-    pane, scroll = _pane(qtbot, rows)
+def _favorites_of(pane, rows):
     pane.set_model(LibrarySnapshot(rows))
-
     pane.show_collection(FAVORITES_KEY, LANDSCAPE)
 
-    assert len(_drawn(scroll)) == gallery_pane._PAGE
-    assert len(pane.listed_prompt_ids()) == 60
 
-
-def test_the_trash_draws_a_page_at_a_time_of_everything_it_lists(qtbot):
-    held = _sixty()
-    pane, scroll = _pane(qtbot)
-    pane.set_model(LibrarySnapshot([], held))
-
+def _trash_of(pane, rows):
+    pane.set_model(LibrarySnapshot([], rows))
     pane.show_collection(TRASH_KEY)
 
-    assert len(_drawn(scroll)) == gallery_pane._PAGE
-    assert len(pane.listed_prompt_ids()) == 60
 
-
-def test_the_experiments_draw_a_page_at_a_time_of_everything_they_list(qtbot):
-    rows = [dict(row, source="experiment") for row in _sixty()]
-    pane, scroll = _pane(qtbot, rows)
+def _experiments_of(pane, rows):
     pane.set_model(LibrarySnapshot(rows))
-
     pane.show_collection(EXPERIMENTS_KEY)
 
-    assert len(_drawn(scroll)) == gallery_pane._PAGE
-    assert len(pane.listed_prompt_ids()) == 60
 
-
-def test_a_folder_of_your_own_draws_a_page_at_a_time_of_everything_it_lists(qtbot):
-    rows = _sixty()
-    pane, scroll = _pane(qtbot, rows)
-
+def _folder_of_your_own_of(pane, rows):
     pane.show_custom_collection(gallery.CustomCollection(key="custom:1", label="mine", children=[],
-                                                rows=rows, folder_id=1))
+                                                         rows=rows, folder_id=1))
 
-    assert len(_drawn(scroll)) == gallery_pane._PAGE
-    assert len(pane.listed_prompt_ids()) == 60
+
+@pytest.mark.parametrize(("opened", "marked", "in_the_database"), [
+    (_latest_of, {}, True),
+    (_settings_folder_of, {}, True),
+    (_favorites_of, {"starred": 1}, True),
+    (_trash_of, {}, False),
+    (_experiments_of, {"source": "experiment"}, True),
+    (_folder_of_your_own_of, {}, True),
+], ids=["latest", "settings_folder", "favorites", "trash", "experiments",
+        "folder_of_your_own"])
+def test_a_folder_draws_a_page_at_a_time_of_everything_it_lists(qtbot, opened, marked,
+                                                                 in_the_database):
+    rows = [dict(row, **marked) for row in _sixty()]
+    pane, scroll = _pane(qtbot, rows if in_the_database else ())
+
+    opened(pane, rows)
+
+    listed = [row["prompt_id"] for row in rows]
+    assert pane.listed_prompt_ids() == listed
+    assert [tile.prompt_id for tile in _drawn(scroll)] == listed[:gallery_pane._PAGE], (
+        "building thousands of thumbnails in one pass locks the window, so a folder draws a "
+        "page at a time")
 
 
 def test_a_folder_of_folders_draws_a_page_of_them_at_a_time(qtbot):

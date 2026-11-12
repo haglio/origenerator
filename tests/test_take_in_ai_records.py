@@ -131,11 +131,12 @@ def test_a_video_this_app_made_is_found_by_its_upscale_or_else_by_the_name_it_wa
     assert counts["matched"] == 2
 
 
-def test_origenerators_and_genaus_ai_records_are_read_and_no_record_under_a_non_ai_folder_is(tmp_path):
+def test_kinos_ai_folder_origenerators_and_genaus_records_are_read_and_no_non_ai_record_is(tmp_path):
     library, db = tmp_path / "library", Database(tmp_path / "gallery.db")
     places = {"origenerator": ("origenerator", "video", "portrait"),
               "genau": ("genau", "loops", "portrait"),
               "kino non-AI": ("kino", "2D", "non_AI", "portrait"),
+              "kino outside its AI folder": ("kino", "VR", "portrait"),
               "genau non-AI": ("genau", "loops", "non_AI", "portrait"),
               "elsewhere": ("evolver", "inbox")}
     for number, (name, under) in enumerate(places.items()):

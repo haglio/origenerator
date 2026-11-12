@@ -2643,6 +2643,27 @@ def test_a_lora_dropdowns_tooltip_ends_with_when_its_picked_lora_was_trained(
     assert dropdown.toolTip() == param_help("lora")
 
 
+def test_a_lora_dropdowns_tooltip_says_what_its_picked_lora_is_for(
+        qtbot, installed_models, titled_models, described_models):
+    titled_models({"example_look": "Example Look 1.0"})
+    described_models({"example_look": "Gives an image the example look.",
+                      "example_style": "Gives an image the example style."})
+    for name in ("example_look", "example_style"):
+        installed_models.add("loras", f"{name}.safetensors", arch="krea2", lora=True,
+                             metadata={"ss_training_finished_at": "1792851468.891"})
+    form = ParamForm([ParamDef("lora", "LoRA", "dropdown", NO_LORA, options=[
+        NO_LORA, "example_look.safetensors", "example_style.safetensors"])], WorkflowTraits(lora_keys=("lora",)))
+    qtbot.addWidget(form)
+    dropdown = form._widgets["lora"]
+    trained = f"Trained {datetime.fromtimestamp(1792851468.891).astimezone():%Y-%m-%d %H:%M}."
+
+    dropdown.setCurrentIndex(dropdown.findData("example_look.safetensors"))
+    assert dropdown.toolTip() == f"{param_help('lora')} Gives an image the example look. {trained}"
+
+    form.set_values({"lora": "example_style.safetensors"})
+    assert dropdown.toolTip() == f"{param_help('lora')} Gives an image the example style."
+
+
 def _lora_form(qtbot, traits=NO_TRAITS):
     form = ParamForm([ParamDef("lora", "LoRA", "dropdown", NO_LORA,
                                options=[NO_LORA, "example_look.safetensors"])], traits)

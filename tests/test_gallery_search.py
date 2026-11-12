@@ -183,6 +183,19 @@ def test_the_field_shows_a_search_is_still_going_until_its_widening_lands(contro
     assert not found.field.working()
 
 
+def test_the_searches_run_while_typing_ask_the_model_nothing(controller):
+    asked = []
+    expander = SearchExpander(expand=asked.append)
+    found = controller([_row("g1", "a tabby on a wall")], expander=expander)
+
+    for typed in ("kit", "kitt", "kitte", "kitten"):
+        _type(found, typed)
+
+    assert (asked, expander._in_flight) == ([], set()), (
+        "each search run while typing reads the widenings already known and asks the model "
+        "nothing, so typing costs lookups rather than a model call per character")
+
+
 def test_a_search_for_a_name_alone_has_finished_once_it_is_drawn(controller):
     found = controller([_row("g1", "a tabby on a wall")])
 

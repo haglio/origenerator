@@ -6,7 +6,7 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication, QToolButton
 from shared_ui.colors import BG_PRIMARY
 from shared_ui.reference import REFERENCE_WINDOW_TITLE, ReferenceDialog
-from shared_ui.spacing import BUTTON_ICON_INSET, BUTTON_SIZE_HUD
+from shared_ui.spacing import BUTTON_GAP, BUTTON_ICON_INSET, BUTTON_ROW_GAP, BUTTON_SIZE_HUD
 
 from origenerator import ui_scale
 from origenerator.gui import omnipause
@@ -199,6 +199,40 @@ def test_the_first_group_that_shows_is_the_one_left_unindented(buttons):
     assert gaps[0] is False
     assert gaps[1] is False
     assert gaps[3] is True
+
+
+def test_the_buttons_stand_in_groups_by_what_they_are_about(buttons):
+    made = buttons()
+
+    assert [group for _gap, group in made._groups] == [
+        (made.back, made.forward),
+        (made.undo, made.redo),
+        (made.group,),
+        (made.favorite, made.enhance, made.delete),
+        (made.slideshow, made.populate, made.radio),
+        (made.power, made.play_pause, made.reference, made.mic),
+    ], ("an icon-only row reads by its groups, a button's neighbors saying as much about it as "
+        "its glyph: where you are, what you did, the picked folders, what is in front, what the "
+        "app is doing")
+
+
+def test_space_alone_sets_the_groups_apart(buttons):
+    made = _every_button_showing_as_the_app_styles_it(buttons)
+
+    for gap, _group in made._groups[1:]:
+        drawn = gap.grab().toImage()
+        colors = {drawn.pixel(x, y) for x in range(drawn.width()) for y in range(drawn.height())}
+        assert (gap.width() > 0, len(colors)) == (True, 1), (
+            "space alone sets the groups apart: in a row that wraps, a rule would land at the end "
+            "of one row or the start of the next, marking nothing")
+
+
+def test_wrapped_rows_stand_the_familys_wider_gap_apart(buttons):
+    layout = buttons(hosted=True).layout()
+
+    assert (layout.spacing(), layout.row_spacing()) == (BUTTON_GAP, BUTTON_ROW_GAP), (
+        "along a row the family's gap, and between wrapped rows its wider one, so a row that "
+        "wraps does not have its two rows all but touching")
 
 
 def test_every_button_presses_its_own_handler(buttons):

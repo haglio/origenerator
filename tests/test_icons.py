@@ -5,8 +5,8 @@ from collections import Counter
 from pathlib import Path
 
 from PyQt6.QtCore import QSize
-from PyQt6.QtGui import QColor, QIcon
-from shared_ui.colors import GREEN, RED, TEXT_MUTED, TEXT_PRIMARY, YELLOW
+from PyQt6.QtGui import QColor, QIcon, QPalette
+from shared_ui.colors import GREEN, RED, TEXT_MUTED, TEXT_PRIMARY, WHITE, YELLOW, family_palette
 from shared_ui.icon_geometry import icon_names
 from shared_ui.icons import icon_pixmap, qt_icon
 from shared_ui.spacing import BUTTON_FILLING_ICON
@@ -18,17 +18,34 @@ from origenerator.gui import icons
 from origenerator.media import MediaType
 
 
-def test_a_collections_mark_is_drawn_once_however_many_folders_wear_it(qtbot, monkeypatch):
+def _drawn_by(monkeypatch, drawing: str) -> list:
     drawn = []
-    real = icons.qt_icon
-    monkeypatch.setattr(icons, "qt_icon",
+    real = getattr(icons, drawing)
+    monkeypatch.setattr(icons, drawing,
                         lambda *args, **kwargs: drawn.append(args) or real(*args, **kwargs))
+    return drawn
+
+
+def test_a_collections_mark_is_drawn_once_however_many_folders_wear_it(qtbot, monkeypatch):
+    drawn = _drawn_by(monkeypatch, "qt_icon")
     icons.collection_icon.cache_clear()
 
     for _ in range(3):
         icons.collection_icon(icons.EXPERIMENTS_KEY)
 
     assert drawn == [("flask",)]
+
+
+def test_a_toc_initial_is_drawn_once_however_many_rows_wear_it(qtbot, monkeypatch):
+    drawn = _drawn_by(monkeypatch, "_render_toc_initial")
+    icons.toc_initial_icon.cache_clear()
+
+    for _ in range(3):
+        icons.toc_initial_icon("lora")
+
+    assert drawn == [icons._TOC_INITIALS["lora"]], (
+        "the same few TOC initials decorate many TOC rows and Gallery pane tiles, so each is "
+        "drawn once")
 
 
 def test_tab_close_icon_is_the_familys_cross(qtbot):
@@ -57,7 +74,9 @@ def test_each_toc_initial_is_tellable_from_its_siblings(qtbot):
              for level in icons.LEVEL_LABELS]
     for i, one in enumerate(drawn):
         for other in drawn[i + 1:]:
-            assert one != other
+            assert one != other, (
+                "each level's TOC initial is its own, so a TOC row or a Gallery pane tile says "
+                "which level it is without anyone counting indentation")
 
 
 def test_item_type_icons_render_for_image_and_video(qtbot):
@@ -68,6 +87,40 @@ def test_item_type_icons_render_for_image_and_video(qtbot):
     assert not video_icon.isNull()
     assert video_icon.width() > 0
     assert image_icon.toImage() != video_icon.toImage()
+
+
+def test_an_item_type_mark_is_a_white_glyph_on_a_translucent_dark_ground(qtbot):
+    for media_type in (MediaType.IMAGE, MediaType.VIDEO):
+        drawn = icons.item_type_icon(media_type).toImage()
+        ground = drawn.pixelColor(drawn.width() // 2, 3)
+        brightest = max((drawn.pixelColor(x, y) for x in range(drawn.width())
+                         for y in range(drawn.height())), key=QColor.lightness)
+
+        assert (ground.lightness() < 64, 0 < ground.alpha() < 255, brightest.rgba()) == (
+            True, True, QColor(WHITE).rgba()), (
+            "the item type mark is a white glyph on a translucent dark ground, so it reads over "
+            "a thumbnail of any color")
+
+
+def test_the_mark_among_words_is_drawn_without_the_ground(qtbot):
+    for media_type in (MediaType.IMAGE, MediaType.VIDEO):
+        drawn = icons.media_type_icon(media_type).pixmap(icons._ITEM_TYPE_ICON_SIZE).toImage()
+        ground = drawn.pixelColor(drawn.width() // 2, 3)
+        inked = any(drawn.pixelColor(x, y).alpha() > 40 for x in range(drawn.width())
+                    for y in range(drawn.height()))
+
+        assert (ground.alpha(), inked) == (0, True), (
+            "the mark in a TOC row or a tab's title sits among words, where the dark ground would "
+            "be a black square, so it is drawn bare")
+
+
+def test_a_folder_lately_worked_in_wears_a_dot_in_the_familys_accent_color(qtbot):
+    accent = family_palette().color(QPalette.ColorRole.Accent)
+
+    assert (icons.recent_mark_icon().pixmap(icons._SIZE).toImage()
+            == icon_pixmap("disc", icons._SIZE, accent).toImage()), (
+        "a dot rather than a glyph, in the family's one accent color: it says a folder is one of "
+        "the few last worked in and nothing else")
 
 
 def test_the_side_marks_are_one_frame_and_its_quarter_turn(qtbot):

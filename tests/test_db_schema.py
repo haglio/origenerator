@@ -103,6 +103,7 @@ SCHEMA = {
         ("why_it_cannot_be_made_again", "TEXT", 0, None, 0),
         ("evolver_upscale", "TEXT", 0, None, 0),
         ("evolver_upscaled_at", "TEXT", 0, None, 0),
+        ("finale_id", "TEXT", 0, None, 0),
     ),
     "requests": (
         ("prompt_id", "TEXT", 0, None, 1),

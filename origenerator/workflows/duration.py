@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from origenerator.workflows.base import ParamDef
+from origenerator.workflows.base import ParamDef, chained_to
 
 
 def _origin(pd: ParamDef) -> tuple[float, float]:
@@ -39,3 +39,13 @@ def seconds_for_frames(frames: int, rate: float, pd: ParamDef) -> float:
         if _nearest_on_grid(candidate * rate, pd) == frames:
             return candidate
     return exact
+
+
+def lasting(params: dict, workflow, seconds: float) -> dict:
+    pd = next(pd for pd in workflow.param_definitions() if pd.key == "frame_count")
+    frames = frames_for_seconds(seconds, pd.shown_in_seconds_at, pd)
+    if "scene_frames" not in params:
+        return {**params, "frame_count": frames}
+    scenes = [int(count) for count in params["scene_frames"] or [frames]]
+    return {**params, "frame_count": frames,
+            "scene_frames": chained_to(frames, scenes, int(pd.min_val))}

@@ -365,8 +365,8 @@ def test_the_work_left_for_while_closed_reaches_the_queue(qtbot, tmp_path, monke
         _baked(db, f"baked{i}", seed=i)
     jobs = JobQueue(db, ComfyUIClient(folders=SUITE_FOLDERS))
 
-    assert downtime.queue_the_work_left(jobs, db.list_generations(), experiments_on=False,
-                                        policy=None) == 3
+    assert downtime.queue_the_work_left(jobs, db, db.list_generations(), experiments_on=False,
+                                        finales_on=False, policy=None) == 3
 
     repairs = [r for r in db.list_generations()
                if r.get("source") == GenerationSource.BASE_RENDER]

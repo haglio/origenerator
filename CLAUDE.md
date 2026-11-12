@@ -659,6 +659,26 @@ stamp. Run it once when such a change lands, from the production checkout, as
 with `-m` it names the package first, and the hook that keeps the app's window
 off his screen refuses it.
 
+## Each Genau flick gets a finale, made while the app is closed
+
+The user asked for a 15-second video for every flick sent down the Genau lane:
+the flick's own action with the video checkbox the overlay's
+`genau_finale_checkbox` names ticked, animated from the flick's start image
+(2026-11-12). "Finale" is the code's word and never his: to him it is that
+checkbox's name followed by "video". `flick_finales.queue_finales` makes them
+with the rest of the work the app leaves for ComfyUI as it closes, on the
+settings Combine would pick for that image and action
+(`combine_runs.as_action`, the one place that choice is made), and only where
+Combine would offer the action for that image. A finale lands at the top of
+Latest like a video he made. The flick's `finale_id` names its finale: a finale
+he deletes is not made again (his ruling), a failed one is, and one still being
+made when the app opens is dropped and queued again at the next closing
+(`drop_finales_in_flight`). It ships switched off (`flick_finales.SWITCHED_ON`,
+held there by a test) until he says the image actions and the settings Combine
+picks are ready; most images had no actions then, and most actions no good
+settings. The flicks Genaumacher cut from real videos are not items here, so
+nothing gives them an action, and they get no finale.
+
 ## A setting a person can change comes back after a restart
 
 Origenerator keeps every setting a person can change in one place and brings

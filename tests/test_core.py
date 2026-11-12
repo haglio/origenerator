@@ -23,7 +23,15 @@ from PyQt6.QtWidgets import QApplication, QMessageBox, QWidget
 from shared_ui.hard_to_miss import FadedBackground
 from shared_ui.preview import Preview
 
-from origenerator import action_settings, app_link, downtime, gallery, toast_raising, ui_scale
+from origenerator import (
+    action_settings,
+    app_link,
+    downtime,
+    flick_finales,
+    gallery,
+    toast_raising,
+    ui_scale,
+)
 from origenerator.app_state import AppState
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
@@ -707,6 +715,28 @@ def test_opening_clears_the_experiments_the_last_absence_left_queued(qtbot, tmp_
     assert win._gallery_view._live_jobs == {}
 
 
+def _a_video_for_a_genau_flick_being_made(db) -> None:
+    for prompt_id in ("flick", "finale"):
+        db.insert_generation(NewGeneration(
+            prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v002",
+            params_json=json.dumps({"positive_prompt": "x", "seed": 1}), workflow_json="{}"))
+    db.update_generation("flick", status="completed")
+    db.update_generation("finale", status="running")
+    db.fill_in(flick_finales.FINALE_COLUMN, {"flick": "finale"})
+
+
+def test_opening_drops_a_video_for_a_genau_flick_still_being_made(qtbot, tmp_path):
+    db = Database(tmp_path / "t.db")
+    _a_video_for_a_genau_flick_being_made(db)
+    client = _QueueSpyClient()
+
+    win = Core(client, db, AppState(tmp_path / "ui.json"))
+    qtbot.addWidget(win)
+
+    assert (client.canceled, db.get_generation("finale")) == (["finale"], None)
+    assert db.get_generation("flick")[flick_finales.FINALE_COLUMN] is None
+
+
 def test_an_opening_branch_session_clears_nothing(qtbot, tmp_path, monkeypatch):
     monkeypatch.setenv(ENV_FLAG, "1")
     monkeypatch.setattr(downtime.config, "LIBRARY_STATE_DIR", tmp_path)
@@ -718,6 +748,7 @@ def test_an_opening_branch_session_clears_nothing(qtbot, tmp_path, monkeypatch):
         workflow_json="{}", source="experiment",
     ))
     db.update_generation("exp-1", status="running")
+    _a_video_for_a_genau_flick_being_made(db)
     client = _QueueSpyClient()
 
     win = Core(client, db, AppState(tmp_path / "ui.json"))

@@ -26,7 +26,7 @@ from origenerator.media import MediaType
 _SIZE = int(CANVAS)
 
 _TOC_INITIALS = {
-    "workflow": ("W", BLUE), "model": ("M", MAGENTA), "lora": ("L", YELLOW),
+    "workflow": ("W", BLUE), "site": ("S", BLUE), "model": ("M", MAGENTA), "lora": ("L", YELLOW),
     "source_image": ("I", GREEN),
 }
 

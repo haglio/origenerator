@@ -284,6 +284,14 @@ class GenerateTab(DropZones):
         finally:
             self._loading_config -= 1
 
+    @contextmanager
+    def _not_showing_the_folders_newest(self):
+        self._autoshow_held = True
+        try:
+            yield
+        finally:
+            self._autoshow_held = False
+
     def _note_user_edit(self):
         if not self._loading_config:
             self.user_edited.emit()
@@ -1081,7 +1089,8 @@ class GenerateTab(DropZones):
 
     def open_modify_batch(self, folder_key: str, label: str, workflow_name: str,
                           params: dict, thumbnails: list) -> None:
-        self.prefill(workflow_name, params)
+        with self._not_showing_the_folders_newest():
+            self.prefill(workflow_name, params)
         self._modify_batch = ModifyBatch(
             folder_key=folder_key, label=label, count=len(thumbnails),
             opened_on=self.current_config(),
@@ -1121,16 +1130,13 @@ class GenerateTab(DropZones):
         self._set_displayed_row(None)
         self._end_modify_batch()
         workflow_name = row.get("workflow_name", "")
-        self._autoshow_held = True
-        try:
+        with self._not_showing_the_folders_newest():
             if workflow_named(workflow_name) is not None:
                 self.prefill(workflow_name, merge_denormalized(row))
             else:
                 with self._loading():
                     self._workflow_dropdown.setCurrentIndex(-1)
                     self._offer_workflows(makes=media_type_of_row(row), holding=None)
-        finally:
-            self._autoshow_held = False
 
     def show_completed_result(self, row: dict, image_rows: list[dict]):
         if self._modify_batch is not None:

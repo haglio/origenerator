@@ -262,6 +262,24 @@ def test_copy_name_on_a_modify_batch_tab_copies_the_folders_name_alone(tabs):
     assert QApplication.clipboard().text() == "AB12CD34"
 
 
+def test_modify_batch_opens_while_another_tab_shows_the_folders_newest_item(tabs, monkeypatch):
+    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
+    params = _sdxl_full(positive_prompt="a wizard", seed=1)
+    _complete_gen(tabs._db, "older", params, "sdxl_older.png")
+    newest = _complete_gen(tabs._db, "newest", dict(params, seed=2), "sdxl_newest.png")
+    for tab in tabs.generate_tabs():
+        tab._viewport.show_media = MagicMock()
+    tabs.load_selection(newest, [newest])
+    tabs.pin_current_tab()
+    folder = settings_folder_key(newest)
+
+    opened = tabs.open_modify_batch(folder, "AB12CD34", "sdxl_t2i", params, [None, None])
+
+    assert tabs.indexOf(opened) >= 0
+    assert tabs.current_generate_tab() is opened
+    assert opened.title() == "Modify batch AB12CD34"
+
+
 def test_go_to_folder_asks_for_the_tab_it_was_raised_over(tabs):
     tab = _loaded_tab(tabs)
     tabs._add_subtab()

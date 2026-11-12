@@ -4,7 +4,7 @@ import logging
 import time
 
 from funestra.funestra import User
-from funestra.funestra_verbs import RELOAD_PLAYLIST, play_file
+from funestra.funestra_verbs import PLAY_FILE, RELOAD_PLAYLIST, play_file
 from funestra.hud_overlay import HUD_OVERLAY_ID
 from funestra.main_hud import ModeHud
 from funestra.playlist import PlaylistItem
@@ -17,10 +17,17 @@ from PyQt6.QtGui import QWheelEvent
 from PyQt6.QtWidgets import QApplication
 
 from origenerator import running_ahead
+from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_pane import FunestraPane, PaneAudio, PaneChannel
+from origenerator.gui.funestra_slideshow import FunestraSlideshow, Hosting, Playing, Seat
 from tests import gestures
 from tests.running_ahead_support import record_the_app_running_ahead
 from tests.slideshow_hud_support import speaker_on_screen
+from tests.slideshow_support import stop_the_poll_to_tick_by_hand
+
+
+def _a_verb_of_the_funestras_own(command: str) -> bool:
+    return command.split(" ", 1)[0].isupper()
 
 
 class _Running:
@@ -32,7 +39,7 @@ class _Running:
 
     def apply_command(self, command: str) -> bool:
         self.commands.append(command)
-        return not command.split(" ", 1)[0].isupper()
+        return not _a_verb_of_the_funestras_own(command)
 
     def tick(self) -> None:
         self.ticks += 1
@@ -53,7 +60,7 @@ class _Running:
         self.closed = True
 
 
-def _pane(qtbot, *, hud=lambda: None, engine=None, **kw):
+def _pane(qtbot, *, hud=lambda: None, engine=None, channel=None, **kw):
     engine = engine if engine is not None else FakeEngine()
     running: list[_Running] = []
 
@@ -61,7 +68,7 @@ def _pane(qtbot, *, hud=lambda: None, engine=None, **kw):
         running.append(_Running(playback))
         return running[-1]
 
-    pane = FunestraPane(channel=PaneChannel(), user=make, hud=hud,
+    pane = FunestraPane(channel=channel or PaneChannel(), user=make, hud=hud,
                         engine_for=lambda wid: engine, **kw)
     qtbot.addWidget(pane)
     return pane, engine, running
@@ -77,6 +84,47 @@ def _hand_over(pane, items, land=None):
     if landing is not None:
         pane.channel.send(play_file(landing))
     pane.channel.send(RELOAD_PLAYLIST)
+
+
+class _RecordingChannel(PaneChannel):
+    def __init__(self) -> None:
+        super().__init__()
+        self.steps: list[str] = []
+
+    def write_playlist(self, items) -> None:
+        self.steps.append("list written")
+        super().write_playlist(items)
+
+    def send(self, verb: str) -> bool:
+        self.steps.append(verb.split(" ", 1)[0])
+        return super().send(verb)
+
+    def hand_over_steps(self) -> list[str]:
+        return [step for step in self.steps if step in ("list written", PLAY_FILE, RELOAD_PLAYLIST)]
+
+
+class _NoWindow:
+    player = None
+
+    def hud_changed(self) -> None:
+        pass
+
+
+def test_a_pass_is_handed_over_here_the_way_a_slideshow_hands_its_funestra_one(qtbot, tmp_path):
+    slides = [(str(tmp_path / f"{name}.png"), "image", f"id-{name}") for name in ("one", "two")]
+    from_the_slideshow = _RecordingChannel()
+    seat = Seat("landscape", from_the_slideshow, FrameFiles(tmp_path / "frames"))
+    slideshow = FunestraSlideshow(Playing(slides, start=1, shuffle=lambda order: None), seat,
+                                  Hosting(shown=_NoWindow()))
+    stop_the_poll_to_tick_by_hand(slideshow)
+    pane, _engine, _running = _pane(qtbot, channel=_RecordingChannel())
+    items = _items(tmp_path, "one", "two")
+
+    _hand_over(pane, items, land=items[1].path)
+
+    assert pane.channel.hand_over_steps() == from_the_slideshow.hand_over_steps(), (
+        "the pane is tested on the sequence a slideshow really hands it: the list written, the "
+        "item to stand on played, then the list taken up")
 
 
 def test_what_runs_on_the_funestra_is_what_a_funestra_asks_of_it():

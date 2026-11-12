@@ -806,7 +806,10 @@ def test_combine_new_folder_lands_on_latest_then_reveals_on_finish(qtbot, tmp_pa
 
     view._combine._generate_combination("img", "vid")
 
-    assert view._gallery_pane.showing_latest()
+    assert view._gallery_pane.showing_latest(), (
+        "the fixture video was made from no image, so a combination, filed by the image dropped "
+        "on it, opens a folder of its own rather than joining the video's, and waits on Latest "
+        "until it lands")
     prompt_id = next(iter(view._live_jobs.values())).prompt_id
 
     client.job_completed.emit(prompt_id, _VID_REROLL_HISTORY)

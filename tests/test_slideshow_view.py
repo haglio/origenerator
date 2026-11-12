@@ -33,7 +33,7 @@ from tests import gestures
 from tests.marked_words import words
 from tests.motion_doubles import FakeMotion
 from tests.slideshow_hud_support import button_on_screen, speaker_on_screen, thumbnail_on_screen
-from tests.slideshow_support import ahead, slides_named
+from tests.slideshow_support import ahead, slides_named, stop_the_poll_to_tick_by_hand
 
 _ITEMS = [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")]
 
@@ -63,7 +63,7 @@ def _view(qtbot, items=_ITEMS, **kw):
     wiring = {name: kw.pop(name) for name in ("motion", "radio", "volume") if name in kw}
     view = SlideshowView(items, ViewShow(**kw), ViewWiring(engine=FakeEngine(), clock=_Clock(), **wiring))
     qtbot.addWidget(view)
-    view.slideshow._timer.stop()
+    stop_the_poll_to_tick_by_hand(view.slideshow)
     return view
 
 

@@ -16,10 +16,14 @@ from origenerator.timing import RunTiming
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 
 
-@pytest.fixture
-def enhance_payload(monkeypatch):
+def _the_same_detectors_installed_on_every_machine(monkeypatch) -> None:
     monkeypatch.setattr(detail_parts, "list_detector_files",
                         lambda: ["face_yolov8m.pt", "hand_yolov8s.pt"])
+
+
+@pytest.fixture
+def enhance_payload(monkeypatch):
+    _the_same_detectors_installed_on_every_machine(monkeypatch)
     wf = WORKFLOW_REGISTRY["image_enhance"]
 
     def build(**params):

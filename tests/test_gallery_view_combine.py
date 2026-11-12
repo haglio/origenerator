@@ -838,6 +838,23 @@ def test_combine_existing_folder_is_opened_with_the_live_tile(qtbot, tmp_path):
     assert view._selected_reroll_key == expected
 
 
+def test_a_combine_left_running_comes_back_after_a_restart_in_its_folder(qtbot, tmp_path):
+    db = _combine_db(tmp_path)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._combine._generate_combination("img", "vid")
+    (key,) = view._live_jobs
+    reopened = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(reopened)
+
+    reopened.reconnect_running_jobs()
+
+    assert list(reopened._live_jobs) == [key], (
+        "a combine is kept under its settings folder, so after a restart it reconnects and lands "
+        "in that folder exactly as a re-roll does")
+
+
 def test_combine_slot_predicates_gate_by_kind(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)

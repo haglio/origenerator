@@ -19,6 +19,7 @@ from tests.comfyui_folders import SUITE_FOLDERS
 
 I2V = WORKFLOW_REGISTRY["wan22_i2v"]
 _HANG_MS = HANG_AFTER_S * 1000
+_NO_EARLIER_RUN_OF_THIS_ID: dict = {}
 
 
 class _Speaker:
@@ -40,7 +41,7 @@ def _client():
     client = ComfyUIClient(folders=SUITE_FOLDERS)
     client.submit_job = MagicMock(return_value="comfy-A")
     client.free_memory = MagicMock()
-    client.fetch_history = MagicMock(return_value={})
+    client.fetch_history = MagicMock(return_value=_NO_EARLIER_RUN_OF_THIS_ID)
     return client
 
 

@@ -178,7 +178,9 @@ def test_populating_in_a_new_folder_ends_it_in_the_old_one(qtbot):
     populate.start("b")
 
     assert populate.is_active("b")
-    assert not populate.is_active("a")
+    assert not populate.is_active("a"), (
+        "Populate runs in one folder at a time: two would only take turns at the machine, each "
+        "waiting out the other's render")
     assert stopped == ["a"], (
         "reported as a hand-stop is, so the folder left behind has its switch cleared in the one "
         "handler every ending goes through")

@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+from unittest.mock import call
+
 import pytest
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from origenerator.gui.gallery_view import GalleryView
-from tests.gallery_view_support import FakeDB, _image
+from tests.gallery_view_support import (
+    FakeDB,
+    _image,
+    _reroll_client,
+    _seeded_db,
+    _select_first_leaf,
+)
 
 
 def _gallery(qtbot, db=None):
@@ -116,6 +124,28 @@ def test_a_tick_whose_answers_raise_leaves_the_next_tick_free_to_read(qtbot):
     view._poll()
 
     assert len(held) == 2
+
+
+def test_the_ticks_reads_are_handed_what_the_jobs_were_at_the_tick(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._start_reroll(key)
+    (job,) = view._jobs.all_jobs
+    reads = []
+    view.off_thread = lambda work, done: reads.append(work)
+    view._poll()
+
+    view._cancel_job(job.prompt_id)
+    assert job.state == "canceled"
+    client.fetch_history.reset_mock()
+    reads[0]()
+
+    assert client.fetch_history.call_args_list == [call(job.prompt_id)], (
+        "the tick's reads run off the window's thread, so they are handed the jobs' names and "
+        "states as strings and touch nothing the window owns")
 
 
 def test_a_listing_that_could_not_be_read_draws_nothing_and_leaves_the_next_tick_free(qtbot):

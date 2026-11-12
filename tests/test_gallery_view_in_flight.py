@@ -1832,7 +1832,6 @@ def test_another_image_of_the_folder_being_generated_cannot_be_generated_too(qtb
     rows = {r["prompt_id"]: r for r in db.list_generations()}
     image_rows = list(rows.values())
     first = _click_thumbnail(view, rows["a"], image_rows)
-    first.use_random_seed()
     first._on_generate()
     assert len(view._jobs.all_jobs) == 1
 
@@ -1844,7 +1843,6 @@ def test_another_image_of_the_folder_being_generated_cannot_be_generated_too(qtb
         "read again at once")
     assert tab._generate_btn.isEnabled() is False
 
-    tab.use_random_seed()
     tab._on_generate()
 
     assert len(view._jobs.all_jobs) == 1

@@ -130,15 +130,15 @@ def test_the_mic_button_is_the_only_thing_that_opens_the_mic(qtbot, tmp_path):
     assert not view._voice.listener.commands_on
 
 
-def test_voice_status_caption_shows_listening_and_what_was_heard(qtbot, tmp_path):
+def test_with_no_slideshow_up_cores_line_shows_what_was_heard_and_nothing_while_idle(
+        qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
 
     view._buttons.mic.setChecked(True)
-    assert not view._voice.status.isHidden()
-    assert "Listening" in words(view._voice.status)
+    assert view._voice.status.isHidden()
 
     view._voice.listener.heard.emit("no hat")
     assert "no hat" in words(view._voice.status)
@@ -155,6 +155,9 @@ def test_the_captions_section_is_up_only_while_the_caption_is(qtbot, tmp_path):
     assert not section.isVisible()
 
     view._buttons.mic.setChecked(True)
+    assert not section.isVisible()
+
+    view._voice.listener.heard.emit("no hat")
     assert section.isVisible()
 
     view._buttons.mic.setChecked(False)
@@ -168,14 +171,6 @@ def test_what_was_heard_gives_way_after_a_few_seconds(qtbot, tmp_path):
     _select_first_leaf(view)
     view._buttons.mic.setChecked(True)
     view._voice.listener.heard.emit("no hat")
-
-    view._voice._flash_timer.timeout.emit()
-
-    assert words(view._voice.status) == "Listening…"
-    assert not view._voice.status.isHidden()
-
-    view._buttons.mic.setChecked(False)
-    view._voice._show("nothing here to enhance", transient=True)
 
     view._voice._flash_timer.timeout.emit()
 

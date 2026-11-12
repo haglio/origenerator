@@ -406,15 +406,23 @@ def test_closing_shuts_the_mic_and_waits_for_the_microphone_to_close(router):
     assert voice.status.isHidden()
 
 
-def test_a_flashed_line_goes_back_to_the_idle_caption(router):
-    voice, _host, _slideshows = router()
+def test_listening_with_nothing_heard_puts_no_line_in_core(router):
+    voice, _host, _slideshows = router(buttons={"mic": FakeButton(checked=True)})
+
+    voice.sync()
+
+    assert (voice.listener.commands_on, voice.status.isHidden()) == (True, True)
+
+
+def test_a_flashed_line_goes_away_once_its_moment_is_up(router):
+    voice, _host, _slideshows = router(buttons={"mic": FakeButton(checked=True)})
     voice.sync()
 
     voice.say("radio on")
     assert words(voice.status) == "radio on"
 
     voice._revert()
-    assert words(voice.status) == "Listening…"
+    assert voice.status.isHidden()
 
 
 def test_a_line_said_with_no_mark_is_shown_as_it_is(router):
@@ -463,21 +471,28 @@ def test_an_answer_given_on_a_slideshow_opened_meanwhile_ends_the_captions_promi
     voice._answer_request(slideshow, "no hat — generating", mine)
 
     assert slideshow.requests == [("no hat — generating", False, INFO)]
-    assert words(voice.status) == "Listening…", (
+    assert voice.status.isHidden(), (
         "a slideshow can open while the request is worked out, so the answer that goes to it "
         "takes the caption's promise down at once")
 
 
-def test_what_was_heard_reaches_the_caption_and_the_center_top_of_the_slideshow(router):
+def test_what_was_heard_shows_at_the_center_top_of_the_slideshow_and_not_in_core(router):
     slideshow = FakeSlideshow()
     voice, _host, slideshows = router(slideshows=FakeSlideshows(showing=slideshow))
 
     voice.listener.heard.emit("start slideshow")
 
-    assert words(voice.status) == "heard: “start slideshow”"
-    assert slideshows.said == ["heard: “start slideshow”"], (
-        "what was heard is said on the slideshow too: someone watching a slideshow sees nothing "
-        "of this window")
+    assert (voice.status.isHidden(), slideshows.said) == (True, ["heard: “start slideshow”"]), (
+        "what was heard is said on the slideshow, which someone watching it sees, and Core's "
+        "line stays away while a slideshow is up to say it")
+
+
+def test_what_was_heard_with_no_slideshow_up_shows_in_core(router):
+    voice, _host, _slideshows = router()
+
+    voice.listener.heard.emit("start slideshow")
+
+    assert words(voice.status).startswith("heard:")
 
 
 def test_words_that_are_no_command_show_for_a_moment_and_are_logged_nowhere(router, caplog):
@@ -487,9 +502,7 @@ def test_words_that_are_no_command_show_for_a_moment_and_are_logged_nowhere(rout
     with caplog.at_level(logging.DEBUG):
         voice.listener.heard.emit("put the kettle on")
 
-    assert words(voice.status) == "heard: “put the kettle on”"
     assert slideshows.said == ["heard: “put the kettle on”"]
-    assert voice._flash_timer.isActive()
     assert caplog.messages == []
 
 

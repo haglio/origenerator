@@ -206,7 +206,6 @@ class VoiceRouter(QObject):
             self.shut_the_mic()
             return
         self.listener.start_commands(self.on_command)
-        self._show("Listening…", transient=False)
 
     def shut_the_mic(self) -> None:
         self.listener.stop_commands()
@@ -240,8 +239,6 @@ class VoiceRouter(QObject):
     def _revert(self) -> None:
         if self._promise.note:
             self._show(self._promise.note, transient=False)
-        elif self.listening():
-            self._show("Listening…", transient=False)
         else:
             self._set_caption(None)
 
@@ -254,7 +251,8 @@ class VoiceRouter(QObject):
         self._say_both(message, kind=ERROR)
 
     def _say_both(self, message: str, *, kind: str = INFO) -> None:
-        self._show(message, transient=True)
+        if self._slideshows.showing is None:
+            self._show(message, transient=True)
         self._slideshows.note_voice_command(message, kind=kind)
 
     def _bare_command(self, text: str):

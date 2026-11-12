@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from app_support.comfy_file_refs import frame_name
-from app_support.video_names import stem_as_made
+from app_support.video_names import stem_as_made, stem_of_either_copy
 
 from origenerator.gallery.signatures import workflow_output_type
 from origenerator.generation_state import GenerationStatus
@@ -74,7 +74,7 @@ def place_of_its_own(file: dict) -> str | None:
 
 
 def stems_made_as(row: dict) -> frozenset[str]:
-    return frozenset(stem_as_made(name) for file in row_output_files(row) if isinstance(file, dict)
+    return frozenset(stem_of_either_copy(name) for file in row_output_files(row) if isinstance(file, dict)
                      for name in (file.get("filename"), file.get("library_path")) if name)
 
 

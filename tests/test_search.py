@@ -166,7 +166,8 @@ def _made_as(prompt_id, filename, **file):
 
 @pytest.mark.parametrize("typed", [
     "wan_loop_00042_", "wan_loop_00042_.mp4", "WAN_LOOP_00042_.MP4",
-    "wan_loop_00042_ (2).mp4", "wan_loop_00042__topaz.mp4", "  wan_loop_00042_  "])
+    "wan_loop_00042_ (2).mp4", "wan_loop_00042__topaz.mp4", "  wan_loop_00042_  ",
+    "wan_loop_00042_-audio.mp4"])
 def test_a_file_name_finds_the_item_it_was_made_as_whatever_the_library_did_to_it(typed):
     rows = [_made_as("made", "wan_loop_00042_.mp4"), _made_as("other", "wan_loop_00043_.mp4")]
     assert _hits(_index(rows), typed) == ["made"]

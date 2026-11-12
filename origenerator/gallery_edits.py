@@ -5,8 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from app_support.comfy_file_refs import frame_name
-from app_support.video_names import stem_as_made
+from app_support.video_names import stem_of_either_copy
 
 from origenerator import trash_collection
 from origenerator.db_generations import library_paths_in
@@ -17,7 +16,7 @@ from origenerator.gallery import (
     resolve_preview,
     unreviewed_experiments,
 )
-from origenerator.gallery.output import row_output_files, with_files_renamed
+from origenerator.gallery.output import stems_made_as, with_files_renamed
 from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.trash import Genau, Kino, TrashedBatch, take_out_of_play
@@ -366,10 +365,8 @@ def _in_genau(genau: Genau | None, row: dict, genau_videos: list[Path],
 
 
 def _copies_of(row: dict, genau_videos: list[Path]) -> list[Path]:
-
-    made = {stem for file in row_output_files(row)
-            if (stem := Path(frame_name(file.get("filename"))).stem)}
-    return [video for video in genau_videos if stem_as_made(video) in made]
+    made = stems_made_as(row)
+    return [video for video in genau_videos if stem_of_either_copy(video) in made]
 
 
 def _delete_label(count: int) -> str:

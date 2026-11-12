@@ -442,7 +442,10 @@ def test_toggling_populate_starts_populate(qtbot, tmp_path):
 
     view._buttons.populate.click()
 
-    assert view._populate.is_active(key)
+    assert view._populate.is_active(key), (
+        "Populate runs under the folder's own key, not the TOC row's, which carries the shape: "
+        "it is filed with the jobs it launches, and those are keyed by folder whichever shape's "
+        "row is selected")
     assert key in view._live_jobs
     client.submit_job.assert_called_once()
     assert view._buttons.populate.isChecked()

@@ -99,6 +99,7 @@ from origenerator.workflows.model_files import NO_LORA
 from tests import drops
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import _struck_and_lit
+from tests.marked_words import words_shown
 from tests.related_links import settings_tile, source_tile
 from tests.text_readers import clap_reader, clip_reader, word_reader, word_reading
 from tests.thumbnail_rows import looping_video, painted_row, where_the_thumbnail_is
@@ -2570,7 +2571,7 @@ def test_the_items_name_heads_the_column_in_line_with_the_sections_under_it(save
 
 
 def _message(tab):
-    return "" if tab._viewport._message.isHidden() else tab._viewport._message.text()
+    return words_shown(tab._viewport._message)
 
 
 def _set_prompt(tab, text):

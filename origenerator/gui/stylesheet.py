@@ -105,7 +105,7 @@ def build_stylesheet() -> str:
     QPlainTextEdit[inert="true"], QLabel[inert="true"] {{
         color: {_h(TEXT_MUTED)};
     }}
-    QLabel#estimateLabel {{
+    QLabel#mutedLabel {{
         color: {_h(TEXT_MUTED)};
     }}
     QLabel#dimensionsHint {{

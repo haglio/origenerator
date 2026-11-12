@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from PIL import Image
 from PyQt6.QtCore import QSize, Qt
+from shared_ui.spacing import MARGIN_STANDARD
 
 from origenerator.gui.combination import Combination
 from origenerator.gui.combination_view import CombinationView, combination_pixmap
@@ -99,6 +100,17 @@ def test_the_plus_shows_only_with_both_halves(qtbot, tmp_path):
 
     assert not both.plus_label.isHidden()
     assert alone.plus_label.isHidden()
+
+
+def test_each_half_takes_a_share_of_the_panes_height_short_of_its_margins(qtbot, tmp_path):
+    frame = _image(tmp_path / "frame.png", size=(80, 80))
+    view = _view(qtbot, Combination(frame, _image(tmp_path / "video.png", size=(80, 80))))
+
+    drawn = view.image_label.pixmap().height()
+
+    assert 0 < drawn < view.height() - 2 * MARGIN_STANDARD, (
+        "a half takes a share of the pane's height, leaving room between the pair and the "
+        "pane's own margins around it")
 
 
 def test_the_parentheses_show_only_around_a_source_video_whose_prompt_was_edited(qtbot, tmp_path):

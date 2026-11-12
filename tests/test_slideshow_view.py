@@ -87,18 +87,20 @@ def _video_up(view) -> bool:
     return view.slideshow._video_on_screen() is not None
 
 
-def _runs_out(view):
-    _engine(view).run_out()
+def _the_slideshow_follows_the_funestra(view):
     view._pane.tick()
     view._pane.tick()
     _settle(view)
+
+
+def _runs_out(view):
+    _engine(view).run_out()
+    _the_slideshow_follows_the_funestra(view)
 
 
 def _time_passes(view, seconds: float):
     view._clock.now += seconds
-    view._pane.tick()
-    view._pane.tick()
-    _settle(view)
+    _the_slideshow_follows_the_funestra(view)
 
 
 def _will_move_on(view) -> bool:

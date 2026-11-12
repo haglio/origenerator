@@ -19,6 +19,7 @@ from origenerator.app import (
 from origenerator.boot_passes import (
     MAINTENANCE,
 )
+from origenerator.fun_time_mode import WINDOW_TITLE
 from origenerator.gui.loading_screen import (
     CANCEL_HINT,
     CAPTION,
@@ -48,7 +49,7 @@ def test_the_splash_never_wears_the_apps_own_caption(qtbot):
     screen = _screen()
     qtbot.addWidget(screen)
 
-    assert screen.windowTitle() != "Origenerator", (
+    assert screen.windowTitle() != WINDOW_TITLE, (
         "a hosting Fun Time session finds Core by that exact caption, and would take the loading "
         "screen for it")
 

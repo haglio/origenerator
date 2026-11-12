@@ -769,7 +769,7 @@ class GalleryPane(QObject):
     @staticmethod
     def _empty_state(text: str) -> QWidget:
         label = QLabel(text)
-        label.setObjectName("estimateLabel")
+        label.setObjectName("mutedLabel")
         label.setWordWrap(True)
         label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
         label.setContentsMargins(MARGIN_DIALOG, MARGIN_DIALOG, MARGIN_DIALOG, MARGIN_DIALOG)

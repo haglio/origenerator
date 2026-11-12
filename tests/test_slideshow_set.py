@@ -23,11 +23,11 @@ _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
           ("three.png", "image", "id-3")]
 
 
-def _set(items=_ITEMS, *, hud=None, start=None, **asked_of_the_library):
+def _set(items=_ITEMS, *, hud=None, start=None, shuffle=in_order, **asked_of_the_library):
     dealt = []
     slideshow_set = SlideshowSet(items,
                                  actions=SlideshowActions(**asked_of_the_library),
-                                 deal=SetDeal(shuffle=in_order, start=start), hud=hud,
+                                 deal=SetDeal(shuffle=shuffle, start=start), hud=hud,
                                  on_pass_change=dealt.append)
     return slideshow_set, dealt
 
@@ -472,6 +472,17 @@ def test_a_map_cell_the_pass_never_held_is_spliced_in_and_jumped_to():
     assert slideshow_set.current_prompt_id() == "id-1x"
     assert _ids(slideshow_set.playlist.items) == ["id-1", "id-2", "id-3", "id-1x"]
     assert slideshow_set.map().corner.prompt_id == "id-1x"
+
+
+def test_a_map_press_on_a_slide_the_shuffled_pass_holds_lands_on_that_slide():
+    slideshow_set, _dealt = _mapped(shuffle=lambda order: order.reverse())
+    pressed = slideshow_set.slide_for_path("one.png")
+
+    slideshow_set.jump_to(pressed)
+
+    assert slideshow_set.current_prompt_id() == "id-1", (
+        "a press on the HUD map names its slide by its place in the set, so the playlist's "
+        "items keep the set's order whatever order the pass plays them in")
 
 
 def test_a_slide_the_set_took_in_past_its_switches_is_still_found_by_its_file():

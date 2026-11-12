@@ -678,7 +678,10 @@ def test_the_tile_the_version_list_and_the_slideshow_all_learn_of_a_run(enhance,
 
     controller.reconcile()
 
-    assert tab.pending == ("running", b"frame", "upscale x2")
+    assert tab.pending == ("running", b"frame", "upscale x2"), (
+        "a tab holds none of the gallery's jobs, so the controller makes the match, every "
+        "running enhance against every tab's displayed row, and tells the tab what is being "
+        "made of its image")
     assert set(gallery_pane.enhancing) == {"i1"}
     assert slideshows.told == {"i1": "running"}
     assert slideshows.frames == {"i1": b"frame"}

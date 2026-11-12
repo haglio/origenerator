@@ -4,7 +4,7 @@ import time
 
 import numpy as np
 from funestra.satellite_hud import map_block_width
-from PIL import Image
+from PIL import Image, ImageChops
 from shared_ui.palette import RED
 
 from origenerator.gui import hud_queue
@@ -15,6 +15,7 @@ from origenerator.gui.hud_queue import (
     DOWN,
     FRAME,
     OPEN,
+    ROWS,
     SHIELD,
     SHIELD_ALL,
     START_NOW,
@@ -307,6 +308,78 @@ def _reds(image) -> int:
     pixels = np.asarray(image).reshape(-1, 4).astype(int)
     near = np.all(np.abs(pixels[:, :3] - np.array(RED[:3])) < 24, axis=1)
     return int(np.count_nonzero(near & (pixels[:, 3] > 0)))
+
+
+def _png(path, color) -> str:
+    Image.new("RGB", (40, 40), color).save(path)
+    return str(path)
+
+
+def _head(section) -> tuple[Image.Image, tuple]:
+    image, targets = _painted(section)
+    x, y, width, height = next(rect for rect, button in targets
+                               if button.command.startswith(f"{FRAME}|"))
+    return image, (x, y, x + width, y + height)
+
+
+def test_until_a_frame_streams_the_head_shows_what_its_job_is_made_from(tmp_path):
+    start = _png(tmp_path / "start.png", RED[:3])
+    section = queue_section([_item("j1", status="running", source_image=start)], 0)
+
+    image, head = _head(section)
+
+    assert _reds(image.crop(head)) > 0, (
+        "until ComfyUI has streamed a frame of it, the head shows what the job is being made "
+        "from rather than standing empty")
+
+
+def test_three_dots_under_the_rows_say_the_line_runs_on_past_the_rows_drawn():
+    line = [_item(f"j{number}") for number in range(ROWS + 1)]
+    runs_on, targets = _painted(queue_section(line, 0))
+    all_drawn, _targets = _painted(queue_section(line[:ROWS], 0))
+    last_row_foot = max(y + height for (_x, y, _w, height), button in targets
+                        if button.command.startswith(f"{OPEN}|"))
+
+    changed = ImageChops.difference(runs_on, all_drawn).getbbox()
+
+    assert changed is not None, (
+        "the three dots below the rows say the line runs on past the rows drawn")
+    assert changed[1] >= last_row_foot
+
+
+def _white_columns(image, head) -> list[int]:
+    left, top, right, bottom = head
+    middle = (top + bottom) // 2
+    return [x for x in range(left, right) if image.getpixel((x, middle))[:3] == (255, 255, 255)]
+
+
+def _between_plus_and_video(image, head) -> tuple[int, int, int, int]:
+    left, top, _right, bottom = head
+    video = _white_columns(image, head)[0]
+    inked = np.asarray(image.crop((left, top, video, bottom)))[..., 3].max(axis=0)
+    gaps = [x for x in range(1, len(inked)) if inked[x] == 0 and inked[x - 1] > 0]
+    plus_ends = left + gaps[1]
+    return plus_ends, top, video, bottom
+
+
+def test_a_source_video_whose_prompt_was_edited_stands_in_parentheses_at_the_head(tmp_path):
+    start, video = _png(tmp_path / "start.png", RED[:3]), _png(tmp_path / "video.png",
+                                                               (255, 255, 255))
+    as_made, head = _head(queue_section([_item(
+        "j1", status="running", source_image=start, source_video_thumbnail=video)], 0))
+    edited, edited_head = _head(queue_section([_item(
+        "j1", status="running", source_image=start, source_video_thumbnail=video,
+        prompt_edited=True)], 0))
+    _left, top, right, bottom = edited_head
+    after_the_video = (_white_columns(edited, edited_head)[-1] + 1, top, right, bottom)
+
+    marks = [_inked(image.crop(_between_plus_and_video(image, rect)))
+             for image, rect in ((as_made, head), (edited, edited_head))]
+    marks.append(_inked(edited.crop(after_the_video)))
+
+    assert marks == [False, True, True], (
+        "a source video whose prompt was edited stands in parentheses, which a video as it was "
+        "made does not")
 
 
 def test_the_word_that_throws_a_job_away_is_drawn_in_the_huds_own_ink():

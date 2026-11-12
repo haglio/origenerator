@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import threading
 import time
 from itertools import pairwise
@@ -111,14 +112,16 @@ def test_the_takeover_keeps_streaming_and_eases_its_interval_out(qtbot):
         "the device is parked wherever the last thing to hold it left it, so the first target "
         "can be the length of the axis away; holding the stream back for the glide turned the "
         "seam into a slam, the device sitting still and then covering all of it in one tick")
-    for _ in range(4):
-        clock.t += 0.025
+    tick_s = 0.025
+    for _ in range(math.ceil(_HANDOFF_MS / 1000 / tick_s)):
+        clock.t += tick_s
         driver.poll()
     intervals = [i for _pos, i in broker.positions]
-    assert all(earlier > later for earlier, later in pairwise(intervals)), (
+    assert intervals[-1] == _LOOKAHEAD_MS
+    one_ticks_ease = math.ceil((_HANDOFF_MS - _LOOKAHEAD_MS) * tick_s * 1000 / _HANDOFF_MS)
+    assert max(earlier - later for earlier, later in pairwise(intervals)) <= one_ticks_ease, (
         "the interval eases back to the lookahead as the glide closes, so there is no step the "
         "moment it ends")
-    assert all(i >= _LOOKAHEAD_MS for i in intervals)
     clock.t += 0.5
     driver.poll()
     assert broker.positions[-1][1] == _LOOKAHEAD_MS

@@ -2373,3 +2373,39 @@ def test_core_in_a_session_stays_at_the_sessions_rect_through_a_switch(
 
     geo = win.geometry()
     assert (geo.x(), geo.y(), geo.width(), geo.height()) == (10, 20, 800, 600)
+
+
+def _times_core_said_it_was_up(win) -> list:
+    said = []
+    win._sides.core_is_up.connect(lambda: said.append(True))
+    return said
+
+
+def test_core_shown_on_its_own_says_it_is_up_so_the_slideshow_can_come_up_beside_it(
+        qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    said = _times_core_said_it_was_up(win)
+
+    win.show()
+
+    assert said == [True]
+
+
+def test_core_shown_in_a_session_does_not_say_it_is_up(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path, fun_time=_fun_time_session())
+    said = _times_core_said_it_was_up(win)
+
+    win.show()
+
+    assert said == []
+
+
+def test_core_handed_back_from_a_session_says_it_is_up_again(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    win.show()
+    win.become_hosted(_fun_time_session())
+    said = _times_core_said_it_was_up(win)
+
+    win.become_standalone()
+
+    assert said

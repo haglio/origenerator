@@ -13,6 +13,7 @@ from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.volume import VolumeHud
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QWidget
+from shared_ui.foreground import bring_to_front
 
 from origenerator import gallery
 from origenerator.config import FRAMES_BEING_MADE_DIR, OUTPUT_PLACES
@@ -209,7 +210,9 @@ class SlideshowDirector:
         self._job_queue = surroundings.job_queue
         fun_time = self._fun_time = surroundings.fun_time
         self.two_screens = surroundings.two_screens or TwoScreens()
+        self._asked_for_by_him = True
         self.two_screens.switched.connect(self._keep_the_slideshow_off_cores_monitor)
+        self.two_screens.core_is_up.connect(self._keep_a_slideshow_up)
         self._slideshow = None
         self._standalone_shape: str | None = None
         self._standalone_window_shape: str | None = None
@@ -492,6 +495,7 @@ class SlideshowDirector:
             start_now=self._job_queue.start_now,
             cancel_all=self._job_queue.cancel_all,
             core_window=self._host.window,
+            leave_for_core=self._leave_for_core,
             drive_toggle=self._osr2.toggle,
             omnipause=self._ask_the_room_to_pause(),
             neighbors=partial(self.neighbors_of, shape=shape),
@@ -583,7 +587,8 @@ class SlideshowDirector:
         return view.slideshow
 
     def _show_on_its_monitor(self, view, *, built: bool) -> None:
-        self.two_screens.put_the_slideshow_on(self._standalone_window_shape)
+        if self._asked_for_by_him:
+            self.two_screens.put_the_slideshow_on(self._standalone_window_shape)
         monitor = self.two_screens.slideshows_monitor()
         if monitor is not None and (built or view.screen().geometry() != monitor.geometry()):
             if view.isFullScreen():
@@ -593,6 +598,29 @@ class SlideshowDirector:
             view.showFullScreen()
         elif built or view.isMinimized():
             view.showFullScreen()
+
+    def _has_a_monitor_of_its_own(self) -> bool:
+        return self._fun_time is None and self.two_screens.slideshows_monitor() is not None
+
+    def _keep_a_slideshow_up(self) -> None:
+        if self._has_a_monitor_of_its_own() and self._window_up() is None:
+            self._asked_for_by_him = False
+            try:
+                self.start()
+            finally:
+                self._asked_for_by_him = True
+
+    def _leave_for_core(self, prompt_id: str | None) -> bool:
+        if not self._has_a_monitor_of_its_own():
+            return False
+        if prompt_id:
+            self._show_in_core(prompt_id)
+        bring_to_front(self._host.window())
+        return True
+
+    def _show_in_core(self, prompt_id: str) -> None:
+        if not self._host.reveal(prompt_id):
+            self._host.follow_link(prompt_id)
 
     def switch_sides(self) -> None:
         if self._fun_time is None:
@@ -837,8 +865,8 @@ class SlideshowDirector:
 
     def _pick_where_it_played(self, prompt_id: str):
         self._slideshow = None
-        if not self._giving_them_back and not self._host.reveal(prompt_id):
-            self._host.follow_link(prompt_id)
+        if not self._giving_them_back:
+            self._show_in_core(prompt_id)
 
     def base_location(self, shape: str) -> str:
         return shaped_key(gallery.ALL_KEY, shape)
@@ -1137,6 +1165,8 @@ class SlideshowDirector:
         if command is SlideshowCommand.STOP:
             if slideshow is None:
                 self._host.say("no slideshow to close")
+                return
+            if self._leave_for_core(slideshow.hud_prompt_id):
                 return
             slideshow.close()
             self._host.say("slideshow closed")

@@ -260,7 +260,12 @@ class SlideshowView(QWidget):
     def _press_on_the_slide(self) -> None:
         self._toggle_pause()
         if self._pane.pressing_again:
-            defer(self, self.close)
+            defer(self, self._leave)
+
+    def _leave(self) -> None:
+        leave_for_core = self._actions.leave_for_core
+        if leave_for_core is None or not leave_for_core(self.slideshow.hud_prompt_id):
+            self.close()
 
     def _toggle_pause(self) -> None:
         if self._actions.omnipause is not None:
@@ -308,7 +313,7 @@ class SlideshowView(QWidget):
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             self._move_the_hud(key)
         elif key == Qt.Key.Key_Escape:
-            self.close() if shifted else self._toggle_pause()
+            self._leave() if shifted else self._toggle_pause()
         elif key == Qt.Key.Key_Left:
             answer(slideshow, "cycle_version_back") if shifted else slideshow.slideshow_step(-1)
         elif key == Qt.Key.Key_Right:
@@ -320,7 +325,7 @@ class SlideshowView(QWidget):
         elif key in (Qt.Key.Key_E, Qt.Key.Key_Home):
             slideshow.slideshow_loop_cycle()
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            self.close()
+            self._leave()
         elif apply_motion_key(self._motion, key,
                               on_drive_toggle=self._actions.drive_toggle):
             pass

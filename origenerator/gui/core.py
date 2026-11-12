@@ -214,6 +214,8 @@ class Core(QMainWindow):
         # Qt puts its own geometry back on a reparent or a window-flag change, so the rect goes on again through Win32 at every show.
         if self._device_rect is not None:
             place_window_in_device_pixels(int(self.winId()), *self._device_rect)
+        if self._fun_time is None:
+            self._sides.core_is_up.emit()
 
     def go_to_generation(self, prompt_id: str) -> None:
         if self._fun_time is None:

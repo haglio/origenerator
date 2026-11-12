@@ -7,7 +7,13 @@ import pytest
 from PIL import Image
 from PyQt6.QtWidgets import QWidget
 
-from origenerator import action_settings, evolver_export, gallery
+from origenerator import (
+    action_settings,
+    animation_paths,
+    animation_settings,
+    evolver_export,
+    gallery,
+)
 from origenerator.action_vocabulary import vocabulary
 from origenerator.animate_command import AnimateRequest
 from origenerator.animation_names import JOINER, item_actions_named
@@ -26,6 +32,7 @@ from origenerator.item_actions import ItemActions
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import FrameFolders, OutsideVideo, Record, rows_bringing_in
+from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.thumbnail_rows import square
 
 IMAGE_WORKFLOW = "sdxl_t2i"
@@ -565,7 +572,7 @@ def test_the_stand_in_row_comes_off_when_the_launch_finds_nothing_to_make(combin
 
 def test_a_dropped_pair_runs_the_videos_settings_on_the_image(combine, monkeypatch):
     workflow = FakeWorkflow()
-    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
+    monkeypatch.setitem(WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "combined_params",
                         lambda video_row, image_row, wf: {"seed": 7, "input_image": "one.png"})
@@ -579,7 +586,7 @@ def test_a_dropped_pair_runs_the_videos_settings_on_the_image(combine, monkeypat
 
 
 def test_a_dropped_pair_notes_the_lane_its_video_was_used_under(combine, monkeypatch):
-    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
+    monkeypatch.setitem(WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "combined_params", lambda v, i, wf: {"seed": 7})
     db = FakeDB([_image("img"), _video("clip")])
@@ -592,7 +599,7 @@ def test_a_dropped_pair_notes_the_lane_its_video_was_used_under(combine, monkeyp
 
 
 def test_an_unrebuildable_pair_launches_nothing(combine, monkeypatch):
-    monkeypatch.delitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, raising=False)
+    monkeypatch.delitem(WORKFLOW_REGISTRY, VIDEO_WORKFLOW, raising=False)
     jobs = FakeReroll()
     controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]), jobs=jobs)
 
@@ -604,7 +611,7 @@ def test_an_unrebuildable_pair_launches_nothing(combine, monkeypatch):
 
 def test_a_video_combine_makes_is_given_its_actions_and_its_ticked_boxes(
         combine, monkeypatch):
-    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
+    monkeypatch.setitem(WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "combined_params",
                         lambda video_row, image_row, wf: {"seed": 7})
@@ -618,7 +625,7 @@ def test_a_video_combine_makes_is_given_its_actions_and_its_ticked_boxes(
 
 def test_a_dropped_video_combined_with_a_ticked_box_is_given_the_box_alone(
         combine, monkeypatch):
-    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
+    monkeypatch.setitem(WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "combined_params",
                         lambda video_row, image_row, wf: {"seed": 7})
@@ -647,7 +654,7 @@ def test_an_action_with_nothing_assigned_runs_its_most_used_video_and_asks_no_mo
     sent = []
     monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: sent.append(a))
     monkeypatch.setattr(module.action_settings, "pinned_settings", lambda c, i: None)
-    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
+    monkeypatch.setitem(WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "combined_params",
                         lambda video_row, image_row, wf: {"seed": 7})
@@ -664,7 +671,7 @@ def test_a_video_the_gallery_gained_after_the_window_opened_is_one_generate_can_
         combine, monkeypatch):
     monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: None)
     monkeypatch.setattr(module.action_settings, "pinned_settings", lambda c, i: None)
-    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
+    monkeypatch.setitem(WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "combined_params",
                         lambda video_row, image_row, wf: {"seed": 7})
@@ -686,7 +693,7 @@ def test_pinned_settings_outrank_the_mining(combine, monkeypatch):
     workflow = FakeWorkflow()
     monkeypatch.setattr(module.action_settings, "pinned_settings",
                         lambda category, intent: {"workflow": VIDEO_WORKFLOW})
-    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
+    monkeypatch.setitem(WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "written_params",
                         lambda settings, row, wf: {"seed": 3})
@@ -746,7 +753,7 @@ def test_the_stand_in_row_goes_whatever_the_match_answers(combine, starting, mon
 def test_an_opened_combination_prefills_a_tab_with_both_its_halves(combine,
                                                                    monkeypatch):
     workflow = FakeWorkflow()
-    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
+    monkeypatch.setitem(WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "combined_params", lambda v, i, wf: {"seed": 7})
     monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
@@ -764,7 +771,7 @@ def test_an_opened_combination_prefills_a_tab_with_both_its_halves(combine,
 def _a_curated_action_opened(combine, monkeypatch):
     monkeypatch.setattr(module.action_settings, "pinned_settings",
                         lambda c, i: {"workflow": VIDEO_WORKFLOW})
-    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
+    monkeypatch.setitem(WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "written_params", lambda s, r, wf: {"seed": 3})
     tab = FakeGenerateTab()
@@ -796,7 +803,7 @@ def test_a_curated_action_opened_shows_the_images_full_size_file_over_its_thumbn
 
 
 def _nothing_assigned(monkeypatch):
-    monkeypatch.setattr(module.animation_settings, "settings_for",
+    monkeypatch.setattr(animation_settings, "settings_for",
                         lambda lane, action, state: None)
     monkeypatch.setattr(module.action_settings, "pinned_settings", lambda c, i: None)
 
@@ -819,7 +826,7 @@ def test_an_action_with_no_settings_assigned_opens_the_lanes_workflow_as_it_star
     controller._open_category("img", "alpha")
 
     (name, params), = tabs.opened
-    workflow = module.WORKFLOW_REGISTRY[name]
+    workflow = WORKFLOW_REGISTRY[name]
     assert workflow.display_name == "WAN 2.2 I2V"
     assert params["input_image"] == "one.png [output]"
     assert (params["positive_prompt"], params["negative_prompt"]) == ("", ""), (
@@ -839,7 +846,7 @@ def test_the_lanes_workflow_opens_with_its_prompts_empty_whatever_it_starts_with
                     "steps": 20}
 
     _nothing_assigned(monkeypatch)
-    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, StartsWithWords())
+    monkeypatch.setitem(WORKFLOW_REGISTRY, VIDEO_WORKFLOW, StartsWithWords())
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
     tabs = FakeTabs(FakeGenerateTab())
@@ -853,7 +860,7 @@ def test_the_lanes_workflow_opens_with_its_prompts_empty_whatever_it_starts_with
 
 
 def _what_the_press_runs(combine, monkeypatch, *, edit_first, lane, assigned):
-    monkeypatch.setattr(module.animation_settings, "settings_for", lambda *_: assigned)
+    monkeypatch.setattr(animation_settings, "settings_for", lambda *_: assigned)
     monkeypatch.setattr(module.action_settings, "pinned_settings", lambda c, i: None)
     monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
     jobs, tabs = FakeReroll(), FakeTabs(FakeGenerateTab())
@@ -866,7 +873,7 @@ def _what_the_press_runs(combine, monkeypatch, *, edit_first, lane, assigned):
     ran = tabs.opened if edit_first else [
         (name, params) for _key, name, params in jobs.prepared]
     return [(name, _apart_from_the_image_and_the_seeds(
-        params, module.WORKFLOW_REGISTRY[name])) for name, params in ran]
+        params, WORKFLOW_REGISTRY[name])) for name, params in ran]
 
 
 @pytest.mark.parametrize("lane", [action_settings.VIDEO, action_settings.GENAU])
@@ -907,7 +914,7 @@ def test_a_spoken_launch_is_stamped_to_hand_its_clip_on(combine, monkeypatch):
     workflow = FakeWorkflow()
     monkeypatch.setattr(module.action_settings, "pinned_settings",
                         lambda c, i: {"workflow": VIDEO_WORKFLOW})
-    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
+    monkeypatch.setitem(WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "written_params", lambda s, r, wf: {"seed": 3})
     db = FakeDB([_image("img")])
@@ -922,7 +929,7 @@ def test_a_pressed_generate_leaves_its_clip_in_the_gallery(combine, monkeypatch)
     workflow = FakeWorkflow()
     monkeypatch.setattr(module.action_settings, "pinned_settings",
                         lambda c, i: {"workflow": VIDEO_WORKFLOW})
-    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
+    monkeypatch.setitem(WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "written_params", lambda s, r, wf: {"seed": 3})
     db = FakeDB([_image("img")])
@@ -1059,7 +1066,7 @@ def test_a_spoken_action_whose_folder_is_already_making_one_joins_that_run(combi
     workflow = FakeWorkflow()
     monkeypatch.setattr(module.action_settings, "pinned_settings",
                         lambda c, i: {"workflow": VIDEO_WORKFLOW})
-    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
+    monkeypatch.setitem(WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "written_params", lambda s, r, wf: {"seed": 3})
     slideshows = FakeSlideshows(showing="img")
@@ -1083,7 +1090,7 @@ _PATHS = {"video_actions": {
 
 
 def _paths(monkeypatch):
-    monkeypatch.setattr(module.animation_paths, "load_content", lambda: _PATHS)
+    monkeypatch.setattr(animation_paths, "load_content", lambda: _PATHS)
 
 
 def _no_mining(monkeypatch, available=("alpha",)):
@@ -1206,7 +1213,7 @@ def test_the_actions_narrow_to_what_the_dropped_image_can_start_from(combine,
 
     assert sorted(controller.widget.available) == ["alpha", "leaning"]
 
-    monkeypatch.setattr(module.animation_paths, "actions_for",
+    monkeypatch.setattr(animation_paths, "actions_for",
                         lambda state, lane, **kw: ("alpha",))
     controller.image_dropped()
 
@@ -1232,7 +1239,7 @@ def _accepted_only(monkeypatch, *accepted):
     _paths(monkeypatch)
     monkeypatch.setattr(module.action_settings, "available_categories",
                         lambda rows, intent, checked=(): set())
-    monkeypatch.setattr(module.animation_settings, "settings_for",
+    monkeypatch.setattr(animation_settings, "settings_for",
                         lambda lane, name, state: {"workflow": VIDEO_WORKFLOW}
                         if (lane, name, state) in accepted else None)
 
@@ -1275,7 +1282,7 @@ def test_the_settings_accepted_for_this_images_own_state_outrank_the_actions_pin
     pinned = {"workflow": VIDEO_WORKFLOW, "params": {"steps": 4}}
     accepted = {"workflow": VIDEO_WORKFLOW, "params": {"steps": 24}}
     monkeypatch.setattr(module.action_settings, "pinned_settings", lambda c, i: pinned)
-    monkeypatch.setattr(module.animation_settings, "settings_for",
+    monkeypatch.setattr(animation_settings, "settings_for",
                         lambda lane, action, state: accepted if state else None)
     controller, _host = combine(db=FakeDB([_image("img", state="state one")]))
 
@@ -1290,7 +1297,7 @@ def test_the_settings_accepted_for_this_images_own_state_outrank_the_actions_pin
 def test_an_image_nobody_sorted_still_gets_the_actions_pin(combine, monkeypatch):
     pinned = {"workflow": VIDEO_WORKFLOW, "params": {"steps": 4}}
     monkeypatch.setattr(module.action_settings, "pinned_settings", lambda c, i: pinned)
-    monkeypatch.setattr(module.animation_settings, "settings_for",
+    monkeypatch.setattr(animation_settings, "settings_for",
                         lambda lane, action, state: None)
     controller, _host = combine(db=FakeDB([_image("img")]))
 
@@ -1346,10 +1353,9 @@ def test_an_image_browsed_from_outside_runs_the_settings_on_that_file(combine, t
     controller.widget.image_zone.set_item(photo)
     controller.widget.video_zone.set_item("clip")
 
-    _workflow, params, _video_row, image_row = controller._combined_params(photo, "clip")
+    run = controller._combined_run(photo, "clip")
 
-    assert params["input_image"] == photo
-    assert image_row is None
+    assert run.params["input_image"] == photo
     assert controller._accepts_image(photo) is True
     assert controller._accepts_image(str(tmp_path / "nowhere.png")) is False
     assert controller._state_of(photo) == ""
@@ -1378,5 +1384,4 @@ def test_a_picked_action_runs_its_pinned_settings_on_a_browsed_image(combine, tm
     built = controller._curated_combination(photo, "gamma")
 
     assert built is not None
-    _workflow, params = built
-    assert (params["input_image"], params["steps"]) == (photo, 7)
+    assert (built.params["input_image"], built.params["steps"]) == (photo, 7)

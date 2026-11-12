@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from collections import Counter
 from pathlib import Path
 from typing import NamedTuple
@@ -14,16 +13,11 @@ from app_support.watch_weights import WATCH_BLOCK, add_counts
 
 from origenerator.db import Database
 from origenerator.db_generations import WATCH_COLUMN_OF
-from origenerator.gallery.output import (
-    generations_by_stem,
-    place_of_its_own,
-    row_output_files,
-    stem_as_made,
-)
 from origenerator.gallery.signatures import parse_params
 from origenerator.generation_state import GenerationSource, source_of
 from origenerator.media import MediaType
 from origenerator.outside_videos import made_of, seed_number
+from origenerator.video_rows import VideoRows
 from origenerator.workflows.outside import PLACES
 
 AI_RECORDS = (("kino",), ("origenerator", "video"), ("genau",))
@@ -46,7 +40,7 @@ class Write(NamedTuple):
 def take_in(db, library: Path, *, dry_run: bool = False) -> Counter:
     counts: Counter = Counter()
     records_folder = Path(library) / "videos" / "metadata"
-    row_of = RowFinder(db.list_generations())
+    row_of = VideoRows(db.list_generations())
     for sidecar in _ai_sidecars(records_folder):
         counts["records read"] += 1
         try:
@@ -102,24 +96,6 @@ def _settings_filled_in(row: dict, record: dict) -> tuple[Call, ...]:
     return (Call("set_params_json", (prompt_id, json.dumps({**params, **missing}))),
             *(Call("fill_in", (column, {prompt_id: value})) for column, value in columns.items()
               if value is not None and row.get(column) is None))
-
-
-class RowFinder:
-    def __init__(self, rows: list[dict]) -> None:
-        self._at = {_place(kept): row["prompt_id"] for row in reversed(rows)
-                    for file in row_output_files(row) if (kept := place_of_its_own(file))}
-        self._upscaled_at = {_place(row["evolver_upscale"]): row["prompt_id"]
-                             for row in reversed(rows) if row.get("evolver_upscale")}
-        self._by_stem = generations_by_stem(rows)
-
-    def __call__(self, video: Path) -> str | None:
-        place = _place(video)
-        return (self._at.get(place) or self._upscaled_at.get(place)
-                or self._by_stem.get(stem_as_made(video)))
-
-
-def _place(path) -> str:
-    return os.path.normcase(os.path.abspath(path))
 
 
 def _library_record(record: dict) -> dict:

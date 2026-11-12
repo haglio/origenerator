@@ -50,7 +50,7 @@ from origenerator.gui.param_help import (
     definition_help,
     option_help,
     param_help,
-    with_training_date,
+    with_the_picked_lora,
 )
 from origenerator.gui.preset_dropdown import PresetDropdown
 from origenerator.gui.prompt_boxes import PromptBoxes, mark_in_use, set_in_use
@@ -358,7 +358,7 @@ class ParamForm(QWidget):
         label.setToolTip(help_text or label.text())
         if widget is not None and help_text and not isinstance(widget, DropZone):
             if key in self._lora_keys:
-                help_text = with_training_date(help_text, self._read_field(self._defs[key]))
+                help_text = with_the_picked_lora(help_text, self._read_field(self._defs[key]))
             widget.setToolTip(help_text)
 
     def _explain_lora_picks(self) -> None:

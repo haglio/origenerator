@@ -62,7 +62,7 @@ from origenerator.gui.no_wheel import (
 )
 from origenerator.gui.panes import border_as_a_set
 from origenerator.gui.param_fields import choose_option, offer_options
-from origenerator.gui.param_help import definition_help, param_help, with_training_date
+from origenerator.gui.param_help import definition_help, param_help, with_the_picked_lora
 from origenerator.gui.training_controls import TrainingControls
 from origenerator.gui.warning_mark import WarningMark
 from origenerator.setting_advice import (
@@ -716,7 +716,7 @@ class FixPromptsDialog(QDialog):
         choose_option(self.lora, lora)
 
     def _explain_lora(self) -> None:
-        self.lora.setToolTip(with_training_date("", self.picked_lora()))
+        self.lora.setToolTip(with_the_picked_lora("", self.picked_lora()))
 
     def prompts(self) -> dict:
         return fix_prompts_of(self._part, {

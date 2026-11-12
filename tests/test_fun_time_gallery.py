@@ -1471,6 +1471,7 @@ def test_a_gallery_handed_back_from_a_session_answers_its_switch_words_itself_ag
     radio = _FakeRadio()
     view = GalleryView(FakeDB([]), shared=Shared(radio=radio))
     qtbot.addWidget(view)
+    view.show()
     view.become_hosted(_session())
 
     view.become_standalone()

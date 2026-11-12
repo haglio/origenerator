@@ -308,8 +308,19 @@ def _radio_view(qtbot):
     return view, radio
 
 
+def test_a_radio_switch_put_back_on_before_the_window_is_up_waits_for_it_to_show(qtbot):
+    view, radio = _radio_view(qtbot)
+
+    view.set_radio_enabled(True)
+    assert radio.starts == 0, "the loading screen is still up while the window is built"
+
+    view.show()
+    assert radio.starts == 1
+
+
 def test_the_radio_switch_tunes_the_radio_in_and_silences_it(qtbot):
     view, radio = _radio_view(qtbot)
+    view.show()
     assert (radio.starts, radio.stops) == (0, 0)
 
     view._buttons.radio.setChecked(True)
@@ -321,6 +332,7 @@ def test_the_radio_switch_tunes_the_radio_in_and_silences_it(qtbot):
 
 def test_the_radio_switch_round_trips_for_persistence(qtbot):
     view, radio = _radio_view(qtbot)
+    view.show()
     assert view.radio_enabled() is False
 
     view.set_radio_enabled(True)
@@ -537,6 +549,7 @@ def test_a_slideshow_standing_on_its_own_plays_the_radio_while_its_image_is_up(
 def test_a_move_of_a_standing_slideshows_volume_turns_the_radio_on(qtbot, monkeypatch):
     radio = _FakeRadio()
     view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch, radio=radio)
+    view.show()
 
     slideshow._actions.volume_moved(VolumeHud(volume=40, muted=False))
 

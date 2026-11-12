@@ -372,8 +372,8 @@ def _middle_pane_style(view, qtbot):
     with qtbot.waitExposed(view):
         view.show()
     pane = view._scroll.rect()
-    return worn(view._scroll.grab().toImage(), pane,
-                QPoint(pane.right() - 3, pane.bottom() - 3))
+    where_no_tile_or_text_is_drawn = QPoint(pane.right() - 3, pane.bottom() - 3)
+    return worn(view._scroll.grab().toImage(), pane, where_no_tile_or_text_is_drawn)
 
 
 def test_an_open_custom_folder_lights_while_an_item_it_would_take_is_dragged(qtbot):

@@ -879,7 +879,7 @@ def test_a_folder_played_as_a_slideshow_opens_with_its_seed_loop_lit(qtbot):
     assert view.slideshow.hud_map().loop == ""
 
 
-def _seeds_only(prompt_id):
+def _seeds_and_no_column_to_stop_at(prompt_id):
     return (NavMapNeighbors(seeds=(Slide("b.png", "image", "id-b"),), label="fox")
             if prompt_id == "id-a" else NavMapNeighbors())
 
@@ -887,7 +887,8 @@ def _seeds_only(prompt_id):
 def test_taking_the_loop_off_a_folder_slideshow_asks_the_gallery_for_the_library(qtbot):
     widened = []
     view = _view(qtbot, _KEYED, actions=SlideshowActions(
-        neighbors=_seeds_only, browse_all=lambda slideshow: widened.append(slideshow) or True))
+        neighbors=_seeds_and_no_column_to_stop_at,
+        browse_all=lambda slideshow: widened.append(slideshow) or True))
 
     view.slideshow.slideshow_loop("")
     _settle(view)
@@ -899,7 +900,8 @@ def test_taking_the_loop_off_a_folder_slideshow_asks_the_gallery_for_the_library
 def test_the_loop_key_off_a_folder_slideshow_leaves_the_folder_in_one_press(qtbot):
     widened = []
     view = _view(qtbot, _KEYED, actions=SlideshowActions(
-        neighbors=_seeds_only, browse_all=lambda slideshow: widened.append(slideshow) or True))
+        neighbors=_seeds_and_no_column_to_stop_at,
+        browse_all=lambda slideshow: widened.append(slideshow) or True))
 
     _press(view, Qt.Key.Key_Home)
 

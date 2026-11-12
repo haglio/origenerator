@@ -549,16 +549,21 @@ def test_canceling_a_selected_reroll_releases_the_generate_pane(qtbot, tmp_path)
         "once the folder has no run left, the tabs following it stop following it")
 
 
+def _a_streaming_run_the_poll_lists_in_flight(view, client):
+    key, job = _running_reroll(view)
+    _generating_tile(view).selected.emit()
+    client.preview_image.emit(job.prompt_id, _png_bytes())
+    view._poll()
+    return key, job
+
+
 def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
         qtbot, tmp_path, monkeypatch):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
     qtbot.addWidget(view)
     view.refresh()
-    _key, job = _running_reroll(view)
-    _generating_tile(view).selected.emit()
-    client.preview_image.emit(job.prompt_id, _png_bytes())
-    view._poll()
+    _key, job = _a_streaming_run_the_poll_lists_in_flight(view, client)
 
     win = _viewport_of(view).open_fullscreen()
     qtbot.addWidget(win.shown)
@@ -597,10 +602,7 @@ def test_a_run_watched_fullscreen_lands_as_its_generation_among_its_folder(
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
-    _key, job = _running_reroll(view)
-    _generating_tile(view).selected.emit()
-    client.preview_image.emit(job.prompt_id, _png_bytes())
-    view._poll()
+    _key, job = _a_streaming_run_the_poll_lists_in_flight(view, client)
     slideshow = _viewport_of(view).open_fullscreen()
     qtbot.addWidget(slideshow.shown)
     funestra_of(slideshow.shown)
@@ -620,10 +622,7 @@ def test_a_cancelled_generation_is_taken_out_of_the_slideshow_watching_it(qtbot,
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
-    key, job = _running_reroll(view)
-    _generating_tile(view).selected.emit()
-    client.preview_image.emit(job.prompt_id, _png_bytes())
-    view._poll()
+    key, job = _a_streaming_run_the_poll_lists_in_flight(view, client)
     slideshow = _double_click_slideshow(view, qtbot, media=None)
     slideshow.shown.show()
 
@@ -631,7 +630,9 @@ def test_a_cancelled_generation_is_taken_out_of_the_slideshow_watching_it(qtbot,
     view._poll()
 
     assert job.prompt_id not in [slide.prompt_id
-                                 for slide in slideshow._set.playlist.in_play_order()]
+                                 for slide in slideshow._set.playlist.in_play_order()], (
+        "the gallery's poll is what hears that a canceled run is no longer in flight, and "
+        "only then is it taken out of the slideshow watching it")
 
 
 def test_a_cancelled_generation_leaves_a_slideshow_of_a_saved_file_alone(qtbot, tmp_path):

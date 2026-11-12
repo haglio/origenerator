@@ -2321,8 +2321,8 @@ def test_every_surface_hears_which_file_and_versions_an_item_has_left_after_a_de
             for slideshow in made] == [[("g1", "better.png")], [("g1", "better.png")]]
 
 
-def _image(prompt_id, prompt, *, seed, steps=50, size=(100, 200)):
-    width, height = size
+def _image(prompt_id, prompt, *, seed, steps=50, size_its_settings_ask_for=(100, 200)):
+    width, height = size_its_settings_ask_for
     params = {"positive_prompt": prompt, "seed": seed, "steps": steps,
               "width": width, "height": height}
     row = _row(prompt_id, params=params)
@@ -2330,8 +2330,8 @@ def _image(prompt_id, prompt, *, seed, steps=50, size=(100, 200)):
     return row
 
 
-def _animation(prompt_id, *, frame, action, tmp_path, size=(100, 200)):
-    width, height = size
+def _animation(prompt_id, *, frame, action, tmp_path, size_of_its_thumbnail=(100, 200)):
+    width, height = size_of_its_thumbnail
     params = {"positive_prompt": "it moves", "noise_seed": 5, "input_image": frame}
     row = _row(prompt_id, workflow_name="wan22_i2v", params=params,
                files=(f"{prompt_id}.mp4",))
@@ -2354,7 +2354,7 @@ def test_the_library_of_the_slideshows_side_answers_for_the_map_around_a_generat
             _animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path),
             _animation("v2", frame="g1.png", action="beta", tmp_path=tmp_path),
             _animation("v3", frame="g1.png", action="beta", tmp_path=tmp_path),
-            _image("w1", "a red fox", seed=3, size=(200, 100))]
+            _image("w1", "a red fox", seed=3, size_its_settings_ask_for=(200, 100))]
     director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
 
     around = director.neighbors_of("g1", shape="portrait")

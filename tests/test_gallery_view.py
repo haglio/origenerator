@@ -705,12 +705,12 @@ def test_starring_a_folder_marks_its_row_where_it_stands(qtbot):
         "out from under the mouse")
 
 
-def _a_folder_drawn_on_both_sides(qtbot):
-    shapes = {"i1": (1280, 720), "i2": (720, 1280)}
+def _a_folder_drawn_on_both_sides(qtbot, *, also=None, actions=None):
+    shapes = {"i1": (1280, 720, 50), "i2": (720, 1280, 50), **(also or {})}
     view = GalleryView(FakeDB([
-        _row(pid, "sdxl_t2i", {"positive_prompt": f"prompt {pid}", "steps": 50,
+        _row(pid, "sdxl_t2i", {"positive_prompt": f"prompt {pid}", "steps": steps,
                                "width": width, "height": height}, f"sdxl_t2i_{pid}.png")
-        for pid, (width, height) in shapes.items()]))
+        for pid, (width, height, steps) in shapes.items()]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     key = _key(_image_workflow(view._tree))
@@ -2148,6 +2148,24 @@ def test_back_returns_to_the_side_of_the_list_the_folder_was_opened_on(qtbot):
     assert view._tree.currentItem() is second_side, (
         "a folder's place in the TOC is where the user is standing, shape and all, so that and"
         " not the folder's own key is what Back records")
+
+
+def test_deleting_a_folder_returns_to_the_side_of_the_list_last_stood_on(qtbot):
+    view, _key_of_both, (first_side, second_side) = _a_folder_drawn_on_both_sides(
+        qtbot, also={"i3": (1280, 720, 20)}, actions=FakeActions())
+    doomed = next(item for item in view._item_by_key.values()
+                  if isinstance(item.data(0, _GROUP_ROLE), gallery.SettingsGroup)
+                  and [row["prompt_id"] for row in gallery.rows_under(
+                      item.data(0, _GROUP_ROLE))] == ["i3"])
+    for item in (second_side, first_side, doomed):
+        view._tree.setCurrentItem(item)
+    view._confirm = lambda text: True
+
+    view._delete_folders([doomed.data(0, _GROUP_ROLE)])
+
+    assert view._tree.currentItem() is first_side, (
+        "a folder's place in the TOC is where the user is standing, shape and all, so that and"
+        " not the folder's own key is what the return-after-delete trail records")
 
 
 def test_back_returns_to_the_latest_collection_then_forward_reopens_the_folder(qtbot):

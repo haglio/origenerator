@@ -1,4 +1,4 @@
-"""Which modules are allowed to need Qt, held as an equality.
+"""Which modules may need Qt.
 
 Each module is imported in a fresh interpreter, because PyQt6 is already loaded in this process.
 """
@@ -30,7 +30,6 @@ QT_FREE = (
     "origenerator.app",
     "origenerator.boot_passes",
     "origenerator.passes_on_the_files",
-    "origenerator.windows_toast",
     "origenerator.comfyui_api",
     "origenerator.completion",
     "origenerator.inflight",
@@ -107,6 +106,7 @@ def test_what_windows_runs_on_a_toast_click_loads_no_qt():
 
 @pytest.mark.parametrize("module", ["origenerator.landed_while_away",
                                     "origenerator.toast_raising",
+                                    "origenerator.windows_toast",
                                     "origenerator.single_instance"])
 def test_what_a_closing_copy_starts_to_wait_out_its_runs_loads_no_qt(module):
     assert _loaded_after_importing(module, "PyQt6") is False, (

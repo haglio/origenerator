@@ -5,7 +5,7 @@ from PyQt6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from origenerator.gui.drags import under_way
-from origenerator.gui.drop_style import AIMED, LIT
+from origenerator.gui.drop_style import AIMED, EDGE, LIT
 from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.gallery_pane import GalleryPaneScrollArea
 from origenerator.gui.generation_drag import generation_mime
@@ -88,3 +88,23 @@ def test_a_pane_that_would_turn_the_drag_away_stays_as_it_is(qtbot):
     _hold_over(pane, mime)
 
     assert _style_worn(pane) is None
+
+
+def test_the_edge_is_drawn_over_what_the_zone_comes_to_hold(qtbot):
+    zone = QWidget()
+    DropTarget(zone, lambda _mime, _source: ("taken",), lambda *_landing: None)
+    qtbot.addWidget(zone)
+    zone.resize(300, 200)
+    held = QWidget(zone)
+    held.setStyleSheet("background-color: #c03030;")
+    held.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)
+    held.setGeometry(zone.rect())
+    with qtbot.waitExposed(zone):
+        zone.show()
+
+    under_way.started.emit(generation_mime("p1"), None)
+
+    image = zone.grab().toImage()
+    middle = zone.rect().center()
+    assert image.pixelColor(middle.x(), 0).name() == EDGE.name(), (
+        "the edge is drawn over everything the zone holds, which would otherwise hide it")

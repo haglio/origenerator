@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, QItemSelectionModel, QMimeData, QRect, QSize, Qt, Signal
-from PySide6.QtGui import QDrag, QDragLeaveEvent, QIcon, QPainter
+import math
+
+from PySide6.QtCore import QEvent, QItemSelectionModel, QMimeData, QRect, QRectF, QSize, Qt, Signal
+from PySide6.QtGui import QDrag, QDragLeaveEvent, QFontMetricsF, QIcon, QPainter, QPalette
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QMenu,
     QStyle,
     QStyledItemDelegate,
@@ -82,7 +85,7 @@ def _holds(folder, row) -> bool:
     return False
 
 
-_DIGIT_WIDE_SPACE = " "
+_DIGIT_WIDE_SPACE = "\u2007"
 
 
 class _CountBeforeName(QStyledItemDelegate):
@@ -95,11 +98,23 @@ class _CountBeforeName(QStyledItemDelegate):
 
     def initStyleOption(self, option, index):
         super().initStyleOption(option, index)
+        widest = self._widest_count(index)
+        if widest:
+            option.text = _DIGIT_WIDE_SPACE * _spaces_for_counts(option, widest) + option.text
+
+    def paint(self, painter, option, index):
+        super().paint(painter, option, index)
+        count = self.count_shown(index)
+        if not count:
+            return
+        shown = QStyleOptionViewItem(option)
+        self.initStyleOption(shown, index)
+        _draw_count(painter, shown, count_place(shown, self._widest_count(index)), count)
+
+    @staticmethod
+    def count_shown(index) -> str:
         count = index.data(COUNT_ROLE)
-        if count:
-            digits = str(count)
-            padding = _DIGIT_WIDE_SPACE * (self._widest_count(index) - len(digits))
-            option.text = f"{padding}({digits}) {option.text}"
+        return f"({count})" if count else ""
 
     def _widest_count(self, index) -> int:
         parent = index.parent()
@@ -110,6 +125,33 @@ class _CountBeforeName(QStyledItemDelegate):
                 len(str(model.index(row, 0, parent).data(COUNT_ROLE) or ""))
                 for row in range(model.rowCount(parent)))
         return self._widest_among_siblings[place]
+
+
+def _draw_count(painter, option, place: QRectF, count: str) -> None:
+    selected = bool(option.state & QStyle.StateFlag.State_Selected)
+    painter.save()
+    painter.setFont(option.font)
+    painter.setPen(option.palette.color(
+        QPalette.ColorRole.HighlightedText if selected else QPalette.ColorRole.Text))
+    painter.drawText(place, Qt.AlignmentFlag.AlignCenter, count)
+    painter.restore()
+
+
+def _spaces_for_counts(option, widest: int) -> int:
+    metrics = QFontMetricsF(option.font)
+    needed = metrics.horizontalAdvance(f"({'0' * widest}) ")
+    return math.ceil(needed / metrics.horizontalAdvance(_DIGIT_WIDE_SPACE))
+
+
+def count_place(option, widest: int) -> QRectF:
+    widget = option.widget
+    style = widget.style() if widget is not None else QApplication.style()
+    text = style.subElementRect(QStyle.SubElement.SE_ItemViewItemText, option, widget)
+    margin = style.pixelMetric(QStyle.PixelMetric.PM_FocusFrameHMargin, option, widget) + 1
+    metrics = QFontMetricsF(option.font)
+    column = (_spaces_for_counts(option, widest) * metrics.horizontalAdvance(_DIGIT_WIDE_SPACE)
+              - metrics.horizontalAdvance(" "))
+    return QRectF(text.left() + margin, text.top(), column, text.height())
 
 
 class FolderTree(QTreeWidget):

@@ -16,4 +16,6 @@ def test_the_icon_is_the_familys_o():
 def test_committed_icon_matches_the_generator(qapp):
     master = Image.open(ICON_PATH).convert("RGBA")
     assert master.size == (CANVAS, CANVAS)
-    assert master.tobytes() == render_icon(CANVAS).tobytes()
+    assert master.tobytes() == render_icon(CANVAS).tobytes(), (
+        "icon.ico is made by origenerator/icon_design.py, so after a change to the design it is "
+        "made again with: python -c \"from origenerator.icon_design import main; main()\"")

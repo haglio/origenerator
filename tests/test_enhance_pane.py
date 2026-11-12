@@ -766,7 +766,7 @@ def test_a_detector_by_another_name_does_not_count_as_installed(qtbot):
         "some other detector in that folder would leave every part tickable and every pass finding nothing")
 
 
-def _mean_ink(widget) -> float:
+def _mean_ink_whatever_fonts_render(widget) -> float:
     """Mean brightness over the app's background, rendered onto a filled pixmap since a bare Qt ``grab`` leaves unpainted pixels uninitialized."""
     pixmap = QPixmap(widget.size())
     pixmap.fill(BG_PRIMARY)
@@ -786,13 +786,13 @@ def test_switched_off_the_panel_actually_looks_switched_off(qtbot):
     pane.resize(360, 150)
     with qtbot.waitExposed(pane):
         pane.show()
-    live = _mean_ink(pane)
+    live = _mean_ink_whatever_fonts_render(pane)
 
     pane.set_applicable(False, "no video enhancer")
 
     assert not pane.isEnabled()
     assert pane.toolTip() == "no video enhancer"
-    assert _mean_ink(pane) < live, (
+    assert _mean_ink_whatever_fonts_render(pane) < live, (
         "the app's stylesheet colors every label, dropdown and spinner outright and names no disabled "
         "state, so a pane only disabled went on reading as live")
 

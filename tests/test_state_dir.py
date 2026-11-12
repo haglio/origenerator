@@ -7,7 +7,7 @@ from pathlib import Path
 
 from app_support import haglio_settings
 
-from origenerator import config
+from origenerator import action_drawings, config
 from tests.children import run_python
 
 _PROBE = (
@@ -84,4 +84,15 @@ def test_a_branch_session_shares_the_live_installs_library_and_keeps_its_own_win
 
 
 def test_this_run_is_not_writing_into_the_live_state_directory():
-    assert config.STATE_DIR != config.PROJECT_DIR / "state"
+    assert config.STATE_DIR != config.PROJECT_DIR / "state", (
+        "a run once left a log, arrow PNGs, thumbnails, trash and a real recording in the "
+        "checkout's own state folder, and what one run left decided what the next one drew, "
+        "so each run keeps its state in a folder of its own")
+
+
+def test_every_path_kept_in_the_state_folder_is_in_this_runs_own():
+    assert {config.UI_STATE_PATH.parent, config.DB_PATH.parent,
+            action_drawings.OWN_DRAWINGS_DIR.parent} == {config.STATE_DIR}, (
+        "config binds the state folder at import and every module that reads it binds a copy "
+        "of its own, so the suite names its folder in the environment before the first "
+        "origenerator import: a patch of config.STATE_DIR would not reach those copies")

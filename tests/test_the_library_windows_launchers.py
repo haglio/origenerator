@@ -32,4 +32,7 @@ def test_a_library_window_reads_the_live_library(file: str, module: str):
     report = dry_run(REPO_ROOT / file)
 
     assert report.value("arguments") == f"-m {module}"
-    assert report.value("environment") == "ORIGENERATOR_BRANCH_SESSION=1"
+    assert report.values("environment") == ["ORIGENERATOR_BRANCH_SESSION=1"], (
+        "the flag opens the production library from whichever checkout starts the window, "
+        "since a branch's own database is one nobody animates from, so sorting or settling "
+        "animations spent on it would be lost")

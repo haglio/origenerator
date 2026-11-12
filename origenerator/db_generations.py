@@ -25,7 +25,7 @@ LIFECYCLE_COLUMNS = frozenset({
 
 SENT_COLUMNS = ("evolver_exported_at", "genau_exported_at")
 
-WATCH_COLUMN_OF = {field: f"watch_{field}" for field in COUNT_FIELDS}
+WATCH_COLUMNS = tuple((field, f"watch_{field}") for field in COUNT_FIELDS)
 LIBRARY_RECORD_COLUMNS = frozenset({"web_url", "library_id", "upscale_provenance"})
 
 _KNOWN_SOURCES = tuple(GenerationSource)
@@ -226,7 +226,7 @@ class GenerationStore(Store):
 
     def set_watch_counts(self, prompt_id: str, counts: dict):
         self._set_columns(prompt_id, {column: int(counts.get(field) or 0)
-                                      for field, column in WATCH_COLUMN_OF.items()})
+                                      for field, column in WATCH_COLUMNS})
 
     def set_library_record(self, prompt_id: str, **fields):
         refused = set(fields) - LIBRARY_RECORD_COLUMNS

@@ -15,7 +15,7 @@ from funestra.video_groups import (
     widened_seed_items,
 )
 
-from origenerator.db_generations import WATCH_COLUMN_OF
+from origenerator.db_generations import WATCH_COLUMNS
 from origenerator.gallery import media_type_of_row
 from origenerator.gallery.signatures import parse_params
 from origenerator.gallery.source_image import start_images_among
@@ -40,7 +40,7 @@ def record_of_row(video: dict, start_image: dict | None) -> dict:
     if labels := json.loads(video.get("combined_labels") or "[]"):
         shown[STORED_ACTIONS_KEY] = labels
     record = {"video": shown, WATCH_BLOCK: {WEIGHT_KEY: weight_for(
-        {field: video.get(column) or 0 for field, column in WATCH_COLUMN_OF.items()})}}
+        {field: video.get(column) or 0 for field, column in WATCH_COLUMNS})}}
     if start_image is not None and source_of(start_image) == GenerationSource.OUTSIDE:
         record["source_image"] = _recorded(start_image, MediaType.IMAGE)
     return record

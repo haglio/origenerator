@@ -62,12 +62,14 @@ def test_lines_already_on_disk_are_spoken_again_after_the_worker_changes_what_it
 
 
 def test_the_voice_is_a_preset_unless_the_custom_one_is_chosen():
-    assert voice_request(_params()) == {"mode": "preset", "speaker": "Vivian"}
+    assert voice_request(_params()) == {"mode": "preset", "speaker": "Vivian"}, (
+        "a preset speaker is the same voice every run, which a story needs across its scenes")
     assert voice_request(_params(voice=""))["speaker"] == speech.VOICE_PRESETS[0]
     assert voice_request(_params(voice="Serena", voice_sample="C:/v/her.wav"))["mode"] == "preset"
     assert voice_request(_params(voice=speech.CUSTOM_VOICE, voice_sample=" C:/v/her.wav ",
                                  voice_sample_text=" Hello. ")) == {
-        "mode": "clone", "sample": "C:/v/her.wav", "sample_text": "Hello."}
+        "mode": "clone", "sample": "C:/v/her.wav", "sample_text": "Hello."}, (
+        "the copy of a recording is a close one only when it is told what the recording says")
 
 
 def test_a_custom_voice_without_a_recording_is_a_plain_error(tmp_path):

@@ -41,7 +41,8 @@ def test_the_preview_launcher_marks_the_run_and_borrows_the_primary_venv():
 
     primary = _REPO_ROOT.parents[2]
     assert report.value("environment") == f"{ENV_FLAG}=1"
-    assert Path(report.value("interpreter")) == primary / ".venv" / "Scripts" / "python.exe"
+    assert Path(report.value("interpreter")) == primary / ".venv" / "Scripts" / "python.exe", (
+        "a preview runs on the primary checkout's Python: a worktree has no venv of its own")
     assert Path(report.value("directory")) == _REPO_ROOT
     assert report.value("arguments") == "-m origenerator"
     assert Path(report.value("log")) == _REPO_ROOT / "state" / "origenerator_launcher.log"

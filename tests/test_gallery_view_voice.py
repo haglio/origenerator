@@ -1312,12 +1312,12 @@ def test_the_mic_can_be_shut_by_voice(qtbot, tmp_path):
 def test_a_spoken_bar_word_moves_its_bar_the_way_its_key_does(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
     bars = view._osr2_motion.state.state
-    amplitude, center = bars.amplitude, bars.center
+    widest_travel, center = bars.amplitude, bars.center
 
     view._voice.listener.speak("amp down")
     view._voice.listener.speak("center up")
 
-    assert bars.amplitude == amplitude - 10
+    assert bars.amplitude == widest_travel - 10
     assert bars.center == center + 5
     assert words(view._voice.status) == view._osr2_motion.status_text(), (
         "answered with what the device now reads")

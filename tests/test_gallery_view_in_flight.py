@@ -1184,7 +1184,7 @@ def test_an_populating_folders_live_tile_offers_the_stop_its_button_cannot(
     assert view._jobs.all_jobs == []
 
 
-def _running_in_folder(prompt_id, prompt, steps, seed):
+def _a_tabs_generate_running_in_folder(prompt_id, prompt, steps, seed):
     return _row(prompt_id, "sdxl_t2i",
                 {"positive_prompt": prompt, "steps": steps, "seed": seed},
                 f"{prompt_id}.png", status="running", output_files="[]")
@@ -1207,7 +1207,7 @@ def test_open_folder_shows_a_running_generation_on_its_generating_tile(qtbot, tm
 
 def test_open_folder_omits_a_running_row_from_the_static_grid(qtbot):
     db = FakeDB([_image("i1", "a cat", 50, 1)])
-    db.add(_running_in_folder("run1", "a cat", 50, 2))
+    db.add(_a_tabs_generate_running_in_folder("run1", "a cat", 50, 2))
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()

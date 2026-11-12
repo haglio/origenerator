@@ -1282,7 +1282,9 @@ def test_the_settings_accepted_for_this_images_own_state_outrank_the_actions_pin
     built = controller._curated_combination("img", "alpha")
 
     assert built is not None
-    assert built[1]["steps"] == 24
+    assert built[1]["steps"] == 24, (
+        "settings accepted for the image's own state outrank the action's one pin, which can be "
+        "right for only one situation")
 
 
 def test_an_image_nobody_sorted_still_gets_the_actions_pin(combine, monkeypatch):

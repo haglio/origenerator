@@ -721,7 +721,9 @@ def test_an_opening_branch_session_clears_nothing(qtbot, tmp_path, monkeypatch):
     win = Core(client, db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(win)
 
-    assert client.canceled == []
+    assert client.canceled == [], (
+        "a preview cancels none of the experiments the production app queued: they outlive the "
+        "preview in a queue only the app that queued them can account for")
     assert client.interrupted == []
     assert db.get_generation("exp-1") is not None
 

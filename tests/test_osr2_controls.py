@@ -591,13 +591,27 @@ def test_no_state_draws_the_osr2_controls_outside_the_room_kept_for_them():
         assert height <= room_height, fit
 
 
-def test_the_readouts_trace_is_what_the_device_is_sent_from_the_playhead_on(qtbot):
-    live = FakeMotion().state
-    live.state.playing = True
+def _running_a_wave(live):
     motion_engine.set_amplitude(live.state, 40)
     motion_engine.set_center(live.state, 60)
     motion_engine.cycle_shape(live.state)
     motion_engine.advance(live, 0.37)
+
+
+def _running_a_learned_phrase(live):
+    phrase = Phrase(tuple((500, 80 if i % 2 == 0 else 20) for i in range(16)))
+    live.learned.model = LearnedModel(phrases={classify(phrase): [phrase]},
+                                      seen={classify(phrase): 1})
+    live.learned.rng = random.Random(1)
+    motion_engine.enable_learned_motion(live)
+    motion_engine.tick_learned_motion(live, 1000.0)
+
+
+@pytest.mark.parametrize("set_going", [_running_a_wave, _running_a_learned_phrase])
+def test_the_readouts_trace_is_what_the_device_is_sent(qtbot, set_going):
+    live = FakeMotion().state
+    live.state.playing = True
+    set_going(live)
 
     hud = drive_hud(live, active=True)
 
@@ -640,16 +654,9 @@ def test_the_readouts_drawing_slides_on_through_the_end_of_a_cycle(qtbot):
 
 
 def test_the_readout_holds_the_learned_motions_drawing_still_between_knots(qtbot):
-
-    phrase = Phrase(tuple((500, 80 if i % 2 == 0 else 20) for i in range(16)))
-    motion = FakeMotion()
-    live = motion.state
+    live = FakeMotion().state
     live.state.playing = True
-    live.learned.model = LearnedModel(phrases={classify(phrase): [phrase]},
-                                      seen={classify(phrase): 1})
-    live.learned.rng = random.Random(1)
-    motion_engine.enable_learned_motion(live)
-    motion_engine.tick_learned_motion(live, 1000.0)
+    _running_a_learned_phrase(live)
     before = drive_hud(live, active=True)
     motion_engine.tick_learned_motion(live, 1000.02)
 

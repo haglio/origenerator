@@ -2075,8 +2075,8 @@ def test_a_run_lands_after_the_tab_that_launched_it_is_closed(qtbot, tmp_path):
     _finish_reroll(view, job)
 
     assert db.get_generation(job.prompt_id) is not None, (
-        "the gallery owns every job and a tab keeps only the ids of the runs it started, so a "
-        "run goes on and lands once the tab that launched it is closed")
+        "the gallery owns every job, so a run goes on and lands once the tab that launched it "
+        "is closed")
 
 
 def test_a_duplicate_generate_switches_the_front_tab_to_a_random_seed(qtbot, tmp_path):

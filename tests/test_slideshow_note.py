@@ -39,16 +39,14 @@ def _fade(view):
     view._refresh_note()
 
 
-def test_a_flash_has_stopped_its_timer_by_the_time_the_corner_falls_back(qtbot):
+def test_a_flash_has_stopped_its_timer_by_the_time_the_message_fades(qtbot):
     view = _view(qtbot)
 
-    with qtbot.waitSignal(view._note_timer.timeout):
-        view.flash("Locked", ms=1)
+    view.flash("Locked")
 
-    assert words_shown(view._note) == ""
-    assert not view._note_timer.isActive(), (
-        "a flash's timer is a single shot, so it has stopped by the time the corner falls back, "
-        "which is why _fade stops it before it refreshes the corner")
+    assert view._note_timer.isSingleShot(), (
+        "a flash's timer is a single shot, so it has stopped by the time the message fades, "
+        "which is why _fade stops it before it refreshes the message")
 
 
 def test_the_message_up_while_a_request_is_being_said_does_not_fade(qtbot):

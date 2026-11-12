@@ -195,7 +195,8 @@ def test_run_from_the_command_line_it_prints_only_counts(tmp_path, capsys):
         f"left out of the gallery: 0 {by_folder(0, 0, 0)}", f"matched: 1 {by_folder(1, 0, 0)}",
         f"stars added: 1 {by_folder(1, 0, 0)}", f"counts written: 0 {by_folder(0, 0, 0)}",
         f"library records written: 1 {by_folder(1, 0, 0)}",
-        f"actions added: 0 {by_folder(0, 0, 0)}", f"settings filled in: 0 {by_folder(0, 0, 0)}"]
+        f"actions added: 0 {by_folder(0, 0, 0)}", f"flips added: 0 {by_folder(0, 0, 0)}",
+        f"settings filled in: 0 {by_folder(0, 0, 0)}"]
     assert db.get_generation("out-1")["starred"] == 0
 
 
@@ -254,3 +255,16 @@ def test_a_genau_copy_of_a_video_made_here_is_found_under_any_name_the_lanes_gav
     _made_here(db, "gen-2", "beta_00003_.mp4")
 
     assert take_in(db, library)["matched"] == 3
+
+
+def test_a_flick_turned_over_in_genau_stays_turned_over_on_its_row(tmp_path):
+    library, db = tmp_path / "library", Database(tmp_path / "gallery.db")
+    under = ("genau", "loops", "2D", "AI", "portrait")
+    _outside_row(db, "out-1", _filed(library, "scene one.mp4", {"genau": {"flipped": True}},
+                                     under=under))
+    _outside_row(db, "out-2", _filed(library, "scene two.mp4", {"genau": {}}, under=under))
+
+    counts = take_in(db, library)
+
+    assert [db.get_generation(one)["genau_flipped"] for one in ("out-1", "out-2")] == [1, 0]
+    assert counts["flips added"] == 1

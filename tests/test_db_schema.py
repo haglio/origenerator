@@ -111,6 +111,7 @@ SCHEMA = {
         ("library_id", "TEXT", 0, None, 0),
         ("upscale_provenance", "TEXT", 0, None, 0),
         ("video_seconds", "REAL", 0, None, 0),
+        ("genau_flipped", "INTEGER", 1, "0", 0),
     ),
     "requests": (
         ("prompt_id", "TEXT", 0, None, 1),

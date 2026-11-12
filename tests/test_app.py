@@ -380,14 +380,16 @@ def test_the_taskbar_identity_is_claimed_before_any_window_exists(qapp):
 
     with _a_faked_boot([], **{
         "origenerator.app._init_windows_taskbar_identity": built("identity claimed"),
+        "origenerator.app._say_what_evolver_no_longer_agrees_with": built("a warning could open"),
         "origenerator.gui.loading_screen.loading_screen": built("loading screen opened"),
         "origenerator.gui.core.Core": built("window built"),
     }):
         assert main([]) == 0
 
-    assert events == ["identity claimed", "loading screen opened", "window built"], (
-        "the launch claims the taskbar identity before any window exists, the loading screen "
-        "first among them")
+    assert events == ["identity claimed", "a warning could open", "loading screen opened",
+                      "window built"], (
+        "the launch claims the taskbar identity before any window exists, a warning box before "
+        "the loading screen included")
 
 
 def test_the_loading_screen_wears_the_taskbar_button_the_apps_windows_wear(qapp, tmp_path):

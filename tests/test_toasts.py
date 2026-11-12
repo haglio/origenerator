@@ -138,7 +138,7 @@ def test_windows_refusing_the_notification_costs_the_app_nothing(qapp, monkeypat
 def test_windows_refusing_the_heading_over_a_toast_costs_the_launch_nothing(
         qapp, monkeypatch, caplog):
     def refuse(app_id, **named):
-        raise OSError("the heading could not be registered")
+        raise RuntimeError("the heading could not be registered")
 
     monkeypatch.setattr(toasts_module, "register_toast_identity", refuse)
     with caplog.at_level("WARNING", logger=toasts_module.__name__):

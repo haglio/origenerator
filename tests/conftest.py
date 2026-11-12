@@ -195,18 +195,9 @@ class FakeCommandAndRequestListener(QObject):
         return matched
 
     def bare_command(self, text):
-        collecting = self._dictation is not None and self._dictation.listening
-        if collecting or self._bare_matcher is None:
-            return None
-        return self._bare_matcher(text)
+        return self._bare_matcher(text) if self._bare_matcher is not None else None
 
     def speak(self, text):
-        collecting = self._dictation is not None and self._dictation.listening
-        if not collecting and self.commands_on and self._bare_matcher is not None:
-            bare = self._bare_matcher(text)
-            if bare is not None:
-                self._execute(bare)
-                return bare
         spoken = self.push_dictation(text)
         if spoken is not None:
             self.request.emit(spoken)

@@ -3329,3 +3329,11 @@ def test_a_video_with_no_group_on_its_record_is_a_group_of_its_own(slideshows, t
     group_of = _group_of_on_the_portrait_side(director, made)
 
     assert group_of(Slide("o1.mp4", "video", "o1"), False) is None
+
+
+def test_a_lock_held_on_a_video_stars_it_here_as_it_is_told_to_the_session(slideshows, tmp_path):
+    video = _a_sites(_animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path))
+
+    host, told = _a_video_locked_in_a_session(slideshows, tmp_path, video)
+
+    assert (told, host.favorited) == (["portrait_lock_held|v1.png"], ["v1"])

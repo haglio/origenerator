@@ -3,6 +3,7 @@
   "table": "generations",
   "columns": [
     "prompt_id",
+    "source",
     "workflow_name",
     "workflow_version",
     "positive_prompt",
@@ -26,7 +27,12 @@
     "upscale_provenance",
     "watch_completions",
     "watch_skips",
-    "watch_locks"
+    "watch_locks",
+    "recipe_category",
+    "combined_labels",
+    "shape",
+    "video_seconds",
+    "genau_flipped"
   ],
   "params_model_keys": [
     "unet_high",
@@ -61,5 +67,11 @@
     ".venv/Scripts/python.exe",
     "-m",
     "origenerator.ai_video_records"
-  ]
+  ],
+  "outside_workflow_prefixes": {
+    "video": "outside:",
+    "image_to_video": "outside image-to-video:",
+    "text_to_video": "outside text-to-video:",
+    "image": "outside picture:"
+  }
 }

@@ -32,6 +32,11 @@ def _parser() -> argparse.ArgumentParser:
     starred = favorite.add_mutually_exclusive_group(required=True)
     starred.add_argument("--on", dest="starred", action="store_true")
     starred.add_argument("--off", dest="starred", action="store_false")
+    flipped = verbs.add_parser("flipped")
+    flipped.add_argument("--video", type=Path, required=True)
+    turned = flipped.add_mutually_exclusive_group(required=True)
+    turned.add_argument("--on", dest="flipped", action="store_true")
+    turned.add_argument("--off", dest="flipped", action="store_false")
     upscaled = verbs.add_parser("upscaled")
     upscaled.add_argument("--video", type=Path, required=True)
     upscaled.add_argument("--provenance", type=Path, required=True)
@@ -57,6 +62,8 @@ def main(argv: list[str] | None = None, *, db_path: Path | None = None,
                  for video, counts in read_json(args.totals).items()]
     elif args.verb == "favorite":
         found = [_on_its_row(db, args.video, "set_generation_favorite", args.starred)]
+    elif args.verb == "flipped":
+        found = [_on_its_row(db, args.video, "set_library_record", genau_flipped=int(args.flipped))]
     else:
         found = [_on_its_row(db, args.video, "set_library_record",
                              upscale_provenance=json.dumps(read_json(args.provenance)))]

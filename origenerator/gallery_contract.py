@@ -11,6 +11,7 @@ TABLE = "generations"
 
 COLUMNS = (
     "prompt_id",
+    "source",
     "workflow_name",
     "workflow_version",
     "positive_prompt",
@@ -36,6 +37,11 @@ OPTIONAL_COLUMNS = (
     "watch_completions",
     "watch_skips",
     "watch_locks",
+    "recipe_category",
+    "combined_labels",
+    "shape",
+    "video_seconds",
+    "genau_flipped",
 )
 
 PARAMS_MODEL_KEYS = ("unet_high", "unet", "checkpoint", "unet_low")
@@ -62,6 +68,7 @@ PROJECT_DIR = Path(__file__).resolve().parent.parent
 
 def declaration() -> dict:
     from origenerator.workflows.frame_rate import NATIVE_FPS  # noqa: PLC0415
+    from origenerator.workflows.outside import published_prefixes  # noqa: PLC0415
 
     return {
         "database_path": DATABASE_PATH,
@@ -76,6 +83,7 @@ def declaration() -> dict:
         "downtime_command": list(DOWNTIME_COMMAND),
         "outside_video_entries_command": list(OUTSIDE_VIDEO_ENTRIES_COMMAND),
         "records_command": list(RECORDS_COMMAND),
+        "outside_workflow_prefixes": published_prefixes(),
     }
 
 

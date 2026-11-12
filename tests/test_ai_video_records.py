@@ -181,3 +181,16 @@ def test_the_command_the_document_names_answers_in_its_last_line_when_evolver_ru
 
 def test_where_the_library_keeps_no_records_folder_the_phones_file_is_written_nowhere(tmp_path):
     assert ai_video_records.this_librarys_phone_records(_the_gallery(tmp_path)).write() == 0
+
+
+def test_a_flick_turned_over_in_genau_is_turned_over_on_its_row_and_back(tmp_path, capsys):
+    db = _the_gallery(tmp_path)
+    video = _filed(_places(tmp_path))
+    _outside(db, "o1", video)
+
+    on = _run(tmp_path, capsys, "flipped", "--video", str(video), "--on")
+    flipped = db.get_generation("o1")["genau_flipped"]
+    off = _run(tmp_path, capsys, "flipped", "--video", str(video), "--off")
+
+    assert (on, flipped, off, db.get_generation("o1")["genau_flipped"]) == (
+        {"done": 1, "no_row": 0}, 1, {"done": 1, "no_row": 0}, 0)

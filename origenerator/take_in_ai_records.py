@@ -8,6 +8,7 @@ from functools import partial
 from pathlib import Path
 from typing import NamedTuple
 
+from app_support.gallery_records import FLIPPED, GENAU_SECTION, PLACES
 from app_support.gallery_rows import VideoRows
 from app_support.json_store import read_json
 from app_support.kino_folder import is_ai_video
@@ -22,13 +23,13 @@ from origenerator.gallery.signatures import parse_params
 from origenerator.generation_state import GenerationSource, source_of
 from origenerator.media import MediaType
 from origenerator.outside_videos import library_record, made_of, seed_number
-from origenerator.workflows.outside import PLACES
 
 ORIGENERATORS_OWN = ("origenerator", "video")
 TOP_FOLDERS = ("kino", ORIGENERATORS_OWN[0], "genau")
 COUNTED = ("records read", "unreadable", "no video", "no row", "left out of the gallery",
            "matched", "stars added",
-           "counts written", "library records written", "actions added", "settings filled in")
+           "counts written", "library records written", "actions added", "flips added",
+           "settings filled in")
 
 
 class Call(NamedTuple):
@@ -105,6 +106,9 @@ def writes_for(row: dict, record: dict) -> list[Write]:
     action = _block(record, "video").get("action")
     if action and not row.get("action"):
         writes.append(Write("actions added", (Call("set_action", (prompt_id, action)),)))
+    if _block(record, GENAU_SECTION).get(FLIPPED) is True and not row.get("genau_flipped"):
+        writes.append(Write("flips added",
+                            (Call("set_library_record", (prompt_id,), {"genau_flipped": 1}),)))
     if source_of(row) == GenerationSource.OUTSIDE and (filled := _settings_filled_in(row, record)):
         writes.append(Write("settings filled in", filled))
     return writes

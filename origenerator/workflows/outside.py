@@ -2,25 +2,13 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from app_support.gallery_records import PLACES
+
 from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
 
 OUTSIDE_MODEL_KEYS = ("model",)
 OUTSIDE_LORA_KEYS = ("style",)
-
-_SETTINGS = ("model", "style", "resolution", "aspect_ratio", "quality", "creativity")
-PLACES = {
-    MediaType.VIDEO: {"prompt": "positive_prompt", "seed": "seed",
-                      **{name: name for name in _SETTINGS}},
-    MediaType.IMAGE: {"positive_prompt": "positive_prompt", "negative_prompt": "negative_prompt",
-                      "seed": "seed", **{name: name for name in _SETTINGS}},
-}
-
-
-def recorded_block(params: dict, made: MediaType) -> dict:
-    return {key: params[place] for key, place in PLACES[made].items()
-            if params.get(place) not in (None, "")}
-
 
 class VideoKind(StrEnum):
     IMAGE_TO_VIDEO = "I2V"
@@ -33,6 +21,16 @@ _PREFIXES = {
     (MediaType.VIDEO, VideoKind.TEXT_TO_VIDEO): "outside text-to-video:",
     (MediaType.IMAGE, None): "outside picture:",
 }
+
+
+PUBLISHED_PREFIXES = (("video", (MediaType.VIDEO, None)),
+                      ("image_to_video", (MediaType.VIDEO, VideoKind.IMAGE_TO_VIDEO)),
+                      ("text_to_video", (MediaType.VIDEO, VideoKind.TEXT_TO_VIDEO)),
+                      ("image", (MediaType.IMAGE, None)))
+
+
+def published_prefixes() -> dict[str, str]:
+    return {kind: _PREFIXES[made_and_kind] for kind, made_and_kind in PUBLISHED_PREFIXES}
 
 
 def outside_workflow(source: str, made: MediaType = MediaType.VIDEO,

@@ -3,11 +3,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from app_support.gallery_records import RECORD_COLUMNS
+
 from origenerator import config, db_schema
 from origenerator import gallery_contract as contract
 from origenerator.export_lane import EXPORT_LANES
+from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.frame_rate import NATIVE_FPS
+from origenerator.workflows.outside import VideoKind, outside_workflow
 from tests.children import run_python
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -40,6 +44,12 @@ def test_every_column_the_document_names_is_one_this_app_writes():
     assert declared <= set(db_schema.GENERATION_COLUMNS), (
         "a rename the document does not carry leaves Evolver reading every row as never sent, "
         "with no other test in either app failing")
+
+
+def test_the_document_names_every_column_the_familys_record_builder_reads():
+    document = _document()
+
+    assert set(RECORD_COLUMNS) <= {*document["columns"], *document["optional_columns"]}
 
 
 def test_a_column_added_since_the_table_first_shipped_is_one_a_reader_must_ask_for():
@@ -100,3 +110,13 @@ def test_the_start_frame_key_is_the_one_every_image_to_video_workflow_records():
 
     assert animating
     assert all(contract.PARAMS_INPUT_IMAGE_KEY in wf.default_params() for wf in animating)
+
+
+def test_the_document_names_the_workflow_name_each_kind_of_outside_row_starts_with():
+    prefixes = _document()["outside_workflow_prefixes"]
+
+    assert {kind: prefix + "a-site" for kind, prefix in prefixes.items()} == {
+        "video": outside_workflow("a-site"),
+        "image_to_video": outside_workflow("a-site", MediaType.VIDEO, VideoKind.IMAGE_TO_VIDEO),
+        "text_to_video": outside_workflow("a-site", MediaType.VIDEO, VideoKind.TEXT_TO_VIDEO),
+        "image": outside_workflow("a-site", MediaType.IMAGE)}

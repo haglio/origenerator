@@ -140,6 +140,23 @@ def test_a_late_tick_still_sends_over_the_lookahead(qtbot):
     assert all(0.0 <= pos <= 100.0 for pos, _i in broker.positions)
 
 
+def test_a_tick_half_a_tick_late_still_finds_the_device_short_of_its_target(qtbot):
+    driver, broker, clock = _driver(qtbot)
+    driver.start()
+    clock.t += 0.5
+    driver.poll()
+    sent = len(broker.positions)
+    half_a_tick_late = driver.tickers[0].interval_s * 1.5
+    for _ in range(4):
+        clock.t += half_a_tick_late
+        driver.poll()
+    outlasts_the_wait = [i / 1000 > half_a_tick_late for _pos, i in broker.positions[sent:]]
+    assert outlasts_the_wait == [True] * 4, (
+        "each command gives the device longer than a tick, so a tick that runs a little late"
+        " still finds it short of its target and re-aims it; under a tick it arrives early,"
+        " stands still, then sprints for the next")
+
+
 def test_stopping_parks_the_device(qtbot):
     driver, broker, _clock = _driver(qtbot)
     driver.start()
@@ -365,7 +382,9 @@ def test_a_tick_that_lands_after_the_device_is_given_up_sends_nothing(qtbot):
     driver.poll()
 
     assert broker.parked == 1
-    assert len(broker.positions) == sent
+    assert broker.positions[sent:] == [], (
+        "the park asked for on letting go is where whoever has the device next expects to"
+        " find it, so a tick that lands after that sends nothing")
 
 
 def test_a_frozen_room_stops_the_motion_at_once_and_sends_nothing_more(qtbot):

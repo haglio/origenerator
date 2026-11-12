@@ -86,6 +86,22 @@ def test_every_saved_preference_is_read_and_put_back_by_the_views_own_methods():
         "preference is an import error and the dead-code check can still see who calls them")
 
 
+_KEYS_SESSIONS_ON_DISK_WERE_SAVED_UNDER = (
+    "generate_tabs", "toc_shapes", "open_folders", "gallery_folder", "gallery_selection",
+    "gallery_combine", "osr2_enabled", "max_intensity", "motion", "experiments_enabled",
+    "audio_enabled", "mic_enabled", "enhance_settings", "search_sort", "slideshows",
+    "session_slideshows", "how_many", "request_auto_generate",
+)
+
+
+def test_every_key_a_session_was_saved_under_is_still_read_back():
+    read_back = {key for key, _read, _put_back in SESSION_UI_STATE}
+
+    assert [key for key in _KEYS_SESSIONS_ON_DISK_WERE_SAVED_UNDER if key not in read_back] == [], (
+        "the keys are the state file's public surface, \"generate_tabs\" included: a key renamed"
+        " here leaves every session saved under the old one opening without that setting")
+
+
 def test_a_preview_on_its_own_is_titled_for_the_feature_it_demos(qtbot, tmp_path):
     win = _window(qtbot, tmp_path, launch=Launch(preview=Preview(feature="the new seed row")))
 

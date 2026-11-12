@@ -301,6 +301,19 @@ def test_a_session_saved_under_retracted_or_control_off_reopens_parked(qtbot):
         assert view.osr2_state() == OSR2_PARKED, saved
 
 
+def test_a_session_saved_by_the_on_off_switch_reopens_driving_or_parked(qtbot):
+    view, _driver, _panel = _osr2_view(qtbot)
+
+    reopened = {}
+    for saved in (True, False):
+        view.restore_osr2_state(saved)
+        reopened[saved] = view.osr2_state()
+
+    assert reopened == {True: OSR2_DRIVING, False: OSR2_PARKED}, (
+        "\"osr2_enabled\" still reads the True or False the switch held before it had four"
+        " states, True as driving")
+
+
 def _radio_view(qtbot):
     radio = _FakeRadio()
     view = GalleryView(FakeDB([]), actions=FakeActions(), shared=Shared(radio=radio))

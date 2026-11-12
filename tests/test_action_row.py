@@ -116,6 +116,19 @@ def test_an_image_lists_the_actions_it_was_set_with_and_no_dropdown(action):
     assert (_listed(action, MediaType.IMAGE), action.findChildren(QComboBox)) == (("alpha", "beta"), [])
 
 
+
+def test_an_items_pills_show_in_alphabetical_order_whatever_order_they_were_added_in(action, qtbot):
+    action.show_row(_row(image=ItemActions(("gamma", "Beta", "alpha"))))
+    _rows(action).show()
+    shown_on_coming_back = _listed(action, MediaType.IMAGE)
+    action.show_row(_row(image=ItemActions(("gamma",))))
+    _adder(action, MediaType.IMAGE).click()
+    qtbot.mouseClick(next(pill for pill in _offered(action, MediaType.IMAGE) if pill.text() == "alpha"),
+                     Qt.MouseButton.LeftButton)
+
+    assert (shown_on_coming_back, _listed(action, MediaType.IMAGE)) == (
+        ("alpha", "Beta", "gamma"), ("gamma", "alpha"))
+
 def test_an_image_with_no_actions_shows_no_pills_and_offers_to_add_them(action):
     action.show_row(_row())
 

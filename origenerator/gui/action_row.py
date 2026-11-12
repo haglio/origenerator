@@ -84,7 +84,8 @@ class _Side(QWidget):
         self.set_actions_again(item_actions)
 
     def set_actions_again(self, item_actions: ItemActions) -> None:
-        self._pills.show_names(item_actions.actions, editable=self._editable)
+        self._pills.show_names(tuple(sorted(item_actions.actions, key=str.casefold)),
+                               editable=self._editable)
         self._name_the_setter()
         for name, box in self._boxes.items():
             box.setChecked(name in item_actions.checked)

@@ -30,7 +30,6 @@ from shared_ui.spacing import MARGIN_STANDARD
 
 from origenerator import (
     gallery,
-    outside_videos,
 )
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_api import ForeignQueue
@@ -602,28 +601,6 @@ def test_starring_an_image_counts_it_on_the_favorites_of_every_folder_above_it(q
 
     assert _shown(_collection_row(_at(_image_workflow(view._tree), 0), "Favorites")) == "(1) Favorites"
     assert _shown(_collection_row(_video_workflow(view._tree), "Favorites")) == "Favorites"
-
-
-def test_starring_another_sources_video_tells_fun_time_through_the_journal(qtbot, tmp_path,
-                                                                          monkeypatch):
-    video = {"prompt_id": "o1", "source": GenerationSource.OUTSIDE,
-             "workflow_name": "outside:a-site", "workflow_version": "outside",
-             "status": "completed", "params_json": "{}", "starred": 0,
-             "output_files": json.dumps([{"filename": "c1_topaz.mp4",
-                                          "library_path": str(tmp_path / "outbox" / "c1_topaz.mp4")}])}
-    journal = tmp_path / "journals" / "origenerator.jsonl"
-    monkeypatch.setattr(outside_videos, "places_here", lambda: outside_videos.Places(
-        kino=tmp_path / "kino", records_folder=tmp_path / "records",
-        frames_dir=tmp_path / "frames", thumb_dir=tmp_path / "thumbs",
-        skip_sources=frozenset(), library_root=tmp_path, journal=journal))
-    view = GalleryView(FakeDB([video]))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    view.set_items_favorite(["o1"], True)
-
-    [line] = journal.read_text(encoding="utf-8").splitlines()
-    assert json.loads(line)["event"] == "favorite"
 
 
 def _square_texts(view, key) -> list[str]:

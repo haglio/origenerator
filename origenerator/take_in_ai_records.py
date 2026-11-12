@@ -16,7 +16,7 @@ from origenerator.db_generations import WATCH_COLUMNS
 from origenerator.gallery.signatures import parse_params
 from origenerator.generation_state import GenerationSource, source_of
 from origenerator.media import MediaType
-from origenerator.outside_videos import made_of, seed_number
+from origenerator.outside_videos import library_record, made_of, seed_number
 from origenerator.video_rows import VideoRows
 from origenerator.workflows.outside import PLACES
 
@@ -79,7 +79,7 @@ def writes_for(row: dict, record: dict) -> list[Write]:
     watched = add_counts(_block(record, WATCH_BLOCK))
     if watched != add_counts({field: row.get(column) for field, column in WATCH_COLUMNS}):
         writes.append(Write("counts written", (Call("set_watch_counts", (prompt_id, watched)),)))
-    kept = _library_record(record)
+    kept = library_record(record)
     if any(row.get(column) != value for column, value in kept.items()):
         writes.append(Write("library records written",
                             (Call("set_library_record", (prompt_id,), kept),)))
@@ -102,13 +102,6 @@ def _settings_filled_in(row: dict, record: dict) -> tuple[Call, ...]:
     return (Call("set_params_json", (prompt_id, json.dumps({**params, **missing}))),
             *(Call("fill_in", (column, {prompt_id: value})) for column, value in columns.items()
               if value is not None and row.get(column) is None))
-
-
-def _library_record(record: dict) -> dict:
-    upscale = _block(record, "provenance").get("upscale")
-    kept = {"web_url": record.get("web_url"), "library_id": record.get("id"),
-            "upscale_provenance": json.dumps(upscale) if upscale else None}
-    return {column: value for column, value in kept.items() if value}
 
 
 def _block(record: dict, name: str) -> dict:

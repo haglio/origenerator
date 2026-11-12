@@ -2425,8 +2425,6 @@ class GalleryView(QWidget):
         for pid in prompt_ids:
             self._db.set_generation_favorite(pid, favorite)
         ids = set(prompt_ids)
-        outside_videos.tell_fun_time([row for row in self._listed_rows if row["prompt_id"] in ids],
-                                     favorite)
         for row in self._listed_rows:
             if row["prompt_id"] in ids:
                 row["starred"] = 1 if favorite else 0

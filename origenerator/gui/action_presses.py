@@ -4,7 +4,6 @@ from collections.abc import Callable
 
 from funestra.loop_cycle import SEED
 
-from origenerator import said_action
 from origenerator.gui.message import INFO, WARNING
 from origenerator.gui.slideshow_set import (
     SlideshowSet,
@@ -12,8 +11,7 @@ from origenerator.gui.slideshow_set import (
     narrow_to_the_action_on_screen,
 )
 from origenerator.gui.slideshow_wiring import SlideshowActions
-from origenerator.outside_videos import places_here
-from origenerator.sent_back import SentBack, the_librarys
+from origenerator.sent_back import SentBack, send_back, the_librarys
 from origenerator.slideshow import Slide
 
 NO_ACTION_TO_REMOVE = "No action to remove"
@@ -61,10 +59,10 @@ class ActionPresses:
         self._flash(said, kind=INFO if done else WARNING)
 
 
-def striking(db, gallery, places_here=places_here,
+def striking(db, gallery,
              sent_back: Callable[[], SentBack] = the_librarys) -> Callable[[Slide], str]:
     def strike(slide) -> str:
-        struck = said_action.strike(db, slide, places_here, sent_back())
+        struck = send_back(db, slide.prompt_id, sent_back())
         if struck:
             gallery.refresh()
         return struck

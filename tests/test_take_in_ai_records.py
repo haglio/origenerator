@@ -134,10 +134,11 @@ def test_a_video_this_app_made_is_found_by_its_upscale_or_else_by_the_name_it_wa
 def test_kinos_ai_folder_origenerators_and_genaus_records_are_read_and_no_non_ai_record_is(tmp_path):
     library, db = tmp_path / "library", Database(tmp_path / "gallery.db")
     places = {"origenerator": ("origenerator", "video", "portrait"),
-              "genau": ("genau", "loops", "portrait"),
+              "genau": ("genau", "loops", "2D", "AI", "portrait"),
               "kino non-AI": ("kino", "2D", "non_AI", "portrait"),
               "kino outside its AI folder": ("kino", "VR", "portrait"),
-              "genau non-AI": ("genau", "loops", "non_AI", "portrait"),
+              "genau non-AI": ("genau", "loops", "2D", "non_AI", "portrait"),
+              "genau VR": ("genau", "loops", "VR"),
               "elsewhere": ("evolver", "inbox")}
     for number, (name, under) in enumerate(places.items()):
         _outside_row(db, name, _filed(library, f"scene {number}.mp4", {"favorite": True},
@@ -182,7 +183,7 @@ def test_run_from_the_command_line_it_prints_only_counts(tmp_path, capsys):
         "favorite": True, "web_url": "https://example.com/watch/101"}))
     _filed(library, "scene two.mp4", {"favorite": True})
 
-    _filed(library, "scene three.mp4", {"favorite": True}, under=("genau", "loops", "portrait"))
+    _filed(library, "scene three.mp4", {"favorite": True}, under=("genau", "loops", "2D", "AI", "portrait"))
 
     assert main(["--db", str(db.path), "--library", str(library), "--dry-run"],
                 phone_records=_never_written) == 0
@@ -249,7 +250,7 @@ def test_a_row_naming_its_video_by_file_name_alone_is_found_by_that_name(tmp_pat
 def test_a_genau_copy_of_a_video_made_here_is_found_under_any_name_the_lanes_gave_it(tmp_path):
     library, db = tmp_path / "library", Database(tmp_path / "gallery.db")
     for name in ("beta_00003__topaz.mp4", "beta_00003_-audio_topaz.mp4", "beta_00003_ (2).mp4"):
-        _filed(library, name, {"favorite": True}, under=("genau", "loops", "portrait"))
+        _filed(library, name, {"favorite": True}, under=("genau", "loops", "2D", "AI", "portrait"))
     _made_here(db, "gen-2", "beta_00003_.mp4")
 
     assert take_in(db, library)["matched"] == 3

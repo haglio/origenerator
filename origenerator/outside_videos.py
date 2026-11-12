@@ -74,8 +74,8 @@ def record_of(video: Path, records_folder: Path, *, action: str | None = None) -
         shown = {**shown, "action": action}
     image = made_from if isinstance(made_from, dict) else None
     read = {"video": shown, "source_image": image}
-    return Record(video=_made(shown, PLACES[MediaType.VIDEO]),
-                  image=_made(image, PLACES[MediaType.IMAGE]) if image is not None else None,
+    return Record(video=made_of(shown, PLACES[MediaType.VIDEO]),
+                  image=made_of(image, PLACES[MediaType.IMAGE]) if image is not None else None,
                   action=shown.get("action") or None,
                   image_key=seed_group_and_seed(read) if image else None,
                   favorite=recorded.get("favorite") is True)
@@ -90,7 +90,7 @@ def _recorded(video: Path, records_folder: Path) -> dict:
     return record if isinstance(record, dict) else {}
 
 
-def _made(block: dict, places: dict[str, str]) -> Made:
+def made_of(block: dict, places: dict[str, str]) -> Made:
     return Made({place: str(block[key]) for key, place in places.items()
                  if block.get(key) not in (None, "")},
                 created=block.get("created") or None)
@@ -437,7 +437,7 @@ def _recorded_fields(source: str, workflow_name: str, params: dict, when: tuple[
         "params_json": json.dumps(params),
         "positive_prompt": params.get("positive_prompt"),
         "negative_prompt": params.get("negative_prompt"),
-        "seed": _seed_number(params.get("seed")),
+        "seed": seed_number(params.get("seed")),
         "action": action,
         "created_at": made.strftime("%Y-%m-%d %H:%M:%S"),
         "completed_at": filed.isoformat(),
@@ -482,7 +482,7 @@ def _saved_frame(frame: Image.Image, dest: Path) -> Path:
     return dest
 
 
-def _seed_number(seed: str | None) -> int | None:
+def seed_number(seed: str | None) -> int | None:
     try:
         return int(seed) if seed else None
     except ValueError:

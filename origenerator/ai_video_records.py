@@ -14,6 +14,7 @@ from origenerator.db import Database
 from origenerator.outside_videos import Places, places_here, take_record
 from origenerator.thumbnail import first_frame_of
 from origenerator.video_rows import VideoRows
+from origenerator.warm_gun_records import PhoneRecords
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +38,14 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def this_librarys_phone_records(db) -> PhoneRecords:
+    return PhoneRecords.of_this_library(db, preview=False)
+
+
 def main(argv: list[str] | None = None, *, db_path: Path | None = None,
          places: Callable[[], Places | None] = places_here, grab=first_frame_of,
-         log_to: Callable[[str, Path], object] = configure_logging) -> int:
+         log_to: Callable[[str, Path], object] = configure_logging,
+         phone_records: Callable[[Database], object] = this_librarys_phone_records) -> int:
     args = _parser().parse_args(argv)
     log_to("", config.STATE_DIR / "origenerator.log")
     install_exception_logging(logger)
@@ -54,6 +60,7 @@ def main(argv: list[str] | None = None, *, db_path: Path | None = None,
     else:
         found = [_on_its_row(db, args.video, "set_library_record",
                              upscale_provenance=json.dumps(read_json(args.provenance)))]
+    phone_records(db).write()
     print(json.dumps({"done": sum(found), "no_row": len(found) - sum(found)}))
     return 0
 

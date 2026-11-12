@@ -292,7 +292,6 @@ class GalleryView(QWidget):
         super().__init__()
         self._db = db
         self._prompt_heights = shared.prompt_heights
-        self._phone_records = shared.phone_records
         self._client = client
         self._fun_time = fun_time
         self._radio = shared.radio if shared.radio is not None else OrigeneratorRadio()
@@ -1041,8 +1040,6 @@ class GalleryView(QWidget):
         self._slideshows.fill_the_wanted_regions()
 
     def _poll(self):
-        if self._phone_records is not None:
-            self._phone_records.write_when_due(self.off_thread)
         if self._poll_inflight or (self.window().isMinimized()
                                    and not self._slideshows.any_up()):
             return

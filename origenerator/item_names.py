@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from origenerator import gallery
 from origenerator.gallery.item_numbers import item_name, number_items
+from origenerator.gallery.output import stems_made_as
 from origenerator.gallery.tree import rows_with_a_folder
 from origenerator.row_readings import RowReadings
 from origenerator.trash_collection import trash_items
@@ -56,6 +57,10 @@ class ItemNames:
 
     def prompt_id_of(self, name: str) -> str | None:
         return self._wearing.get(name)
+
+    def by_file(self, rows: list[dict]) -> dict[str, str]:
+        return {stem: name for row in rows if (name := self.of(row["prompt_id"]))
+                for stem in stems_made_as(row)}
 
 
 def _videos_of_starting_frames(rows: list[dict], held_rows: list[dict],

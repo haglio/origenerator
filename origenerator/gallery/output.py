@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from functools import lru_cache
 from pathlib import Path
 
 from app_support.comfy_file_refs import frame_name
-from app_support.video_names import UPSCALE_SUFFIX
+from app_support.video_names import stem_as_made
 
 from origenerator.gallery.signatures import workflow_output_type
 from origenerator.generation_state import GenerationStatus
@@ -74,19 +73,9 @@ def place_of_its_own(file: dict) -> str | None:
     return file.get("path") or file.get("library_path")
 
 
-_COPY_COUNTER = re.compile(r" \(\d+\)$")
-
-
-def _stem_before_the_library_renamed_it(stem: str) -> str:
-    while True:
-        earlier = _COPY_COUNTER.sub("", stem).removesuffix(UPSCALE_SUFFIX)
-        if earlier == stem:
-            return stem
-        stem = earlier
-
-
-def stem_as_made(path) -> str:
-    return _stem_before_the_library_renamed_it(Path(frame_name(str(path))).stem)
+def stems_made_as(row: dict) -> frozenset[str]:
+    return frozenset(stem_as_made(name) for file in row_output_files(row) if isinstance(file, dict)
+                     for name in (file.get("filename"), file.get("library_path")) if name)
 
 
 def generations_by_stem(rows: list[dict]) -> dict[str, str]:

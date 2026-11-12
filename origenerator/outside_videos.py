@@ -13,6 +13,7 @@ from typing import NamedTuple
 from app_support import kino_folder
 from app_support.gallery_records import PLACES, recorded_block
 from app_support.gallery_rows import VideoRows, made_here, source_of
+from app_support.video_names import stem_as_made
 from app_support.win32 import mutex_name
 from funestra.video_families import seed_group_and_seed
 from PIL import Image
@@ -21,7 +22,7 @@ from origenerator import config
 from origenerator.db_generations import library_paths_in
 from origenerator.evolver_export import PARTIAL_MARKER
 from origenerator.evolver_upscales import filed_under, filed_upscales
-from origenerator.gallery.output import generations_by_stem, parse_file_list, stem_as_made
+from origenerator.gallery.output import generations_by_stem, parse_file_list
 from origenerator.gallery.signatures import parse_params
 from origenerator.gallery.source_image import videos_from_source_image
 from origenerator.gallery.tree import settings_folder_key, start_frame_index

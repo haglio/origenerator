@@ -4,8 +4,9 @@ import contextlib
 import os
 from pathlib import Path
 
+from app_support.video_names import stem_as_made
+
 from origenerator.file_numbers import NUMBERED, next_number, numbered
-from origenerator.gallery.output import stem_as_made
 from origenerator.media import MediaType, media_type_from_filename
 from origenerator.output_places import OutputPlaces, files_under, folders_in
 from origenerator.trash import Trash

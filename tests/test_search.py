@@ -159,6 +159,32 @@ def test_a_seed_lands_on_the_one_generation_carrying_it():
     assert _hits(_index(rows), "778899") == ["g1"]
 
 
+def _made_as(prompt_id, filename, **file):
+    return dict(_row(prompt_id, "a quiet street"),
+                output_files=json.dumps([{"filename": filename, **file}]))
+
+
+@pytest.mark.parametrize("typed", [
+    "wan_loop_00042_", "wan_loop_00042_.mp4", "WAN_LOOP_00042_.MP4",
+    "wan_loop_00042_ (2).mp4", "wan_loop_00042__topaz.mp4", "  wan_loop_00042_  "])
+def test_a_file_name_finds_the_item_it_was_made_as_whatever_the_library_did_to_it(typed):
+    rows = [_made_as("made", "wan_loop_00042_.mp4"), _made_as("other", "wan_loop_00043_.mp4")]
+    assert _hits(_index(rows), typed) == ["made"]
+
+
+def test_a_file_name_finds_an_item_brought_in_from_the_library():
+    rows = [_made_as("brought in", "", library_path="C:/library/videos/an example clip.mp4"),
+            _made_as("other", "wan_loop_00043_.mp4")]
+    assert _hits(_index(rows), "an example clip") == ["brought in"]
+
+
+def test_a_file_name_is_never_widened():
+    rows = [_made_as("made", "wan_loop_00042_.mp4"), _made_as("other", "wan_loop_00043_.mp4")]
+    index = _index(rows)
+    assert not index.widens("wan_loop_00042_.mp4")
+    assert _hits(index, "wan_loop_00042_.mp4", expansions={"wan": ["street"]}) == ["made"]
+
+
 def test_the_code_leading_a_name_finds_every_item_of_its_folder():
     rows = [_row("g1", "a quiet street"), _row("g2", "a quiet street"),
             _row("g3", "a quiet street")]

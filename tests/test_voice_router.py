@@ -262,7 +262,7 @@ class FakeHost:
         return "queued it", INFO
 
 
-class FakeAnswerer:
+class AnswererThatAsksNoLocalModel:
 
     def __init__(self):
         self.asked = []
@@ -302,7 +302,7 @@ def router(qtbot, monkeypatch, starting):
         router = VoiceRouter(
             host, VoiceSources(db=db or FakeDB(), slideshows=slideshows,
                                client=parts.get("client", _A_CLIENT), starting=starting,
-                               requests=parts.get("requests") or FakeAnswerer(),
+                               requests=parts.get("requests") or AnswererThatAsksNoLocalModel(),
                                setters=setters),
             parent=parent, motion=parts.get("motion"))
         built.append((parent, router))
@@ -908,7 +908,7 @@ def test_a_requests_row_in_the_job_queue_goes_whatever_its_answer(router, starti
 
 
 def test_a_finished_request_is_asked_of_the_model_about_the_image_it_was_said_over(router):
-    requests = FakeAnswerer()
+    requests = AnswererThatAsksNoLocalModel()
     voice, _host, _slideshows = router(db=FakeDB([_row("g1")]), requests=requests)
 
     voice._begin_request("g1", Spoken("no hat"))

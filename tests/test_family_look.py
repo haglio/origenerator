@@ -16,16 +16,21 @@ _THE_POSE_MODELS_LETTERBOX = "origenerator/workflows/motion_aim.py: color (114, 
 _QTS_TAB_LABEL_GAP = "origenerator/gui/eliding_tab_bar.py: spacing _QT_LABEL_GAP = 4"
 # Not ours to set: the caret Qt's style draws on every TOC folder, drawn the same way on one frozen at the top.
 _QTS_CARET = "origenerator/gui/folder_tree.py: icon QStyle.PrimitiveElement.PE_IndicatorBranch"
-_A_REVEALS_SCROLL = "origenerator/gui/pane_place.py: spacing REVEAL_MARGIN = 40"
-_THE_BRACKETS_ROUND_A_COMBINATION = ("origenerator/gui/combination.py: text size "
-                                     "enclosing.setPixelSize(max(1, int(side * _PAREN_HEIGHT_SHARE)))")
-_THE_APP_ICONS_CORNER = "origenerator/icon_design.py: spacing CORNER_RADIUS = 5"
+_A_REVEALS_SCROLL_DISTANCE_NEVER_DRAWN = (
+    "origenerator/gui/pane_place.py: spacing REVEAL_MARGIN = 40")
+_BRACKETS_SIZED_TO_WHAT_THEY_ENCLOSE = (
+    "origenerator/gui/combination.py: text size "
+    "enclosing.setPixelSize(max(1, int(side * _PAREN_HEIGHT_SHARE)))")
+_THE_APP_ICONS_CORNER_SHARED_UI_CHECKS_ITSELF = (
+    "origenerator/icon_design.py: spacing CORNER_RADIUS = 5")
 # Not drawn: the mark ComfyUI's WAN text reader puts where each word starts, as its own vocabulary spells it.
 _UMT5S_WORD_START = "origenerator/prompt_tokens.py: symbol ▁ (U+2581 LOWER ONE EIGHTH BLOCK)"
 
 
 def test_everything_origenerator_draws_with_comes_from_shared_ui():
     assert_the_look_is_shared_uis(_CHECKOUT, [_CHECKOUT / "origenerator", _CHECKOUT / "tools"],
-                                  allowing=(_THE_POSE_MODELS_LETTERBOX, _QTS_TAB_LABEL_GAP, _A_REVEALS_SCROLL,
-                                            _THE_BRACKETS_ROUND_A_COMBINATION, _THE_APP_ICONS_CORNER,
+                                  allowing=(_THE_POSE_MODELS_LETTERBOX, _QTS_TAB_LABEL_GAP,
+                                            _A_REVEALS_SCROLL_DISTANCE_NEVER_DRAWN,
+                                            _BRACKETS_SIZED_TO_WHAT_THEY_ENCLOSE,
+                                            _THE_APP_ICONS_CORNER_SHARED_UI_CHECKS_ITSELF,
                                             _UMT5S_WORD_START, _QTS_CARET))

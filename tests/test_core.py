@@ -996,10 +996,14 @@ def test_reopening_a_normal_window_stays_normal(qtbot, tmp_path):
     assert not reopened.isMaximized()
 
 
+def _least_width_once_shown_and_laid_out(win) -> int:
+    win.show()
+    return max(win.minimumWidth(), win.minimumSizeHint().width())
+
+
 def test_window_can_shrink_to_tile_into_a_monitor_half(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
-    win.show()
-    effective_min_width = max(win.minimumWidth(), win.minimumSizeHint().width())
+    effective_min_width = _least_width_once_shown_and_laid_out(win)
     assert effective_min_width <= 704, (
         "a tiling window manager snaps windows into a third of a 2560 pixel monitor (about 853) "
         "or half of a 1440 pixel portrait monitor (about 720); the window with its frame (about "
@@ -1024,18 +1028,16 @@ def test_window_still_tiles_while_showing_an_images_versions(qtbot, tmp_path):
                                                 "enhance_steps": 20}}]),
     )
     row = db.get_generation("img1")
-    win.show()
     win._gallery_view._generate_pane.current_generate_tab().show_saved_generation(row, [row])
 
-    effective_min_width = max(win.minimumWidth(), win.minimumSizeHint().width())
+    effective_min_width = _least_width_once_shown_and_laid_out(win)
     assert effective_min_width <= 704
 
 
 def test_window_still_tiles_with_a_generate_tab_open(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
-    win.show()
     win._gallery_view._generate_pane.open_config("wan22_i2v", {"positive_prompt": "x"})
-    effective_min_width = max(win.minimumWidth(), win.minimumSizeHint().width())
+    effective_min_width = _least_width_once_shown_and_laid_out(win)
     assert effective_min_width <= 704
 
 

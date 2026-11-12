@@ -1795,8 +1795,8 @@ def _held(mime) -> tuple:
 def _brought_over(pane, mime):
     """A drag of ``mime`` brought over ``pane`` and held there. Qt hands a
     drag's later events to the widget that took its first."""
-    QApplication.sendEvent(pane, QDragEnterEvent(QPoint(5, 5), *_held(mime)))
-    QApplication.sendEvent(pane, QDragMoveEvent(QPoint(5, 5), *_held(mime)))
+    QApplication.sendEvent(pane, QDragEnterEvent(QPointF(5, 5), *_held(mime)))
+    QApplication.sendEvent(pane, QDragMoveEvent(QPointF(5, 5), *_held(mime)))
 
 
 def _dropped_on(pane, mime):

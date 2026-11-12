@@ -13,7 +13,7 @@ def let_go_over(widget: QWidget, prompt_id: str) -> QDragEnterEvent:
     at = QPointF(widget.rect().center())
     held = (Qt.DropAction.CopyAction, mime, Qt.MouseButton.LeftButton,
             Qt.KeyboardModifier.NoModifier)
-    enter = QDragEnterEvent(at.toPoint(), *held)
+    enter = QDragEnterEvent(at, *held)
     QApplication.sendEvent(widget, enter)
     if enter.isAccepted():
         QApplication.sendEvent(widget, QDropEvent(at, *held))

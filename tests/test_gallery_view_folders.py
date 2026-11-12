@@ -212,7 +212,7 @@ def test_dropping_a_folder_onto_a_custom_folder_adds_it(qtbot):
 def _drop_on(row, mime) -> bool:
     tree = row.treeWidget()
     spot = QPointF(tree.visualRect(tree.indexFromItem(row)).center())
-    move = QDragMoveEvent(spot.toPoint(), Qt.DropAction.CopyAction, mime,
+    move = QDragMoveEvent(spot, Qt.DropAction.CopyAction, mime,
                           Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
     tree.dragMoveEvent(move)
     tree.dropEvent(QDropEvent(spot, Qt.DropAction.CopyAction, mime,
@@ -261,7 +261,7 @@ def test_a_folder_of_your_own_refuses_an_item_no_folder_shows(qtbot):
 def _drop_in_the_middle_pane(view, mime, source=None) -> bool:
     pane = view._scroll.viewport()
     spot = QPointF(pane.rect().center())
-    held = (spot.toPoint(), Qt.DropAction.CopyAction, mime,
+    held = (spot, Qt.DropAction.CopyAction, mime,
             Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
     enter, move = QDragEnterEvent(*held), QDragMoveEvent(*held)
     drop = QDropEvent(spot, *held[1:])

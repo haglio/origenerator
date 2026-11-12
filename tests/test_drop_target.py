@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPointF, Qt
 from PySide6.QtGui import QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent
 from PySide6.QtWidgets import QApplication, QWidget
 
@@ -42,7 +42,7 @@ def test_a_pane_lights_while_a_drag_it_would_take_is_under_way(qtbot):
 
 
 def _hold_over(pane, mime):
-    held = (pane.viewport().rect().center(), Qt.DropAction.CopyAction, mime,
+    held = (QPointF(pane.viewport().rect().center()), Qt.DropAction.CopyAction, mime,
             Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
     for event in (QDragEnterEvent(*held), QDragMoveEvent(*held)):
         QApplication.sendEvent(pane.viewport(), event)

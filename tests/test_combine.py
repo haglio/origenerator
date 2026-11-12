@@ -59,7 +59,7 @@ def _panel(qtbot, start_images=None, *, fitting=None, preview=None, uses=None):
 def _drag_over(zone, pid):
     # The event keeps only a pointer to the QMimeData, so hold it in a local.
     mime = generation_mime(pid)
-    event = QDragEnterEvent(QPoint(1, 1), Qt.DropAction.CopyAction, mime,
+    event = QDragEnterEvent(QPointF(1, 1), Qt.DropAction.CopyAction, mime,
                             Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
     zone.dragEnterEvent(event)
     return event
@@ -387,7 +387,7 @@ def test_both_drop_zones_stay_lit_while_the_drag_moves_about_between_them(qtbot)
     combine = _panel(qtbot, start_images={"vid1": "img1"})
     _drag_over(combine._between, "vid1")
     mime = generation_mime("vid1")
-    event = QDragMoveEvent(QPoint(5, 3), Qt.DropAction.CopyAction, mime,
+    event = QDragMoveEvent(QPointF(5, 3), Qt.DropAction.CopyAction, mime,
                            Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
 
     combine._between.dragMoveEvent(event)

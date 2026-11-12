@@ -1051,10 +1051,7 @@ def _drag_event(queue, kind, key, at_row, *, on_top_half=True):
     mime = QMimeData()
     mime.setData(QUEUE_ROW_MIME, key.encode())
     _HELD_MIME.append(mime)
-    # QDropEvent takes a QPointF; QDragMoveEvent still takes a QPoint.
-    point = row.mapTo(queue, inside)
-    return kind(QPointF(point) if kind.__name__ == "QDropEvent" else point,
-                Qt.DropAction.MoveAction, mime,
+    return kind(QPointF(row.mapTo(queue, inside)), Qt.DropAction.MoveAction, mime,
                 Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
 
 

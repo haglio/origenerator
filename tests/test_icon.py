@@ -17,5 +17,5 @@ def test_committed_icon_matches_the_generator(qapp):
     master = Image.open(ICON_PATH).convert("RGBA")
     assert master.size == (CANVAS, CANVAS)
     assert master.tobytes() == render_icon(CANVAS).tobytes(), (
-        "icon.ico is made by origenerator/icon_design.py, so after a change to the design it is "
-        "made again with: python -c \"from origenerator.icon_design import main; main()\"")
+        f"icon.ico is made by {render_icon.__module__}, so after a change to the design it is "
+        f"made again with: python -c \"from {render_icon.__module__} import main; main()\"")

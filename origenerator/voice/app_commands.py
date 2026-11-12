@@ -31,6 +31,7 @@ class AppCommand(Enum):
     DRIVE_ON = "drive_on"
     DRIVE_OFF = "drive_off"
     MIC_OFF = "mic_off"
+    SWITCH = "switch"
 
     ENHANCED_ON = "enhanced_on"
     ENHANCED_OFF = "enhanced_off"
@@ -109,6 +110,7 @@ for _words, (_toggle, _on, _off) in (
         _say(_on, f"{_word} on")
         _say(_off, f"{_word} off")
 _say(AppCommand.MIC_OFF, "mic off", "voice off")
+_say(AppCommand.SWITCH, "switch")
 # Whisper writes the letters either way: "osr two" or "o s r two".
 _say(AppCommand.DRIVE_OFF, "osr two off", "o s r two off")
 for _osr2 in ("osr two", "o s r two"):
@@ -162,6 +164,7 @@ SWITCHES: dict[AppCommand, tuple[str, bool | None, str]] = {
     AppCommand.MIC_OFF: (MIC_SWITCH, False, "the mic"),
 }
 SWITCHES_A_HOST_HOLDS = (RADIO_SWITCH, DRIVE_SWITCH, MIC_SWITCH)
+_STANDALONES_ALONE = frozenset({AppCommand.EXPERIMENTS, AppCommand.SWITCH})
 
 _BARS = ("speed", "amp", "center")
 _TENS: dict[str, int] = {
@@ -196,7 +199,7 @@ def spoken_phrases() -> frozenset[str]:
 def _answered_when_hosted(command: AppCommand | BarSetting | GoToCollection) -> bool:
     if isinstance(command, GoToCollection):
         return collection(command.key).voice.answered_when_hosted
-    if isinstance(command, BarSetting) or command in MOTION_MOVES:
+    if isinstance(command, BarSetting) or command in MOTION_MOVES or command in _STANDALONES_ALONE:
         return False
     return command not in SWITCHES or SWITCHES[command][0] not in SWITCHES_A_HOST_HOLDS
 

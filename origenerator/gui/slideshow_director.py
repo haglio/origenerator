@@ -12,8 +12,7 @@ from funestra.hud_placement import HudCorner
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.volume import VolumeHud
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QApplication, QWidget
-from shared_ui.orientation import orientation_of_size as shape_of_size
+from PySide6.QtWidgets import QWidget
 
 from origenerator import gallery
 from origenerator.config import FRAMES_BEING_MADE_DIR, OUTPUT_PLACES
@@ -66,6 +65,7 @@ from origenerator.gui.slideshow_wiring import (
     Showing,
     SlideshowActions,
 )
+from origenerator.gui.two_screens import TwoScreens
 from origenerator.item_shape import (
     filter_rows,
     row_shape,
@@ -146,16 +146,6 @@ def _place_of(prompt_id: str, items) -> int | None:
     return next((index for index, item in enumerate(items) if item[2] == prompt_id), None)
 
 
-def _screens():
-    return QApplication.screens()
-
-
-def _monitor_shaped(shape: str):
-    return next((screen for screen in _screens()
-                 if shape_of_size(screen.geometry().width(),
-                                        screen.geometry().height()) == shape), None)
-
-
 def _place_among(kept, state: SlideshowState) -> SlideshowState:
     order = tuple(prompt_id for prompt_id in state.order if prompt_id in kept)
     if state.current in kept:
@@ -218,6 +208,8 @@ class SlideshowDirector:
         self._osr2 = surroundings.osr2
         self._job_queue = surroundings.job_queue
         fun_time = self._fun_time = surroundings.fun_time
+        self.two_screens = surroundings.two_screens or TwoScreens()
+        self.two_screens.switched.connect(self._keep_the_slideshow_off_cores_monitor)
         self._slideshow = None
         self._standalone_shape: str | None = None
         self._standalone_window_shape: str | None = None
@@ -591,7 +583,8 @@ class SlideshowDirector:
         return view.slideshow
 
     def _show_on_its_monitor(self, view, *, built: bool) -> None:
-        monitor = _monitor_shaped(self._standalone_window_shape)
+        self.two_screens.put_the_slideshow_on(self._standalone_window_shape)
+        monitor = self.two_screens.slideshows_monitor()
         if monitor is not None and (built or view.screen().geometry() != monitor.geometry()):
             if view.isFullScreen():
                 view.showNormal()
@@ -600,6 +593,16 @@ class SlideshowDirector:
             view.showFullScreen()
         elif built or view.isMinimized():
             view.showFullScreen()
+
+    def switch_sides(self) -> None:
+        if self._fun_time is None:
+            self.two_screens.switch()
+
+    def _keep_the_slideshow_off_cores_monitor(self) -> None:
+        up = self._window_up() if self._fun_time is None else None
+        if up is not None:
+            self._standalone_window_shape = self.two_screens.slideshow_on()
+            self._show_on_its_monitor(up.shown, built=False)
 
     def items_of(self, rows) -> list:
         return self._library().slides_of(rows)

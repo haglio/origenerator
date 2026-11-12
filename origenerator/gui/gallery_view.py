@@ -169,6 +169,7 @@ from origenerator.gui.toc_editing import (
     names_of_the_picked_folders,
     saved_custom_collection,
 )
+from origenerator.gui.two_screens import TwoScreens
 from origenerator.gui.voice_router import VoiceRouter, VoiceSources, VoiceSwitches
 from origenerator.item_names import ItemNames
 from origenerator.item_shape import (
@@ -247,6 +248,7 @@ class GalleryView(QWidget):
         self._db = db
         self._prompt_heights = shared.prompt_heights
         self._inbox = shared.inbox or evolver_export.default_inbox()
+        self._two_screens = shared.two_screens or TwoScreens(self)
         self._client = client
         self._fun_time = fun_time
         self._radio = shared.radio if shared.radio is not None else OrigeneratorRadio()
@@ -392,7 +394,8 @@ class GalleryView(QWidget):
             DirectorSurroundings(
                 pace=self._pace, motion=self.osr2.motion, osr2=self.osr2,
                 job_queue=self.job_queue, fun_time=self._fun_time,
-                radio=self._radio, buttons_of=lambda: self._buttons))
+                radio=self._radio, buttons_of=lambda: self._buttons,
+                two_screens=self._two_screens))
         self._gallery_pane.slideshow_requested.connect(self._slideshows.open_on_tile)
         self._combine = CombineController(
             self,
@@ -509,7 +512,7 @@ class GalleryView(QWidget):
                 pause_or_play=self._slideshows.pause_or_play_the_room,
                 quit=self.quit_asked.emit,
             ),
-            hosted=self._fun_time is not None,
+            hosted=self._fun_time is not None, two_screens=self._two_screens,
         )
         gallery_column.addLayout(_top_section(self._folder_path, self._buttons, self._folder_actions))
         self._experiments_cb = TickControl("Run experiments while the app is closed")

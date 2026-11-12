@@ -22,6 +22,7 @@ from origenerator.gui import icons, omnipause
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.link_tip import LinkTip, link
 from origenerator.gui.reference_window import ReferenceWindow
+from origenerator.gui.two_screens import LEFT, TwoScreens
 
 
 def _lit(color: str) -> str:
@@ -127,13 +128,25 @@ def _lit_switch(icon, tooltip: str, handler) -> QToolButton:
     return switch
 
 
+def _reference_button() -> QToolButton:
+    button = QToolButton()
+    button.setIcon(icons.question_icon())
+    button.setToolTip(REFERENCE_WINDOW_TITLE)
+    button.setCheckable(True)
+    button.setStyleSheet(_LIT)
+    ReferenceWindow(button)
+    return button
+
+
 def _group_gap() -> QWidget:
     return QWidget()
 
 
 class GalleryPaneButtons(QWidget):
-    def __init__(self, handlers: ButtonHandlers, *, hosted: bool):
+    def __init__(self, handlers: ButtonHandlers, *, hosted: bool,
+                 two_screens: TwoScreens | None = None):
         super().__init__()
+        self._two_screens = two_screens or TwoScreens(self)
         policy = self.sizePolicy()
         policy.setHeightForWidth(True)  # Qt's column above gives it the rows it asks for only with this
         self.setSizePolicy(policy)
@@ -164,6 +177,7 @@ class GalleryPaneButtons(QWidget):
         self.play_pause = None
         self.power = None
         self.reference = None
+        self.switch = None
         if not hosted:
             self.power = _tool_button(icons.power_icon(), "Quit", handlers.quit)
             self.play_pause = _tool_button(icons.pause_icon(), "", handlers.pause_or_play,
@@ -171,12 +185,7 @@ class GalleryPaneButtons(QWidget):
             self.play_pause.setCheckable(True)
             self.play_pause.setStyleSheet(_LIT)
             omnipause.holds(self.play_pause)
-            self.reference = QToolButton()
-            self.reference.setIcon(icons.question_icon())
-            self.reference.setToolTip(REFERENCE_WINDOW_TITLE)
-            self.reference.setCheckable(True)
-            self.reference.setStyleSheet(_LIT)
-            ReferenceWindow(self.reference)
+            self.reference = _reference_button()
             self.radio = _tool_button(
                 icons.radio_icon(),
                 f"Origenerator Radio: play {RADIO_STATIONS} library videos at once, "
@@ -192,6 +201,7 @@ class GalleryPaneButtons(QWidget):
                 "hands”, “animate as kino”)",
                 handlers.toggle_mic,
             )
+            self.switch = self._switch_between_the_monitors()
         layout = FlowLayout(self)
         self._groups: list[tuple[QWidget, tuple[QToolButton, ...]]] = []
         for listed in (
@@ -200,7 +210,7 @@ class GalleryPaneButtons(QWidget):
             (self.group,),
             (self.favorite, self.enhance, self.delete),
             (self.slideshow, self.populate, self.radio),
-            (self.power, self.play_pause, self.reference, self.mic),
+            (self.power, self.play_pause, self.reference, self.mic, self.switch),
         ):
             buttons = tuple(b for b in listed if b is not None)
             gap = _group_gap()
@@ -208,7 +218,7 @@ class GalleryPaneButtons(QWidget):
             for button in buttons:
                 layout.addWidget(button)
             self._groups.append((gap, buttons))
-        self._show_the_gaps()
+        self._point_the_switch_where_core_would_move()
         self._draw_at_the_huds_scale(hosted=hosted)
 
     def _draw_at_the_huds_scale(self, *, hosted: bool) -> None:
@@ -223,14 +233,30 @@ class GalleryPaneButtons(QWidget):
 
     def become_hosted(self) -> None:
         self._draw_at_the_huds_scale(hosted=True)
-        self._room_switches = (self.radio, self.mic, self.play_pause, self.power, self.reference)
+        self._room_switches = (self.radio, self.mic, self.play_pause, self.power, self.reference,
+                               self.switch)
         self._show_the_room_switches(False)
         self.radio = self.mic = self.play_pause = self.power = self.reference = None
+        self.switch = None
 
     def become_standalone(self) -> None:
         self._draw_at_the_huds_scale(hosted=False)
-        self.radio, self.mic, self.play_pause, self.power, self.reference = self._room_switches
+        (self.radio, self.mic, self.play_pause, self.power, self.reference,
+         self.switch) = self._room_switches
         self._show_the_room_switches(True)
+        self._point_the_switch_where_core_would_move()
+
+    def _switch_between_the_monitors(self) -> QToolButton:
+        self._two_screens.switched.connect(self._point_the_switch_where_core_would_move)
+        return _tool_button(icons.switch_icon(LEFT), "Switch Core and the slideshow",
+                            self._two_screens.switch)
+
+    def _point_the_switch_where_core_would_move(self) -> None:
+        direction = self._two_screens.core_would_move()
+        if self.switch is not None:
+            self.switch.setVisible(direction is not None)
+            self.switch.setIcon(icons.switch_icon(direction or LEFT))
+        self._show_the_gaps()
 
     def turn_the_radio_on(self) -> None:
         if self.radio is not None:

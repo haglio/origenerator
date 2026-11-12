@@ -62,6 +62,7 @@ def _core() -> ReferenceSection:
         )),
         ReferenceGroup("Voice control", (
             _row("stop listening", said=_said(AppCommand.MIC_OFF)),
+            _row("switch Core and the slideshow", said=_said(AppCommand.SWITCH)),
             _row("Request — say what to change about the image on screen, and end with “over”",
                  said=LEAD_WORDS[:1]),
         )),

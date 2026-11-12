@@ -9,7 +9,7 @@ from shared_ui.reference import REFERENCE_WINDOW_TITLE, ReferenceDialog
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ICON_INSET, BUTTON_ROW_GAP, BUTTON_SIZE_HUD
 
 from origenerator import ui_scale
-from origenerator.gui import omnipause
+from origenerator.gui import icons, omnipause, two_screens
 from origenerator.gui.gallery_pane_buttons import (
     POPULATE_ELSEWHERE_TIP,
     Button,
@@ -18,6 +18,8 @@ from origenerator.gui.gallery_pane_buttons import (
     GalleryPaneButtons,
 )
 from origenerator.gui.stylesheet import build_stylesheet
+from origenerator.gui.two_screens import TwoScreens
+from tests.his_monitors import HIS_TWO_MONITORS
 from tests.lit_switches import lit_in
 
 
@@ -37,8 +39,8 @@ def _state(**overrides) -> ButtonStates:
 
 @pytest.fixture
 def buttons(qtbot):
-    def build(handlers=None, *, hosted=False):
-        made = GalleryPaneButtons(handlers or _handlers(), hosted=hosted)
+    def build(handlers=None, *, hosted=False, sides=None):
+        made = GalleryPaneButtons(handlers or _handlers(), hosted=hosted, two_screens=sides)
         qtbot.addWidget(made)
         return made
     return build
@@ -210,11 +212,12 @@ def test_the_buttons_stand_in_groups_by_what_they_are_about(buttons):
         (made.group,),
         (made.favorite, made.enhance, made.delete),
         (made.slideshow, made.populate, made.radio),
-        (made.power, made.play_pause, made.reference, made.mic),
+        (made.power, made.play_pause, made.reference, made.mic, made.switch),
     ], ("an icon-only row reads by its groups, a button's neighbors saying as much about it as "
         "its glyph: where you are, what you did, the picked folders, what is in front, what the "
         "app is doing, and the room's own Quit, play/pause, reference and Listen, grouped as Fun "
-        "Time's dashboard groups them")
+        "Time's dashboard groups them, with the switch between the two monitors where he asked "
+        "for it, in that bank")
 
 
 def test_space_alone_sets_the_groups_apart(buttons):
@@ -436,3 +439,44 @@ def test_the_question_mark_opens_the_reference_lit_blue_and_closing_the_referenc
 
 def test_a_session_s_own_reference_stands_in_for_the_room_s(buttons):
     assert buttons(hosted=True).reference is None
+
+
+@pytest.fixture
+def pointed(monkeypatch):
+    drawn = []
+    real = icons.switch_icon
+    monkeypatch.setattr(icons, "switch_icon",
+                        lambda direction: drawn.append(direction) or real(direction))
+    return drawn
+
+
+def test_the_switch_points_the_way_core_would_move(buttons, monkeypatch, pointed):
+    monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)
+
+    made = buttons()
+
+    assert (pointed[-1], made.switch.isHidden()) == ("right", False)
+
+
+def test_a_press_on_the_switch_trades_the_monitors_and_turns_the_arrow_round(
+        buttons, monkeypatch, pointed):
+    monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)
+    sides = TwoScreens()
+    made = buttons(sides=sides)
+
+    made.switch.click()
+
+    assert (sides.core_on(), pointed[-1]) == ("portrait", "left")
+
+
+def test_the_switch_is_away_without_a_monitor_of_each_shape(buttons):
+    assert buttons().switch.isHidden()
+
+
+def test_a_bank_handed_back_with_one_monitor_keeps_the_switch_away(buttons):
+    taken = buttons()
+    taken.become_hosted()
+
+    taken.become_standalone()
+
+    assert taken.switch.isHidden()

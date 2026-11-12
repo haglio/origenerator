@@ -27,6 +27,7 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.shapes import BOTH
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import slideshow_director as module
+from origenerator.gui import two_screens
 from origenerator.gui.message import FAVORITE, INFO, WARNING
 from origenerator.gui.slideshow_director import (
     Carrying,
@@ -47,6 +48,7 @@ from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
 from origenerator.video_records import FiledLoops
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.slideshow_commands import SlideshowCommand
+from tests.his_monitors import HIS_TWO_MONITORS, LANDSCAPE_MONITOR, PORTRAIT_MONITOR
 from tests.real_db import database_of, on_disk
 from tests.slideshow_hud_support import open_both_shapes
 
@@ -57,10 +59,6 @@ _HELD_ON_G1 = SlideshowState(order=("g2", "g1"), current="g1", locked=True)
 ALL_LANDSCAPE = shaped_key(gallery.ALL_KEY, LANDSCAPE)
 LATEST_PORTRAIT = shaped_key(LATEST_KEY, PORTRAIT)
 LATEST_LANDSCAPE = shaped_key(LATEST_KEY, LANDSCAPE)
-PORTRAIT_MONITOR = QRect(2560, 0, 1440, 2560)
-LANDSCAPE_MONITOR = QRect(0, 0, 2560, 1440)
-HIS_TWO_MONITORS = [SimpleNamespace(geometry=lambda: LANDSCAPE_MONITOR),
-                    SimpleNamespace(geometry=lambda: PORTRAIT_MONITOR)]
 TALL = {"width": 832, "height": 1216}
 WIDE = {"width": 1216, "height": 832}
 
@@ -597,7 +595,7 @@ def slideshows(monkeypatch):
     monkeypatch.setattr(module.SlideshowDirector, "_wear_the_hud", lambda self, view, shape: None)
     monkeypatch.setattr(module, "place_window_in_device_pixels",
                         lambda *args: None)
-    monkeypatch.setattr(module, "_screens", list)
+    monkeypatch.setattr(two_screens, "screens", list)
 
     def build(host=None, *, db=None, gallery_pane=None, fun_time=None, records=None):
         host = host or FakeHost()
@@ -926,7 +924,7 @@ def test_a_slideshow_taken_over_on_an_item_of_the_other_shape_goes_on_from_the_n
                                                 (LANDSCAPE, LANDSCAPE_MONITOR)])
 def test_a_slideshow_on_its_own_opens_full_screen_on_the_monitor_of_its_shape(
         slideshows, monkeypatch, shape, monitor):
-    monkeypatch.setattr(module, "_screens", lambda: HIS_TWO_MONITORS)
+    monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)
     director, _host, made = slideshows()
 
     director.open([("a.png", "image", "g1", None)], shape=shape)
@@ -940,7 +938,7 @@ def test_a_slideshow_on_its_own_opens_full_screen_on_the_monitor_of_its_shape(
                                                   ((TALL, WIDE), LANDSCAPE_MONITOR)])
 def test_a_slideshow_of_both_shapes_opens_on_the_monitor_most_of_its_items_fit(
         slideshows, monkeypatch, shapes, monitor):
-    monkeypatch.setattr(module, "_screens", lambda: HIS_TWO_MONITORS)
+    monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)
     director, _host, made = slideshows()
     rows = [_shaped(f"g{n}", params) for n, params in enumerate(shapes)]
 
@@ -954,7 +952,7 @@ def test_a_slideshow_of_both_shapes_opens_on_the_monitor_most_of_its_items_fit(
                                                   ((WIDE, WIDE, TALL), PORTRAIT_MONITOR)])
 def test_a_slideshow_of_both_shapes_opened_on_an_item_goes_to_that_items_monitor(
         slideshows, monkeypatch, shapes, monitor):
-    monkeypatch.setattr(module, "_screens", lambda: HIS_TWO_MONITORS)
+    monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)
     director, _host, made = slideshows()
     rows = [_shaped(f"g{n}", params) for n, params in enumerate(shapes)]
 
@@ -966,7 +964,7 @@ def test_a_slideshow_of_both_shapes_opened_on_an_item_goes_to_that_items_monitor
 
 def test_a_slideshow_of_both_shapes_coming_back_to_an_item_goes_to_that_items_monitor(
         slideshows, monkeypatch):
-    monkeypatch.setattr(module, "_screens", lambda: HIS_TWO_MONITORS)
+    monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)
     director, _host, made = slideshows()
     rows = [_shaped(f"g{n}", params) for n, params in enumerate((TALL, TALL, WIDE))]
 
@@ -979,7 +977,7 @@ def test_a_slideshow_of_both_shapes_coming_back_to_an_item_goes_to_that_items_mo
 
 def test_a_slideshow_of_the_other_shape_asked_for_while_one_is_up_moves_to_its_monitor(
         slideshows, monkeypatch):
-    monkeypatch.setattr(module, "_screens", lambda: HIS_TWO_MONITORS)
+    monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)
     director, _host, made = slideshows()
     director.open([("a.png", "image", "g1", None)], shape=LANDSCAPE)
 
@@ -991,7 +989,7 @@ def test_a_slideshow_of_the_other_shape_asked_for_while_one_is_up_moves_to_its_m
 
 
 def test_a_slideshow_asked_for_again_on_the_monitor_it_is_on_stays_put(slideshows, monkeypatch):
-    monkeypatch.setattr(module, "_screens", lambda: HIS_TWO_MONITORS)
+    monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)
     director, _host, made = slideshows()
     director.open([("a.png", "image", "g1", None)], shape=PORTRAIT)
 
@@ -1000,9 +998,55 @@ def test_a_slideshow_asked_for_again_on_the_monitor_it_is_on_stays_put(slideshow
     assert made[0].shown.fullscreen == 1
 
 
+def test_a_slideshow_opening_on_the_monitor_core_is_on_sends_core_to_the_other(
+        slideshows, monkeypatch):
+    monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)
+    director, _host, _made = slideshows()
+
+    director.open([("a.png", "image", "g1", None)], shape=LANDSCAPE)
+
+    assert director.two_screens.core_on() == PORTRAIT
+
+
+def test_a_switch_moves_the_slideshow_up_to_the_monitor_core_left(slideshows, monkeypatch):
+    monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)
+    director, _host, made = slideshows()
+    director.open([("a.png", "image", "g1", None)], shape=PORTRAIT)
+
+    director.two_screens.switch()
+
+    assert (made[0].shown.geometry, made[0].shown.isFullScreen()) == (
+        LANDSCAPE_MONITOR.getRect(), True)
+
+
+def test_asked_to_switch_sides_on_its_own_it_trades_the_monitors(slideshows):
+    director, _host, _made = slideshows()
+
+    director.switch_sides()
+
+    assert director.two_screens.core_on() == PORTRAIT
+
+
+def test_asked_to_switch_sides_in_a_session_it_leaves_core_where_it_was(slideshows):
+    director, _host, _made = slideshows(fun_time=FakeSession())
+
+    director.switch_sides()
+
+    assert director.two_screens.core_on() == LANDSCAPE
+
+
+def test_a_switch_with_no_slideshow_up_opens_none(slideshows, monkeypatch):
+    monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)
+    director, _host, made = slideshows()
+
+    director.two_screens.switch()
+
+    assert made == []
+
+
 def test_a_slideshow_with_no_monitor_of_its_shape_opens_full_screen_where_it_always_did(
         slideshows, monkeypatch):
-    monkeypatch.setattr(module, "_screens", lambda: HIS_TWO_MONITORS[:1])
+    monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS[:1])
     director, _host, made = slideshows()
 
     director.open([("a.png", "image", "g1", None)], shape=PORTRAIT)

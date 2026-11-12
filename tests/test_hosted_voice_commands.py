@@ -63,6 +63,7 @@ def test_a_hosting_session_is_told_every_action_a_video_can_have_and_how_each_is
 @pytest.mark.parametrize("phrase", [
     "experiments", "experiment", "show experiments", "experiments collection",
     "play slideshow", "start slideshow", "pause slideshow", "stop slideshow", "stop slide show",
+    "switch",
 ])
-def test_a_hosting_session_does_not_hear_the_experiments_or_the_slideshows_play_pause_and_stop(phrase):
+def test_a_hosting_session_does_not_hear_what_only_a_standalone_app_answers(phrase):
     assert phrase not in hosted_phrases()

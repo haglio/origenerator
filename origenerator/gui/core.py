@@ -33,6 +33,7 @@ from origenerator.gui.panes import RememberedBorders
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
 from origenerator.gui.toasts import Toasts
+from origenerator.gui.two_screens import TwoScreens
 from origenerator.gui.window_monitor import GEOMETRY_KEY, the_window_on
 from origenerator.win32 import (
     bring_back_into_sight,
@@ -83,6 +84,7 @@ SESSION_UI_STATE = (
 
 _PROMPT_HEIGHTS_KEY = "prompt_heights"
 _PANE_SIZES_KEY = "pane_sizes"
+_CORE_ON_KEY = "core_on"
 _KEYS_THE_SESSION_OWNS = frozenset(
     {"audio_enabled", "osr2_enabled", "mic_enabled", "max_intensity", "motion", "slideshows"})
 
@@ -126,9 +128,13 @@ class Core(QMainWindow):
         if fun_time is not None:
             self._wear_the_session(fun_time)
 
+        self._sides = TwoScreens(self)
+        self._sides.put_core_on(app_state.get(_CORE_ON_KEY))
+        self._sides.switched.connect(self._fill_its_monitor)
         self._gallery_view = GalleryView(db, client=client, fun_time=fun_time,
                                          shared=Shared(prompt_heights=PROMPT_HEIGHTS, inbox=inbox,
-                                                       device_waits_for_the_window=True))
+                                                       device_waits_for_the_window=True,
+                                                       two_screens=self._sides))
         self.setCentralWidget(self._gallery_view)
         self._toasts = Toasts(self.windowIcon(), parent=self, shown_as=preview,
                                        video_in_front=self._gallery_view.video_in_front)
@@ -164,6 +170,7 @@ class Core(QMainWindow):
     def _restore_session(self):
         if self._fun_time is None or self._fun_time.in_a_headset:
             self._restore_geometry()
+        self._fill_its_monitor()
         for key, _getter, setter in SESSION_UI_STATE:
             setter(self._gallery_view, self._app_state.get(key))
         self._borders.take(self._app_state.get(_PANE_SIZES_KEY))
@@ -188,6 +195,19 @@ class Core(QMainWindow):
             return
         with contextlib.suppress(ValueError):
             self.restoreGeometry(QByteArray(base64.b64decode(blob)))
+
+    def _fill_its_monitor(self) -> None:
+        monitor = self._sides.cores_monitor()
+        if self._fun_time is not None or monitor is None:
+            return
+        shown = self.isVisible()
+        self.setWindowState(self.windowState() & ~(Qt.WindowState.WindowMaximized
+                                                   | Qt.WindowState.WindowFullScreen))
+        if not self.windowFlags() & Qt.WindowType.FramelessWindowHint:
+            self.setWindowFlags(self.windowFlags() | Qt.WindowType.FramelessWindowHint)
+        self.setGeometry(monitor.availableGeometry())
+        if shown:
+            self.show()
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -283,6 +303,7 @@ class Core(QMainWindow):
         self._borders.put_back()
         self._gallery_view.set_mic_enabled(self._app_state.get("mic_enabled"))
         self._stand_where_found(*self._found)
+        self._fill_its_monitor()
         self.handed_back.emit()
 
     def _stand_where_found(self, geometry: QByteArray, scale: float, minimized: bool) -> None:
@@ -360,6 +381,7 @@ class Core(QMainWindow):
         if self._fun_time is None:
             self._borders.keep_where_they_are()
         self._app_state.set(_PANE_SIZES_KEY, self._borders.sizes())
+        self._app_state.set(_CORE_ON_KEY, self._sides.core_on())
         if self._fun_time is None and self.isVisible():
             self._app_state.set(
                 GEOMETRY_KEY,

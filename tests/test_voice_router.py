@@ -147,6 +147,10 @@ class FakeSlideshows:
         self.slideshow_commands = []
         self.filters = []
         self.slide_words = []
+        self.sides_switched = 0
+
+    def switch_sides(self):
+        self.sides_switched += 1
 
     def surface_for(self, shape):
         return self.by_shape.get(shape) if shape is not None else self.showing
@@ -1124,3 +1128,11 @@ def test_a_requests_answer_on_the_caption_stays_up_long_enough_to_be_read(router
     voice._answer_request(None, long_answer, Spoken("a beach"))
 
     assert voice._flash_timer.interval() > short
+
+
+def test_the_word_switch_trades_the_monitors_core_and_the_slideshow_are_on(router):
+    voice, _host, slideshows = router()
+
+    voice.on_command(AppCommand.SWITCH)
+
+    assert slideshows.sides_switched == 1

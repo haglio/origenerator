@@ -348,6 +348,13 @@ class GenerationStore(Store):
             ).fetchall()
         return [as_read(r) for r in rows]
 
+    def rows_left_out(self) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM generations WHERE source IN ({', '.join('?' * len(UNLISTED))})"
+                " ORDER BY id DESC", UNLISTED).fetchall()
+        return [as_read(r) for r in rows]
+
     def rows_made_by(self, workflow_name: str) -> list[dict]:
         with self._connect() as conn:
             rows = conn.execute(

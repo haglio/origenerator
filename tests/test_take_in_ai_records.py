@@ -185,7 +185,8 @@ def test_run_from_the_command_line_it_prints_only_counts(tmp_path, capsys):
     assert main(["--db", str(db.path), "--library", str(library), "--dry-run"]) == 0
 
     assert capsys.readouterr().out.splitlines() == [
-        "records read: 2", "unreadable: 0", "no video: 0", "no row: 1", "matched: 1",
+        "records read: 2", "unreadable: 0", "no video: 0", "no row: 1", "left out of the gallery: 0",
+        "matched: 1",
         "stars added: 1", "counts written: 0", "library records written: 1", "actions added: 0",
         "settings filled in: 0"]
     assert db.get_generation("out-1")["starred"] == 0
@@ -194,3 +195,14 @@ def test_run_from_the_command_line_it_prints_only_counts(tmp_path, capsys):
 def test_the_command_line_refuses_a_gallery_that_is_not_there(tmp_path):
     assert main(["--db", str(tmp_path / "none.db"), "--library", str(tmp_path)]) == 2
     assert not (tmp_path / "none.db").exists()
+
+
+def test_a_video_whose_row_is_left_out_of_the_gallery_is_counted_apart_and_left_alone(tmp_path):
+    library, db = tmp_path / "library", Database(tmp_path / "gallery.db")
+    _outside_row(db, "out-1", _filed(library, "scene one.mp4", {"favorite": True}),
+                 source=GenerationSource.LEFT_OUT)
+
+    counts = take_in(db, library)
+
+    assert (counts["left out of the gallery"], counts["no row"], counts["matched"]) == (1, 0, 0)
+    assert db.generations.rows_left_out()[0]["starred"] == 0

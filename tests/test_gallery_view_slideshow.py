@@ -1404,7 +1404,9 @@ def test_a_run_on_screen_when_it_lands_stays_on_screen_as_its_file(qtbot, monkey
     db.get_generation("i2").update(_image("i2", "a cat", 50, 2))
     view._on_reroll_finished("some-key", "i2")
 
-    assert slideshow._set.playlist.current() == ("i2.png", "image", "i2", None)
+    assert slideshow._set.playlist.current() == ("i2.png", "image", "i2", None), (
+        "the slideshow is told the run landed before the run leaves the in-flight list, which "
+        "it would otherwise read as a run that stopped")
     slideshow.close()
 
 

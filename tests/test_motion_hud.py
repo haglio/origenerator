@@ -67,4 +67,6 @@ def test_space_reaches_the_switch_it_is_given_rather_than_the_motions_own():
     apply_motion_key(motion, Qt.Key.Key_Space, on_drive_toggle=lambda: pressed.append(1))
 
     assert pressed == [1]
-    assert motion.asked == []
+    assert motion.asked == [], (
+        "driving the OSR2 is one switch, which picks the funscript or the motion by what is "
+        "playing, so Space never starts the motion beside a script already streaming")

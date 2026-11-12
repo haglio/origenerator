@@ -709,6 +709,8 @@ def test_opening_clears_the_experiments_the_last_absence_left_queued(qtbot, tmp_
 
 def test_an_opening_branch_session_clears_nothing(qtbot, tmp_path, monkeypatch):
     monkeypatch.setenv(ENV_FLAG, "1")
+    monkeypatch.setattr(downtime.config, "LIBRARY_STATE_DIR", tmp_path)
+    downtime.leave_work_for_while_closed()
     db = Database(tmp_path / "t.db")
     db.insert_generation(NewGeneration(
         prompt_id="exp-1", workflow_name="sdxl_t2i", workflow_version="v002",
@@ -721,9 +723,10 @@ def test_an_opening_branch_session_clears_nothing(qtbot, tmp_path, monkeypatch):
     win = Core(client, db, AppState(tmp_path / "ui.json"))
     qtbot.addWidget(win)
 
-    assert client.canceled == [], (
-        "a preview cancels none of the experiments the production app queued: they outlive the "
-        "preview in a queue only the app that queued them can account for")
+    assert (client.canceled, downtime.work_left()) == ([], True), (
+        "a preview leaves alone the experiments the production app queued and the work it left "
+        "for while closed: that work outlives the preview, and only the app that queued it can "
+        "account for it")
     assert client.interrupted == []
     assert db.get_generation("exp-1") is not None
 

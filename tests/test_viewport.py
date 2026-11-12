@@ -1244,6 +1244,7 @@ def test_the_player_is_torn_down_before_the_surface_it_renders_to(qapp):
 
 
 def test_only_a_player_the_pane_made_itself_is_released_as_the_app_quits(qapp, qtbot):
+    gc.collect()
     before = qapp.receivers(qapp.aboutToQuit)
     qtbot.addWidget(Viewport(player=MagicMock()))
     with_a_handed_in_player = qapp.receivers(qapp.aboutToQuit)

@@ -310,7 +310,7 @@ def test_the_enhance_panel_shows_in_the_collections_what_it_shows_on_a_folder(qt
     for which in (LATEST_KEY, FAVORITES_KEY, EXPERIMENTS_KEY):
         view._tree.setCurrentItem(_collection(view, which))
         assert view._enhance.pane.settings().params["enhance_steps"] == 33, (
-            "the enhancement settings are the app's, not a folder's, so they follow him into "
+            "the enhancement settings are the app's, not a folder's, so they follow the user into "
             "the collections as they were on the folder")
 
 

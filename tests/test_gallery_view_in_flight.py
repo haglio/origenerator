@@ -520,10 +520,14 @@ def test_canceling_a_selected_reroll_releases_the_generate_pane(qtbot, tmp_path)
     view.refresh()
     key, _job = _running_reroll(view)
     _generating_tile(view).selected.emit()
+    tab = view._generate_pane.current_generate_tab()
+    assert tab.watched_key() == key
 
     view._cancel_reroll(key)
 
     assert view._selected_reroll_key is None
+    assert tab.watched_key() is None, (
+        "once the folder has no run left, the tabs following it stop following it")
 
 
 def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
@@ -1870,7 +1874,7 @@ def test_a_setting_that_moves_the_folder_frees_generate_and_moving_back_grays_it
     qtbot.waitUntil(lambda: "already making" in tab._generate_btn.toolTip())
 
 
-def test_finishing_a_reroll_hides_the_front_tabs_cancel_button(qtbot, tmp_path):
+def _a_run_launched_from_the_front_tab(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
@@ -1880,12 +1884,30 @@ def test_finishing_a_reroll_hides_the_front_tabs_cancel_button(qtbot, tmp_path):
     tab._on_generate()
     job = next(iter(view._live_jobs.values()))
     assert tab._cancel_btn.isHidden() is False
+    return client, view, tab, job
+
+
+def test_finishing_a_reroll_hides_the_front_tabs_cancel_button(qtbot, tmp_path):
+    client, view, tab, job = _a_run_launched_from_the_front_tab(qtbot, tmp_path)
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
     assert view._live_jobs == {}
     assert tab._cancel_btn.isHidden() is True
     assert tab._generate_btn.isEnabled() is True
+
+
+def test_finishing_a_reroll_hides_the_cancel_button_of_its_tab_now_under_another(qtbot,
+                                                                                 tmp_path):
+    client, view, launcher, job = _a_run_launched_from_the_front_tab(qtbot, tmp_path)
+    in_front = view._generate_pane._add_subtab()
+
+    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
+
+    assert view._generate_pane.current_generate_tab() is in_front
+    assert launcher._cancel_btn.isHidden() is True, (
+        "every tab is set against the runs in flight, not just the front one, so a tab now "
+        "under another still shows what its own run is doing")
 
 
 def test_a_tabs_cancel_stops_its_run_and_hands_the_folder_back(qtbot, tmp_path):

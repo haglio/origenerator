@@ -35,14 +35,18 @@ class FakeDb:
     def __init__(self, rows=(), requests=()):
         self._rows = list(rows)
         self._requests = list(requests)
+        self.asked = []
 
     def list_generations(self):
+        self.asked.append("list_generations")
         return list(self._rows)
 
     def list_requests(self):
+        self.asked.append("list_requests")
         return list(self._requests)
 
     def recent_durations(self, workflow_name):
+        self.asked.append("recent_durations")
         return [30.0, 32.0, 34.0] if workflow_name == "sdxl_t2i" else []
 
 
@@ -117,8 +121,10 @@ class FakeAuto:
 class FakeTree:
     def __init__(self, groups=None):
         self.groups = groups or {}
+        self.asked = []
 
     def group_for_key(self, key):
+        self.asked.append(key)
         return self.groups.get(key)
 
 
@@ -378,3 +384,41 @@ def test_a_workflows_recent_runs_are_what_the_countdown_reads(build):
     items = build([_row("g1", status="running")])
 
     assert items[0].reading.typical_seconds == pytest.approx(32.0)
+
+
+def _three_runs_of_one_folder():
+    key = "image/sdxl_t2i/aaa"
+    pids = ("g1", "g2", "g3")
+    return _sources([_row(pid, status="running") for pid in pids],
+                    jobs=FakeJobQueue(jobs_by_folder={key: [FakeJob(pid) for pid in pids]}))
+
+
+def test_a_pass_lists_each_table_once_however_many_runs_the_queue_shows(build):
+    sources = _three_runs_of_one_folder()
+
+    build(sources=sources)
+
+    assert sorted(name for name in sources.db.asked if name.startswith("list_")) == [
+        "list_generations", "list_requests"], (
+        "the tiles are rebuilt at every poll, so a pass costs one listing of each table rather "
+        "than a lookup per run")
+
+
+def test_a_pass_reads_a_workflows_usual_time_once_for_all_its_runs(build):
+    sources = _three_runs_of_one_folder()
+
+    build(sources=sources)
+
+    assert sources.db.asked.count("recent_durations") == 1, (
+        "the tiles are rebuilt at every poll and the line often holds many runs of one "
+        "workflow, so its usual time is worked out once a pass")
+
+
+def test_a_pass_gathers_a_folders_thumbnails_once_for_all_its_runs(build):
+    sources = _three_runs_of_one_folder()
+
+    build(sources=sources)
+
+    assert sources.tree.asked == list(sources.jobs.jobs_by_folder), (
+        "the tiles are rebuilt at every poll and Auto-generate fills the line with runs of one "
+        "folder, so its thumbnails are gathered once a pass")

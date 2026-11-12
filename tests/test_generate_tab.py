@@ -1908,6 +1908,17 @@ def test_an_upscaled_videos_versions_have_no_trash_can(saved_panel, monkeypatch,
         "this list's to trash")
 
 
+def test_an_upscaled_videos_versions_offer_no_enhance_row(saved_panel, monkeypatch, tmp_path):
+    tab, db = saved_panel
+    video, _upscale = _evolver_upscaled_video(db, monkeypatch, tmp_path)
+
+    tab.show_saved_generation(video, [])
+
+    assert len(_version_rows(tab)) == 2
+    assert tab._versions._host.findChildren(_AddRow) == [], (
+        "the enhancer takes images, so a video's versions have no + Enhance row to press")
+
+
 def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
     tab, db = saved_panel
     image = _enhanced_image_row(db)
@@ -2018,18 +2029,43 @@ def test_picked_levels_are_deleted_by_filename(saved_panel):
 
     tab._versions.delete_requested.emit([0])
 
-    assert asked == [("img1", ["image_enhance_00001_.png"])]
+    assert asked == [("img1", ["image_enhance_00001_.png"])], (
+        "a position is good only while the list it was read from lasts, so a delete is passed "
+        "on by file name")
+
+
+_LEVEL_COLORS = {"image_enhance_00001_.png": "red", "sdxl_img1.png": "blue"}
+
+
+def _levels_on_disk(tmp_path, monkeypatch):
+    output_dir = tmp_path / "out"
+    (output_dir / "image").mkdir(parents=True)
+    for name, color in _LEVEL_COLORS.items():
+        level = QImage(40, 40, QImage.Format.Format_RGB32)
+        level.fill(QColor(color))
+        level.save(str(output_dir / "image" / name))
+    monkeypatch.setattr(generate_tab_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
+    return output_dir
+
+
+def test_each_level_is_drawn_from_its_own_file(saved_panel, tmp_path, monkeypatch):
+    tab, db = saved_panel
+    _levels_on_disk(tmp_path, monkeypatch)
+    image = _enhanced_image_row(db)
+
+    tab.show_saved_generation(image, [image])
+
+    drawn = [row._thumbnail.pixmap().toImage() for row in _version_rows(tab)]
+    assert [level.pixelColor(level.rect().center()).name() for level in drawn] == [
+        QColor(color).name() for color in _LEVEL_COLORS.values()], (
+        "each version is drawn from its own file, so a version shows what it actually looks like")
 
 
 def test_picking_a_level_swaps_the_preview_without_changing_the_selection(saved_panel,
                                                                           tmp_path,
                                                                           monkeypatch):
     tab, db = saved_panel
-    output_dir = tmp_path / "out"
-    (output_dir / "image").mkdir(parents=True)
-    for name in ("image_enhance_00001_.png", "sdxl_img1.png"):
-        (output_dir / "image" / name).write_bytes(b"x")
-    monkeypatch.setattr(generate_tab_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
+    output_dir = _levels_on_disk(tmp_path, monkeypatch)
 
     image = _enhanced_image_row(db)
     tab.show_saved_generation(image, [image])
@@ -2046,11 +2082,7 @@ def test_picking_a_level_swaps_the_preview_without_changing_the_selection(saved_
 def test_an_arrow_after_a_level_is_clicked_puts_the_next_level_in_the_preview(
         saved_panel, qtbot, tmp_path, monkeypatch):
     tab, db = saved_panel
-    output_dir = tmp_path / "out"
-    (output_dir / "image").mkdir(parents=True)
-    for name in ("image_enhance_00001_.png", "sdxl_img1.png"):
-        (output_dir / "image" / name).write_bytes(b"x")
-    monkeypatch.setattr(generate_tab_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
+    output_dir = _levels_on_disk(tmp_path, monkeypatch)
     image = _enhanced_image_row(db)
     tab.show_saved_generation(image, [image])
     newest = _version_rows(tab)[0]

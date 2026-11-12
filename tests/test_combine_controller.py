@@ -318,6 +318,12 @@ def _assembled(qtbot, host, parts, db):
     return controller, host
 
 
+def _on_the_real_panel(qtbot, db=None):
+    parts = CombineParts(jobs=FakeReroll(), client=_A_CLIENT, info_tabs_of=FakeTabs,
+                         slideshows=FakeSlideshows(), starting=StartingRows())
+    controller, _host = _assembled(qtbot, None, parts, db)
+    return controller
+
 
 def test_the_image_slot_takes_an_image_with_a_file_to_seed_from(combine):
     controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]))
@@ -496,14 +502,13 @@ def test_recent_leaves_out_what_the_video_slot_would_not_take(combine):
     assert _recent_under(controller, action_settings.VIDEO) == []
 
 
-def test_a_restore_puts_the_lane_in_before_the_action(combine):
-    controller, _host = combine(db=FakeDB([_image("img"), _video("clip")]))
+def test_a_restore_puts_the_lane_in_before_the_action(qtbot):
+    controller = _on_the_real_panel(qtbot, FakeDB([_image("img")]))
 
-    controller.restore({"image": "img", "video": "clip",
-                        "intent": action_settings.GENAU, "category": "alpha"})
+    controller.restore({"image": "img", "intent": action_settings.GENAU, "category": "beta"})
 
-    assert controller.widget.intent == action_settings.GENAU
-    assert controller.widget.category == "alpha", (
+    assert controller.widget.selected_intent() == action_settings.GENAU
+    assert controller.widget.selected_category() == "beta", (
         "the lane decides which actions can be answered, so it goes in before the action does")
 
 
@@ -1326,12 +1331,7 @@ def test_the_button_on_the_real_panel_reaches_the_controller(qtbot, monkeypatch)
     made = QWidget()
     qtbot.addWidget(made)
     monkeypatch.setattr(module, "the_animation_window", lambda: made)
-    parent = QWidget()
-    qtbot.addWidget(parent)
-    parts = CombineParts(
-        jobs=FakeReroll(), client=object(), info_tabs_of=FakeTabs,
-        slideshows=FakeSlideshows(), starting=StartingRows())
-    controller = CombineController(FakeHost(), parts, parent=parent, db=FakeDB())
+    controller = _on_the_real_panel(qtbot)
 
     controller.widget._defaults_btn.click()
 

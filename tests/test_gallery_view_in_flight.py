@@ -1813,7 +1813,10 @@ def test_another_image_of_the_folder_being_generated_cannot_be_generated_too(qtb
 
     tab = _click_thumbnail(view, rows["b"], image_rows)
 
-    assert tab._generating is False
+    assert tab is first
+    assert tab._generating is False, (
+        "a tab pointed at another image lets go of the run it launched, so its Generate button is "
+        "read again at once")
     assert tab._generate_btn.isEnabled() is False
 
     tab.use_random_seed()

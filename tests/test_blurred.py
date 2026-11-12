@@ -22,6 +22,16 @@ def test_the_backdrop_fills_the_space_it_is_given(qtbot, tmp_path):
     assert (backdrop.width(), backdrop.height()) == (172, 160)
 
 
+def test_a_tall_image_is_cropped_to_cover_the_plate_rather_than_barred(qtbot, tmp_path):
+    def side_lightness(name, size):
+        Image.new("RGB", size, (255, 255, 255)).save(tmp_path / name)
+        image = blurred_backdrop(str(tmp_path / name), QSize(172, 160)).toImage()
+        return [image.pixelColor(x, 80).lightness() for x in (0, 171)]
+
+    assert side_lightness("tall.png", (40, 200)) == side_lightness("plate_shaped.png", (172, 160)), (
+        "bars down a plate's sides read as an image that failed rather than as a backdrop")
+
+
 def test_nothing_to_stand_there_is_not_an_error(qtbot, tmp_path):
     assert blurred_backdrop(str(tmp_path / "gone.png"), QSize(172, 160)) is None
     assert blurred_backdrop(None, QSize(172, 160)) is None

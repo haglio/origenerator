@@ -115,7 +115,9 @@ def test_the_takeover_keeps_streaming_and_eases_its_interval_out(qtbot):
         clock.t += 0.025
         driver.poll()
     intervals = [i for _pos, i in broker.positions]
-    assert intervals == sorted(intervals, reverse=True)
+    assert all(earlier > later for earlier, later in pairwise(intervals)), (
+        "the interval eases back to the lookahead as the glide closes, so there is no step the "
+        "moment it ends")
     assert all(i >= _LOOKAHEAD_MS for i in intervals)
     clock.t += 0.5
     driver.poll()
@@ -205,11 +207,14 @@ def test_the_status_line_says_the_motion_is_stopped_but_keeps_the_bars(qtbot):
         "as the device, or the app's control of it, being off")
 
 
-def test_the_learned_motion_takes_the_motion_over_and_it_is_what_is_streamed(qtbot):
+def _one_phrase_model() -> LearnedModel:
     phrase = Phrase(tuple((500, 80 if i % 2 == 0 else 20) for i in range(16)))
+    return LearnedModel(phrases={classify(phrase): [phrase]}, seen={classify(phrase): 1})
+
+
+def test_the_learned_motion_takes_the_motion_over_and_it_is_what_is_streamed(qtbot):
     driver, broker, clock = _driver(qtbot)
-    driver.state.learned.model = LearnedModel(
-        phrases={classify(phrase): [phrase]}, seen={classify(phrase): 1})
+    driver.state.learned.model = _one_phrase_model()
     driver.start()
     driver.toggle_learned()
     assert driver.state.learned.active
@@ -515,6 +520,21 @@ def test_where_the_wave_stands_in_its_bars_is_a_fraction_of_the_way_up_from_the_
         fractions.append(motion_engine._envelope_fraction(motion))
 
     assert fractions == pytest.approx([0.0, 0.5, 1.0])
+
+
+def test_the_learned_motion_takes_over_from_where_the_wave_has_the_device():
+    motion = motion_engine.Motion()
+    motion_engine.set_bars(motion.state, speed=50, amplitude=60, center=50)
+    motion.state.playing = True
+    motion.phase = 0.25
+    where_the_wave_is = motion_engine.position(motion)
+
+    motion.learned.model = _one_phrase_model()
+    motion_engine.enable_learned_motion(motion)
+    motion_engine.tick_learned_motion(motion, now=1.0)
+
+    assert motion_engine.position(motion) == pytest.approx(where_the_wave_is), (
+        "the first phrase begins where the wave already has the device, so the takeover cannot be felt")
 
 
 def test_a_wave_with_no_amplitude_stands_at_the_floor_of_its_bars():

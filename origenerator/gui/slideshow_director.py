@@ -55,7 +55,7 @@ from origenerator.gui.hud_places import (
 from origenerator.gui.message import FAVORITE, HEARD_MARK, INFO, WARNING
 from origenerator.gui.region_openings import RegionOpening, RegionOpenings
 from origenerator.gui.regions_left import RegionLeft, restored_regions, saved_regions
-from origenerator.gui.slideshow_lock import lock_held
+from origenerator.gui.slideshow_lock import LockedOn, lock_held
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import HudWear, SlideshowView, ViewShow, ViewWiring
 from origenerator.gui.slideshow_wiring import (
@@ -496,7 +496,8 @@ class SlideshowDirector:
             enhance=self._host.enhance_from_slideshow,
             favorite=self._host.favorite_generation,
             unfavorite=partial(self._host.favorite_generation, favorite=False),
-            lock=(partial(lock_held, self._row_for, self._host.show_generation, self.items_of,
+            lock=(partial(lock_held, LockedOn(self._row_for, self._host.show_generation,
+                                              self._host.favorite_generation), self.items_of,
                           partial(tell_of_a_lock, self._session_channel, shape))
                   if self._fun_time is not None else None),
             reset=(self.reset_region if self._fun_time is not None else None),

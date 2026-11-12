@@ -1,20 +1,28 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import NamedTuple
 
 from origenerator import gallery
 from origenerator.media import MediaType
 
 
-def lock_held(row_for: Callable[[str], dict | None], show: Callable[[str], None],
-              played: Callable[[list], list], tell_the_session: Callable[[object], bool],
-              prompt_id: str) -> None:
-    row = row_for(prompt_id)
+class LockedOn(NamedTuple):
+    row_for: Callable[[str], dict | None]
+    show: Callable[[str], None]
+    star: Callable[[str], None]
+
+
+def lock_held(here: LockedOn, played: Callable[[list], list],
+              tell_the_session: Callable[[object], bool], prompt_id: str) -> None:
+    row = here.row_for(prompt_id)
     if row is None:
         return
     video = _video_played(row, played)
+    if video is not None:
+        here.star(prompt_id)
     if video is None or not tell_the_session(video):
-        show(prompt_id)
+        here.show(prompt_id)
 
 
 def _video_played(row: dict, played: Callable[[list], list]):

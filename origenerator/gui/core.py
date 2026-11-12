@@ -8,7 +8,8 @@ from dataclasses import dataclass, replace
 from app_support.loading_screen import MeetingPlace
 from PyQt6.QtCore import QByteArray, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QKeySequence, QShortcut
-from PyQt6.QtWidgets import QApplication, QMainWindow
+from PyQt6.QtWidgets import QMainWindow
+from shared_ui.application import close_the_windows_it_opened
 from shared_ui.foreground import bring_to_front
 from shared_ui.hard_to_miss import sure
 from shared_ui.preview import Preview, window_title
@@ -315,13 +316,8 @@ class Core(QMainWindow):
         _run_on_its_own(self._leave_work_for_while_closed)
         self._persist_session()
         self._gallery_view.close()
-        self._close_the_windows_it_opened()
+        close_the_windows_it_opened(self)
         super().closeEvent(event)
-
-    def _close_the_windows_it_opened(self) -> None:
-        for window in QApplication.topLevelWidgets():
-            if window is not self and window.isVisible():
-                window.close()
 
     def hand_comfyui_what_runs_while_closed(self) -> None:
         _run_on_its_own(self._gallery_view.flush_queue_to_server)

@@ -656,7 +656,9 @@ def test_a_collection_to_play_and_a_slideshow_command_go_to_the_slideshows(route
     voice.on_command(SlideshowControl(SlideshowCommand.STOP, "landscape"))
 
     assert len(slideshows.collections_played) == 1
-    assert slideshows.slideshow_commands == [(SlideshowCommand.STOP, "landscape")]
+    assert slideshows.slideshow_commands == [(SlideshowCommand.STOP, "landscape")], (
+        "the words about a slideshow are its director's, since a router that carried them "
+        "would only have to hand every one of them straight back")
 
 
 def test_a_filter_word_narrows_the_slideshow_rather_than_the_gallery(router):

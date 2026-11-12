@@ -292,6 +292,18 @@ class TestTheOneHudASlideshowWears:
 
         assert window.slideshow._set.playlist.index != before
 
+    def test_a_press_on_the_motion_row_under_a_session_still_reaches_the_motion(
+            self, qtbot, tmp_path):
+        window = self._window(qtbot)
+        channel = tmp_path / "dashboard_cmd.txt"
+        window.wear_the_hud("portrait", HudWear(dashboard_cmd_file=channel))
+
+        window.press("robot_hand_cycle_shape")
+
+        assert "shape" in window._motion.calls, (
+            "the OSR2 is this app's to drive wherever the slideshow is drawn, so the device's "
+            "presses land on this window even under a session")
+
     def _worn_on_a_device_that_is_on(self, qtbot, monkeypatch, now):
         monkeypatch.setattr("origenerator.gui.slideshow_view.osr2_device.device_mode",
                             lambda: Osr2Mode.CONTROLLED)

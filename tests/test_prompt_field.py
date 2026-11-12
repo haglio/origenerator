@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import pytest
 from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
-from PyQt6.QtGui import QMouseEvent
+from PyQt6.QtGui import QColor, QMouseEvent
 from PyQt6.QtWidgets import QLabel, QWidget
+from shared_ui.colors import BORDER_SUBTLE
 
 from origenerator.gui.prompt_boxes import set_in_use
 from origenerator.gui.prompt_field import (
@@ -68,6 +69,15 @@ def test_a_field_that_moves_under_the_pointer_mid_drag_still_follows_the_pointer
     assert field.height() == DEFAULT_HEIGHT + 80, (
         "the field moves under the pointer as it grows, so a drag measured in its own "
         "coordinates shifts mid-drag")
+
+
+def test_the_lower_edge_wears_two_short_lines(qtbot):
+    field = _field(qtbot)
+    drawn = field.viewport().grab().toImage()
+    middle, lower = field.viewport().width() // 2, field.viewport().height() - 2
+
+    assert [drawn.pixelColor(middle, y) for y in (lower, lower - 3)] == [QColor(BORDER_SUBTLE)] * 2, (
+        "a lower edge nobody can see is found only by dragging at random")
 
 
 def test_dragging_the_lower_edge_up_makes_it_shorter(qtbot):

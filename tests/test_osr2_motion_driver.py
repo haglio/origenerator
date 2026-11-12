@@ -10,8 +10,10 @@ from app_support.osr2_hold import PARK, RESUME, RETRACT
 from funestra.learned_model import LearnedModel, Phrase, classify
 from funestra.main_hud import OSR2_PARKED, OSR2_RETRACTED
 from funestra.robot_hand import RobotHandState, set_max_intensity
+from funestra.tcode import POSITION_MAX, format_tcode_command
 
 from origenerator import motion_engine
+from origenerator.osr2 import format_position
 from origenerator.osr2_motion_driver import (
     _HANDOFF_MS,
     _LOOKAHEAD_MS,
@@ -547,6 +549,9 @@ def test_a_wave_at_the_top_of_full_travel_is_at_the_top_of_the_devices_scale():
 
     assert motion_engine.position(motion) == pytest.approx(100.0), (
         "the motion answers on the 0 to 100 scale osr2.format_position turns into the device's command")
+    motion_engine.set_bars(motion.state, speed=50, amplitude=50, center=25)
+    assert format_position(motion_engine.position(motion), 0) == format_tcode_command(
+        "L0", round(POSITION_MAX / 2), 0)
 
 
 def test_a_wave_with_no_amplitude_stands_at_the_floor_of_its_bars():

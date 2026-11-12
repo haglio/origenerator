@@ -1056,7 +1056,8 @@ def test_right_clicking_the_item_asks_for_its_menu(make_preview, tmp_path):
 
     w.customContextMenuRequested.emit(QPoint(5, 5))
 
-    assert asked == ["p1"]
+    assert asked == ["p1"], (
+        "the right-click menu needs only a row to act on, so it is armed without anything to drag")
 
 
 def test_right_clicking_an_unarmed_preview_asks_for_nothing(make_preview):

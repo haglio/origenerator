@@ -51,6 +51,7 @@ from origenerator.voice.dictation import RequestDictation
 from origenerator.voice.listener import CommandAndRequestListener
 from origenerator.workflows import detail_parts
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
+from tests.closed_windows import is_closed
 from tests.conftest import FakeHearing
 from tests.gallery_view_support import (
     _REROLL_HISTORY,
@@ -494,7 +495,7 @@ def test_stopping_the_slideshow_closes_it(qtbot, tmp_path, monkeypatch, said):
 
     view._voice.listener.speak_command(said)
 
-    assert not slideshow.shown.isVisible()
+    assert is_closed(slideshow.shown)
     assert view._slideshows.showing is None
 
 

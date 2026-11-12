@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import time
 
+import shiboken6
 from funestra.funestra import User
 from funestra.funestra_verbs import PLAY_FILE, RELOAD_PLAYLIST, play_file
 from funestra.hud_overlay import HUD_OVERLAY_ID
@@ -550,3 +551,14 @@ def test_an_open_funestra_says_what_its_status_file_would(qtbot, tmp_path):
     pane.channel.send("NEXT")
 
     assert pane.channel.status()["video"] == str(two.path)
+
+
+def test_a_pane_deleted_without_closing_its_engine_stops_moving_its_image(qtbot, tmp_path):
+    pane, _engine, _running = _pane(qtbot)
+    _hand_over(pane, _items(tmp_path, "one"))
+    mover = pane._mover
+
+    shiboken6.delete(pane)
+
+    mover.join(timeout=5)
+    assert not mover.is_alive()

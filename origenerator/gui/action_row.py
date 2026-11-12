@@ -15,7 +15,7 @@ from origenerator.gui.pills import PillRow
 from origenerator.gui.warning_mark import WarningMark
 from origenerator.item_actions import ItemActions, actions_of
 from origenerator.media import MediaType
-from origenerator.own_window import show_or_say
+from origenerator.own_window import show_or_say, still_open
 
 ACTION_LABEL = "Action"
 ACTIONS_LABEL = "Actions"
@@ -167,7 +167,7 @@ class ActionRow(QWidget):
 
     def _open(self, side: str, prompt_id: str) -> None:
         open_now = self._windows.get(side)
-        if open_now is not None and open_now.isVisible():
+        if still_open(open_now):
             open_now.raise_()
             open_now.activateWindow()
             return

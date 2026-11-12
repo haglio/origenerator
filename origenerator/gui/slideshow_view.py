@@ -105,6 +105,7 @@ class SlideshowView(QWidget):
     def __init__(self, items, show: ViewShow = NOTHING_TO_SHOW,
                  wiring: ViewWiring = USUAL_WIRING, parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         shape = show.shape
         self._actions = show.actions if show.actions is not None else SlideshowActions()
         self._motion = wiring.motion

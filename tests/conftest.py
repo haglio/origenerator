@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import errno
+import functools
 import gc
 import itertools
 import json
@@ -497,13 +498,23 @@ def _collect_widgets_between_tests(_widgets_registered_this_test):
     """Widgets form reference cycles whose C++ objects linger until the cyclic collector runs; collect after each test, then deliver the deletions, and drain again at each test's start because pytest releases the last test's fixtures after every teardown hook; left to pile up across a full run, they corrupt Qt's heap."""
     _deliver_the_deletions_already_scheduled()
     yield
-    # By now pytest-qt has closed what the test registered, so deleting it here cannot free anything Qt is still drawing; Qt for Python's cycle collector cannot see a signal's connections, so a widget wired to itself is freed only by deleting it.
-    for widget in _widgets_registered_this_test:
-        if shiboken6.isValid(widget):
-            widget.deleteLater()
+    # By now pytest-qt has closed what the test registered, so letting go of it here cannot free anything Qt is still drawing.
     _widgets_registered_this_test.clear()
     gc.collect()
     _deliver_the_deletions_already_scheduled()
+
+
+def _alive(widget_ref):
+    widget = widget_ref()
+    return widget if widget is not None and shiboken6.isValid(widget) else None
+
+
+@pytest.hookimpl(wrapper=True, tryfirst=True)
+def pytest_runtest_teardown(item):
+    """pytest-qt closes every widget a test registered, and closing one a close already deleted (a slideshow's window deletes itself on close) raises; this suite holds each registered widget, so pytest-qt's weak reference to it never lets it go."""
+    item.qt_widgets = [(functools.partial(_alive, widget_ref), before_close)
+                       for widget_ref, before_close in getattr(item, "qt_widgets", [])]
+    return (yield)
 
 
 @pytest.hookimpl(hookwrapper=True)

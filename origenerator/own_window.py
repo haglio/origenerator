@@ -79,10 +79,18 @@ def open_on_its_own(title: str, build, *, launcher: str, find_missing_overlay_ke
 
 
 def show_or_say(title: str, built, *, parent=None) -> bool:
+    from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QMessageBox
 
     if isinstance(built, str):
         QMessageBox.information(parent, title, built)
         return True
+    built.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
     built.showMaximized()
     return False
+
+
+def still_open(window) -> bool:
+    import shiboken6
+
+    return window is not None and shiboken6.isValid(window) and window.isVisible()

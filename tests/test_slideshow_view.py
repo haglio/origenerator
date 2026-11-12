@@ -31,6 +31,7 @@ from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.gui.stylesheet import dress_application
 from origenerator.slideshow import LIVE, Slide, SlideshowFilters, in_order
 from tests import gestures
+from tests.closed_windows import is_closed
 from tests.marked_words import words
 from tests.motion_doubles import FakeMotion
 from tests.slideshow_hud_support import button_on_screen, speaker_on_screen, thumbnail_on_screen
@@ -433,7 +434,7 @@ def test_shift_esc_leaves_the_slideshow_as_a_double_click_does_and_leaves_the_ro
 
     _press(view, Qt.Key.Key_Escape, Qt.KeyboardModifier.ShiftModifier)
 
-    qtbot.waitUntil(lambda: not view.isVisible())
+    qtbot.waitUntil(lambda: is_closed(view))
     assert closes == [True]
     assert not view._paused
 
@@ -466,7 +467,7 @@ def test_enter_leaves_for_the_shown_items_folder(qtbot):
     _press(view, Qt.Key.Key_Return)
 
     assert opened == ["id-a"]
-    assert not view.isVisible()
+    assert is_closed(view)
 
 
 def _collection_view(qtbot):
@@ -481,7 +482,7 @@ def _collection_view(qtbot):
 
 def _leave_by_double_clicking_the_slide(qtbot, view):
     gestures.double_click(view._pane._window, _on_the_slide_clear_of_the_hud(view))
-    qtbot.waitUntil(lambda: not view.isVisible())
+    qtbot.waitUntil(lambda: is_closed(view))
 
 
 def test_ending_a_slideshow_on_a_locked_slide_hands_that_slide_over(qtbot):
@@ -1321,7 +1322,7 @@ def test_double_clicking_the_slide_leaves_the_slideshow(qtbot):
 
     gestures.double_click(view._pane._window, _on_the_slide_clear_of_the_hud(view))
 
-    qtbot.waitUntil(lambda: not view.isVisible())
+    qtbot.waitUntil(lambda: is_closed(view))
     assert closes == [True], "the dismissal reaches the gallery, like Escape's"
 
 

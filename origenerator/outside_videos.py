@@ -4,20 +4,18 @@ import itertools
 import json
 import math
 import os
-import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
 
-from app_support import haglio_settings, kino_folder
-from app_support.mirrored_tree import library_roots_beside, mirrored_path
+from app_support import kino_folder
 from app_support.win32 import mutex_name
 from funestra.video_families import seed_group_and_seed
 from PIL import Image
 
-from origenerator import config, evolver_agreement
+from origenerator import config
 from origenerator.db_generations import library_paths_in
 from origenerator.evolver_export import PARTIAL_MARKER
 from origenerator.evolver_upscales import filed_under, filed_upscales
@@ -28,22 +26,22 @@ from origenerator.gallery.tree import settings_folder_key, start_frame_index
 from origenerator.generation_state import GenerationSource, GenerationStatus, made_here, source_of
 from origenerator.media import MediaType, media_type_from_filename
 from origenerator.one_at_a_time import WAIT_S, Turn
-from origenerator.outside_journal import actions_in, favorites_in, said_in
 from origenerator.thumbnail import (
     first_frame_of,
     generate_animated_thumbnail,
     generate_thumbnail,
 )
+from origenerator.video_rows import VideoRows
 from origenerator.workflows.outside import (
     PLACES,
     VideoKind,
     outside_source,
     outside_workflow,
+    recorded_block,
 )
 
 FRAME_PIXELS = 2_000_000
 VIDEOS_PER_WRITE = 100
-JOURNAL_NAME = "origenerator.jsonl"
 
 
 @dataclass(frozen=True)
@@ -67,11 +65,8 @@ class Record:
     favorite: bool = False
 
 
-def record_of(video: Path, records_folder: Path, *, action: str | None = None) -> Record:
-    recorded = _recorded(video, records_folder)
+def record_from(recorded: dict) -> Record:
     shown, made_from = _block(recorded, "video"), recorded.get("source_image")
-    if action is not None:
-        shown = {**shown, "action": action}
     image = made_from if isinstance(made_from, dict) else None
     read = {"video": shown, "source_image": image}
     return Record(video=made_of(shown, PLACES[MediaType.VIDEO]),
@@ -81,24 +76,10 @@ def record_of(video: Path, records_folder: Path, *, action: str | None = None) -
                   favorite=recorded.get("favorite") is True)
 
 
-def _recorded(video: Path, records_folder: Path) -> dict:
-    path = _record_path(video, records_folder)
-    try:
-        record = json.loads(path.read_text(encoding="utf-8")) if path else {}
-    except (OSError, ValueError):
-        return {}
-    return record if isinstance(record, dict) else {}
-
-
 def made_of(block: dict, places: dict[str, str]) -> Made:
     return Made({place: str(block[key]) for key, place in places.items()
                  if block.get(key) not in (None, "")},
                 created=block.get("created") or None)
-
-
-def _record_path(video: Path, records_folder: Path) -> Path | None:
-    return mirrored_path(video, roots=library_roots_beside(records_folder),
-                         mirror_root=records_folder, suffix=".json")
 
 
 def _block(record: dict, name: str) -> dict:
@@ -109,64 +90,22 @@ def _block(record: dict, name: str) -> dict:
 @dataclass(frozen=True)
 class Places:
     kino: Path
-    records_folder: Path
     frames_dir: Path
     thumb_dir: Path
     skip_sources: frozenset[str]
     library_root: Path
-    journal: Path | None
 
     @property
     def upscaled_dir(self) -> Path:
         return kino_folder.upscales_in(self.kino)
 
 
-def places_here() -> Places | None:
-    evolver = evolver_agreement.evolver_checkout()
-    records = evolver_agreement.records_folder(evolver, config.LIBRARY_ROOT)
-    if records is None:
-        return None
-    journals = _journals_folder()
-    return Places(kino=config.KINO_DIR, records_folder=records,
+def places_here() -> Places:
+    return Places(kino=config.KINO_DIR,
                   frames_dir=config.STARTING_FRAMES_DIR, thumb_dir=config.THUMB_DIR,
                   skip_sources=frozenset(source for source in (config.EVOLVER_SOURCE,
                                                                config.GENAU_SOURCE) if source),
-                  library_root=config.LIBRARY_ROOT,
-                  journal=journals / JOURNAL_NAME if journals else None)
-
-
-def _journals_folder() -> Path | None:
-    try:
-        return Path(haglio_settings.value("warm_gun_journal_dir"))
-    except haglio_settings.MissingSetting:
-        return None
-
-
-def tell_fun_time(rows: list[dict], favorite: bool) -> None:
-    places = places_here()
-    if places is not None:
-        journal_favorites(places, rows, favorite)
-
-
-def journal_favorites(places: Places, rows: list[dict], favorite: bool, *, now=time.time) -> None:
-    _journal(places, rows, {"event": "favorite" if favorite else "unfavorite"}, now)
-
-
-def cancel_picks(places: Places, video_row: dict, *, now=time.time) -> None:
-    _journal(places, [video_row], {"event": "action", "action": ""}, now)
-
-
-def _journal(places: Places, rows: list[dict], said: dict, now) -> None:
-    videos = [Path(path) for row in rows if source_of(row) == GenerationSource.OUTSIDE
-              for path in library_paths_in(row.get("output_files"))]
-    if places.journal is None or not videos:
-        return
-    places.journal.parent.mkdir(parents=True, exist_ok=True)
-    lines = [json.dumps({"t": round(now() * 1000), **said,
-                         "path": video.relative_to(places.library_root).as_posix()})
-             for video in videos]
-    with places.journal.open("a", encoding="utf-8", newline="\n") as journal:
-        journal.write("".join(f"{line}\n" for line in lines))
+                  library_root=config.LIBRARY_ROOT)
 
 
 def turn_at(db, *, wait_s: float = WAIT_S) -> Turn:
@@ -184,20 +123,69 @@ _LOOK_FOR_THEM = object()
 
 def bring_in_one(db, video: Path, *, places=_LOOK_FOR_THEM, grab=first_frame_of) -> bool:
     places = places_here() if places is _LOOK_FOR_THEM else places
-    source = None if places is None else filed_under(places.upscaled_dir, video)
-    if source is None:
-        return False
     with turn_at(db).taken() as ours:
-        return ours and scan(db, places, grab=grab, only=OutsideVideo(video, source)) > 0
+        return ours and _brought_in_alone(db, video, places, Record(), grab)
+
+
+def _brought_in_alone(db, video: Path, places: Places | None, record: Record, grab) -> bool:
+    source = None if places is None else filed_under(places.upscaled_dir, video)
+    return source is not None and scan(
+        db, places, grab=grab, only=(OutsideVideo(video, source), record)) > 0
+
+
+def take_record(db, video: Path, recorded: dict, *, places=_LOOK_FOR_THEM,
+                grab=first_frame_of) -> bool:
+    places = places_here() if places is _LOOK_FOR_THEM else places
+    record = record_from(recorded)
+    with turn_at(db).taken() as ours:
+        if not ours:
+            return False
+        prompt_id = VideoRows(db.list_generations())(video)
+        if prompt_id is None:
+            if not _brought_in_alone(db, video, places, record, grab):
+                return False
+            prompt_id = VideoRows(db.list_generations())(video)
+        else:
+            _write_the_record(db, places, db.get_generation(prompt_id), record)
+    db.set_library_record(prompt_id, **library_record(recorded))
+    return True
+
+
+def library_record(recorded: dict) -> dict:
+    upscale = _block(_block(recorded, "provenance"), "upscale")
+    kept = {"web_url": recorded.get("web_url"), "library_id": recorded.get("id"),
+            "upscale_provenance": json.dumps(upscale) if upscale else None}
+    return {column: value for column, value in kept.items() if value}
+
+
+def _write_the_record(db, places: Places | None, video_row: dict, record: Record) -> None:
+    if places is None or source_of(video_row) != GenerationSource.OUTSIDE:
+        return
+    rows = db.list_generations()
+    record = replace(record, action=video_row.get("action") or record.action)
+    path = Path(min(library_paths_in(video_row.get("output_files"))))
+    filed = _filed_at(path) or datetime.now(UTC)
+    site = outside_source(video_row["workflow_name"])
+    kinds = _kinds_by_site(rows, [(OutsideVideo(path, site), record)])
+    frame_row = _frames_by_file(rows).get(_input_image(video_row))
+    frame_file = _kept_file(frame_row) if frame_row is not None else _input_image(video_row)
+    updates = [(video_row, _video_fields(record, filed, frame_file, site,
+                                         _named_kind(record, kinds.get(site, set()))))]
+    if frame_row is not None:
+        updates.append((frame_row, _frame_fields(record, filed, site)))
+    db.set_recorded_fields([{"prompt_id": row["prompt_id"], **fields} for row, fields in updates
+                            if _differs(row, fields)])
+    rows = db.list_generations()
+    _bring_up_to_records(db, places, rows, _kinds_by_site(rows))
 
 
 def scan(db, places: Places, *, grab=first_frame_of,
-         videos_per_write: int = VIDEOS_PER_WRITE, only: OutsideVideo | None = None) -> int:
+         videos_per_write: int = VIDEOS_PER_WRITE,
+         only: tuple[OutsideVideo, Record] | None = None) -> int:
     rows = db.list_generations()
-    found = [only] if only is not None else outside_videos(
+    new = [only] if only is not None else [(video, Record()) for video in outside_videos(
         places.upscaled_dir, skip_sources=places.skip_sources, rows=rows,
-        held=db.library_paths() | db.trashed_library_paths())
-    new = [(video, record_of(video.path, places.records_folder)) for video in found]
+        held=db.library_paths() | db.trashed_library_paths())]
 
     kinds = _kinds_by_site(rows, new)
     images = _bring_up_to_records(db, places, rows, kinds)
@@ -259,8 +247,6 @@ def _frames_by_file(rows: list[dict]) -> dict[str, dict]:
 
 def _bring_up_to_records(db, places: Places, rows: list[dict],
                          kinds: dict[str, set[VideoKind]]) -> dict[tuple, dict]:
-    said = said_in(places.journal)
-    told_here, acted_here = favorites_in(said), actions_in(said)
     frames = _frames_by_file(rows)
     made_here_from_frames = [row for row in rows if made_here(row) and _input_image(row)]
     images: dict[tuple, dict] = {}
@@ -270,10 +256,8 @@ def _bring_up_to_records(db, places: Places, rows: list[dict],
         filed = _filed_at(path)
         if filed is None:
             continue
-        place, written = path.relative_to(places.library_root).as_posix(), _written_at(path, places)
-        record = record_of(path, places.records_folder,
-                           action=_picked_since(acted_here.get(place), written))
         frame_row = frames.get(_input_image(video_row))
+        record = _record_kept(video_row, frame_row)
         site = outside_source(video_row["workflow_name"])
         image = _image_of(site, record)
         kept = images.get(image)
@@ -291,10 +275,19 @@ def _bring_up_to_records(db, places: Places, rows: list[dict],
         for row, fields in updates:
             if _differs(row, fields):
                 rewritten[row["prompt_id"]] = {"prompt_id": row["prompt_id"], **fields}
-        _take_the_favorite(db, video_row, record, told_here.get(place, 0), written)
     db.set_recorded_fields(list(rewritten.values()))
     db.forget_item_numbers(_numbered_in_another_folder(db))
     return images
+
+
+def _record_kept(video_row: dict, frame_row: dict | None) -> Record:
+    shown = {**recorded_block(parse_params(video_row.get("params_json")), MediaType.VIDEO),
+             "created": video_row.get("created_at"), "action": video_row.get("action")}
+    image = None
+    if frame_row is not None and source_of(frame_row) == GenerationSource.OUTSIDE:
+        image = {**recorded_block(parse_params(frame_row.get("params_json")), MediaType.IMAGE),
+                 "created": frame_row.get("created_at")}
+    return record_from({"video": shown, "source_image": image})
 
 
 def _numbered_in_another_folder(db) -> list[str]:
@@ -341,27 +334,6 @@ def _fold(db, copy: dict, kept: dict, made_here_from_frames: list[dict]) -> None
 def _differs(row: dict, fields: dict) -> bool:
     return any(parse_params(row.get(key)) != parse_params(value) if key == "params_json"
                else row.get(key) != value for key, value in fields.items())
-
-
-def _take_the_favorite(db, video_row: dict, record: Record, told_at: float,
-                   written: float | None) -> None:
-    if written is None or told_at >= written:
-        return
-    if bool(video_row.get("starred")) != record.favorite:
-        db.set_generation_favorite(video_row["prompt_id"], record.favorite)
-
-
-def _written_at(video: Path, places: Places) -> float | None:
-    written = _record_path(video, places.records_folder)
-    if written is None or not written.is_file():
-        return None
-    return written.stat().st_mtime
-
-
-def _picked_since(picked: tuple[float, str] | None, written: float | None) -> str | None:
-    if picked is None or (written is not None and picked[0] < written):
-        return None
-    return picked[1]
 
 
 class FrameFolders(NamedTuple):

@@ -7,14 +7,12 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 
-from app_support import haglio_settings
 from funestra.video_families import seed_group_and_seed
 from PIL import Image
 
-from origenerator import config, evolver_agreement, funscript_backfill, trash_collection
+from origenerator import config, funscript_backfill, trash_collection
 from origenerator.action_setter import waiting
 from origenerator.db import Database
-from origenerator.db_generations import library_paths_in
 from origenerator.gallery import (
     SourceImageGroup,
     build_gallery_tree,
@@ -34,20 +32,19 @@ from origenerator.item_names import ItemNames
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import (
-    JOURNAL_NAME,
     FrameFolders,
     Made,
     OutsideVideo,
     Places,
     Record,
     bring_in_one,
-    journal_favorites,
     outside_videos,
     places_here,
-    record_of,
+    record_from,
     rows_bringing_in,
     scan,
     scan_in_turn,
+    take_record,
     turn_at,
 )
 from origenerator.provenance import stamp_unstamped
@@ -78,10 +75,8 @@ def test_the_videos_found_are_the_outbox_videos_this_app_did_not_make(tmp_path):
 
 
 def _record(tmp_path, video, record: dict):
-    path = tmp_path / "videos" / "metadata" / video.relative_to(tmp_path / "videos" / "videos")
-    path = path.with_suffix(".json")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(record), encoding="utf-8")
+    return take_record(Database(tmp_path / "test.db"), video, record, places=_places(tmp_path),
+                       grab=_still)
 
 
 _VIDEO_BLOCK = {"prompt": "a slow walk on the shore", "seed": "11", "action": "Wave",
@@ -95,14 +90,12 @@ _IMAGE_BLOCK = {"positive_prompt": "a quiet shore", "negative_prompt": "rain", "
                   "creativity": "High"}
 
 
-def test_a_record_brings_every_field_this_app_has_a_place_for(tmp_path):
-    video = _filed(tmp_path / "videos" / "videos" / "kino" / "2D" / "AI", "portrait", "a-site", "c1_topaz.mp4")
+def test_a_record_brings_every_field_this_app_has_a_place_for():
     recorded = {"favorite": True, "watch": {"weight": 2.5},
                 "provenance": {"upscale": {"app": "an-upscaler"}},
                 "video": _VIDEO_BLOCK, "source_image": _IMAGE_BLOCK}
-    _record(tmp_path, video, recorded)
 
-    record = record_of(video, tmp_path / "videos" / "metadata")
+    record = record_from(recorded)
 
     assert record == Record(
         video=Made({"positive_prompt": "a slow walk on the shore", "seed": "11",
@@ -117,14 +110,11 @@ def test_a_record_brings_every_field_this_app_has_a_place_for(tmp_path):
         favorite=True)
 
 
-def test_a_video_made_from_words_alone_has_no_image_and_a_missing_record_says_nothing(tmp_path):
-    video = _filed(tmp_path / "videos" / "videos" / "kino" / "2D" / "AI", "portrait", "a-site", "c1_topaz.mp4")
-    unrecorded = _filed(tmp_path / "videos" / "videos" / "kino" / "2D" / "AI", "portrait", "a-site", "c2_topaz.mp4")
-    _record(tmp_path, video, {"video": {"model": "Video Model"}})
-
-    assert record_of(video, tmp_path / "videos" / "metadata") == Record(
+def test_a_video_made_from_words_alone_has_no_image_and_an_empty_record_says_nothing():
+    assert record_from({"video": {"model": "Video Model"}}) == Record(
         video=Made({"model": "Video Model"}))
-    assert record_of(unrecorded, tmp_path / "videos" / "metadata") == Record()
+    assert record_from({}) == Record()
+    assert record_from({"video": "not a block", "source_image": []}) == Record()
 
 
 def _bring_in(tmp_path, record: Record, *, grab=lambda _path: Image.new("RGB", (64, 96))):
@@ -240,10 +230,8 @@ def test_a_video_whose_first_frame_cannot_be_read_is_left_for_the_next_scan(tmp_
 
 def _places(tmp_path) -> Places:
     return Places(kino=tmp_path / "videos" / "videos" / "kino",
-                  records_folder=tmp_path / "videos" / "metadata",
                   frames_dir=tmp_path / "frames", thumb_dir=tmp_path / "thumbs",
-                  skip_sources=frozenset({"this-app"}), library_root=tmp_path,
-                  journal=tmp_path / "videos" / "journals" / "origenerator.jsonl")
+                  skip_sources=frozenset({"this-app"}), library_root=tmp_path)
 
 
 def _still(_path):
@@ -317,7 +305,7 @@ def test_a_video_whose_frame_cannot_be_read_is_not_brought_in_by_itself(tmp_path
     assert bring_in_one(db, one, places=places, grab=lambda _path: None) is False
 
 
-def test_no_records_folder_means_no_video_is_brought_in_by_itself(tmp_path):
+def test_no_places_means_no_video_is_brought_in_by_itself(tmp_path):
     db = Database(tmp_path / "test.db")
 
     assert bring_in_one(db, tmp_path / "c6_topaz.mp4", places=None) is False
@@ -445,37 +433,12 @@ def test_a_video_from_another_source_is_never_stamped_with_this_apps_workflows(t
     assert db.completed_without_duration() == []
 
 
-def test_the_look_reads_this_apps_folders_and_where_evolver_keeps_its_records(
-        tmp_path, monkeypatch):
-    checkout = tmp_path / "evolver"
-    checkout.mkdir()
-    (checkout / "evolver_contract.json").write_text(
-        json.dumps({"library_record": {"folder": "videos/records"}}), encoding="utf-8")
-    monkeypatch.setattr(evolver_agreement, "evolver_checkout", lambda: checkout)
-    settings = tmp_path / "settings.json"
-    settings.write_text("{}", encoding="utf-8")
-    monkeypatch.setenv(haglio_settings.SETTINGS_ENV, str(settings))
-
+def test_the_look_reads_this_apps_folders():
     assert places_here() == Places(
         kino=config.KINO_DIR,
-        records_folder=config.LIBRARY_ROOT / "videos" / "records",
         frames_dir=config.STARTING_FRAMES_DIR, thumb_dir=config.THUMB_DIR,
         skip_sources=frozenset({config.EVOLVER_SOURCE, config.GENAU_SOURCE}),
-        library_root=config.LIBRARY_ROOT, journal=None)
-
-
-def test_the_look_journals_where_the_shared_settings_say_the_journals_are(tmp_path, monkeypatch):
-    checkout = tmp_path / "evolver"
-    checkout.mkdir()
-    (checkout / "evolver_contract.json").write_text(
-        json.dumps({"library_record": {"folder": "videos/records"}}), encoding="utf-8")
-    monkeypatch.setattr(evolver_agreement, "evolver_checkout", lambda: checkout)
-    settings = tmp_path / "settings.json"
-    settings.write_text(json.dumps({"warm_gun_journal_dir": str(tmp_path / "journals")}),
-                        encoding="utf-8")
-    monkeypatch.setenv(haglio_settings.SETTINGS_ENV, str(settings))
-
-    assert places_here().journal == tmp_path / "journals" / JOURNAL_NAME
+        library_root=config.LIBRARY_ROOT)
 
 
 def test_an_image_in_comfyuis_output_named_like_another_sources_video_stays_an_image(tmp_path):
@@ -497,99 +460,6 @@ def test_a_video_from_another_source_whose_thumbnail_went_missing_gets_one_back(
                                           OutputPlaces.in_one_folder(_comfyui_output(tmp_path)), tmp_path / "thumbs")
 
     assert repaired == 1
-
-
-def test_starring_a_video_from_another_source_tells_fun_time_through_the_journal(tmp_path):
-    _video, shown, _frame = _brought_in(tmp_path)
-    places = _places(tmp_path)
-
-    journal_favorites(places, [shown], True, now=lambda: 1_700_000_000.5)
-
-    [line] = places.journal.read_text(encoding="utf-8").splitlines()
-    assert json.loads(line) == {"t": 1_700_000_000_500, "event": "favorite",
-                                "path": "videos/videos/kino/2D/AI/portrait/a-site/c1_topaz.mp4"}
-
-
-def _two_word_made_videos_one_action_apart(tmp_path) -> tuple[Database, dict]:
-    db = _brought_in_with_records(tmp_path, {
-        "c1_topaz.mp4": _made_from_words("a slow walk on the shore", "11"),
-        "c2_topaz.mp4": _made_from_words("a slow walk on the shore", "12", action="Bow")})
-    for record in (tmp_path / "videos" / "metadata").rglob("*.json"):
-        os.utime(record, (1_700_000_000, 1_700_000_000))
-    [picked] = [row for row in _videos(db) if "c1_topaz" in row["output_files"]]
-    return db, picked
-
-
-def _picked_here_before(tmp_path, row: dict, action: str, at: float) -> None:
-    places = _places(tmp_path)
-    places.journal.parent.mkdir(parents=True, exist_ok=True)
-    [video] = library_paths_in(row["output_files"])
-    line = {"t": round(at * 1000), "event": "action", "action": action,
-            "path": Path(video).relative_to(places.library_root).as_posix()}
-    with places.journal.open("a", encoding="utf-8", newline="\n") as journal:
-        journal.write(json.dumps(line) + "\n")
-
-
-def test_the_next_look_keeps_a_pick_evolver_has_not_written_into_the_record_yet(tmp_path):
-    db, picked = _two_word_made_videos_one_action_apart(tmp_path)
-    _picked_here_before(tmp_path, picked, "Bow", 1_700_000_100)
-
-    scan(db, _places(tmp_path), grab=_still)
-
-    assert _leaves(db, "Videos") == [["c1_topaz.mp4", "c2_topaz.mp4"]]
-    assert db.get_generation(picked["prompt_id"])["action"] == "Bow"
-
-
-def test_a_record_written_since_the_pick_is_what_the_next_look_takes(tmp_path):
-    db, picked = _two_word_made_videos_one_action_apart(tmp_path)
-    _picked_here_before(tmp_path, picked, "Bow", 1_700_000_100)
-    video = tmp_path / "videos" / "videos" / "kino" / "2D" / "AI" / "portrait" / "a-site" / "c1_topaz.mp4"
-    _record(tmp_path, video, _made_from_words("a slow walk on the shore", "11", action="Kneel"))
-
-    scan(db, _places(tmp_path), grab=_still)
-
-    assert db.get_generation(picked["prompt_id"])["action"] == "Kneel"
-
-
-def test_a_pick_does_not_keep_a_video_from_taking_its_star_from_the_record(tmp_path):
-    db, picked = _two_word_made_videos_one_action_apart(tmp_path)
-    _picked_here_before(tmp_path, picked, "Bow", 1_700_000_100)
-    video = tmp_path / "videos" / "videos" / "kino" / "2D" / "AI" / "portrait" / "a-site" / "c1_topaz.mp4"
-    _record(tmp_path, video, {**_made_from_words("a slow walk on the shore", "11", action="Bow"),
-                              "favorite": True})
-    record = tmp_path / "videos" / "metadata" / "kino" / "2D" / "AI" / "portrait" / "a-site" / "c1_topaz.json"
-    os.utime(record, (1_700_000_050, 1_700_000_050))
-
-    scan(db, _places(tmp_path), grab=_still)
-
-    assert db.get_generation(picked["prompt_id"])["starred"] == 1
-
-
-def test_a_look_takes_each_videos_star_from_its_record(tmp_path):
-    db, places = Database(tmp_path / "test.db"), _places(tmp_path)
-    video = _filed(places.upscaled_dir, "portrait", "a-site", "c1_topaz.mp4")
-    scan(db, places, grab=_still)
-
-    _record(tmp_path, video, {"favorite": True})
-    scan(db, places, grab=_still)
-
-    assert [row["starred"] for row in _videos(db)] == [1]
-
-
-def test_a_star_set_here_since_its_record_was_written_stands_until_evolver_carries_it(tmp_path):
-    db, places = Database(tmp_path / "test.db"), _places(tmp_path)
-    video = _filed(places.upscaled_dir, "portrait", "a-site", "c1_topaz.mp4")
-    _record(tmp_path, video, {"favorite": False})
-    record = tmp_path / "videos" / "metadata" / "kino" / "2D" / "AI" / "portrait" / "a-site" / "c1_topaz.json"
-    os.utime(record, (1_700_000_000, 1_700_000_000))
-    scan(db, places, grab=_still)
-    [shown] = _videos(db)
-
-    db.set_generation_favorite(shown["prompt_id"], True)
-    journal_favorites(places, [shown], True, now=lambda: 1_700_000_100)
-    scan(db, places, grab=_still)
-
-    assert db.get_generation(shown["prompt_id"])["starred"] == 1
 
 
 def _source_image_folders(groups):
@@ -650,9 +520,10 @@ def _leaves(db, media_label: str) -> list[list[str]]:
 
 def _brought_in_with_records(tmp_path, records: dict[str, dict]) -> Database:
     db, places = Database(tmp_path / "test.db"), _places(tmp_path)
-    for name, record in records.items():
-        _record(tmp_path, _filed(places.upscaled_dir, "portrait", "a-site", name), record)
+    filed = {name: _filed(places.upscaled_dir, "portrait", "a-site", name) for name in records}
     scan(db, places, grab=_still)
+    for name, record in records.items():
+        _record(tmp_path, filed[name], record)
     return db
 
 
@@ -785,8 +656,6 @@ def test_videos_from_other_sites_are_on_latest_by_when_they_came_not_when_they_w
         _record(tmp_path, video, {"video": {"prompt": "a slow walk on the shore", "seed": "11",
                                             "created": made}})
 
-    scan(db, places, grab=_still)
-
     shown = [row for row in recent_generations(db.list_generations())
              if media_type_of_row(row) == MediaType.VIDEO]
     assert [json.loads(row["output_files"])[0]["filename"] for row in shown] == [
@@ -794,13 +663,12 @@ def test_videos_from_other_sites_are_on_latest_by_when_they_came_not_when_they_w
     assert [row["created_at"] for row in shown] == ["2025-01-01 00:00:00", "2025-06-01 00:00:00"]
 
 
-def test_a_look_brings_a_video_already_brought_in_up_to_its_record(tmp_path):
+def test_a_record_brings_a_video_already_brought_in_up_to_it(tmp_path):
     db, places = Database(tmp_path / "test.db"), _places(tmp_path)
     video = _filed(places.upscaled_dir, "portrait", "a-site", "c1_topaz.mp4")
     scan(db, places, grab=_still)
-    _record(tmp_path, video, {"video": _VIDEO_BLOCK, "source_image": _IMAGE_BLOCK})
 
-    scan(db, places, grab=_still)
+    assert _record(tmp_path, video, {"video": _VIDEO_BLOCK, "source_image": _IMAGE_BLOCK}) is True
 
     [shown] = _videos(db)
     image = _frame_of(db, shown)
@@ -814,7 +682,6 @@ def test_a_look_files_an_image_brought_in_under_its_videos_workflow_under_its_ow
     db, places = Database(tmp_path / "test.db"), _places(tmp_path)
     video = _filed(places.upscaled_dir, "portrait", "a-site", "c1_topaz.mp4")
     _record(tmp_path, video, {"video": _VIDEO_BLOCK, "source_image": _IMAGE_BLOCK})
-    scan(db, places, grab=_still)
     [image] = _images(db)
     first_preview = sqlite3.connect(tmp_path / "test.db")
     with closing(first_preview), first_preview:
@@ -835,7 +702,6 @@ def test_a_look_rewrites_no_row_whose_record_is_unchanged(tmp_path):
     db, places = Database(tmp_path / "test.db"), _places(tmp_path)
     video = _filed(places.upscaled_dir, "portrait", "a-site", "c1_topaz.mp4")
     _record(tmp_path, video, {"video": _VIDEO_BLOCK, "source_image": _IMAGE_BLOCK})
-    scan(db, places, grab=_still)
     written, write = [], db.set_recorded_fields
     db.set_recorded_fields = lambda rows: (written.extend(rows), write(rows))
 
@@ -899,9 +765,8 @@ def test_a_video_made_from_an_image_already_in_points_at_it_at_a_site_of_both_ki
         "c2_topaz.mp4": _made_from_words("a slow walk on the shore", "11")})
     places = _places(tmp_path)
     later = _filed(places.upscaled_dir, "portrait", "a-site", "c3_topaz.mp4")
-    _record(tmp_path, later, _made_from_an_image("turn to the right", "a quiet shore", "22"))
 
-    scan(db, places, grab=_still)
+    assert _record(tmp_path, later, _made_from_an_image("turn to the right", "a quiet shore", "22"))
 
     assert len(_images(db)) == 1
 
@@ -930,9 +795,8 @@ def _brought_in_one_by_one(tmp_path, records: dict[str, dict]) -> Database:
     db, places = Database(tmp_path / "test.db"), _places(tmp_path)
     for name, recorded in records.items():
         video = _filed(places.upscaled_dir, "portrait", "a-site", name)
-        _record(tmp_path, video, recorded)
         db.insert_rows(rows_bringing_in(
-            OutsideVideo(video, "a-site"), record_of(video, places.records_folder),
+            OutsideVideo(video, "a-site"), record_from(recorded),
             FrameFolders(places.frames_dir, places.thumb_dir), grab=_still))
     return db
 
@@ -1025,3 +889,102 @@ def test_a_source_named_like_one_of_this_apps_workflows_is_still_a_folder_of_its
 
     assert len(videos.children) == 2
 
+
+def test_a_record_of_a_video_that_has_no_row_brings_it_in_with_what_the_record_says(tmp_path):
+    db, places = Database(tmp_path / "test.db"), _places(tmp_path)
+    video = _filed(places.upscaled_dir, "portrait", "a-site", "c1_topaz.mp4")
+
+    assert _record(tmp_path, video, {"video": _VIDEO_BLOCK, "source_image": _IMAGE_BLOCK}) is True
+
+    [shown] = _videos(db)
+    assert (shown["positive_prompt"], shown["action"]) == ("a slow walk on the shore", "Wave")
+    assert _frame_of(db, shown)["source"] == GenerationSource.OUTSIDE
+
+
+def test_a_record_of_a_video_outside_kinos_upscales_with_no_row_brings_nothing_in(tmp_path):
+    db = Database(tmp_path / "test.db")
+    elsewhere = _filed(tmp_path / "elsewhere", "portrait", "a-site", "c4_topaz.mp4")
+
+    assert _record(tmp_path, elsewhere, {"video": _VIDEO_BLOCK}) is False
+    assert _videos(db) == []
+
+
+def test_a_record_keeps_the_action_picked_here_and_fills_in_one_where_none_was_picked(tmp_path):
+    db = _brought_in_with_records(tmp_path, {
+        "c1_topaz.mp4": _made_from_words("a slow walk on the shore", "11"),
+        "c2_topaz.mp4": {"video": {"prompt": "a run in the rain"}}})
+    picked, unpicked = sorted(_videos(db), key=lambda row: row["output_files"])
+    db.set_action(picked["prompt_id"], "Bow")
+    places = _places(tmp_path)
+
+    for name in ("c1_topaz.mp4", "c2_topaz.mp4"):
+        _record(tmp_path, places.upscaled_dir / "portrait" / "a-site" / name,
+                _made_from_words("a slow walk on the shore", "11", action="Kneel"))
+
+    assert [db.get_generation(row["prompt_id"])["action"] for row in (picked, unpicked)] == [
+        "Bow", "Kneel"]
+
+
+def test_a_record_leaves_the_star_set_here_alone(tmp_path):
+    db, places = Database(tmp_path / "test.db"), _places(tmp_path)
+    video = _filed(places.upscaled_dir, "portrait", "a-site", "c1_topaz.mp4")
+    scan(db, places, grab=_still)
+    [shown] = _videos(db)
+    db.set_generation_favorite(shown["prompt_id"], True)
+
+    _record(tmp_path, video, {"favorite": False, "video": _VIDEO_BLOCK})
+
+    assert db.get_generation(shown["prompt_id"])["starred"] == 1
+
+
+def test_a_record_keeps_the_page_a_video_came_from_and_its_upscale_on_its_row(tmp_path):
+    db, places = Database(tmp_path / "test.db"), _places(tmp_path)
+    video = _filed(places.upscaled_dir, "portrait", "a-site", "c1_topaz.mp4")
+    upscale = {"app": "an-upscaler", "model": "made-up"}
+
+    _record(tmp_path, video, {"video": _VIDEO_BLOCK, "web_url": "https://example.com/watch/1",
+                              "provenance": {"upscale": upscale}})
+
+    [shown] = _videos(db)
+    assert (shown["web_url"], json.loads(shown["upscale_provenance"])) == (
+        "https://example.com/watch/1", upscale)
+
+
+def test_a_scan_brings_a_new_upscale_in_with_no_record_at_all(tmp_path):
+    db, places = Database(tmp_path / "test.db"), _places(tmp_path)
+    _filed(places.upscaled_dir, "portrait", "a-site", "c1_topaz.mp4")
+    beside = tmp_path / "videos" / "metadata" / "kino" / "portrait" / "a-site" / "c1_topaz.json"
+    beside.parent.mkdir(parents=True)
+    beside.write_text(json.dumps({"favorite": True, "video": _VIDEO_BLOCK}), encoding="utf-8")
+
+    scan(db, places, grab=_still)
+
+    [shown] = _videos(db)
+    assert (shown["starred"], shown["positive_prompt"], shown["action"]) == (0, None, None)
+
+
+def test_a_record_waits_its_turn_while_another_program_is_bringing_videos_in(tmp_path):
+    db, places = Database(tmp_path / "test.db"), _places(tmp_path)
+    video = _filed(places.upscaled_dir, "portrait", "a-site", "c1_topaz.mp4")
+
+    with turn_at(db).taken():
+        taken = take_record(db, video, {"video": _VIDEO_BLOCK}, places=places, grab=_still)
+
+    assert (taken, _videos(db)) == (False, [])
+
+
+def test_a_record_of_a_video_this_app_made_keeps_only_its_page_and_its_upscale(tmp_path):
+    db, places = Database(tmp_path / "test.db"), _places(tmp_path)
+    db.insert_rows([{"prompt_id": "made-1", "workflow_name": "wan22_i2v", "workflow_version": "1",
+                     "workflow_json": "{}", "status": "completed",
+                     "params_json": json.dumps({"seed": 5}),
+                     "output_files": json.dumps([{"filename": "wan22_i2v_00001_.mp4",
+                                                  "subfolder": "video"}])}])
+    copy = _filed(places.upscaled_dir, "portrait", "this-app", "wan22_i2v_00001__topaz.mp4")
+
+    assert take_record(db, copy, {"video": _VIDEO_BLOCK, "web_url": "https://example.com/watch/2"},
+                       places=places, grab=_still) is True
+
+    made = db.get_generation("made-1")
+    assert (json.loads(made["params_json"]), made["action"], made["web_url"]) == (
+        {"seed": 5}, None, "https://example.com/watch/2")

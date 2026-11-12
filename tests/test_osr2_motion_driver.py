@@ -183,6 +183,9 @@ def test_the_clock_runs_off_the_gui_thread(qtbot):
     assert all(t is not threading.main_thread() for t in seen), (
         "a slideshow decodes a full-size image on the GUI thread every few seconds, and each such "
         "stall would starve a clock living there")
+    assert all(type(t) is threading.Thread for t in seen), (
+        "the clock is a plain thread rather than a QTimer because nothing it touches, the wall"
+        " clock, the motion state and the socket, belongs to Qt")
 
 
 def test_a_long_stall_picks_the_beat_up_from_now_instead_of_firing_a_backlog():

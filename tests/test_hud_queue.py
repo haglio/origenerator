@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 
 import numpy as np
-from funestra.satellite_hud import map_block_width
+from funestra.satellite_hud import ELLIPSIS, map_block_width
 from PIL import Image
 from shared_ui.palette import RED
 
@@ -385,6 +385,15 @@ def test_three_dots_under_the_rows_say_the_line_runs_on_past_the_rows_drawn(monk
     assert marks == [[True], []], (
         "the family's three dots, as the map's own axes say it, stand under the rows to say "
         "the line runs on past the rows drawn")
+
+
+def test_the_three_dots_under_the_rows_are_drawn_the_size_the_map_draws_its_own(monkeypatch):
+    pasted = _icons_pasted(monkeypatch)
+    _painted(queue_section([_item(f"j{number}") for number in range(ROWS + 1)], 0))
+
+    assert [frame[2:] for name, frame in pasted if name == "more"] == [(ELLIPSIS, ELLIPSIS)], (
+        "the three dots under the rows are drawn in a frame of funestra's ELLIPSIS, the figure the"
+        " satellite's map draws its own three dots in, so the two look alike")
 
 
 def _white_columns(image, head) -> list[int]:

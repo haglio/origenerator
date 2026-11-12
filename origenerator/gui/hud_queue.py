@@ -23,6 +23,7 @@ from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
 from funestra.satellite_hud import (
     BLOCK_GAP,
     CTRL_BTN,
+    ELLIPSIS,
     MAP_THUMB_H,
     PaintedFoot,
     map_block_width,
@@ -107,7 +108,6 @@ _FRAME = MAP_THUMB_H
 _PLUS_W = 10
 _PAREN_W = 5
 _MARK_H = 8
-_MARK_SIDE = 12
 _DROP_W = 2
 _SHIELD_MARK = CTRL_BTN - 2 * BUTTON_ICON_INSET
 _MARK_TO_WORD = 3
@@ -362,8 +362,8 @@ class QueueSection:
         if not more:
             return
         middle_x, middle_y = x + width / 2, y + _MARK_H / 2
-        paste_icon(image, "more", (round(middle_x - _MARK_SIDE / 2), round(middle_y - _MARK_SIDE / 2),
-                                   _MARK_SIDE, _MARK_SIDE), TEXT_PRIMARY)
+        paste_icon(image, "more", (round(middle_x - ELLIPSIS / 2), round(middle_y - ELLIPSIS / 2),
+                                   ELLIPSIS, ELLIPSIS), TEXT_PRIMARY)
 
 
 def _for_all_width() -> int:

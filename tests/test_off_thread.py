@@ -74,6 +74,34 @@ def test_the_carrier_is_held_from_a_root_until_it_delivers(qtbot, owner):
     assert len(_in_flight) == before
 
 
+class _SetNotingThreads(set):
+    def __init__(self):
+        super().__init__()
+        self.threads = []
+
+    def add(self, item):
+        self.threads.append(threading.get_ident())
+        super().add(item)
+
+    def discard(self, item):
+        self.threads.append(threading.get_ident())
+        super().discard(item)
+
+
+@pytest.mark.parametrize("waits_long", [False, True])
+def test_the_carrier_set_is_touched_only_on_the_calling_thread(qtbot, owner, monkeypatch,
+                                                               waits_long):
+    noted, got = _SetNotingThreads(), []
+    monkeypatch.setattr("origenerator.gui.off_thread._in_flight", noted)
+
+    run_off_thread(lambda: 1, got.append, owner=owner, waits_long=waits_long)
+    _wait_for(qtbot, got)
+
+    assert noted.threads == [threading.get_ident()] * 2, (
+        "the carrier set takes no lock: it is touched only on the thread that calls"
+        " run_off_thread, which is also where results are delivered")
+
+
 def test_an_answer_whose_carrier_the_app_took_on_its_way_out_is_let_go_of(qtbot):
     result = _Result()
     sip.delete(result)

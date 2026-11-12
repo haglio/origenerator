@@ -816,7 +816,9 @@ def test_a_run_no_open_tab_is_for_opens_one_of_its_own(qtbot, tmp_path):
 
     opened = view._generate_pane.current_generate_tab()
     assert opened is not parked
-    assert opened.watched_key() == key
+    assert opened.watched_key() == key, (
+        "filling a tab in with a run's settings ends its following of a run, so a tab pointed at"
+        " a run is filled in first and told to follow after, or the filling in undoes it")
     assert parked.watched_key() is None
 
 

@@ -1427,16 +1427,34 @@ def test_the_eyes_of_two_faces_in_an_enhanced_image_come_back_as_a_close_up_of_e
     assert enhanced.points_of_interest == ((0.1, 0.1, 0.35, 0.19), (0.33, 0.1, 0.58, 0.19))
 
 
-def test_a_region_reset_re_points_what_feeds_it(slideshows):
+def _a_landscape_region_off_its_base(slideshows):
     gallery_pane = FakeGalleryPane(collections={ALL_LANDSCAPE: [_row("g4")]})
     director, _host, made = slideshows(gallery_pane=gallery_pane, fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location="workflow/a",
                   shape=LANDSCAPE)
+    return director, made[0]
 
-    director.reset_region(made[0])
 
-    assert director._live_slideshows == [(made[0], ALL_LANDSCAPE)]
-    assert made[0].retuned == ([("g4.png", "image", "g4", None)], set())
+def test_a_region_reset_re_points_what_feeds_it(slideshows):
+    director, slideshow = _a_landscape_region_off_its_base(slideshows)
+
+    director.reset_region(slideshow)
+
+    assert director._live_slideshows == [(slideshow, ALL_LANDSCAPE)]
+    assert slideshow.retuned == ([("g4.png", "image", "g4", None)], set())
+
+
+def test_a_region_is_at_its_start_only_on_its_regions_base_state(slideshows):
+    director, slideshow = _a_landscape_region_off_its_base(slideshows)
+    at_base = slideshow.actions.at_base
+    answers = [at_base and at_base(slideshow)]
+
+    director.reset_region(slideshow)
+    answers.append(at_base and at_base(slideshow))
+
+    assert answers == [False, True], (
+        "whether a hosted slideshow is at its start is asked of the gallery, because it starts"
+        " from its region's base state, which only the gallery knows")
 
 
 def test_a_slideshow_counts_as_enhanced_what_the_library_counts_as_enhanced(slideshows):

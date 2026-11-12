@@ -1243,6 +1243,20 @@ def test_the_player_is_torn_down_before_the_surface_it_renders_to(qapp):
     assert order == ["player", "surface"]
 
 
+def test_only_a_player_the_pane_made_itself_is_released_as_the_app_quits(qapp, qtbot):
+    before = qapp.receivers(qapp.aboutToQuit)
+    qtbot.addWidget(Viewport(player=MagicMock()))
+    with_a_handed_in_player = qapp.receivers(qapp.aboutToQuit)
+    own = Viewport()
+    with_its_own_too = qapp.receivers(qapp.aboutToQuit)
+    del own
+    gc.collect()
+
+    assert (with_a_handed_in_player - before, with_its_own_too - with_a_handed_in_player) == (0, 1), (
+        "a handed-in player never touches Windows Media Foundation, so only the pane's own "
+        "player is released as the app quits")
+
+
 def test_releasing_the_player_detaches_it_from_the_pane(make_preview):
     w = make_preview()
     p = w._player

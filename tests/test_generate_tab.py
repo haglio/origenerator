@@ -86,7 +86,7 @@ from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tracked_prompt import _Tracker
 from origenerator.item_actions import ItemActions, actions_of
 from origenerator.item_names import ItemNames
-from origenerator.library_views import TabViews
+from origenerator.library_views import NO_VIEWS, TabViews
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import FrameFolders, OutsideVideo, Record, rows_bringing_in
@@ -1725,8 +1725,12 @@ def _video_row(db, prompt_id="vid1", input_image=None, *, workflow_name="wan22_i
 
 @pytest.fixture
 def saved_panel(qtbot, tmp_path, installed_models):
+    return _saved_panel(qtbot, tmp_path)
+
+
+def _saved_panel(qtbot, tmp_path, views=NO_VIEWS):
     db = Database(tmp_path / "t.db")
-    tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
+    tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db, views=views)
     qtbot.addWidget(tab)
     tab._workflow_dropdown.setCurrentIndex(_dropdown_index(tab, "sdxl_t2i"))
     tab._viewport.show_media = MagicMock()
@@ -3489,6 +3493,34 @@ def test_an_answer_to_a_request_since_superseded_is_dropped(saved_panel, monkeyp
     tab._on_rewritten((tab._asked + 1, "img1"), ("an old answer", ""))
 
     assert _positive(tab) == "a cat"
+
+
+class _AnswersHeldBack:
+    def __init__(self):
+        self._waiting = []
+
+    def ask(self, about, pair, words, *, owner, then, **told):
+        self._waiting.append(lambda: then(prompt_edit.work_out(*pair, words, **told)))
+
+    def answer_the_first(self):
+        self._waiting.pop(0)()
+
+
+def test_an_answer_to_a_request_made_of_an_image_since_left_is_dropped(qtbot, tmp_path,
+                                                                       installed_models, monkeypatch):
+    _rewriting(monkeypatch, answer=("a dog", ""))
+    answers = _AnswersHeldBack()
+    tab, db = _saved_panel(qtbot, tmp_path, TabViews(requests=answers))
+    cat = _image_row(db, "img1", prompt="a cat")
+    owl = _image_row(db, "img2", prompt="an owl", filename="sdxl_img2.png")
+    _request_made(db, "img2", source="img1")
+    tab.show_saved_generation(cat, [cat, owl])
+    _ask(tab, qtbot, "a dog instead")
+
+    tab.show_saved_generation(owl, [cat, owl])
+    answers.answer_the_first()
+
+    assert _positive(tab) == "an owl",         "the answer to a request made of the cat came back after the owl was shown, and rewrote the owl"
 
 
 def test_a_request_changes_each_scene_of_a_video_told_in_scenes(saved_panel, qtbot, monkeypatch):

@@ -1048,9 +1048,14 @@ def test_dropping_a_row_above_another_asks_to_move_it_there(queue):
     asked = _asked_to_move(queue)
     _four(queue)
 
+    drawn = queue.keys()
+
     _drop(queue, "d", at_row=1)
 
     assert asked == [("d", "b")]
+    assert queue.keys() == drawn, (
+        "a drop only asks for the move: the queue's rules may put the job somewhere other than "
+        "where it was let go, so the line is drawn again from the queue")
 
 
 def test_dropping_a_row_onto_the_lower_half_puts_it_after(queue):

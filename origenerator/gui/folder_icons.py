@@ -19,9 +19,10 @@ from origenerator.gallery.labels import MEDIA_LABELS
 from origenerator.gallery.output import media_type_of_row
 from origenerator.gallery.shapes import BOTH, LANDSCAPE, PORTRAIT
 from origenerator.gui import icons
+from origenerator.workflows.outside import outside_source
 
 LEVEL_LABELS = {
-    "workflow": "Workflow", "model": "Model", "lora": "LoRA",
+    "workflow": "Workflow", "site": "Site", "model": "Model", "lora": "LoRA",
     "source_image": "Source Image",
 }
 _COLLECTION_MARKS = {
@@ -61,6 +62,8 @@ def separate_mark(size: int) -> QPixmap:
 
 def folder_kind_icon(group) -> tuple[QIcon, str] | None:
     level = folder_level(group)
+    if level == "workflow" and outside_source(group.workflow_name) is not None:
+        level = "site"
     if level is not None:
         return icons.toc_initial_icon(level), LEVEL_LABELS[level]
     if isinstance(group, (MediaGroup, SettingsGroup)):

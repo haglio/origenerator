@@ -6,12 +6,22 @@ from pathlib import Path
 
 from PySide6.QtCore import QSize
 from PySide6.QtGui import QColor, QIcon, QPalette
-from shared_ui.colors import GREEN, RED, TEXT_MUTED, TEXT_PRIMARY, WHITE, YELLOW, family_palette
+from shared_ui.colors import (
+    BLUE,
+    GREEN,
+    RED,
+    TEXT_MUTED,
+    TEXT_PRIMARY,
+    WHITE,
+    YELLOW,
+    family_palette,
+)
 from shared_ui.icon_geometry import icon_names
 from shared_ui.icons import icon_pixmap, qt_icon
 from shared_ui.spacing import BUTTON_FILLING_ICON
 
 import origenerator
+from origenerator import gallery
 from origenerator.gallery.collection import (
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
@@ -22,6 +32,7 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.shapes import BOTH, LANDSCAPE, PORTRAIT
 from origenerator.gui import folder_icons, icons
 from origenerator.media import MediaType
+from origenerator.workflows.outside import outside_workflow
 
 
 def _drawn_by(monkeypatch, drawing: str) -> list:
@@ -61,7 +72,7 @@ def test_tab_close_icon_is_the_familys_cross(qtbot):
 
 def test_toc_initial_icons_render_for_each_level(qtbot):
     assert set(folder_icons.LEVEL_LABELS) == {
-        "workflow", "model", "lora", "source_image"}
+        "workflow", "site", "model", "lora", "source_image"}
     assert folder_icons.LEVEL_LABELS["lora"] == "LoRA"
     assert folder_icons.LEVEL_LABELS["source_image"] == "Source Image"
     for level in folder_icons.LEVEL_LABELS:
@@ -75,14 +86,26 @@ def test_a_lora_folder_wears_an_l(qtbot):
     assert drawn == QIcon(icons._render_toc_initial("L", YELLOW)).pixmap(48, 48).toImage()
 
 
+def test_a_sites_folder_wears_a_blue_s_where_a_workflows_wears_a_blue_w(qtbot):
+    site = gallery.WorkflowGroup("video/" + outside_workflow("a-site", MediaType.VIDEO),
+                                 outside_workflow("a-site", MediaType.VIDEO), "a-site", [])
+    workflow = gallery.WorkflowGroup("video/wan22_i2v", "wan22_i2v", "I2V WAN 2.2", [])
+
+    (site_icon, site_word), (_icon, workflow_word) = (
+        folder_icons.folder_kind_icon(site), folder_icons.folder_kind_icon(workflow))
+
+    assert (site_word, workflow_word) == ("Site", "Workflow")
+    assert site_icon.pixmap(48, 48).toImage() == QIcon(
+        icons._render_toc_initial("S", BLUE)).pixmap(48, 48).toImage()
+
+
 def test_each_toc_initial_is_tellable_from_its_siblings(qtbot):
-    drawn = [icons.toc_initial_icon(level).pixmap(48, 48).toImage()
-             for level in folder_icons.LEVEL_LABELS]
-    for i, one in enumerate(drawn):
-        for other in drawn[i + 1:]:
-            assert one != other, (
-                "each level's TOC initial is its own, so a TOC row or a Gallery pane tile says "
-                "which level it is without anyone counting indentation")
+    worn = [(letter, color.name()) for letter, color in
+            (icons._TOC_INITIALS[level] for level in folder_icons.LEVEL_LABELS)]
+    assert len(set(worn)) == len(worn), (
+        "each level's TOC initial is its own letter in its own color, so a TOC row or a Gallery "
+        "pane tile says which level it is without anyone counting indentation; a site and a "
+        "workflow share the blue of their one tier")
 
 
 def test_item_type_icons_render_for_image_and_video(qtbot):

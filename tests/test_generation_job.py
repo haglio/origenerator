@@ -80,8 +80,14 @@ def test_a_submit_run_off_the_window_touches_nothing_of_the_jobs_there(
         touched_on.append(threading.get_ident())
         job.__dict__["_kept_state"] = state
 
+    def attach(job):
+        touched_on.append(threading.get_ident())
+        wire_the_clients_signals(job)
+
+    wire_the_clients_signals = GenerationJob._attach
     monkeypatch.setattr(GenerationJob, "_state", property(
         lambda job: job.__dict__["_kept_state"], set_state), raising=False)
+    monkeypatch.setattr(GenerationJob, "_attach", attach)
     client = _client()
     client.fetch_history = MagicMock(return_value=history)
     job = GenerationJob(client, JobSpec(SDXL, SDXL.default_params()), JobFolders(
@@ -91,8 +97,7 @@ def test_a_submit_run_off_the_window_touches_nothing_of_the_jobs_there(
 
     job.start(_off_the_gui_thread)
 
-    assert len(touched_on) >= 3
-    assert set(touched_on) == {threading.get_ident()}, (
+    assert touched_on == [threading.get_ident()] * 4, (
         "the slow submit may run on another thread, while the job's signals and state are only "
         "ever touched on the thread that started it")
 

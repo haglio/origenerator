@@ -146,7 +146,7 @@ def take_record(db, video: Path, recorded: dict, *, places=_LOOK_FOR_THEM,
                 return False
             prompt_id = VideoRows(db.list_generations())(video)
         else:
-            _write_the_record(db, places, db.get_generation(prompt_id), record)
+            _write_the_record(db, db.get_generation(prompt_id), record)
     db.set_library_record(prompt_id, **library_record(recorded))
     return True
 
@@ -158,8 +158,8 @@ def library_record(recorded: dict) -> dict:
     return {column: value for column, value in kept.items() if value}
 
 
-def _write_the_record(db, places: Places | None, video_row: dict, record: Record) -> None:
-    if places is None or source_of(video_row) != GenerationSource.OUTSIDE:
+def _write_the_record(db, video_row: dict, record: Record) -> None:
+    if source_of(video_row) != GenerationSource.OUTSIDE:
         return
     rows = db.list_generations()
     record = replace(record, action=video_row.get("action") or record.action)
@@ -176,7 +176,7 @@ def _write_the_record(db, places: Places | None, video_row: dict, record: Record
     db.set_recorded_fields([{"prompt_id": row["prompt_id"], **fields} for row, fields in updates
                             if _differs(row, fields)])
     rows = db.list_generations()
-    _bring_up_to_records(db, places, rows, _kinds_by_site(rows))
+    _bring_up_to_records(db, rows, _kinds_by_site(rows))
 
 
 def scan(db, places: Places, *, grab=first_frame_of,
@@ -188,7 +188,7 @@ def scan(db, places: Places, *, grab=first_frame_of,
         held=db.library_paths() | db.trashed_library_paths())]
 
     kinds = _kinds_by_site(rows, new)
-    images = _bring_up_to_records(db, places, rows, kinds)
+    images = _bring_up_to_records(db, rows, kinds)
     brought = (made for video, record in new
                if (made := _brought_in(video, record, places, images, (grab, kinds))))
     brought_in = 0
@@ -245,7 +245,7 @@ def _frames_by_file(rows: list[dict]) -> dict[str, dict]:
             for file in parse_file_list(row.get("output_files")) if file.get("path")}
 
 
-def _bring_up_to_records(db, places: Places, rows: list[dict],
+def _bring_up_to_records(db, rows: list[dict],
                          kinds: dict[str, set[VideoKind]]) -> dict[tuple, dict]:
     frames = _frames_by_file(rows)
     made_here_from_frames = [row for row in rows if made_here(row) and _input_image(row)]

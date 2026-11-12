@@ -284,7 +284,9 @@ def test_a_side_handed_over_on_its_own_is_filled_on_its_own(qtbot, tmp_path, mon
     (tmp_path / "origenerator_cmd.txt").write_text("portrait_open_slideshow\n", encoding="utf-8")
     bridge._tick()
 
-    assert filled == ["portrait"]
+    assert filled == ["portrait"], (
+        "each of the session's Satellite Funestras goes into Origenerator mode by itself, so the "
+        "session hands this app one side at a time")
 
 
 def test_release_asks_for_the_app_back_from_the_session(qtbot, tmp_path):
@@ -866,7 +868,8 @@ def test_the_sessions_loop_key_reaches_the_slideshow_on_that_side(qtbot, tmp_pat
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
 
     _press(bridge, tmp_path, "portrait_loop")
-    assert slideshow.locked
+    assert slideshow.locked, (
+        "a slideshow of items no library maps has nothing to loop, so the press is the lock")
 
     _press(bridge, tmp_path, "portrait_loop")
     assert not slideshow.locked
@@ -999,7 +1002,9 @@ def test_a_clip_this_app_did_not_make_leaves_the_gallery_where_it_stands(qtbot, 
     _press(bridge, tmp_path, r"GO_TO|C:\library\genau\clips\scene one 0012.mp4")
 
     assert view.selected_prompt_ids() == ["i1"]
-    assert _the_room_was_told(tmp_path) == []
+    assert _the_room_was_told(tmp_path) == [], (
+        "Genau's folder holds the videos carved by hand as well: one of those is none of this "
+        "app's to show")
 
 
 def test_a_clip_the_session_names_that_this_app_made_asks_the_room_to_show_this_app(
@@ -1047,7 +1052,9 @@ def test_the_session_says_where_each_sides_hud_sits(qtbot, tmp_path):
         "portrait_hud_corner|lower_right\nportrait_hud_minimized|1\n", encoding="utf-8")
     bridge._drain_commands()
 
-    assert view.hud_place("portrait") == (HudCorner.LOWER_RIGHT, True)
+    assert view.hud_place("portrait") == (HudCorner.LOWER_RIGHT, True), (
+        "the keys that move a HUD are the room's, so the session keeps where each side's HUD sits "
+        "and tells this app")
     assert view.hud_place("landscape") == (HudCorner.UPPER_LEFT, False)
 
 

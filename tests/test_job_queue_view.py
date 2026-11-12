@@ -11,6 +11,7 @@ from PyQt6.QtGui import QDrag, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QMou
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication
 from shared_ui.colors import BLUE, BORDER_SUBTLE
+from shared_ui.spacing import GAP_SMALL
 
 from origenerator.gui.combination import Combination
 from origenerator.gui.inflight import EMPTY_QUEUE_TEXT, InFlightItem, RunReading
@@ -216,6 +217,28 @@ def test_a_strip_dragged_open_gives_the_room_to_the_line(queue):
 
     assert queue._running._frame.height() == _ROW_HEIGHT
     assert queue._scroll.height() > _ROW_HEIGHT
+
+
+def test_a_strip_dragged_open_keeps_the_thumbnail_in_its_lower_left_corner(queue):
+    queue.set_items([_item(status="running")])
+    queue.resize(800, 400)
+    QApplication.processEvents()
+    frame = queue._running._frame
+    bottom_left = frame.mapTo(queue, frame.rect().bottomLeft())
+
+    assert (bottom_left.x(), bottom_left.y()) == (0, queue.height() - 1), (
+        "the thumbnail is pinned to the Job Queue's foot, so it still fills the lower-left corner "
+        "once the Job Queue is dragged taller")
+
+
+def test_only_the_far_right_of_the_job_queue_is_held_off_the_window_edge(queue):
+    queue.set_items([_item(status="running"), _item(key="j2", status="queued")])
+    QApplication.processEvents()
+    far_right = queue._for_all.geometry().right()
+
+    assert queue.width() - 1 - far_right == GAP_SMALL, (
+        "the Job Queue goes without the family's standard pane margin so its thumbnail fills "
+        "the corner; only its far right is held off the window edge")
 
 
 def test_the_strip_can_be_dragged_taller_but_not_shorter_than_a_bar(queue):

@@ -800,13 +800,14 @@ def test_a_launch_records_its_image_though_the_line_was_read_before_the_stamp(en
         "written, so the launch records which image the run is of")
 
 
-
 def test_a_delete_takes_the_runs_being_made_of_what_it_deletes(enhance,
                                                                monkeypatch):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: row["prompt_id"] == "i1")
-    jobs = FakeReroll([FakeJob("run-a")])
+    jobs = FakeReroll()
     controller, _host = enhance(jobs=jobs)
+    controller.reconcile()
+    jobs.all_jobs.append(FakeJob("run-a"))
 
     controller.cancel_for_delete([_image("i1"), _image("i2")])
 

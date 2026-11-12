@@ -76,11 +76,11 @@ NEEDS_QT = (
 )
 
 
-def _loaded_after_importing(module: str, what: str) -> bool:
+def _importing_alone(module: str, what: str) -> subprocess.CompletedProcess:
     env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
     env["PYTHONPATH"] = os.pathsep.join(
         p for p in (str(REPO_ROOT), os.environ.get("PYTHONPATH", "")) if p)
-    result = subprocess.run(
+    return subprocess.run(
         [sys.executable, "-c",
          ("import sys\n"
          "import origenerator.content as content\n"
@@ -89,6 +89,10 @@ def _loaded_after_importing(module: str, what: str) -> bool:
          f'print("{what}" in sys.modules)')],
         cwd=REPO_ROOT, env=env, capture_output=True, text=True, check=False,
     )
+
+
+def _loaded_after_importing(module: str, what: str) -> bool:
+    result = _importing_alone(module, what)
     assert result.returncode == 0, result.stderr
     return result.stdout.strip() == "True"
 
@@ -279,6 +283,14 @@ def test_the_combine_is_drawn_with_no_database():
 def test_a_job_is_followed_with_no_database_of_its_own():
     assert _loaded_after_importing("origenerator.gui.generation_job", "origenerator.db") is False, (
         "a job owns no database: whoever launched it decides what to keep of it")
+
+
+def test_speech_imports_alone_without_the_workflows_package():
+    result = _importing_alone("origenerator.speech", "origenerator.workflows")
+
+    assert (result.returncode, result.stdout.strip()) == (0, "False"), (
+        "speech.py cannot import the workflows package at load, since that package imports "
+        "speech.py back")
 
 
 def _modules_imported_by(source_file: str) -> set[str]:

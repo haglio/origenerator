@@ -459,7 +459,7 @@ def test_the_map_reads_folder_keys_only_of_rows_of_the_items_own_workflow(monkey
     lambda rows, index: actions_lines(rows, image_index=index),
     lambda rows, index: group_keys(rows, image_index=index),
 ], ids=["surroundings", "actions_lines", "group_keys"])
-def test_the_map_works_out_once_which_image_each_video_came_from(monkeypatch, question):
+def test_one_call_works_out_once_which_image_each_video_came_from(monkeypatch, question):
     one, two = _image("i1", "a fox", seed=1), _image("i2", "a fox", seed=2)
     index = gallery.build_image_config_index([one, two])
     rows = [one, two,
@@ -470,5 +470,5 @@ def test_the_map_works_out_once_which_image_each_video_came_from(monkeypatch, qu
     question(rows, index)
 
     assert sorted(asked) == ["v1", "v2"], (
-        "every question the map asks would walk the rows again, so which image each video "
-        "came from is worked out once, for all of them")
+        "every question the map asks would walk the rows again, so one call of each of these "
+        "works out once which image each video came from, for all its questions")

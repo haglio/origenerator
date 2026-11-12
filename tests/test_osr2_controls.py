@@ -138,8 +138,8 @@ def test_the_osr2_controls_are_told_the_genau_mode():
     main_hud = osr2_controls_hud(FakeMotion()).main_hud_model
 
     assert main_hud.main_mode is MainMode.GENAU, (
-        "this app's motion is made by the app itself over what is on screen, with no playlist "
-        "of videos under it, so the OSR2 controls are told the Genau mode")
+        "this app's motion is made by the app itself over what is on screen, with no "
+        "video's funscript under it to follow, so the OSR2 controls are told the Genau mode")
 
 
 def test_a_room_paused_while_the_motion_has_the_device_sends_the_dot_home(qtbot):

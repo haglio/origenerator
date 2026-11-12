@@ -810,7 +810,9 @@ def test_a_delete_takes_the_runs_being_made_of_what_it_deletes(enhance,
 
     controller.cancel_for_delete([_image("i1"), _image("i2")])
 
-    assert jobs.cancelled == ["run-a"]
+    assert jobs.cancelled == ["run-a"], (
+        "a delete reads the jobs in flight afresh rather than a listing a redraw already holds, "
+        "so it cancels a run no redraw has seen")
 
 
 def test_cancelling_from_a_tile_leaves_the_image_exactly_as_it_was(enhance,

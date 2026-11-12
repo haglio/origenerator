@@ -145,7 +145,7 @@ def test_a_complete_overlay_is_missing_nothing(tmp_path):
         local, REPO_ROOT / "content.example.json") == ()
 
 
-def test_a_key_present_but_empty_is_not_missing(tmp_path):
+def test_a_key_left_empty_to_switch_its_feature_off_is_not_missing(tmp_path):
     example = tmp_path / "content.example.json"
     example.write_text(json.dumps({"library_root": "C:/x", "search_synonyms": [["a"]]}),
                        encoding="utf-8")
@@ -153,7 +153,8 @@ def test_a_key_present_but_empty_is_not_missing(tmp_path):
     local.write_text(json.dumps({"library_root": "D:/y", "search_synonyms": []}),
                      encoding="utf-8")
 
-    assert content.missing_overlay_keys(local, example) == ()
+    assert content.missing_overlay_keys(local, example) == (), (
+        "a key left empty is how its feature is switched off, so it is not named as missing")
 
 
 def test_no_local_overlay_at_all_is_missing_nothing(tmp_path):

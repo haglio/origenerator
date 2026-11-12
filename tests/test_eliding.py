@@ -81,7 +81,7 @@ def test_a_squeezed_label_elides_but_keeps_its_text(qtbot):
     assert label.text() == _PHRASE
 
 
-def test_a_label_with_room_keeps_the_colors_and_alignment_qts_own_label_would(qtbot):
+def test_a_label_paints_its_colors_and_alignment_as_qlabel_does(qtbot):
     def painted(label):
         qtbot.addWidget(label)
         label.setStyleSheet("color: rgb(220, 40, 40); background: rgb(30, 60, 200);")

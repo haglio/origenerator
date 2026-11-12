@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import QLabel, QWidget
 
 from origenerator import gallery, search
 from origenerator.gallery.collection import (
+    COLLECTIONS,
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
@@ -19,7 +20,7 @@ from origenerator.gallery.collection import (
     TRASH_KEY,
     FolderCollection,
 )
-from origenerator.gallery.shapes import LANDSCAPE
+from origenerator.gallery.shapes import LANDSCAPE, SHAPES_AND_BOTH
 from origenerator.gui import gallery_pane
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.gallery_pane import (
@@ -235,6 +236,28 @@ def _sixty():
 
 def _drawn(scroll, kind=ItemTile):
     return list(scroll.widget().findChildren(kind))
+
+
+def test_every_collection_is_both_gathered_and_drawn_on_every_shape(qtbot):
+    pane, scroll = _pane(qtbot)
+    pane.set_model(LibrarySnapshot([_row("a", 1)]))
+    not_answered_by_both = []
+    for which in COLLECTIONS:
+        for shape in SHAPES_AND_BOTH:
+            pane.show_empty()
+            empty_page = scroll.widget()
+            try:
+                gathered = pane.rows_for_collection(shaped_key(which, shape))
+                pane.show_collection(which, shape)
+            except KeyError:
+                not_answered_by_both.append((which, shape))
+                continue
+            if gathered is None or scroll.widget() is empty_page:
+                not_answered_by_both.append((which, shape))
+
+    assert not_answered_by_both == [], (
+        "what a collection gathers and how it draws it answer for the same collections, so a "
+        "new collection is an entry in both and neither can answer for one the other does not")
 
 
 def test_latest_draws_a_page_at_a_time_of_everything_it_lists(qtbot):
@@ -980,7 +1003,7 @@ def test_a_shut_search_section_still_holds_its_tiles_in_the_shown_order(qtbot):
         "a shut section's tiles are still built and still counted, so unfolding it is instant")
 
 
-def _what_a_click_a_double_click_and_a_right_click_ask_of(qtbot, pane, scroll, prompt_id):
+def _asked_by_the_mouse(qtbot, pane, scroll, prompt_id):
     heard = []
     pane.thumbnail_activated.connect(lambda chosen: heard.append(("shown", chosen)))
     pane.item_jump_requested.connect(lambda chosen: heard.append(("jumped to", chosen)))
@@ -1004,9 +1027,9 @@ def test_a_search_hit_answers_the_mouse_as_it_does_in_latest(qtbot):
     found.show_search_results([search.SearchTile(row=rows[0])], search.SearchTerms(
         sort_mode=search.SORT_MODEL_LORA, query="scene", outcome=None, collapsed=set()))
 
-    asked_in_latest = _what_a_click_a_double_click_and_a_right_click_ask_of(
+    asked_in_latest = _asked_by_the_mouse(
         qtbot, in_latest, latest_scroll, "a")
-    asked_of_the_hit = _what_a_click_a_double_click_and_a_right_click_ask_of(
+    asked_of_the_hit = _asked_by_the_mouse(
         qtbot, found, found_scroll, "a")
 
     assert {kind for kind, _ in asked_in_latest} >= {"shown", "jumped to", "menu"}

@@ -36,7 +36,7 @@ def offered_workflows(*, makes: MediaType | None) -> list[WorkflowTemplate]:
 
 
 RETIRED_WORKFLOW_NAMES: dict[str, str] = {
-    "wan21_ati_i2v": "WAN 2.1 I2V (Motion-Tracked)",
+    "wan21_ati_i2v": "I2V WAN 2.1 (Motion-Tracked)",
 }
 
 

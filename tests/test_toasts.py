@@ -20,7 +20,7 @@ from origenerator.win32 import APP_USER_MODEL_ID
 
 
 def _outcome(**over):
-    fields = {"kind": "Video", "display_name": "WAN 2.2 I2V", "seconds": 252.0,
+    fields = {"kind": "Video", "display_name": "I2V WAN 2.2", "seconds": 252.0,
                   "ok": True, "source": GenerationSource.GENERATED,
                   "generation": "7f0c9b2e-1111-4444-8888-aaaabbbbcccc"}
     return RunOutcome(**{**fields, **over})
@@ -74,7 +74,7 @@ def test_a_long_run_reaches_the_desktop_as_a_windows_notification(qapp, monkeypa
     toasts.note(_outcome())
 
     assert said[0][0] == APP_USER_MODEL_ID
-    assert _lines(said) == ["Video ready", "WAN 2.2 I2V · 4:12"]
+    assert _lines(said) == ["Video ready", "I2V WAN 2.2 · 4:12"]
 
 
 def test_a_run_nobody_left_the_room_for_says_nothing(qapp, monkeypatch):
@@ -195,7 +195,7 @@ def test_windows_refusing_the_heading_over_a_toast_costs_the_launch_nothing(
     toasts.note(_outcome())
 
     assert "could not be registered" in caplog.text
-    assert _lines(said) == ["Video ready", "WAN 2.2 I2V · 4:12"]
+    assert _lines(said) == ["Video ready", "I2V WAN 2.2 · 4:12"]
 
 
 def test_it_tells_windows_what_to_call_this_app_and_what_mark_to_draw(qapp, monkeypatch, tmp_path):
@@ -268,7 +268,7 @@ def test_a_mark_that_cannot_be_written_leaves_the_toast_to_speak_for_itself(
 
     toasts.note(_outcome())
 
-    assert _lines(said) == ["Video ready", "WAN 2.2 I2V · 4:12"]
+    assert _lines(said) == ["Video ready", "I2V WAN 2.2 · 4:12"]
     assert _toast(said).find("./visual/binding/image") is None
 
 

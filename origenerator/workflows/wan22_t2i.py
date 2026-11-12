@@ -17,7 +17,7 @@ from origenerator.workflows.wan_experts import wan_expert_shift_param
 class Wan22T2iWorkflow(WorkflowTemplate):
     name = "wan22_t2i"
     version = "v002"
-    display_name = "WAN 2.2 T2I"
+    display_name = "T2I WAN 2.2"
     output_type = MediaType.IMAGE
     model_keys = ("unet_high", "unet_low")
     text_reader = UMT5

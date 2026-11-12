@@ -20,7 +20,7 @@ from origenerator.workflows.prompt_readers import CLIP
 class SdxlT2iWorkflow(WorkflowTemplate):
     name = "sdxl_t2i"
     version = "v004"
-    display_name = "SDXL T2I"
+    display_name = "T2I SDXL"
     output_type = MediaType.IMAGE
     model_keys = ("checkpoint",)
     lora_keys = loras_keyed_only_when_named = LORA_KEYS

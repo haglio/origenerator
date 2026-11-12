@@ -43,7 +43,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
     """ComfyUI's own wan22_14b_i2v_dual_noise_template graph."""
     name = "wan22_i2v"
     version = "v007"
-    display_name = "WAN 2.2 I2V"
+    display_name = "I2V WAN 2.2"
     output_type = MediaType.VIDEO
     derives_size_from_input = True
     model_keys = ("unet_high", "unet_low")

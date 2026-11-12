@@ -220,7 +220,7 @@ def test_a_restore_puts_the_item_back_in_its_own_folder(qtbot, tmp_path):
 
     view.restore_from_trash(["p1"])
 
-    assert "SDXL T2I" in _workflow_rows(view._tree)
+    assert "T2I SDXL" in _workflow_rows(view._tree)
     assert view.listed_prompt_ids() == ["p1"]
     assert view._db.list_trashed() == []
 

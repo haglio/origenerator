@@ -69,7 +69,7 @@ class OutsideWorkflow(WorkflowTemplate):
     @property
     def display_name(self) -> str:
         site = shown_name(self.source)
-        return f"{site} {self.kind}" if self.kind else site
+        return f"{self.kind} {site}" if self.kind else site
 
     def default_params(self) -> dict:
         return {pd.key: pd.default for pd in self.param_definitions()}

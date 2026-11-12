@@ -230,7 +230,7 @@ def test_edit_individual_in_the_genau_lane_opens_the_looping_workflow_as_it_star
     assert shown == []
     config = view._generate_pane.current_generate_tab().current_config()
     assert WORKFLOW_REGISTRY[config.workflow_name].display_name == (
-        "WAN 2.2 I2V (Looping)")
+        "I2V WAN 2.2 (Looping)")
     assert config.params["input_image"] == "sdxl_pick.png [output]"
     assert (config.params["positive_prompt"], config.params["negative_prompt"]) == ("", "")
     assert config.params["frame_count"] == looping.default_params()["frame_count"]

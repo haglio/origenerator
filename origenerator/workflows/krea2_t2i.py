@@ -41,7 +41,7 @@ def _diffusion_model_loader(unet: str) -> dict:
 class Krea2T2iWorkflow(WorkflowTemplate):
     name = "krea2_t2i"
     version = "v002"
-    display_name = "Krea 2 T2I"
+    display_name = "T2I Krea 2"
     output_type = MediaType.IMAGE
     model_keys = ("unet",)
     lora_keys = LORA_KEYS

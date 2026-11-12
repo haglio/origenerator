@@ -591,7 +591,7 @@ def test_a_sites_videos_made_from_images_and_from_words_are_two_workflows_named_
         "c1_topaz.mp4": _made_from_an_image("turn to the left", "a quiet shore", "22"),
         "c2_topaz.mp4": _made_from_words("a slow walk on the shore", "11")})
 
-    assert _workflow_folders(db, "Videos") == ["a-site I2V", "a-site T2V"]
+    assert _workflow_folders(db, "Videos") == ["I2V a-site", "T2V a-site"]
 
 
 def test_a_site_whose_videos_are_all_made_from_words_keeps_its_own_name(tmp_path):
@@ -606,7 +606,7 @@ def test_a_site_whose_videos_are_all_made_from_images_names_their_kind(tmp_path)
     db = _brought_in_with_records(tmp_path, {
         "c1_topaz.mp4": _made_from_an_image("turn to the left", "a quiet shore", "22")})
 
-    assert _workflow_folders(db, "Videos") == ["a-site I2V"]
+    assert _workflow_folders(db, "Videos") == ["I2V a-site"]
 
 
 def test_a_video_made_from_an_image_is_filed_under_that_images_folder(tmp_path):
@@ -635,7 +635,7 @@ def test_videos_brought_in_under_their_sites_name_move_to_their_kinds_at_the_nex
 
     scan(db, _places(tmp_path), grab=_still)
 
-    assert _workflow_folders(db, "Videos") == ["a-site I2V", "a-site T2V"]
+    assert _workflow_folders(db, "Videos") == ["I2V a-site", "T2V a-site"]
 
 
 def test_a_family_animated_with_two_models_is_a_folder_of_its_own_under_each(tmp_path):

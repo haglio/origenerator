@@ -2631,7 +2631,7 @@ def _note(tab):
     return words.replace("\u200b", "").lstrip("\ufffc\xa0 ")
 
 
-_RETIRED_NOTE = ("This was made with WAN 2.1 I2V (Motion-Tracked), which has been "
+_RETIRED_NOTE = ("This was made with I2V WAN 2.1 (Motion-Tracked), which has been "
                  "retired, so no new ones can be made. Select a workflow above to make something new.")
 
 
@@ -2696,7 +2696,7 @@ def test_generate_says_why_it_is_grayed_out_beside_such_a_video(saved_panel):
     tab._apply_generate_caption()
 
     assert not tab._generate_pair.isEnabled()
-    assert tab._generate_btn.toolTip() == ("WAN 2.1 I2V (Motion-Tracked) has been "
+    assert tab._generate_btn.toolTip() == ("I2V WAN 2.1 (Motion-Tracked) has been "
                                              "retired — select a workflow first")
 
 
@@ -2814,7 +2814,7 @@ def test_a_model_installed_but_not_made_for_the_workflow_says_so_rather_than_not
 
     mark = tab._param_form._warning_marks["checkpoint"]
     assert (mark.isHidden(), mark.toolTip()) == (
-        False, ("an_old_look (full size) isn't made for SDXL T2I, so it isn't offered here. "
+        False, ("an_old_look (full size) isn't made for T2I SDXL, so it isn't offered here. "
                 "Click to use reapony_v80."))
     assert _note(tab) == ""
     assert tab._generate_pair.isEnabled()

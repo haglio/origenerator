@@ -20,6 +20,7 @@ from origenerator.gallery.collection import LATEST_KEY
 from origenerator.gallery.shapes import SEPARATE, TOGETHER
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import icons
+from origenerator.gui.collapsible_section import FoldHeader
 from origenerator.gui.gallery_view import GalleryView, Shared
 from origenerator.gui.generate_pane import GeneratePane
 from origenerator.gui.generate_tab import GenerateTab
@@ -174,13 +175,16 @@ def test_fun_time_gallery_has_no_chevron_to_fold_its_toc_away(qtbot, monkeypatch
         return draw(name, *how, **more)
 
     monkeypatch.setattr(icons, "qt_icon", noting)
-    _fun_time_view(qtbot)
+    view = _fun_time_view(qtbot)
+    view.grab()
 
-    sideways = [name for name in asked if name in ("chevron_left", "chevron_right")]
+    folds = [header.fold for header in view.findChildren(FoldHeader)
+             if not view._generate_pane.isAncestorOf(header)]
+    sideways = [name for name in asked + folds if name in ("chevron_left", "chevron_right")]
     assert sideways == ["chevron_left", "chevron_right"], (
-        "the only sideways chevrons drawn are one left and one right, for Back and Forward:"
-        " one that folded the TOC away would read as a third of them, and folding gains a"
-        " column this narrow very little")
+        "outside the Generate pane's sections the only sideways chevrons are Back's and"
+        " Forward's: one that folded the TOC away would read as a third of them, and folding"
+        " gains a column this narrow very little")
 
 
 def test_fun_time_gallery_opens_its_toc_at_the_width_a_window_of_its_own_starts_from(qtbot):

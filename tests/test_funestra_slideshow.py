@@ -551,8 +551,8 @@ def test_culling_tells_the_funestra_to_drop_it_before_deleting_it(qtbot, tmp_pat
 
     assert deleted == ["id-1"]
     assert queued_at_delete[:1] == ["TRASH"], (
-        "Windows will not move a file a process still has open, and the Funestra is playing"
-        " it, so the Funestra is told to drop it before its generation is deleted")
+        "the Funestra is playing the condemned file and holds it open, so it is told to drop"
+        " it before the generation is deleted")
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
     assert played == ["two.png", "three.png"]
 

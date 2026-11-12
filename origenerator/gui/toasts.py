@@ -10,6 +10,7 @@ from PyQt6.QtCore import QObject, Qt, QTimer
 from PyQt6.QtGui import QGuiApplication, QIcon
 from PyQt6.QtWidgets import QSystemTrayIcon
 from shared_ui.alert import Level, icon_pixmap_for
+from shared_ui.app_icon import CANVAS
 from shared_ui.preview import Preview, taskbar_identity, window_title
 from shared_ui.preview_icon_pil import in_preview_ink
 
@@ -27,8 +28,6 @@ from origenerator.win32 import (
 logger = logging.getLogger(__name__)
 
 APP_NAME = "Origenerator"
-
-_MARK_PX = 256
 
 _TOAST_MARKS = {
     True: ("toast-ready.png", Level.INFO),
@@ -59,7 +58,7 @@ def _the_apps_mark(shown_as: Preview | None) -> Path:
     mark = _where_marks_live() / (
         "toast.png" if shown_as is None else "toast-preview.png")
     mark.parent.mkdir(parents=True, exist_ok=True)
-    letter = render_icon(_MARK_PX)
+    letter = render_icon()
     (letter if shown_as is None else in_preview_ink(letter)).save(mark)
     return mark
 
@@ -70,7 +69,7 @@ def _the_marks_beside_a_toast() -> dict[bool, Path | None]:
         mark = _where_marks_live() / name
         try:
             mark.parent.mkdir(parents=True, exist_ok=True)
-            drawn = icon_pixmap_for(level, _MARK_PX)
+            drawn = icon_pixmap_for(level, CANVAS)
             marks[landed] = mark if drawn.save(str(mark)) else None
         except Exception as e:
             logger.warning("No mark to draw beside a toast: %s", e)

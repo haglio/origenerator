@@ -300,6 +300,20 @@ def test_enhance_pane_stays_up_wherever_you_are(qtbot, tmp_path):
         assert not view._enhance.pane.isHidden()
 
 
+def test_the_enhance_panel_shows_in_the_collections_what_it_shows_on_a_folder(qtbot, tmp_path):
+    view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._enhance.pane._steps.setValue(33)
+
+    for which in (LATEST_KEY, FAVORITES_KEY, EXPERIMENTS_KEY):
+        view._tree.setCurrentItem(_collection(view, which))
+        assert view._enhance.pane.settings().params["enhance_steps"] == 33, (
+            "the enhancement settings are the app's, not a folder's, so they follow him into "
+            "the collections as they were on the folder")
+
+
 def test_the_panel_opens_on_the_settings_the_session_left(qtbot, tmp_path):
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)

@@ -684,6 +684,20 @@ def test_the_tile_the_version_list_and_the_slideshow_all_learn_of_a_run(enhance,
     assert slideshows.frames == {"i1": b"frame"}
 
 
+def test_a_slideshow_hears_of_a_run_on_an_image_outside_the_open_folder(enhance):
+    outside, inside = _image("i1", files=("one.png",)), _image("i2", files=("two.png",))
+    slideshows = FakeSlideshows()
+    controller, _host = enhance(FakeHost(rows=[outside, inside], group=FakeGroup([inside])),
+                                jobs=FakeReroll([FakeJob("run-a", input_image="one.png")]),
+                                slideshows=slideshows)
+
+    controller.reconcile()
+
+    assert slideshows.told == {"i1": "running"}, (
+        "a slideshow of a collection plays items from anywhere, so the slideshows hear of runs "
+        "on every image in the library, not only the open folder's")
+
+
 def test_a_run_from_before_the_stamp_is_matched_by_the_file_it_reads(enhance):
     read, other = _image("i1", files=("one.png",)), _image("i2", files=("two.png",))
     db = FakeDB([read, other])

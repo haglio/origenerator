@@ -15,8 +15,9 @@ from funestra.playlist import PlaylistItem, read_playlist
 from funestra.satellite_hud import parse_hud
 from funestra.status import FunestraStatus, status_fields
 
+from origenerator import osr2_driver
 from origenerator.fun_time_mode import FunestraChannel
-from origenerator.funscript import funscript_path_for
+from origenerator.funscript import funscript_path_for, synthesize_actions, write_funscript
 from origenerator.gui import slideshow_pass
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow, Hosting, Playing, Seat
@@ -301,6 +302,18 @@ def test_a_video_the_session_s_funestra_plays_is_none_on_this_app_s_own_screen(q
     slideshow = _slideshow(qtbot, tmp_path, items=[("clip.mp4", "video", "id-1")])
 
     assert slideshow.video_on_screen() is None
+
+
+def test_the_osr2_follows_nothing_on_a_session_s_funestra(qtbot, tmp_path, monkeypatch):
+    places = OutputPlaces.in_one_folder(tmp_path / "output")
+    monkeypatch.setattr(osr2_driver, "OUTPUT_PLACES", places)
+    script = funscript_path_for("clip.mp4", places=places)
+    script.parent.mkdir(parents=True)
+    write_funscript(script, synthesize_actions(2.0, hz=1.0))
+    slideshow = _slideshow(qtbot, tmp_path, items=[("clip.mp4", "video", "id-1")])
+
+    assert slideshow.osr2_drive_target() is None, (
+        "on a session's Funestra the OSR2 is the Main Funestra's, so this app's switch drives nothing")
 
 
 def test_the_funestra_is_told_how_long_an_image_holds_that_nothing_holds_it_and_to_read_the_list(

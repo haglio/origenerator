@@ -86,7 +86,7 @@ def test_a_run_nobody_left_the_room_for_says_nothing(qapp, monkeypatch):
     assert said == []
 
 
-def test_a_failed_run_wears_the_warning_mark(qapp, monkeypatch):
+def test_ready_and_failed_runs_write_marks_of_their_own(qapp, monkeypatch):
     marks = _marks_beside_a_toast(Toasts(QIcon()), monkeypatch)
 
     assert marks[False].name == "toast-failed.png"

@@ -152,9 +152,9 @@ def test_a_tick_half_a_tick_late_still_finds_the_device_short_of_its_target(qtbo
         driver.poll()
     outlasts_the_wait = [i / 1000 > half_a_tick_late for _pos, i in broker.positions[sent:]]
     assert outlasts_the_wait == [True] * 4, (
-        "each command gives the device longer than a tick, so a tick that runs a little late"
-        " still finds it short of its target and re-aims it; under a tick it arrives early,"
-        " stands still, then sprints for the next")
+        "each command gives the device comfortably longer than a tick, so a tick half a tick"
+        " late still finds it short of its target and re-aims it; under a tick it arrives"
+        " early, stands still, then sprints for the next")
 
 
 def test_stopping_parks_the_device(qtbot):

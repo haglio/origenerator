@@ -5,6 +5,7 @@ from collections.abc import Callable, Hashable, Iterable
 from typing import NamedTuple
 
 from app_support.comfy_file_refs import frame_name
+from app_support.gallery_rows import VideoRows
 from app_support.video_action import STORED_ACTIONS_KEY
 from app_support.watch_weights import NEUTRAL_WEIGHT, WATCH_BLOCK, WEIGHT_KEY, weight_for
 from funestra.video_families import FRAME_OF_VIDEO
@@ -24,7 +25,6 @@ from origenerator.gallery.signatures import parse_params
 from origenerator.gallery.source_image import start_images_among
 from origenerator.generation_state import GenerationSource, made_here, source_of
 from origenerator.media import MediaType, media_type_from_filename
-from origenerator.video_rows import VideoRows
 from origenerator.workflows.outside import recorded_block
 
 _NOTHING_FILED = VideoEntry(path="", weight=NEUTRAL_WEIGHT)

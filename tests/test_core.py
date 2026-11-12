@@ -10,6 +10,7 @@ from unittest.mock import patch
 from xml.etree import ElementTree
 
 import pytest
+import shiboken6
 from app_support import loading_screen as launchers_screen
 from app_support.file_channel import read_key_values
 from app_support.frame_channel import _HEADER
@@ -64,7 +65,11 @@ from tests.test_combine import _listed_under_recent
 _CTRL_ALT = Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier
 
 
+_ONE_AT_A_TIME: list = []
+
+
 def _window(qtbot, tmp_path, app_state=None, *, fun_time=None, launch=None):
+    _the_window_before_goes()
     win = Core(
         ComfyUIClient(folders=SUITE_FOLDERS),
         Database(tmp_path / "t.db"),
@@ -73,7 +78,17 @@ def _window(qtbot, tmp_path, app_state=None, *, fun_time=None, launch=None):
         launch=launch,
     )
     qtbot.addWidget(win)
+    _ONE_AT_A_TIME.append(win)
     return win
+
+
+def _the_window_before_goes():
+    """A restart is a new process, so the window closed before it is gone by then; under Qt for Python two Cores alive at once crash the run a few hundred tests later."""
+    while _ONE_AT_A_TIME:
+        before = _ONE_AT_A_TIME.pop()
+        if shiboken6.isValid(before):
+            before.close()
+            shiboken6.delete(before)
 
 
 def test_every_saved_preference_is_read_and_put_back_by_the_views_own_methods():
@@ -2247,3 +2262,12 @@ def test_a_window_handed_back_can_be_taken_by_the_next_session(qtbot, tmp_path):
     assert not win.windowFlags() & Qt.WindowType.FramelessWindowHint
     assert win._gallery_view._arrangement.stack is None
     qtbot.waitUntil(lambda: win.findChildren(FunTimeBridge) == [])
+
+
+def test_a_window_built_after_a_close_is_the_only_one_alive_as_after_a_real_restart(qtbot, tmp_path):
+    first = _window(qtbot, tmp_path)
+    first.close()
+
+    _window(qtbot, tmp_path)
+
+    assert not shiboken6.isValid(first)

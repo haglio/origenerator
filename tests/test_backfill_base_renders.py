@@ -29,6 +29,7 @@ from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.job_queue import JobQueue
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.comfyui_folders import SUITE_FOLDERS
+from tests.test_core import _window
 from tools import backfill_base_renders as backfill_tool
 
 _SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
@@ -377,15 +378,12 @@ def test_the_work_left_for_while_closed_reaches_the_queue(qtbot, tmp_path, monke
 def test_closing_leaves_work_for_while_closed_and_opening_takes_it_back(qtbot, tmp_path,
                                                                          monkeypatch):
     monkeypatch.setattr(downtime.config, "LIBRARY_STATE_DIR", tmp_path)
-    db = Database(tmp_path / "t.db")
-    window = Core(ComfyUIClient(folders=SUITE_FOLDERS), db, AppState(tmp_path / "ui.json"))
-    qtbot.addWidget(window)
+    window = _window(qtbot, tmp_path)
 
     window.close()
     assert downtime.work_left()
 
-    reopened = Core(ComfyUIClient(folders=SUITE_FOLDERS), db, AppState(tmp_path / "ui.json"))
-    qtbot.addWidget(reopened)
+    _window(qtbot, tmp_path)
     assert not downtime.work_left()
 
 

@@ -10,6 +10,7 @@ from app_support.comfy_file_refs import reference_basename
 
 from origenerator import config, precision, title_words
 from origenerator.precision import Precision
+from origenerator.what_from_what import kind_first
 from origenerator.workflows.model_arch import describe, safetensors_metadata
 
 _QUANTIZED_FLUX_SUFFIX = ".gguf"
@@ -79,7 +80,8 @@ def _title_and_size(value) -> tuple[str, Precision | None]:
 
 def _kept_title(value) -> str:
     stem = model_stem(value)
-    return kept_by_stem(config.MODEL_TITLES_PATH).get(stem) or _fix_title(value, stem) or stem
+    kept = kept_by_stem(config.MODEL_TITLES_PATH).get(stem)
+    return kind_first(kept) if kept else _fix_title(value, stem) or stem
 
 
 def _is_a_lora(value, installed: Path | None) -> bool:

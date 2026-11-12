@@ -23,6 +23,19 @@ def test_a_model_file_is_shown_by_its_title(titled_models):
     assert model_title("example_model.safetensors") == "Example Model v2"
 
 
+@pytest.mark.parametrize(("written", "shown"), [
+    ("Example Look Alpha 2.2 I2V v1.0", "I2V Example Look Alpha 2.2 v1.0"),
+    ("Example Base T2V 14B", "T2V Example Base 14B"),
+    ("T2I Example Model", "T2I Example Model"),
+    ("Example Model v2", "Example Model v2"),
+])
+def test_a_title_that_says_what_its_model_makes_from_what_says_it_first(
+        titled_models, written, shown):
+    titled_models({"example_model": written})
+
+    assert model_title("example_model.safetensors") == shown
+
+
 def test_a_model_file_with_no_title_is_shown_by_its_name_without_its_extension(titled_models):
     titled_models({"example_model": "Example Model v2"})
 

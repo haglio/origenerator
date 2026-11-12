@@ -16,14 +16,10 @@ from origenerator.timing import RunTiming
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 
 
-def _the_same_detectors_installed_on_every_machine(monkeypatch) -> None:
+@pytest.fixture
+def enhance_payload_on_any_machine(monkeypatch):
     monkeypatch.setattr(detail_parts, "list_detector_files",
                         lambda: ["face_yolov8m.pt", "hand_yolov8s.pt"])
-
-
-@pytest.fixture
-def enhance_payload(monkeypatch):
-    _the_same_detectors_installed_on_every_machine(monkeypatch)
     wf = WORKFLOW_REGISTRY["image_enhance"]
 
     def build(**params):
@@ -88,14 +84,15 @@ def test_a_still_workflow_costs_its_enhance_tail_like_its_base_render():
         "back through the graph for a scale factor")
 
 
-def test_a_detail_fix_costs_less_per_step_than_the_render_it_patches(enhance_payload):
-    payload = enhance_payload(
+def test_a_detail_fix_costs_less_per_step_than_the_render_it_patches(
+        enhance_payload_on_any_machine):
+    payload = enhance_payload_on_any_machine(
         enhance_steps=20, enhance_detail_fixes={"faces": 0.45, "hands": 0.5})
     costs = sampler_costs(payload)
     tail_id = _ids(payload, "KSampler")[0]
     tail = costs[tail_id][1]
     assert all(cost < tail for node, (_, cost) in costs.items() if node != tail_id)
-    assert expected_sampling_seconds(enhance_payload(
+    assert expected_sampling_seconds(enhance_payload_on_any_machine(
         enhance_steps=20,
         enhance_detail_fixes={"faces": 0.45, "hands": 0.5})) == 16, (
         "the tail's 20 steps come to 10, and each of the two fixes' cheaper 20 to 3")
@@ -105,14 +102,17 @@ def test_expected_pass_count_is_one_for_a_lone_sampler():
     assert expected_pass_count(_payload("flux_t2i_upscaled")) == 1
 
 
-def test_expected_pass_count_counts_the_tail_and_each_fix(enhance_payload):
-    payload = enhance_payload(enhance_detail_fixes={"faces": 0.45, "hands": 0.5})
-    assert expected_pass_count(payload) == 3
-    assert expected_pass_count(enhance_payload(enhance_detail_fixes={})) == 1
+def test_expected_pass_count_counts_the_tail_and_each_fix(enhance_payload_on_any_machine):
+    payload = enhance_payload_on_any_machine(enhance_detail_fixes={"faces": 0.45, "hands": 0.5})
+    assert expected_pass_count(payload) == 3, (
+        "a part with no installed detector builds no pass at all, so the fixture installs the "
+        "face and hand detectors on any machine rather than leaving the count to whatever "
+        "this machine's ComfyUI has")
+    assert expected_pass_count(enhance_payload_on_any_machine(enhance_detail_fixes={})) == 1
 
 
-def test_the_bar_does_not_refill_once_per_fix(enhance_payload):
-    payload = enhance_payload(
+def test_the_bar_does_not_refill_once_per_fix(enhance_payload_on_any_machine):
+    payload = enhance_payload_on_any_machine(
         enhance_steps=20, enhance_detail_fixes={"faces": 0.45, "hands": 0.5})
     tail = _ids(payload, "KSampler")[0]
     faces, hands = _ids(payload, "DetailerForEach")
@@ -124,8 +124,9 @@ def test_the_bar_does_not_refill_once_per_fix(enhance_payload):
     assert tracker.update(20, 20, hands) == (16, 16)
 
 
-def test_a_second_region_widens_the_total_rather_than_pinning_the_bar(enhance_payload):
-    payload = enhance_payload(
+def test_a_second_region_widens_the_total_rather_than_pinning_the_bar(
+        enhance_payload_on_any_machine):
+    payload = enhance_payload_on_any_machine(
         enhance_steps=20, enhance_detail_fixes={"faces": 0.45, "hands": 0.5})
     tail = _ids(payload, "KSampler")[0]
     faces, hands = _ids(payload, "DetailerForEach")
@@ -157,12 +158,13 @@ def test_each_sampler_pass_is_named_the_way_the_form_names_it():
     assert (names["15"], names["16"], names["24"]) == ("First pass", "Second pass", "Audio")
 
 
-def test_a_stills_second_sampler_is_named_for_the_denoise_that_marks_it(enhance_payload):
+def test_a_stills_second_sampler_is_named_for_the_denoise_that_marks_it(
+        enhance_payload_on_any_machine):
     stills = _payload("sdxl_t2i", steps=50, enhance=True)
     render, enhance = _ids(stills, "KSampler")
     names = stage_names(stills)
     assert (names[render], names[enhance]) == ("Render", "Enhance")
-    fixed = enhance_payload(enhance_detail_fixes={"faces": 0.45, "hands": 0.5})
+    fixed = enhance_payload_on_any_machine(enhance_detail_fixes={"faces": 0.45, "hands": 0.5})
     fixes = stage_names(fixed)
     tail = _ids(fixed, "KSampler")[0]
     assert [fixes[tail], *(fixes[n] for n in _ids(fixed, "DetailerForEach"))] == [

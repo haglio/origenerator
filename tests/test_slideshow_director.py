@@ -1902,6 +1902,15 @@ def test_a_named_side_holding_nothing_is_an_answer_in_itself(slideshows):
     assert director.surface_for(LANDSCAPE) is not None
 
 
+def test_standalone_a_named_shape_is_accepted_and_ignored(slideshows):
+    director, _host, made = slideshows()
+    director.open([("a.png", "image", "g1", None)])
+
+    assert [director.surface_for(shape) for shape in (None, PORTRAIT, LANDSCAPE)] == made * 3, (
+        "standalone there is one slideshow and no regions, so a command that opens with a shape"
+        " goes to that slideshow")
+
+
 def test_the_spoken_favorites_flips_f_mode_rather_than_opening_a_collection(slideshows):
     class Spoken:
         collection_key = FAVORITES_KEY

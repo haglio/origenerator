@@ -166,6 +166,28 @@ def test_it_tells_windows_what_to_call_this_app_and_what_mark_to_draw(qapp, monk
     assert tmp_path in named["icon"].parents
 
 
+def test_each_launch_writes_the_toast_heading_and_the_link_handler_again(
+        qapp, monkeypatch, tmp_path):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    marks, written = [], []
+
+    def heading(_app_id, **named):
+        marks.append(named["icon"])
+        written.append(("heading", named["icon"].exists()))
+
+    monkeypatch.setattr(toasts_module, "register_toast_identity", heading)
+    monkeypatch.setattr(toasts_module, "register_link_handler",
+                        lambda scheme, **_named: written.append(("link", scheme)))
+
+    Toasts(QIcon())
+    marks[0].unlink()
+    Toasts(QIcon())
+
+    assert written == [("heading", True), ("link", app_link.SCHEME)] * 2, (
+        "the toast's name and mark and the command a link runs are written on every launch"
+        " rather than once, so a mark that has moved or been deleted comes back")
+
+
 def test_a_previews_toasts_are_headed_by_the_feature_it_demos_beside_the_yellow_letter(
         qapp, monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))

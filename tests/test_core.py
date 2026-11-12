@@ -45,6 +45,7 @@ from origenerator.gui import core, toasts
 from origenerator.gui.core import SESSION_UI_STATE, Core, Launch
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.headset_window import CAP_PX
+from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP
 from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
@@ -857,7 +858,7 @@ def test_reconnects_a_running_i2v_reroll_by_its_frame_config(qtbot, tmp_path):
     assert key in win._gallery_view._live_jobs
 
 
-def test_reconnected_reroll_lights_its_tabs_generate_button(qtbot, tmp_path):
+def _a_restart_with_a_video_of_an_image_still_running(qtbot, tmp_path):
     db = Database(tmp_path / "t.db")
     img_params = dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
                       seed=1, positive_prompt="a face")
@@ -879,11 +880,28 @@ def test_reconnected_reroll_lights_its_tabs_generate_button(qtbot, tmp_path):
         {"config": {"workflow_name": "wan22_i2v", "params": vid_params, "seed_is_random": True},
          "title": None, "launched_runs": ["rr"]},
     ], "current": 0})
-    win = _window(qtbot, tmp_path, state)
+    return _window(qtbot, tmp_path, state)
+
+
+def test_reconnected_reroll_lights_its_tabs_generate_button(qtbot, tmp_path):
+    win = _a_restart_with_a_video_of_an_image_still_running(qtbot, tmp_path)
     win._gallery_view.refresh()
 
     tab = win._gallery_view._generate_pane.current_generate_tab()
     assert tab._generating is True
+
+
+def test_the_rebuild_after_a_restart_holds_the_running_folders_generate(qtbot, tmp_path):
+    win = _a_restart_with_a_video_of_an_image_still_running(qtbot, tmp_path)
+    tab = win._gallery_view._generate_pane.current_generate_tab()
+
+    win._gallery_view.refresh()
+
+    assert (tab._generate_pair.isEnabled(), tab._generate_btn.toolTip()) == (
+        False, ALREADY_MAKING_ONE_TIP), (
+        "each rebuild sets the front tab's Generate against the runs in flight, so once the"
+        " gallery is built after a restart, a run picked up again holds its folder's Generate as"
+        " already making one")
 
 
 def test_reconnected_job_resumes_its_persisted_progress_on_the_bar(qtbot, tmp_path):

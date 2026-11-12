@@ -31,9 +31,6 @@ QT_FREE = (
     "origenerator.boot_passes",
     "origenerator.passes_on_the_files",
     "origenerator.windows_toast",
-    "origenerator.landed_while_away",
-    "origenerator.toast_raising",
-    "origenerator.single_instance",
     "origenerator.comfyui_api",
     "origenerator.completion",
     "origenerator.inflight",
@@ -104,7 +101,18 @@ def test_a_module_that_claims_to_be_qt_free_is(module):
 
 def test_what_windows_runs_on_a_toast_click_loads_no_qt():
     assert _loaded_after_importing("origenerator.app_link", "PyQt6") is False, (
-        "Qt-free, because this is what runs on a click")
+        "Qt-free, because this is what runs on a click: a fresh process every time, whose whole"
+        " job is over before the app it starts has drawn anything")
+
+
+@pytest.mark.parametrize("module", ["origenerator.landed_while_away",
+                                    "origenerator.toast_raising",
+                                    "origenerator.single_instance"])
+def test_what_a_closing_copy_starts_to_wait_out_its_runs_loads_no_qt(module):
+    assert _loaded_after_importing(module, "PyQt6") is False, (
+        "Qt-free, because a closing copy starts a process of its own to wait out its runs in"
+        " flight, which raises the toast when one lands and asks the one-copy rule whether the"
+        " app is back")
 
 
 def test_the_experiment_policy_asks_no_language_model():
@@ -209,7 +217,11 @@ def test_timing_loads_no_database():
 
 @pytest.mark.parametrize("module", NEEDS_QT)
 def test_the_modules_that_do_need_qt_are_only_these(module):
-    assert _loaded_after_importing(module, "PyQt6") is True
+    assert _loaded_after_importing(module, "PyQt6") is True, (
+        "the control: without it the Qt-free lists could pass by importing nothing at all, and"
+        " the boundary would be decorative")
+
+
 OUTSIDE_THE_WIDGETS = (
     "radio",
     "osr2_controls_commands",
@@ -224,8 +236,13 @@ OUTSIDE_THE_WIDGETS = (
 
 @pytest.mark.parametrize("module", OUTSIDE_THE_WIDGETS)
 def test_the_app_own_machinery_is_not_in_the_widget_package(module):
-    assert (REPO_ROOT / "origenerator" / f"{module}.py").exists()
-    assert not (REPO_ROOT / "origenerator" / "gui" / f"{module}.py").exists()
+    here = (REPO_ROOT / "origenerator" / f"{module}.py").exists()
+    among_the_widgets = (REPO_ROOT / "origenerator" / "gui" / f"{module}.py").exists()
+
+    assert (here, among_the_widgets) == (True, False), (
+        "the app's own machinery left the widget package because importing a gui module dragged"
+        " device I/O and filesystem IPC with it, and a reader after the app's IPC contract had"
+        " to know to look among the widgets to find it")
 
 
 def test_populate_is_run_with_no_gallery_and_no_job():

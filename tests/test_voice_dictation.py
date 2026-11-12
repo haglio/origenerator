@@ -93,7 +93,11 @@ def test_over_only_ends_a_request_as_the_last_word():
 def test_a_mangled_lead_word_still_opens_one():
     dictation = RequestDictation()
 
-    assert dictation.push("Requesf, no hat, over.").state == COMPLETED
+    spoken = dictation.push("Requesf, no hat, over.")
+
+    assert getattr(spoken, "state", None) == COMPLETED, (
+        "\"request\" is distinctive enough that one slip is safe, the same tolerance the fix"
+        " commands allow their lead word")
 
 
 def test_a_request_that_never_hears_over_is_given_up_on():

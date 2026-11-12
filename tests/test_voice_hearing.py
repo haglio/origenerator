@@ -81,7 +81,9 @@ def test_a_quiet_sound_with_no_words_in_it_is_not_worth_a_caption(qtbot):
         hearing.start()
     hearing.close()
 
-    assert arrived == [" . . . "]
+    assert arrived == [" . . . "], (
+        "the pause detector hears quiet sounds so that a quiet word gets through, and a quiet"
+        " sound with no words in it is a chair, not something to answer")
 
 
 def test_a_sound_with_no_words_in_it_arrives_as_nothing_so_the_caption_can_say_so(qtbot):
@@ -123,7 +125,7 @@ def test_left_to_itself_it_listens_the_way_this_app_needs(qtbot, monkeypatch):
     assert (settings.model_name, settings.device_name) == ("a-model", "a-microphone")
     assert settings.pauses is not None
     assert settings.speech_hint == request_bias()
-    assert settings.miss_dir is None
+    assert settings.miss_dir is None, "nothing said here reaches the disk"
     assert isinstance(engines.verifying_listener, WhisperReader)
     assert isinstance(engines.take_down, WhisperReader)
     assert engines.take_down is not engines.verifying_listener

@@ -4,7 +4,7 @@ import time
 
 import numpy as np
 from funestra.satellite_hud import map_block_width
-from PIL import Image, ImageChops
+from PIL import Image
 from shared_ui.palette import RED
 
 from origenerator.gui import hud_queue
@@ -333,18 +333,35 @@ def test_until_a_frame_streams_the_head_shows_what_its_job_is_made_from(tmp_path
         "from rather than standing empty")
 
 
-def test_three_dots_under_the_rows_say_the_line_runs_on_past_the_rows_drawn():
-    line = [_item(f"j{number}") for number in range(ROWS + 1)]
-    runs_on, targets = _painted(queue_section(line, 0))
-    all_drawn, _targets = _painted(queue_section(line[:ROWS], 0))
+def _icons_pasted(monkeypatch) -> list:
+    pasted = []
+    real = hud_queue.paste_icon
+
+    def recording(image, name, frame, color):
+        pasted.append((name, frame))
+        real(image, name, frame, color)
+
+    monkeypatch.setattr(hud_queue, "paste_icon", recording)
+    return pasted
+
+
+def _dots_under_the_rows(pasted, line) -> list[bool]:
+    pasted.clear()
+    _image, targets = _painted(queue_section(line, 0))
     last_row_foot = max(y + height for (_x, y, _w, height), button in targets
                         if button.command.startswith(f"{OPEN}|"))
+    return [frame[1] >= last_row_foot for name, frame in pasted if name == "more"]
 
-    changed = ImageChops.difference(runs_on, all_drawn).getbbox()
 
-    assert changed is not None, (
-        "the three dots below the rows say the line runs on past the rows drawn")
-    assert changed[1] >= last_row_foot
+def test_three_dots_under_the_rows_say_the_line_runs_on_past_the_rows_drawn(monkeypatch):
+    pasted = _icons_pasted(monkeypatch)
+    line = [_item(f"j{number}") for number in range(ROWS + 1)]
+
+    marks = [_dots_under_the_rows(pasted, line), _dots_under_the_rows(pasted, line[:ROWS])]
+
+    assert marks == [[True], []], (
+        "the family's three dots, as the map's own axes say it, stand under the rows to say "
+        "the line runs on past the rows drawn")
 
 
 def _white_columns(image, head) -> list[int]:
@@ -353,13 +370,9 @@ def _white_columns(image, head) -> list[int]:
     return [x for x in range(left, right) if image.getpixel((x, middle))[:3] == (255, 255, 255)]
 
 
-def _between_plus_and_video(image, head) -> tuple[int, int, int, int]:
-    left, top, _right, bottom = head
-    video = _white_columns(image, head)[0]
-    inked = np.asarray(image.crop((left, top, video, bottom)))[..., 3].max(axis=0)
-    gaps = [x for x in range(1, len(inked)) if inked[x] == 0 and inked[x - 1] > 0]
-    plus_ends = left + gaps[1]
-    return plus_ends, top, video, bottom
+def _inked_after_the_video(image, head) -> bool:
+    _left, top, right, bottom = head
+    return _inked(image.crop((_white_columns(image, head)[-1] + 1, top, right, bottom)))
 
 
 def test_a_source_video_whose_prompt_was_edited_stands_in_parentheses_at_the_head(tmp_path):
@@ -370,14 +383,11 @@ def test_a_source_video_whose_prompt_was_edited_stands_in_parentheses_at_the_hea
     edited, edited_head = _head(queue_section([_item(
         "j1", status="running", source_image=start, source_video_thumbnail=video,
         prompt_edited=True)], 0))
-    _left, top, right, bottom = edited_head
-    after_the_video = (_white_columns(edited, edited_head)[-1] + 1, top, right, bottom)
 
-    marks = [_inked(image.crop(_between_plus_and_video(image, rect)))
-             for image, rect in ((as_made, head), (edited, edited_head))]
-    marks.append(_inked(edited.crop(after_the_video)))
+    marks = [_white_columns(edited, edited_head)[0] > _white_columns(as_made, head)[0],
+             _inked_after_the_video(as_made, head), _inked_after_the_video(edited, edited_head)]
 
-    assert marks == [False, True, True], (
+    assert marks == [True, False, True], (
         "a source video whose prompt was edited stands in parentheses, which a video as it was "
         "made does not")
 

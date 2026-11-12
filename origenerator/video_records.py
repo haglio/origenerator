@@ -25,7 +25,7 @@ from origenerator.gallery.source_image import start_images_among
 from origenerator.generation_state import GenerationSource, made_here, source_of
 from origenerator.media import MediaType, media_type_from_filename
 from origenerator.video_rows import VideoRows
-from origenerator.workflows.outside import PLACES
+from origenerator.workflows.outside import recorded_block
 
 _NOTHING_FILED = VideoEntry(path="", weight=NEUTRAL_WEIGHT)
 SOURCE_IMAGE = "source_image"
@@ -69,9 +69,7 @@ def _source_image(video: dict, start_image: dict | None) -> dict | None:
 
 
 def _recorded(row: dict, made: MediaType) -> dict:
-    params = parse_params(row.get("params_json"))
-    return {key: params[place] for key, place in PLACES[made].items()
-            if params.get(place) not in (None, "")}
+    return recorded_block(parse_params(row.get("params_json")), made)
 
 
 class GalleryRecords:

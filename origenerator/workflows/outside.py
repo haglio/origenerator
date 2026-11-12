@@ -17,6 +17,11 @@ PLACES = {
 }
 
 
+def recorded_block(params: dict, made: MediaType) -> dict:
+    return {key: params[place] for key, place in PLACES[made].items()
+            if params.get(place) not in (None, "")}
+
+
 class VideoKind(StrEnum):
     IMAGE_TO_VIDEO = "I2V"
     TEXT_TO_VIDEO = "T2V"

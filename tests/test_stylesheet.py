@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from PIL import Image
 from PyQt6.QtCore import QPoint
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
@@ -34,6 +35,7 @@ from origenerator.gui.stylesheet import (
     build_stylesheet,
     dress_application,
 )
+from origenerator.spin_arrows import arrow_paths
 
 
 def test_the_stylesheet_is_qss_with_every_shared_ui_token_resolved():
@@ -196,6 +198,14 @@ def test_a_step_button_sits_one_step_lighter_under_the_pointer(qtbot, pointer):
     pointer.on(spinner, down.center())
 
     assert spinner.grab().toImage().pixelColor(ground).name() == hovered(at_rest).name()
+
+
+def test_the_drawn_arrow_is_narrower_than_the_step_button_it_sits_in(qtbot, tmp_path):
+    up, _ = arrow_paths(TEXT_PRIMARY, tmp_path)
+
+    assert Image.open(up).width < _spin_down_rect(_styled_spinner(qtbot)).width(), (
+        "the arrow is a small triangle sized to sit inside the step button the stylesheet gives "
+        "the spinner")
 
 
 def _tab_bar_image(qtbot):

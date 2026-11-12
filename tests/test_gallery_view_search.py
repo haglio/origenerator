@@ -546,6 +546,23 @@ def test_the_model_lora_sort_bands_the_results_by_model_and_lora(qtbot):
     assert headings[0].endswith("(2)")
 
 
+def test_a_sectioned_search_in_a_tall_gallery_leaves_each_section_its_own_height(qtbot):
+    view = GalleryView(FakeDB([_i2v_video("v1", "styleA", prompt="a cat"),
+                               _i2v_video("v2", "styleB", prompt="a cat")]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _search_for(view, "cat")
+    view.set_search_sort(search.SORT_MODEL_LORA)
+    view.resize(900, 2400)
+    view.show()
+    column = view._scroll.widget().layout()
+    column.activate()
+    section = column.itemAt(1).widget()
+
+    assert section.height() == section.layout().heightForWidth(section.width()), (
+        "sections stay their own height and the slack falls to the end of the column")
+
+
 def test_the_model_lora_order_remembered_under_its_old_name_comes_back(qtbot):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)

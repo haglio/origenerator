@@ -772,6 +772,27 @@ def test_a_curated_action_opened_shows_the_frame_alone(combine, monkeypatch):
     assert tab.combination == Combination("img-thumb.png")
 
 
+def test_a_curated_action_opened_shows_the_images_full_size_file_over_its_thumbnail(
+        combine, monkeypatch, tmp_path):
+    output = tmp_path / "output"
+    output.mkdir()
+    (output / "one.png").write_bytes(b"pixels")
+    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
+    monkeypatch.setattr(module.action_settings, "pinned_settings",
+                        lambda c, i: {"workflow": VIDEO_WORKFLOW})
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, VIDEO_WORKFLOW, FakeWorkflow())
+    monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
+    monkeypatch.setattr(module.gallery, "written_params", lambda s, r, wf: {"seed": 3})
+    tab = FakeGenerateTab()
+    controller, _host = combine(db=FakeDB([_image("img")]), tabs=FakeTabs(tab))
+
+    controller._open_category("img", "alpha")
+
+    assert tab.combination == Combination(str(output / "one.png")), (
+        "a pane this big would be enlarging the stored thumbnail, so the full-size output is "
+        "shown where it is a still")
+
+
 def _nothing_assigned(monkeypatch):
     monkeypatch.setattr(module.animation_settings, "settings_for",
                         lambda lane, action, state: None)

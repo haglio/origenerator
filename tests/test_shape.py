@@ -10,7 +10,7 @@ from PyQt6.QtCore import QPoint, QRect, Qt
 from PyQt6.QtWidgets import QApplication, QFrame, QLabel
 from shared_ui.colors import BORDER_SUBTLE
 
-from origenerator import gallery
+from origenerator import gallery, item_shape
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
@@ -41,6 +41,7 @@ from origenerator.item_shape import (
     shaped_key,
     split_key,
 )
+from origenerator.output_places import OutputPlaces
 from tests.gallery_view_support import FakeDB, _image, _row, _shape_rows
 from tests.test_folder_tree import _shown
 from tests.test_icons import (
@@ -128,6 +129,19 @@ def test_a_video_with_a_thumbnail_goes_by_its_thumbnail_before_its_start_frame(t
     _thumbed(video, tmp_path, 160, 90)
 
     assert row_shape(video) == "landscape"
+
+
+def test_an_image_whose_thumbnail_and_file_disagree_goes_by_its_thumbnail(tmp_path, monkeypatch):
+    places = OutputPlaces.in_one_folder(tmp_path / "output")
+    monkeypatch.setattr(item_shape, "OUTPUT_PLACES", places)
+    image = _row("i1", "image_enhance", {"positive_prompt": "scene seven"}, "image_enhance_i1.png")
+    places.comfyui.mkdir()
+    Image.new("RGB", (90, 160)).save(places.comfyui / "image_enhance_i1.png")
+    _thumbed(image, tmp_path, 160, 90)
+
+    assert row_shape(image) == "landscape", (
+        "the thumbnail is read before the file: a header read of a small file that keeps "
+        "the item's aspect")
 
 
 def test_a_folder_holds_itself_and_the_folders_below_it_on_the_same_shape_only():

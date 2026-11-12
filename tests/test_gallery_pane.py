@@ -103,7 +103,7 @@ class _NothingEnhancing:
 
 
 def _pane_host(lead_tiles=lambda group: LeadTiles(), selected=None,
-               animated_preview=lambda row: None):
+               animated_preview=lambda row: None, folder_context=lambda key: ""):
     return PaneHost(
         image_rows=list,
         animated_preview=animated_preview,
@@ -113,7 +113,7 @@ def _pane_host(lead_tiles=lambda group: LeadTiles(), selected=None,
         item_name=lambda prompt_id: f"item {prompt_id}",
         tree=TreeNavigation(
             selected_folder_key=lambda: selected,
-            folder_context=lambda key: "",
+            folder_context=folder_context,
             group_for_key=lambda key: None,
         ),
     )
@@ -308,6 +308,40 @@ def test_a_folder_of_folders_draws_a_page_of_them_at_a_time(qtbot):
     pane.show_folder_tiles(folders)
 
     assert len(_drawn(scroll, FolderTile)) == gallery_pane._PAGE
+
+
+_TWO_OF_ONE_NAME = [gallery.SettingsGroup(key="image/alpha/k1", label="30 steps", rows=[_row("a", 1)]),
+                    gallery.SettingsGroup(key="image/beta/k2", label="30 steps", rows=[_row("b", 2)])]
+_WHERE_EACH_SITS = {"image/alpha/k1": "Images › Alpha", "image/beta/k2": "Images › Beta"}
+
+
+def _paths_each_folder_wears(scroll):
+    return {tile.key: _WHERE_EACH_SITS[tile.key] in {label.toolTip() for label in tile.findChildren(QLabel)}
+            for tile in _drawn(scroll, FolderTile)}
+
+
+def test_folders_of_one_name_gathered_together_are_each_captioned_with_where_it_sits(qtbot):
+    pane, scroll = _pane(qtbot, host=_pane_host(folder_context=_WHERE_EACH_SITS.get))
+
+    pane.show_custom_collection(gallery.CustomCollection(
+        key="custom:1", label="mine", children=_TWO_OF_ONE_NAME, rows=[], folder_id=1))
+
+    assert _paths_each_folder_wears(scroll) == {"image/alpha/k1": True, "image/beta/k2": True}, (
+        "a grouping can hold two folders of one name from opposite corners of the TOC, so each "
+        "is captioned with the path above it")
+
+
+def test_folders_of_one_name_found_by_a_search_are_each_captioned_with_where_it_sits(qtbot):
+    pane, scroll = _pane(qtbot, host=_pane_host(folder_context=_WHERE_EACH_SITS.get))
+
+    pane.show_search_results(
+        [search.SearchTile(row=group.rows[0], group=group) for group in _TWO_OF_ONE_NAME],
+        search.SearchTerms(sort_mode=search.SORT_RECENT, query="steps", outcome=None,
+                           collapsed=set()))
+
+    assert _paths_each_folder_wears(scroll) == {"image/alpha/k1": True, "image/beta/k2": True}, (
+        "a search can find two folders of one name from opposite corners of the TOC, so each "
+        "is captioned with the path above it")
 
 
 def test_a_page_too_short_to_fill_the_pane_draws_on_until_the_pane_is_full(qtbot):

@@ -122,7 +122,7 @@ def test_an_empty_line_says_what_it_is_for(queue):
     assert queue._hint.isVisible(), (
         "a blank half of a laid-out Job Queue reads as something that failed to draw")
     assert queue._hint.text() == EMPTY_QUEUE_TEXT
-    assert queue._hint.objectName() == "estimateLabel", (
+    assert queue._hint.objectName() == "mutedLabel", (
         "in the muted style, it reads as a note about the space, not as a row in it")
 
 

@@ -344,7 +344,7 @@ class GenerateTab(DropZones):
         self._cannot_remake_note.setWordWrap(True)
         self._metadata_section.add_note(self._cannot_remake_note)
         self._estimate_label = ElidingLabel()
-        self._estimate_label.setObjectName("estimateLabel")
+        self._estimate_label.setObjectName("mutedLabel")
         self._metadata_section.add_line(TYPICAL_TIME, self._estimate_label)
 
     def _reflect_metadata(self) -> None:

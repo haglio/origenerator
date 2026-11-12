@@ -80,7 +80,7 @@ class CombinationView(QWidget):
         self.close_paren_label = QLabel(")")
         self._parens = (self.open_paren_label, self.close_paren_label)
         for operator in (self.plus_label, *self._parens):
-            operator.setObjectName("estimateLabel")
+            operator.setObjectName("mutedLabel")
         for paren in self._parens:
             paren.hide()
         for label in (self.image_label, self.plus_label, self.open_paren_label,

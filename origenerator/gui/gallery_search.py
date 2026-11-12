@@ -90,7 +90,7 @@ class GallerySearchController(QObject):
         field_row.addWidget(self.search_all)
 
         self._count = QLabel("")
-        self._count.setObjectName("estimateLabel")
+        self._count.setObjectName("mutedLabel")
         self._sort_dropdown = NoWheelDropdown()
         for label, mode in _SORTS:
             self._sort_dropdown.addItem(label, mode)

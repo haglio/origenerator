@@ -103,6 +103,22 @@ def test_clicking_the_favorite_icon_on_a_leaf_emits_favorite_clicked(qtbot):
     assert fired == ["m/w/mo/key"]
 
 
+def test_the_star_a_press_favorites_with_is_the_star_that_then_stays_filled(qtbot):
+    tree, leaf = _tree_with_an_indented_leaf(qtbot)
+    star, _delete = _action_rects(tree.visualRect(tree.indexFromItem(leaf)))
+    bare = _pixels_within(tree, leaf, star)
+    _hover_over(qtbot, tree, leaf)
+    offered = _pixels_within(tree, leaf, star)
+
+    qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=star.center())
+    leaf.setData(0, _ROLE, _Group("m/w/mo/key", True))
+
+    assert offered != bare, "a hover offers the star where a press favorites the folder"
+    assert _wears_within(tree, leaf, star, _is_green), (
+        "the star is both the favorite button and the favorite mark, so the star a press "
+        "lands on is the one that then stays, filled, where it was")
+
+
 def _is_red(color) -> bool:
     return color.red() > color.green() + 50 and color.red() > color.blue() + 50
 
@@ -677,9 +693,13 @@ def _pixels_from(tree, item, left: int) -> list:
     return [(x, color.name()) for x, color in _row_pixels(tree, item) if x >= left]
 
 
+def _pixels_within(tree, item, columns: QRect) -> list:
+    return [(x, color) for x, color in _row_pixels(tree, item)
+            if columns.left() <= x <= columns.right()]
+
+
 def _wears_within(tree, item, columns: QRect, ink) -> bool:
-    return any(ink(color) for x, color in _row_pixels(tree, item)
-               if columns.left() <= x <= columns.right())
+    return any(ink(color) for _x, color in _pixels_within(tree, item, columns))
 
 
 def test_the_picked_folder_is_marked_by_its_blue_ground_alone(qtbot):

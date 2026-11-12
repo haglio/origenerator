@@ -32,7 +32,9 @@
     "combined_labels",
     "shape",
     "video_seconds",
-    "genau_flipped"
+    "genau_flipped",
+    "video_resolution",
+    "video_aspect_ratio"
   ],
   "params_model_keys": [
     "unet_high",

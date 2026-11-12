@@ -8,13 +8,14 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import NamedTuple
 
-from app_support.gallery_records import GalleryReading
+from app_support.gallery_records import GalleryReading, size_labels
 from app_support.kino_folder import is_ai_video
 
 from origenerator import config
 from origenerator.evolver_agreement import evolver_checkout, records_folder
 from origenerator.evolver_export import PARTIAL_MARKER
-from origenerator.media import MediaType, media_type_from_filename, video_header
+from origenerator.generation_state import made_here
+from origenerator.media import MediaType, VideoHeader, media_type_from_filename, video_header
 
 FILE_NAME = "gallery_records.json"
 
@@ -26,17 +27,19 @@ class PlayedFrom(NamedTuple):
 
 
 def records_for_the_phone(rows: list[dict], played_from: PlayedFrom, *,
-                          length_of: Callable[[Path, dict], float | None]) -> dict[str, dict]:
+                          measured: Callable[[Path, dict, bool], dict]) -> dict[str, dict]:
     reading = GalleryReading(rows)
-    records = {}
+    records, measured_rows = {}, {}
     for folder in (played_from.kino, played_from.genau):
         for video in _videos_in(folder, played_from.library_root):
             row = reading.row_of(video)
             if row is None:
                 continue
             genau = folder == played_from.genau
+            row = measured_rows[row["prompt_id"]] = measured(
+                video, measured_rows.get(row["prompt_id"], row), genau)
             records[video.relative_to(played_from.library_root).as_posix()] = reading.record_of(
-                row, where=video, genau=genau, seconds=None if genau else length_of(video, row))
+                row, where=video, genau=genau)
     return records
 
 
@@ -46,11 +49,6 @@ def _videos_in(folder: Path, library_root: Path) -> Iterator[Path]:
                 and PARTIAL_MARKER not in video.name
                 and is_ai_video(video.relative_to(library_root)) and video.is_file()):
             yield video
-
-
-def measured_seconds(video: Path) -> float | None:
-    header = video_header(video)
-    return header.seconds if header is not None else None
 
 
 def _timer(seconds: float, work: Callable[[], object]) -> Callable[[], None]:
@@ -65,7 +63,7 @@ class PhoneRecords:
 
     def __init__(self, db, *, write_to: Path | None, played_from: PlayedFrom,
                  later: Callable[[float, Callable], Callable[[], None]] = _timer,
-                 measure: Callable[[Path], float | None] = measured_seconds) -> None:
+                 measure: Callable[[Path], VideoHeader | None] = video_header) -> None:
         self._db, self._write_to, self._played_from = db, write_to, played_from
         self._later, self._measure = later, measure
         self._writing = threading.Lock()
@@ -97,7 +95,7 @@ class PhoneRecords:
             return 0
         with self._writing:
             records = records_for_the_phone(self._db.list_generations(), self._played_from,
-                                            length_of=self._length_of)
+                                            measured=self._measured)
             self._write_to.parent.mkdir(parents=True, exist_ok=True)
             partial = self._write_to.with_name(self._write_to.stem + self._partial)
             partial.write_text(json.dumps(records, indent=1, sort_keys=True) + "\n",
@@ -105,10 +103,13 @@ class PhoneRecords:
             os.replace(partial, self._write_to)
         return len(records)
 
-    def _length_of(self, video: Path, row: dict) -> float | None:
-        if row.get("video_seconds") is not None:
-            return row["video_seconds"]
-        seconds = self._measure(video)
-        if seconds is not None:
-            self._db.set_library_record(row["prompt_id"], video_seconds=seconds)
-        return seconds
+    def _measured(self, video: Path, row: dict, genau: bool) -> dict:
+        wants_seconds = not genau and row.get("video_seconds") is None
+        wants_size = made_here(row) and not row.get("video_resolution")
+        header = self._measure(video) if wants_seconds or wants_size else None
+        if header is None:
+            return row
+        found = {"video_seconds": header.seconds, **size_labels(header.width, header.height)}
+        kept = {column: value for column, value in found.items() if row.get(column) in (None, "")}
+        self._db.set_library_record(row["prompt_id"], **kept)
+        return {**row, **kept}

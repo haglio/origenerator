@@ -196,6 +196,7 @@ def test_run_from_the_command_line_it_prints_only_counts(tmp_path, capsys):
         f"stars added: 1 {by_folder(1, 0, 0)}", f"counts written: 0 {by_folder(0, 0, 0)}",
         f"library records written: 1 {by_folder(1, 0, 0)}",
         f"actions added: 0 {by_folder(0, 0, 0)}", f"flips added: 0 {by_folder(0, 0, 0)}",
+        f"sizes added: 0 {by_folder(0, 0, 0)}",
         f"settings filled in: 0 {by_folder(0, 0, 0)}"]
     assert db.get_generation("out-1")["starred"] == 0
 
@@ -268,3 +269,19 @@ def test_a_flick_turned_over_in_genau_stays_turned_over_on_its_row(tmp_path):
 
     assert [db.get_generation(one)["genau_flipped"] for one in ("out-1", "out-2")] == [1, 0]
     assert counts["flips added"] == 1
+
+
+def test_the_size_a_sidecar_gave_a_video_made_here_lands_on_its_row_where_it_has_none(tmp_path):
+    library, db = tmp_path / "library", Database(tmp_path / "gallery.db")
+    _filed(library, "alpha_00007_topaz.mp4",
+           {"video": {"resolution": "832x480", "aspect_ratio": "16:9"}})
+    _filed(library, "beta_00003_topaz.mp4",
+           {"video": {"resolution": "832x480", "aspect_ratio": "16:9"}})
+    _made_here(db, "gen-1", "alpha_00007.mp4")
+    _made_here(db, "gen-2", "beta_00003.mp4", video_resolution="480x832", video_aspect_ratio="9:16")
+
+    counts = take_in(db, library)
+
+    assert [(db.get_generation(one)["video_resolution"], db.get_generation(one)["video_aspect_ratio"])
+            for one in ("gen-1", "gen-2")] == [("832x480", "16:9"), ("480x832", "9:16")]
+    assert counts["sizes added"] == 1

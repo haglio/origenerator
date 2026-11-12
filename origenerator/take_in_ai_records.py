@@ -20,16 +20,17 @@ from origenerator.ai_video_records import this_librarys_phone_records
 from origenerator.db import Database
 from origenerator.db_generations import WATCH_COLUMNS
 from origenerator.gallery.signatures import parse_params
-from origenerator.generation_state import GenerationSource, source_of
+from origenerator.generation_state import GenerationSource, made_here, source_of
 from origenerator.media import MediaType
 from origenerator.outside_videos import library_record, made_of, seed_number
 
 ORIGENERATORS_OWN = ("origenerator", "video")
 TOP_FOLDERS = ("kino", ORIGENERATORS_OWN[0], "genau")
+_SIZE_COLUMNS = (("resolution", "video_resolution"), ("aspect_ratio", "video_aspect_ratio"))
 COUNTED = ("records read", "unreadable", "no video", "no row", "left out of the gallery",
            "matched", "stars added",
            "counts written", "library records written", "actions added", "flips added",
-           "settings filled in")
+           "sizes added", "settings filled in")
 
 
 class Call(NamedTuple):
@@ -109,6 +110,9 @@ def writes_for(row: dict, record: dict) -> list[Write]:
     if _block(record, GENAU_SECTION).get(FLIPPED) is True and not row.get("genau_flipped"):
         writes.append(Write("flips added",
                             (Call("set_library_record", (prompt_id,), {"genau_flipped": 1}),)))
+    sized = {column: _block(record, "video").get(key) for key, column in _SIZE_COLUMNS}
+    if made_here(row) and not row.get("video_resolution") and all(sized.values()):
+        writes.append(Write("sizes added", (Call("set_library_record", (prompt_id,), sized),)))
     if source_of(row) == GenerationSource.OUTSIDE and (filled := _settings_filled_in(row, record)):
         writes.append(Write("settings filled in", filled))
     return writes

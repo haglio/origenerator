@@ -6,6 +6,7 @@ import threading
 from origenerator import config, warm_gun_records
 from origenerator.db import Database
 from origenerator.generation_state import GenerationSource
+from origenerator.media import VideoHeader
 from origenerator.warm_gun_records import FILE_NAME, PhoneRecords, PlayedFrom, records_for_the_phone
 from tests.media_files import write_mp4
 
@@ -40,8 +41,12 @@ def _made_here(db, prompt_id: str, filename: str, **fields) -> None:
                      **fields}])
 
 
-def _seconds(seconds: float):
-    return lambda _video, _row=None: seconds
+def _lasting(seconds: float):
+    return lambda _video, row, _genau: {**row, "video_seconds": seconds}
+
+
+def _sized(width: int, height: int, seconds: float = 5.0):
+    return lambda _video: VideoHeader(width=width, height=height, fps=16.0, frames=16.0 * seconds)
 
 
 def test_the_phone_gets_each_ai_videos_record_under_the_place_it_plays_from(tmp_path):
@@ -50,7 +55,7 @@ def test_the_phone_gets_each_ai_videos_record_under_the_place_it_plays_from(tmp_
     _outside(db, "o1", video, starred=1, recipe_category="alpha", watch_completions=3,
              watch_skips=0, watch_locks=0)
 
-    records = records_for_the_phone(db.list_generations(), played_from, length_of=_seconds(5.0))
+    records = records_for_the_phone(db.list_generations(), played_from, measured=_lasting(5.0))
 
     assert records == {"videos/videos/kino/2D/AI/portrait/scene one.mp4": {
         "video": {"prompt": "a slow walk", "seed": "7", "action": "alpha",
@@ -67,7 +72,7 @@ def test_a_copy_of_a_video_made_here_carries_that_videos_record_and_genaus_copie
     _filed(played_from.genau / "loops" / "2D" / "AI", "wan22_i2v_00001_-audio.mp4")
     _filed(played_from.genau / "loops" / "VR", "wan22_i2v_00001_-audio.mp4")
 
-    records = records_for_the_phone(db.list_generations(), played_from, length_of=_seconds(60.0))
+    records = records_for_the_phone(db.list_generations(), played_from, measured=_lasting(60.0))
 
     assert {place: record["video"]["type"] for place, record in records.items()} == {
         "videos/videos/kino/2D/AI/portrait/wan22_i2v_00001__topaz.mp4": "full_length",
@@ -84,7 +89,7 @@ def test_a_non_ai_video_a_vr_one_a_file_being_written_and_a_video_with_no_row_ar
     _filed(played_from.kino, "no row of its own.mp4")
     _filed(played_from.kino, "notes.txt")
 
-    assert records_for_the_phone(db.list_generations(), played_from, length_of=_seconds(5.0)) == {}
+    assert records_for_the_phone(db.list_generations(), played_from, measured=_lasting(5.0)) == {}
 
 
 class _Later:
@@ -105,7 +110,7 @@ class _Later:
 def _phone(tmp_path, db, later=None, measure=None) -> PhoneRecords:
     return PhoneRecords(db, write_to=tmp_path / "metadata" / FILE_NAME,
                         played_from=_played_from(tmp_path), later=later or _Later(),
-                        measure=measure or _seconds(5.0))
+                        measure=measure or _sized(832, 480))
 
 
 def _written(tmp_path) -> dict:
@@ -165,7 +170,8 @@ def test_a_preview_never_writes_the_phones_file_into_the_library(tmp_path):
 def test_a_videos_running_time_is_measured_once_ever_and_kept_on_its_row(tmp_path):
     db, later, measured = Database(tmp_path / "gallery.db"), _Later(), []
     _outside(db, "o1", _filed(_played_from(tmp_path).kino, "scene one.mp4"))
-    phone = _phone(tmp_path, db, later, measure=lambda video: measured.append(video.name) or 4.0)
+    phone = _phone(tmp_path, db, later,
+                   measure=lambda video: measured.append(video.name) or _sized(832, 480, 4.0)(video))
     phone.watch()
 
     later.run()
@@ -175,11 +181,12 @@ def test_a_videos_running_time_is_measured_once_ever_and_kept_on_its_row(tmp_pat
         ["scene one.mp4"], 4.0, [])
 
 
-def test_a_running_time_the_gallery_holds_is_never_measured_and_a_genau_copy_never_needs_one(
+def test_a_running_time_and_a_size_the_gallery_holds_are_never_measured_again(
         tmp_path):
     db, played_from = Database(tmp_path / "gallery.db"), _played_from(tmp_path)
     _outside(db, "o1", _filed(played_from.kino, "scene one.mp4"), video_seconds=600.0)
-    _made_here(db, "m1", "wan22_i2v_00001_.mp4")
+    _made_here(db, "m1", "wan22_i2v_00001_.mp4", video_resolution="832x480",
+               video_aspect_ratio="16:9")
     _filed(played_from.genau / "loops" / "2D" / "AI", "wan22_i2v_00001_-audio.mp4")
 
     def never(video):
@@ -256,3 +263,21 @@ def test_left_to_itself_the_first_write_runs_on_a_thread_of_its_own(tmp_path):
 
     assert done.wait(timeout=10)
     assert written_on != [threading.current_thread()]
+
+
+def test_a_video_made_here_is_opened_once_for_its_size_and_its_running_time_together(tmp_path):
+    db, played_from, opened = Database(tmp_path / "gallery.db"), _played_from(tmp_path), []
+    _made_here(db, "m1", "wan22_i2v_00001_.mp4")
+    _filed(played_from.genau / "loops" / "2D" / "AI", "wan22_i2v_00001_-audio.mp4")
+    _filed(played_from.kino, "wan22_i2v_00001__topaz.mp4")
+    phone = _phone(tmp_path, db,
+                   measure=lambda video: opened.append(video.name) or _sized(480, 832, 4.0)(video))
+
+    phone.write()
+    phone.write()
+
+    row = db.get_generation("m1")
+    assert (len(opened), row["video_resolution"], row["video_aspect_ratio"], row["video_seconds"]) == (
+        1, "480x832", "9:16", 4.0)
+    assert {(record["video"]["resolution"], record["video"]["aspect_ratio"])
+            for record in _written(tmp_path).values()} == {("480x832", "9:16")}

@@ -42,6 +42,8 @@ OPTIONAL_COLUMNS = (
     "shape",
     "video_seconds",
     "genau_flipped",
+    "video_resolution",
+    "video_aspect_ratio",
 )
 
 PARAMS_MODEL_KEYS = ("unet_high", "unet", "checkpoint", "unet_low")

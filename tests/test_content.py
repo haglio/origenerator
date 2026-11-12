@@ -216,3 +216,22 @@ def test_an_overlay_written_before_the_pins_were_renamed_reads_under_the_new_nam
     assert loaded["pinned_kino_settings"] == {"alpha": {"workflow": "wan22_i2v"}}
     assert loaded["pinned_genau_settings"] == {}
     assert content.missing_overlay_keys(local, example) == ()
+
+
+def test_a_preview_without_an_overlay_of_its_own_reads_the_production_checkouts(tmp_path):
+    preview, production = tmp_path / "preview", tmp_path / "production"
+    preview.mkdir(), production.mkdir()
+
+    assert content.local_overlay(preview, production) == production / "content.local.json"
+
+
+def test_a_preview_with_an_overlay_of_its_own_reads_that_one(tmp_path):
+    preview, production = tmp_path / "preview", tmp_path / "production"
+    preview.mkdir(), production.mkdir()
+    (preview / "content.local.json").write_text("{}", encoding="utf-8")
+
+    assert content.local_overlay(preview, production) == preview / "content.local.json"
+
+
+def test_a_copy_that_is_no_preview_reads_only_its_own_overlay(tmp_path):
+    assert content.local_overlay(tmp_path, None) == tmp_path / "content.local.json"

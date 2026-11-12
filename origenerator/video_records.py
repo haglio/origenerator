@@ -72,20 +72,21 @@ def _recorded(row: dict, made: MediaType) -> dict:
     return recorded_block(parse_params(row.get("params_json")), made)
 
 
-class GalleryRecords:
-    def __init__(self, db) -> None:
-        self._db = db
-        self._read_at: object = None
-        self._rows: dict[str, dict] = {}
-        self._row_of: Callable[[object], str | None] = VideoRows([])
-        self._start_image_of: Callable[[dict], dict | None] = lambda _row: None
+class GalleryReading:
+    def __init__(self, rows: list[dict]) -> None:
+        self._rows = {row["prompt_id"]: row for row in rows}
+        self._row_of = VideoRows(rows)
+        self._start_image_of = start_images_among(
+            [row for row in rows if media_type_of_row(row) == MediaType.IMAGE])
         self._videos_from_frame: dict[str, list[dict]] = {}
+        for row in rows:
+            if frame := frame_name(parse_params(row.get("params_json")).get("input_image")):
+                self._videos_from_frame.setdefault(frame, []).append(row)
 
-    def __call__(self, video) -> dict:
-        self._keep_up()
-        row = self._rows.get(self._row_of(video))
-        if row is None:
-            return {}
+    def row_of(self, video) -> dict | None:
+        return self._rows.get(self._row_of(video))
+
+    def record_of(self, row: dict) -> dict:
         start_image = self._start_image_of(row)
         return record_of_row(row, start_image, frame_of=self._words_video_of_frame(row, start_image))
 
@@ -99,19 +100,19 @@ class GalleryRecords:
                     return record["video"]
         return None
 
-    def _keep_up(self) -> None:
+
+class GalleryRecords:
+    def __init__(self, db) -> None:
+        self._db = db
+        self._read_at: object = None
+        self._reading = GalleryReading([])
+
+    def __call__(self, video) -> dict:
         version = self._db.library_version()
-        if version == self._read_at:
-            return
-        rows = self._db.list_generations()
-        self._read_at, self._rows, self._row_of = (
-            version, {row["prompt_id"]: row for row in rows}, VideoRows(rows))
-        self._start_image_of = start_images_among(
-            [row for row in rows if media_type_of_row(row) == MediaType.IMAGE])
-        self._videos_from_frame = {}
-        for row in rows:
-            if frame := frame_name(parse_params(row.get("params_json")).get("input_image")):
-                self._videos_from_frame.setdefault(frame, []).append(row)
+        if version != self._read_at:
+            self._read_at, self._reading = version, GalleryReading(self._db.list_generations())
+        row = self._reading.row_of(video)
+        return self._reading.record_of(row) if row is not None else {}
 
 
 class VideoRecords:

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
 from PIL import Image
 
 from origenerator.comfyui_client import ComfyUIClient
@@ -19,6 +21,7 @@ from origenerator.gui.generation_job import (
     JobState,
     display_status,
 )
+from origenerator.gui.job_queue import _off_the_gui_thread
 from origenerator.gui.job_records import insert_generation_row
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.output_places import OutputPlaces
@@ -66,6 +69,32 @@ def test_start_submits_payload_under_our_prompt_id_and_queues(qtbot, tmp_path):
     job, client = _started_job(tmp_path)
     client.submit_job.assert_called_once_with(job.payload, "comfy-A")
     assert job.state == "queued"
+
+
+@pytest.mark.parametrize("history", [{}, SDXL_HISTORY], ids=["sent", "already landed"])
+def test_a_submit_run_off_the_window_touches_nothing_of_the_jobs_there(
+        qtbot, tmp_path, monkeypatch, history):
+    touched_on = []
+
+    def set_state(job, state):
+        touched_on.append(threading.get_ident())
+        job.__dict__["_kept_state"] = state
+
+    monkeypatch.setattr(GenerationJob, "_state", property(
+        lambda job: job.__dict__["_kept_state"], set_state), raising=False)
+    client = _client()
+    client.fetch_history = MagicMock(return_value=history)
+    job = GenerationJob(client, JobSpec(SDXL, SDXL.default_params()), JobFolders(
+        places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs"))
+    job.sent.connect(lambda: touched_on.append(threading.get_ident()))
+    job.finished.connect(lambda *told: touched_on.append(threading.get_ident()))
+
+    job.start(_off_the_gui_thread)
+
+    assert len(touched_on) >= 3
+    assert set(touched_on) == {threading.get_ident()}, (
+        "the slow submit may run on another thread, while the job's signals and state are only "
+        "ever touched on the thread that started it")
 
 
 def test_a_launched_row_records_which_version_of_its_workflow_ran(qtbot, tmp_path):
@@ -482,18 +511,35 @@ def test_reconnect_without_a_start_time_stamps_one_at_the_first_tick(qtbot, tmp_
         "a clock that undercounts is better than no clock")
 
 
-def test_reconnect_seeds_progress_from_a_persisted_snapshot(qtbot, tmp_path):
+def _reconnected_from_a_snapshot_with_no_pass_count(tmp_path, last_progress, banked):
     wf = WORKFLOW_REGISTRY["wan22_i2v"]
-    state = {"last_progress": [446, 818],
-             "tracker": {"total": 818.0, "banked": 405.0, "stage_max": 10,
+    state = {"last_progress": last_progress,
+             "tracker": {"total": 818.0, "banked": banked, "stage_max": 10,
                          "stage_seconds": 40.5, "last_value": 3, "node": "16"}}
-    job = GenerationJob.reconnect(_client(), JobSpec(wf, {**wf.default_params(), "steps": 20}, prompt_id="pid"), folders=JobFolders(places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs"), progress_state=state)
+    return GenerationJob.reconnect(
+        _client(), JobSpec(wf, {**wf.default_params(), "steps": 20}, prompt_id="pid"),
+        folders=JobFolders(places=OutputPlaces.in_one_folder(tmp_path),
+                           thumb_dir=tmp_path / "thumbs"),
+        progress_state=state)
+
+
+def test_reconnect_seeds_progress_from_a_persisted_snapshot(qtbot, tmp_path):
+    job = _reconnected_from_a_snapshot_with_no_pass_count(tmp_path, [446, 818], banked=405.0)
     assert job.last_progress == (446, 818)
     assert job.last_pass_progress == (3, 10)
     assert job.last_stage == "Second pass"
 
     job._on_progress("pid", "16", 4, 10)
     assert job.last_progress == (567, 818)
+
+
+def test_a_first_pass_snapshot_with_no_pass_count_reads_its_pass_from_the_payload(
+        qtbot, tmp_path):
+    job = _reconnected_from_a_snapshot_with_no_pass_count(tmp_path, [41, 818], banked=0.0)
+
+    assert job.last_pass_progress == (3, 10), (
+        "a row written before the pass count was recorded takes it from the run's payload, so its "
+        "pass reading comes back with it")
 
 
 def test_reconnect_without_a_snapshot_starts_blank(qtbot, tmp_path):

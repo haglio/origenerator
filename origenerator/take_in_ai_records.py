@@ -20,7 +20,7 @@ from origenerator.outside_videos import made_of, seed_number
 from origenerator.video_rows import VideoRows
 from origenerator.workflows.outside import PLACES
 
-AI_RECORDS = (("kino",), ("origenerator", "video"), ("genau",))
+AI_RECORDS = (("kino", "2D", "AI"), ("origenerator", "video"), ("genau",))
 NON_AI_FOLDER = "non_AI"
 COUNTED = ("records read", "unreadable", "no video", "no row", "matched", "stars added",
            "counts written", "library records written", "actions added", "settings filled in")

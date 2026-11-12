@@ -213,7 +213,8 @@ def test_the_buttons_stand_in_groups_by_what_they_are_about(buttons):
         (made.power, made.play_pause, made.reference, made.mic),
     ], ("an icon-only row reads by its groups, a button's neighbors saying as much about it as "
         "its glyph: where you are, what you did, the picked folders, what is in front, what the "
-        "app is doing")
+        "app is doing, and the room's own Quit, play/pause, reference and Listen, grouped as Fun "
+        "Time's dashboard groups them")
 
 
 def test_space_alone_sets_the_groups_apart(buttons):

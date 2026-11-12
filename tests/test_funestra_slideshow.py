@@ -1351,10 +1351,11 @@ def test_the_hud_maps_the_item_on_screen_against_the_library(qtbot, tmp_path):
 
     model = parse_hud(slideshow.channel.hud_file.read_text(encoding="utf-8"))
 
-    assert [cell.path for cell in model.seeds] == ["one-b.png"], (
-        "the HUD hands the Funestra the item's other seeds as its row and its other actions as "
+    assert ([cell.path for cell in model.seeds],
+            [(cell.path, cell.label) for cell in model.actions]) == (
+        ["one-b.png"], [("one-x.png", "dawn")]), (
+        "the HUD hands the Funestra the item's other seeds for its row and its other actions for "
         "its column, as a Fun Time satellite maps a video, so the two maps read alike")
-    assert [(cell.path, cell.label) for cell in model.actions] == [("one-x.png", "dawn")]
     assert (model.current_action, model.seed_count, model.action_count) == ("fox", 2, 2)
 
 

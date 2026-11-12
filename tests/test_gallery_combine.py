@@ -5,6 +5,7 @@ import json
 import pytest
 
 from origenerator import gallery
+from origenerator.content import EXAMPLE_CONTENT, load_content
 from origenerator.gallery import combine
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS
@@ -220,8 +221,8 @@ def test_genau_settings_are_generated_at_the_shortest_length_that_closes():
 def test_genau_settings_play_at_the_top_rate_the_writer_allows():
     assert _shaped()["frame_rate"] == MAX_PLAYBACK_FPS, (
         "29 frames of one cycle are far too coarse to scrub slowly, which is most of what Genau is "
-        "for; the frames between are interpolated after decode, so the top rate costs a pass and no "
-        "sampler time")
+        "for; the frames between are interpolated after decode, so the top rate costs a pass and "
+        "no sampler time")
 
 
 def test_the_words_that_ask_for_one_cycle_are_added_to_the_videos_own():
@@ -261,9 +262,20 @@ def test_an_action_with_its_own_words_gets_them_and_the_rest_get_the_default():
     default = combine.cycle_words("")
 
     assert own != default, (
-        "a cycle is not one motion: its stages are different parts of the body from one action to the next")
+        "a cycle is not one motion: its stages are different parts of the body from one action "
+        "to the next")
     assert combine.cycle_words("an action with no entry") == default
-    assert _shaped(positive_prompt="x", category="beta")["positive_prompt"] !=         _shaped(positive_prompt="x")["positive_prompt"]
+    assert (_shaped(positive_prompt="x", category="beta")["positive_prompt"]
+            != _shaped(positive_prompt="x")["positive_prompt"])
+
+
+def test_an_actions_cycle_words_are_the_ones_the_overlay_gives_it():
+    overlaid = load_content(EXAMPLE_CONTENT)["genau_flick_prompts"]["beta"]
+
+    assert combine.cycle_words("beta") == (overlaid["positive"], overlaid["negative"]), (
+        "the cycle words come from the overlay, as every other phrase the library speaks in "
+        "does: this code is public, and the blocked-word check bans that vocabulary from the "
+        "tracked tree")
 
 
 def test_an_overlay_carrying_no_words_leaves_the_prompt_exactly_as_it_was(monkeypatch):

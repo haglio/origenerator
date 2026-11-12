@@ -400,8 +400,8 @@ def test_a_pass_lists_each_table_once_however_many_runs_the_queue_shows(build):
 
     assert sorted(name for name in sources.db.asked if name.startswith("list_")) == [
         "list_generations", "list_requests"], (
-        "the tiles are rebuilt at every poll, so a pass costs one listing of each table rather "
-        "than a lookup per run")
+        "the tiles are rebuilt at every poll and a table is small where the queue rarely is, so "
+        "a pass costs one listing of each table rather than a lookup per run")
 
 
 def test_a_pass_reads_a_workflows_usual_time_once_for_all_its_runs(build):
@@ -410,8 +410,8 @@ def test_a_pass_reads_a_workflows_usual_time_once_for_all_its_runs(build):
     build(sources=sources)
 
     assert sources.db.asked.count("recent_durations") == 1, (
-        "the tiles are rebuilt at every poll and the line often holds many runs of one "
-        "workflow, so its usual time is worked out once a pass")
+        "the line often holds many runs of one workflow, so its usual time is worked out once "
+        "a pass")
 
 
 def test_a_pass_gathers_a_folders_thumbnails_once_for_all_its_runs(build):
@@ -420,5 +420,5 @@ def test_a_pass_gathers_a_folders_thumbnails_once_for_all_its_runs(build):
     build(sources=sources)
 
     assert sources.tree.asked == list(sources.jobs.jobs_by_folder), (
-        "the tiles are rebuilt at every poll and Auto-generate fills the line with runs of one "
-        "folder, so its thumbnails are gathered once a pass")
+        "Auto-generate fills the line with runs of one folder, so its thumbnails are gathered "
+        "once a pass")

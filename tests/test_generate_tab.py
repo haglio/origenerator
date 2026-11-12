@@ -2044,7 +2044,8 @@ def _levels_on_disk(tmp_path, monkeypatch):
         level = QImage(40, 40, QImage.Format.Format_RGB32)
         level.fill(QColor(color))
         level.save(str(output_dir / "image" / name))
-    monkeypatch.setattr(generate_tab_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
+    monkeypatch.setattr(generate_tab_module, "OUTPUT_PLACES",
+                        OutputPlaces.in_one_folder(output_dir))
     return output_dir
 
 

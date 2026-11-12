@@ -18,7 +18,6 @@ import json
 from pathlib import Path
 import origenerator.content as content
 content.LOCAL_CONTENT = content.EXAMPLE_CONTENT
-content.load_content.cache_clear()
 
 reads, probes = [], []
 _read, _is_dir = Path.read_text, Path.is_dir

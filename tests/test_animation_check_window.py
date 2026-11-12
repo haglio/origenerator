@@ -166,7 +166,9 @@ def test_the_arrows_step_through_the_animations(window):
     assert _said(made, HEADING).startswith("Kino · beta")
 
     _press(made, BACK).click()
-    assert _said(made, HEADING).startswith("Kino · alpha")
+    assert _said(made, HEADING).startswith("Kino · alpha"), (
+        "the arrows step plainly through the line, as the user asked when they took the place of "
+        "Leave for later, which sent the one shown to the back of the line")
 
 
 def test_the_count_says_how_many_have_had_their_settings_taken(window):

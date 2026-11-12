@@ -114,6 +114,7 @@ class DirectorSurroundings:
     fun_time: object
     radio: object = None
     buttons_of: Callable | None = None
+    two_screens: object = None
 
 
 @dataclass(frozen=True)

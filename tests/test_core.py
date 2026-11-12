@@ -43,8 +43,9 @@ from origenerator.fun_time_mode import CORE_READY, FunTimeSession, Rect
 from origenerator.gallery.collection import LATEST_KEY, FolderCollection
 from origenerator.gallery.shapes import BOTH, SEPARATE
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import core, toasts
+from origenerator.gui import core, toasts, two_screens
 from origenerator.gui.core import SESSION_UI_STATE, Core, Launch, OwnedBy
+from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.headset_window import CAP_PX
 from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP
 from origenerator.gui.panes import PaneSplitter
@@ -60,6 +61,7 @@ from tests import gestures
 from tests.closed_windows import is_closed
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import _collection, _select_first_leaf, _selected_folder
+from tests.his_monitors import HIS_TWO_MONITORS, LANDSCAPE_MONITOR, PORTRAIT_MONITOR, TASKBAR
 from tests.real_db import keep_on_disk
 from tests.test_combine import _listed_under_recent
 
@@ -2315,3 +2317,59 @@ def test_a_window_built_after_a_close_is_the_only_one_alive_as_after_a_real_rest
     _window(qtbot, tmp_path)
 
     assert not shiboken6.isValid(first)
+@pytest.fixture
+def his_two_monitors(monkeypatch):
+    monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)
+
+
+def _fills(win, monitor) -> bool:
+    return win.geometry() == monitor.adjusted(0, 0, 0, -TASKBAR)
+
+
+def test_on_its_own_core_fills_the_landscape_monitor_above_the_taskbar_with_no_title_bar(
+        qtbot, tmp_path, his_two_monitors):
+    win = _window(qtbot, tmp_path)
+
+    assert (_fills(win, LANDSCAPE_MONITOR),
+            bool(win.windowFlags() & Qt.WindowType.FramelessWindowHint)) == (True, True)
+
+
+def test_a_switch_sends_core_to_the_portrait_monitor_and_keeps_it_showing(
+        qtbot, tmp_path, his_two_monitors):
+    win = _window(qtbot, tmp_path)
+    win.show()
+
+    win._gallery_view._buttons.switch.click()
+
+    assert (_fills(win, PORTRAIT_MONITOR), win.isVisible()) == (True, True)
+
+
+def test_core_comes_back_on_the_monitor_it_was_switched_to(qtbot, tmp_path, his_two_monitors):
+    path = tmp_path / "ui.json"
+    first = _window(qtbot, tmp_path, AppState(path))
+    first._gallery_view._buttons.switch.click()
+    first.close()
+
+    assert _fills(_window(qtbot, tmp_path, AppState(path)), PORTRAIT_MONITOR)
+
+
+def test_core_handed_back_from_a_session_fills_its_monitor_again(
+        qtbot, tmp_path, his_two_monitors):
+    win = _window(qtbot, tmp_path)
+    win.show()
+    win.become_hosted(_fun_time_session())
+
+    win.become_standalone()
+
+    assert (_fills(win, LANDSCAPE_MONITOR), win.isVisible(),
+            bool(win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)) == (True, True, False)
+
+
+def test_core_in_a_session_stays_at_the_sessions_rect_through_a_switch(
+        qtbot, tmp_path, his_two_monitors):
+    win = _window(qtbot, tmp_path, fun_time=_fun_time_session())
+
+    win._sides.switch()
+
+    geo = win.geometry()
+    assert (geo.x(), geo.y(), geo.width(), geo.height()) == (10, 20, 800, 600)

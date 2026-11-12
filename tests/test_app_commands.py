@@ -253,3 +253,7 @@ def test_two_equal_bar_settings_built_apart_agree_rather_than_collide():
     _say(BarSetting("speed", 0), "speed zero", said=said)
 
     _say(BarSetting("speed", 0), "speed zero", said=said)
+
+
+def test_switch_is_a_word_of_its_own():
+    assert match_app_command("switch") is AppCommand.SWITCH

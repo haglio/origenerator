@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from origenerator import gallery_names_file
 from origenerator.evolver_export import EvolverInbox
+from origenerator.gui.two_screens import TwoScreens
 from origenerator.osr2_motion_driver import Osr2MotionDriver
 from origenerator.radio import OrigeneratorRadio
 
@@ -17,6 +18,7 @@ class Shared:
     inbox: EvolverInbox | None = None
     publish_names: Callable[[dict[str, str]], None] = gallery_names_file.publish
     device_waits_for_the_window: bool = False
+    two_screens: TwoScreens | None = None
 
 
 NO_SHARED = Shared()

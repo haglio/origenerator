@@ -311,6 +311,8 @@ class VoiceRouter(QObject):
             self._slideshows.clear_action_filter(shape)
         elif command in _SWITCHES:
             self._flip_switch(command)
+        elif command is AppCommand.SWITCH:
+            self._slideshows.switch_sides()
         elif command in _MOTION:
             self._move_the_motion(command)
         elif self._slideshows.showing is not None and command in _ABOUT_THE_SLIDE:

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from app_support.logging_utils import configure_logging, install_exception_logging
 
-from origenerator import collection_notes, config, gallery, places_backfill
+from origenerator import collection_notes, config, flick_finales, gallery, places_backfill
 from origenerator.app_state import AppState
 from origenerator.base_backfill import TARGET_KEY as BASE_RENDER_TARGET_KEY
 from origenerator.base_backfill import queue_base_renders
@@ -79,8 +79,9 @@ def work_left() -> bool:
     return _left_work().exists()
 
 
-def queue_the_work_left(jobs, rows: list[dict], *, experiments_on: bool, policy) -> int:
-    queued = 0
+def queue_the_work_left(jobs, db, rows: list[dict], *, experiments_on: bool, finales_on: bool,
+                        policy) -> int:
+    queued = flick_finales.queue_finales(jobs, db, rows) if finales_on else 0
     if experiments_on:
         index = gallery.image_config_index_of(rows)
         queued += queue_experiments(rows, policy, lambda proposal: jobs.start_prepared(
@@ -114,8 +115,9 @@ def _handed_over(db, client, queue: Callable[[object], int]) -> int:
 
 def hand_comfyui_the_work_left(db, client, ui: AppState) -> None:
     def everything(jobs) -> int:
-        return (queue_the_work_left(jobs, db.list_generations(),
+        return (queue_the_work_left(jobs, db, db.list_generations(),
                                       experiments_on=ui.get("experiments_enabled") is True,
+                                      finales_on=flick_finales.SWITCHED_ON,
                                       policy=ExperimentPolicy(registry=WORKFLOW_REGISTRY,
                                                               rng=random.Random()))
                 + places_backfill.queue_finding_for_the_absence(db, client))

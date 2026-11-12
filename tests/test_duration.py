@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from origenerator.workflows.base import ParamDef
-from origenerator.workflows.duration import frames_for_seconds, on_grid, seconds_for_frames
+from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows.base import ParamDef, chained_frames
+from origenerator.workflows.duration import frames_for_seconds, lasting, on_grid, seconds_for_frames
 from origenerator.workflows.frame_rate import NATIVE_FPS, playback_rate
 
 
@@ -45,3 +46,22 @@ def test_a_frame_rate_between_two_native_multiples_lands_where_the_graph_puts_it
 def test_a_frame_count_counts_from_one_not_from_the_fewest_the_model_renders():
     assert on_grid(6, _frames()) == 5
     assert on_grid(7, _frames()) == 9
+
+
+def test_a_run_made_to_last_some_seconds_stretches_its_last_scene_to_reach_them():
+    workflow = WORKFLOW_REGISTRY["wan22_i2v"]
+    two_scenes = {**workflow.default_params(), "scene_frames": [81, 81]}
+
+    lengthened = lasting(two_scenes, workflow, 15)
+
+    assert lengthened["frame_count"] == 15 * NATIVE_FPS + 1
+    assert chained_frames(lengthened["scene_frames"]) == lengthened["frame_count"]
+    assert lengthened["scene_frames"][0] == 81
+
+
+def test_a_run_whose_workflow_has_no_scenes_is_given_none():
+    workflow = WORKFLOW_REGISTRY["wan22_i2v"]
+    one_length = {key: value for key, value in workflow.default_params().items()
+                  if key != "scene_frames"}
+
+    assert "scene_frames" not in lasting(one_length, workflow, 15)

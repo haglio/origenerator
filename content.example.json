@@ -61,6 +61,7 @@
       "shared_photos": false
     }
   ],
+  "genau_finale_checkbox": "third box",
   "genau_flick_prompts": {
     "": {
       "positive": "(one complete alpha cycle: all the way out, then all the way in, then return:1.5), (long travel:1.4)",

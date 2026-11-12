@@ -14,9 +14,14 @@ logger = logging.getLogger(__name__)
 
 
 def drop_in_flight(db, client, source: str, noun: str) -> int:
-    dropped = 0
-    for row in db.list_generations():
-        if row.get("source") != source or not is_in_progress(row):
+    return len(drop_runs(db, client, [row for row in db.list_generations()
+                                      if row.get("source") == source], noun))
+
+
+def drop_runs(db, client, rows: list[dict], noun: str) -> set[str]:
+    dropped = set()
+    for row in rows:
+        if not is_in_progress(row):
             continue
         prompt_id = row["prompt_id"]
         try:
@@ -26,9 +31,9 @@ def drop_in_flight(db, client, source: str, noun: str) -> int:
             logger.warning("Could not dequeue %s %s: %s", noun, prompt_id, e)
             continue
         db.delete_generation(prompt_id)
-        dropped += 1
+        dropped.add(prompt_id)
     if dropped:
-        logger.info("Dropped %d queued %s(s) — the app is open", dropped, noun)
+        logger.info("Dropped %d queued %s(s) — the app is open", len(dropped), noun)
     return dropped
 
 

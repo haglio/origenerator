@@ -5,7 +5,7 @@ import types
 from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
-from origenerator import collection_notes, downtime, gallery, lora_training
+from origenerator import collection_notes, downtime, flick_finales, gallery, lora_training
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.db import Database
@@ -14,6 +14,7 @@ from origenerator.gui.job_queue import JobQueue
 from origenerator.output_places import OutputPlaces
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 from tests.comfyui_folders import SUITE_FOLDERS
+from tests.test_flick_finales import a_flick_sent_to_genau
 
 
 @dataclass
@@ -100,12 +101,30 @@ def test_the_work_left_tries_experiments_from_the_policy_handed_in_only_while_th
                                      base_prompt_id="p0", mutated_keys=["steps"])
     off, on = _Proposing([proposal]), _Proposing([proposal])
 
-    assert downtime.queue_the_work_left(jobs, [], experiments_on=False, policy=off) == 0
-    assert downtime.queue_the_work_left(jobs, [], experiments_on=True, policy=on) == 1
+    assert downtime.queue_the_work_left(jobs, db, [], experiments_on=False, finales_on=False,
+                                        policy=off) == 0
+    assert downtime.queue_the_work_left(jobs, db, [], experiments_on=True, finales_on=False,
+                                        policy=on) == 1
 
     assert off.asked == 0
     (tried,) = [row for row in db.list_generations() if row.get("source") == "experiment"]
     assert jobs.job_for(gallery.settings_folder_key(tried, {})).prompt_id == tried["prompt_id"]
+
+
+def test_the_work_left_queues_a_video_for_each_genau_flick_only_while_those_are_on(
+        qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr(GenerationJob, "start", lambda self, submit=None: None)
+    db = Database(tmp_path / "t.db")
+    jobs = JobQueue(db, ComfyUIClient(folders=SUITE_FOLDERS))
+    a_flick_sent_to_genau(db)
+
+    for finales_on, queued in ((False, 0), (True, 1)):
+        assert downtime.queue_the_work_left(jobs, db, db.list_generations(), experiments_on=False,
+                                            finales_on=finales_on, policy=_Proposing([])) == queued
+
+
+def test_the_videos_for_genaus_flicks_stay_off_until_his_actions_and_settings_are_ready():
+    assert flick_finales.SWITCHED_ON is False
 
 
 def _the_command_on_a_scratch_library(monkeypatch, tmp_path):

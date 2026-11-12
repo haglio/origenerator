@@ -20,6 +20,7 @@ from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.experiments.background import cancel_experiments
+from origenerator.flick_finales import drop_finales_in_flight
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import WINDOW_TITLE, FunTimeSession, Rect
 from origenerator.gui.gallery_view import GalleryView, Shared
@@ -129,6 +130,7 @@ class Core(QMainWindow):
         self._persist_the_session_as_it_changes()
         if not is_branch_session():
             cancel_experiments(db, client)
+            drop_finales_in_flight(db, client)
         fold_completed_base_renders(db)
         cancel_base_renders(db, client)
         places_backfill.fold_found_places(db, client, places_backfill.RECORD)

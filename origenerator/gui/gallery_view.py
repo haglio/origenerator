@@ -339,7 +339,7 @@ class GalleryView(QWidget):
                 AppCommand.GROUP: (self._buttons.group, self._group_selection),
             },
         )
-        self._re_aim()
+        self._re_aim_every_button()
         self._intercept_the_rooms_keys(True)
 
         self._poll_inflight = False
@@ -417,7 +417,7 @@ class GalleryView(QWidget):
         self._gallery_pane.experiment_verdict.connect(self._on_experiment_verdict)
         self._gallery_pane.trash_action_triggered.connect(self._on_trash_action)
         self._gallery_pane.cancel_requested.connect(self._cancel_job)
-        self._gallery_pane.selection_changed.connect(self._re_aim)
+        self._gallery_pane.selection_changed.connect(self._re_aim_every_button)
         self._fingerprint = (None, None)
         self._folder_meta: dict = {}
         self._drawn_version = 0
@@ -883,7 +883,7 @@ class GalleryView(QWidget):
             row = self._db.get_generation(prompt_id)
             if row is not None:
                 self._edits.reject_experiment(row)
-            self._re_aim()
+            self._re_aim_every_button()
         self.refresh()
 
     def folder_key_for(self, workflow_name: str, params: dict,
@@ -1194,7 +1194,7 @@ class GalleryView(QWidget):
             return
         with working():
             self.refresh()
-        self._re_aim()
+        self._re_aim_every_button()
 
     def _reselect_generation(self, prompt_id: str | None):
         if not prompt_id or prompt_id not in self._gallery_pane.listed_prompt_ids():
@@ -1234,7 +1234,7 @@ class GalleryView(QWidget):
         self._gallery_pane.show_search_results(tiles, terms)
 
     def search_results_drawn(self) -> None:
-        self._re_aim()
+        self._re_aim_every_button()
         self._navigation.record()
 
     def suppress_history(self):
@@ -1269,7 +1269,7 @@ class GalleryView(QWidget):
 
     def nav_state_changed(self, can_go_back: bool, can_go_forward: bool) -> None:
         self._trail = (can_go_back, can_go_forward)
-        self._re_aim()
+        self._re_aim_every_button()
 
     def hand_pane_back(self) -> None:
         self._on_folder_selected(self._tree.currentItem(), None)
@@ -1334,7 +1334,7 @@ class GalleryView(QWidget):
             self._search.follow_the_folder()
             self._search.run()
             return
-        self._re_aim()
+        self._re_aim_every_button()
         base, shape = _split_collection_key(self._tree_view.selected_folder_key())
         collection = folder_collection(base)
         self._experiments_bar.setVisible(collection is not None
@@ -1343,7 +1343,7 @@ class GalleryView(QWidget):
             self._folder_path.set_display("")
             self._avg_label.setText("")
             self._gallery_pane.show_empty()
-            self._re_aim()
+            self._re_aim_every_button()
             return
         if collection is not None:
             self._open_collection(collection, shape, current)
@@ -1357,7 +1357,7 @@ class GalleryView(QWidget):
         landed = self._land_on_the_first_item()
         if group is not None:
             self._navigation.record(landed)
-        self._re_aim()
+        self._re_aim_every_button()
 
     def _land_on_the_first_item(self) -> str | None:
         if self._navigation.suppressed:
@@ -1404,7 +1404,7 @@ class GalleryView(QWidget):
         if was_multi:
             self._on_folder_selected(self._tree.currentItem(), None)
         else:
-            self._re_aim()
+            self._re_aim_every_button()
 
     def _selected_groups(self) -> list:
         return [group for key in self._tree.selected_folder_keys()
@@ -1416,7 +1416,7 @@ class GalleryView(QWidget):
         self._folder_path.set_display(group.label)
         self._update_folder_average(group)
         self._gallery_pane.show_custom_collection(group)
-        self._re_aim()
+        self._re_aim_every_button()
 
     def _restore_multi_selection(self, keys: list[str]):
         items = [item for key in keys if (item := self._item_by_key.get(key)) is not None]
@@ -1456,7 +1456,7 @@ class GalleryView(QWidget):
         self._tree.clearSelection()
         self._selection_group = None
         self.refresh()
-        self._re_aim()
+        self._re_aim_every_button()
         item = self._tree_item_for(gallery.custom_collection_key(folder_id))
         if item is not None:
             self._tree.setCurrentItem(item)
@@ -1467,7 +1467,7 @@ class GalleryView(QWidget):
             for group in groups:
                 if _takes_a_favorite(group):
                     self._set_folder_favorite(group.key, True)
-            self._re_aim()
+            self._re_aim_every_button()
             return
         folder_id = gallery.custom_folder_id(target_key)
         if folder_id is None:
@@ -1509,7 +1509,7 @@ class GalleryView(QWidget):
         self._tree.clearSelection()
         self._selection_group = None
         self.refresh()
-        self._re_aim()
+        self._re_aim_every_button()
 
     def _remove_from_custom_collection(self, group, folder_keys=(), items=()):
         folders = [self._folder_identity(gathered)
@@ -1517,7 +1517,7 @@ class GalleryView(QWidget):
                    for key in folder_keys]
         self._edits.custom_collections.remove_from(group.folder_id, folders, items)
         self.refresh()
-        self._re_aim()
+        self._re_aim_every_button()
 
     def _note_folder_visit(self, key: str | None):
         if self._navigation.suppressed or key is None:
@@ -1759,7 +1759,7 @@ class GalleryView(QWidget):
             self._populate.stop_all()
         elif group is not None:
             self._begin_populate(group.key)
-        self._re_aim()
+        self._re_aim_every_button()
         self._sync_cancel_buttons()
 
     def _begin_populate(self, key: str):
@@ -1784,7 +1784,7 @@ class GalleryView(QWidget):
         self._populate_settings.pop(key, None)
         if key == self._selected_reroll_key and key not in self._live_jobs:
             self._clear_reroll_selection()
-        self._re_aim()
+        self._re_aim_every_button()
         self._sync_cancel_buttons()
 
     def _sync_cancel_buttons(self):
@@ -1841,7 +1841,7 @@ class GalleryView(QWidget):
             return self._tree_view.folder_path(self._tree.currentItem())
         return "this folder"
 
-    def _re_aim(self) -> None:
+    def _re_aim_every_button(self) -> None:
         enhance = self._enhance.offer()
         self._buttons.apply(self.button_states(enhance))
         self._enhance.sync_pane(enhance)
@@ -1984,13 +1984,13 @@ class GalleryView(QWidget):
         row = self._db.get_generation(prompt_id)
         if row is None or not self._edits.delete_enhance_versions(row, filenames):
             return
-        self._re_aim()
+        self._re_aim_every_button()
         self.refresh()
         updated = self._db.get_generation(prompt_id)
         if updated is not None:
             self._generate_pane.refresh_displayed(updated, self._image_rows)
             self._slideshows.note_versions_deleted(updated)
-        self._re_aim()
+        self._re_aim_every_button()
 
     def slideshow_location(self):
         collection = self._current_collection_key()
@@ -2020,7 +2020,7 @@ class GalleryView(QWidget):
     def trash_generation(self, prompt_id: str):
         row = self._db.get_generation(prompt_id)
         if row is not None and self._edits.trash(row):
-            self._re_aim()
+            self._re_aim_every_button()
 
     def trash_file(self, path: str, already_at: str | None = None):
         try:
@@ -2030,7 +2030,7 @@ class GalleryView(QWidget):
             logger.exception("Could not send %s to Trash", path)
             return
         self.refresh()
-        self._re_aim()
+        self._re_aim_every_button()
 
     def _reroll_item_seed(self, prompt_id: str, which: str):
         if self._client is None:
@@ -2051,7 +2051,7 @@ class GalleryView(QWidget):
         run_off_thread(work, done, owner=self)
 
     def enhance_offer_changed(self) -> None:
-        self._re_aim()
+        self._re_aim_every_button()
 
     def enhance_settings(self) -> str:
         return self._enhance.settings_json()
@@ -2234,7 +2234,7 @@ class GalleryView(QWidget):
         self._reconcile_generating()
         self._populate.note_finished(key)
         self._enhance.enhance_when_wanted(finished_row)
-        self._re_aim()
+        self._re_aim_every_button()
         self._enhance.reconcile()
 
     def _show_reroll_result_in_tab(self, finished_row: dict | None, launcher):
@@ -2432,7 +2432,7 @@ class GalleryView(QWidget):
             self._gallery_pane.refresh_corners()
         self._generate_pane.reconcile_previews(self._live_ids)
         if ids & self._gallery_pane.selected_ids:
-            self._re_aim()
+            self._re_aim_every_button()
 
     def _recount_the_collections(self) -> None:
         for shape in self._tree.shapes:
@@ -2586,7 +2586,7 @@ class GalleryView(QWidget):
         if not rows:
             return
         self._edit_then_redraw(
-            lambda: self._edits.delete_rows(rows), lambda _outcome: self._re_aim(),
+            lambda: self._edits.delete_rows(rows), lambda _outcome: self._re_aim_every_button(),
             failed="Delete failed", could_not="Could not delete the selected item(s)",
             logged=f"Failed to delete {len(rows)} generation(s)")
 
@@ -2598,7 +2598,7 @@ class GalleryView(QWidget):
         self.refresh()
         if focus:
             self._go_to_generation(focus)
-        self._re_aim()
+        self._re_aim_every_button()
 
     def _redo(self):
         if not self._edits.can_redo():
@@ -2606,7 +2606,7 @@ class GalleryView(QWidget):
         self._edits.redo()
         self._gallery_pane.clear_selection()
         self.refresh()
-        self._re_aim()
+        self._re_aim_every_button()
 
     def _confirm(self, text: str) -> bool:
         reply = QMessageBox.question(
@@ -2709,7 +2709,7 @@ class GalleryView(QWidget):
         group = self.group_for_key(key)
         if _takes_a_favorite(group):
             self._set_folder_favorite(group.key, not group.favorite)
-            self._re_aim()
+            self._re_aim_every_button()
 
     def _set_folder_favorite(self, key: str, favorite: bool):
         if bool(self._folder_meta.get(key, {}).get("starred")) == favorite:

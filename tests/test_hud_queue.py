@@ -284,6 +284,29 @@ def test_shield_all_is_grayed_out_while_no_job_is_left_for_it_to_shield():
             "the HUD's muted ink, never its bright one, on a press that would do nothing")
 
 
+def test_shield_all_shows_the_shield_and_then_its_word(monkeypatch):
+    real_draw_icon = hud_queue.draw_icon
+    shields = []
+
+    def draw_icon(image, name, rect, ink):
+        if name == "shield":
+            shields.append(rect)
+        real_draw_icon(image, name, rect, ink)
+
+    monkeypatch.setattr(hud_queue, "draw_icon", draw_icon)
+    section = queue_section([_item("j1", status="running", shield=lambda _on: None)], 0)
+
+    image, targets = _painted(section)
+
+    x, y, width, height = next(rect for rect, b in targets if b.command == SHIELD_ALL)
+    after = [left + side for left, _top, side, _height in shields if x <= left < x + width]
+    word_after_a_shield = bool(after) and _brightest(
+        image, (after[0], y, x + width - after[0], height)) >= 180
+    assert word_after_a_shield, (
+        "no button face the HUD declares draws a shield and a word together, so Shield All "
+        "is painted by hand: the shield, and its word after it")
+
+
 def test_cancel_all_is_grayed_out_while_no_job_can_be_canceled():
     grayed = queue_section([_item("j1", status="running"), _item("j2")], 0)
     lit = queue_section([_item("j1", status="running"), _item("j2", cancel=lambda: None)], 0)

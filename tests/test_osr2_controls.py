@@ -16,7 +16,7 @@ from funestra.main_hud import (
     OSR2_PARKED,
 )
 from funestra.main_hud_painter import MainHudPainter, hud_xy
-from funestra.modes import Osr2State
+from funestra.modes import MainMode, Osr2State
 from funestra.osr2_visualizer import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
 from funestra.robot_hand import POSITION_MAX
 from PyQt6.QtCore import QEvent, QObject, QPoint, QPointF, Qt, pyqtSignal
@@ -132,6 +132,14 @@ def test_a_press_on_the_broker_button_presses_the_broker(qtbot, monkeypatch):
     _press(controls, BROKER_PRESS)
 
     assert presses == [True]
+
+
+def test_the_osr2_controls_are_told_the_genau_mode():
+    main_hud = osr2_controls_hud(FakeMotion()).main_hud_model
+
+    assert main_hud.main_mode is MainMode.GENAU, (
+        "this app's motion is made by the app itself over what is on screen, with no playlist "
+        "of videos under it, so the OSR2 controls are told the Genau mode")
 
 
 def test_a_room_paused_while_the_motion_has_the_device_sends_the_dot_home(qtbot):

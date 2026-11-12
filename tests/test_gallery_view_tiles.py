@@ -967,7 +967,7 @@ def test_a_mixed_pick_enhances_the_images_in_it(qtbot):
     _select_first_leaf(view)
     _click_tile(view, "i1")
     view._gallery_pane.selected_ids.add("v1")
-    view._re_aim()
+    view._re_aim_every_button()
     queued = []
     view._enhance.enhance_items = queued.append
 

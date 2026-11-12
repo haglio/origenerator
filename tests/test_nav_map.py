@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from origenerator import gallery
 from origenerator.nav_map import (
     actions_lines,
     beyond_the_row,
+    config_family,
     group_keys,
     one_per_stretch,
     seed_group,
@@ -420,3 +423,52 @@ def test_an_image_is_named_for_its_actions_then_its_checked_boxes_as_a_video_is(
     named = actions_lines([source, alone, runs], image_index=index)
 
     assert (named["i1"], named["i2"]) == ("Source image, beta, first box", "gamma, second box")
+
+
+def _rows_asked_of(monkeypatch, name: str) -> list[str]:
+    real = getattr(gallery, name)
+    asked = []
+
+    def asking(row, *args, **kwargs):
+        asked.append(row["prompt_id"])
+        return real(row, *args, **kwargs)
+
+    monkeypatch.setattr(gallery, name, asking)
+    return asked
+
+
+@pytest.mark.parametrize("question", [seed_group, config_family])
+def test_the_map_reads_folder_keys_only_of_rows_of_the_items_own_workflow(monkeypatch,
+                                                                          question):
+    current = _image("g1", "a red fox in snow", seed=1)
+    sibling = _image("g2", "a red fox in snow", seed=1, steps=30)
+    stranger = {**_image("g3", "a red fox in snow", seed=1), "workflow_name": "flux_t2i"}
+    settings = _rows_asked_of(monkeypatch, "settings_folder_key")
+    levels = _rows_asked_of(monkeypatch, "folder_key_at_level")
+
+    question(current, [current, sibling, stranger], image_index={})
+
+    assert set(settings + levels) == {"g1", "g2"}, (
+        "only rows of the item's own workflow can share a settings folder or a model with it, "
+        "and the workflow is a lookup where each folder key is a parse, so the map reads the "
+        "keys of no other workflow's rows")
+
+
+@pytest.mark.parametrize("question", [
+    lambda rows, index: surroundings(rows[-1], rows, image_index=index),
+    lambda rows, index: actions_lines(rows, image_index=index),
+    lambda rows, index: group_keys(rows, image_index=index),
+], ids=["surroundings", "actions_lines", "group_keys"])
+def test_the_map_works_out_once_which_image_each_video_came_from(monkeypatch, question):
+    one, two = _image("i1", "a fox", seed=1), _image("i2", "a fox", seed=2)
+    index = gallery.build_image_config_index([one, two])
+    rows = [one, two,
+            _video("v1", "the fox runs", noise_seed=5, frame="i1.png", action="alpha"),
+            _video("v2", "the fox sleeps", noise_seed=6, frame="i2.png", action="beta")]
+    asked = _rows_asked_of(monkeypatch, "source_image_id_in")
+
+    question(rows, index)
+
+    assert sorted(asked) == ["v1", "v2"], (
+        "every question the map asks would walk the rows again, so which image each video "
+        "came from is worked out once, for all of them")

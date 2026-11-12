@@ -4,6 +4,7 @@ import os
 
 from PIL import Image
 from PyQt6.QtCore import Qt
+from shared_ui.spacing import HAIRLINE
 
 from origenerator.gui import queue_thumbs
 from origenerator.gui.combination import Combination
@@ -123,6 +124,19 @@ def _painted(image, left, right):
 def test_neither_half_on_disk_is_still_no_thumbnail(qapp, tmp_path):
     assert source_pixmap(Combination(tmp_path / "gone.png", tmp_path / "also-gone.png"),
                          CELL) is None
+
+
+def test_the_thumbnails_stand_a_hairline_apart(qapp, tmp_path):
+    paths = [_thumbnail(tmp_path / f"{index}.png", (255, 0, 0), size=(40, 40))
+             for index in range(FOLDER_CELLS)]
+
+    block = folder_pixmap(paths, CELL)
+
+    unpainted = [x for x in range(block.width()) if _color_at(block, x, CELL // 2).alpha() == 0]
+    assert unpainted == [index * (CELL + HAIRLINE) - HAIRLINE + step
+                         for index in range(1, FOLDER_CELLS) for step in range(HAIRLINE)], (
+        "one pixel between the cells is enough to read as separate thumbnails, and two at "
+        "this size is a visible stripe between them")
 
 
 def test_the_thumbnails_lie_across_the_row_not_stacked(qapp, tmp_path):

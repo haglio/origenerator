@@ -16,6 +16,7 @@ from origenerator import (
 )
 from origenerator.db import Database, NewGeneration
 from origenerator.gallery.shapes import PORTRAIT
+from origenerator.generation_state import GenerationSource
 from origenerator.gui import (
     combine_controller,
 )
@@ -1371,7 +1372,7 @@ def test_a_seed_re_roll_into_a_folder_already_making_one_starts_nothing(qtbot, t
     assert asked == []
 
 
-def _a_portrait_launch_while_latest_is_browsed(qtbot, tmp_path):
+def _a_portrait_launch_while_landscape_is_browsed(qtbot, tmp_path):
     db = _seeded_db(tmp_path)
     tall = dict(_SDXL.default_params(), positive_prompt="a standing one", width=720, height=1280)
     db.insert_generation(NewGeneration(
@@ -1391,17 +1392,35 @@ def _a_portrait_launch_while_latest_is_browsed(qtbot, tmp_path):
 
 
 def test_a_launch_in_a_portrait_folder_is_shown_on_that_side_whichever_is_browsed(qtbot, tmp_path):
-    view, key = _a_portrait_launch_while_latest_is_browsed(qtbot, tmp_path)
+    view, key = _a_portrait_launch_while_landscape_is_browsed(qtbot, tmp_path)
 
     assert view._launched_side(key) == PORTRAIT
 
 
 def test_a_revealed_launch_parks_on_the_latest_that_holds_its_in_flight_tile(qtbot, tmp_path):
-    view, key = _a_portrait_launch_while_latest_is_browsed(qtbot, tmp_path)
+    view, key = _a_portrait_launch_while_landscape_is_browsed(qtbot, tmp_path)
 
     view.reveal_launch(key)
 
     assert view._jobs.job_for(key).prompt_id in view._gallery_pane._inflight_tiles, (
-        "a run just launched is revealed on the shape its asked size says, read the same way "
-        "its in-flight tile is filed between the two Latest collections, or the view parks "
-        "on the Latest collection that does not hold the run's tile")
+        "a run just launched is revealed on the shape its asked size says, since it has no "
+        "result to measure yet, read the same way its in-flight tile is filed between the "
+        "two Latest collections, or the view parks on the Latest collection that does not "
+        "hold the run's tile")
+
+
+def test_an_experiment_landing_where_a_combine_was_revealed_leaves_the_reveal_waiting(
+        qtbot, tmp_path):
+    view, key = _a_portrait_launch_while_landscape_is_browsed(qtbot, tmp_path)
+    view._db.insert_generation(NewGeneration(
+        prompt_id="e1", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
+        positive_prompt="a tall one", negative_prompt="", seed=8, params_json="{}",
+        workflow_json="{}", source=GenerationSource.EXPERIMENT))
+    view.reveal_launch(key)
+    standing_on = view.selected_folder_key()
+
+    view._on_reroll_finished(key, "e1")
+
+    assert (view.selected_folder_key(), view._pending_combine_key) == (standing_on, key), (
+        "a background experiment that lands moves nothing on screen, so it spends no "
+        "combine's reveal")

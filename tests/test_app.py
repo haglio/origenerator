@@ -993,6 +993,8 @@ def test_a_boot_listens_for_clicked_toasts_before_its_slow_work_begins(qapp):
     with _a_faked_boot(ran, **{
         "origenerator.gui.link_listener.LinkListener":
             MagicMock(side_effect=lambda *a, **k: ran.append("listening") or MagicMock()),
+        "origenerator.comfyui_launcher.ensure_comfyui_server":
+            MagicMock(side_effect=lambda *a, **k: ran.append("ComfyUI")),
         "origenerator.gui.core.Core":
             MagicMock(side_effect=lambda *a, **k: ran.append("Core") or MagicMock()),
     }):

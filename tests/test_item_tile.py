@@ -187,19 +187,38 @@ def test_item_type_icon_appears_only_when_a_type_is_given(qtbot):
     assert len(typed.findChildren(ItemTypeIcon)) == 1
 
 
-def test_the_item_type_icon_keeps_to_the_one_corner_no_control_takes(qtbot):
+def _video_tile(qtbot, **appearance):
     tile = ItemTile("p1", None, "label", TileAppearance(
-        media_type=MediaType.VIDEO, favorite=True, enhance=icons.ENHANCE_OPEN))
+        media_type=MediaType.VIDEO, favorite=True, enhance=icons.ENHANCE_OPEN, **appearance))
     qtbot.addWidget(tile)
     with qtbot.waitExposed(tile):
         tile.show()
+    return tile
+
+
+def _type_icon_at(tile):
     (mark,) = tile.findChildren(ItemTypeIcon)
-    at = mark.geometry()
+    return mark.geometry()
+
+
+def test_the_item_type_icon_keeps_clear_of_the_star_the_trash_can_and_the_plus(qtbot):
+    tile = _video_tile(qtbot)
+    at = _type_icon_at(tile)
 
     on_its_corner = (at.center().x() < tile.width() // 2, at.center().y() < tile.height() // 2)
     under_a_control = any(at.intersects(corner.geometry()) for corner in _corners(tile))
     assert (on_its_corner, under_a_control) == ((True, True), False), (
-        "top-left is the one corner the star, the trash can and the plus leave free")
+        "the star, the trash can and the plus own the other three corners, so the mark sits top-left")
+
+
+def test_the_item_type_icon_stands_in_one_place_whatever_else_the_tile_wears(qtbot):
+    plain = _type_icon_at(_video_tile(qtbot))
+    beside_a_collections_own_buttons = _type_icon_at(
+        _video_tile(qtbot, corner_buttons=_corner_button_specs()))
+
+    assert beside_a_collections_own_buttons == plain, (
+        "a mark that only reports stays where it has always been, or it moves depending on which "
+        "collection is open")
 
 
 def test_no_corner_buttons_by_default(qtbot):

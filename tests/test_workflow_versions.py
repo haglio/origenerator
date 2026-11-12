@@ -25,9 +25,13 @@ def _rounded(value):
     return round(value, 6) if isinstance(value, float) else value
 
 
+_HOW_A_VIDEO_IS_COMPRESSED = frozenset({"format", "bitrate", "megabit"})
+
+
 def _compared_inputs(built: dict) -> dict:
     if built["class_type"] == "VHS_VideoCombine":
-        return {name: value for name, value in built["inputs"].items() if name != "crf"}
+        return {name: value for name, value in built["inputs"].items()
+                if name not in _HOW_A_VIDEO_IS_COMPRESSED}
     return built["inputs"]
 
 
@@ -216,9 +220,9 @@ GRAPH_FINGERPRINTS = {
     ("krea2_t2i", "v002"): "d864b9064cf7267b",
     ("sdxl_pose_transfer", "v004"): "c7504f4f79923d78",
     ("sdxl_t2i", "v004"): "d09e37b8381909c1",
-    ("wan22_animate", "v001"): "10789855b0e79ece",
-    ("wan22_flf2v_loop", "v009"): "1336ecd8bec4a6d3",
-    ("wan22_i2v", "v007"): "55a7b4aed1d19c51",
+    ("wan22_animate", "v001"): "060cdcc6579e94dd",
+    ("wan22_flf2v_loop", "v009"): "409f895e9a0ff82c",
+    ("wan22_i2v", "v007"): "d1090ab87aa806ae",
     ("wan22_t2i", "v002"): "f0794cae55c3e05d",
 }
 
@@ -309,9 +313,9 @@ def test_how_finely_a_video_is_compressed_is_no_part_of_its_settings(name, monke
     workflow = WORKFLOW_REGISTRY[name]
     before = _workflow_fingerprint(workflow)
 
-    monkeypatch.setattr(video_writer, "CRF", video_writer.CRF + 7)
+    monkeypatch.setattr(video_writer, "BITRATE_MEGABITS", video_writer.BITRATE_MEGABITS + 7)
 
-    assert _payload(workflow, {})[workflow.output_node_id]["inputs"]["crf"] == video_writer.CRF
+    assert _payload(workflow, {})[workflow.output_node_id]["inputs"]["bitrate"] == video_writer.BITRATE_MEGABITS
     assert _workflow_fingerprint(workflow) == before
 
 

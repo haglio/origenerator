@@ -2155,14 +2155,16 @@ def test_the_audio_is_scored_for_the_scenes_as_they_add_up(wf):
 
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
-def test_every_video_is_saved_as_h264_at_one_high_quality(name):
+def test_every_video_is_saved_as_h264_on_the_graphics_card_at_one_high_quality_since_an_lgpl_ffmpeg_has_no_x264(name):
     wf = WORKFLOW_REGISTRY[name]
     params = wf.default_params()
     writer = wf.build_api_payload(params)[wf.output_node_id]
 
     assert writer["class_type"] == "VHS_VideoCombine"
     inputs = writer["inputs"]
-    assert (inputs["format"], inputs["pix_fmt"], inputs["crf"]) == ("video/h264-mp4", "yuv420p", 13)
+    assert (inputs["format"], inputs["pix_fmt"], inputs["bitrate"], inputs["megabit"]) == (
+        "video/nvenc_h264-mp4", "yuv420p", 20, True)
+    assert "crf" not in inputs
     assert inputs["filename_prefix"] == params["filename_prefix"]
 
 

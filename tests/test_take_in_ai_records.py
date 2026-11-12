@@ -182,14 +182,41 @@ def test_run_from_the_command_line_it_prints_only_counts(tmp_path, capsys):
         "favorite": True, "web_url": "https://example.com/watch/101"}))
     _filed(library, "scene two.mp4", {"favorite": True})
 
-    assert main(["--db", str(db.path), "--library", str(library), "--dry-run"]) == 0
+    _filed(library, "scene three.mp4", {"favorite": True}, under=("genau", "loops", "portrait"))
 
+    assert main(["--db", str(db.path), "--library", str(library), "--dry-run"],
+                phone_records=_never_written) == 0
+
+    by_folder = "(kino {}, origenerator {}, genau {})".format
     assert capsys.readouterr().out.splitlines() == [
-        "records read: 2", "unreadable: 0", "no video: 0", "no row: 1", "left out of the gallery: 0",
-        "matched: 1",
-        "stars added: 1", "counts written: 0", "library records written: 1", "actions added: 0",
-        "settings filled in: 0"]
+        f"records read: 3 {by_folder(2, 0, 1)}", f"unreadable: 0 {by_folder(0, 0, 0)}",
+        f"no video: 0 {by_folder(0, 0, 0)}", f"no row: 2 {by_folder(1, 0, 1)}",
+        f"left out of the gallery: 0 {by_folder(0, 0, 0)}", f"matched: 1 {by_folder(1, 0, 0)}",
+        f"stars added: 1 {by_folder(1, 0, 0)}", f"counts written: 0 {by_folder(0, 0, 0)}",
+        f"library records written: 1 {by_folder(1, 0, 0)}",
+        f"actions added: 0 {by_folder(0, 0, 0)}", f"settings filled in: 0 {by_folder(0, 0, 0)}"]
     assert db.get_generation("out-1")["starred"] == 0
+
+
+def _never_written(db):
+    raise AssertionError("a dry run writes nothing, the phone's file included")
+
+
+def test_a_take_in_that_wrote_to_the_gallery_rewrites_the_phones_file_from_it(tmp_path, capsys):
+    library, db = tmp_path / "library", Database(tmp_path / "gallery.db")
+    _outside_row(db, "out-1", _filed(library, "scene one.mp4", {"favorite": True}))
+    written = []
+
+    class _Phone:
+        def __init__(self, gallery):
+            self.gallery = gallery
+
+        def write(self):
+            written.append(self.gallery.get_generation("out-1")["starred"])
+
+    assert main(["--db", str(db.path), "--library", str(library)], phone_records=_Phone) == 0
+
+    assert written == [1]
 
 
 def test_the_command_line_refuses_a_gallery_that_is_not_there(tmp_path):
@@ -206,3 +233,23 @@ def test_a_video_whose_row_is_left_out_of_the_gallery_is_counted_apart_and_left_
 
     assert (counts["left out of the gallery"], counts["no row"], counts["matched"]) == (1, 0, 0)
     assert db.rows_left_out()[0]["starred"] == 0
+
+
+def test_a_row_naming_its_video_by_file_name_alone_is_found_by_that_name(tmp_path):
+    library, db = tmp_path / "library", Database(tmp_path / "gallery.db")
+    _filed(library, "alpha_00009_-audio_topaz (2).mp4", {"favorite": True})
+    db.insert_rows([{"prompt_id": "gen-1", "workflow_name": "wan22_i2v", "workflow_version": "v1",
+                     "status": GenerationStatus.COMPLETED, "params_json": "{}",
+                     "workflow_json": "{}",
+                     "output_files": json.dumps([{"filename": "alpha_00009_.mp4"}])}])
+
+    assert (take_in(db, library)["matched"], db.get_generation("gen-1")["starred"]) == (1, 1)
+
+
+def test_a_genau_copy_of_a_video_made_here_is_found_under_any_name_the_lanes_gave_it(tmp_path):
+    library, db = tmp_path / "library", Database(tmp_path / "gallery.db")
+    for name in ("beta_00003__topaz.mp4", "beta_00003_-audio_topaz.mp4", "beta_00003_ (2).mp4"):
+        _filed(library, name, {"favorite": True}, under=("genau", "loops", "portrait"))
+    _made_here(db, "gen-2", "beta_00003_.mp4")
+
+    assert take_in(db, library)["matched"] == 3

@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 from collections import Counter
+from collections.abc import Callable
+from functools import partial
 from pathlib import Path
 from typing import NamedTuple
 
@@ -11,6 +13,7 @@ from app_support.mirrored_tree import library_roots_beside, mirrored_source
 from app_support.video_ids import VIDEO_SUFFIXES
 from app_support.watch_weights import WATCH_BLOCK, add_counts
 
+from origenerator.ai_video_records import this_librarys_phone_records
 from origenerator.db import Database
 from origenerator.db_generations import WATCH_COLUMNS
 from origenerator.gallery.signatures import parse_params
@@ -21,6 +24,7 @@ from origenerator.video_rows import VideoRows
 from origenerator.workflows.outside import PLACES
 
 AI_RECORDS = (("kino", "2D", "AI"), ("origenerator", "video"), ("genau",))
+TOP_FOLDERS = tuple(parts[0] for parts in AI_RECORDS)
 NON_AI_FOLDER = "non_AI"
 COUNTED = ("records read", "unreadable", "no video", "no row", "left out of the gallery",
            "matched", "stars added",
@@ -38,37 +42,52 @@ class Write(NamedTuple):
     calls: tuple[Call, ...]
 
 
-def take_in(db, library: Path, *, dry_run: bool = False) -> Counter:
-    counts: Counter = Counter()
+class Tally(Counter):
+    def __init__(self) -> None:
+        super().__init__()
+        self.by_folder: Counter = Counter()
+
+    def add(self, name: str, folder: str) -> None:
+        self[name] += 1
+        self.by_folder[name, folder] += 1
+
+    def line(self, name: str) -> str:
+        split = ", ".join(f"{folder} {self.by_folder[name, folder]}" for folder in TOP_FOLDERS)
+        return f"{name}: {self[name]} ({split})"
+
+
+def take_in(db, library: Path, *, dry_run: bool = False) -> Tally:
+    tally = Tally()
     records_folder = Path(library) / "videos" / "metadata"
     listed = db.list_generations()
     row_of = VideoRows([*listed, *db.rows_left_out()])
     in_the_gallery = {row["prompt_id"] for row in listed}
     for sidecar in _ai_sidecars(records_folder):
-        counts["records read"] += 1
+        counts = partial(tally.add, folder=sidecar.relative_to(records_folder).parts[0])
+        counts("records read")
         try:
             record = read_json(sidecar)
         except (OSError, ValueError):
-            counts["unreadable"] += 1
+            counts("unreadable")
             continue
         video = mirrored_source(sidecar, roots=library_roots_beside(records_folder),
                                 mirror_root=records_folder, suffixes=VIDEO_SUFFIXES)
         if video is None:
-            counts["no video"] += 1
+            counts("no video")
             continue
         prompt_id = row_of(video)
         if prompt_id is None:
-            counts["no row"] += 1
+            counts("no row")
             continue
         if prompt_id not in in_the_gallery:
-            counts["left out of the gallery"] += 1
+            counts("left out of the gallery")
             continue
-        counts["matched"] += 1
+        counts("matched")
         for write in writes_for(db.get_generation(prompt_id), record):
-            counts[write.counted_as] += 1
+            counts(write.counted_as)
             for call in write.calls if not dry_run else ():
                 getattr(db, call.method)(*call.args, **(call.kwargs or {}))
-    return counts
+    return tally
 
 
 def writes_for(row: dict, record: dict) -> list[Write]:
@@ -115,7 +134,8 @@ def _ai_sidecars(records_folder: Path) -> list[Path]:
             if NON_AI_FOLDER not in sidecar.relative_to(records_folder).parts]
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, *,
+         phone_records: Callable[[Database], object] = this_librarys_phone_records) -> int:
     parser = argparse.ArgumentParser(prog="python -m origenerator.take_in_ai_records")
     parser.add_argument("--db", type=Path, required=True)
     parser.add_argument("--library", type=Path, required=True)
@@ -124,9 +144,12 @@ def main(argv: list[str] | None = None) -> int:
     if not args.db.is_file():
         print("no gallery at the path given")
         return 2
-    counts = take_in(Database(args.db), args.library, dry_run=args.dry_run)
+    db = Database(args.db)
+    tally = take_in(db, args.library, dry_run=args.dry_run)
+    if not args.dry_run:
+        phone_records(db).write()
     for name in COUNTED:
-        print(f"{name}: {counts[name]}")
+        print(tally.line(name))
     return 0
 
 

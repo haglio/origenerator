@@ -772,16 +772,21 @@ def test_a_slideshow_wears_one_hud_with_the_device_on_it(qtbot, monkeypatch):
     slideshow.close()
 
 
-def test_slideshow_plays_the_experiments_collection(qtbot, monkeypatch):
+def _on_the_experiments_collection(qtbot, monkeypatch, db):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
+    return view
+
+
+def test_slideshow_plays_the_experiments_collection(qtbot, monkeypatch):
+    view = _on_the_experiments_collection(qtbot, monkeypatch, FakeDB([
         _experiment_row("e1"),
         _experiment_row("e2", seed=10),
         _experiment_row("e3", verdict="up", seed=11),
     ]))
-    qtbot.addWidget(view)
-    view.refresh()
-    view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
     assert not view._buttons.slideshow.isHidden(), (
         "going through a batch of experiments one at a time, full screen, is what a slideshow is for")
     assert "Experiments" in view._buttons.slideshow.toolTip()
@@ -790,6 +795,21 @@ def test_slideshow_plays_the_experiments_collection(qtbot, monkeypatch):
 
     qtbot.addWidget(view._slideshows.showing.shown)
     assert {item[2] for item in view._slideshows.showing._set.playlist._items} == {"e1", "e2"}
+    view._slideshows.showing.close()
+
+
+def test_an_experiment_landing_is_lined_up_on_no_slideshow(qtbot, monkeypatch):
+    db = FakeDB([_experiment_row("e1"), _experiment_row("e2", seed=10)])
+    view = _on_the_experiments_collection(qtbot, monkeypatch, db)
+    view._slideshows.start()
+    qtbot.addWidget(view._slideshows.showing.shown)
+
+    db.add(_experiment_row("e3", seed=11))
+    view._on_reroll_finished("some-key", "e3")
+
+    assert {item[2] for item in view._slideshows.showing._set.playlist._items} == {"e1", "e2"}, (
+        "a background experiment that lands waits in the Experiments collection and moves "
+        "nothing on screen, so no slideshow is fed it, the Experiments slideshow included")
     view._slideshows.showing.close()
 
 

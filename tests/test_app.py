@@ -988,6 +988,22 @@ def test_a_boot_answers_a_clicked_toast_with_the_window_it_just_built(qapp):
     listener.return_value.answer_with.assert_called_once_with(window.go_to_generation)
 
 
+def test_a_boot_listens_for_clicked_toasts_before_its_slow_work_begins(qapp):
+    ran = []
+    with _a_faked_boot(ran, **{
+        "origenerator.gui.link_listener.LinkListener":
+            MagicMock(side_effect=lambda *a, **k: ran.append("listening") or MagicMock()),
+        "origenerator.gui.core.Core":
+            MagicMock(side_effect=lambda *a, **k: ran.append("Core") or MagicMock()),
+    }):
+        assert main([]) == 0
+
+    assert ran[0] == "listening", (
+        "the listener stands from the launch's start, not from the window, since a launch is "
+        "slow and a click during one would otherwise find nobody listening and start a second "
+        "copy")
+
+
 def test_a_window_handed_back_by_a_session_is_offered_to_the_next_one(qapp):
     window = MagicMock()
     watch = MagicMock()

@@ -1371,13 +1371,37 @@ def test_a_seed_re_roll_into_a_folder_already_making_one_starts_nothing(qtbot, t
     assert asked == []
 
 
-def test_a_launch_in_a_portrait_folder_is_shown_on_that_side_whichever_is_browsed(qtbot, tmp_path):
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+def _a_portrait_launch_while_latest_is_browsed(qtbot, tmp_path):
+    db = _seeded_db(tmp_path)
+    tall = dict(_SDXL.default_params(), positive_prompt="a standing one", width=720, height=1280)
+    db.insert_generation(NewGeneration(
+        prompt_id="tall", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
+        positive_prompt="a standing one", negative_prompt="", seed=3,
+        params_json=json.dumps(tall), workflow_json="{}"))
+    db.update_generation("tall", status="completed",
+                         output_files=json.dumps([{"filename": "sdxl_tall.png", "subfolder": ""}]))
+    view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     params = dict(_SDXL.default_params(), positive_prompt="a tall one", width=720, height=1280)
     key = view.folder_key_for("sdxl_t2i", params)
     view._jobs.start_prepared(key, _SDXL, params)
+    return view, key
+
+
+def test_a_launch_in_a_portrait_folder_is_shown_on_that_side_whichever_is_browsed(qtbot, tmp_path):
+    view, key = _a_portrait_launch_while_latest_is_browsed(qtbot, tmp_path)
 
     assert view._launched_side(key) == PORTRAIT
+
+
+def test_a_revealed_launch_parks_on_the_latest_that_holds_its_in_flight_tile(qtbot, tmp_path):
+    view, key = _a_portrait_launch_while_latest_is_browsed(qtbot, tmp_path)
+
+    view.reveal_launch(key)
+
+    assert view._jobs.job_for(key).prompt_id in view._gallery_pane._inflight_tiles, (
+        "a run just launched is revealed on the shape its asked size says, read the same way "
+        "its in-flight tile is filed between the two Latest collections, or the view parks "
+        "on the Latest collection that does not hold the run's tile")

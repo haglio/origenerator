@@ -183,15 +183,24 @@ def test_the_field_shows_a_search_is_still_going_until_its_widening_lands(contro
     assert not found.field.working()
 
 
-def test_the_searches_run_while_typing_ask_the_model_nothing(controller):
+def test_the_searches_run_while_typing_ask_the_model_nothing(controller, qtbot):
     asked = []
-    expander = SearchExpander(expand=asked.append)
+
+    def widen(query):
+        asked.append(query)
+        return {"kitten": ("tabby",)}
+
+    expander = SearchExpander(expand=widen)
     found = controller([_row("g1", "a tabby on a wall")], expander=expander)
+    with qtbot.waitSignal(expander.expanded):
+        expander.request("kitten")
+    asked.clear()
 
     for typed in ("kit", "kitt", "kitte", "kitten"):
         _type(found, typed)
 
-    assert (asked, expander._in_flight) == ([], set()), (
+    assert (asked, expander._in_flight, found._expansions) == (
+        [], set(), {"kitten": ("tabby",)}), (
         "each search run while typing reads the widenings already known and asks the model "
         "nothing, so typing costs lookups rather than a model call per character")
 

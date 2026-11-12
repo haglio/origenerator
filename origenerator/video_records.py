@@ -4,8 +4,10 @@ import json
 from collections.abc import Callable, Hashable, Iterable
 from typing import NamedTuple
 
+from app_support.comfy_file_refs import frame_name
 from app_support.video_action import STORED_ACTIONS_KEY
 from app_support.watch_weights import NEUTRAL_WEIGHT, WATCH_BLOCK, WEIGHT_KEY, weight_for
+from funestra.video_families import FRAME_OF_VIDEO
 from funestra.video_groups import (
     GroupIndex,
     VideoEntry,
@@ -17,14 +19,16 @@ from funestra.video_groups import (
 
 from origenerator.db_generations import WATCH_COLUMNS
 from origenerator.gallery import media_type_of_row
+from origenerator.gallery.output import frame_names_of
 from origenerator.gallery.signatures import parse_params
 from origenerator.gallery.source_image import start_images_among
-from origenerator.generation_state import GenerationSource, source_of
+from origenerator.generation_state import GenerationSource, made_here, source_of
 from origenerator.media import MediaType, media_type_from_filename
 from origenerator.video_rows import VideoRows
 from origenerator.workflows.outside import PLACES
 
 _NOTHING_FILED = VideoEntry(path="", weight=NEUTRAL_WEIGHT)
+SOURCE_IMAGE = "source_image"
 
 
 class FiledLoops(NamedTuple):
@@ -33,17 +37,35 @@ class FiledLoops(NamedTuple):
     more_seeds: tuple[str, ...] = ()
 
 
-def record_of_row(video: dict, start_image: dict | None) -> dict:
+def record_of_row(video: dict, start_image: dict | None, *, frame_of: dict | None = None) -> dict:
+    record = {"video": _shown(video), WATCH_BLOCK: {WEIGHT_KEY: weight_for(
+        {field: video.get(column) or 0 for field, column in WATCH_COLUMNS})}}
+    if (image := _source_image(video, start_image)) is not None:
+        record[SOURCE_IMAGE] = {**image, **({FRAME_OF_VIDEO: frame_of} if frame_of else {})}
+    return record
+
+
+def _shown(video: dict) -> dict:
     shown = _recorded(video, MediaType.VIDEO)
     if video.get("action"):
         shown["action"] = video["action"]
     if labels := json.loads(video.get("combined_labels") or "[]"):
         shown[STORED_ACTIONS_KEY] = labels
-    record = {"video": shown, WATCH_BLOCK: {WEIGHT_KEY: weight_for(
-        {field: video.get(column) or 0 for field, column in WATCH_COLUMNS})}}
-    if start_image is not None and source_of(start_image) == GenerationSource.OUTSIDE:
-        record["source_image"] = _recorded(start_image, MediaType.IMAGE)
-    return record
+    return shown
+
+
+def _source_image(video: dict, start_image: dict | None) -> dict | None:
+    if start_image is None:
+        return None
+    if source_of(start_image) == GenerationSource.OUTSIDE:
+        return _recorded(start_image, MediaType.IMAGE)
+    if not made_here(video):
+        return None
+    seed = start_image.get("seed")
+    return {key: value for key, value in (
+        ("positive_prompt", start_image.get("positive_prompt")),
+        ("negative_prompt", start_image.get("negative_prompt")),
+        ("seed", str(seed) if seed is not None else None)) if value}
 
 
 def _recorded(row: dict, made: MediaType) -> dict:
@@ -59,11 +81,25 @@ class GalleryRecords:
         self._rows: dict[str, dict] = {}
         self._row_of: Callable[[object], str | None] = VideoRows([])
         self._start_image_of: Callable[[dict], dict | None] = lambda _row: None
+        self._videos_from_frame: dict[str, list[dict]] = {}
 
     def __call__(self, video) -> dict:
         self._keep_up()
         row = self._rows.get(self._row_of(video))
-        return record_of_row(row, self._start_image_of(row)) if row is not None else {}
+        if row is None:
+            return {}
+        start_image = self._start_image_of(row)
+        return record_of_row(row, start_image, frame_of=self._words_video_of_frame(row, start_image))
+
+    def _words_video_of_frame(self, video: dict, start_image: dict | None) -> dict | None:
+        if start_image is None or not made_here(video):
+            return None
+        for frame in frame_names_of(start_image.get("output_files")):
+            for other in self._videos_from_frame.get(frame, ()):
+                record = record_of_row(other, self._start_image_of(other))
+                if other is not video and SOURCE_IMAGE not in record and record["video"].get("prompt"):
+                    return record["video"]
+        return None
 
     def _keep_up(self) -> None:
         version = self._db.library_version()
@@ -74,6 +110,10 @@ class GalleryRecords:
             version, {row["prompt_id"]: row for row in rows}, VideoRows(rows))
         self._start_image_of = start_images_among(
             [row for row in rows if media_type_of_row(row) == MediaType.IMAGE])
+        self._videos_from_frame = {}
+        for row in rows:
+            if frame := frame_name(parse_params(row.get("params_json")).get("input_image")):
+                self._videos_from_frame.setdefault(frame, []).append(row)
 
 
 class VideoRecords:

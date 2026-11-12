@@ -160,3 +160,71 @@ def test_the_director_weighs_videos_from_the_gallery_it_is_handed(tmp_path):
                                               library=lambda: None, listing=lambda: None)
 
     assert sources.weight_of(videos / "scene one.mp4") == 4.0
+
+
+_WORDS_VIDEO = {"prompt": "a lighthouse in words", "model": "Motion W", "seed": "7"}
+_FRAME = "frame-one.png"
+
+
+def _frame(db, prompt_id: str, *files: str, source=GenerationSource.STARTING_FRAME, **fields):
+    db.insert_rows([{"prompt_id": prompt_id, "source": source, "workflow_name": "outside picture:Example Site",
+                     "workflow_version": "outside", "status": GenerationStatus.COMPLETED,
+                     "params_json": "{}", "workflow_json": "{}",
+                     "output_files": json.dumps([{"filename": name} for name in files]), **fields}])
+
+
+def _made_here_from(db, frame_file: str) -> str:
+    db.insert_rows([{"prompt_id": "made-1", "workflow_name": "wan22_i2v", "workflow_version": "v1",
+                     "status": GenerationStatus.COMPLETED, "workflow_json": "{}",
+                     "params_json": json.dumps({"input_image": frame_file}),
+                     "output_files": json.dumps([{"filename": "wan22_i2v_00001_.mp4",
+                                                  "subfolder": "video"}])}])
+    return "wan22_i2v_00001__topaz.mp4"
+
+
+def _words_video_from(db, videos, frame_file: str, *, video=_WORDS_VIDEO):
+    _outside(db, "words-1", videos / "words one.mp4",
+             params={"positive_prompt": video.get("prompt"), "model": video.get("model"),
+                     "seed": video.get("seed"), "input_image": frame_file})
+
+
+def test_a_video_made_from_a_text_to_video_videos_frame_names_the_video_it_was_taken_from(tmp_path):
+    db, videos = _gallery(tmp_path)
+    _frame(db, "frame-1", _FRAME, positive_prompt="the words of the frame")
+    _words_video_from(db, videos, _FRAME)
+
+    record = GalleryRecords(db)(videos / _made_here_from(db, _FRAME))
+
+    assert record["source_image"]["frame_of_video"] == _WORDS_VIDEO
+    assert record["source_image"]["positive_prompt"] == "the words of the frame"
+    assert action_group_key(record) == action_group_key({"video": _WORDS_VIDEO})
+
+
+def test_it_finds_the_text_to_video_video_through_any_file_of_the_frame(tmp_path):
+    db, videos = _gallery(tmp_path)
+    _frame(db, "frame-1", _FRAME, "frame-one-enhanced.png", positive_prompt="the words of the frame")
+    _words_video_from(db, videos, _FRAME)
+
+    record = GalleryRecords(db)(videos / _made_here_from(db, "frame-one-enhanced.png"))
+
+    assert record["source_image"]["frame_of_video"] == _WORDS_VIDEO
+
+
+def test_a_video_made_from_an_image_names_no_video(tmp_path):
+    db, videos = _gallery(tmp_path)
+    _frame(db, "image-1", _FRAME, source=GenerationSource.OUTSIDE, positive_prompt="an image")
+    _words_video_from(db, videos, _FRAME)
+
+    record = GalleryRecords(db)(videos / _made_here_from(db, _FRAME))
+
+    assert "frame_of_video" not in record["source_image"]
+
+
+def test_a_video_whose_frame_was_taken_from_a_video_with_no_words_names_no_video(tmp_path):
+    db, videos = _gallery(tmp_path)
+    _frame(db, "frame-1", _FRAME, positive_prompt="the words of the frame")
+    _words_video_from(db, videos, _FRAME, video={})
+
+    record = GalleryRecords(db)(videos / _made_here_from(db, _FRAME))
+
+    assert "frame_of_video" not in record["source_image"]

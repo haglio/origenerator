@@ -18,7 +18,15 @@
     "evolver_unsent_at",
     "genau_exported_at",
     "genau_unsent_at",
-    "remade_at"
+    "remade_at",
+    "starred",
+    "evolver_upscale",
+    "web_url",
+    "library_id",
+    "upscale_provenance",
+    "watch_completions",
+    "watch_skips",
+    "watch_locks"
   ],
   "params_model_keys": [
     "unet_high",
@@ -48,5 +56,10 @@
     ".venv/Scripts/python.exe",
     "-m",
     "origenerator.outside_video_entries"
+  ],
+  "records_command": [
+    ".venv/Scripts/python.exe",
+    "-m",
+    "origenerator.ai_video_records"
   ]
 }

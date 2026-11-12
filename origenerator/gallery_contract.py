@@ -28,6 +28,14 @@ OPTIONAL_COLUMNS = (
     "genau_exported_at",
     "genau_unsent_at",
     "remade_at",
+    "starred",
+    "evolver_upscale",
+    "web_url",
+    "library_id",
+    "upscale_provenance",
+    "watch_completions",
+    "watch_skips",
+    "watch_locks",
 )
 
 PARAMS_MODEL_KEYS = ("unet_high", "unet", "checkpoint", "unet_low")
@@ -47,6 +55,8 @@ DOWNTIME_COMMAND = (".venv/Scripts/python.exe", "-m", "origenerator.downtime")
 OUTSIDE_VIDEO_ENTRIES_COMMAND = (".venv/Scripts/python.exe", "-m",
                                  "origenerator.outside_video_entries")
 
+RECORDS_COMMAND = (".venv/Scripts/python.exe", "-m", "origenerator.ai_video_records")
+
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -65,6 +75,7 @@ def declaration() -> dict:
         "generated_fps": NATIVE_FPS,
         "downtime_command": list(DOWNTIME_COMMAND),
         "outside_video_entries_command": list(OUTSIDE_VIDEO_ENTRIES_COMMAND),
+        "records_command": list(RECORDS_COMMAND),
     }
 
 

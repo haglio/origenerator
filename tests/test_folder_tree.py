@@ -106,12 +106,12 @@ def test_clicking_the_favorite_icon_on_a_leaf_emits_favorite_clicked(qtbot):
 def test_the_star_a_press_favorites_with_is_the_star_that_then_stays_filled(qtbot):
     tree, leaf = _tree_with_an_indented_leaf(qtbot)
     star, _delete = _action_rects(tree.visualRect(tree.indexFromItem(leaf)))
+    tree.favorite_clicked.connect(lambda key: leaf.setData(0, _ROLE, _Group(key, True)))
     bare = _pixels_within(tree, leaf, star)
     _hover_over(qtbot, tree, leaf)
     offered = _pixels_within(tree, leaf, star)
 
     qtbot.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=star.center())
-    leaf.setData(0, _ROLE, _Group("m/w/mo/key", True))
 
     assert offered != bare, "a hover offers the star where a press favorites the folder"
     assert _wears_within(tree, leaf, star, _is_green), (

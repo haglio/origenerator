@@ -12,7 +12,7 @@ from app_support.video_ids import VIDEO_SUFFIXES
 from app_support.watch_weights import WATCH_BLOCK, add_counts
 
 from origenerator.db import Database
-from origenerator.db_generations import WATCH_COLUMN_OF
+from origenerator.db_generations import WATCH_COLUMNS
 from origenerator.gallery.signatures import parse_params
 from origenerator.generation_state import GenerationSource, source_of
 from origenerator.media import MediaType
@@ -71,7 +71,7 @@ def writes_for(row: dict, record: dict) -> list[Write]:
     if record.get("favorite") is True and not row.get("starred"):
         writes.append(Write("stars added", (Call("set_generation_favorite", (prompt_id, True)),)))
     watched = add_counts(_block(record, WATCH_BLOCK))
-    if watched != add_counts({field: row.get(column) for field, column in WATCH_COLUMN_OF.items()}):
+    if watched != add_counts({field: row.get(column) for field, column in WATCH_COLUMNS}):
         writes.append(Write("counts written", (Call("set_watch_counts", (prompt_id, watched)),)))
     kept = _library_record(record)
     if any(row.get(column) != value for column, value in kept.items()):

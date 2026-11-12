@@ -273,7 +273,7 @@ def _drop_at(tree, item, mime):
 
 def _drag_move_at(tree, item, mime):
     pos = QPointF(tree.visualRect(tree.indexFromItem(item)).center())
-    event = QDragMoveEvent(pos.toPoint(), Qt.DropAction.CopyAction, mime,
+    event = QDragMoveEvent(pos, Qt.DropAction.CopyAction, mime,
                            Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
     tree.dragMoveEvent(event)
     return event
@@ -620,7 +620,7 @@ def test_an_item_drag_is_let_into_the_tree(qtbot):
     tree, collection, _a, _b = _collecting_tree(qtbot)
     mime = generation_mime("p1")
     pos = tree.visualRect(tree.indexFromItem(collection)).center()
-    enter = QDragEnterEvent(pos, Qt.DropAction.CopyAction, mime,
+    enter = QDragEnterEvent(QPointF(pos), Qt.DropAction.CopyAction, mime,
                             Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
 
     tree.dragEnterEvent(enter)
@@ -640,7 +640,7 @@ def _too_long_for_its_height(qtbot):
 
 
 def _held_at(spot, mime):
-    return QDragMoveEvent(spot, Qt.DropAction.CopyAction, mime,
+    return QDragMoveEvent(QPointF(spot), Qt.DropAction.CopyAction, mime,
                           Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
 
 
@@ -898,7 +898,7 @@ def test_folders_dragged_from_the_other_half_land_nowhere(qtbot):
     dropped = []
     tree.dropped.connect(lambda _target, keys, _items: dropped.append(keys))
     pos = QPointF(tree.visualRect(tree.indexFromItem(collection)).center())
-    move = QDragMoveEvent(pos.toPoint(), Qt.DropAction.CopyAction, mime,
+    move = QDragMoveEvent(pos, Qt.DropAction.CopyAction, mime,
                           Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
     drop = QDropEvent(pos, Qt.DropAction.CopyAction, mime,
                       Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)

@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import pytest
 from PIL import Image
-from PySide6.QtCore import QMimeData, QPoint, QPointF, Qt
+from PySide6.QtCore import QMimeData, QPointF, Qt
 from PySide6.QtGui import QColor, QDragEnterEvent, QDragLeaveEvent, QDropEvent, QMovie
 from PySide6.QtWidgets import QApplication
 from shared_ui.colors import hovered
@@ -43,7 +43,7 @@ def _drop(zone, pid):
 
 def _drag_enter(zone, pid):
     mime = generation_mime(pid)
-    ev = QDragEnterEvent(QPoint(1, 1), Qt.DropAction.CopyAction, mime,
+    ev = QDragEnterEvent(QPointF(1, 1), Qt.DropAction.CopyAction, mime,
                          Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
     zone.dragEnterEvent(ev)
     return ev
@@ -265,7 +265,7 @@ def test_a_drag_carrying_no_gallery_item_is_turned_away(qtbot):
     zone = _zone(qtbot)
     mime = QMimeData()
     mime.setText("elsewhere.png")
-    event = QDragEnterEvent(QPoint(1, 1), Qt.DropAction.CopyAction, mime,
+    event = QDragEnterEvent(QPointF(1, 1), Qt.DropAction.CopyAction, mime,
                             Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
 
     zone.dragEnterEvent(event)

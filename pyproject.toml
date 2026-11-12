@@ -25,15 +25,12 @@ dependencies = [
     "funestra @ git+https://github.com/haglio/funestra@v0.1.891",
     "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.418",
     "voice-core @ git+https://github.com/haglio/voice_core@v0.1.179",
-    # PySide6 and the Qt it ships stay at 6.11, the version production Origenerator
-    # runs on, until the family moves on purpose: Qt 6.12.0 (out 2026-10-28) fails
-    # test_work_deferred_by_a_dead_owner_never_runs and
-    # test_show_videos_replaces_the_previous_tiles, which check that a widget handed
-    # deleteLater() is gone by the point each one names. And not below 6.11.2: Qt
-    # 6.11.1 handed its wildcard-disconnect warning to the Python message handler
-    # holding a signal/slot lock (QTBUG-145216); 6.11.2 lets go of the lock first.
-    "PySide6>=6.11.2,<6.12",
-    "shiboken6>=6.11.2,<6.12",
+    # PySide6 and the Qt it ships are 6.12, for every app of the family: on 6.11,
+    # 6.11.3 included, a Generate tab with prompt boxes, shown in the gallery and
+    # then deleted, corrupted memory and crashed the app at a later allocation,
+    # which 6.12.0 does not.
+    "PySide6>=6.12.0,<6.13",
+    "shiboken6>=6.12.0,<6.13",
     "pillow>=12,<13",
     "opencv-python>=4.8,<6",
     "websockets>=17,<18",

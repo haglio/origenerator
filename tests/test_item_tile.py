@@ -657,7 +657,9 @@ def _look(appearance):
 
 
 @pytest.mark.parametrize("field", [field.name for field in fields(TileAppearance)])
-def test_a_tiles_look_holds_exactly_the_fields_a_built_tile_has_no_setter_for(qtbot, field):
+def test_a_tiles_look_holds_the_fields_a_built_tile_has_no_setter_for(qtbot, field):
+    assert field in _A_CHANGE_TO, (
+        f"{field} is a field of TileAppearance with no change listed in _A_CHANGE_TO")
     plain = TileAppearance()
     changed = replace(plain, **{field: _A_CHANGE_TO[field]()})
 

@@ -792,6 +792,33 @@ def test_selected_reroll_survives_the_rebuild_its_running_row_triggers(qtbot, tm
     assert _frame_shown(tab._viewport, frame)
 
 
+def _staying_in_the_runs_folder(_view):
+    pass
+
+
+@pytest.mark.parametrize(("go_to", "run_selected"), [
+    (_staying_in_the_runs_folder, True),
+    (_open_latest, False),
+])
+def test_a_rebuild_selects_a_running_run_again_only_on_its_own_folder(qtbot, tmp_path, go_to,
+                                                                    run_selected):
+    client = _reroll_client()
+    client.fetch_history = MagicMock(return_value={})
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key, _job = _running_reroll(view)
+    _generating_tile(view).selected.emit()
+    go_to(view)
+    view.select_generation("orig")
+
+    view.refresh()
+
+    assert (view._selected_reroll_key == key) is run_selected, (
+        "a rebuild selects a running run again only when its folder is on screen, checked"
+        " against the folder the job is filed under rather than the tree row showing it")
+
+
 def test_i2v_video_stage_keeps_the_last_image_frame_until_it_previews(qtbot, tmp_path):
     client = _reroll_client()
     client.fetch_history = MagicMock(return_value={})

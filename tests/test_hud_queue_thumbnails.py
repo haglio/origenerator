@@ -59,7 +59,9 @@ def test_a_file_written_again_is_read_again(tmp_path):
     path = tmp_path / "changing.png"
     path.write_bytes(_png_bytes(color=(200, 40, 40)))
     first = fitted_thumbnail(path, 16)
-    assert fitted_thumbnail(path, 16) is first
+    assert fitted_thumbnail(path, 16) is first, (
+        "the HUD's Job Queue is drawn again on every beat of the HUD from full-size images on "
+        "disk, so a thumbnail fitted once is kept rather than read off disk again")
 
     path.write_bytes(_png_bytes(color=(40, 200, 40)))
     os.utime(path, ns=(1, 1))

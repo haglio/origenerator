@@ -143,6 +143,9 @@ class Database:
     def list_generations(self) -> list[dict]:
         return self.generations.list_generations()
 
+    def rows_left_out(self) -> list[dict]:
+        return self.generations.rows_left_out()
+
     def library_version(self) -> int:
         return self.generations.library_version()
 

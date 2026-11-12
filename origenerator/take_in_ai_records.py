@@ -42,7 +42,7 @@ def take_in(db, library: Path, *, dry_run: bool = False) -> Counter:
     counts: Counter = Counter()
     records_folder = Path(library) / "videos" / "metadata"
     listed = db.list_generations()
-    row_of = VideoRows([*listed, *db.generations.rows_left_out()])
+    row_of = VideoRows([*listed, *db.rows_left_out()])
     in_the_gallery = {row["prompt_id"] for row in listed}
     for sidecar in _ai_sidecars(records_folder):
         counts["records read"] += 1

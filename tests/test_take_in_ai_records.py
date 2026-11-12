@@ -205,4 +205,4 @@ def test_a_video_whose_row_is_left_out_of_the_gallery_is_counted_apart_and_left_
     counts = take_in(db, library)
 
     assert (counts["left out of the gallery"], counts["no row"], counts["matched"]) == (1, 0, 0)
-    assert db.generations.rows_left_out()[0]["starred"] == 0
+    assert db.rows_left_out()[0]["starred"] == 0

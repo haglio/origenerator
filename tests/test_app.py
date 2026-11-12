@@ -35,7 +35,7 @@ from shared_ui.colors import BLUE
 from shared_ui.preview import Preview
 from shared_ui.testing import brought_to_front
 
-from origenerator import app_link, config, content, evolver_agreement, gallery
+from origenerator import app_link, config, content, evolver_agreement, gallery, warm_gun_records
 from origenerator.app import _arm_the_crash_log as unpatched_arm_the_crash_log
 from origenerator.app import (
     _configure_logging,
@@ -2017,3 +2017,22 @@ def test_the_launch_check_is_no_launch_in_the_crash_log(qapp, monkeypatch):
         assert main(["--check-launch"]) == 0
 
     armed.assert_not_called()
+
+
+def test_the_launch_watches_the_gallery_for_the_phones_file_as_it_opens_the_library(
+        library, monkeypatch):
+    watched = []
+
+    class _Watching:
+        def __init__(self, db):
+            self.db = db
+
+        def watch(self):
+            watched.append(self.db.path)
+
+    monkeypatch.setattr(warm_gun_records.PhoneRecords, "of_this_library",
+                        classmethod(lambda _cls, db, *, preview: _Watching(db)))
+
+    _boot(library)
+
+    assert watched == [library]

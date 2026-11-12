@@ -39,13 +39,37 @@ def _json_file(tmp_path, name: str, value) -> str:
     return str(path)
 
 
-def _run(tmp_path, capsys, *argv, logged_to=None) -> dict:
+class _Phone:
+    def __init__(self):
+        self.written = []
+
+    def of(self, db):
+        self.db = db
+        return self
+
+    def write(self):
+        self.written.append(self.db.path)
+
+
+def _run(tmp_path, capsys, *argv, logged_to=None, phone=None) -> dict:
     logged_to = [] if logged_to is None else logged_to
     assert ai_video_records.main(list(argv), db_path=tmp_path / "origenerator.db",
                                  places=lambda: _places(tmp_path),
                                  grab=lambda _path: Image.new("RGB", (64, 96)),
-                                 log_to=lambda *where: logged_to.append(where)) == 0
+                                 log_to=lambda *where: logged_to.append(where),
+                                 phone_records=(phone or _Phone()).of) == 0
     return json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+
+
+def test_every_verb_rewrites_the_phones_file_from_the_gallery_it_changed(tmp_path, capsys):
+    db = _the_gallery(tmp_path)
+    video = _filed(_places(tmp_path))
+    _outside(db, "o1", video)
+    phone = _Phone()
+
+    _run(tmp_path, capsys, "favorite", "--video", str(video), "--on", phone=phone)
+
+    assert phone.written == [tmp_path / "origenerator.db"]
 
 
 def _the_gallery(tmp_path) -> Database:
@@ -153,3 +177,7 @@ def test_the_command_the_document_names_answers_in_its_last_line_when_evolver_ru
     assert interpreter == ".venv/Scripts/python.exe"
     assert answered.returncode == 0, answered.stderr
     assert json.loads(answered.stdout.strip().splitlines()[-1]) == {"done": 0, "no_row": 1}
+
+
+def test_where_the_library_keeps_no_records_folder_the_phones_file_is_written_nowhere(tmp_path):
+    assert ai_video_records.this_librarys_phone_records(_the_gallery(tmp_path)).write() == 0

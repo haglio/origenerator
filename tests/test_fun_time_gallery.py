@@ -1856,21 +1856,3 @@ def test_a_regions_reset_drops_the_enhanced_switch_with_the_rest(qtbot, tmp_path
 
     assert slideshow.hud_enhanced_mode is False
 
-
-class _PhoneRecords:
-    def __init__(self):
-        self.asked = []
-
-    def write_when_due(self, off_thread):
-        self.asked.append(off_thread)
-
-
-def test_each_tick_asks_whether_the_phones_file_is_due_even_while_the_window_is_down(qtbot):
-    phone = _PhoneRecords()
-    view = GalleryView(FakeDB([]), shared=Shared(phone_records=phone))
-    qtbot.addWidget(view)
-    view._poll_inflight = True
-
-    view._poll()
-
-    assert phone.asked == [view.off_thread]

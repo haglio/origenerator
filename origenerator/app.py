@@ -170,11 +170,9 @@ def _open_the_loading(fun_time, app, logger, preview, taskbar):
 
 def _build_window(client, db, app_state, boot, next_launch):
     from origenerator.gui.core import Core, Launch
-    from origenerator.warm_gun_records import PhoneRecords
 
     window = Core(client, db, app_state, fun_time=boot.fun_time,
-                  launch=Launch(boot.preview, boot.taskbar, next_launch),
-                  phone_records=PhoneRecords.of_this_library(db, preview=boot.preview is not None))
+                  launch=Launch(boot.preview, boot.taskbar, next_launch))
     if boot.fun_time is not None and not boot.fun_time.in_a_headset:
         window.showMinimized()
     return window
@@ -431,6 +429,7 @@ def _open_the_library(boot, client) -> Library:
     from origenerator.db import Database
     from origenerator.evolver_export import default_inbox
     from origenerator.inflight import in_flight_at
+    from origenerator.warm_gun_records import PhoneRecords
 
     boot.say(OPENING_THE_LIBRARY)
     boot.logger.info("Library: %s", DB_PATH)
@@ -438,6 +437,7 @@ def _open_the_library(boot, client) -> Library:
     library = Library(db=db, client=client, places=OUTPUT_PLACES, thumb_dir=THUMB_DIR,
                       log_dir=COMFYUI_LOG_DIR, inbox=default_inbox(), in_flight=in_flight_at(db))
     run_maintenance(library, boot.maintenance(), boot.say, boot.logger)
+    PhoneRecords.of_this_library(db, preview=boot.preview is not None).watch()
     return library
 
 

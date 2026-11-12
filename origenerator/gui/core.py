@@ -89,8 +89,7 @@ class Core(QMainWindow):
     handed_back = pyqtSignal()
 
     def __init__(self, client: ComfyUIClient, db: Database, app_state: AppState,
-                 *, fun_time: FunTimeSession | None = None, launch: Launch | None = None,
-                 phone_records=None):
+                 *, fun_time: FunTimeSession | None = None, launch: Launch | None = None):
         super().__init__()
         launch = launch or Launch()
         self._app_state = app_state
@@ -107,8 +106,7 @@ class Core(QMainWindow):
             self._wear_the_session(fun_time)
 
         self._gallery_view = GalleryView(db, client=client, fun_time=fun_time,
-                                         shared=Shared(prompt_heights=PROMPT_HEIGHTS,
-                                                       phone_records=phone_records))
+                                         shared=Shared(prompt_heights=PROMPT_HEIGHTS))
         self.setCentralWidget(self._gallery_view)
         self._toasts = Toasts(self.windowIcon(), parent=self, shown_as=preview,
                                        video_in_front=self._gallery_view.video_in_front)

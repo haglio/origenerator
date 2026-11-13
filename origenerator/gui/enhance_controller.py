@@ -428,9 +428,6 @@ class EnhanceController:
         return RunningEnhancement(run.status, run.frame,
                                   gallery.describe_enhance_params(job.params))
 
-    def forget(self, prompt_id: str) -> None:
-        self._targets.pop(prompt_id, None)
-
     def jobs_targeting(self, rows) -> list:
         running = self._enhances_in_flight()
         return [job for job in running

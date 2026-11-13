@@ -842,6 +842,7 @@ def test_a_landed_enhancement_retires_the_enhance_button_and_the_tabs_live_row(q
 
     assert not view._buttons.enhance.isEnabled()
     assert tab._pending_enhancement is None
+    assert view._enhance._by_prompt == {}
 
 
 def test_pressing_enhance_leaves_the_image_picked_and_new_settings_offer_another(qtbot, tmp_path):
@@ -859,3 +860,38 @@ def test_pressing_enhance_leaves_the_image_picked_and_new_settings_offer_another
     enhance_pane = view._enhance.pane
     enhance_pane._denoise.setValue(enhance_pane._denoise.value() + 0.1)
     assert enhance_pane._enhance_button.isEnabled()
+
+
+def test_an_enhancement_that_lands_is_no_longer_told_to_the_slideshows_as_enhancing(
+        qtbot, tmp_path):
+    db = _enhanceable_db(tmp_path, count=2)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view.enhance_items(["g0"])
+    (job,) = view._jobs.all_jobs
+    heard = []
+    view._slideshows.note_enhancing = lambda statuses, frames: heard.append(statuses)
+
+    view._client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
+    view._enhance.tell_the_slideshows()
+
+    assert heard[-1] == {}, "the poll tells the slideshows what is enhancing every second"
+
+
+def test_an_image_auto_enhanced_as_it_lands_leaves_the_folders_enhance_offer_at_once(
+        qtbot, tmp_path):
+    db = _enhanceable_db(tmp_path, count=2)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    _click_off(view)
+    _set_enhance(view, auto=True)
+    button = view._enhance.pane._enhance_button
+    assert button.toolTip().startswith("Enhance 2 not-yet-enhanced images in this folder")
+
+    view._on_reroll_finished(gallery.settings_folder_key(db.get_generation("g0")), "g0")
+
+    assert button.toolTip().startswith("Enhance 1 not-yet-enhanced image in this folder")

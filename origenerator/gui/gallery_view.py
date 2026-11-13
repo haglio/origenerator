@@ -2231,11 +2231,9 @@ class GalleryView(QWidget):
             item = self._tree_item_for(key)
             if item is not None:
                 self._tree.setCurrentItem(item)
-        self._enhance.forget(prompt_id)
         self._reconcile_generating()
         self._populate.note_finished(key)
         self._enhance.enhance_when_wanted(finished_row)
-        self._re_aim_every_button()
         self._enhance.reconcile()
 
     def _show_reroll_result_in_tab(self, finished_row: dict | None, launcher):

@@ -4,11 +4,12 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QTextCursor
 from PySide6.QtWidgets import QApplication, QPushButton
 
+from origenerator.gui import diff_text
 from origenerator.gui.prompt_marks import RESOLVE_IN_BOTH_PROMPTS, problem_to_resolve
 from origenerator.gui.scenes_editor import ScenesEditor
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES
-from origenerator.workflows.base import ParamDef
+from origenerator.workflows.base import ParamDef, story_of
 from tests.text_readers import word_reading
 
 
@@ -62,6 +63,20 @@ def test_a_scene_with_a_line_of_hers_reads_no_prompts_so_nothing_is_in_both(qtbo
     editor.fields("scene_lines")[0].setPlainText("made up words")
 
     assert problem_to_resolve(editor.text_fields()) is None
+
+
+def test_a_story_reads_each_scene_as_the_prompt_it_would_generate_while_a_change_is_up(qtbot):
+    editor = _editor(qtbot, scenes=2)
+    for field in editor.text_fields():
+        field.setPlainText("a cat dog on a couch")
+        diff_text.hold_value(field, "a dog on a couch")
+
+    read = (editor.story("positive_prompt"), editor.story("negative_prompt"), editor.lines())
+
+    held = story_of(["a dog on a couch"] * 2)
+    assert read == (held, held, ["a dog on a couch"] * 2), (
+        "nothing reads a field's own text while a change is up: every reader takes the live "
+        "text, the prompt that would generate")
 
 
 def test_a_list_of_lengths_short_of_the_scenes_leaves_the_rest_as_they_are(qtbot):

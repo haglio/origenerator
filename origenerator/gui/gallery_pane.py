@@ -782,8 +782,7 @@ class GalleryPane(QObject):
         placement = self._model.placement(shape)
         tallies = {collection: placement.tally(
                        self._model.in_collection(collection, shape, gallery.ALL_KEY))
-                   for collection in (ENHANCED_KEY, EXPERIMENTS_KEY, TRASH_KEY)}
-        tallies[FAVORITES_KEY] = placement.tally_favorites(self._model.on_shape(shape))
+                   for collection in (FAVORITES_KEY, ENHANCED_KEY, EXPERIMENTS_KEY, TRASH_KEY)}
         return {FolderCollection(collection, folder).key: count
                 for collection, tally in tallies.items() for folder, count in tally.items()}
 

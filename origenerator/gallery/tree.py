@@ -206,17 +206,25 @@ def _overlay(label: str, key: str, folder_meta: dict) -> tuple[str, bool]:
     return (meta.get("custom_name") or label, bool(meta.get("starred")))
 
 
-def favorite_folders(tree: list[MediaGroup]) -> list:
+def _folders_where(tree: list, wanted: Callable[[object], bool]) -> list:
     found: list = []
 
     def walk(groups):
         for group in groups:
-            if group.favorite:
+            if wanted(group):
                 found.append(group)
             walk(child_groups(group))
 
     walk(tree)
     return found
+
+
+def favorite_folders(tree: list[MediaGroup]) -> list:
+    return _folders_where(tree, lambda group: group.favorite)
+
+
+def leaf_folders(tree: list[MediaGroup]) -> list[SettingsGroup]:
+    return _folders_where(tree, lambda group: isinstance(group, SettingsGroup))
 
 
 _HOLDING_EVERYTHING = (AllGroup, MediaGroup)

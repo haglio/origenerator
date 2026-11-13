@@ -85,6 +85,7 @@ from tests.gallery_view_support import (
     _video_workflow,
     _write_looping_webp,
 )
+from tests.marked_words import words
 from tests.qt_exec import faking_exec
 from tests.related_links import source_tile
 from tests.test_enhance_pane import _dropped_on
@@ -566,7 +567,7 @@ def test_the_gallery_pane_buttons_are_a_group_of_compact_icon_buttons(qtbot):
         assert btn.text() == ""
 
 
-def test_delete_button_enables_for_a_selection_or_a_deletable_folder(qtbot):
+def test_the_trash_at_the_top_offers_the_open_folder_whatever_is_picked(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -576,66 +577,83 @@ def test_delete_button_enables_for_a_selection_or_a_deletable_folder(qtbot):
     assert not view._buttons.delete.isEnabled()
 
     _select_first_leaf(view)
-    assert view._buttons.delete.isEnabled()
+    assert view._buttons.delete.toolTip().startswith("Delete folder")
 
     _pick_by_clicking(view, "i1")
-    assert view._buttons.delete.isEnabled()
+    assert view._buttons.delete.toolTip().startswith("Delete folder")
 
 
-def test_delete_button_deletes_the_picked_thumbnails(qtbot):
+def test_the_trash_at_the_top_deletes_the_open_folder_with_an_item_picked(qtbot, monkeypatch):
     actions = FakeActions()
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]),
                        actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert view._gallery_pane.selected_prompt_ids() == ["i1"]
+    _pick_by_clicking(view, "i1")
+    _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
 
     view._buttons.delete.click()
 
-    assert actions.deleted
-    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
+    assert [{r["prompt_id"] for r in batch} for batch in actions.deleted] == [{"i1", "i2"}]
 
 
-
-def test_favorite_button_aims_at_the_picked_thumbnails_and_toggles(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
-    view = GalleryView(db)
-    qtbot.addWidget(view)
-    view.refresh()
+def test_the_delete_key_deletes_the_picked_thumbnails(qtbot):
+    actions = FakeActions()
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]),
+                       actions=actions)
+    _on_screen(qtbot, view, 1200, 900)
     _select_first_leaf(view)
     assert view._gallery_pane.selected_prompt_ids() == ["i1"]
 
-    assert view._buttons.favorite.isEnabled()
-    assert view._buttons.favorite.toolTip() == "Favorite 1 item"
-    view._buttons.favorite.click()
-    assert db.get_generation("i1")["starred"]
+    gestures.press_key(view, Qt.Key.Key_Delete)
 
-    assert view._buttons.favorite.toolTip() == "Unfavorite 1 item"
-    view._buttons.favorite.click()
+    assert [{r["prompt_id"] for r in batch} for batch in actions.deleted] == [{"i1"}]
+
+
+
+def test_the_spoken_favorite_aims_at_the_picked_thumbnails_and_toggles(qtbot):
+    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._buttons.mic.setChecked(True)
+    _select_first_leaf(view)
+    _pick_by_clicking(view, "i1")
+
+    view._voice.listener.speak("favorite")
+    assert words(view._voice.status) == "Favorite 1 item"
+    assert [bool(db.get_generation(pid).get("starred")) for pid in ("i1", "i2")] == [True, False]
+
+    view._voice.listener.speak("favorite")
+    assert words(view._voice.status) == "Unfavorite 1 item"
     assert not db.get_generation("i1")["starred"]
 
 
-def test_favorite_button_is_dark_where_a_favorite_means_nothing(qtbot):
+def test_the_star_at_the_top_is_grayed_out_where_no_leaf_folder_is_open(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
-    assert not view._buttons.favorite.isEnabled()
-    assert view._buttons.favorite.toolTip() == "Nothing here to favorite"
+    for place in (_collection(view, LATEST_KEY), _image_workflow(view._tree)):
+        view._tree.setCurrentItem(place)
+        assert not view._buttons.favorite.isEnabled()
+        assert view._buttons.favorite.toolTip() == "Only a leaf folder can be favorited"
+        assert not view._buttons.enhance.isEnabled()
+        assert view._buttons.enhance.toolTip() == "Only a leaf folder can be enhanced as a whole"
 
 
-def test_enhance_button_takes_the_picked_thumbnails_over_the_folder(qtbot, tmp_path):
+def test_the_enhance_panes_button_takes_the_picked_thumbnails_over_the_folder(qtbot, tmp_path):
     view = GalleryView(_enhanceable_db(tmp_path, count=2), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
     queued = []
     view._enhance.enhance_items = queued.append
+    button = view._enhance.pane._enhance_button
 
     _pick_by_clicking(view, "g0")
-    assert view._buttons.enhance.toolTip().startswith("Enhance 1 item")
-    view._buttons.enhance.click()
+    assert button.toolTip().startswith("Enhance 1 item")
+    button.click()
 
     assert queued == [["g0"]]
 
@@ -658,25 +676,26 @@ def _deleted_batches(_view, actions):
      ["image/sdxl_t2i_g0.png [output]", "image/sdxl_t2i_g1.png [output]"]),
     ("delete", _deleted_batches, [{"g0", "g1"}]),
 ])
-def test_with_nothing_picked_each_of_the_three_buttons_acts_on_the_folder_on_screen(
-        qtbot, tmp_path, monkeypatch, button, outcome, expected):
+@pytest.mark.parametrize("picked", [(), ("g0",)])
+def test_each_of_the_three_at_the_top_acts_on_the_folder_on_screen_whatever_is_picked(
+        qtbot, tmp_path, monkeypatch, button, outcome, expected, picked):
     actions = FakeActions()
     view = GalleryView(_enhanceable_db(tmp_path, count=2), client=_reroll_client(),
                        actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    _select_first_leaf(view)
+    key = _select_first_leaf(view)
     _click_off(view)
+    for prompt_id in picked:
+        _pick_by_clicking(view, prompt_id)
     _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
     pressed = getattr(view._buttons, button)
     assert pressed.isEnabled()
-    assert "folder" in pressed.toolTip()
+    assert view.group_for_key(key).label in pressed.toolTip()
 
     pressed.click()
 
-    assert outcome(view, actions) == expected, (
-        "Favorite, Enhance and Delete act on one target, the picked thumbnails or else the "
-        "folder on screen, so with nothing picked each of them acts on the folder")
+    assert outcome(view, actions) == expected
 
 
 def _video_leaf(view):
@@ -711,7 +730,8 @@ def test_the_enhance_pane_grays_out_on_a_video_too(qtbot):
     assert view._enhance.pane.toolTip() == ""
 
 
-def test_enhance_goes_dark_on_an_image_already_made_at_these_settings(qtbot, tmp_path):
+def test_the_enhance_panes_button_goes_dark_on_an_image_already_made_at_these_settings(
+        qtbot, tmp_path):
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -726,12 +746,13 @@ def test_enhance_goes_dark_on_an_image_already_made_at_these_settings(qtbot, tmp
     _select_first_leaf(view)
 
     _pick_by_clicking(view, "g0")
-    assert not view._buttons.enhance.isEnabled()
-    assert "these settings" in view._buttons.enhance.toolTip()
+    button = view._enhance.pane._enhance_button
+    assert not button.isEnabled()
+    assert "these settings" in button.toolTip()
 
     view._enhance._on_settings_changed(
         gallery.EnhanceSettings(auto=False, params={"enhance_scale": 3.0}))
-    assert view._buttons.enhance.isEnabled()
+    assert button.isEnabled()
 
 
 def test_a_version_dragged_onto_the_enhance_pane_grays_the_enhance_that_would_repeat_it(
@@ -758,7 +779,7 @@ def test_a_version_dragged_onto_the_enhance_pane_grays_the_enhance_that_would_re
 
     _dropped_on(view._enhance.pane, mime)
 
-    assert not view._buttons.enhance.isEnabled()
+    assert not view._enhance.pane._enhance_button.isEnabled()
     (tile,) = versions._host.findChildren(_AddRow)
     assert "already has a version" in tile.toolTip()
 
@@ -835,19 +856,6 @@ def test_unfavoriting_a_favorite_drops_it_from_the_collection_with_a_real_librar
     view._gallery_pane._thumb_widgets["g0"]._controls.triggered.emit(corner_buttons.STAR)
 
     assert view.listed_prompt_ids() == []
-
-
-def test_favoriting_the_picked_items_turns_the_favorite_button_to_unfavorite(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions())
-    qtbot.addWidget(view)
-    view.refresh()
-    _select_first_leaf(view)
-    assert view._gallery_pane.selected_prompt_ids() == ["i1"]
-    assert view._buttons.favorite.toolTip() == "Favorite 1 item"
-
-    view._buttons.favorite.click()
-
-    assert view._buttons.favorite.toolTip() == "Unfavorite 1 item"
 
 
 def test_a_tiles_trash_corner_deletes_that_tile(qtbot):
@@ -968,9 +976,8 @@ def test_a_mixed_pick_enhances_the_images_in_it(qtbot):
     queued = []
     view._enhance.enhance_items = queued.append
 
-    assert view._buttons.enhance.isEnabled()
     assert view._enhance.pane.isEnabled()
-    view._buttons.enhance.click()
+    view._enhance.pane._enhance_button.click()
 
     assert queued == [["i1"]]
 

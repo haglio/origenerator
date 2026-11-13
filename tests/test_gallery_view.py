@@ -77,7 +77,6 @@ from tests.gallery_view_support import (
     _at,
     _children_by_prompt,
     _click_beside_the_mark_of,
-    _click_off,
     _collection,
     _collection_row,
     _drawn,
@@ -537,14 +536,15 @@ def test_images_shows_its_collections_then_its_workflow_folders_as_squares(qtbot
     assert _square_names(view) == [*_COLLECTION_NAMES, "T2I SDXL"]
 
 
-def test_videos_once_favorited_is_a_square_in_alls_favorites(qtbot, monkeypatch):
+def test_a_folder_with_folders_inside_offers_its_favorite_grayed_out(qtbot, monkeypatch):
     view = _of_both_kinds(qtbot)
-    _answer_menu(monkeypatch, "Favorite")
+    offered = {}
+    faking_exec(monkeypatch, QMenu, lambda menu, *a: offered.update(
+        (act.text(), act.isEnabled()) for act in menu.actions()))
 
     _tree_menu(view, "video")
-    view._tree.setCurrentItem(_alls(view._tree)["Favorites"])
 
-    assert _square_names(view) == ["Videos"]
+    assert offered["Favorite"] is False
 
 
 def test_a_folder_of_your_own_can_gather_the_videos_whole(qtbot):
@@ -650,16 +650,22 @@ def test_a_folder_the_user_made_takes_no_favorite(qtbot):
     assert not view.group_for_key(made).favorite
 
 
-def test_the_favorite_button_offers_to_take_back_the_favorite_it_just_made(qtbot):
+def test_the_star_at_the_top_is_a_switch_lit_while_the_open_folder_is_a_favorite(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    _select_first_leaf(view)
-    _click_off(view)
+    key = _select_first_leaf(view)
 
     view._buttons.favorite.click()
 
-    assert view._buttons.favorite.toolTip().startswith("Unfavorite folder")
+    assert view._buttons.favorite.isChecked()
+    assert view.group_for_key(key).favorite
+    assert view._buttons.favorite.toolTip().startswith("Stop favoriting new items in")
+
+    view._buttons.favorite.click()
+
+    assert not view._buttons.favorite.isChecked()
+    assert not view.group_for_key(key).favorite
 
 
 def test_unfavoriting_a_folder_takes_it_off_the_open_favorites_collection(qtbot):
@@ -671,7 +677,8 @@ def test_unfavoriting_a_folder_takes_it_off_the_open_favorites_collection(qtbot)
     view._toggle_favorite(dog)
 
     assert view._gallery_pane._listed_folders == []
-    assert _shown(_collection(view, FAVORITES_KEY)) == "Favorites"
+    assert _shown(_collection(view, FAVORITES_KEY)) == "(1) Favorites", (
+        "the folder's item keeps the star the folder gave it")
 
 
 def _long_list_view(qtbot):
@@ -719,7 +726,14 @@ def _a_folder_drawn_on_both_sides(qtbot, *, also=None, actions=None):
 
 
 def test_starring_a_folder_marks_it_on_both_sides_of_the_list(qtbot):
-    view, key, rows = _a_folder_drawn_on_both_sides(qtbot)
+    view = GalleryView(FakeDB([{**_image(pid, "a cat", 50, seed), "shape": shape}
+                               for pid, seed, shape in (("i1", 1, LANDSCAPE),
+                                                        ("i2", 2, PORTRAIT))]))
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _key(_at(_image_workflow(view._tree, LANDSCAPE), 0, 0, 0))
+    rows = [view._tree_item_for(tree_key) for tree_key in view._tree_view.keys_for_folder(key)]
+    assert len(rows) == 2
 
     view._toggle_favorite(key)
 
@@ -839,7 +853,7 @@ def test_favoriting_a_folder_persists_without_reordering(qtbot):
         "the text, so the labels stay the plain folder names")
 
 
-def test_favoriting_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
+def test_a_right_click_on_a_folders_caret_leaves_it_open(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
     db = FakeDB(rows)
     view = GalleryView(db)
@@ -849,21 +863,17 @@ def test_favoriting_a_folder_from_its_menu_leaves_it_open(qtbot, monkeypatch):
     _top_level(tree)["All"].setExpanded(True)
     images = _image_workflow(tree)
     images.setExpanded(True)
-    key = _key(images)
     half = _shape(tree, LANDSCAPE)
     row = half.visualRect(half.indexFromItem(images))
     caret = QPoint(row.left() - half.indentation() // 2, row.center().y())
 
     qtbot.mouseClick(half.viewport(), Qt.MouseButton.RightButton, pos=caret)
-    faking_exec(monkeypatch, QMenu,
-        lambda menu, *a: next(act for act in menu.actions() if act.text() == "Favorite"),
-    )
+    faking_exec(monkeypatch, QMenu, lambda menu, *a: None)
     view._on_tree_context_menu(images, caret, LANDSCAPE)
 
-    assert db.folder_meta_map()[key]["starred"] is True
     assert _image_workflow(view._tree).isExpanded(), (
         "the menu covers the TOC, so a right-click that shut the folder on the way in is seen only "
-        "once the menu closes, and reads as something the star did")
+        "once the menu closes, and reads as something the menu did")
 
 
 def test_favorite_collection_is_pinned_first_and_collects_favorite_folders(qtbot):
@@ -881,7 +891,7 @@ def test_favorite_collection_is_pinned_first_and_collects_favorite_folders(qtbot
     collection = _alls(view._tree)["Favorites"]
     view._tree.setCurrentItem(collection)
     assert view._gallery_pane._listed_folders == [dog_key]
-    assert view.listed_prompt_ids() == []
+    assert view.listed_prompt_ids() == ["i2"]
 
 
 def test_favorites_leads_with_its_count_and_latest_leaves_its_count_to_all(qtbot):
@@ -1147,7 +1157,7 @@ def test_favorite_collection_shows_both_favorite_items_and_folders(qtbot):
 
     collection = _alls(view._tree)["Favorites"]
     view._tree.setCurrentItem(collection)
-    assert view.listed_prompt_ids() == ["i1"]
+    assert sorted(view.listed_prompt_ids()) == ["i1", "i2"]
     assert view._gallery_pane._listed_folders == [dog_key]
 
 
@@ -1346,7 +1356,7 @@ def test_a_rebuild_keeps_the_pages_latest_had_been_scrolled_into(qtbot):
     _scroll_to_the_end(view)
     scrolled_into = _drawn(view)
 
-    db._rows.insert(0, _image("fresh", "a dog", 50, 999))
+    db.add(_image("fresh", "a dog", 50, 999))
     view.refresh()
 
     assert _drawn(view) == ["fresh", *scrolled_into]

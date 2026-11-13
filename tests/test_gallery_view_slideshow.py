@@ -835,7 +835,7 @@ def test_favorite_slideshow_plays_only_items_with_their_own_star(qtbot, monkeypa
     qtbot.addWidget(view)
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)
-    db.set_folder_favorite(_key(_children_by_prompt(lora)["a cat"]), True)
+    db.set_folder_favorite(_key(_children_by_prompt(lora)["a cat"]), True, after_id=3)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
 

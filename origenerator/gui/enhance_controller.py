@@ -194,7 +194,7 @@ class EnhanceController:
                   if (row := self._host.row_for(pid)) is not None]
         folder = None if picked or self._gallery_pane.selected_ids else self._host.current_group()
         in_front = picked or list(getattr(folder, "rows", []) or [])
-        self.pane.set_applicable(not _all_video(in_front), NO_VIDEO_ENHANCER)
+        self.pane.set_applicable(not all_video(in_front), NO_VIDEO_ENHANCER)
         self.pane.show_offer(offer.available, offer.tip)
         self.pane.show_images_in_front(picked, folder)
 
@@ -205,7 +205,7 @@ class EnhanceController:
                 return Offer(True, f"Enhance {len(ids)} item"
                                    f"{'s' if len(ids) != 1 else ''} "
                                    f"{_WHAT_AN_ENHANCE_DOES}")
-            return Offer(False, NO_VIDEO_ENHANCER if self._selection_is_all_video()
+            return Offer(False, NO_VIDEO_ENHANCER if self._selection_isall_video()
                          else ALREADY_AT_THESE_SETTINGS)
         group = self._host.current_group()
         awaiting = (
@@ -230,8 +230,8 @@ class EnhanceController:
         return (gallery.is_enhanceable_row(row)
                 and gallery.version_matching_settings(row, self._settings) is None)
 
-    def _selection_is_all_video(self) -> bool:
-        return _all_video(row for pid in self._host.selected_prompt_ids()
+    def _selection_isall_video(self) -> bool:
+        return all_video(row for pid in self._host.selected_prompt_ids()
                           if (row := self._db.get_generation(pid)) is not None)
 
     def enhance_the_selection(self) -> None:
@@ -245,9 +245,11 @@ class EnhanceController:
 
     def _enhance_all(self) -> None:
         group = self._host.current_group()
-        if not isinstance(group, gallery.SettingsGroup):
-            return
-        self._enqueue(self._awaiting(group.rows), self._settings)
+        if isinstance(group, gallery.SettingsGroup):
+            self.enhance_what_awaits(group.rows)
+
+    def enhance_what_awaits(self, rows: list[dict]) -> None:
+        self._enqueue(self._awaiting(rows), self._settings)
         self._host.enhance_offer_changed()
 
     def enhance_items(self, prompt_ids: list[str]) -> None:
@@ -449,6 +451,6 @@ class EnhanceController:
             self.reconcile()
 
 
-def _all_video(rows) -> bool:
+def all_video(rows) -> bool:
     rows = list(rows)
     return bool(rows) and all(gallery.media_type_of_row(row) == MediaType.VIDEO for row in rows)

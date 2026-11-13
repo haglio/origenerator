@@ -1247,18 +1247,16 @@ def test_a_step_with_nowhere_to_go_says_so(qtbot, tmp_path):
         "reading a tooltip back")
 
 
-def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(
+def test_a_bank_word_acts_on_the_folder_with_nothing_picked_and_answers_in_its_own_words(
         qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
-    _select_first_leaf(view)
+    key = _select_first_leaf(view)
     _click_off(view)
-    aimed = view._buttons.favorite.toolTip()
-    assert aimed.startswith("Favorite folder")
 
     view._voice.listener.speak("favorite")
 
-    assert words(view._voice.status) == aimed
-    assert view._buttons.favorite.toolTip().startswith("Unfavorite folder")
+    assert words(view._voice.status) == f"Favorite folder “{view.group_for_key(key).label}”"
+    assert view._buttons.favorite.isChecked()
 
 
 def test_a_bank_word_with_nothing_to_do_says_why(qtbot, tmp_path):

@@ -91,11 +91,11 @@ from origenerator.gui.enhance_controller import (
     ALREADY_AT_THESE_SETTINGS,
     EnhanceController,
     EnhanceParts,
-    Offer,
 )
 from origenerator.gui.folder_actions import FolderActions
 from origenerator.gui.folder_icons import collection_mark
 from origenerator.gui.folder_path import FolderPath
+from origenerator.gui.folder_switches import FolderSwitches
 from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
 from origenerator.gui.folder_tree import offer_collapse_and_expand
 from origenerator.gui.gallery_navigation import NavigationController
@@ -114,6 +114,7 @@ from origenerator.gui.gallery_pane_buttons import (
     ButtonHandlers,
     ButtonStates,
     GalleryPaneButtons,
+    OfferedPress,
 )
 from origenerator.gui.gallery_search import GallerySearchController
 from origenerator.gui.gallery_tree import (
@@ -248,7 +249,7 @@ def _saved_custom_collection(group):
 
 
 def _takes_a_favorite(group) -> bool:
-    return group is not None and not isinstance(group, gallery.CustomCollection)
+    return isinstance(group, gallery.SettingsGroup)
 
 
 def _offer_copy_names_above_a_line(menu: QMenu, names: list[str]) -> None:
@@ -347,12 +348,15 @@ class GalleryView(QWidget):
                 populate=self._buttons.populate, radio=self._buttons.radio,
                 drive=self.osr2_control if self._osr2_motion is not None else None,
                 mic=self._buttons.mic),
-            enhance=(self._buttons.enhance, self._enhance.enhance_the_selection),
+            enhance=(OfferedPress(self._enhance_the_picked_offer),
+                     self._enhance.enhance_the_selection),
             actions={
                 AppCommand.BACK: (self._buttons.back, self._navigation.go_back),
                 AppCommand.FORWARD: (self._buttons.forward, self._navigation.go_forward),
-                AppCommand.CULL: (self._buttons.delete, self._delete_selection),
-                AppCommand.FAVORITE: (self._buttons.favorite, self._favorite_selection),
+                AppCommand.CULL: (OfferedPress(self._delete_the_picked_offer),
+                                  self._delete_selection),
+                AppCommand.FAVORITE: (OfferedPress(self._favorite_the_picked_offer),
+                                      self._favorite_selection),
                 AppCommand.UNDO: (self._buttons.undo, self._undo),
                 AppCommand.REDO: (self._buttons.redo, self._redo),
                 AppCommand.GROUP: (self._buttons.group, self._group_selection),
@@ -472,6 +476,7 @@ class GalleryView(QWidget):
                 jobs=self._jobs, gallery_pane=self._gallery_pane,
                 slideshows=self._slideshows, info_tabs_of=lambda: self._generate_pane),
             db=db)
+        self._folder_switches = FolderSwitches(self, db, self._enhance)
         self._jobs.changed.connect(self._enhance.reconcile)
         self._jobs.enhance_images_with(self._enhance.enhance_a_videos_start_image)
         self._look_training = LookTrainingController(
@@ -632,10 +637,10 @@ class GalleryView(QWidget):
                 start_slideshow=self._slideshows.start,
                 toggle_populate=self._toggle_populate,
                 go_to_populating_folder=self._go_to_populating_folder,
-                favorite=self._favorite_selection,
-                enhance=self._enhance.enhance_the_selection,
+                favorite=self._switch_the_open_folders_favorite,
+                enhance=self._switch_the_open_folders_enhance,
                 group=self._group_selection,
-                delete=self._delete_selection,
+                delete=self._delete_the_open_folder,
                 toggle_radio=self._on_radio_toggle,
                 toggle_mic=self._voice.mic_toggled,
                 pause_or_play=self._slideshows.pause_or_play_the_room,
@@ -1175,6 +1180,7 @@ class GalleryView(QWidget):
         self._reconcile_generating()
         for tab in self._generate_pane.generate_tabs():
             tab.refresh_generate_caption()
+        self._folder_switches.take_in_the_arrivals()
 
     def _reading_of(self, rows, meta) -> LibrarySnapshot:
         state = _fingerprint(rows, meta)
@@ -1872,13 +1878,13 @@ class GalleryView(QWidget):
 
     def _re_aim_every_button(self) -> None:
         enhance = self._enhance.offer()
-        self._buttons.apply(self.button_states(enhance))
+        self._buttons.apply(self.button_states())
         self._enhance.sync_pane(enhance)
         self._generate_pane.reread_folder_buttons()
         self._tree.offer_delete_on_picked_rows(
             self._selection_group is None or bool(self._current_deletable_folders()))
 
-    def button_states(self, enhance: Offer) -> ButtonStates:
+    def button_states(self) -> ButtonStates:
         can_go_back, can_go_forward = self._trail
         undo_label = self._edits.undo_label()
         redo_label = self._edits.redo_label()
@@ -1897,9 +1903,9 @@ class GalleryView(QWidget):
                         tip=f"Redo: {redo_label}" if redo_label else "Nothing to redo"),
             group=Button(visible=self._selection_group is not None,
                          tip=GROUP_TIP),
-            favorite=self._favorite_offer(),
-            enhance=Button(enabled=enhance.available, tip=enhance.tip),
-            delete=self._delete_offer(),
+            favorite=self._folder_switches.favorite_switch(),
+            enhance=self._folder_switches.enhance_switch(),
+            delete=self._delete_the_folder_offer(),
             slideshow=(Button(enabled=False, tip="Trash doesn't play as a slideshow")
                        if self._in_the_trash()
                        else Button(visible=self._slideshows.anything_to_play(),
@@ -1934,7 +1940,7 @@ class GalleryView(QWidget):
             return "Populate can't make more of these: what they were made from is gone."
         return None
 
-    def _favorite_offer(self) -> Button:
+    def _favorite_the_picked_offer(self) -> Button:
         pids = self.selected_prompt_ids() if self._gallery_pane.selected_ids else []
         if pids and not self._in_the_trash():
             favoriting = not self._all_favorites(pids)
@@ -1946,7 +1952,11 @@ class GalleryView(QWidget):
         return Button(tip=f"{'Unfavorite' if group.favorite else 'Favorite'} "
                           f"folder “{group.label}”")
 
-    def _delete_offer(self) -> Button:
+    def _enhance_the_picked_offer(self) -> Button:
+        offer = self._enhance.offer()
+        return Button(enabled=offer.available, tip=offer.tip)
+
+    def _delete_the_picked_offer(self) -> Button:
         count = len(self._gallery_pane.selected_ids)
         if self._in_the_trash():
             return Button(
@@ -1955,6 +1965,9 @@ class GalleryView(QWidget):
                 if count else "Pick an item to delete permanently")
         if count:
             return Button(tip=f"Delete {count} item{'s' if count != 1 else ''}")
+        return self._delete_the_folder_offer()
+
+    def _delete_the_folder_offer(self) -> Button:
         folders = self._current_deletable_folders()
         if not folders:
             return Button(enabled=False, tip="Nothing to delete")
@@ -1962,8 +1975,39 @@ class GalleryView(QWidget):
             return Button(tip=f"Delete folder “{folders[0].label}”")
         return Button(tip=f"Delete {len(folders)} folders")
 
+    def _delete_the_open_folder(self):
+        self._delete_folders(self._current_deletable_folders())
+
+    def open_leaf_folder(self):
+        group = self.current_group()
+        if (self._selection_group is not None or self._current_collection_key() is not None
+                or not isinstance(group, gallery.SettingsGroup)):
+            return None
+        return group
+
+    def leaf_folders(self) -> dict[str, list[dict]]:
+        return self._library.leaf_folders(self._tree.shapes)
+
+    def highest_id_listed(self) -> int:
+        return self._library.highest_id
+
+    def folder_meta(self) -> dict[str, dict]:
+        return self._folder_meta
+
+    def _switch_the_open_folders_favorite(self, on: bool):
+        leaf = self.open_leaf_folder()
+        if leaf is not None:
+            self._set_folder_favorite(leaf.key, on)
+        self._re_aim_every_button()
+
+    def _switch_the_open_folders_enhance(self, on: bool):
+        leaf = self.open_leaf_folder()
+        if leaf is not None:
+            self._folder_switches.set_enhancing(leaf.key, on)
+        self._re_aim_every_button()
+
     def _favoritable_folder(self):
-        if self._selection_group is not None:
+        if self._selection_group is not None or not _takes_a_favorite(self.current_group()):
             return None
         return self.current_group()
 
@@ -2684,6 +2728,7 @@ class GalleryView(QWidget):
         menu = QMenu(self)
         _offer_copy_names_above_a_line(menu, [group.label])
         favorite_action = menu.addAction("Unfavorite" if group.favorite else "Favorite")
+        favorite_action.setEnabled(_takes_a_favorite(group))
         remove_action = _offer_taking_out(menu, holder, group)
         add_menu = self._add_to_folder_menu(menu, key)
         delete_action = None
@@ -2735,15 +2780,18 @@ class GalleryView(QWidget):
     def _set_folder_favorite(self, key: str, favorite: bool):
         if bool(self._folder_meta.get(key, {}).get("starred")) == favorite:
             return
-        self._db.set_folder_favorite(key, favorite)
+        after_id = self._library.highest_id if favorite else None
+        self._db.set_folder_favorite(key, favorite, after_id=after_id)
         self._tree_view.mark_favorite(key, favorite)
         self._folder_meta[key] = {**self._folder_meta.get(key, {"custom_name": None}),
-                                  "starred": favorite}
+                                  "starred": favorite, "favorite_after_id": after_id}
         self._fingerprint = (self._fingerprint[0],
                              _folder_meta_fingerprint(self._folder_meta))
         self._drawn_version += 1
         if not self._redrew_the_favorites_collection():
             self._gallery_pane.mark_folder_favorite(key, favorite)
+        if favorite:
+            self._folder_switches.star_what_is_in(key)
 
     def _delete_folder_by_key(self, key: str):
         group = self.group_for_key(key)

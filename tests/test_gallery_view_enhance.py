@@ -54,16 +54,16 @@ from tests.slideshow_hud_support import funestra_of
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 
 
-def test_enhance_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_path):
+def test_the_enhance_panes_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_path):
     db = _enhanceable_db(tmp_path, count=1)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
     _click_off(view)
-    assert not view._buttons.enhance.isHidden()
-    assert view._buttons.enhance.isEnabled()
-    assert "1 not-yet-enhanced image" in view._buttons.enhance.toolTip()
+    assert not view._enhance.pane._enhance_button.isHidden()
+    assert view._enhance.pane._enhance_button.isEnabled()
+    assert "1 not-yet-enhanced image" in view._enhance.pane._enhance_button.toolTip()
 
     db.insert_generation(NewGeneration(
         prompt_id="e0", workflow_name="image_enhance", workflow_version="v001",
@@ -75,10 +75,10 @@ def test_enhance_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_
     view.refresh()
     key = gallery.settings_folder_key(db.get_generation("g0"))
     view._tree.setCurrentItem(view._tree_item_for(key))
-    assert not view._buttons.enhance.isHidden(), (
+    assert not view._enhance.pane._enhance_button.isHidden(), (
         "a button that vanishes is one the user has to go looking for")
-    assert not view._buttons.enhance.isEnabled()
-    assert view._buttons.enhance.toolTip() == NOTHING_LEFT_TO_ENHANCE
+    assert not view._enhance.pane._enhance_button.isEnabled()
+    assert view._enhance.pane._enhance_button.toolTip() == NOTHING_LEFT_TO_ENHANCE
 
 
 def test_enhance_all_never_stops_one_of_its_own_images_for_the_next(qtbot, tmp_path):
@@ -269,7 +269,7 @@ def test_enhance_items_queues_the_picked_images(qtbot, tmp_path):
     assert {j.workflow.name for j in jobs} == {"image_enhance"}
 
 
-def test_the_enhance_panes_button_is_aimed_and_pressed_like_the_banks(qtbot, tmp_path):
+def test_the_enhance_panes_button_is_aimed_and_pressed_at_what_awaits_in_the_folder(qtbot, tmp_path):
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -277,8 +277,7 @@ def test_the_enhance_panes_button_is_aimed_and_pressed_like_the_banks(qtbot, tmp
     button = view._enhance.pane._enhance_button
 
     assert button.isEnabled()
-    assert view._buttons.enhance.isEnabled()
-    assert button.toolTip() == view._buttons.enhance.toolTip()
+    assert button.toolTip() == view._enhance.offer().tip
 
     button.click()
 
@@ -827,20 +826,20 @@ def test_a_tick_tells_a_locked_slide_its_run_began_though_no_frame_has_come(qtbo
     slideshow.close()
 
 
-def test_a_landed_enhancement_retires_the_enhance_button_and_the_tabs_live_row(qtbot, tmp_path):
+def test_a_landed_enhancement_retires_the_enhance_panes_button_and_the_tabs_live_row(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_enhanceable_db(tmp_path, count=1), client=client)
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
     tab = view._generate_pane.current_generate_tab()
-    assert view._buttons.enhance.isEnabled()
+    assert view._enhance.pane._enhance_button.isEnabled()
     view.enhance_items(["g0"])
     (job,) = view._jobs.all_jobs
 
     client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
 
-    assert not view._buttons.enhance.isEnabled()
+    assert not view._enhance.pane._enhance_button.isEnabled()
     assert tab._pending_enhancement is None
     assert view._enhance._by_prompt == {}
 

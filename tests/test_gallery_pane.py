@@ -799,7 +799,7 @@ def test_a_folders_latest_leads_with_only_its_own_work_in_flight(qtbot):
     assert list(pane._inflight_tiles) == ["a2"]
 
 
-def test_a_folders_favorites_are_its_favorite_items_and_the_favorite_folders_below_it(qtbot):
+def test_a_folders_favorites_are_its_favorite_items_beside_the_favorite_folders_below_it(qtbot):
     rows = [_made_with("a1", "alpha.safetensors", starred=1),
             _made_with("a2", "alpha.safetensors", prompt="scene two"),
             _made_with("b1", "beta.safetensors", starred=1)]
@@ -816,26 +816,8 @@ def test_a_folders_favorites_are_its_favorite_items_and_the_favorite_folders_bel
 
     assert pane.listed_prompt_ids() == ["a1"]
     assert pane._listed_folders == [scene_two.key]
-    assert sorted(row["prompt_id"] for row in
-                  pane.rows_for_collection(shaped_key(favorites, LANDSCAPE))) == ["a1", "a2"]
-
-
-def test_a_favorite_item_inside_a_favorite_folder_is_one_item_in_what_favorites_gathers(qtbot):
-    rows = [_made_with("a1", "alpha.safetensors", starred=1),
-            _made_with("a2", "alpha.safetensors", prompt="scene two", starred=1)]
-    tree = gallery.build_gallery_tree(rows)
-    alpha = _models(tree)["alpha"]
-    (lora,) = gallery.child_groups(alpha)
-    (scene_two,) = [leaf for leaf in gallery.child_groups(lora) if leaf.rows[0]["prompt_id"] == "a2"]
-    pane, _scroll = _pane(qtbot, rows)
-    pane.set_model(LibrarySnapshot(
-        rows, folder_meta={scene_two.key: {"custom_name": None, "starred": True}}))
-    favorites = FolderCollection(FAVORITES_KEY, alpha.key).key
-
-    pane.show_collection(favorites, LANDSCAPE)
-
-    assert sorted(row["prompt_id"] for row in
-                  pane.rows_for_collection(shaped_key(favorites, LANDSCAPE))) == ["a1", "a2"]
+    assert [row["prompt_id"] for row in
+            pane.rows_for_collection(shaped_key(favorites, LANDSCAPE))] == ["a1"]
 
 
 def _enhanced_made_with(prompt_id, checkpoint):

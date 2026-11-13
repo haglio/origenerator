@@ -54,6 +54,8 @@ SCHEMA = {
         ("starred", "INTEGER", 1, "0", 0),
         ("level", "TEXT", 0, None, 0),
         ("ref_prompt_id", "TEXT", 0, None, 0),
+        ("favorite_after_id", "INTEGER", 0, None, 0),
+        ("enhance_after_id", "INTEGER", 0, None, 0),
     ),
     "generations": (
         ("id", "INTEGER", 0, None, 1),

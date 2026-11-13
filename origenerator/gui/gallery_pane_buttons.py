@@ -45,6 +45,20 @@ class Button(NamedTuple):
     checked: bool | None = None
 
 
+class OfferedPress:
+    def __init__(self, offer: Callable[[], Button]):
+        self._offer = offer
+
+    def isHidden(self) -> bool:  # noqa: N802 -- read where a QToolButton's is
+        return not self._offer().visible
+
+    def isEnabled(self) -> bool:  # noqa: N802 -- read where a QToolButton's is
+        return self._offer().enabled
+
+    def toolTip(self) -> str:  # noqa: N802 -- read where a QToolButton's is
+        return self._offer().tip
+
+
 class ButtonStates(NamedTuple):
     back: Button
     forward: Button
@@ -67,8 +81,8 @@ class ButtonHandlers(NamedTuple):
     start_slideshow: Callable[[], None]
     toggle_populate: Callable[[bool], None]
     go_to_populating_folder: Callable[[str], None]
-    favorite: Callable[[], None]
-    enhance: Callable[[], None]
+    favorite: Callable[[bool], None]
+    enhance: Callable[[bool], None]
     group: Callable[[], None]
     delete: Callable[[], None]
     toggle_radio: Callable[[bool], None]
@@ -107,6 +121,12 @@ def _tool_button(icon, tooltip: str, handler, *, checkable=False,
     return btn
 
 
+def _lit_switch(icon, tooltip: str, handler) -> QToolButton:
+    switch = _tool_button(icon, tooltip, handler, checkable=True)
+    switch.setStyleSheet(_LIT)
+    return switch
+
+
 def _group_gap() -> QWidget:
     return QWidget()
 
@@ -125,17 +145,16 @@ class GalleryPaneButtons(QWidget):
             icons.slideshow_icon(), "Play this folder as a slideshow",
             handlers.start_slideshow)
         self.slideshow.hide()
-        self.populate = _tool_button(
+        self.populate = _lit_switch(
             icons.populate_icon(),
             "Populate: repeatedly generate variations of this folder until "
             "toggled off",
-            handlers.toggle_populate, checkable=True,
+            handlers.toggle_populate,
         )
-        self.populate.setStyleSheet(_LIT)
         self.populate_tip = LinkTip(self.populate)
         self.populate_tip.link_activated.connect(handlers.go_to_populating_folder)
-        self.favorite = _tool_button(icons.star_icon(filled=True), "Favorite", handlers.favorite)
-        self.enhance = _tool_button(icons.enhance_icon(), "Enhance", handlers.enhance)
+        self.favorite = _lit_switch(icons.star_switch_icon(), "Favorite", handlers.favorite)
+        self.enhance = _lit_switch(icons.enhance_icon(), "Enhance", handlers.enhance)
         self.group = _tool_button(
             icons.custom_collection_icon(), GROUP_TIP, handlers.group)
         self.group.hide()
@@ -165,15 +184,14 @@ class GalleryPaneButtons(QWidget):
                 handlers.toggle_radio, checkable=True, kind=_AudioSwitch,
             )
             omnipause.holds(self.radio)
-            self.mic = _tool_button(
+            self.mic = _lit_switch(
                 icons.mic_icon(),
                 "Listen: bare words for the collections and this bank (“experiments”, "
                 "“undo”, “star”), Fun Time's own words over a slideshow (“next”, "
                 "“trash”, “lock”), and orders about the image (“enhance”, “fix "
                 "hands”, “animate as kino”)",
-                handlers.toggle_mic, checkable=True,
+                handlers.toggle_mic,
             )
-            self.mic.setStyleSheet(_LIT)
         layout = FlowLayout(self)
         self._groups: list[tuple[QWidget, tuple[QToolButton, ...]]] = []
         for listed in (

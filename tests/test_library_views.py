@@ -242,6 +242,19 @@ def test_favorites_are_the_items_with_their_own_star_whatever_their_folder_is():
     assert [row["prompt_id"] for row in favorites] == ["a1"]
 
 
+def test_a_leaf_folder_holds_its_items_of_every_shape_shown():
+    rows = [_made_with("wide", "alpha.safetensors"),
+            _made_with("tall", "alpha.safetensors", shape="portrait"),
+            _made_with("other", "beta.safetensors")]
+    library = LibrarySnapshot(rows)
+    (alpha_leaf,) = [key for key, held in library.leaf_folders(("landscape", "portrait")).items()
+                     if "wide" in {row["prompt_id"] for row in held}]
+
+    held = library.leaf_folders(("landscape", "portrait"))[alpha_leaf]
+
+    assert sorted(row["prompt_id"] for row in held) == ["tall", "wide"]
+
+
 def test_the_trash_of_a_folder_holds_what_was_deleted_from_it():
     kept = _made_with("a1", "alpha.safetensors")
     held = [_made_with("d1", "alpha.safetensors"), _made_with("d2", "beta.safetensors")]

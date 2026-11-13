@@ -194,7 +194,7 @@ def test_the_clock_is_written_across_the_bar_it_measures(queue):
     QApplication.processEvents()
     preview = queue._running
 
-    assert preview._progress.caption() == "50% · 1:30 elapsed · ~6:02 left"
+    assert preview._progress.caption() == "50% · ~6:02 left"
     assert preview._progress.isTextVisible()
     assert not preview._caption.isVisible()
 
@@ -863,16 +863,18 @@ def _timing(queue) -> str:
     return queue._running.status_text()
 
 
-def test_shows_how_far_along_it_is_the_elapsed_time_and_what_is_left(queue):
+def test_shows_how_far_along_it_is_and_what_is_left_as_the_huds_job_queue_does(queue):
     queue.set_items([_item(status="running", progress=(10, 20),
                            started_at=time.time() - 90.5, typical_seconds=725.0)])
-    assert _timing(queue) == "50% · 1:30 elapsed · ~6:02 left"
+    assert _timing(queue) == "50% · ~6:02 left", (
+        "the time elapsed made the line too long for its bar once a step name led it, so "
+        "it scrolled; the user chose the HUD's shorter line (2026-11-13)")
 
 
-def test_shows_the_elapsed_time_alone_with_no_estimate(queue):
+def test_shows_how_far_along_it_is_alone_with_no_estimate(queue):
     queue.set_items([_item(status="running", progress=(1, 20),
                            started_at=time.time() - 45.5)])
-    assert _timing(queue) == "5% · 0:45 elapsed"
+    assert _timing(queue) == "5%"
 
 
 def test_no_clock_on_a_job_comfyui_has_not_started(queue):
@@ -881,11 +883,12 @@ def test_no_clock_on_a_job_comfyui_has_not_started(queue):
 
 
 def test_the_clock_advances_between_polls(queue):
-    queue.set_items([_item(status="running", started_at=time.time() - 5.5)])
-    assert _timing(queue) == "0:05 elapsed"
+    queue.set_items([_item(status="running", started_at=time.time() - 5.5,
+                           typical_seconds=725.0)])
+    assert _timing(queue) == "~11:59 left"
     queue._running._item.reading.started_at -= 3
     queue._running._tick.timeout.emit()
-    assert _timing(queue) == "0:08 elapsed"
+    assert _timing(queue) == "~11:56 left"
 
 
 def test_the_clock_stops_when_the_queue_empties(queue):
@@ -899,8 +902,9 @@ def test_the_clock_stops_when_the_queue_empties(queue):
 
 
 def test_another_apps_backlog_takes_the_slot_back_when_ours_empties(queue):
-    queue.set_items([_item(status="running", started_at=time.time() - 5.5)])
-    assert "elapsed" in _timing(queue)
+    queue.set_items([_item(status="running", started_at=time.time() - 5.5,
+                           typical_seconds=725.0)])
+    assert "left" in _timing(queue)
 
     queue.set_items([], foreign_queued=2)
 

@@ -132,8 +132,8 @@ def test_the_bar_carries_the_percentage_and_the_clock(qtbot):
         "a percentage that lived only in the Job Queue left the tile and the queue each telling half "
         "of one story")
     assert tile._bar.caption() == "50% · ~6:02 left", (
-        "a tile takes the compact reading, how far along and how much longer: its width has no"
-        " room for the elapsed count the Job Queue shows too")
+        "a tile takes the compact reading, how far along and how much longer, as the Job Queue "
+        "does")
     assert (tile._bar.value(), tile._bar.maximum()) == (10, 20)
 
 

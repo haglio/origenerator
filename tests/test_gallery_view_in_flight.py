@@ -1533,7 +1533,7 @@ def test_the_strip_times_the_job_against_the_workflows_recent_runs(qtbot):
     assert item.reading.typical_seconds == 724.0
 
     view._update_queue()
-    assert view._queue._running.status_text() == "50% · 1:30 elapsed · ~6:02 left"
+    assert view._queue._running.status_text() == "50% · ~6:02 left"
 
 
 def test_the_strip_has_no_clock_for_a_job_still_queued(qtbot):

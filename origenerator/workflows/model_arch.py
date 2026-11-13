@@ -21,6 +21,7 @@ WAN_T2V = "wan_t2v"
 WAN_FUN_CONTROL = "wan_fun_control"
 LTX = "ltx"
 KREA2 = "krea2"
+MINIMAX_H3 = "minimax_h3"
 
 # No real safetensors header comes near this: a longer length means a corrupt or misidentified file,
 # and reading that many bytes would pull the whole model into memory.
@@ -55,6 +56,7 @@ _EXPERT_INITIALS = {"h": "high", "l": "low"}
 
 # What a Krea 2 block holds and a WAN block never does -- wq/wk/wv/wo and a gated
 # MLP -- dotted, or flattened as lycoris spells it (`lycoris_blocks_0_attn_wq`).
+_MINIMAX_H3_BLOCK = re.compile(r"blocks[._]\d+[._]attn[._](?:qkv|out)_proj")
 _KREA2_BLOCK = re.compile(r"blocks[._]\d+[._](?:attn[._]w[qkvo]|mlp[._](?:gate|up|down))")
 
 # kohya's flattened SD UNet, which is how the enhance's fix training writes a LoRA with no text encoder
@@ -235,10 +237,9 @@ def _arch_from(shapes: dict[str, list[int] | None]) -> str | None:
 
 
 def _arch_after_the_transformer_families(shapes, keys, has, starts) -> str | None:
-    # Krea 2 before WAN: its single-stream `blocks.N` would read as WAN's. The text-fusion
-    # adapter beside them is what only it has, and a LoRA trained on the blocks alone shows what only its blocks hold.
-    if has("txtfusion") or any(_KREA2_BLOCK.search(key) for key in keys):
-        return KREA2
+    single_stream = _single_stream_family(keys, has)
+    if single_stream is not None:
+        return single_stream
     # WAN S2V and WAN Animate before WAN: each is WAN's `blocks.N` with one thing beside them only it has
     # -- the audio injector, the pose embedding.
     if has("audio_injector"):
@@ -254,6 +255,18 @@ def _arch_after_the_transformer_families(shapes, keys, has, starts) -> str | Non
     # single-text-encoder LoRA marker, and the original ControlNet shape.
     if has("cond_stage_model", "zero_convs", "input_hint_block") or starts("lora_te_"):
         return SD15
+    return None
+
+
+def _single_stream_family(keys, has) -> str | None:
+    # Krea 2 and MiniMax H3 before WAN: their single-stream `blocks.N` would read as WAN's. Krea 2's
+    # text-fusion adapter is what only it has, and a LoRA trained on its blocks alone shows what only
+    # its blocks hold; MiniMax H3 fuses its attention into one `qkv_proj` and reads its video and its
+    # sound in through a patch projection each.
+    if has("txtfusion") or any(_KREA2_BLOCK.search(key) for key in keys):
+        return KREA2
+    if has("video_patch_proj", "audio_patch_proj") or any(_MINIMAX_H3_BLOCK.search(key) for key in keys):
+        return MINIMAX_H3
     return None
 
 

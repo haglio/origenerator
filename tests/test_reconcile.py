@@ -194,6 +194,34 @@ def test_reconcile_repoints_a_favorite_orphaned_by_the_settings_formula_change(t
     assert summary["repointed"] == 1
 
 
+def test_a_repointed_favorite_keeps_starring_and_enhancing_what_arrives(tmp_path):
+    db = Database(tmp_path / "t.db")
+    row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
+                         filename="sdxl_t2i_p1.png")
+    legacy_key = gallery.legacy_settings_folder_key(row)
+    db.set_folder_favorite(legacy_key, True, after_id=5)
+    db.set_folder_enhance(legacy_key, after_id=4)
+
+    reconcile_folder_meta(db)
+
+    meta = db.folder_meta_map()[gallery.settings_folder_key(row)]
+    assert (meta["favorite_after_id"], meta["enhance_after_id"]) == (5, 4)
+
+
+def test_a_refreshed_favorite_keeps_starring_and_enhancing_what_arrives(tmp_path):
+    db = Database(tmp_path / "t.db")
+    row = _add_completed(db, "p1", params={"positive_prompt": "a cat", "steps": 30, "seed": 1},
+                         filename="sdxl_t2i_p1.png")
+    key = gallery.settings_folder_key(row)
+    db.set_folder_favorite(key, True, after_id=5)
+    db.set_folder_enhance(key, after_id=4)
+
+    reconcile_folder_meta(db)
+
+    meta = db.folder_meta_map()[key]
+    assert (meta["favorite_after_id"], meta["enhance_after_id"]) == (5, 4)
+
+
 def test_a_launch_whose_favorites_all_still_match_works_out_no_old_keys(tmp_path, monkeypatch):
     db = Database(tmp_path / "t.db")
     row = _add_completed(db, "p1", params={"positive_prompt": "a quay", "steps": 30, "seed": 1},

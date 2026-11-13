@@ -571,7 +571,6 @@ class ParamForm(QWidget):
         form = self._sections["Size"].content_form()
         if form.contentsMargins().left() != margin:
             form.setContentsMargins(margin, GAP_SMALL, 0, GAP_SMALL)
-            return
         top, lower = top_row.geometry(), lower_row.geometry()
         y = (top.center().y() + lower.center().y()) // 2 - btn.height() // 2
         btn.move(max(0, (margin - btn.width()) // 2), y)

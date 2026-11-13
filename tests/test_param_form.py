@@ -2878,3 +2878,24 @@ def test_with_audio_on_and_no_lines_the_audio_prompts_take_typing(qtbot):
 
     assert _in_use_with(form, "audio_prompt", param_help("audio_prompt"))
     assert _in_use_with(form, "audio_negative_prompt", param_help("audio_negative_prompt"))
+
+
+def test_the_swap_button_sits_between_the_rows_when_size_is_opened_after_the_form_shows(qtbot):
+    form = ParamForm([
+        ParamDef("prompt", "Positive Prompt", "str", "", multiline=True),
+        *_dimension_defs(),
+    ])
+    form.setFont(make_font(FONT_UI, SIZE_HEADING))
+    qtbot.addWidget(form)
+    form._sections["Size"].set_collapsed(True)
+    form.resize(400, 320)
+    with qtbot.waitExposed(form):
+        form.show()
+    form._sections["Size"].set_collapsed(False)
+    qtbot.waitUntil(form._widgets["width"].isVisible)
+
+    btn = form._swap_dimensions_btn.geometry()
+    width = form._widgets["width"].geometry()
+    height = form._widgets["height"].geometry()
+    assert width.center().y() < btn.center().y() < height.center().y()
+    assert btn.right() <= width.left()

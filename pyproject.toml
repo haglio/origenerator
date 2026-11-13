@@ -22,7 +22,7 @@ requires-python = ">=3.14"
 # one is this repo's own commit, with its own suite to answer for it.
 dependencies = [
     "app-support @ git+https://github.com/haglio/app_support@v0.1.484",
-    "funestra @ git+https://github.com/haglio/funestra@v0.1.895",
+    "funestra @ git+https://github.com/haglio/funestra@v0.1.901",
     "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.421",
     "voice-core @ git+https://github.com/haglio/voice_core@v0.1.180",
     # PySide6 and the Qt it ships are 6.12, for every app of the family: on 6.11,

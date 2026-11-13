@@ -102,9 +102,12 @@ EVOLVER_SOURCE = "origenerator"
 KINO_DIR = kino_folder.kino_dir()
 KINO_UPSCALES_DIR = kino_folder.upscales_in(KINO_DIR)
 KINO_TRASH_DIR = kino_folder.trash_folder_in(KINO_DIR)
+GENAU_SOURCE = haglio_settings.value("genau_source")
+GENAU_DIR = Path(haglio_settings.value("genau_dir"))
 
 OUTPUT_PLACES = OutputPlaces.from_settings(haglio_settings.load(), comfyui_dir=COMFYUI_DIR,
-                                           trash=TRASH_DIR, kino_library=KINO_UPSCALES_DIR,
+                                           trash=TRASH_DIR,
+                                           down_the_lanes=(EVOLVER_AI_DIR, KINO_DIR, GENAU_DIR),
                                            library=LIBRARY_VIDEOS_DIR)
 COMFYUI_INPUT_DIR = COMFYUI_DIR / "input"
 COMFYUI_TEMP_DIR = COMFYUI_DIR / "temp"
@@ -116,9 +119,6 @@ COMFYUI_LOG_DIR = COMFYUI_DIR / "user"
 
 COMFYUI_HOST = "127.0.0.1"
 COMFYUI_PORT = 8188
-
-GENAU_SOURCE = haglio_settings.value("genau_source")
-GENAU_DIR = Path(haglio_settings.value("genau_dir"))
 
 
 CUSTOM_POSES_DIR = LIBRARY_ROOT / "images" / "custom_poses"

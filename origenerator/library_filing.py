@@ -4,7 +4,6 @@ import contextlib
 import os
 from pathlib import Path
 
-from origenerator.evolver_upscales import filed_upscales
 from origenerator.file_numbers import NUMBERED, next_number, numbered
 from origenerator.gallery.output import stem_as_made
 from origenerator.media import MediaType, media_type_from_filename
@@ -78,17 +77,16 @@ def file_what_comfyui_left(places: OutputPlaces) -> int:
 
 
 def _names_taken(places: OutputPlaces) -> set[str]:
-    return _held_in_trash(places) | _names_in_kinos_library(places)
+    return _held_in_trash(places) | _names_down_the_lanes(places)
 
 
 def _held_in_trash(places: OutputPlaces) -> set[str]:
     return Trash(places.trash).held_names() if places.trash is not None else set()
 
 
-def _names_in_kinos_library(places: OutputPlaces) -> set[str]:
-    if places.kino_library is None:
-        return set()
-    return {stem_as_made(path) + path.suffix for _site, path in filed_upscales(places.kino_library)}
+def _names_down_the_lanes(places: OutputPlaces) -> set[str]:
+    return {stem_as_made(path) + path.suffix for lane in places.down_the_lanes
+            for path in Path(lane).rglob("*")}
 
 
 def _file_everything_under(top: Path, places: OutputPlaces, held: set[str]) -> int:

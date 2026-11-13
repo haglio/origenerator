@@ -149,8 +149,9 @@ def test_which_kind_of_output_a_folder_holds_is_worked_out_once_for_that_folder(
         "worked out again for every video handed to a slideshow, it cost a double-click on Latest a second")
 
 
-def test_the_apps_own_places_know_where_kinos_library_is():
-    assert config.OUTPUT_PLACES.kino_library == config.KINO_UPSCALES_DIR
+def test_the_apps_own_places_know_every_folder_a_sent_videos_copies_sit_in():
+    assert config.OUTPUT_PLACES.down_the_lanes == (
+        config.EVOLVER_AI_DIR, config.KINO_DIR, config.GENAU_DIR)
 
 
 def test_the_apps_own_places_know_where_the_video_library_is():

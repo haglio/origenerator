@@ -20,6 +20,7 @@ from origenerator.gallery import (
     build_gallery_tree,
     build_image_config_index,
     child_groups,
+    config_folder_name,
     enhance_params_for,
     enhanced_generations,
     favorite_folders,
@@ -651,6 +652,25 @@ def _settings_folders(groups):
         if isinstance(group, SettingsGroup):
             yield group
         yield from _settings_folders(child_groups(group))
+
+
+@pytest.mark.parametrize("row", [
+    _row(prompt_id="i1", workflow_name="sdxl_t2i",
+         params_json=json.dumps(dict(WORKFLOW_REGISTRY["sdxl_t2i"].default_params(),
+                                     positive_prompt="a lighthouse")),
+         output_files=json.dumps([{"filename": "sdxl_t2i_i1.png"}])),
+    _row(prompt_id="v1", workflow_name="wan22_i2v",
+         params_json=json.dumps(dict(WORKFLOW_REGISTRY["wan22_i2v"].default_params(),
+                                     positive_prompt="a wave")),
+         output_files=json.dumps([{"filename": "wan22_i2v_v1.mp4"}])),
+], ids=["image", "video"])
+def test_a_generate_tab_on_a_folders_settings_wears_the_code_its_folder_wears(row):
+    (folder,) = _settings_folders(build_gallery_tree([row]))
+    signature = settings_signature(row["workflow_name"], row["params_json"])
+
+    assert config_folder_name(row["workflow_name"], signature) == folder.label, (
+        "a folder's generic name is one short code from its key, the same code in the TOC "
+        "and on a Generate tab holding its settings")
 
 
 def test_a_run_that_recorded_no_model_never_shares_a_folder_key_with_the_default_models_run():

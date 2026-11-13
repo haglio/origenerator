@@ -36,4 +36,6 @@ def test_a_folders_generic_name_is_one_short_upper_case_code():
 
     assert len(name) == 8
     assert name == name.upper()
+    assert set(name.lower()) <= _HEX, (
+        "a folder's name is in hex, which has no O to mistake for 0 and no I to mistake for 1")
     assert name == folder_id(settings_key("image", "sdxl_t2i", "steps=30"))

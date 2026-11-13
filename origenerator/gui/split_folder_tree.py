@@ -28,7 +28,8 @@ from origenerator.gallery.shapes import (
     SHAPES_AND_BOTH,
     TOGETHER,
 )
-from origenerator.gui import icons
+from origenerator.gallery.tree import ALL_KEY
+from origenerator.gui import folder_icons
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tree import FolderTree
 from origenerator.gui.panes import PaneSplitter
@@ -78,7 +79,7 @@ def _heading(shape: str) -> QFrame:
 
     mark = QLabel()
     mark.setObjectName("treeSectionMark")
-    mark.setPixmap(icons.shape_mark(shape))
+    mark.setPixmap(folder_icons.shape_mark(shape))
     row.addWidget(mark)
 
     name = QLabel(SHAPE_LABELS[shape])
@@ -130,8 +131,8 @@ class SplitFolderTree(QWidget):
         self._show_sections(SEPARATE)
 
     def _build_radio(self) -> QWidget:
-        separate = _Choice(_SEPARATE_WORD, icons.separate_mark(BUTTON_FILLING_ICON), _SEPARATE_TIP)
-        together = _Choice(_TOGETHER_WORD, icons.shape_mark(BOTH, BUTTON_FILLING_ICON), _TOGETHER_TIP)
+        separate = _Choice(_SEPARATE_WORD, folder_icons.separate_mark(BUTTON_FILLING_ICON), _SEPARATE_TIP)
+        together = _Choice(_TOGETHER_WORD, folder_icons.shape_mark(BOTH, BUTTON_FILLING_ICON), _TOGETHER_TIP)
         self.separate_button = separate.button
         self.together_button = together.button
         radio = QButtonGroup(self)
@@ -189,7 +190,7 @@ class SplitFolderTree(QWidget):
         column.addWidget(_rule())
         column.addSpacing(GAP_SMALL)
 
-        tree = FolderTree(group_role, takes_item=self._takes_item,
+        tree = FolderTree(group_role, all_key=ALL_KEY, takes_item=self._takes_item,
                           takes_folder=self._takes_folder)
         tree.setHeaderHidden(True)
         tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)

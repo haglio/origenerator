@@ -31,7 +31,7 @@ from shared_ui.testing import appending_to
 from origenerator.gallery.collection import COLLECTION_LABELS, FAVORITES_KEY, LATEST_KEY
 from origenerator.gallery.shapes import LANDSCAPE
 from origenerator.gallery.tree import ALL_KEY
-from origenerator.gui import folder_tree, icons
+from origenerator.gui import folder_icons, folder_tree, icons
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import AIMED, LIT
 from origenerator.gui.folder_tree import (
@@ -74,7 +74,7 @@ def test_action_rects_sit_left_of_the_label_star_nearest():
 
 
 def _tree_with_an_indented_leaf(qtbot, *, favorite=False):
-    tree = FolderTree(_ROLE)
+    tree = FolderTree(_ROLE, all_key=ALL_KEY)
     qtbot.addWidget(tree)
     media = _folder_row("Media", "m")
     wf = _folder_row("Workflow", "m/w")
@@ -241,7 +241,7 @@ def test_a_row_holding_nothing_shows_its_name_alone(qtbot):
 
 def _collecting_tree(qtbot, takes_item=lambda _row_key, _prompt_id: False,
                      takes_folder=lambda _row_key, _folder_key: True):
-    tree = FolderTree(_ROLE, takes_item=takes_item, takes_folder=takes_folder)
+    tree = FolderTree(_ROLE, all_key=ALL_KEY, takes_item=takes_item, takes_folder=takes_folder)
     qtbot.addWidget(tree)
     collection = QTreeWidgetItem(["Favorites"])
     collection.setData(0, DROP_KEY_ROLE, "__starred__")
@@ -629,7 +629,7 @@ def test_an_item_drag_is_let_into_the_tree(qtbot):
 
 
 def _too_long_for_its_height(qtbot):
-    tree = FolderTree(_ROLE)
+    tree = FolderTree(_ROLE, all_key=ALL_KEY)
     qtbot.addWidget(tree)
     for n in range(100):
         tree.addTopLevelItem(_folder_row(f"Folder {n}", f"k/{n}"))
@@ -826,13 +826,13 @@ def _laid_out(tree, item, element) -> QRect:
 
 
 def _tree_with_a_collection(qtbot, which=LATEST_KEY):
-    tree = FolderTree(_ROLE)
+    tree = FolderTree(_ROLE, all_key=ALL_KEY)
     qtbot.addWidget(tree)
     top = _folder_row("All", "all")
     folder = _folder_row("Workflow", "wf")
     folder.setIcon(0, icons.toc_initial_icon("workflow"))
     collection = QTreeWidgetItem([COLLECTION_LABELS[which]])
-    collection.setIcon(0, icons.collection_icon(which))
+    collection.setIcon(0, folder_icons.collection_icon(which))
     folder.addChild(collection)
     top.addChild(folder)
     tree.addTopLevelItem(top)
@@ -869,7 +869,7 @@ def test_a_picked_favorites_rows_star_is_ringed_in_white(qtbot):
 
 
 def test_a_folder_of_your_own_offers_no_star_or_delete_beside_its_mark(qtbot):
-    tree = FolderTree(_ROLE)
+    tree = FolderTree(_ROLE, all_key=ALL_KEY)
     qtbot.addWidget(tree)
     own = _folder_row("Keepers", "__custom__/1")
     own.setIcon(0, icons.custom_collection_icon())
@@ -891,7 +891,7 @@ def test_a_folder_of_your_own_offers_no_star_or_delete_beside_its_mark(qtbot):
 
 def test_folders_dragged_from_the_other_half_land_nowhere(qtbot):
     tree, collection, a, _b = _collecting_tree(qtbot)
-    other_half = FolderTree(_ROLE)
+    other_half = FolderTree(_ROLE, all_key=ALL_KEY)
     qtbot.addWidget(other_half)
     mime = QMimeData()
     mime.setData(FOLDER_KEYS_MIME, a.data(0, TREE_KEY_ROLE).encode("utf-8"))
@@ -913,7 +913,7 @@ def test_folders_dragged_from_the_other_half_land_nowhere(qtbot):
 
 
 def _long_tree(qtbot):
-    tree = FolderTree(_ROLE)
+    tree = FolderTree(_ROLE, all_key=ALL_KEY)
     qtbot.addWidget(tree)
     every = _folder_row("All", ALL_KEY)
     tree.addTopLevelItem(every)

@@ -28,6 +28,7 @@ from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
 from origenerator.gui import (
     diff_text,
     file_pick,
+    folder_icons,
     icons,
     param_sections,
     thumbnail_dropdown,
@@ -767,7 +768,7 @@ def _dimension_defs():
 
 def _size_heading_wears(form, orientation) -> bool:
     mark = form._sections["Size"]._header._mark
-    return mark is not None and mark.toImage() == icons.shape_mark(orientation).toImage()
+    return mark is not None and mark.toImage() == folder_icons.shape_mark(orientation).toImage()
 
 
 def test_the_size_heading_wears_the_frame_of_the_shape_the_size_makes(qtbot):

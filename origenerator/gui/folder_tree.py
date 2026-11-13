@@ -13,7 +13,6 @@ from PySide6.QtWidgets import (
 from shared_ui.colors import BLUE, BORDER_SUBTLE
 from shared_ui.spacing import BUTTON_ICON, GAP_SMALL
 
-from origenerator.gallery.tree import ALL_KEY
 from origenerator.gui import drop_style, icons
 from origenerator.gui.drags import carry, under_way
 from origenerator.gui.generation_drag import dragged_generation
@@ -58,18 +57,18 @@ def _mark_rect(content: QRect) -> QRect:
     return QRect(_PAD, content.y() + (content.height() - _DOT) // 2, _DOT, _DOT)
 
 
-def _is_all(row, group_role) -> bool:
-    return getattr(row.data(0, group_role), "key", None) == ALL_KEY
+def _is_all(row, group_role, all_key) -> bool:
+    return getattr(row.data(0, group_role), "key", None) == all_key
 
 
-def _path_of(row, group_role) -> list:
-    return [] if _is_all(row, group_role) else [*_folders_around(row, group_role), row]
+def _path_of(row, group_role, all_key) -> list:
+    return [] if _is_all(row, group_role, all_key) else [*_folders_around(row, group_role, all_key), row]
 
 
-def _folders_around(row, group_role) -> list:
+def _folders_around(row, group_role, all_key) -> list:
     folders = []
     node = row.parent() if row is not None else None
-    while node is not None and not _is_all(node, group_role):
+    while node is not None and not _is_all(node, group_role, all_key):
         folders.append(node)
         node = node.parent()
     return folders[::-1]
@@ -96,10 +95,11 @@ class FolderTree(QTreeWidget):
     delete_clicked = Signal(object)
     dropped = Signal(str, list, list)
 
-    def __init__(self, group_role, takes_item=lambda _row_key, _prompt_id: False,
+    def __init__(self, group_role, *, all_key: str, takes_item=lambda _row_key, _prompt_id: False,
                  takes_folder=lambda _row_key, _folder_key: True, parent=None):
         super().__init__(parent)
         self._role = group_role
+        self._all_key = all_key
         self._takes_item = takes_item
         self._takes_folder = takes_folder
         self._delete = icons.delete_icon()
@@ -142,7 +142,7 @@ class FolderTree(QTreeWidget):
             frozen = self._frozen_while_scrolling(held)
             passed = self._in_list_order(
                 [folder for row in self.selectedItems() if self._scrolled_past(row, frozen)
-                 for folder in _path_of(row, self._role)])
+                 for folder in _path_of(row, self._role, self._all_key)])
             if len(passed) == len(held) and all(a is b for a, b in zip(passed, held, strict=True)):
                 break
             held = passed
@@ -152,7 +152,7 @@ class FolderTree(QTreeWidget):
         chain = []
         while True:
             shown = self._in_list_order(chain + held)
-            folders = _folders_around(self.itemAt(0, self._height_of(shown)), self._role)
+            folders = _folders_around(self.itemAt(0, self._height_of(shown)), self._role, self._all_key)
             if len(folders) <= len(chain) or folders[:len(chain)] != chain:
                 return shown
             folder = folders[len(chain)]

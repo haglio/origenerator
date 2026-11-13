@@ -20,7 +20,7 @@ from origenerator.gallery.collection import (
     folder_collection,
 )
 from origenerator.gallery.shapes import SHAPE_LABELS
-from origenerator.gui import icons
+from origenerator.gui import folder_icons, icons
 from origenerator.gui.folder_tree import COUNT_ROLE, DROP_KEY_ROLE, RECENT_ROLE, TREE_KEY_ROLE
 from origenerator.item_shape import key_holds, shape_of, shaped_key, split_key
 from origenerator.media import MediaType
@@ -154,7 +154,7 @@ class GalleryTree:
             key = FolderCollection(collection, folder_key).key
             item = QTreeWidgetItem([COLLECTION_LABELS[collection]])
             item.setData(0, COUNT_ROLE, shape.collection_counts.get(key, 0))
-            item.setIcon(0, icons.collection_icon(collection))
+            item.setIcon(0, folder_icons.collection_icon(collection))
             item.setToolTip(0, _COLLECTION_TIPS[collection])
             if collection == FAVORITES_KEY:
                 item.setData(0, DROP_KEY_ROLE, FAVORITES_KEY)
@@ -243,7 +243,7 @@ class GalleryTree:
         item = QTreeWidgetItem([group.label])
         item.setData(0, GROUP_ROLE, group)
         item.setData(0, COUNT_ROLE, len(gallery.rows_under(group)))
-        kind_icon = icons.folder_kind_icon(group)
+        kind_icon = folder_icons.folder_kind_icon(group)
         if kind_icon is not None:
             item.setIcon(0, kind_icon[0])
         item.setToolTip(0, _tooltip_of(group, kind_icon))

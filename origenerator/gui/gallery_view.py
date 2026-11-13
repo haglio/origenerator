@@ -90,6 +90,7 @@ from origenerator.gui.enhance_controller import (
     EnhanceParts,
     Offer,
 )
+from origenerator.gui.folder_icons import collection_mark
 from origenerator.gui.folder_path import FolderPath
 from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
 from origenerator.gui.folder_tree import offer_collapse_and_expand
@@ -125,7 +126,6 @@ from origenerator.gui.generate_pane import GeneratePane, TabViews
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.generation_failed import GenerationFailed
 from origenerator.gui.how_many import HOW_MANY
-from origenerator.gui.icons import collection_mark
 from origenerator.gui.inflight import (
     CANCEL_ALL_TEXT,
     CANCEL_TEXT,

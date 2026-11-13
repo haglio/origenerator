@@ -21,26 +21,10 @@ from shared_ui.icons import CANVAS, draw_icon, icon_pixmap, qt_icon
 from shared_ui.spacing import BUTTON_ICON
 from shared_ui.type_scale import FONT_UI, SIZE_TINY, in_pixels
 
-from origenerator.gallery.collection import (
-    COLLECTION_LABELS,
-    ENHANCED_KEY,
-    EXPERIMENTS_KEY,
-    FAVORITES_KEY,
-    LATEST_KEY,
-    TRASH_KEY,
-)
-from origenerator.gallery.groups import MediaGroup, SettingsGroup, folder_level, rows_under
-from origenerator.gallery.labels import MEDIA_LABELS
-from origenerator.gallery.output import media_type_of_row
-from origenerator.gallery.shapes import BOTH, LANDSCAPE, PORTRAIT
 from origenerator.media import MediaType
 
 _SIZE = int(CANVAS)
 
-LEVEL_LABELS = {
-    "workflow": "Workflow", "model": "Model", "lora": "LoRA",
-    "source_image": "Source Image",
-}
 _TOC_INITIALS = {
     "workflow": ("W", BLUE), "model": ("M", MAGENTA), "lora": ("L", YELLOW),
     "source_image": ("I", GREEN),
@@ -54,12 +38,9 @@ _TOC_INITIAL_LETTER = round(in_pixels(SIZE_TINY) * _SIZE / BUTTON_ICON)
 _GLYPH_ON_GROUND = 44
 _GROUND_INSET = (_SIZE - _GLYPH_ON_GROUND) / 2
 
-_STAR_GLYPH = GREEN
-_ENHANCE_MARK = ("plus", YELLOW)
-_DELETE_MARK = ("trash", RED)
-_COLLECTION_MARKS = {
-    FAVORITES_KEY: ("star", _STAR_GLYPH), ENHANCED_KEY: _ENHANCE_MARK, TRASH_KEY: _DELETE_MARK,
-}
+STAR_GLYPH = GREEN
+ENHANCE_MARK = ("plus", YELLOW)
+DELETE_MARK = ("trash", RED)
 _REROLL_GLYPH = WHITE
 
 _REROLL_MEDIA = 34
@@ -103,7 +84,7 @@ def slideshow_icon() -> QIcon:
 
 
 def enhance_icon() -> QIcon:
-    name, color = _ENHANCE_MARK
+    name, color = ENHANCE_MARK
     return qt_icon(name, color=color, size=_SIZE)
 
 
@@ -139,12 +120,12 @@ def trash_icon(*, color=None) -> QIcon:
 
 
 def delete_icon() -> QIcon:
-    return trash_icon(color=_DELETE_MARK[1])
+    return trash_icon(color=DELETE_MARK[1])
 
 
 def star_icon(*, filled: bool) -> QIcon:
     if filled:
-        icon = qt_icon("star", color=_STAR_GLYPH, size=_SIZE)
+        icon = qt_icon("star", color=STAR_GLYPH, size=_SIZE)
         icon.addPixmap(_painted(_ringed_star), QIcon.Mode.Selected)
         return icon
     return qt_icon("star_outline", size=_SIZE)
@@ -152,7 +133,7 @@ def star_icon(*, filled: bool) -> QIcon:
 
 def _ringed_star(painter: QPainter):
     draw_icon(painter, "star_ring", TEXT_PRIMARY, size=_SIZE)
-    draw_icon(painter, "star", _STAR_GLYPH, size=_SIZE)
+    draw_icon(painter, "star", STAR_GLYPH, size=_SIZE)
 
 
 @cache
@@ -173,22 +154,6 @@ def latest_icon() -> QIcon:
 
 def flask_icon() -> QIcon:
     return qt_icon("flask", size=_SIZE)
-
-
-@cache
-def collection_icon(collection: str) -> QIcon:
-    return {
-        LATEST_KEY: latest_icon, FAVORITES_KEY: lambda: star_icon(filled=True),
-        ENHANCED_KEY: enhance_icon, EXPERIMENTS_KEY: flask_icon, TRASH_KEY: delete_icon,
-    }[collection]()
-
-
-def collection_mark(collection: str) -> tuple[str, QColor] | None:
-    return _COLLECTION_MARKS.get(collection)
-
-
-def collection_kind_icon(collection: str) -> tuple[QIcon, str]:
-    return collection_icon(collection), COLLECTION_LABELS[collection]
 
 
 def all_icon() -> QIcon:
@@ -231,20 +196,6 @@ def media_type_icon(media_type: str) -> QIcon:
     return qt_icon("play" if media_type == MediaType.VIDEO else "photo", size=_SIZE)
 
 
-MARK_BESIDE_A_WORD = 15
-_SIDE_MARKS = {PORTRAIT: PORTRAIT, LANDSCAPE: LANDSCAPE, BOTH: "portrait_and_landscape"}
-
-
-@cache
-def shape_mark(shape: str, size: int = MARK_BESIDE_A_WORD) -> QPixmap:
-    return icon_pixmap(_SIDE_MARKS[shape], size, TEXT_PRIMARY)
-
-
-@cache
-def separate_mark(size: int) -> QPixmap:
-    return icon_pixmap("portrait_beside_landscape", size, TEXT_PRIMARY)
-
-
 ENHANCE_OPEN = "open"
 ENHANCE_HELD = "held"
 ENHANCE_MORE = "more"
@@ -260,7 +211,7 @@ _ENHANCE_SHADOW = 5.0
 @cache
 def corner_star_icon(*, favorite: bool, armed: bool) -> QIcon:
     return _corner_icon("star" if favorite else "star_outline",
-                        _STAR_GLYPH if favorite else _CORNER_REST, armed)
+                        STAR_GLYPH if favorite else _CORNER_REST, armed)
 
 
 @cache
@@ -350,16 +301,6 @@ def reroll_seed_icon(media_type: str) -> QIcon:
 
 def tab_close_icon() -> QIcon:
     return qt_icon("cross", size=_SIZE)
-
-
-def folder_kind_icon(group) -> tuple[QIcon, str] | None:
-    level = folder_level(group)
-    if level is not None:
-        return toc_initial_icon(level), LEVEL_LABELS[level]
-    if isinstance(group, (MediaGroup, SettingsGroup)):
-        media = media_type_of_row(rows_under(group)[0])
-        return media_type_icon(media), MEDIA_LABELS[media]
-    return None
 
 
 @cache

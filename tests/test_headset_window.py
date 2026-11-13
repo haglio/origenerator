@@ -5,6 +5,7 @@ import struct
 from unittest.mock import MagicMock
 
 import shiboken6
+from app_support.frame_channel import LOOK_AGAIN_AFTER_S
 from PySide6.QtCore import QEvent, QPoint, Qt
 from PySide6.QtGui import QColor, QImage
 from PySide6.QtMultimedia import QVideoFrame
@@ -14,7 +15,6 @@ from origenerator.fun_time_mode import parse_app_args
 from origenerator.gui import headset_window
 from origenerator.gui.drag_thumbnail import DragOut
 from origenerator.gui.headset_window import (
-    _IDLE_LOOK_S,
     CAP_PX,
     HEARTBEAT_S,
     HeadsetWindow,
@@ -302,7 +302,7 @@ class TestTheRoomsPressesReachTheWindow:
             grabbed = self._counting_grabs(window)
 
             headset._heard("hover 30 40")
-            headset.publish(now=1.0 + _IDLE_LOOK_S / 2)
+            headset.publish(now=1.0 + LOOK_AGAIN_AFTER_S / 2)
 
             assert grabbed == [], (
                 "pointing at the window is not a change to it, and the room sends a hover every "
@@ -322,7 +322,7 @@ class TestTheRoomsPressesReachTheWindow:
             grabbed = self._counting_grabs(window)
 
             headset._heard("press 30 40")
-            headset.publish(now=1.0 + _IDLE_LOOK_S / 2)
+            headset.publish(now=1.0 + LOOK_AGAIN_AFTER_S / 2)
 
             assert grabbed == [1], (
                 "what a press does to the window is what the room is waiting to see, so that "

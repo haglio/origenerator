@@ -7,6 +7,7 @@ from origenerator.workflows.base import WorkflowTemplate
 from origenerator.workflows.flux_t2i_upscaled import FluxT2iUpscaledWorkflow
 from origenerator.workflows.image_enhance import ImageEnhanceWorkflow
 from origenerator.workflows.krea2_t2i import Krea2T2iWorkflow
+from origenerator.workflows.minimax_h3_i2v import MiniMaxH3I2vWorkflow
 from origenerator.workflows.outside import OutsideWorkflow, VideoKind, outside_parts
 from origenerator.workflows.sdxl_pose_transfer import SdxlPoseTransferWorkflow
 from origenerator.workflows.sdxl_t2i import SdxlT2iWorkflow
@@ -27,6 +28,7 @@ WORKFLOW_REGISTRY: dict[str, WorkflowTemplate] = {
     "wan22_flf2v_loop": Wan22Flf2vLoopWorkflow(),
     "wan22_i2v": Wan22I2vWorkflow(),
     "wan22_animate": Wan22AnimateWorkflow(),
+    "minimax_h3_i2v": MiniMaxH3I2vWorkflow(),
 }
 
 

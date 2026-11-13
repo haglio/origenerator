@@ -69,6 +69,8 @@ PROJECT_DIR = Path(__file__).resolve().parent.parent
 
 
 def declaration() -> dict:
+    from origenerator.media import MediaType  # noqa: PLC0415
+    from origenerator.workflows import WORKFLOW_REGISTRY  # noqa: PLC0415
     from origenerator.workflows.frame_rate import NATIVE_FPS  # noqa: PLC0415
     from origenerator.workflows.outside import published_prefixes  # noqa: PLC0415
 
@@ -82,6 +84,9 @@ def declaration() -> dict:
         "lanes": {lane: dict(stamps) for lane, stamps in LANES.items()},
         "silent_copy_role": SILENT_COPY_ROLE,
         "generated_fps": NATIVE_FPS,
+        "generated_fps_by_workflow": {name: workflow.native_fps
+                                      for name, workflow in WORKFLOW_REGISTRY.items()
+                                      if workflow.output_type == MediaType.VIDEO},
         "downtime_command": list(DOWNTIME_COMMAND),
         "outside_video_entries_command": list(OUTSIDE_VIDEO_ENTRIES_COMMAND),
         "records_command": list(RECORDS_COMMAND),

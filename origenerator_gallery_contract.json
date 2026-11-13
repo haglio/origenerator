@@ -55,6 +55,12 @@
   },
   "silent_copy_role": "silent",
   "generated_fps": 16.0,
+  "generated_fps_by_workflow": {
+    "wan22_flf2v_loop": 16.0,
+    "wan22_i2v": 16.0,
+    "wan22_animate": 16.0,
+    "minimax_h3_i2v": 24.0
+  },
   "downtime_command": [
     ".venv/Scripts/python.exe",
     "-m",

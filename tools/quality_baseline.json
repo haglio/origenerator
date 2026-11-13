@@ -14,7 +14,7 @@
     "origenerator/slideshow_buttons.py": 2,
     "origenerator/voice/app_commands.py": 2,
     "origenerator/workflows/__init__.py": 2,
-    "origenerator/workflows/base.py": 4
+    "origenerator/workflows/base.py": 3
   },
   "private_imports": {
     "origenerator/gallery/labels.py": 1,

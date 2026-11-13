@@ -82,6 +82,15 @@ def test_the_document_promises_the_rate_every_video_is_generated_at():
         "every M-th frame of a video saved at M times this rate")
 
 
+def test_the_document_promises_the_rate_each_video_workflow_generates_at():
+    assert _document()["generated_fps_by_workflow"] == {
+        name: wf.native_fps for name, wf in WORKFLOW_REGISTRY.items()
+        if wf.output_type == MediaType.VIDEO}, (
+        "a MiniMax H3 video is generated at 24 frames a second where WAN's are at 16, so Evolver "
+        "reads the rate of the workflow that made the video")
+    assert _document()["generated_fps_by_workflow"]["minimax_h3_i2v"] == 24.0
+
+
 def test_the_contract_imports_first_though_the_workflows_it_reads_the_rate_from_import_it():
     imported = run_python(["-c", "import origenerator.gallery_contract"])
 

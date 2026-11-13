@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QComboBox, QLabel, QPushButton
+from PySide6.QtWidgets import QComboBox, QFrame, QLabel, QPushButton
 
 from origenerator.gui.eliding import (
     ElidingButton,
@@ -92,6 +92,20 @@ def test_a_label_paints_its_colors_and_alignment_as_qlabel_does(qtbot):
     assert painted(ElidingLabel(_PHRASE)) == painted(QLabel(_PHRASE)), (
         "the label paints through the style as QLabel does, so it keeps the colors and the "
         "alignment its stylesheet and its owner give it")
+
+
+@pytest.mark.parametrize("alignment", [Qt.AlignmentFlag.AlignLeft, Qt.AlignmentFlag.AlignRight])
+def test_a_framed_label_indents_its_text_from_the_frame_as_qlabel_does(qtbot, alignment):
+    def painted(label):
+        qtbot.addWidget(label)
+        label.setFrameShape(QFrame.Shape.Box)
+        label.setAlignment(alignment | Qt.AlignmentFlag.AlignVCenter)
+        label.resize(label.sizeHint().width() * 2, label.sizeHint().height())
+        return label.grab().toImage()
+
+    assert painted(ElidingLabel(_PHRASE)) == painted(QLabel(_PHRASE)), (
+        "a stock label keeps half an x of room between its frame and its text, so a label "
+        "beside it that elides keeps the same room")
 
 
 def test_a_dropdowns_list_keeps_room_for_its_longest_entry_and_a_scroll_bar(qtbot):

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from origenerator.action_settings import loops
 from origenerator.config import EVOLVER_SOURCE, GENAU_SOURCE
+from origenerator.content import genau_flick_word
 from origenerator.db import Database
 from origenerator.funscript import funscript_of
 from origenerator.gallery import resolve_preview
@@ -22,12 +23,28 @@ class ExportLane:
     source: str
     mark: Callable[[Database, str], None]
     unmark: Callable[[Database, str], None]
-    noun: str
-    tooltip: str
-    unsend_tooltip: str
-    withdrawn_tooltip: str
+    word: Callable[[], str]
+    send_help: str
+    unsend_help: str
+    withdrawn_help: str
     hands_over_funscript: bool
     carries_loops: bool
+
+    @property
+    def noun(self) -> str:
+        return self.word()
+
+    @property
+    def tooltip(self) -> str:
+        return self.send_help.format(noun=self.noun)
+
+    @property
+    def unsend_tooltip(self) -> str:
+        return self.unsend_help.format(noun=self.noun)
+
+    @property
+    def withdrawn_tooltip(self) -> str:
+        return self.withdrawn_help.format(noun=self.noun)
 
     @property
     def flag(self) -> str:
@@ -69,13 +86,13 @@ KINO = ExportLane(
     name="Kino", source_key="evolver", source=EVOLVER_SOURCE,
     mark=lambda db, prompt_id: db.mark_evolver_exported(prompt_id),
     unmark=lambda db, prompt_id: db.mark_evolver_unsent(prompt_id),
-    noun="video",
-    tooltip="Send this video down the Kino lane: Evolver sorts and upscales it on its usual "
-            "schedule, then files it where Kino plays it.",
-    unsend_tooltip="Delete the copy Evolver holds, wherever it has filed it by "
-                   "now. It goes on Evolver's next run.",
-    withdrawn_tooltip="An earlier copy of this video is down for deletion in "
-                      "Evolver. Sending puts a fresh one in its inbox.",
+    word=lambda: "video",
+    send_help="Send this {noun} down the Kino lane: Evolver sorts and upscales it on its usual "
+              "schedule, then files it where Kino plays it.",
+    unsend_help="Delete the copy Evolver holds, wherever it has filed it by "
+                "now. It goes on Evolver's next run.",
+    withdrawn_help="An earlier copy of this {noun} is down for deletion in "
+                   "Evolver. Sending puts a fresh one in its inbox.",
     hands_over_funscript=True,
     carries_loops=False,
 )
@@ -84,13 +101,13 @@ GENAU = ExportLane(
     name="Genau", source_key="genau", source=GENAU_SOURCE,
     mark=lambda db, prompt_id: db.mark_genau_exported(prompt_id),
     unmark=lambda db, prompt_id: db.mark_genau_unsent(prompt_id),
-    noun="clip",
-    tooltip="Send this clip down the Genau lane: Evolver upscales it on its "
-            "usual schedule, then delivers it to the folder Genau plays from.",
-    unsend_tooltip="Delete this clip from the folder Genau plays from. Evolver "
-                   "does it on its next run.",
-    withdrawn_tooltip="An earlier copy of this clip is down for deletion in "
-                      "Genau's folder. Sending starts a fresh one down the lane.",
+    word=genau_flick_word,
+    send_help="Send this {noun} down the Genau lane: Evolver upscales it on its "
+              "usual schedule, then delivers it to the folder Genau plays from.",
+    unsend_help="Delete this {noun} from the folder Genau plays from. Evolver "
+                "does it on its next run.",
+    withdrawn_help="An earlier copy of this {noun} is down for deletion in "
+                   "Genau's folder. Sending starts a fresh one down the lane.",
     hands_over_funscript=False,
     carries_loops=True,
 )

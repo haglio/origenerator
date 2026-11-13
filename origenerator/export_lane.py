@@ -87,7 +87,7 @@ KINO = ExportLane(
     mark=lambda db, prompt_id: db.mark_evolver_exported(prompt_id),
     unmark=lambda db, prompt_id: db.mark_evolver_unsent(prompt_id),
     word=lambda: "video",
-    send_help="Send this {noun} down the Kino lane: Evolver sorts and upscales it on its usual "
+    send_help="Send this {noun} to Kino: Evolver sorts and upscales it on its usual "
               "schedule, then files it where Kino plays it.",
     unsend_help="Delete the copy Evolver holds, wherever it has filed it by "
                 "now. It goes on Evolver's next run.",
@@ -102,12 +102,12 @@ GENAU = ExportLane(
     mark=lambda db, prompt_id: db.mark_genau_exported(prompt_id),
     unmark=lambda db, prompt_id: db.mark_genau_unsent(prompt_id),
     word=genau_flick_word,
-    send_help="Send this {noun} down the Genau lane: Evolver upscales it on its "
+    send_help="Send this {noun} to Genau: Evolver upscales it on its "
               "usual schedule, then delivers it to the folder Genau plays from.",
     unsend_help="Delete this {noun} from the folder Genau plays from. Evolver "
                 "does it on its next run.",
     withdrawn_help="An earlier copy of this {noun} is down for deletion in "
-                   "Genau's folder. Sending starts a fresh one down the lane.",
+                   "Genau's folder. Sending starts a fresh one.",
     hands_over_funscript=False,
     carries_loops=True,
 )

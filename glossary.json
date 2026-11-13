@@ -1355,11 +1355,11 @@
     },
     {
       "id": "lane",
-      "thing": "where a finished video is sent: down the Kino lane to the Satellites, or the Genau lane",
+      "thing": "where a finished video is sent: to Kino for the Satellites, or to Genau",
       "screen": [
         "Kino",
         "Genau",
-        "Send this video down the Kino lane"
+        "Send this video to Kino"
       ],
       "his_word": null,
       "code_today": [

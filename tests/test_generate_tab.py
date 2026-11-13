@@ -4082,7 +4082,7 @@ def test_a_loop_is_offered_to_genau_and_any_other_video_to_kino_alone(
 
 def test_the_kino_lanes_button_says_where_its_video_ends_up():
     assert export_lane_module.KINO.tooltip == (
-        "Send this video down the Kino lane: Evolver sorts and upscales it on its usual "
+        "Send this video to Kino: Evolver sorts and upscales it on its usual "
         "schedule, then files it where Kino plays it.")
 
 

@@ -5,7 +5,7 @@ import json
 import pytest
 
 from origenerator.action_settings import GENAU, VIDEO
-from origenerator.animation_check_session import AnimationCheckSession
+from origenerator.default_animation_settings_session import DefaultAnimationSettingsSession
 
 _ORDER = [
     (VIDEO, "alpha", "state one"),
@@ -42,7 +42,7 @@ def _video(prompt_id, *, positive="a scene", negative="flaws", steps=8):
 @pytest.fixture
 def session():
     def build(samples=None, store=None, order=None, pinned=None):
-        return AnimationCheckSession(order or _ORDER, samples or {},
+        return DefaultAnimationSettingsSession(order or _ORDER, samples or {},
                                      store or _Store(), pinned=pinned)
 
     return build
@@ -181,7 +181,7 @@ def test_an_animation_with_neither_a_sample_nor_pinned_action_settings_starts_fr
 
 def test_assigning_saves_the_prompts_the_user_typed_with_nothing_else_to_go_on():
     store = _Store()
-    session = AnimationCheckSession(_ORDER, {}, store)
+    session = DefaultAnimationSettingsSession(_ORDER, {}, store)
 
     session.accept(positive="a scene", negative="its flaws")
 
@@ -194,7 +194,7 @@ def test_assigning_saves_the_prompts_the_user_typed_with_nothing_else_to_go_on()
 def test_an_animation_the_user_has_assigned_opens_on_what_was_assigned():
     store = _Store()
     store.accepted[_ORDER[0]] = ("wan22_i2v", {"positive_prompt": "what the user typed"})
-    session = AnimationCheckSession(_ORDER, {_ORDER[0]: [_video("kept")]}, store)
+    session = DefaultAnimationSettingsSession(_ORDER, {_ORDER[0]: [_video("kept")]}, store)
 
     assert session.starting_point == {
         "workflow": "wan22_i2v", "params": {"positive_prompt": "what the user typed"}}

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock
 
-from origenerator import check_animations, gallery
+from origenerator import default_animation_settings, gallery
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -41,7 +41,7 @@ def _library(tmp_path):
 def test_a_trial_from_an_image_never_enhanced_is_made_from_its_enhancement(qtbot, tmp_path):
     db = _library(tmp_path)
     client = _client()
-    trial = check_animations._launcher(db, client)
+    trial = default_animation_settings._launcher(db, client)
 
     said = trial(db.get_generation("sample"), "alpha", "beta")
     (enhance,) = [row for row in db.list_generations() if row["enhance_of"] == "image"]
@@ -60,7 +60,7 @@ def test_a_trial_from_an_image_never_enhanced_is_made_from_its_enhancement(qtbot
 def test_a_trial_carries_the_prompts_as_edited_under_seeds_the_sample_did_not_use(qtbot, tmp_path):
     db = _library(tmp_path)
     client = _client()
-    trial = check_animations._launcher(db, client)
+    trial = default_animation_settings._launcher(db, client)
 
     trial(db.get_generation("sample"), "alpha", "beta")
     (enhance,) = [row for row in db.list_generations() if row["enhance_of"] == "image"]

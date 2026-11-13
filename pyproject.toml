@@ -135,11 +135,11 @@ venv = "primary"
 log = 'state\action_setter_launcher.log'
 environment = { ORIGENERATOR_BRANCH_SESSION = "1" }
 
-[tool.haglio.launchers."check_animations.vbs"]
-app = "Origenerator (checking animations)"
-run = "-m origenerator.check_animations"
+[tool.haglio.launchers."default_animation_settings.vbs"]
+app = "Origenerator (default animation settings)"
+run = "-m origenerator.default_animation_settings"
 venv = "primary"
-log = 'state\check_animations_launcher.log'
+log = 'state\default_animation_settings_launcher.log'
 environment = { ORIGENERATOR_BRANCH_SESSION = "1" }
 
 # What Origenerator relies on Windows to keep: the shortcut it is pinned from.

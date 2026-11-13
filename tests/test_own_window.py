@@ -16,15 +16,15 @@ from origenerator import (
     action_settings,
     animation_settings,
     branch_session,
-    check_animations,
     config,
+    default_animation_settings,
     own_window,
 )
 from origenerator.gui import stylesheet
-from origenerator.gui.animation_check_window import (
+from origenerator.gui.default_animation_settings_window import (
     HEADING,
     POSITIVE,
-    AnimationCheckWindow,
+    DefaultAnimationSettingsWindow,
 )
 
 
@@ -60,16 +60,16 @@ def test_the_action_setter_tools_own_launch_says_so_when_every_image_already_has
 
 def test_checking_animations_own_launch_opens_a_window_on_the_first_of_them(
         a_library_of_its_own, monkeypatch):
-    up: list[AnimationCheckWindow] = []
+    up: list[DefaultAnimationSettingsWindow] = []
 
     def what_is_up(app) -> int:
         up.extend(w for w in app.topLevelWidgets()
-                  if isinstance(w, AnimationCheckWindow))
+                  if isinstance(w, DefaultAnimationSettingsWindow))
         return 0
 
     monkeypatch.setattr(QApplication, "exec", what_is_up)
 
-    assert check_animations.main() == 0, _WHY_THE_LAUNCH_IS_RUN
+    assert default_animation_settings.main() == 0, _WHY_THE_LAUNCH_IS_RUN
 
     assert len(up) == 1
     assert up[0].isVisible()
@@ -82,7 +82,7 @@ def test_an_animation_with_no_sample_starts_from_the_actions_own_settings(
                         lambda action, lane: {"workflow": "wan22_i2v",
                                            "params": {"positive_prompt": "the action's own"}})
 
-    made = check_animations.the_animation_window()
+    made = default_animation_settings.the_default_animation_settings_window()
 
     assert made.findChild(QPlainTextEdit, POSITIVE).toPlainText() == "the action's own", (
         "the user's ask: the action's own settings are the starting position where nothing kept "
@@ -95,7 +95,7 @@ def test_each_window_names_itself_to_windows_under_the_apps_own_name():
         "a window that claimed the app's own name would answer the pinned Origenerator button "
         "in the app's place")
     assert own_window.taskbar_identity(
-        "Checking animations", None) == "Origenerator.CheckingAnimations"
+        "Default animation settings", None) == "Origenerator.DefaultAnimationSettings"
 
 
 def test_a_window_out_of_a_branch_is_shown_as_a_preview():

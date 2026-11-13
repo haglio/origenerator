@@ -5,7 +5,7 @@ import json
 Path = tuple[str, str, str]
 
 
-class AnimationCheckSession:
+class DefaultAnimationSettingsSession:
 
     def __init__(self, paths: list[Path], samples: dict[Path, list[dict]], store,
                  *, pinned=None):

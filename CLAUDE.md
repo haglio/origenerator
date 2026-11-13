@@ -504,13 +504,13 @@ would be lost. `tests/test_the_library_windows_launchers.py` holds both to that.
   running copy's own `state/picture_states/` and then the live install's: his,
   and library subject matter, so
   they are as uncommittable as the button names and live beside the library.
-- `check_animations.vbs` -> `origenerator.check_animations` -- settles what each
+- `default_animation_settings.vbs` -> `origenerator.default_animation_settings` -- settles what each
   animation the overlay's `video_actions.starts_from` lists runs, one at a time,
   against a video the user already kept: a video button from an image button, and
   the same with each of the video buttons' checkboxes, which makes an animation of
   its own (his ruling, 2026-11-06: a box ticked beside an action causes "a
   different type of video to be made"). `animation_samples` finds and orders them,
-  `animation_check_session` is the walk, `gui/animation_check_window.py` is the
+  `default_animation_settings_session` is the walk, `gui/default_animation_settings_window.py` is the
   window, and what is accepted goes to `animation_settings` -- one set of
   settings per (lane, action, image state) in a file of its own beside the library, which
   `CombineController._curated_combination` asks before the overlay's per-action pin.

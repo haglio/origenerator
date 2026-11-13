@@ -16,8 +16,8 @@ from PySide6.QtWidgets import (
 from shared_ui.preview import Preview
 
 from origenerator.action_settings import VIDEO
-from origenerator.animation_check_session import AnimationCheckSession
-from origenerator.gui.animation_check_window import (
+from origenerator.default_animation_settings_session import DefaultAnimationSettingsSession
+from origenerator.gui.default_animation_settings_window import (
     ACCEPT,
     BACK,
     BLANK,
@@ -26,6 +26,7 @@ from origenerator.gui.animation_check_window import (
     FROM_THE_ACTIONS_OWN,
     HEADING,
     IMAGE,
+    MAKING_THE_THUMBNAIL,
     NEGATIVE,
     NO_SAMPLE,
     POSITIVE,
@@ -33,7 +34,7 @@ from origenerator.gui.animation_check_window import (
     SAID,
     SAMPLE,
     SUBMIT,
-    AnimationCheckWindow,
+    DefaultAnimationSettingsWindow,
 )
 from origenerator.gui.stylesheet import COMMITS, build_stylesheet
 
@@ -103,8 +104,8 @@ def window(qtbot, tmp_path):
     def build(samples=None, store=None, look=None, pinned=None, make_loop=None,
               off_thread=None):
         store = store or _Store()
-        session = AnimationCheckSession(_ORDER, samples or {}, store, pinned=pinned)
-        made = AnimationCheckWindow(
+        session = DefaultAnimationSettingsSession(_ORDER, samples or {}, store, pinned=pinned)
+        made = DefaultAnimationSettingsWindow(
             session, look or (lambda row: (None, None)),
             lambda row, positive, negative: submitted.append(
                 (row["prompt_id"], positive, negative)) or "Queued it.",
@@ -313,6 +314,8 @@ def test_a_moving_preview_not_made_yet_is_made_off_the_windows_thread(window, tm
     assert made_on_the_window == [], (
         "sampling a video's frames takes seconds, and the window stalls if it waits for them")
     assert made.findChild(QLabel, SAMPLE).movie() is None
+    assert made.findChild(QLabel, SAMPLE).text() == MAKING_THE_THUMBNAIL, (
+        "an empty half reads as a video that is missing; a line says it is on its way")
 
     held.finish()
 
@@ -370,11 +373,11 @@ def test_an_animation_with_neither_says_there_is_nothing_to_go_by(window):
     assert made.findChild(QLabel, BLANK).text() == NO_SAMPLE
 
 
-def test_the_animation_check_opened_in_a_preview_names_the_preview(window, monkeypatch):
+def test_the_default_animation_settings_opened_in_a_preview_names_the_preview(window, monkeypatch):
     monkeypatch.setenv("ORIGENERATOR_BRANCH_SESSION", "1")
     monkeypatch.setattr("origenerator.branch_session.preview_of",
                         lambda checkout: Preview(feature="Example scene pausing"))
 
     made, _store, _sent = window()
 
-    assert made.windowTitle() == "Origenerator — how should this be animated? — preview of Example scene pausing"
+    assert made.windowTitle() == "Origenerator — default animation settings — preview of Example scene pausing"

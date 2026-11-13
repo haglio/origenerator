@@ -13,9 +13,9 @@ from origenerator import (
 )
 from origenerator.animate_command import what_to_animate
 from origenerator.animation_names import Animation, image_button_of, item_actions_named, named
-from origenerator.check_animations import the_animation_window
 from origenerator.combine_runs import CombineRun
 from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES
+from origenerator.default_animation_settings import the_default_animation_settings_window
 from origenerator.export_lane import GENAU as GENAU_LANE
 from origenerator.gallery.combine import cycle_names
 from origenerator.gui.combination import Combination
@@ -94,8 +94,8 @@ class CombineController(QObject):
             self._animation_settings.raise_()
             self._animation_settings.activateWindow()
             return
-        built = the_animation_window()
-        if not show_or_say("Checking animations", built, parent=self.widget):
+        built = the_default_animation_settings_window()
+        if not show_or_say("Default animation settings", built, parent=self.widget):
             self._animation_settings = built
 
     def _accepts_image(self, image_id: str) -> bool:

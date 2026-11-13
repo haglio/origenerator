@@ -1,4 +1,4 @@
-' Rendered from [tool.haglio.launchers."check_animations.vbs"] in pyproject.toml.
+' Rendered from [tool.haglio.launchers."default_animation_settings.vbs"] in pyproject.toml.
 ' Change the spec, then run  python -m app_support.launcher --write  in this
 ' folder: the suite fails on a launcher that differs from its spec.
 
@@ -17,10 +17,10 @@ Else
 End If
 
 Sub Decide()
-  app = "Origenerator (checking animations)"
+  app = "Origenerator (default animation settings)"
   primary = fso.GetParentFolderName(fso.GetParentFolderName(fso.GetParentFolderName(root)))
-  logPath = fso.BuildPath(root, "state\check_animations_launcher.log")
-  arguments = "-m origenerator.check_animations"
+  logPath = fso.BuildPath(root, "state\default_animation_settings_launcher.log")
+  arguments = "-m origenerator.default_animation_settings"
   interpreter = fso.BuildPath(primary, ".venv\Scripts\python.exe")
   directory = root
   base = primary

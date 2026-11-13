@@ -1313,7 +1313,7 @@ def test_edit_default_opens_the_window_that_settles_each_animation(combine, monk
     controller, _host = combine()
     made = QWidget()
     qtbot.addWidget(made)
-    monkeypatch.setattr(module, "the_animation_window", lambda: made)
+    monkeypatch.setattr(module, "the_default_animation_settings_window", lambda: made)
 
     controller.widget.animation_settings_requested.emit()
 
@@ -1330,7 +1330,7 @@ def test_a_second_press_brings_that_window_back_rather_than_another(combine, mon
         built.append(made)
         return made
 
-    monkeypatch.setattr(module, "the_animation_window", one_more)
+    monkeypatch.setattr(module, "the_default_animation_settings_window", one_more)
 
     controller.widget.animation_settings_requested.emit()
     controller.widget.animation_settings_requested.emit()
@@ -1341,7 +1341,7 @@ def test_a_second_press_brings_that_window_back_rather_than_another(combine, mon
 def test_the_button_on_the_real_panel_reaches_the_controller(qtbot, monkeypatch):
     made = QWidget()
     qtbot.addWidget(made)
-    monkeypatch.setattr(module, "the_animation_window", lambda: made)
+    monkeypatch.setattr(module, "the_default_animation_settings_window", lambda: made)
     controller = _on_the_real_panel(qtbot)
 
     controller.widget._defaults_btn.click()

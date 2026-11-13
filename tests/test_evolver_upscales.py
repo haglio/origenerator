@@ -36,7 +36,7 @@ def test_a_video_is_matched_to_the_upscale_evolver_filed_for_it(tmp_path):
 
     assert _upscales(tmp_path).upscale_of(video) == upscale, (
         "an upscale is found where app_support's kino_folder.upscale_in files it, the path "
-        "Evolver writes each upscale to")
+        "Evolver writes each Kino upscale to")
 
 
 def test_a_portrait_video_is_found_under_its_own_shape(tmp_path):

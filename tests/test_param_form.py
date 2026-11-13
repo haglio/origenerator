@@ -31,6 +31,7 @@ from origenerator.gui import (
     icons,
     param_sections,
     thumbnail_dropdown,
+    tracked_prompt,
     training_controls,
 )
 from origenerator.gui.collapsible_section import CollapsibleSection
@@ -1644,6 +1645,20 @@ def test_a_story_starts_as_one_scene_whose_length_is_the_videos(qtbot):
     assert form.get_values() == {"positive_prompt": "", "negative_prompt": "",
                                  "scene_frames": [81], "scene_lines": [""], "frame_count": 81}
     assert form._present_keys["Prompts & Seed"] == ["scene_frames"]
+
+
+def test_a_scene_showing_a_change_is_measured_again_from_the_prompt_it_would_generate(qtbot):
+    form = ParamForm(_scene_defs())
+    qtbot.addWidget(form)
+    (prompt,) = form._widgets["scene_frames"].fields("positive_prompt")
+    prompt.setPlainText("a dog on a couch")
+    tracked_prompt.track(prompt, "a cat on a couch")
+
+    form.track_prompt_rewrites({})
+
+    assert prompt.toPlainText() == "a dog on a couch", (
+        "nothing reads a field's own text while a change is up: every reader takes the live "
+        "text, the prompt that would generate")
 
 
 def test_a_scenes_prompts_mark_unpaired_parentheses_and_its_spoken_line_does_not(qtbot):

@@ -1279,6 +1279,27 @@ def test_populate_switched_on_over_a_folder_already_making_one_stays_on(qtbot, t
     assert view._populate.is_active(key)
 
 
+def test_populate_switched_on_over_a_folders_experiment_carries_on_when_it_lands(
+        qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    view._jobs.start_prepared(key, _SDXL, dict(_SDXL.default_params(), positive_prompt="a cat"),
+                              source=GenerationSource.EXPERIMENT)
+    experiment = view._live_jobs[key]
+    view._toggle_populate(True)
+
+    client.job_completed.emit(experiment.prompt_id, _REROLL_HISTORY)
+
+    assert view._populate.is_active(key)
+    assert key in view._live_jobs, (
+        "Populate switched on while an experiment was being made there launched nothing of "
+        "its own, so the experiment landing is its turn to launch, or the switch stays lit "
+        "with nothing running")
+
+
 def test_switching_populate_off_from_another_folder_stops_it_there(qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)

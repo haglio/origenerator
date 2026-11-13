@@ -2206,6 +2206,7 @@ class GalleryView(QWidget):
         if (finished_row is not None
                 and finished_row.get("source") == GenerationSource.EXPERIMENT):
             self.refresh()
+            self._populate.note_finished(key)
             return
         folded = False
         if finished_row is not None \

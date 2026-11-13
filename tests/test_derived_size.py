@@ -90,3 +90,7 @@ def test_measure_derived_size_is_none_when_unmeasurable(tmp_path, monkeypatch):
     assert measure_derived_size("") is None
     assert measure_derived_size("missing.png") is None
     assert measure_derived_size("notanimage.png") is None
+
+
+def test_a_model_that_takes_sizes_in_steps_of_32_is_sized_as_comfyui_sized_it():
+    assert scale_to_total_pixels(1024, 576, 0.6, steps=32) == (1056, 608)

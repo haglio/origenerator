@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows import WORKFLOW_REGISTRY, minimax_h3_i2v
 from origenerator.workflows.minimax_h3_i2v import (
     H3_FPS,
     MiniMaxH3I2vWorkflow,
@@ -62,15 +62,24 @@ def test_a_video_longer_than_the_model_was_trained_on_is_made_in_clips_each_star
 
 
 def test_the_sound_of_each_clip_is_joined_in_order():
-    payload = _payload(frame_count=frames_on_the_models_steps(30 * 24))
+    payload = _payload(frame_count=frames_on_the_models_steps(30 * 24), enable_audio=True)
     _, writer = _only(payload, VIDEO_WRITER)
     last_join = payload[writer["inputs"]["audio"][0]]
     assert last_join["class_type"] == "AudioConcat"
     assert last_join["inputs"]["direction"] == "after"
 
 
-def test_the_video_is_written_at_the_models_own_frame_rate_with_the_sound_it_made():
+def test_with_audio_off_as_on_the_wan_forms_the_video_is_written_silent():
     payload = _payload()
+    _, writer = _only(payload, VIDEO_WRITER)
+    assert "audio" not in writer["inputs"]
+    assert not [node for node in payload.values()
+                if node["class_type"] in ("VAEDecodeAudio", "AudioConcat")
+                or node["inputs"].get("vae_name") == "minimax_h3_audio_vae_fp32.safetensors"]
+
+
+def test_the_video_is_written_at_the_models_own_frame_rate_with_the_sound_it_made():
+    payload = _payload(enable_audio=True)
     _, writer = _only(payload, VIDEO_WRITER)
     audio_id, _ = _only(payload, "VAEDecodeAudio")
     assert writer["inputs"]["frame_rate"] == H3_FPS
@@ -100,3 +109,11 @@ def test_the_seed_and_steps_reach_the_sampler():
     payload = _payload(noise_seed=42, steps=12)
     assert _only(payload, "RandomNoise")[1]["inputs"]["noise_seed"] == 42
     assert _only(payload, "BasicScheduler")[1]["inputs"]["steps"] == 12
+
+
+def test_the_size_the_form_shows_is_the_size_the_graph_makes(monkeypatch):
+    monkeypatch.setattr(minimax_h3_i2v, "measure_derived_size",
+                        lambda image, megapixels, steps: (image, megapixels, steps))
+    shown = MiniMaxH3I2vWorkflow().derived_display_size({"input_image": "start.png"})
+    scale = _only(_payload(), "ImageScaleToTotalPixels")[1]["inputs"]
+    assert shown == ("start.png", scale["megapixels"], scale["resolution_steps"])

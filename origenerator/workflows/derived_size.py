@@ -13,13 +13,14 @@ RESOLUTION_STEPS = 16
 
 def scale_to_total_pixels(
     src_width: int, src_height: int, megapixels: float = TARGET_MEGAPIXELS,
+    steps: int = RESOLUTION_STEPS,
 ) -> tuple[int, int]:
-    """Replicates ComfyUI's ImageScaleToTotalPixels, whose banker's rounding and /16 stride the in-graph size follows, with a floor of one stride."""
+    """Replicates ComfyUI's ImageScaleToTotalPixels, whose banker's rounding and stride the in-graph size follows, with a floor of one stride."""
     total = megapixels * 1024 * 1024
     scale = math.sqrt(total / (src_width * src_height))
-    width = round(src_width * scale / RESOLUTION_STEPS) * RESOLUTION_STEPS
-    height = round(src_height * scale / RESOLUTION_STEPS) * RESOLUTION_STEPS
-    return max(RESOLUTION_STEPS, width), max(RESOLUTION_STEPS, height)
+    width = round(src_width * scale / steps) * steps
+    height = round(src_height * scale / steps) * steps
+    return max(steps, width), max(steps, height)
 
 
 def resolve_input_image_path(input_image: str | None) -> Path | None:
@@ -57,12 +58,13 @@ def measure_image_size(input_image: str | None) -> tuple[int, int] | None:
 
 def measure_derived_size(
     input_image: str | None, megapixels: float = TARGET_MEGAPIXELS,
+    steps: int = RESOLUTION_STEPS,
 ) -> tuple[int, int] | None:
     path = resolve_input_image_path(input_image)
     if path is None:
         return None
     try:
         with Image.open(path) as img:
-            return scale_to_total_pixels(*img.size, megapixels=megapixels)
+            return scale_to_total_pixels(*img.size, megapixels=megapixels, steps=steps)
     except (OSError, ValueError):
         return None

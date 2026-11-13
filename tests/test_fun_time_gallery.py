@@ -13,6 +13,7 @@ from PIL import Image
 from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
 from PySide6.QtGui import QKeyEvent, QMovie, QPixmap
 from PySide6.QtWidgets import QLabel, QSplitter, QWidget
+from shared_ui.testing import icons_drawn
 
 from origenerator import gallery
 from origenerator.db import Database
@@ -20,7 +21,6 @@ from origenerator.fun_time_mode import FunTimeSession, Rect
 from origenerator.gallery.collection import LATEST_KEY
 from origenerator.gallery.shapes import SEPARATE, TOGETHER
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import icons
 from origenerator.gui.collapsible_section import FoldHeader
 from origenerator.gui.gallery_view import GalleryView, Shared
 from origenerator.gui.generate_pane import GeneratePane
@@ -168,21 +168,14 @@ def test_fun_time_gallery_gives_the_lower_corner_to_the_queue(qtbot):
     )
 
 
-def test_fun_time_gallery_has_no_chevron_to_fold_its_toc_away(qtbot, monkeypatch):
-    asked = []
-    draw = icons.qt_icon
-
-    def noting(name, *how, **more):
-        asked.append(name)
-        return draw(name, *how, **more)
-
-    monkeypatch.setattr(icons, "qt_icon", noting)
-    view = _fun_time_view(qtbot)
-    view.grab()
+def test_fun_time_gallery_has_no_chevron_to_fold_its_toc_away(qtbot):
+    with icons_drawn() as drawn:
+        view = _fun_time_view(qtbot)
+        view.grab()
 
     folds = [header.fold for header in view.findChildren(FoldHeader)
              if not view._generate_pane.isAncestorOf(header)]
-    sideways = [name for name in asked + folds if name in ("chevron_left", "chevron_right")]
+    sideways = sorted({name for name in drawn + folds if name in ("chevron_left", "chevron_right")})
     assert sideways == ["chevron_left", "chevron_right"], (
         "outside the Generate pane's sections the only sideways chevrons are Back's and"
         " Forward's: one that folded the TOC away would read as a third of them, and folding"

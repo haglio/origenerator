@@ -56,6 +56,7 @@ from origenerator.gallery.source_image import build_image_config_index
 from origenerator.generation_state import GenerationSource, in_sight
 from origenerator.media import MediaType
 from origenerator.output_files import produced_output
+from origenerator.workflows.outside import outside_source
 
 
 def _group_by_creation(newest_first, key):
@@ -475,7 +476,8 @@ def _media_folder(media_type, rows, folder_meta, image_index, name_of, kept) -> 
         tier = _Tier(media_type, wf_name, folder_meta, image_index, name_of, kept)
         workflows.append(tier.kept_folder(wf_key, wf_rows, _workflow_folder,
                                           tier, wf_key, wf_label, wf_rows, wf_favorite))
-    workflows = in_alphabetical_order(workflows)
+    workflows = sorted(in_alphabetical_order(workflows),
+                       key=lambda workflow: outside_source(workflow.workflow_name) is None)
     return kept.kept(str(media_type), workflows, MediaGroup, str(media_type), label, workflows,
                      favorite)
 

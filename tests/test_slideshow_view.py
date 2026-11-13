@@ -65,6 +65,7 @@ def _view(qtbot, items=_ITEMS, **kw):
     wiring = {name: kw.pop(name) for name in ("motion", "radio", "volume") if name in kw}
     view = SlideshowView(items, ViewShow(**kw), ViewWiring(engine=FakeEngine(), clock=_Clock(), **wiring))
     qtbot.addWidget(view)
+    view.resize(1280, 720)
     stop_the_poll_to_tick_by_hand(view.slideshow)
     return view
 

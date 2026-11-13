@@ -43,6 +43,7 @@ class Message(QLabel):
         self.setFont(make_font(FONT_UI, MESSAGE_TYPE_SIZE, bold=True))
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         float_over_media(self)
+        self._said = ("", "", _INK[INFO])
         self.hide()
 
     def say(self, text: str, *, kind: str = INFO, mark: str = "") -> None:
@@ -52,13 +53,26 @@ class Message(QLabel):
             f" color: {ink}; border: 1px solid {ink};"
             f" padding: {MESSAGE_PAD_V}px {MESSAGE_PAD_H}px; border-radius: {MESSAGE_RADIUS}px;"
         )
-        set_marked_text(self, text, mark=mark, color=_INK[kind])
+        self._said = (text, mark, _INK[kind])
         self.show()
         self.reposition()
 
     def reposition(self) -> None:
         host = self.parentWidget()
-        self.adjustSize()
+        self._fit_into(host.width() - 2 * MESSAGE_TOP_MARGIN)
         x = (host.width() - self.width()) // 2
         self.move(max(0, x), MESSAGE_TOP_MARGIN)
         raise_over_media(self)
+
+    def _fit_into(self, room: int) -> None:
+        text, mark, ink = self._said
+        set_marked_text(self, text, mark=mark, color=ink)
+        self.adjustSize()
+        overhang = self.width() - room
+        if overhang <= 0:
+            return
+        metrics = self.fontMetrics()
+        fitted = metrics.elidedText(text, Qt.TextElideMode.ElideRight,
+                                    max(0, metrics.horizontalAdvance(text) - overhang - 1))
+        set_marked_text(self, fitted, mark=mark, color=ink)
+        self.adjustSize()

@@ -1453,3 +1453,20 @@ def test_each_trash_action_spins_the_pointer_until_the_gallery_is_redrawn(qtbot,
 
     assert actions.pointers == redrawing == [Qt.CursorShape.WaitCursor]
     assert QApplication.overrideCursor() is None
+
+
+def test_deleting_an_items_enhancement_versions_puts_the_delete_on_the_undo_button(qtbot):
+    class DeletesVersions(FakeActions):
+        def delete_enhance_versions(self, row, filenames):
+            self._label = "Delete 1 version"
+            return True
+
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=DeletesVersions())
+    qtbot.addWidget(view)
+    view.refresh()
+    assert not view._buttons.undo.isEnabled()
+
+    view.delete_enhance_versions("i1", ["enhanced.png"])
+
+    assert view._buttons.undo.isEnabled()
+    assert "Delete 1 version" in view._buttons.undo.toolTip()

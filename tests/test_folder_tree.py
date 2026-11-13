@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
     QStyleOptionViewItem,
     QTreeWidgetItem,
 )
-from shared_ui.colors import BLUE, BORDER_SUBTLE, TEXT_MUTED
+from shared_ui.colors import BLUE, BORDER_SUBTLE, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.testing import appending_to
 
 from origenerator.gallery.collection import COLLECTION_LABELS, FAVORITES_KEY, LATEST_KEY
@@ -282,10 +282,14 @@ def test_siblings_counts_share_one_column(qtbot, monkeypatch):
         == (drawn["(12000)"].left(), drawn["(12000)"].width())
 
 
-def test_a_count_is_drawn_in_gray_against_the_right_of_its_place(qtbot):
+@pytest.mark.parametrize(("picked", "ink"), [(False, TEXT_MUTED), (True, TEXT_PRIMARY)])
+def test_a_count_is_drawn_centered_in_its_place_gray_or_white_on_the_picked_folder(
+        qtbot, picked, ink):
     tree, (leaf,) = _siblings_counting(qtbot, 3)
     option = QStyleOptionViewItem()
     tree.itemDelegate().initStyleOption(option, tree.indexFromItem(leaf))
+    if picked:
+        option.state |= QStyle.StateFlag.State_Selected
     image = QImage(200, 40, QImage.Format.Format_ARGB32)
     image.fill(Qt.GlobalColor.magenta)
     painter = QPainter(image)
@@ -295,9 +299,10 @@ def test_a_count_is_drawn_in_gray_against_the_right_of_its_place(qtbot):
     ground = image.pixelColor(0, 0)
     inked = [(x, image.pixelColor(x, y).name()) for x in range(200) for y in range(40)
              if image.pixelColor(x, y) != ground]
+    columns = [x for x, _color in inked]
 
-    assert max(x for x, _color in inked) == pytest.approx(159, abs=2)
-    assert Counter(color for _x, color in inked).most_common(1)[0][0] == TEXT_MUTED.name()
+    assert (min(columns) + max(columns)) / 2 == pytest.approx(100, abs=1.5)
+    assert Counter(color for _x, color in inked).most_common(1)[0][0] == ink.name()
 
 
 def test_the_column_follows_a_siblings_count_as_it_changes(qtbot):

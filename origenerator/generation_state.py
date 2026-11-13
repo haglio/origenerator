@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from app_support import gallery_rows
+from app_support.gallery_rows import source_of
+
 
 class GenerationStatus(StrEnum):
     PENDING = "pending"
@@ -11,30 +14,21 @@ class GenerationStatus(StrEnum):
 
 
 class GenerationSource(StrEnum):
-    GENERATED = "generated"
+    GENERATED = gallery_rows.GENERATED
     IMPORTED = "imported"
     EXPERIMENT = "experiment"
     BASE_RENDER = "base_render"
     STROKE_TRIM = "stroke_trim"
-    OUTSIDE = "outside"
-    STARTING_FRAME = "starting_frame"
-    LEFT_OUT = "left_out"
+    OUTSIDE = gallery_rows.OUTSIDE
+    STARTING_FRAME = gallery_rows.STARTING_FRAME
+    LEFT_OUT = gallery_rows.LEFT_OUT
     REPLACED = "replaced"
 
 
-MADE_ELSEWHERE = (GenerationSource.OUTSIDE, GenerationSource.STARTING_FRAME,
-                  GenerationSource.LEFT_OUT)
+MADE_ELSEWHERE = tuple(sorted(GenerationSource(source) for source in gallery_rows.MADE_ELSEWHERE))
 OUT_OF_SIGHT = (GenerationSource.STARTING_FRAME, GenerationSource.LEFT_OUT,
                 GenerationSource.REPLACED)
 UNLISTED = (GenerationSource.LEFT_OUT, GenerationSource.REPLACED)
-
-
-def source_of(row: dict) -> str:
-    return row.get("source") or GenerationSource.GENERATED
-
-
-def made_here(row: dict) -> bool:
-    return source_of(row) not in MADE_ELSEWHERE
 
 
 def in_sight(row: dict) -> bool:

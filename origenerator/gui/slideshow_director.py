@@ -7,6 +7,7 @@ from functools import partial
 from random import randrange
 from typing import Protocol
 
+from app_support.gallery_rows import source_of
 from funestra.hud_placement import HudCorner
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.volume import VolumeHud
@@ -36,7 +37,7 @@ from origenerator.gallery.shapes import (
     SHAPES as _SHAPES,
 )
 from origenerator.gallery.shapes import shape_holds, the_one_shape_on, the_shape_of
-from origenerator.generation_state import GenerationSource, source_of
+from origenerator.generation_state import GenerationSource
 from origenerator.gui.action_presses import striking
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow, Hosting, Playing, Seat

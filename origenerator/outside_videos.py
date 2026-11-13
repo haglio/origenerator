@@ -12,7 +12,7 @@ from typing import NamedTuple
 
 from app_support import kino_folder
 from app_support.gallery_records import PLACES, recorded_block
-from app_support.gallery_rows import VideoRows
+from app_support.gallery_rows import VideoRows, made_here, source_of
 from app_support.win32 import mutex_name
 from funestra.video_families import seed_group_and_seed
 from PIL import Image
@@ -25,7 +25,7 @@ from origenerator.gallery.output import generations_by_stem, parse_file_list, st
 from origenerator.gallery.signatures import parse_params
 from origenerator.gallery.source_image import videos_from_source_image
 from origenerator.gallery.tree import settings_folder_key, start_frame_index
-from origenerator.generation_state import GenerationSource, GenerationStatus, made_here, source_of
+from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.media import MediaType, media_type_from_filename
 from origenerator.one_at_a_time import WAIT_S, Turn
 from origenerator.thumbnail import (

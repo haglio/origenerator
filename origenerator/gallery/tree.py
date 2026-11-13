@@ -5,6 +5,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
+from app_support.gallery_rows import source_of
+
 from origenerator.gallery.enhance import enhancement_recency, is_enhanced_row
 from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.gallery.groups import (
@@ -51,7 +53,7 @@ from origenerator.gallery.signatures import (
     settings_only,
 )
 from origenerator.gallery.source_image import build_image_config_index
-from origenerator.generation_state import GenerationSource, in_sight, source_of
+from origenerator.generation_state import GenerationSource, in_sight
 from origenerator.media import MediaType
 from origenerator.output_files import produced_output
 

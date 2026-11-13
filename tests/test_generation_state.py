@@ -3,8 +3,10 @@ from __future__ import annotations
 import sqlite3
 from contextlib import closing
 
+from app_support.gallery_rows import source_of
+
 from origenerator.db import Database, NewGeneration
-from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
+from origenerator.generation_state import GenerationSource, GenerationStatus
 
 
 def _insert(db: Database, prompt_id: str = "a-generation", **fields) -> None:

@@ -226,7 +226,7 @@ class RunningPreview(OpensAFolder, QWidget):
 
 class QueueRow(OpensAFolder, QWidget):
     HEIGHT = 34
-    THUMB = HEIGHT - 6
+    THUMB = HEIGHT - 2 * GAP_SMALL
     INSET = GAP_SMALL
 
     def __init__(self, item, parent=None):

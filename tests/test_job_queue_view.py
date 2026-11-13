@@ -1332,6 +1332,16 @@ def test_the_thumbnail_sits_at_the_near_edge_of_the_line(queue, tmp_path):
     assert row._cancel.x() < row._thumbs.x() < row._lead.x() < row._note.x()
 
 
+def test_the_thumbnail_fits_between_the_rows_top_and_bottom_margins(queue, tmp_path):
+    queue.set_items([_item(job_kind="Image", status="queued", starting=True,
+                           folder_thumbnails=(_image(tmp_path / "m.png"),))])
+    QApplication.processEvents()
+    row = queue.rows()[0]
+    margins = row.layout().contentsMargins()
+
+    assert row._thumbs.height() == row.height() - margins.top() - margins.bottom()
+
+
 def test_a_job_with_nothing_to_show_carries_no_block(queue):
     queue.set_items([_item(job_kind="Image")])
     assert queue.rows()[0]._thumbs.isHidden(), (

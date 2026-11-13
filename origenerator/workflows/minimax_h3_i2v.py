@@ -7,6 +7,7 @@ from origenerator.workflows.base import (
     ParamType,
     WorkflowTemplate,
 )
+from origenerator.workflows.derived_size import measure_derived_size
 from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS, rate_options
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import MINIMAX_H3
@@ -43,6 +44,7 @@ class MiniMaxH3I2vWorkflow(WorkflowTemplate):
     lora_keys = LORA_KEYS
     text_reader = QWEN3VL
     loras_keyed_only_when_named = LORA_KEYS[1:]
+    keyed_only_when_on = ("enable_audio",)
     output_node_id = "19"
 
     def default_params(self) -> dict:
@@ -55,6 +57,7 @@ class MiniMaxH3I2vWorkflow(WorkflowTemplate):
             "sampler_name": "res_multistep",
             "scheduler": "simple",
             "frame_rate": H3_FPS,
+            "enable_audio": False,
             "unet": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
             **lora_defaults(LORA_KEYS),
             "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
@@ -69,6 +72,7 @@ class MiniMaxH3I2vWorkflow(WorkflowTemplate):
         return [
             ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             ParamDef("input_image", "Start Image", ParamType.IMAGE, defaults["input_image"]),
+            ParamDef("enable_audio", "Enable Audio", ParamType.BOOL, defaults["enable_audio"], switch=True),
             ParamDef("noise_seed", "Seed", ParamType.SEED, defaults["noise_seed"]),
             ParamDef("frame_count", "Duration", ParamType.INT, defaults["frame_count"], min_val=_FIRST_FRAMES,
                      max_val=_LONGEST_FRAMES, step=_FRAMES_PER_STEP, options=DURATION_OPTIONS,
@@ -80,6 +84,9 @@ class MiniMaxH3I2vWorkflow(WorkflowTemplate):
                      min_val=H3_FPS, max_val=min(MAX_PLAYBACK_FPS, max(rates)), step=H3_FPS,
                      options=rates, unit="fps"),
         ]
+
+    def derived_display_size(self, params: dict) -> tuple[int, int] | None:
+        return measure_derived_size(params.get("input_image", ""), _MEGAPIXELS, _SIZE_STEPS)
 
     @staticmethod
     def segment_lengths(frame_count: int) -> list[int]:
@@ -101,7 +108,7 @@ class MiniMaxH3I2vWorkflow(WorkflowTemplate):
             ids = {part: prefix + part for part in ("h3", "noise", "schedule", "guide", "sample",
                                                     "decode", "sound")}
             sounds.append([ids["sound"], 0])
-            return {
+            nodes = {
                 ids["h3"]: {"class_type": "MiniMaxH3ImageToVideo", "inputs": {
                     "clip": ["2", 0], "vae": ["3", 0], "prompt": params["positive_prompt"],
                     "width": sized.width, "height": sized.height, "length": at.length,
@@ -118,12 +125,14 @@ class MiniMaxH3I2vWorkflow(WorkflowTemplate):
                     "sigmas": [ids["schedule"], 0], "latent_image": [ids["h3"], 1]}},
                 ids["decode"]: {"class_type": "VAEDecode",
                                 "inputs": {"samples": [ids["sample"], 0], "vae": ["3", 0]}},
-                ids["sound"]: {"class_type": "VAEDecodeAudio",
-                               "inputs": {"samples": [ids["sample"], 0], "vae": ["5", 0]}},
-            }, [ids["decode"], 0]
+            }
+            if params["enable_audio"]:
+                nodes[ids["sound"]] = {"class_type": "VAEDecodeAudio",
+                                       "inputs": {"samples": [ids["sample"], 0], "vae": ["5", 0]}}
+            return nodes, [ids["decode"], 0]
 
         segments, decoded_ref, _frames = self.chain_segments(params, sized.image, segment)
-        sound_nodes, sound_ref = self._joined(sounds)
+        sound_nodes, sound_ref = self._joined(sounds, params) if params["enable_audio"] else ({}, None)
         interpolate, frames_ref = self.interpolation_nodes("25", decoded_ref, params)
         return {
             **sized.nodes,
@@ -136,15 +145,14 @@ class MiniMaxH3I2vWorkflow(WorkflowTemplate):
             "2": {"class_type": "CLIPLoader",
                   "inputs": {"clip_name": params["clip_name"], "type": "minimax", "device": "default"}},
             "3": {"class_type": "VAELoader", "inputs": {"vae_name": params["vae_name"]}},
-            "5": {"class_type": "VAELoader", "inputs": {"vae_name": params["audio_vae_name"]}},
             "12": {"class_type": "LoadImage", "inputs": {"image": params["input_image"]}},
             "15": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": params["sampler_name"]}},
             self.output_node_id: video_writer(frames_ref, sound_ref, params, H3_FPS),
         }
 
     @staticmethod
-    def _joined(sounds: list[list]) -> tuple[dict, list]:
-        nodes: dict = {}
+    def _joined(sounds: list[list], params: dict) -> tuple[dict, list]:
+        nodes: dict = {"5": {"class_type": "VAELoader", "inputs": {"vae_name": params["audio_vae_name"]}}}
         joined = sounds[0]
         for index, sound in enumerate(sounds[1:], start=1):
             node_id = f"s{index}_sound_join"

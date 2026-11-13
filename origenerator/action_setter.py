@@ -40,26 +40,41 @@ def _its_own_image_actions(rows: list[dict]) -> list[Waiting]:
             and not inherits_image_actions(video, start := start_image_of(video))]
 
 
-def waiting(rows: list[dict], side: str, *, sent_back: tuple[str, ...] = ()) -> list[Waiting]:
+def holders(rows: list[dict], side: str) -> list[Waiting]:
     found = [Waiting(row, row) for row in rows if _finished(row, side)]
     if side == MediaType.IMAGE:
         found += _its_own_image_actions(rows)
-    without_actions = sorted((entry for entry in found if not actions_of(entry.holder, side).actions),
-                       reverse=True, key=lambda entry: (bool(entry.shown.get("starred")),
-                                                        entry.shown.get("created_at") or ""))
+    return sorted(found, reverse=True, key=lambda entry: (bool(entry.shown.get("starred")),
+                                                         entry.shown.get("created_at") or ""))
+
+
+def waiting(rows: list[dict], side: str, *, sent_back: tuple[str, ...] = ()) -> list[Waiting]:
+    without_actions = [entry for entry in holders(rows, side)
+                       if not actions_of(entry.holder, side).actions]
     order = {prompt_id: place for place, prompt_id in enumerate(sent_back)}
     return sorted(without_actions, key=lambda entry: order.get(entry.holder["prompt_id"], len(order)))
 
 
+def in_folders(line: list[Waiting], every: list[Waiting], folder_of) -> list[list[Waiting]]:
+    folders: dict[str, list[Waiting]] = {}
+    for entry in line:
+        folders.setdefault(folder_of(entry.shown["prompt_id"]), [])
+    for entry in every:
+        held = folders.get(folder_of(entry.shown["prompt_id"]))
+        if held is not None:
+            held.append(entry)
+    return list(folders.values())
+
+
 class Answer(NamedTuple):
-    item: dict
+    folder: dict
     said: str
     item_actions: ItemActions
     replaced: dict
 
 
 class Thrown(NamedTuple):
-    item: dict
+    folder: dict
 
 
 def _shown_id(item: dict) -> str:
@@ -67,8 +82,8 @@ def _shown_id(item: dict) -> str:
 
 
 class SetterSession:
-    def __init__(self, items: list[dict], store, side: str, rubbish=None):
-        self._line = deque(items)
+    def __init__(self, folders: list[dict], store, side: str, rubbish=None):
+        self._line = deque(folders)
         self._store = store
         self._side = side
         self._rubbish = rubbish
@@ -98,9 +113,11 @@ class SetterSession:
     def set_as(self, said: str, item_actions: ItemActions) -> None:
         if not self._line:
             return
-        item = self._line.popleft()
-        replaced = self._store.set_actions(item["prompt_id"], self._side, item_actions)
-        self._done.append(Answer(item, said, item_actions, replaced))
+        folder = self._line.popleft()
+        replaced = {}
+        for item in folder["items"]:
+            replaced.update(self._store.set_actions(item["prompt_id"], self._side, item_actions))
+        self._done.append(Answer(folder, said, item_actions, replaced))
 
     def skip(self) -> None:
         self._line.rotate(-1)
@@ -108,19 +125,21 @@ class SetterSession:
     def trash(self) -> None:
         if not self._line or self._rubbish is None:
             return
-        item = self._line.popleft()
-        self._rubbish.away(_shown_id(item))
-        self._done.append(Thrown(item))
+        folder = self._line.popleft()
+        for item in folder["items"]:
+            self._rubbish.away(_shown_id(item))
+        self._done.append(Thrown(folder))
 
     def undo(self) -> None:
         if not self._done:
             return
         done = self._done.pop()
         if isinstance(done, Thrown):
-            self._rubbish.back(_shown_id(done.item))
+            for item in done.folder["items"]:
+                self._rubbish.back(_shown_id(item))
         else:
             self._store.put_back(self._side, done.replaced)
-        self._line.appendleft(done.item)
+        self._line.appendleft(done.folder)
 
 
 class Locks:

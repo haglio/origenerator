@@ -72,7 +72,8 @@ def missing_overlay_keys(
     missing = _overlay.missing_keys(LOCAL_CONTENT if local_path is None else local_path,
                                     EXAMPLE_CONTENT if example_path is None else example_path)
     present = load_content(local_path, example_path)
-    return tuple(key for key in missing if _RENAMED_KEYS.get(key, key) not in present)
+    under_an_old_name = {new for new in _RENAMED_KEYS.values() if new in present}
+    return tuple(key for key in missing if key not in under_an_old_name)
 
 
 def genau_flick_word() -> str:

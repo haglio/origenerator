@@ -714,11 +714,13 @@ def test_a_run_over_is_nobody_s_enhance_any_more(enhance, monkeypatch):
                         lambda target, image, row: True)
     db = FakeDB([_image("i1")])
     _stamped_run(db, "run-a", "i1")
-    controller, _host = enhance(db=db, jobs=FakeReroll([FakeJob("run-a")]))
+    jobs = FakeReroll([FakeJob("run-a")])
+    controller, _host = enhance(db=db, jobs=jobs)
     controller.run_of(_image("i1"))
-    assert "run-a" in controller._targets, "asking reads the stamp and keeps it, or nothing is here to forget"
+    assert "run-a" in controller._targets, "asking reads the stamp and keeps it, or nothing is here to let go"
 
-    controller.forget("run-a")
+    jobs.all_jobs.clear()
+    controller.reconcile()
 
     assert "run-a" not in controller._targets
 

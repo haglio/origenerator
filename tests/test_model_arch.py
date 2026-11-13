@@ -10,6 +10,7 @@ from origenerator.workflows.model_arch import (
     FLUX,
     KREA2,
     LTX,
+    MINIMAX_H3,
     QWEN,
     SD15,
     SDXL,
@@ -83,6 +84,12 @@ ARCH_CASES_MADE_UP_IN_REAL_LAYOUTS = [
                    "patch_embedding.weight", "pose_patch_embedding.weight"]),
     (WAN_ANIMATE, ["model.diffusion_model.blocks.0.self_attn.q.weight",
                    "model.diffusion_model.pose_patch_embedding.weight"]),
+    (MINIMAX_H3, ["blocks.0.attn.qkv_proj.weight", "video_patch_proj.weight",
+                  "audio_patch_proj.weight"]),
+    (MINIMAX_H3, ["diffusion_model.blocks.0.attn.qkv_proj.lora_A.weight",
+                  "diffusion_model.blocks.0.attn.out_proj.lora_A.weight"]),
+    (MINIMAX_H3, ["diffusion_model.blocks.0.attn.out_proj.alpha",
+                  "diffusion_model.blocks.0.attn.qkv_proj.lora_down.weight"]),
 ]
 
 AN_SDXL_CHECKPOINT = ARCH_CASES_MADE_UP_IN_REAL_LAYOUTS[0][1]

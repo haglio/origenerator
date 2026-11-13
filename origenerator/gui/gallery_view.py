@@ -1984,13 +1984,11 @@ class GalleryView(QWidget):
         row = self._db.get_generation(prompt_id)
         if row is None or not self._edits.delete_enhance_versions(row, filenames):
             return
-        self._re_aim_every_button()
         self.refresh()
         updated = self._db.get_generation(prompt_id)
         if updated is not None:
             self._generate_pane.refresh_displayed(updated, self._image_rows)
             self._slideshows.note_versions_deleted(updated)
-        self._re_aim_every_button()
 
     def slideshow_location(self):
         collection = self._current_collection_key()

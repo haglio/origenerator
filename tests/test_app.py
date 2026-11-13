@@ -740,6 +740,31 @@ def test_a_hard_crash_writes_a_python_stack_to_the_state_dir(tmp_path):
     assert "the_frame_that_died" in written
 
 
+def test_a_crash_while_a_video_shows_names_the_item_it_was_showing(tmp_path):
+    state = tmp_path / "state"
+    child = textwrap.dedent(f"""
+        import logging, os, sys
+        os.environ["QT_QPA_PLATFORM"] = "offscreen"
+        sys.path.insert(0, {str(Path.cwd())!r})
+        from pathlib import Path
+        from PySide6.QtWidgets import QApplication
+        from origenerator.app import _arm_the_crash_log
+        from origenerator.gui.viewport import Viewport
+        _arm_the_crash_log(Path({str(state)!r}), logging.getLogger("t"))
+        app = QApplication([])
+        viewer = Viewport()
+        viewer.show_video(Path({str(tmp_path / "video one.mp4")!r}), "item-one")
+        viewer.show_video(Path({str(tmp_path / "video two.mp4")!r}), "item-two")
+        import faulthandler
+        faulthandler._sigabrt()
+    """)
+    run_python(["-c", child])
+
+    written = (state / "origenerator_crash.log").read_text(encoding="utf-8")
+    crash = written.index("Fatal Python error")
+    assert written.rindex("item-two", 0, crash) > written.rindex("item-one", 0, crash)
+
+
 def test_the_crash_log_keeps_what_earlier_runs_left(tmp_path):
     state = tmp_path / "state"
     state.mkdir(parents=True)

@@ -1597,6 +1597,17 @@ def test_a_models_lora_folders_are_in_alphabetical_order_with_no_lora_last():
         == ["alpha_look_high", "zeta_look_high", "(no LoRA)"]
 
 
+def test_sites_come_before_workflows_each_in_alphabetical_order():
+    rows = [dict(_LOOP_VIDEO, prompt_id=name, workflow_name=name) for name in (
+        outside_workflow("zeta-site", MediaType.VIDEO), "wan22_i2v",
+        outside_workflow("alpha-site", MediaType.VIDEO), "wan22_flf2v_loop")]
+
+    videos = build_gallery_tree(rows)[0]
+
+    assert [w.label for w in videos.children] == [
+        "alpha-site", "zeta-site", workflow_label("wan22_i2v"), workflow_label("wan22_flf2v_loop")]
+
+
 def test_a_workflow_folder_given_a_name_is_placed_by_that_name():
     newest_first = [_made_with("flux_t2i_upscaled"), _img("i1", "a cat", 50, 1)]
     renamed = {"image/sdxl_t2i": {"custom_name": "alpha stills"}}

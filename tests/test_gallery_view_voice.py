@@ -537,7 +537,7 @@ def test_start_slideshow_is_heard_with_no_slideshow_and_no_populate(qtbot, tmp_p
 def _speak_request(view, qtbot, *utterances):
     for text in utterances:
         view._voice.listener.speak(text)
-    qtbot.waitUntil(lambda: view._slideshows.showing.shown._working_request is None, timeout=5000)
+    qtbot.waitUntil(lambda: view._slideshows.showing.shown._promise.note == "", timeout=5000)
 
 
 def test_saying_request_pauses_the_slideshow_until_over(qtbot, tmp_path, monkeypatch):
@@ -562,7 +562,7 @@ def test_a_finished_request_stands_in_every_job_queue_until_its_job_does(
     assert standing.starting
     assert standing.requested
     assert [item.key for item in shown.queue_foot.hud_queue[0]] == [standing.key]
-    qtbot.waitUntil(lambda: shown._working_request is None, timeout=5000)
+    qtbot.waitUntil(lambda: shown._promise.note == "", timeout=5000)
     (queued,) = view._queue._items
     assert queued.requested
     assert not queued.starting

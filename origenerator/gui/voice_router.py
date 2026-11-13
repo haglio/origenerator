@@ -33,6 +33,7 @@ from origenerator.gui.message import (
 )
 from origenerator.gui.open_setters import ForTheSetter, OpenSetters
 from origenerator.gui.request_answering import RequestAnswerer
+from origenerator.gui.request_promise import RequestPromise
 from origenerator.gui.voice_wiring import VoiceSources, VoiceSwitches
 from origenerator.setter_voice import setter_phrases
 from origenerator.voice.app_commands import (
@@ -159,8 +160,7 @@ class VoiceRouter(QObject):
         self._flash_timer = QTimer(self)
         self._flash_timer.setSingleShot(True)
         self._flash_timer.timeout.connect(self._revert)
-        self._working_status = ""
-        self._working_request = None
+        self._promise = RequestPromise()
         self._switches: dict[str, QWidget | None] = {}
         self._buttons: dict = {}
         self._enhance = None
@@ -234,8 +234,8 @@ class VoiceRouter(QObject):
             self._flash_timer.stop()
 
     def _revert(self) -> None:
-        if self._working_status:
-            self._show(self._working_status, transient=False)
+        if self._promise.note:
+            self._show(self._promise.note, transient=False)
         elif self.listening():
             self._show("Listening…", transient=False)
         else:
@@ -427,13 +427,9 @@ class VoiceRouter(QObject):
     def _answer_request(self, slideshow, message: str, spoken, *,
                         working: bool = False, kind: str = INFO) -> None:
         if working:
-            self._working_status = "" if slideshow is not None else message
-            self._working_request = spoken
-        elif spoken is self._working_request:
-            promised, self._working_status = self._working_status, ""
-            self._working_request = None
-            if promised and self.status.text() == promised:
-                self._revert()
+            self._promise.make("" if slideshow is not None else message, spoken)
+        elif (promised := self._promise.keep(spoken)) and self.status.text() == promised:
+            self._revert()
         if slideshow is not None:
             slideshow.note_request(message, spoken, working=working, kind=kind)
         else:

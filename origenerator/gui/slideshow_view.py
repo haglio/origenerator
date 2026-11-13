@@ -29,6 +29,7 @@ from origenerator.gui.osr2_controls_state import (
     osr2_controls_state,
     post_device_action,
 )
+from origenerator.gui.request_promise import RequestPromise
 from origenerator.gui.slideshow_hud import (
     COLLAPSES,
     OPENS_IN,
@@ -133,8 +134,7 @@ class SlideshowView(QWidget):
 
         self._note = Message(self)
         self._request_note = ""
-        self._working_note = ""
-        self._working_request = None
+        self._promise = RequestPromise()
         self._note_timer = QTimer(self)
         self._note_timer.setSingleShot(True)
         self._note_timer.timeout.connect(self._refresh_note)
@@ -318,19 +318,18 @@ class SlideshowView(QWidget):
     def request_line(self, message: str, request=None, *, working: bool = False,
                      kind: str = INFO) -> None:
         if working:
-            self._working_note, self._working_request = message, request
+            self._promise.make(message, request)
             self._note_timer.stop()
             self._refresh_note()
             return
-        if request is self._working_request:
-            self._working_note, self._working_request = "", None
+        self._promise.keep(request)
         self.flash(message, ms=time_to_read_ms(message), kind=kind, mark=HEARD_MARK)
 
     def _refresh_note(self):
         if self._request_note:
             self._note.say(self._request_note, kind=INFO, mark=HEARD_MARK)
-        elif self._working_note:
-            self._note.say(self._working_note, kind=INFO, mark=HEARD_MARK)
+        elif self._promise.note:
+            self._note.say(self._promise.note, kind=INFO, mark=HEARD_MARK)
         else:
             self._note.hide()
 

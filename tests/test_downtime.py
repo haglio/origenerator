@@ -175,9 +175,9 @@ def test_the_command_evolver_runs_hands_comfyui_each_file_a_run_reads_as_a_copy_
                            places=OutputPlaces.in_one_folder(tmp_path / "output"))
     for name, value in (("LIBRARY_STATE_DIR", tmp_path), ("STATE_DIR", tmp_path),
                         ("UI_STATE_PATH", tmp_path / "ui_state.json"),
-                        ("FIX_TRAINING_DIR", tmp_path / "fix training"),
-                        ("COMFYUI_FOLDERS", folders)):
+                        ("FIX_TRAINING_DIR", tmp_path / "fix training")):
         monkeypatch.setattr(downtime.config, name, value)
+    monkeypatch.setattr(downtime.comfyui_folders, "COMFYUI_FOLDERS", folders)
     monkeypatch.setattr(downtime, "configure_logging", lambda *args: None)
     _the_app_is(monkeypatch, open_now=False)
     handed = []

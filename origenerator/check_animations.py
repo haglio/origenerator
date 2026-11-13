@@ -57,8 +57,8 @@ def the_animation_window():
     from origenerator.animation_check_session import AnimationCheckSession
     from origenerator.animation_settings import AcceptedSettings
     from origenerator.comfyui_client import ComfyUIClient
+    from origenerator.comfyui_folders import COMFYUI_FOLDERS
     from origenerator.config import (
-        COMFYUI_FOLDERS,
         COMFYUI_HOST,
         COMFYUI_PORT,
         DB_PATH,

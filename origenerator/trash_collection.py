@@ -10,7 +10,7 @@ from pathlib import Path
 from app_support.comfy_file_refs import frame_name
 
 from origenerator.branch_session import is_branch_session
-from origenerator.config import COMFYUI_FOLDERS
+from origenerator.comfyui_folders import COMFYUI_FOLDERS
 from origenerator.gallery.output import (
     is_in_progress,
     parse_file_list,

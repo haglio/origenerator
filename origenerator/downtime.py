@@ -9,7 +9,14 @@ from pathlib import Path
 
 from app_support.logging_utils import configure_logging, install_exception_logging
 
-from origenerator import collection_notes, config, flick_finales, gallery, places_backfill
+from origenerator import (
+    collection_notes,
+    comfyui_folders,
+    config,
+    flick_finales,
+    gallery,
+    places_backfill,
+)
 from origenerator.app_state import AppState
 from origenerator.base_backfill import TARGET_KEY as BASE_RENDER_TARGET_KEY
 from origenerator.base_backfill import queue_base_renders
@@ -138,7 +145,7 @@ def main() -> int:
     from origenerator.db import Database  # noqa: PLC0415
 
     db = Database(config.LIBRARY_STATE_DIR / "origenerator.db")
-    client = ComfyUIClient(folders=config.COMFYUI_FOLDERS)
+    client = ComfyUIClient(folders=comfyui_folders.COMFYUI_FOLDERS)
     copies = Copies(config.LIBRARY_STATE_DIR)
     ui = AppState(config.UI_STATE_PATH)
 

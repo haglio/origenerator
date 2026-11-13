@@ -161,11 +161,11 @@ class PillRow(QWidget):
             if held is not self._adder:
                 held.setParent(None)
                 held.deleteLater()
+        self._flow.addWidget(self._adder)
         for name in names:
             pill = Pill(name, removable=editable, parent=self)
             pill.removed.connect(self._remove)
             self._flow.addWidget(pill)
-        self._flow.addWidget(self._adder)
         self._adder.setVisible(editable and bool(self._remaining()))
         self.updateGeometry()
 

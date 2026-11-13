@@ -315,7 +315,9 @@ def test_a_delete_is_held_in_the_trash_with_the_row_it_dropped(tmp_path):
 
     (held,) = db.list_trashed()
     assert held["prompt_id"] == "p1"
-    assert held["row"] == row
+    assert held["row"] == row, (
+        "the whole row travels to the Trash, since the item's own row is gone the moment it is "
+        "deleted, rather than staying behind a flag")
     assert held["deleted_at"]
     moved = dict(held["batch"]["moves"])
     assert set(moved) == {str(output_dir / "a.png"), str(tmp_path / "thumbs" / "p1.jpg")}

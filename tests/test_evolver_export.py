@@ -163,9 +163,17 @@ class TestTheInbox:
         inbox = evolver_export.EvolverInbox(tmp_path / "0_inbox")
         video = tmp_path / "clip.mp4"
         video.write_bytes(b"video")
+        refusal = ""
 
-        with pytest.raises(ValueError, match="no folder"):
+        try:
             inbox.hand_over(video, "")
+        except ValueError as refused:
+            refusal = str(refused)
+
+        assert list(tmp_path.glob("0_inbox/*")) == [], (
+            "Evolver sorts only the folders inside its inbox, one per lane, so a video "
+            "dropped in the inbox's own folder belongs to no lane it knows")
+        assert "no folder" in refusal
 
     def test_the_app_s_own_inbox_is_the_one_config_names(self):
         assert evolver_export.default_inbox().inbox_dir == config.EVOLVER_INBOX_DIR

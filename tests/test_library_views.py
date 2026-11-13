@@ -358,13 +358,15 @@ def test_a_reading_scans_evolvers_upscales_once(monkeypatch):
     monkeypatch.setattr(gallery, "resolve_preview", lambda row, _places: ("pic-1.mp4", "video"))
     monkeypatch.setattr(library_views.EvolverUpscales, "scan",
                         lambda *args: scanned.append(args) or library_views.EvolverUpscales({}))
-    library = LibrarySnapshot([_listed("pic-1")])
+    library = LibrarySnapshot([_listed("pic-1"), _listed("pic-2")])
 
     library.slides_of(library.rows)
     library.versions_of(library.rows)
     library.slides_of(library.rows)
 
-    assert len(scanned) == 1
+    assert len(scanned) == 1, (
+        "listed afresh at every look, Evolver's folder of upscales was read three to eight "
+        "times over before a double-clicked slideshow could open")
 
 
 def _another_sites_upscale(evolvers, monkeypatch, *, with_its_original: bool = True):

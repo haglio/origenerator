@@ -3,6 +3,9 @@ from __future__ import annotations
 import os
 import time
 
+from app_support import kino_folder
+
+from origenerator.config import EVOLVER_SOURCE
 from origenerator.evolver_upscales import EvolverUpscales
 
 _LONG_AGO = (1_000_000, 1_000_000)
@@ -19,12 +22,11 @@ def _video(tmp_path):
 
 
 def _upscale(tmp_path, shape="landscape"):
-    return _file(tmp_path / "upscaled_by_orientation" / shape / "origenerator"
-                 / "clip_00001__topaz.mp4")
+    return _file(kino_folder.upscale_in(tmp_path / "kino", shape, EVOLVER_SOURCE, "clip_00001_"))
 
 
 def _upscales(tmp_path):
-    return EvolverUpscales.scan(tmp_path / "upscaled_by_orientation", "origenerator")
+    return EvolverUpscales.scan(kino_folder.upscales_in(tmp_path / "kino"), EVOLVER_SOURCE)
 
 
 def test_a_video_is_matched_to_the_upscale_evolver_filed_for_it(tmp_path):
@@ -32,7 +34,9 @@ def test_a_video_is_matched_to_the_upscale_evolver_filed_for_it(tmp_path):
     os.utime(video, _LONG_AGO)
     upscale = _upscale(tmp_path)
 
-    assert _upscales(tmp_path).upscale_of(video) == upscale
+    assert _upscales(tmp_path).upscale_of(video) == upscale, (
+        "an upscale is found where app_support's kino_folder.upscale_in files it, the path "
+        "Evolver writes each upscale to")
 
 
 def test_a_portrait_video_is_found_under_its_own_shape(tmp_path):

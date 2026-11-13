@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import gc
+import weakref
+
 from PySide6.QtGui import QTextCursor, QTextDocument
 from PySide6.QtWidgets import QPlainTextEdit
 from shared_ui.colors import GREEN, RED
@@ -48,6 +51,19 @@ def test_holding_nothing_returns_the_field_to_its_own_text(qtbot):
     diff_text.hold_value(edit, None)
 
     assert diff_text.live_text(edit) == "a cat dog on a couch"
+
+
+def test_a_held_prompt_keeps_no_field_alive(qapp):
+    edit = QPlainTextEdit()
+    diff_text.hold_value(edit, "a dog on a couch")
+    field = weakref.ref(edit)
+
+    del edit
+    gc.collect()
+
+    assert field() is None, (
+        "the held prompt rides on the field itself, since a table keyed by field would "
+        "keep every form the app ever built")
 
 
 def test_clearing_a_diff_collapses_the_document_to_the_prompt_it_stands_for(qtbot):

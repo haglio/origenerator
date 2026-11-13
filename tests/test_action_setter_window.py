@@ -60,8 +60,8 @@ class _Stage(QWidget):
         super().__init__()
         self.shown = []
 
-    def show_media(self, path, media_type):
-        self.shown.append((str(path), media_type))
+    def show_folder(self, paths):
+        self.shown.append(list(paths))
 
     def show_message(self, text):
         self.shown.append(text)
@@ -95,19 +95,25 @@ def _said(made, name) -> str:
     return made.findChild(QLabel, name).text()
 
 
+def _a_folder_of(item: dict) -> dict:
+    return {"key": item["prompt_id"], "name": item.get("name"), "items": [item],
+            "thumbnails": [item.get("path")], "actions": item.get("actions")}
+
+
 @pytest.fixture
 def window(qtbot, tmp_path):
     def build(*prompt_ids, items=None, drawings=None, tiles=None, checkboxes=(),
-              side=MediaType.IMAGE, locks=None, keep_going=None, rubbish=None):
+              side=MediaType.IMAGE, locks=None, keep_going=None, rubbish=None, folders=None,
+              confirm=lambda _parent, _text: True):
         store = ActionStore()
-        listed = items or [{"prompt_id": p, "name": "3FA9C0D2 000", "path": None}
-                           for p in prompt_ids]
+        listed = folders or [_a_folder_of(item) for item in items or [
+            {"prompt_id": p, "name": "3FA9C0D2 000"} for p in prompt_ids]]
         stage = _Stage()
         made = ActionSetterWindow(
             SetterSession(listed, store, side, rubbish),
             Vocabulary(_BUTTONS, tiles or _TILES, tuple(checkboxes), {}, {}, {}, {}),
             drawings or {}, locks or Locks(tmp_path / "locks.json"), stage=stage,
-            keep_going=keep_going)
+            keep_going=keep_going, confirm=confirm)
         qtbot.addWidget(made)
         return made, store, stage
 
@@ -117,7 +123,7 @@ def window(qtbot, tmp_path):
 def test_the_window_is_called_the_action_setter_tool_for_its_kind(window, qtbot, tmp_path):
     made, _store, _stage = window("first")
     for_videos = ActionSetterWindow(
-        SetterSession([{"prompt_id": "vid", "name": "3FA9C0D2 000", "actions": None}],
+        SetterSession([_a_folder_of({"prompt_id": "vid", "name": "3FA9C0D2 000"})],
                       ActionStore(), MediaType.VIDEO),
         Vocabulary(_BUTTONS, _TILES, ("third box",), {}, {}, {}, {}), {},
         Locks(tmp_path / "locks.json"), stage=_Stage())
@@ -386,19 +392,28 @@ def test_words_the_setter_tool_does_not_know_are_left_for_the_rest_of_the_app(wi
     assert (made.hear("go to recents"), store.item_actions) == (False, {})
 
 
-def test_the_item_on_screen_is_put_up_from_its_file_as_what_it_is(window, tmp_path):
-    image = _drawn(tmp_path / "item.png")
-    _made, _store, stage = window(items=[{"prompt_id": "first", "name": "3FA9C0D2 001",
-                                          "path": image}], side=MediaType.VIDEO)
+def test_the_folder_on_screen_shows_all_its_items_at_once_under_its_name(window):
+    _made, _store, stage = window(folders=[{
+        "key": "folder", "name": "3FA9C0D2", "actions": None,
+        "items": [{"prompt_id": "first"}, {"prompt_id": "second"}],
+        "thumbnails": ["first.jpg", "second.jpg"]}])
 
-    assert stage.shown == [(image, MediaType.VIDEO)]
+    assert (stage.shown, _said(_made, STATUS_LINE)) == (
+        [["first.jpg", "second.jpg"]], "1 left · 3FA9C0D2")
 
 
-def test_an_item_whose_file_has_gone_says_so_rather_than_showing_nothing(window, tmp_path):
-    _made, _store, stage = window(items=[{"prompt_id": "first", "name": "3FA9C0D2 001",
-                                          "path": str(tmp_path / "gone.png")}])
+def test_trash_asks_first_whether_to_delete_the_folder_and_its_items(window):
+    asked = []
+    rubbish = _Bin()
+    made, _store, stage = window(folders=[{
+        "key": "folder", "name": "3FA9C0D2", "actions": None,
+        "items": [{"prompt_id": "first"}, {"prompt_id": "second"}], "thumbnails": []}],
+        rubbish=rubbish, confirm=lambda _parent, text: asked.append(text) or False)
+    rubbish.stage = stage
 
-    assert stage.shown == [ActionSetterWindow.MISSING]
+    _press(made, TRASH_BUTTON).click()
+
+    assert (asked, rubbish.thrown) == (["Delete “3FA9C0D2” and its 2 items?"], [])
 
 
 def test_closing_the_window_lets_go_of_what_it_was_showing(window):
@@ -438,7 +453,7 @@ def _previously(made) -> QLabel:
 
 
 def _set_before(*items):
-    return [{"prompt_id": prompt_id, "name": "3FA9C0D2 000", "path": None, "actions": item_actions}
+    return [_a_folder_of({"prompt_id": prompt_id, "name": "3FA9C0D2 000", "actions": item_actions})
             for prompt_id, item_actions in items]
 
 
@@ -458,7 +473,7 @@ def _name_color(made, name) -> str:
     (Tile("button one", 0, 0), Tile("button three", 1, 0), Tile("button two", 0, 1, rows=2)),
 ], ids=["one row", "down two rows"])
 def test_the_button_an_item_was_set_with_before_is_all_yellow_with_its_name_in_black(window, tiles):
-    made, _store, _stage = window(items=_set_before(("first", ItemActions(("beta", "alpha")))), tiles=tiles)
+    made, _store, _stage = window(folders=_set_before(("first", ItemActions(("beta", "alpha")))), tiles=tiles)
     made.setStyleSheet(build_stylesheet())
 
     assert [(_edge(made, name), _fill(made, name)) for name in _BUTTONS] == [
@@ -470,7 +485,7 @@ def test_the_button_an_item_was_set_with_before_is_all_yellow_with_its_name_in_b
 
 
 def test_a_yellow_line_beside_the_checkboxes_says_what_the_yellow_box_means(window):
-    made, _store, _stage = window(items=_set_before(("first", ItemActions(("gamma",)))))
+    made, _store, _stage = window(folders=_set_before(("first", ItemActions(("gamma",)))))
     line = _previously(made)
     line.ensurePolished()
 
@@ -480,7 +495,7 @@ def test_a_yellow_line_beside_the_checkboxes_says_what_the_yellow_box_means(wind
 
 
 def test_an_item_never_set_shows_no_yellow_box_and_no_yellow_line(window):
-    made, _store, _stage = window(items=_set_before(("first", ItemActions(("gamma",))), ("second", None)))
+    made, _store, _stage = window(folders=_set_before(("first", ItemActions(("gamma",))), ("second", None)))
     made.setStyleSheet(build_stylesheet())
 
     _tile(made, "button one").click()
@@ -490,7 +505,7 @@ def test_an_item_never_set_shows_no_yellow_box_and_no_yellow_line(window):
 
 
 def test_an_item_set_with_actions_no_button_stands_for_shows_no_yellow_line(window):
-    made, _store, _stage = window(items=_set_before(("first", ItemActions(("beta",)))))
+    made, _store, _stage = window(folders=_set_before(("first", ItemActions(("beta",)))))
 
     assert _previously(made).isHidden()
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import (
@@ -32,6 +31,7 @@ from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, MARGIN_STANDARD
 from shared_ui.tick_control import TickControl
 
 from origenerator.branch_session import titled
+from origenerator.gui.deleting import asked_to_delete, deleting_a_folder
 from origenerator.gui.text_color import color_text
 from origenerator.item_actions import ItemActions
 from origenerator.media import MediaType
@@ -129,11 +129,11 @@ class ActionSetterWindow(QWidget):
     closed = Signal()
 
     NOTHING_LEFT = "Nothing left to set."
-    MISSING = "(this one's file is missing)"
 
     def __init__(self, session, vocabulary, drawings: dict[str, str], locks, *,
-                 stage=None, keep_going=None, parent=None):
+                 stage=None, keep_going=None, confirm=asked_to_delete, parent=None):
         super().__init__(parent)
+        self._confirm = confirm
         self._keep_going = keep_going
         self._session = session
         self._vocabulary = vocabulary
@@ -214,13 +214,13 @@ class ActionSetterWindow(QWidget):
         controls.setSpacing(GAP_MEDIUM)
         for name, caption, tip, press in (
             (SKIP_BUTTON, "Skip",
-             "Leave this one as it is and come back to it at the end", self._on_skip),
+             "Leave this folder as it is and come back to it at the end", self._on_skip),
             (SAME_BUTTON, "Same as last",
-             "Give this one the actions the last one got", self._on_same),
+             "Give this folder the actions the last one got", self._on_same),
             (UNDO_BUTTON, "Undo",
-             "Take the last answer back and put its item up again", self._on_undo),
+             "Take the last answer back and put its folder up again", self._on_undo),
             (TRASH_BUTTON, "Trash",
-             "Throw this one into Origenerator's Trash", self._on_trash),
+             "Throw every item in this folder into Origenerator's Trash", self._on_trash),
         ):
             button = QPushButton(caption, objectName=name)
             button.setToolTip(tip)
@@ -379,7 +379,9 @@ class ActionSetterWindow(QWidget):
         self._said("Last: undone")
 
     def _on_trash(self) -> None:
-        if self._session.current is None:
+        folder = self._session.current
+        if folder is None or not self._confirm(
+                self, deleting_a_folder(folder.get("name"), len(folder["items"]))):
             return
         self._stage.clear()
         self._session.trash()
@@ -423,22 +425,18 @@ class ActionSetterWindow(QWidget):
 
     def _show_current(self) -> None:
         self._presses[SKIP_BUTTON].setEnabled(self._keep_going is None)
-        item = self._session.current
-        self._mark_the_button_set_before(item)
-        if item is None:
+        folder = self._session.current
+        self._mark_the_button_set_before(folder)
+        if folder is None:
             self._stage.show_message("")
             self._status.setText(self.NOTHING_LEFT)
             return
-        self._status.setText(f"{self._session.remaining} left · {item.get('name')}")
-        self._set_the_boxes_for(item)
-        path = item.get("path")
-        if path and Path(path).is_file():
-            self._stage.show_media(path, self._session.side)
-        else:
-            self._stage.show_message(self.MISSING)
+        self._status.setText(f"{self._session.remaining} left · {folder.get('name')}")
+        self._set_the_boxes_for(folder)
+        self._stage.show_folder(folder["thumbnails"])
 
-    def _mark_the_button_set_before(self, item: dict | None) -> None:
-        item_actions = (item or {}).get("actions") or ItemActions()
+    def _mark_the_button_set_before(self, folder: dict | None) -> None:
+        item_actions = (folder or {}).get("actions") or ItemActions()
         set_before = self._vocabulary.button_made_of(item_actions.actions)
         for name, tile in self._tiles.items():
             for marked in {tile, self._face(name)}:
@@ -447,9 +445,9 @@ class ActionSetterWindow(QWidget):
                 marked.style().polish(marked)
         self._previously.setHidden(not set_before)
 
-    def _set_the_boxes_for(self, item: dict) -> None:
+    def _set_the_boxes_for(self, folder: dict) -> None:
         held = self._locks.held(self._session.side)
-        _set(self._boxes, held, (item.get("actions") or ItemActions()).checked)
+        _set(self._boxes, held, (folder.get("actions") or ItemActions()).checked)
 
     def closeEvent(self, event) -> None:  # noqa: N802 -- Qt override
         self._stage.clear()
@@ -476,8 +474,8 @@ def ask_to_keep_going(parent) -> bool:
 
 
 def _lock_tip(locked: bool) -> str:
-    return ("Kept for every item until you unlock it" if locked
-            else "Lock to keep this box as it is for every item")
+    return ("Kept for every folder until you unlock it" if locked
+            else "Lock to keep this box as it is for every folder")
 
 
 def _a_viewport():

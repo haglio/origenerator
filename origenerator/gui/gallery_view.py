@@ -84,6 +84,7 @@ from origenerator.gui.busy_cursor import working
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController, CombineParts
 from origenerator.gui.copy_names import copy_names, offer_copy_names
+from origenerator.gui.deleting import asked_to_delete, deleting_a_folder, deleting_folders
 from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.enhance_controller import (
     ALREADY_AT_THESE_SETTINGS,
@@ -2546,10 +2547,8 @@ class GalleryView(QWidget):
                      for row in gallery.rows_under(group)}.values())
         if not rows:
             return
-        plural = "s" if len(rows) != 1 else ""
-        named = (f"“{groups[0].label}” and its" if len(groups) == 1
-                 else f"{len(groups)} folders and their")
-        if not self._confirm(f"Delete {named} {len(rows)} item{plural}?"):
+        if not self._confirm(deleting_a_folder(groups[0].label, len(rows)) if len(groups) == 1
+                             else deleting_folders(len(groups), len(rows))):
             return
         target = self._post_delete_target(groups)
         if target is not None:
@@ -2608,11 +2607,7 @@ class GalleryView(QWidget):
         self._re_aim_every_button()
 
     def _confirm(self, text: str) -> bool:
-        reply = QMessageBox.question(
-            self, "Delete", text,
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        return reply == QMessageBox.StandardButton.Yes
+        return asked_to_delete(self, text)
 
     def _on_tree_context_menu(self, item, global_pos: QPoint, shape: str):
         if item is None:

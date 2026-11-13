@@ -13,7 +13,25 @@ _SET = ItemActions(("alpha", "beta"), ("first box",))
 
 
 def _items(*prompt_ids, before=None):
-    return [{"prompt_id": prompt_id, "actions": before} for prompt_id in prompt_ids]
+    return [_folder(prompt_id, {"prompt_id": prompt_id, "actions": before})
+            for prompt_id in prompt_ids]
+
+
+def _folder(key, *items):
+    return {"key": key, "items": list(items)}
+
+
+def test_a_press_saves_its_actions_on_every_item_in_the_folder_on_screen():
+    store = ActionStore({"set before": ItemActions(("gamma",))})
+    session = SetterSession([_folder("folder", {"prompt_id": "waiting"},
+                                     {"prompt_id": "set before"}), *_items("next")],
+                            store, MediaType.IMAGE)
+
+    session.set_as("two", _SET)
+    session.undo()
+
+    assert store.item_actions == {"waiting": None, "set before": ItemActions(("gamma",))}
+    assert (session.current["key"], session.remaining) == ("folder", 2)
 
 
 def test_a_press_saves_its_actions_on_the_item_on_screen_and_the_next_one_comes_up():
@@ -23,7 +41,7 @@ def test_a_press_saves_its_actions_on_the_item_on_screen_and_the_next_one_comes_
     session.set_as("two", _SET)
 
     assert (store.item_actions, store.sides) == ({"first": _SET}, [MediaType.IMAGE])
-    assert (session.current["prompt_id"], session.remaining) == ("second", 1)
+    assert (session.current["key"], session.remaining) == ("second", 1)
 
 
 def test_a_press_with_nothing_on_screen_does_nothing():
@@ -42,7 +60,7 @@ def test_skipping_sends_the_item_to_the_back_of_the_line_without_actions():
     session.skip()
 
     assert store.item_actions == {}
-    assert (session.current["prompt_id"], session.remaining) == ("second", 2)
+    assert (session.current["key"], session.remaining) == ("second", 2)
 
 
 def test_undo_puts_back_every_action_the_press_replaced_and_puts_the_item_on_screen_again():
@@ -54,7 +72,7 @@ def test_undo_puts_back_every_action_the_press_replaced_and_puts_the_item_on_scr
     session.undo()
 
     assert store.item_actions == {"first": before}
-    assert (session.current["prompt_id"], session.remaining) == ("first", 2)
+    assert (session.current["key"], session.remaining) == ("first", 2)
 
 
 def test_undo_takes_an_item_nobody_had_given_actions_back_to_none():
@@ -73,7 +91,7 @@ def test_undo_with_nothing_pressed_yet_changes_nothing():
 
     session.undo()
 
-    assert (store.item_actions, session.current["prompt_id"]) == ({}, "first")
+    assert (store.item_actions, session.current["key"]) == ({}, "first")
 
 
 def test_the_session_says_what_the_last_press_was_and_whether_it_can_be_undone():
@@ -105,18 +123,19 @@ def test_trash_throws_the_item_on_screen_away_and_the_next_one_comes_up():
 
     session.trash()
 
-    assert (rubbish.thrown, session.current["prompt_id"], session.remaining) == (
+    assert (rubbish.thrown, session.current["key"], session.remaining) == (
         ["first"], "second", 1)
 
 
-def test_trash_throws_away_the_item_shown_where_its_actions_live_on_another():
+def test_trash_throws_away_every_item_in_the_folder_each_as_it_is_shown():
     rubbish = _Bin()
-    session = SetterSession([{"prompt_id": "frame", "shown_id": "video", "actions": None}],
+    session = SetterSession([_folder("folder", {"prompt_id": "frame", "shown_id": "video"},
+                                     {"prompt_id": "image"})],
                             ActionStore(), MediaType.IMAGE, rubbish)
 
     session.trash()
 
-    assert rubbish.thrown == ["video"]
+    assert rubbish.thrown == ["video", "image"]
 
 
 def test_undo_brings_a_trashed_item_back_and_puts_it_on_screen_again():
@@ -127,7 +146,7 @@ def test_undo_brings_a_trashed_item_back_and_puts_it_on_screen_again():
 
     session.undo()
 
-    assert (rubbish.thrown, store.item_actions, session.current["prompt_id"], session.remaining) == (
+    assert (rubbish.thrown, store.item_actions, session.current["key"], session.remaining) == (
         [], {}, "first", 2)
 
 
@@ -146,7 +165,7 @@ def test_with_no_trash_to_throw_into_nothing_is_thrown_away():
 
     session.trash()
 
-    assert (session.current["prompt_id"], session.can_undo) == ("first", False)
+    assert (session.current["key"], session.can_undo) == ("first", False)
 
 
 def test_locks_hold_each_checkbox_as_it_was_left_until_they_are_let_go(tmp_path):

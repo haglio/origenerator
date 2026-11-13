@@ -12,46 +12,70 @@ NOTHING_WAITING = {MediaType.IMAGE: "Every image already has its actions.",
                    MediaType.VIDEO: "Every video already has its actions."}
 
 
-def _shown_from(row: dict, places, side: str):
-    from origenerator import gallery
-
-    found = gallery.resolve_preview(row, places)
-    if found is not None and found[1] == side:
-        return str(found[0])
-    return row.get("thumbnail_path") if side == MediaType.IMAGE else None
-
-
-def _opened_on(first: str, rows: list[dict], line: list):
+def _opened_on(first: str, rows: list[dict], every: list) -> list:
     from origenerator.action_setter import Waiting
 
     if not first:
-        return None
-    found = next((entry for entry in line if entry.holder["prompt_id"] == first), None)
+        return []
+    found = next((entry for entry in every if entry.holder["prompt_id"] == first), None)
     if found is not None:
-        return found
+        return [found]
     row = next((row for row in rows if row["prompt_id"] == first), None)
-    return Waiting(row, row) if row is not None else None
+    return [Waiting(row, row)] if row is not None else []
 
 
-def waiting_items(db, places, side: str, first: str = "", *, returned=None) -> list[dict]:
-    from origenerator.action_setter import waiting
-    from origenerator.item_actions import actions_if_any
+def _leaf_folders(rows: list[dict]):
+    from origenerator import gallery
+
+    def walk(groups):
+        for group in groups:
+            if isinstance(group, gallery.SettingsGroup):
+                yield group
+            yield from walk(gallery.child_groups(group))
+
+    return {row["prompt_id"]: group for group in walk(gallery.build_gallery_tree(rows, {}))
+            for row in gallery.rows_under(group)}
+
+
+def _shared(item_actions: list):
+    return item_actions[0] if item_actions and len(set(item_actions)) == 1 else None
+
+
+def waiting_folders(db, places, side: str, first: str = "", *, returned=None) -> list[dict]:
+    from origenerator.action_setter import holders, in_folders, waiting
     from origenerator.item_names import ItemNames
     from origenerator.sent_back import to_the_library
 
     returned = returned or to_the_library()
     returned.take_in(db, places)
     rows = db.list_generations()
+    every = holders(rows, side)
     line = waiting(rows, side, sent_back=returned.still_waiting(rows))
-    opened_on = _opened_on(first, rows, line)
-    if opened_on is not None:
-        line = [opened_on, *(entry for entry in line if entry.holder["prompt_id"] != first)]
+    leaves = _leaf_folders(rows)
     names = ItemNames.from_library(db)
-    return [{"prompt_id": entry.holder["prompt_id"], "shown_id": entry.shown["prompt_id"],
-             "name": names.of(entry.shown["prompt_id"]),
-             "path": _shown_from(entry.holder, places, side),
-             "actions": actions_if_any(entry.holder, side)}
-            for entry in line]
+
+    def folder_of(prompt_id: str) -> str:
+        leaf = leaves.get(prompt_id)
+        return leaf.key if leaf is not None else prompt_id
+
+    opened_on = _opened_on(first, rows, every)
+    every += [entry for entry in opened_on if entry not in every]
+    return [_shown_as_a_folder(entries, side, leaves.get(entries[0].shown["prompt_id"]), names)
+            for entries in in_folders([*opened_on, *line], every, folder_of)]
+
+
+def _shown_as_a_folder(entries: list, side: str, leaf, names) -> dict:
+    from origenerator.item_actions import actions_if_any
+
+    shown = entries[0].shown["prompt_id"]
+    items = [{"prompt_id": entry.holder["prompt_id"], "shown_id": entry.shown["prompt_id"],
+              "actions": actions_if_any(entry.holder, side)} for entry in entries]
+    return {"key": leaf.key if leaf is not None else shown,
+            "name": leaf.label if leaf is not None else names.of(shown),
+            "items": items,
+            "thumbnails": [entry.shown.get("thumbnail_path") for entry in entries],
+            "actions": _shared([item["actions"] for item in items
+                                if item["actions"] is not None])}
 
 
 class AnswersTold:
@@ -113,7 +137,7 @@ def the_setter_tool(side: str = MediaType.IMAGE, first: str = "", heard=_nobody_
     from origenerator.gui.action_setter_window import ActionSetterWindow
 
     db = Database(DB_PATH)
-    waiting = waiting_items(db, OUTPUT_PLACES, side, first)
+    waiting = waiting_folders(db, OUTPUT_PLACES, side, first)
     if not waiting:
         return NOTHING_WAITING[side]
     named = vocabulary(side)

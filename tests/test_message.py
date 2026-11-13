@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import pytest
 from PySide6.QtWidgets import QWidget
+from shared_ui.message_shape import MESSAGE_TOP_MARGIN
 
 from origenerator.gui import media_overlay
-from origenerator.gui.message import Message, time_to_read_ms
+from origenerator.gui.message import HEARD_MARK, Message, time_to_read_ms
 
 
 def _a_message_over_a_surface(qtbot) -> tuple[QWidget, Message]:
@@ -44,3 +46,38 @@ def test_a_message_stays_up_until_something_says_otherwise(qtbot):
     assert message.isVisible(), (
         "a message puts its text up and keeps it up: what takes it down is up to whatever put "
         "it there")
+
+
+_LONG = ("a model's answer that runs on and on about every change it made to the prompt, "
+         "far longer than any slideshow is wide")
+
+
+@pytest.mark.parametrize("mark", ["", HEARD_MARK])
+def test_a_message_too_long_for_the_slideshow_is_elided_to_fit(qtbot, mark):
+    host, message = _a_message_over_a_surface(qtbot)
+    host.resize(400, 300)
+
+    message.say(_LONG, mark=mark)
+
+    assert (message.geometry().left() >= MESSAGE_TOP_MARGIN,
+            message.geometry().right() < host.width() - MESSAGE_TOP_MARGIN,
+            "…" in message.text()) == (True, True, True)
+
+
+def test_a_message_follows_its_slideshow_when_the_slideshow_widens(qtbot):
+    host, message = _a_message_over_a_surface(qtbot)
+    host.resize(400, 300)
+    message.say(_LONG)
+
+    host.resize(4000, 300)
+    message.reposition()
+
+    assert message.text() == _LONG
+
+
+def test_a_message_that_fits_is_shown_whole(qtbot):
+    _host, message = _a_message_over_a_surface(qtbot)
+
+    message.say("scene one")
+
+    assert message.text() == "scene one"

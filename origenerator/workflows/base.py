@@ -18,7 +18,7 @@ from origenerator.workflows.derived_size import (
 )
 from origenerator.workflows.detail_parts import detail_fix_passes, fix_prompts
 from origenerator.workflows.fix_finding import finding_nodes, parts_found_by
-from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier
+from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier, rate_options
 from origenerator.workflows.parts import NodeRefs, Segment
 
 # ComfyUI's own KSampler names: it refuses a run that names one it has not got.
@@ -43,7 +43,7 @@ _SEAM_FRAME = 1
 # 481 is 31 GB on the 16 GB graphics card, which Windows pages through system RAM at a crawl.
 SINGLE_WINDOW_FRAMES = 161
 SCENE_BREAK = "---"
-FRAME_RATE_OPTIONS = [16, 32, 48, 64, 80, 96, 112]
+FRAME_RATE_OPTIONS = rate_options()
 
 # RIFE 4.7 is the recommendation and the default of the ComfyUI pack the interpolation node comes from.
 RIFE_CHECKPOINT = "rife47.pth"
@@ -218,6 +218,8 @@ class WorkflowTemplate(ABC):
     output_type: MediaType
     looping: bool = False
     derives_size_from_input: bool = False
+    native_fps: float = NATIVE_FPS
+    video_model: str = "WAN 2.2"
     derived_size_source: str = "input_image"
     selectable: bool = True
     generates_here: bool = True
@@ -379,8 +381,8 @@ class WorkflowTemplate(ABC):
         return nodes, joined, cls.video_frames(plan)
 
     @staticmethod
-    def image_size_nodes(image_ref, params: dict,
-                         megapixels: float = TARGET_MEGAPIXELS) -> SizedInput:
+    def image_size_nodes(image_ref, params: dict, megapixels: float = TARGET_MEGAPIXELS,
+                         resolution_steps: int = 16) -> SizedInput:
         override = override_size(params)
         if override is not None:
             width, height = override
@@ -404,7 +406,7 @@ class WorkflowTemplate(ABC):
                     "image": image_ref,
                     "upscale_method": "lanczos",
                     "megapixels": megapixels,
-                    "resolution_steps": 16,
+                    "resolution_steps": resolution_steps,
                 },
             },
             _SIZE_GET: {
@@ -644,9 +646,8 @@ class WorkflowTemplate(ABC):
             track = [node_id, 0]
         return nodes, track
 
-    @staticmethod
-    def interpolation_nodes(node_id: str, frames_ref, params: dict):
-        multiplier = rate_multiplier(params["frame_rate"])
+    def interpolation_nodes(self, node_id: str, frames_ref, params: dict):
+        multiplier = rate_multiplier(params["frame_rate"], self.native_fps)
         if multiplier == 1:
             return {}, frames_ref
         nodes = {

@@ -2129,7 +2129,9 @@ def test_a_window_a_session_launched_draws_separate_and_keeps_together_for_the_n
     assert win._gallery_view._tree.shapes == SEPARATE
     win.close()
 
-    assert AppState(path).get("toc_shapes") == [BOTH]
+    assert AppState(path).get("toc_shapes") == [BOTH], (
+        "a session draws one list for each of its monitors' shapes, but on its own the app is "
+        "one window, where either shape fits, so Together waits for its next launch")
 
 
 def test_a_window_a_session_launched_keeps_the_folders_left_open_on_together(qtbot, tmp_path):

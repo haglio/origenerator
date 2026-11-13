@@ -21,7 +21,9 @@ def test_an_accepted_animation_reads_back_as_settings(held):
                                 animation_settings.Setting("wan22_i2v", {"steps": 8}), path=held)
 
     assert animation_settings.settings_for(VIDEO, "alpha", "state one", path=held) == {
-        "workflow": "wan22_i2v", "params": {"steps": 8}}
+        "workflow": "wan22_i2v", "params": {"steps": 8}}, (
+        "an accepted animation's settings are shaped like the overlay's pinned settings, a "
+        "workflow and its params, since checking an animation starts from either one")
     assert animation_settings.accepted(path=held) == {(VIDEO, "alpha", "state one")}
 
 

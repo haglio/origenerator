@@ -116,10 +116,14 @@ def test_the_example_table_names_only_buttons_the_example_declares():
     states = set(example["image_actions"]["buttons"])
     table = example["video_actions"]["starts_from"]
 
+    named_actions = {action for written in table.values() for action in written}
+    named_states = {state for written in table.values() for listed in written.values()
+                    for state in listed}
     assert table
+    assert sorted((named_actions - actions) | (named_states - states)) == [], (
+        "a line naming a video button or an image button the overlay does not declare "
+        "can never fire")
     for lane, written in table.items():
-        assert set(written) <= actions, lane
         for action, listed in written.items():
-            assert set(listed) <= states, (lane, action)
             assert all(animation_paths.allows(lane, action, state, content=example)
                        for state in listed)

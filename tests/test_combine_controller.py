@@ -180,8 +180,9 @@ class FakeDB:
     def set_settings_source(self, prompt_id, *, category="", video_prompt_id=None):
         self.settings_sources.append((prompt_id, category, video_prompt_id))
 
-    def set_actions(self, prompt_id, side, item_actions):
-        self.actions_by_id[prompt_id] = (side, item_actions)
+    def set_many_actions(self, side, actions_by_id):
+        self.actions_by_id.update({prompt_id: (side, item_actions)
+                                   for prompt_id, item_actions in actions_by_id.items()})
 
     def fill_in(self, column, values):
         pass

@@ -46,9 +46,11 @@ class Pill(QWidget):
     removed = Signal(str)
     picked = Signal(str)
 
-    def __init__(self, text: str, *, removable: bool = False, pickable: bool = False, parent=None):
+    def __init__(self, text: str, *, removable: bool = False, pickable: bool = False,
+                 partial: bool = False, parent=None):
         super().__init__(parent)
         self._text = text
+        self._partial = partial
         self._pickable = pickable
         self._hovered = False
         self._remove = None
@@ -105,7 +107,8 @@ class Pill(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         edge = QRectF(self.rect()).adjusted(HAIRLINE / 2, HAIRLINE / 2, -HAIRLINE / 2, -HAIRLINE / 2)
         ground = BG_BUTTON if enabled else BG_SECONDARY
-        painter.setPen(QPen(BORDER_SUBTLE, HAIRLINE))
+        painter.setPen(QPen(BORDER_DEFAULT, HAIRLINE, Qt.PenStyle.DotLine) if self._partial
+                       else QPen(BORDER_SUBTLE, HAIRLINE))
         painter.setBrush(hovered(ground) if self._hovered else ground)
         painter.drawRoundedRect(edge, edge.height() / 2, edge.height() / 2)
         painter.setPen(TEXT_PRIMARY if enabled else TEXT_MUTED)
@@ -137,6 +140,7 @@ class PillRow(QWidget):
         super().__init__(parent)
         self._offered = offered
         self._names: tuple[str, ...] = ()
+        self._partial: tuple[str, ...] = ()
         self._editable = True
         self._flow = FlowLayout(self, spacing=GAP_SMALL)
         self._adder = QToolButton(objectName=adder_name)
@@ -153,8 +157,13 @@ class PillRow(QWidget):
     def names(self) -> tuple[str, ...]:
         return self._names
 
-    def show_names(self, names: tuple[str, ...], *, editable: bool) -> None:
+    def partial(self) -> tuple[str, ...]:
+        return self._partial
+
+    def show_names(self, names: tuple[str, ...], *, editable: bool,
+                   partial: tuple[str, ...] = ()) -> None:
         self._names = names
+        self._partial = tuple(name for name in partial if name in names)
         self._editable = editable
         while self._flow.count():
             held = self._flow.takeAt(0).widget()
@@ -163,23 +172,26 @@ class PillRow(QWidget):
                 held.deleteLater()
         self._flow.addWidget(self._adder)
         for name in names:
-            pill = Pill(name, removable=editable, parent=self)
+            pill = Pill(name, removable=editable, partial=name in self._partial, parent=self)
             pill.removed.connect(self._remove)
             self._flow.addWidget(pill)
         self._adder.setVisible(editable and bool(self._remaining()))
         self.updateGeometry()
 
     def _remaining(self) -> tuple[str, ...]:
-        return tuple(name for name in self._offered if name not in self._names)
+        return tuple(name for name in self._offered
+                     if name not in self._names or name in self._partial)
 
     def _remove(self, name: str) -> None:
         self._set(tuple(held for held in self._names if held != name))
 
     def _add(self, name: str) -> None:
-        self._set((*self._names, name))
+        self._set(self._names if name in self._names else (*self._names, name),
+                  without_partial=name)
 
-    def _set(self, names: tuple[str, ...]) -> None:
-        self.show_names(names, editable=self._editable)
+    def _set(self, names: tuple[str, ...], *, without_partial: str = "") -> None:
+        self.show_names(names, editable=self._editable,
+                        partial=tuple(held for held in self._partial if held != without_partial))
         self.changed.emit(names)
 
     def _offer(self) -> None:

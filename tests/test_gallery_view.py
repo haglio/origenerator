@@ -28,10 +28,12 @@ from shared_ui import folder_path as shared_folder_path
 from shared_ui.colors import GREEN, RED, YELLOW
 from shared_ui.icons import icon_then_text
 from shared_ui.spacing import MARGIN_STANDARD
+from shared_ui.tick_control import TickControl
 
 from origenerator import (
     gallery,
 )
+from origenerator.action_vocabulary import vocabulary
 from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_api import ForeignQueue
 from origenerator.comfyui_client import ComfyUIClient
@@ -54,11 +56,15 @@ from origenerator.gui import (
     off_thread,
 )
 from origenerator.gui import gallery_view as gallery_view_module
+from origenerator.gui.action_row import action_checkbox
+from origenerator.gui.folder_actions import FolderActions
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.folder_tree import RECENT_ROLE
 from origenerator.gui.gallery_tree import _RECENT_TIP
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView, Shared
+from origenerator.item_actions import actions_of
 from origenerator.item_shape import row_shape, shaped_key
+from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.trash import Trash
 from tests import gestures
@@ -2053,7 +2059,7 @@ def _linked_view(qtbot, source="i7", count=12):
                   "input_image": f"sdxl_t2i_{source}.png"},
                  "wan22_i2v_00001_.mp4")
     view = GalleryView(FakeDB([video, *images]))
-    _on_screen(qtbot, view, 1100, 1200)
+    _on_screen(qtbot, view, 1100, 1500)
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
     _pick_by_clicking(view, "vid1")
     return view
@@ -3070,3 +3076,39 @@ def test_a_rebuild_puts_no_stop_on_the_way_back(qtbot):
     assert view._navigation._history._stack == stops, (
         "a rebuild puts the view back as it was, which is no move of the user's; a poll would "
         "otherwise pile up stops")
+
+
+def _the_folders_actions(view) -> FolderActions:
+    return view.findChild(FolderActions)
+
+
+def test_a_leaf_folder_shows_its_actions_to_the_right_of_the_buttons_and_no_other_folder_does(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    in_a_leaf = not _the_folders_actions(view).isHidden()
+    view._tree.setCurrentItem(_image_workflow(view._tree))
+
+    assert (in_a_leaf, _the_folders_actions(view).isHidden()) == (True, True)
+    buttons, shown = view._buttons, _the_folders_actions(view)
+    assert buttons.parentWidget() is shown.parentWidget()
+
+
+def test_actions_set_for_a_folder_reach_every_item_in_it_and_the_tab_showing_one(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    db = FakeDB(rows)
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    name = vocabulary(MediaType.IMAGE).checkboxes[0]
+
+    _the_folders_actions(view).findChild(TickControl, action_checkbox(MediaType.IMAGE, name)).click()
+
+    tab = view._generate_pane.current_generate_tab()
+    assert [actions_of(db.get_generation(prompt_id), MediaType.IMAGE).checked
+            for prompt_id in ("i1", "i2")] == [(name,), (name,)]
+    assert tab._action.form().parentWidget().findChild(
+        TickControl, action_checkbox(MediaType.IMAGE, name)).isChecked()

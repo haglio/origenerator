@@ -442,8 +442,9 @@ class FakeDB:
         self.gets += 1
         return self.rows.get(prompt_id)
 
-    def set_actions(self, prompt_id, side, labels):
-        self.rows[prompt_id].update(zip(columns(side), stored(labels), strict=True))
+    def set_many_actions(self, side, actions_by_id):
+        for prompt_id, item_actions in actions_by_id.items():
+            self.rows[prompt_id].update(zip(columns(side), stored(item_actions), strict=True))
 
     def folder_meta_map(self):
         return {}

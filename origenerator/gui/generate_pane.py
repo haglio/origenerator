@@ -382,6 +382,10 @@ class GeneratePane(QTabWidget):
     def landing_tab(self) -> GenerateTab:
         return self._landing_tab()
 
+    def hear_actions(self, side: str, actions_by_id: dict) -> None:
+        for tab in self.generate_tabs():
+            tab.hear_actions(side, actions_by_id)
+
     def refresh_displayed(self, row: dict, image_rows: list[dict]):
         for tab in self.generate_tabs():
             tab.refresh_displayed(row, image_rows)

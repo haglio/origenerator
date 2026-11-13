@@ -100,7 +100,7 @@ from origenerator.library_views import NO_VIEWS, LibraryViews, TabViews
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
 from origenerator.prompt_tokens import prompt_readings
-from origenerator.published_actions import set_actions
+from origenerator.published_actions import set_many_actions
 from origenerator.regeneration import (
     MADE_ELSEWHERE_TIP,
     told_why_it_cannot_be_made_again,
@@ -224,6 +224,7 @@ class GenerateTab(DropZones):
     versions_delete_requested = Signal(str, list)
     train_requested = Signal(str)
     trash_requested = Signal(str)
+    actions_saved = Signal(str, object)
 
     def __init__(self, client: ComfyUIClient | None, db: Database,
                  *, fun_time=None, inbox: evolver_export.EvolverInbox | None = None,
@@ -339,6 +340,7 @@ class GenerateTab(DropZones):
         body.addWidget(self._metadata_section)
         self._action = ActionRow(self._metadata_section.form())
         self._action.changed.connect(self._save_actions)
+        self._action.told.connect(self.actions_saved)
         self._cannot_remake_note = QLabel()
         self._cannot_remake_note.setObjectName("cannotRemakeNote")
         self._cannot_remake_note.setWordWrap(True)
@@ -351,8 +353,11 @@ class GenerateTab(DropZones):
         self._metadata_section.setVisible(self._metadata_section.has_content())
         line_up_the_labels(self)
 
-    def _save_actions(self, prompt_id: str, side: str, item_actions) -> None:
-        set_actions(self._db, prompt_id, side, item_actions)
+    def _save_actions(self, side: str, actions_by_id: dict) -> None:
+        self.actions_saved.emit(side, set_many_actions(self._db, side, actions_by_id).after)
+
+    def hear_actions(self, side: str, actions_by_id: dict) -> None:
+        self._action.hear(side, actions_by_id)
 
     def _build_workflow_dropdown(self, body: QVBoxLayout) -> None:
         self._form_workflow_key = None

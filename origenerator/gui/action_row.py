@@ -48,7 +48,7 @@ class _Side(QWidget):
                  changed):
         super().__init__()
         self._side = side
-        self._prompt_id = ""
+        self._held: dict[str, ItemActions] = {}
         self._changed = changed
         self._editable = True
         column = QVBoxLayout(self)
@@ -71,24 +71,29 @@ class _Side(QWidget):
         row.addWidget(self._pills, 1)
         self._setter = QPushButton(ADD, objectName=setter_button(side))
         self._setter.setToolTip(_TIPS[side])
-        self._setter.clicked.connect(lambda: opened(side, self._prompt_id))
+        self._setter.clicked.connect(lambda: opened(side, next(iter(self._held), "")))
         column.addWidget(self._setter, 0, Qt.AlignmentFlag.AlignLeft)
 
-    def shows(self, prompt_id: str) -> bool:
-        return bool(prompt_id) and prompt_id == self._prompt_id
-
-    def show_actions(self, prompt_id: str, item_actions: ItemActions, *, editable: bool = True) -> None:
-        self._prompt_id = prompt_id
+    def show_actions(self, held: dict[str, ItemActions], *, editable: bool = True) -> None:
+        self._held = dict(held)
         self._editable = editable
         self._setter.setVisible(editable)
-        self.set_actions_again(item_actions)
+        self._draw()
 
-    def set_actions_again(self, item_actions: ItemActions) -> None:
-        self._pills.show_names(tuple(sorted(item_actions.actions, key=str.casefold)),
-                               editable=self._editable)
+    def hear(self, actions_by_id: dict[str, ItemActions | None]) -> None:
+        reached = {prompt_id: item_actions or ItemActions()
+                   for prompt_id, item_actions in actions_by_id.items() if prompt_id in self._held}
+        if reached:
+            self._held.update(reached)
+            self._draw()
+
+    def _draw(self) -> None:
+        held = list(self._held.values())
+        self._pills.show_names(_in_any(each.actions for each in held), editable=self._editable,
+                               partial=_in_some(each.actions for each in held))
         self._name_the_setter()
         for name, box in self._boxes.items():
-            box.setChecked(name in item_actions.checked)
+            box.setCheckState(_tick(sum(name in each.checked for each in held), len(held)))
 
     def _name_the_setter(self) -> None:
         self._setter.setText(EDIT if self._pills.names() else ADD)
@@ -98,15 +103,36 @@ class _Side(QWidget):
         self._save()
 
     def _save(self) -> None:
-        self._changed(self._prompt_id, self._side, self._item_actions())
+        self._held = {prompt_id: self._as_shown(own) for prompt_id, own in self._held.items()}
+        self._changed(self._side, dict(self._held))
 
-    def _item_actions(self) -> ItemActions:
-        return ItemActions(self._pills.names(), tuple(name for name, box in self._boxes.items()
-                                                 if box.isChecked()))
+    def _as_shown(self, own: ItemActions) -> ItemActions:
+        partial = self._pills.partial()
+        return ItemActions(
+            tuple(name for name in self._pills.names() if name not in partial or name in own.actions),
+            tuple(name for name, box in self._boxes.items()
+                  if box.checkState() == Qt.CheckState.Checked
+                  or (box.checkState() == Qt.CheckState.PartiallyChecked and name in own.checked)))
+
+
+def _in_any(listed) -> tuple[str, ...]:
+    return tuple(sorted(dict.fromkeys(name for names in listed for name in names), key=str.casefold))
+
+
+def _in_some(listed) -> tuple[str, ...]:
+    listed = list(listed)
+    return tuple(name for name in _in_any(listed) if not all(name in names for names in listed))
+
+
+def _tick(checked: int, of: int) -> Qt.CheckState:
+    if checked and checked == of:
+        return Qt.CheckState.Checked
+    return Qt.CheckState.PartiallyChecked if checked else Qt.CheckState.Unchecked
 
 
 class ActionRow(QWidget):
-    changed = Signal(str, str, object)
+    changed = Signal(str, object)
+    told = Signal(str, object)
 
     def __init__(self, form: LabelForm, *, checkboxes: dict[str, tuple[str, ...]] | None = None,
                  actions: dict[str, tuple[str, ...]] | None = None, open_setter=the_setter_tool):
@@ -132,23 +158,28 @@ class ActionRow(QWidget):
             form.setRowVisible(shown, False)
 
     def show_row(self, row: dict, start_image: dict | None = None) -> None:
-        kind = media_type_of_row(row)
+        self.show_folder([row], {row.get("prompt_id"): start_image})
+
+    def show_folder(self, rows: list[dict], start_images: dict[str, dict | None] | None = None) -> None:
+        kind = media_type_of_row(rows[0]) if rows else None
         if kind is None:
             self.clear()
             return
+        start_images = start_images or {}
         image, video = self._sides[MediaType.IMAGE], self._sides[MediaType.VIDEO]
         self._names[MediaType.IMAGE].setText(
             ACTIONS_LABEL if kind == MediaType.IMAGE else SIDE_LABELS[MediaType.IMAGE])
         if kind == MediaType.IMAGE:
-            image.show_actions(row["prompt_id"], actions_of(row, MediaType.IMAGE))
+            image.show_actions({row["prompt_id"]: actions_of(row, MediaType.IMAGE) for row in rows})
             image.setEnabled(True)
         else:
-            holder = image_actions_row(row, start_image)
-            inherited = inherits_image_actions(row, start_image)
-            image.show_actions(holder["prompt_id"], actions_of(holder, MediaType.IMAGE),
-                              editable=not inherited)
+            starts = [start_images.get(row["prompt_id"]) for row in rows]
+            inherited = any(map(inherits_image_actions, rows, starts))
+            image.show_actions({holder["prompt_id"]: actions_of(holder, MediaType.IMAGE)
+                                for holder in map(image_actions_row, rows, starts)},
+                               editable=not inherited)
             image.setEnabled(not inherited)
-            video.show_actions(row["prompt_id"], actions_of(row, MediaType.VIDEO))
+            video.show_actions({row["prompt_id"]: actions_of(row, MediaType.VIDEO) for row in rows})
         self._form.setRowVisible(image, True)
         self._form.setRowVisible(video, kind == MediaType.VIDEO)
 
@@ -163,8 +194,11 @@ class ActionRow(QWidget):
         self._setter_host = host
 
     def heard(self, prompt_id: str, side: str, item_actions: ItemActions | None) -> None:
-        if self._sides[side].shows(prompt_id):
-            self._sides[side].set_actions_again(item_actions or ItemActions())
+        self.hear(side, {prompt_id: item_actions})
+        self.told.emit(side, {prompt_id: item_actions})
+
+    def hear(self, side: str, actions_by_id: dict[str, ItemActions | None]) -> None:
+        self._sides[side].hear(actions_by_id)
 
     def _open(self, side: str, prompt_id: str) -> None:
         open_now = self._windows.get(side)

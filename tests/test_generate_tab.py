@@ -4739,6 +4739,29 @@ def test_a_checkbox_clicked_on_the_tab_lands_on_the_shown_images_row(saved_panel
     assert actions_of(db.get_generation("img9"), MediaType.IMAGE) == ItemActions(("alpha",), (name,))
 
 
+def test_actions_saved_on_the_tab_are_announced_for_every_other_place_showing_them(saved_panel, qtbot):
+    tab, db = saved_panel
+    tab.show_saved_generation(_image_row(db, "img9"), [])
+    name = vocabulary(MediaType.IMAGE).checkboxes[0]
+
+    with qtbot.waitSignal(tab.actions_saved) as caught:
+        tab._action.form().parentWidget().findChild(
+            TickControl, action_checkbox(MediaType.IMAGE, name)).click()
+
+    assert caught.args == [MediaType.IMAGE, {"img9": ItemActions((), (name,))}]
+
+
+def test_actions_saved_somewhere_else_show_on_the_tab_at_once(saved_panel):
+    tab, db = saved_panel
+    tab.show_saved_generation(_image_row(db, "img9"), [])
+    name = vocabulary(MediaType.IMAGE).checkboxes[0]
+
+    tab.hear_actions(MediaType.IMAGE, {"img9": ItemActions((), (name,))})
+
+    assert tab._action.form().parentWidget().findChild(
+        TickControl, action_checkbox(MediaType.IMAGE, name)).isChecked()
+
+
 def test_a_video_on_the_tab_lists_the_actions_it_was_set_with(saved_panel):
     tab, db = saved_panel
     _video_row(db, "vid9")

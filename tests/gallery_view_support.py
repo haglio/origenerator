@@ -45,7 +45,7 @@ from origenerator.gui.folder_tree import _action_rects
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView, Shared
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.new_tile import NewTile
-from origenerator.item_actions import ItemActions
+from origenerator.item_actions import ItemActions, columns, stored
 from origenerator.item_shape import UNMEASURABLE_SHAPE, base_of, shaped_key
 from origenerator.media import MediaType
 from origenerator.motion_engine import Motion
@@ -228,6 +228,14 @@ class FakeDB:
     def set_folder_favorite(self, key, favorite):
         self._meta.setdefault(key, {"custom_name": None, "starred": False})
         self._meta[key]["starred"] = bool(favorite)
+
+    def set_many_actions(self, side, actions_by_id):
+        for prompt_id, item_actions in actions_by_id.items():
+            self._by_id[prompt_id].update(zip(columns(side), stored(item_actions), strict=True))
+
+    def fill_in(self, column, values):
+        for prompt_id, value in values.items():
+            self._by_id[prompt_id][column] = value
 
     def set_generation_favorite(self, prompt_id, favorite):
         row = self._by_id.get(prompt_id)

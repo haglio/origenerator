@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import NamedTuple
 
 from origenerator.animation_names import item_actions_named
 from origenerator.gallery import media_type_of_row
@@ -32,6 +33,14 @@ def publish(db) -> int:
     return len(changed)
 
 
+Replaced = dict[str, ItemActions | None]
+
+
+class Changed(NamedTuple):
+    before: Replaced
+    after: Replaced
+
+
 def combined_from(rows: list[dict], prompt_id: str) -> list[str]:
     found, sources = [], {prompt_id}
     while sources:
@@ -42,23 +51,26 @@ def combined_from(rows: list[dict], prompt_id: str) -> list[str]:
     return found
 
 
-Replaced = dict[str, ItemActions | None]
+def set_many_actions(db, side: str, actions_by_id: Replaced) -> Changed:
+    rows = db.list_generations()
+    after = {}
+    if side == MediaType.VIDEO:
+        for prompt_id, item_actions in actions_by_id.items():
+            after.update(dict.fromkeys(combined_from(rows, prompt_id), item_actions))
+    after.update(actions_by_id)
+    row_of = {row["prompt_id"]: row for row in rows}
+    before = {each: actions_if_any(row_of.get(each) or {}, side) for each in after}
+    db.set_many_actions(side, after)
+    publish(db)
+    return Changed(before, after)
 
 
 def set_actions(db, prompt_id: str, side: str, item_actions: ItemActions | None) -> Replaced:
-    rows = db.list_generations()
-    given = [prompt_id, *(combined_from(rows, prompt_id) if side == MediaType.VIDEO else ())]
-    row_of = {row["prompt_id"]: row for row in rows}
-    replaced = {each: actions_if_any(row_of.get(each) or {}, side) for each in given}
-    for each in given:
-        db.set_actions(each, side, item_actions)
-    publish(db)
-    return replaced
+    return set_many_actions(db, side, {prompt_id: item_actions}).before
 
 
 def put_back(db, side: str, replaced: Replaced) -> None:
-    for prompt_id, item_actions in replaced.items():
-        db.set_actions(prompt_id, side, item_actions)
+    db.set_many_actions(side, replaced)
     publish(db)
 
 

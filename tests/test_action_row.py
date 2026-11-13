@@ -61,8 +61,8 @@ def action(qtbot, opened):
     host = QWidget()
     qtbot.addWidget(host)
 
-    def open_setter(side, first="", heard=None, host=None):
-        opened.append((side, first))
+    def open_setter(side, opened_on=(), heard=None, host=None):
+        opened.append((side, opened_on))
         window = QWidget()
         qtbot.addWidget(window)
         window.heard = heard
@@ -86,6 +86,10 @@ def _pills(action, side) -> list[Pill]:
 
 def _listed(action, side) -> tuple[str, ...]:
     return tuple(pill.text() for pill in _pills(action, side))
+
+
+def _partial(pill: Pill) -> bool:
+    return pill.text() in pill.parentWidget().partial()
 
 
 def _has_an_x(pill: Pill) -> bool:
@@ -180,7 +184,7 @@ def test_clicking_a_checkbox_saves_it_with_the_actions_the_item_already_has(acti
     with qtbot.waitSignal(action.changed) as caught:
         _box(action, MediaType.IMAGE, "first box").click()
 
-    assert caught.args == ["img", MediaType.IMAGE, ItemActions(("alpha",), ("first box",))]
+    assert caught.args == [MediaType.IMAGE, {"img": ItemActions(("alpha",), ("first box",))}]
 
 
 def test_an_image_shows_no_video_part(action):
@@ -224,7 +228,7 @@ def test_a_setter_tool_with_nothing_to_set_says_so(qtbot, monkeypatch):
     host = QWidget()
     qtbot.addWidget(host)
     action = ActionRow(LabelForm(host), checkboxes=_BOXES,
-                       open_setter=lambda side, first="", heard=None, host=None: "nothing waiting")
+                       open_setter=lambda side, opened_on=(), heard=None, host=None: "nothing waiting")
     action.show_row(_row())
 
     _setter(action, MediaType.IMAGE).click()
@@ -402,7 +406,7 @@ def test_each_action_is_a_pill_with_an_x_that_removes_it_and_saves_at_once(actio
     with qtbot.waitSignal(action.changed) as caught:
         alpha.findChild(QToolButton).click()
 
-    assert caught.args == ["img", MediaType.IMAGE, ItemActions(("beta",), ("first box",))]
+    assert caught.args == [MediaType.IMAGE, {"img": ItemActions(("beta",), ("first box",))}]
     assert _listed(action, MediaType.IMAGE) == ("beta",)
 
 
@@ -462,7 +466,7 @@ def test_picking_an_offered_pill_adds_it_and_saves_at_once(action, qtbot):
     with qtbot.waitSignal(action.changed) as caught:
         qtbot.mouseClick(gamma, Qt.MouseButton.LeftButton)
 
-    assert caught.args == ["img", MediaType.IMAGE, ItemActions(("beta", "gamma"), ("second box",))]
+    assert caught.args == [MediaType.IMAGE, {"img": ItemActions(("beta", "gamma"), ("second box",))}]
     assert (_listed(action, MediaType.IMAGE), _offered(action, MediaType.IMAGE)) == (
         ("beta", "gamma"), [])
 
@@ -492,3 +496,106 @@ def test_the_row_goes_with_the_form_it_fills(qtbot):
     shiboken6.delete(host)
 
     qtbot.waitUntil(lambda: not shiboken6.isValid(row))
+
+
+def _a_folder_of_images():
+    return [_row("one", image=ItemActions(("alpha", "beta"), ("first box",))),
+            _row("two", image=ItemActions(("alpha",), ("first box", "second box")))]
+
+
+def test_a_folder_shows_every_action_its_items_have_and_draws_those_only_some_have_partial(action):
+    action.show_folder(_a_folder_of_images())
+
+    assert ([(pill.text(), _partial(pill)) for pill in _pills(action, MediaType.IMAGE)],
+            _named(action, MediaType.IMAGE)) == ([("alpha", False), ("beta", True)], "Actions")
+
+
+def test_a_folders_checkbox_only_some_of_its_items_have_ticked_is_half_ticked(action):
+    action.show_folder(_a_folder_of_images())
+
+    assert [_box(action, MediaType.IMAGE, name).checkState() for name in _BOXES[MediaType.IMAGE]] == [
+        Qt.CheckState.Checked, Qt.CheckState.PartiallyChecked]
+
+
+def test_removing_an_action_in_a_folder_saves_every_item_as_the_folder_shows(action, qtbot):
+    action.show_folder(_a_folder_of_images())
+    alpha = _pills(action, MediaType.IMAGE)[0]
+
+    with qtbot.waitSignal(action.changed) as caught:
+        alpha.findChild(QToolButton).click()
+
+    assert caught.args == [MediaType.IMAGE, {
+        "one": ItemActions(("beta",), ("first box",)),
+        "two": ItemActions((), ("first box", "second box"))}]
+
+
+def test_a_half_ticked_box_clicked_in_a_folder_ticks_it_on_every_item(action, qtbot):
+    action.show_folder(_a_folder_of_images())
+
+    with qtbot.waitSignal(action.changed) as caught:
+        _box(action, MediaType.IMAGE, "second box").click()
+
+    assert caught.args[1] == {"one": ItemActions(("alpha", "beta"), ("first box", "second box")),
+                              "two": ItemActions(("alpha",), ("first box", "second box"))}
+
+
+def test_picking_a_partial_action_from_the_plus_gives_it_to_every_item(action, qtbot):
+    action.show_folder(_a_folder_of_images())
+    _rows(action).show()
+    _adder(action, MediaType.IMAGE).click()
+    beta = next(pill for pill in _offered(action, MediaType.IMAGE) if pill.text() == "beta")
+
+    with qtbot.waitSignal(action.changed) as caught:
+        qtbot.mouseClick(beta, Qt.MouseButton.LeftButton)
+
+    assert [items.actions for items in caught.args[1].values()] == [("alpha", "beta")] * 2
+    assert [_partial(pill) for pill in _pills(action, MediaType.IMAGE)] == [False, False]
+
+
+def test_a_folders_setter_button_opens_the_setter_tool_on_its_folder(action, opened):
+    action.show_folder(_a_folder_of_images())
+
+    _setter(action, MediaType.IMAGE).click()
+
+    assert opened == [(MediaType.IMAGE, "one")]
+
+
+def test_a_folder_of_videos_shows_their_image_actions_grayed_beside_their_own(action):
+    image = _row("img", image=ItemActions(("alpha",)))
+    videos = [_video("one", video=ItemActions(("delta",))), _video("two")]
+
+    action.show_folder(videos, {"one": image, "two": image})
+
+    image_part = _setter(action, MediaType.IMAGE).parentWidget()
+    assert (_listed(action, MediaType.IMAGE), image_part.isEnabled(), _named(action, MediaType.IMAGE),
+            [(pill.text(), _partial(pill)) for pill in _pills(action, MediaType.VIDEO)]) == (
+        ("alpha",), False, "Image Actions", [("delta", True)])
+
+
+def test_an_answer_the_setter_tool_gives_for_an_item_in_the_folder_shows_at_once(action):
+    action.show_folder(_a_folder_of_images())
+
+    action.heard("two", MediaType.IMAGE, ItemActions(("alpha", "beta"), ("first box",)))
+
+    assert ([_partial(pill) for pill in _pills(action, MediaType.IMAGE)],
+            _box(action, MediaType.IMAGE, "second box").checkState()) == (
+        [False, False], Qt.CheckState.Unchecked)
+
+
+def test_an_answer_the_setter_tool_gives_is_told_on_to_whoever_shows_the_same_item(action, qtbot):
+    action.show_row(_row("img-seven"))
+
+    with qtbot.waitSignal(action.told) as caught:
+        action.heard("img-seven", MediaType.IMAGE, ItemActions(("gamma",)))
+
+    assert caught.args == [MediaType.IMAGE, {"img-seven": ItemActions(("gamma",))}]
+
+
+def test_actions_saved_somewhere_else_show_on_every_item_of_the_folder_they_reach(action):
+    action.show_folder(_a_folder_of_images())
+
+    action.hear(MediaType.IMAGE, {"one": ItemActions(("alpha",), ("first box",)),
+                                  "elsewhere": ItemActions(("gamma",))})
+
+    assert (_listed(action, MediaType.IMAGE),
+            [_partial(pill) for pill in _pills(action, MediaType.IMAGE)]) == (("alpha",), [False])

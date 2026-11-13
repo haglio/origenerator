@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from shared_ui.find_bar import FindBar
+from shared_ui.spacing import GAP_MEDIUM
 from shared_ui.tick_control import TickControl
 
 from origenerator import (
@@ -92,6 +93,7 @@ from origenerator.gui.enhance_controller import (
     EnhanceParts,
     Offer,
 )
+from origenerator.gui.folder_actions import FolderActions
 from origenerator.gui.folder_icons import collection_mark
 from origenerator.gui.folder_path import FolderPath
 from origenerator.gui.folder_tree import TREE_KEY_ROLE as _TREE_KEY_ROLE
@@ -280,6 +282,19 @@ def _press_for_the_gallery(event, *, delete, copy_names, undo, redo):
     if event.key() == Qt.Key.Key_Z and control:
         return redo if event.modifiers() & Qt.KeyboardModifier.ShiftModifier else undo
     return None
+
+
+def _top_section(folder_path: QWidget, buttons: QWidget, folder_actions: QWidget) -> QHBoxLayout:
+    left = QVBoxLayout()
+    left.setContentsMargins(0, 0, 0, 0)
+    left.addWidget(folder_path)
+    left.addWidget(buttons)
+    top = QHBoxLayout()
+    top.setContentsMargins(0, 0, 0, 0)
+    top.setSpacing(GAP_MEDIUM)
+    top.addLayout(left, 1)
+    top.addWidget(folder_actions, 1, Qt.AlignmentFlag.AlignTop)
+    return top
 
 
 class GalleryView(QWidget):
@@ -556,6 +571,7 @@ class GalleryView(QWidget):
         self._arrangement = PaneArrangement(
             toc=toc, gallery_pane=gallery_pane, generate_column=self._build_generate_pane(),
             generate_pane=self._generate_pane, queue=self._queue)
+        self._folder_actions.saved.connect(self._generate_pane.hear_actions)
         folded = self._fun_time is not None and not self._fun_time.in_a_headset
         layout.addWidget(self._arrangement.hosted() if folded
                          else self._arrangement.standalone(), 1)
@@ -605,7 +621,8 @@ class GalleryView(QWidget):
         gallery_pane, gallery_column = pane()
         self._folder_path = FolderPath()
         self._folder_path.folder_chosen.connect(self._go_to_folder)
-        gallery_column.addWidget(self._folder_path)
+        self._folder_actions = FolderActions(self._db, lambda: self._image_rows)
+        self._folder_actions.set_setter_host(self._setter_host)
         self._buttons = GalleryPaneButtons(
             ButtonHandlers(
                 go_back=self._navigation.go_back,
@@ -626,7 +643,7 @@ class GalleryView(QWidget):
             ),
             hosted=self._fun_time is not None,
         )
-        gallery_column.addWidget(self._buttons)
+        gallery_column.addLayout(_top_section(self._folder_path, self._buttons, self._folder_actions))
         self._experiments_cb = TickControl("Run experiments while the app is closed")
         self._experiments_cb.toggled.connect(self._on_experiments_toggled)
         self._experiments_cb.setEnabled(not is_branch_session())
@@ -755,6 +772,8 @@ class GalleryView(QWidget):
         tab.set_enhance_settings(self._enhance.settings)
         tab.set_fullscreen_factory(self._slideshows.open_on_preview)
         tab.set_setter_host(self._setter_host)
+        tab.actions_saved.connect(self._folder_actions.hear)
+        tab.actions_saved.connect(self._generate_pane.hear_actions)
         tab.cancel_requested.connect(lambda p=tab: self._cancel_tab_reroll(p))
         tab.prompt_fields_changed.connect(self._retarget_find)
         tab.form_edited.connect(self._find_bar.refresh)
@@ -1232,6 +1251,7 @@ class GalleryView(QWidget):
 
     def name_search_on_screen(self, query: str, scope: _SearchScope) -> None:
         self._folder_path.show_search(f"Search: “{query}” in ", scope.steps)
+        self._folder_actions.show_folder(None)
         self._avg_label.setText("")
         self._experiments_bar.hide()
 
@@ -1346,6 +1366,7 @@ class GalleryView(QWidget):
                                          and collection.which == _EXPERIMENTS_KEY)
         if current is None:
             self._folder_path.set_display("")
+            self._folder_actions.show_folder(None)
             self._avg_label.setText("")
             self._gallery_pane.show_empty()
             self._re_aim_every_button()
@@ -1378,12 +1399,14 @@ class GalleryView(QWidget):
             self._sync_experiments_bar()
         self._folder_path.show_folder(self._tree_view.path_steps(item),
                                       mark=collection_mark(collection.which))
+        self._folder_actions.show_folder(None)
         self._avg_label.setText("")
         self._clear_metadata()
         self._gallery_pane.show_collection(collection.key, shape)
         self._navigation.record()
 
     def _show_group_contents(self, group, item):
+        self._folder_actions.show_folder(group)
         if isinstance(group, gallery.SettingsGroup):
             self._gallery_pane.show_thumbnails(group)
         elif isinstance(group, gallery.CustomCollection):
@@ -1419,6 +1442,7 @@ class GalleryView(QWidget):
         group = self._selection_group
         self._experiments_bar.hide()
         self._folder_path.set_display(group.label)
+        self._folder_actions.show_folder(None)
         self._update_folder_average(group)
         self._gallery_pane.show_custom_collection(group)
         self._re_aim_every_button()
@@ -2262,6 +2286,7 @@ class GalleryView(QWidget):
             place = self._gallery_pane.place()
             self._gallery_pane.show_thumbnails(group)
             self._gallery_pane.return_to(place)
+            self._folder_actions.show_folder(group)
 
     def listed_prompt_ids(self) -> list[str]:
         return self._gallery_pane.listed_prompt_ids()

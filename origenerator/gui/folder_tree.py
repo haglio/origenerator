@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QStyleOptionViewItem,
     QTreeWidget,
 )
-from shared_ui.colors import BLUE, BORDER_SUBTLE, TEXT_MUTED
+from shared_ui.colors import BLUE, BORDER_SUBTLE, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.spacing import BUTTON_ICON, GAP_SMALL
 
 from origenerator.gui import drop_style, icons
@@ -130,8 +130,9 @@ class _CountBeforeName(QStyledItemDelegate):
 def _draw_count(painter, option, place: QRectF, count: str) -> None:
     painter.save()
     painter.setFont(option.font)
-    painter.setPen(TEXT_MUTED)
-    painter.drawText(place, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, count)
+    picked = bool(option.state & QStyle.StateFlag.State_Selected)
+    painter.setPen(TEXT_PRIMARY if picked else TEXT_MUTED)
+    painter.drawText(place, Qt.AlignmentFlag.AlignCenter, count)
     painter.restore()
 
 

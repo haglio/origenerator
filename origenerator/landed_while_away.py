@@ -11,8 +11,8 @@ from app_support.logging_utils import configure_logging, install_exception_loggi
 
 from origenerator import app_link, fix_training, look_training, lora_training
 from origenerator.comfyui_api import ComfyUIApi
+from origenerator.comfyui_folders import COMFYUI_FOLDERS
 from origenerator.config import (
-    COMFYUI_FOLDERS,
     COMFYUI_HOST,
     COMFYUI_PORT,
     LIBRARY_STATE_DIR,

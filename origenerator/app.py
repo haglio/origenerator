@@ -449,8 +449,8 @@ def _boot_and_run(app, app_args, preview) -> int:
         return _refuse_an_incomplete_overlay(missing, fun_time)
 
     from origenerator import config
+    from origenerator.comfyui_folders import COMFYUI_FOLDERS
     from origenerator.config import (
-        COMFYUI_FOLDERS,
         COMFYUI_HOST,
         COMFYUI_PORT,
         LIBRARY_STATE_DIR,

@@ -13,7 +13,8 @@ from origenerator.base_backfill import (
     rows_missing_their_base,
 )
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.config import COMFYUI_FOLDERS, DB_PATH
+from origenerator.comfyui_folders import COMFYUI_FOLDERS
+from origenerator.config import DB_PATH
 from origenerator.db import Database
 from origenerator.workflows import WORKFLOW_REGISTRY
 

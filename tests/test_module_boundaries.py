@@ -76,7 +76,7 @@ NEEDS_QT = (
 )
 
 
-def _importing_alone(module: str, what: str) -> subprocess.CompletedProcess:
+def _printed_after_importing(module: str, expression: str) -> subprocess.CompletedProcess:
     env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
     env["PYTHONPATH"] = os.pathsep.join(
         p for p in (str(REPO_ROOT), os.environ.get("PYTHONPATH", "")) if p)
@@ -86,15 +86,27 @@ def _importing_alone(module: str, what: str) -> subprocess.CompletedProcess:
          "import origenerator.content as content\n"
          "content.LOCAL_CONTENT = content.EXAMPLE_CONTENT\n"
          f"import {module}\n"
-         f'print("{what}" in sys.modules)')],
+         f"print({expression})")],
         cwd=REPO_ROOT, env=env, capture_output=True, text=True, check=False,
     )
+
+
+def _importing_alone(module: str, what: str) -> subprocess.CompletedProcess:
+    return _printed_after_importing(module, f'"{what}" in sys.modules')
 
 
 def _loaded_after_importing(module: str, what: str) -> bool:
     result = _importing_alone(module, what)
     assert result.returncode == 0, result.stderr
     return result.stdout.strip() == "True"
+
+
+def _database_modules_loaded_by(module: str) -> list[str]:
+    result = _printed_after_importing(
+        module, "sorted(name for name in sys.modules"
+                " if name == 'origenerator.db' or name.startswith('origenerator.db_'))")
+    assert result.returncode == 0, result.stderr
+    return ast.literal_eval(result.stdout.strip())
 
 
 @pytest.mark.parametrize("module", QT_FREE)
@@ -180,11 +192,11 @@ def test_every_unstamped_row_is_stamped_in_one_write(tmp_path):
 
 
 def test_the_action_settings_load_no_database():
-    assert _loaded_after_importing("origenerator.action_settings", "origenerator.db") is False
+    assert _database_modules_loaded_by("origenerator.action_settings") == []
 
 
 def test_the_trash_that_moves_files_knows_no_record_and_no_hold_time():
-    assert _loaded_after_importing("origenerator.trash", "origenerator.db") is False, (
+    assert _database_modules_loaded_by("origenerator.trash") == [], (
         "how long a batch is held is the Trash collection's to decide")
     assert _loaded_after_importing("origenerator.trash", "origenerator.trash_collection") is False
 
@@ -215,8 +227,13 @@ def test_one_module_alone_puts_a_question_to_the_language_model():
     assert asking == {"local_llm.py"}, "a second way to the model would answer the same words two ways"
 
 
+def test_the_settings_load_no_database():
+    assert _database_modules_loaded_by("origenerator.config") == [], (
+        "nearly every module reads the settings, so a database module loaded by them is loaded by all")
+
+
 def test_timing_loads_no_database():
-    assert _loaded_after_importing("origenerator.timing", "origenerator.db") is False
+    assert _database_modules_loaded_by("origenerator.timing") == []
 
 
 @pytest.mark.parametrize("module", NEEDS_QT)
@@ -276,12 +293,12 @@ def test_derived_size_imports_no_workflow_so_the_form_and_the_workflows_share_it
 
 
 def test_the_combine_is_drawn_with_no_database():
-    assert _loaded_after_importing("origenerator.gui.combine", "origenerator.db") is False, (
+    assert _database_modules_loaded_by("origenerator.gui.combine") == [], (
         "the Combine only reports what was asked for; its controller owns the database")
 
 
 def test_a_job_is_followed_with_no_database_of_its_own():
-    assert _loaded_after_importing("origenerator.gui.generation_job", "origenerator.db") is False, (
+    assert _database_modules_loaded_by("origenerator.gui.generation_job") == [], (
         "a job owns no database: whoever launched it decides what to keep of it")
 
 

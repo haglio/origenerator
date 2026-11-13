@@ -1250,10 +1250,7 @@ class SlideshowDirector:
         self.answer(said, kind=kind)
 
     def _favorite_prompt_ids(self) -> set[str]:
-        marked = set(self._library().favorite_ids)
-        for shape in _SHAPES:
-            marked.update(self._library().ids_at(shaped_key(_FAVORITES_KEY, shape)))
-        return marked
+        return self._library().favorite_ids
 
     def _enhanced_ids_of(self, rows) -> set[str]:
         return self._library().enhanced_ids_of(rows)

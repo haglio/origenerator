@@ -132,6 +132,10 @@ class LibrarySnapshot:
         return gallery.recent_generations(self.rows, bumped=self.recency)
 
     @cached_property
+    def favorite_rows(self) -> list[dict]:
+        return gallery.favorite_generations(self.rows)
+
+    @cached_property
     def enhanced_rows(self) -> list[dict]:
         return self._each_alone(gallery.enhanced_generations, "enhanced")
 
@@ -162,7 +166,8 @@ class LibrarySnapshot:
     def _listing(self, which: str | None) -> list[dict]:
         if which is None:
             return self.rows
-        return {LATEST_KEY: self.recent_rows, ENHANCED_KEY: self.enhanced_rows,
+        return {LATEST_KEY: self.recent_rows, FAVORITES_KEY: self.favorite_rows,
+                ENHANCED_KEY: self.enhanced_rows,
                 EXPERIMENTS_KEY: self.experiment_rows, TRASH_KEY: self.held_rows}[which]
 
     def placement(self, shape: str | None) -> Placement:
@@ -268,14 +273,7 @@ class LibrarySnapshot:
         return self._ids_at[key]
 
     def in_collection(self, which: str, shape: str | None, folder: str) -> list[dict]:
-        placement = self.placement(shape)
-        if which == FAVORITES_KEY:
-            group = placement.folder(folder)
-            starred_folders = gallery.favorite_folders(gallery.child_groups(group)) if group else []
-            return _each_once([
-                *placement.held_by(folder, gallery.favorite_generations(self.on_shape(shape))),
-                *(row for starred in starred_folders for row in gallery.rows_under(starred))])
-        return placement.held_by(folder, self.on_shape(shape, which))
+        return self.placement(shape).held_by(folder, self.on_shape(shape, which))
 
     @cached_property
     def image_config_index(self) -> dict:
@@ -319,13 +317,6 @@ def _carried_over(rows, before) -> list[dict]:
 
 def _carried_over_whole(reading, before):
     return before if before is not None and before == reading else reading
-
-
-def _each_once(rows) -> list[dict]:
-    first: dict[str, dict] = {}
-    for row in rows:
-        first.setdefault(row["prompt_id"], row)
-    return list(first.values())
 
 
 class LibraryViews:

@@ -229,7 +229,7 @@ def test_a_folders_latest_is_what_that_folder_holds_of_the_shape_newest_first():
     assert [row["prompt_id"] for row in library.in_collection(LATEST_KEY, "portrait", ALL_KEY)] == ["tall"]
 
 
-def test_favorites_are_the_starred_items_and_everything_under_a_starred_folder_each_once():
+def test_favorites_are_the_items_with_their_own_star_whatever_their_folder_is():
     rows = [_made_with("a1", "alpha.safetensors", starred=True),
             _made_with("a2", "alpha.safetensors"),
             _made_with("b1", "beta.safetensors")]
@@ -239,7 +239,7 @@ def test_favorites_are_the_starred_items_and_everything_under_a_starred_folder_e
 
     favorites = library.in_collection(FAVORITES_KEY, "landscape", ALL_KEY)
 
-    assert sorted(row["prompt_id"] for row in favorites) == ["a1", "a2"]
+    assert [row["prompt_id"] for row in favorites] == ["a1"]
 
 
 def test_the_trash_of_a_folder_holds_what_was_deleted_from_it():

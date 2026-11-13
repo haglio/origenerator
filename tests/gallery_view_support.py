@@ -214,14 +214,6 @@ class FakeDB:
     def folder_meta_map(self):
         return {k: dict(v) for k, v in self._meta.items()}
 
-    def folder_enhance_map(self):
-        return {k: v["enhance_json"] for k, v in self._meta.items()
-                if v.get("enhance_json")}
-
-    def set_folder_enhance(self, key, enhance_json):
-        self._meta.setdefault(key, {"custom_name": None, "starred": False})
-        self._meta[key]["enhance_json"] = enhance_json
-
     def upsert_folder_meta(self, key, *, custom_name, favorite, level, ref_prompt_id):
         self._meta[key] = {"custom_name": custom_name, "starred": bool(favorite)}
 

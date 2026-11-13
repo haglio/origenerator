@@ -40,6 +40,7 @@ from tests.gallery_view_support import (
     _a_slideshow_standing_on_its_own,
     _alls,
     _at,
+    _children_by_prompt,
     _collection,
     _collection_row,
     _double_click_slideshow,
@@ -825,21 +826,23 @@ def test_condemning_an_experiment_in_a_slideshow_rejects_it(qtbot):
     assert [r["prompt_id"] for batch in actions.deleted for r in batch] == ["i1"]
 
 
-def test_favorite_slideshow_plays_favorite_items_and_folders_once(qtbot, monkeypatch):
+def test_favorite_slideshow_plays_only_items_with_their_own_star(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
+    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2),
+                 _image("i3", "a dog", 50, 3)])
     db.set_generation_favorite("i2", True)
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)
-    view._toggle_favorite(_key(_at(lora, 0)))
+    db.set_folder_favorite(_key(_children_by_prompt(lora)["a cat"]), True)
+    view.refresh()
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
 
     view._slideshows.start()
 
     qtbot.addWidget(view._slideshows.showing.shown)
-    assert {item[2] for item in view._slideshows.showing._set.playlist._items} == {"i1", "i2"}
+    assert [item[2] for item in view._slideshows.showing._set.playlist._items] == ["i2"]
     view._slideshows.showing.close()
 
 
@@ -966,29 +969,6 @@ def test_leaving_a_slideshow_of_all_picks_the_folder_square_its_slide_came_from(
     assert view._gallery_pane.selected_ids == set()
     picked = [tile.key for tile in _folder_squares(view) if tile._selected]
     assert picked == [_folder_square_holding(view, shown)]
-
-
-def test_leaving_a_favorites_slideshow_picks_the_favorited_folder_its_slide_came_from(
-        qtbot, monkeypatch):
-    _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
-    _on_screen(qtbot, view, 1800, 1300)
-    lora = _at(_image_workflow(view._tree), 0, 0)
-    favorited = _key(_at(lora, 0))
-    view._toggle_favorite(favorited)
-    collection = _collection(view, FAVORITES_KEY)
-    view._tree.setCurrentItem(collection)
-    view._slideshows.start()
-    slideshow = view._slideshows.showing
-    qtbot.addWidget(slideshow.shown)
-    shown = slideshow._set.playlist.current()[2]
-    assert shown not in _drawn(view)
-
-    slideshow.close()
-
-    assert view._tree.currentItem() is collection
-    picked = [tile.key for tile in _folder_squares(view) if tile._selected]
-    assert picked == [favorited]
 
 
 def test_the_image_a_locked_slideshow_ends_on_stays_picked_and_in_view_as_the_library_moves(

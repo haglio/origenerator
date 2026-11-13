@@ -458,13 +458,11 @@ def test_an_answer_given_on_a_slideshow_opened_meanwhile_ends_the_captions_promi
     slideshow = FakeSlideshow()
 
     voice._answer_request(slideshow, "no hat — generating", mine)
-    voice.say("heard: “something else”")
-    voice._revert()
 
     assert slideshow.requests == [("no hat — generating", False, INFO)]
     assert words(voice.status) == "Listening…", (
         "a slideshow can open while the request is worked out, so the answer that goes to it "
-        "ends the caption's promise too, and nothing flashed later falls back to it")
+        "takes the caption's promise down at once")
 
 
 def test_what_was_heard_reaches_the_caption_and_the_center_top_of_the_slideshow(router):

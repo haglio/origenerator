@@ -161,6 +161,7 @@ class VoiceRouter(QObject):
         self._flash_timer.setSingleShot(True)
         self._flash_timer.timeout.connect(self._revert)
         self._promise = RequestPromise()
+        self._caption: str | None = None
         self._switches: dict[str, QWidget | None] = {}
         self._buttons: dict = {}
         self._enhance = None
@@ -218,6 +219,7 @@ class VoiceRouter(QObject):
         self._show(message, transient=True, mark=mark)
 
     def _set_caption(self, text: str | None, mark: str = HEARD_MARK) -> None:
+        self._caption = text
         if text is None:
             self.status.hide()
         else:
@@ -428,7 +430,7 @@ class VoiceRouter(QObject):
                         working: bool = False, kind: str = INFO) -> None:
         if working:
             self._promise.make("" if slideshow is not None else message, spoken)
-        elif (promised := self._promise.keep(spoken)) and self.status.text() == promised:
+        elif (promised := self._promise.keep(spoken)) and self._caption == promised:
             self._revert()
         if slideshow is not None:
             slideshow.note_request(message, spoken, working=working, kind=kind)

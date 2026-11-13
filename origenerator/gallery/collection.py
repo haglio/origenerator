@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
+from funestra.hud_title import LATEST_LABEL
+
 from origenerator.gallery.tree import ALL_KEY
 
 LATEST_KEY = "__recents__"
-LATEST_LABEL = "Latest"
 FAVORITES_KEY = "__starred__"
 FAVORITES_LABEL = "Favorites"
 ENHANCED_KEY = "__enhanced__"

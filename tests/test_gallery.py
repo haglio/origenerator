@@ -669,8 +669,8 @@ def test_a_generate_tab_on_a_folders_settings_wears_the_code_its_folder_wears(ro
     signature = settings_signature(row["workflow_name"], row["params_json"])
 
     assert config_folder_name(row["workflow_name"], signature) == folder.label, (
-        "a folder's generic name is one short code from its key, the same code in the TOC "
-        "and on a Generate tab holding its settings")
+        "a folder's generic name is the same code in the TOC and on a Generate tab holding "
+        "its settings")
 
 
 def test_a_run_that_recorded_no_model_never_shares_a_folder_key_with_the_default_models_run():

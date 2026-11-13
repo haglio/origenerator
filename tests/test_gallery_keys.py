@@ -39,3 +39,9 @@ def test_a_folders_generic_name_is_one_short_upper_case_code():
     assert set(name.lower()) <= _HEX, (
         "a folder's name is in hex, which has no O to mistake for 0 and no I to mistake for 1")
     assert name == folder_id(settings_key("image", "sdxl_t2i", "steps=30"))
+
+
+def test_a_settings_folders_key_keeps_the_value_it_was_saved_under():
+    assert settings_key("image", "sdxl_t2i", "steps=30") == "image/sdxl_t2i/946c3546ea45", (
+        "a folder's key is the identity its favorite is stored under, so its value may not "
+        "change for settings already saved")

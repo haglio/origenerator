@@ -444,10 +444,10 @@ def test_only_that_requests_own_answer_takes_its_promise_down(router):
     voice._answer_request(None, "working out “no hat”…", mine, working=True)
 
     voice._answer_request(None, "something about another one", Spoken("no shoes"))
-    assert voice._working_status == "working out “no hat”…"
+    assert voice._promise.note == "working out “no hat”…"
 
     voice._answer_request(None, "no hat — generating", mine)
-    assert voice._working_status == ""
+    assert voice._promise.note == ""
 
 
 def test_an_answer_given_on_a_slideshow_opened_meanwhile_ends_the_captions_promise(router):

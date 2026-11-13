@@ -116,7 +116,11 @@ class FiledRows(NamedTuple):
 
 def surroundings(current: dict, rows, *, image_index,
                  filed: FiledRows | None = None) -> Surroundings:
-    animations = _Animations(rows, image_index)
+    return _surroundings(current, rows, _Animations(rows, image_index), image_index, filed)
+
+
+def _surroundings(current: dict, rows, animations: _Animations, image_index,
+                  filed: FiledRows | None = None) -> Surroundings:
     own = animations.actions_line_of(current)
     seeds, configs, group = _made_here_around(current, rows, animations, image_index)
     if filed is not None:
@@ -187,7 +191,7 @@ def beyond_the_row(current: dict, rows, *, image_index, additions: int = WIDEN_A
                                           additions=additions)
         return [*filed.more_seeds, *made_here_beyond][:max(additions, 0)]
     animations = _Animations(rows, image_index)
-    around = surroundings(current, rows, image_index=image_index)
+    around = _surroundings(current, rows, animations, image_index)
     kept = {current["prompt_id"], *(row["prompt_id"] for row in around.seeds)}
     model = gallery.folder_key_at_level(current, "model", image_index)
     lora = gallery.folder_key_at_level(current, "lora", image_index)

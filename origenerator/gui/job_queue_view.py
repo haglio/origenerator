@@ -189,7 +189,7 @@ class RunningPreview(OpensAFolder, QWidget):
         self.show_foreign(queue_wait_text(self._item.foreign_ahead, self._item.starts_at) or "")
         self._offer_start_now(seconds_until_start(self._item.starts_at) is not None)
         self._progress.show_progress(
-            self._item.reading.caption(),
+            self._item.reading.caption(compact=True),
             *self._item.reading.bars(),
         )
 

@@ -11,6 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 import shiboken6
+from app_support.kino_folder import upscale_in, upscales_in
 from PIL import Image
 from PySide6.QtCore import QPoint, QPointF, QSize, Qt
 from PySide6.QtGui import (
@@ -1866,8 +1867,9 @@ def _evolver_upscaled_video(db, monkeypatch, tmp_path, prompt_id="vid1"):
     video.parent.mkdir(parents=True)
     video.write_bytes(b"video")
     os.utime(video, _WELL_BEFORE_ITS_UPSCALE)
-    library = tmp_path / "upscaled_by_orientation"
-    upscale = library / "portrait" / EVOLVER_SOURCE / f"{prompt_id}_topaz.mp4"
+    kino = tmp_path / "kino"
+    library = upscales_in(kino)
+    upscale = upscale_in(kino, "portrait", EVOLVER_SOURCE, prompt_id)
     upscale.parent.mkdir(parents=True)
     upscale.write_bytes(b"upscale")
     monkeypatch.setattr(generate_tab_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))

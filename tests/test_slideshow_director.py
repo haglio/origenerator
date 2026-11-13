@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from typing import NamedTuple
 
 import pytest
+from app_support.kino_folder import upscale_in, upscales_in
 from funestra.hud_placement import HudCorner
 from funestra.hud_title import LATEST_LABEL
 from PIL import Image
@@ -1366,8 +1367,9 @@ def _evolver_upscaled_video(tmp_path, monkeypatch):
     video.parent.mkdir()
     video.write_bytes(b"video")
     os.utime(video, _WELL_BEFORE_ITS_UPSCALE)
-    library = tmp_path / "upscaled_by_orientation"
-    upscale = library / "landscape" / "origenerator" / "clip_topaz.mp4"
+    kino = tmp_path / "kino"
+    library = upscales_in(kino)
+    upscale = upscale_in(kino, "landscape", "origenerator", "clip")
     upscale.parent.mkdir(parents=True)
     upscale.write_bytes(b"upscale")
     monkeypatch.setattr(library_views, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))

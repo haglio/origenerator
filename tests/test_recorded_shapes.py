@@ -37,6 +37,20 @@ def test_a_recorded_shape_answers_though_no_file_can_be_opened():
     assert item_shape.row_shape({"shape": PORTRAIT, "thumbnail_path": "/made-up/gone.png"}) == PORTRAIT
 
 
+def test_a_recorded_shape_answers_without_looking_for_the_items_file(monkeypatch, tall_image):
+    looked_up = []
+    measure = item_shape._measure_any
+    monkeypatch.setattr(item_shape, "_measure_any",
+                        lambda candidates: looked_up.append(candidates) or measure(candidates))
+
+    item_shape.row_shape({"shape": PORTRAIT, "thumbnail_path": tall_image})
+
+    assert looked_up == [], (
+        "a slideshow on a Fun Time region sorts the whole library by shape on every image a "
+        "running generation streams, and looking each item's file up again for a shape already "
+        "known froze the window long enough for Windows to close it")
+
+
 def test_a_row_with_no_recorded_shape_is_measured_from_its_thumbnail(tall_image):
     assert item_shape.row_shape({"thumbnail_path": tall_image}) == PORTRAIT
 

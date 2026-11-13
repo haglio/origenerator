@@ -103,29 +103,3 @@ def test_a_tally_counts_a_row_once_in_every_folder_holding_it():
     assert tally[ALL_KEY] == 3
     assert tally[models["alpha"].key] == 2
     assert tally[models["beta"].key] == 1
-
-
-def test_a_folder_favors_its_favorite_rows_and_the_rows_of_favorite_folders_below_it():
-    rows = [_image("p1", "alpha.safetensors", starred=1),
-            _image("p2", "beta.safetensors"), _image("p3", "beta.safetensors", steps=40)]
-    library = _library(rows)
-    models = _models(library)
-    (beta_lora,) = child_groups(models["beta"])
-    beta_lora.favorite = True
-
-    tally = _placement(library).tally_favorites(rows)
-
-    assert tally[ALL_KEY] == 3
-    assert tally[models["alpha"].key] == 1
-    assert tally[models["beta"].key] == 2
-    assert tally[beta_lora.key] == 0
-
-
-def test_a_generation_the_tree_does_not_hold_is_no_favorite_of_its_folder():
-    kept = _image("p1", "beta.safetensors")
-    failed = {**_image("p2", "beta.safetensors", seed=2), "status": "error", "output_files": None}
-    library = _library([kept])
-    (beta_lora,) = child_groups(_models(library)["beta"])
-    beta_lora.favorite = True
-
-    assert _placement(library).tally_favorites([kept, failed])[ALL_KEY] == 1

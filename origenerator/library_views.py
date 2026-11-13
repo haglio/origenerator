@@ -98,6 +98,14 @@ class LibrarySnapshot:
                     image_index=self.image_index, name_of=self._name_of, kept=kept))
         return self._drawn[shape][1]
 
+    def leaf_folders(self, shapes) -> dict[str, list[dict]]:
+        held: dict[str, dict[str, dict]] = {}
+        for shape in shapes:
+            for leaf in gallery.leaf_folders(self.tree(shape)):
+                held.setdefault(leaf.key, {}).update(
+                    (row["prompt_id"], row) for row in leaf.rows)
+        return {key: list(rows.values()) for key, rows in held.items()}
+
     def drawn(self) -> dict[str, tuple[KeptFolders, list]]:
         return {**(self._drawn_before if self._unmoved else {}), **self._drawn}
 
@@ -110,6 +118,10 @@ class LibrarySnapshot:
         if row is not None:
             return row
         return next((held for held in self.held_rows if held["prompt_id"] == prompt_id), None)
+
+    @cached_property
+    def highest_id(self) -> int:
+        return max((row["id"] for row in self.rows), default=0)
 
     @property
     def favorite_ids(self) -> set[str]:
@@ -130,10 +142,6 @@ class LibrarySnapshot:
     @cached_property
     def recent_rows(self) -> list[dict]:
         return gallery.recent_generations(self.rows, bumped=self.recency)
-
-    @cached_property
-    def favorite_rows(self) -> list[dict]:
-        return gallery.favorite_generations(self.rows)
 
     @cached_property
     def enhanced_rows(self) -> list[dict]:
@@ -166,8 +174,7 @@ class LibrarySnapshot:
     def _listing(self, which: str | None) -> list[dict]:
         if which is None:
             return self.rows
-        return {LATEST_KEY: self.recent_rows, FAVORITES_KEY: self.favorite_rows,
-                ENHANCED_KEY: self.enhanced_rows,
+        return {LATEST_KEY: self.recent_rows, ENHANCED_KEY: self.enhanced_rows,
                 EXPERIMENTS_KEY: self.experiment_rows, TRASH_KEY: self.held_rows}[which]
 
     def placement(self, shape: str | None) -> Placement:
@@ -273,7 +280,9 @@ class LibrarySnapshot:
         return self._ids_at[key]
 
     def in_collection(self, which: str, shape: str | None, folder: str) -> list[dict]:
-        return self.placement(shape).held_by(folder, self.on_shape(shape, which))
+        listed = (gallery.favorite_generations(self.on_shape(shape)) if which == FAVORITES_KEY
+                  else self.on_shape(shape, which))
+        return self.placement(shape).held_by(folder, listed)
 
     @cached_property
     def image_config_index(self) -> dict:

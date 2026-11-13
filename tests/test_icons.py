@@ -315,6 +315,16 @@ def test_a_favorite_folders_favorite_is_the_same_green(qtbot):
         != filled.toImage()
 
 
+def test_the_star_switch_wears_its_white_ring_while_it_is_on(qtbot):
+    star = icons.star_switch_icon()
+    size = QSize(48, 48)
+
+    on = star.pixmap(size, QIcon.Mode.Normal, QIcon.State.On).toImage()
+
+    assert on == star.pixmap(size, QIcon.Mode.Selected).toImage()
+    assert on != star.pixmap(size, QIcon.Mode.Normal, QIcon.State.Off).toImage()
+
+
 def test_reroll_seed_icons_render_and_differ_by_media(qtbot):
     video = icons.reroll_seed_icon(MediaType.VIDEO)
     image = icons.reroll_seed_icon(MediaType.IMAGE)

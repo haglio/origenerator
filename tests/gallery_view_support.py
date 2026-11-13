@@ -145,6 +145,9 @@ class FakeDB:
     def __init__(self, rows):
         self._rows = list(rows)
         self._by_id = {r["prompt_id"]: r for r in rows}
+        self._issued = 0
+        for row in reversed(self._rows):
+            self._issue_an_id(row)
         self._meta = {}
         self._custom = {}
         self._next_custom = 1
@@ -153,6 +156,12 @@ class FakeDB:
         self._seed_uses = []
         self._combine_video_uses = []
         self._item_numbers = {}
+
+    def _issue_an_id(self, row):
+        if "id" not in row:
+            self._issued += 1
+            row["id"] = self._issued
+        self._issued = max(self._issued, row["id"])
 
     def list_generations(self):
         return [dict(row) for row in self._rows]
@@ -217,9 +226,21 @@ class FakeDB:
     def upsert_folder_meta(self, key, *, custom_name, favorite, level, ref_prompt_id):
         self._meta[key] = {"custom_name": custom_name, "starred": bool(favorite)}
 
-    def set_folder_favorite(self, key, favorite):
-        self._meta.setdefault(key, {"custom_name": None, "starred": False})
-        self._meta[key]["starred"] = bool(favorite)
+    def _meta_of(self, key):
+        return self._meta.setdefault(key, {"custom_name": None, "starred": False,
+                                           "favorite_after_id": None,
+                                           "enhance_after_id": None})
+
+    def set_folder_favorite(self, key, favorite, *, after_id=None):
+        self._meta_of(key).update(starred=bool(favorite),
+                                  favorite_after_id=after_id if favorite else None)
+
+    def set_folder_enhance(self, key, *, after_id):
+        self._meta_of(key)["enhance_after_id"] = after_id
+
+    def move_folder_arrivals_on(self, key, *, favorite_after_id, enhance_after_id):
+        self._meta_of(key).update(favorite_after_id=favorite_after_id,
+                                  enhance_after_id=enhance_after_id)
 
     def set_many_actions(self, side, actions_by_id):
         for prompt_id, item_actions in actions_by_id.items():
@@ -312,6 +333,7 @@ class FakeDB:
                 for key, (level, ref) in f["folders"].items()]
 
     def add(self, row):
+        self._issue_an_id(row)
         self._rows.insert(0, row)
         self._by_id[row["prompt_id"]] = row
 

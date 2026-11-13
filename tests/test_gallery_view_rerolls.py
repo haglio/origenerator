@@ -462,6 +462,10 @@ def test_populating_in_a_folder_favorites_it(qtbot, tmp_path):
 
     assert db.folder_meta_map()[key]["starred"] is True
     assert view.group_for_key(key).favorite
+    view.refresh()
+    assert {row["prompt_id"]: bool(row["starred"]) for row in db.list_generations()} == {
+        row["prompt_id"]: True for row in db.list_generations()}, (
+        "what Populate makes there arrives in a favorite folder, so it gets a star of its own")
 
 
 def test_populating_in_a_favorite_folder_leaves_it_a_favorite(qtbot, tmp_path):

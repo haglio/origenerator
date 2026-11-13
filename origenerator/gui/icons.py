@@ -135,6 +135,12 @@ def star_icon(*, filled: bool) -> QIcon:
     return qt_icon("star_outline", size=_SIZE)
 
 
+def star_switch_icon() -> QIcon:
+    icon = star_icon(filled=True)
+    icon.addPixmap(_painted(_ringed_star), QIcon.Mode.Normal, QIcon.State.On)
+    return icon
+
+
 def _ringed_star(painter: QPainter):
     draw_icon(painter, "star_ring", TEXT_PRIMARY, size=_SIZE)
     draw_icon(painter, "star", STAR_GLYPH, size=_SIZE)

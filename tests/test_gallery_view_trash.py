@@ -374,7 +374,8 @@ def test_neither_trash_action_asks_anything_of_an_empty_pick(qtbot):
     assert actions.purged == []
 
 
-def test_delete_on_the_trash_collection_means_permanently(qtbot, monkeypatch):
+def test_delete_on_the_trash_collection_means_permanently_and_the_trash_at_the_top_grays_out(
+        qtbot, monkeypatch):
     actions = FakeActions()
     view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1))]),
                        actions=actions)
@@ -384,7 +385,7 @@ def test_delete_on_the_trash_collection_means_permanently(qtbot, monkeypatch):
     view._gallery_pane.apply_selection("d1", _NO_MOD)
     monkeypatch.setattr(view, "_confirm", lambda text: True)
 
-    assert "Permanently delete 1 item" in view._buttons.delete.toolTip()
+    assert not view._buttons.delete.isEnabled()
     view._delete_selection()
 
     assert actions.purged == [["d1"]]
@@ -782,7 +783,7 @@ def test_clicking_the_pane_background_drops_the_selection(qtbot):
     qtbot.mouseClick(pane, Qt.MouseButton.LeftButton, pos=QPoint(560, 560))
 
     assert view.selected_prompt_ids() == []
-    assert "folder" in view._buttons.enhance.toolTip()
+    assert "folder" in view._enhance.pane._enhance_button.toolTip()
 
 
 def test_clicking_the_pane_background_leaves_the_tiles_on_screen(qtbot):
@@ -1382,7 +1383,7 @@ def test_a_deleted_item_picked_in_the_trash_has_nothing_to_favorite(qtbot):
 
     assert view.selected_prompt_ids() == ["d1"]
     assert not view._buttons.favorite.isEnabled()
-    assert view._buttons.favorite.toolTip() == "Nothing here to favorite"
+    assert view._buttons.favorite.toolTip() == "Only a leaf folder can be favorited"
 
 
 def test_trashing_an_item_with_no_row_from_a_slideshow_does_nothing(qtbot):

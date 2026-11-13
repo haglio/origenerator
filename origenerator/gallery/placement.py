@@ -4,7 +4,6 @@ from collections import Counter
 
 from origenerator.gallery.groups import child_groups
 from origenerator.gallery.tree import ALL_KEY, folder_chain
-from origenerator.output_files import produced_output
 
 
 class Placement:
@@ -43,16 +42,3 @@ class Placement:
 
     def tally(self, rows) -> Counter:
         return Counter(key for row in rows for key in self.chain(row))
-
-    def tally_favorites(self, rows) -> Counter:
-        favorite_keys = {key for key, folder in self._folders.items() if folder.favorite}
-        tally = Counter()
-        for row in rows:
-            if row.get("starred") and produced_output(row):
-                tally.update(self.chain(row))
-                continue
-            placed = self._placed.get(row["prompt_id"], ())
-            deepest = max((depth for depth, key in enumerate(placed) if key in favorite_keys),
-                          default=0)
-            tally.update(placed[:deepest])
-        return tally

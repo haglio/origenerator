@@ -354,6 +354,33 @@ def test_the_pills_wrap_onto_more_lines_rather_than_being_cut_short(action, qtbo
     assert all(pill.width() >= pill.sizeHint().width() for pill in _pills(action, MediaType.IMAGE))
 
 
+
+def _laid_out(action, qtbot) -> None:
+    qtbot.waitUntil(lambda: all(pill.isVisible() for pill in _pills(action, MediaType.IMAGE)))
+    row = _pill_row(action, MediaType.IMAGE)
+    row.layout().setGeometry(row.rect())
+
+
+def test_the_plus_stands_left_of_the_pills_and_stays_put_as_one_is_added(action, qtbot):
+    action.show_row(_row(image=ItemActions(("beta",))))
+    host = _rows(action)
+    host.resize(900, 400)
+    with qtbot.waitExposed(host):
+        host.show()
+    _laid_out(action, qtbot)
+    plus = _adder(action, MediaType.IMAGE)
+    before = plus.pos()
+    plus.click()
+    qtbot.mouseClick(next(pill for pill in _offered(action, MediaType.IMAGE)
+                          if pill.text() == "alpha"), Qt.MouseButton.LeftButton)
+    _laid_out(action, qtbot)
+
+    pills = _pills(action, MediaType.IMAGE)
+    assert (plus.pos(), [pill.text() for pill in pills],
+            all(pill.x() > plus.x() and pill.y() == plus.y() for pill in pills)) == (
+        before, ["beta", "alpha"], True)
+
+
 def test_the_button_sits_on_a_line_of_its_own_under_the_checkboxes_and_the_actions(action):
     action.show_row(_row(image=ItemActions(("alpha",))))
     _rows(action).resize(600, 300)

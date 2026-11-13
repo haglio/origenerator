@@ -24,3 +24,13 @@ def test_the_genau_lanes_word_is_the_one_haglios_settings_give_genaus_videos():
 def test_the_kino_lane_calls_what_it_sends_a_video():
     assert KINO.noun == "video"
     assert "this video" in KINO.withdrawn_tooltip
+
+
+def test_each_send_button_says_it_sends_to_its_app_in_plain_words():
+    lane = dataclasses.replace(GENAU, word=lambda: "flick")
+
+    said = [lane.tooltip, lane.withdrawn_tooltip, KINO.tooltip, KINO.withdrawn_tooltip]
+
+    assert (lane.tooltip.startswith("Send this flick to Genau:"),
+            KINO.tooltip.startswith("Send this video to Kino:"),
+            [words for words in said if "lane" in words]) == (True, True, [])

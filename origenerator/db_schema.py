@@ -327,6 +327,8 @@ ADDED_COLUMNS = {
     "folder_meta": {
         "level": "TEXT",
         "ref_prompt_id": "TEXT",
+        "favorite_after_id": "INTEGER",
+        "enhance_after_id": "INTEGER",
     },
     "custom_folders": {
         "side": "TEXT",

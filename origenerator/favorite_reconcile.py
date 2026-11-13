@@ -61,7 +61,8 @@ def reconcile_folder_meta(db, folders: Folders | None = None) -> dict:
         level, ref = identity
         held = meta_by_key[row["folder_key"]]
         db.upsert_folder_meta(row["folder_key"], custom_name=held["custom_name"],
-                              favorite=held["starred"], level=level, ref_prompt_id=ref)
+                              favorite=held["starred"], level=level, ref_prompt_id=ref,
+                              **_switches_of(held))
         held["level"], held["ref_prompt_id"] = level, ref
 
     def repoint(row, target, identity):
@@ -164,14 +165,21 @@ def _repoint_target(row, folders: Folders):
     return folders.legacy_keys.get(row["folder_key"])
 
 
+def _switches_of(meta: dict) -> dict:
+    return {"favorite_after_id": meta.get("favorite_after_id"),
+            "enhance_after_id": meta.get("enhance_after_id")}
+
+
 def _move_favorite(db, row, target, identity, meta_by_key):
     level, ref = identity
     existing = meta_by_key.get(target)
     name = (existing["custom_name"] if existing else None) or row["custom_name"]
     favorite = bool((existing["starred"] if existing else False) or row["starred"])
+    switches = {switch: (existing or {}).get(switch) or row.get(switch)
+                for switch in _switches_of(row)}
     db.upsert_folder_meta(target, custom_name=name, favorite=favorite,
-                          level=level, ref_prompt_id=ref)
+                          level=level, ref_prompt_id=ref, **switches)
     db.delete_folder_meta(row["folder_key"])
     meta_by_key[target] = {"folder_key": target, "custom_name": name, "starred": favorite,
-                           "level": level, "ref_prompt_id": ref}
+                           "level": level, "ref_prompt_id": ref, **switches}
     meta_by_key.pop(row["folder_key"], None)

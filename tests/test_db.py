@@ -296,7 +296,8 @@ def test_an_early_database_gains_every_generations_column(tmp_path, column):
     assert column in _columns(tmp_path / "old.db", "generations")
 
 
-@pytest.mark.parametrize("column", ["level", "ref_prompt_id"])
+@pytest.mark.parametrize("column", ["level", "ref_prompt_id", "favorite_after_id",
+                                    "enhance_after_id"])
 def test_an_early_database_gains_every_folder_meta_column(tmp_path, column):
     Database(_database_as_first_written(tmp_path / "old.db"))
 
@@ -569,6 +570,41 @@ def test_favorite_folder_round_trips_and_preserves_custom_name(tmp_path):
     assert db.folder_meta_map()["image/sdxl_t2i"]["starred"] is False
 
 
+def test_a_folder_favorited_from_an_item_on_remembers_the_item_and_forgets_it_when_unfavorited(
+        tmp_path):
+    db = Database(tmp_path / "test.db")
+
+    db.set_folder_favorite("k", True, after_id=41)
+    assert db.folder_meta_map()["k"]["favorite_after_id"] == 41
+
+    db.set_folder_favorite("k", False)
+    assert db.folder_meta_map()["k"]["favorite_after_id"] is None
+
+
+def test_a_folders_enhance_is_on_from_an_item_until_it_is_turned_off(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.set_folder_favorite("k", True, after_id=3)
+
+    db.set_folder_enhance("k", after_id=7)
+    assert db.folder_meta_map()["k"]["enhance_after_id"] == 7
+    assert db.folder_meta_map()["k"]["favorite_after_id"] == 3
+
+    db.set_folder_enhance("k", after_id=None)
+    assert db.folder_meta_map()["k"]["enhance_after_id"] is None
+    assert db.folder_meta_map()["k"]["starred"] is True
+
+
+def test_a_folders_arrivals_move_on_without_touching_its_switches(tmp_path):
+    db = Database(tmp_path / "test.db")
+    db.set_folder_favorite("k", True, after_id=3)
+    db.set_folder_enhance("k", after_id=3)
+
+    db.move_folder_arrivals_on("k", favorite_after_id=9, enhance_after_id=8)
+
+    meta = db.folder_meta_map()["k"]
+    assert (meta["starred"], meta["favorite_after_id"], meta["enhance_after_id"]) == (True, 9, 8)
+
+
 def test_folder_meta_full_reports_identity_columns(tmp_path):
     db = Database(tmp_path / "test.db")
     db.upsert_folder_meta("image/sdxl_t2i/abc123", custom_name="Cats", favorite=True,
@@ -576,6 +612,7 @@ def test_folder_meta_full_reports_identity_columns(tmp_path):
     assert db.folder_meta_full() == [{
         "folder_key": "image/sdxl_t2i/abc123", "custom_name": "Cats",
         "starred": True, "level": "settings", "ref_prompt_id": "p1",
+        "favorite_after_id": None, "enhance_after_id": None,
     }]
 
 

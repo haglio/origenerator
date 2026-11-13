@@ -19,7 +19,7 @@ from shared_ui.colors import (
 )
 from shared_ui.icons import CANVAS, draw_icon, icon_pixmap, qt_icon
 from shared_ui.spacing import BUTTON_ICON
-from shared_ui.type_scale import FONT_UI, SIZE_TINY, in_pixels
+from shared_ui.type_scale import FONT_UI, SIZE_BODY, SIZE_TINY, in_pixels
 
 from origenerator.media import icon_name
 
@@ -33,7 +33,11 @@ _TOC_INITIALS = {
 _ITEM_TYPE_ICON_GROUND = QColor(*palette.BLACK, 160)
 _ITEM_TYPE_ICON_INK = WHITE
 _ITEM_TYPE_ICON_SIZE = 22
-_TOC_INITIAL_LETTER = round(in_pixels(SIZE_TINY) * _SIZE / BUTTON_ICON)
+_DRAWN_BIGGER = {"S": SIZE_BODY}
+
+
+def _initial_size(letter: str) -> int:
+    return round(in_pixels(_DRAWN_BIGGER.get(letter, SIZE_TINY)) * _SIZE / BUTTON_ICON)
 
 _GLYPH_ON_GROUND = 44
 _GROUND_INSET = (_SIZE - _GLYPH_ON_GROUND) / 2
@@ -333,7 +337,7 @@ def _render_toc_initial(letter: str, color) -> QPixmap:
     def draw(painter: QPainter):
         font = QFont(FONT_UI)
         font.setBold(True)
-        font.setPixelSize(_TOC_INITIAL_LETTER)
+        font.setPixelSize(_initial_size(letter))
         painter.setFont(font)
         painter.setPen(_readable_on(color))
         painter.drawText(QRectF(0, 0, _SIZE, _SIZE),

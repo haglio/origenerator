@@ -244,7 +244,7 @@ class AnimationCheckWindow(QWidget):
     def _play(self, loop) -> None:
         if not loop:
             self._video.clear()
-            self._video.setText("(this clip's file is missing)")
+            self._video.setText("(this video's file is missing)")
             return
         play_in(self._video, str(loop),
                 QSize(self._video.width(), self._video.height()))

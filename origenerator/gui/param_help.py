@@ -61,7 +61,7 @@ PARAM_HELP: dict[str, str] = {
     "scene_frames": (
         "How long each scene of the story runs, at the rate the model paces "
         "motion. Every scene after the first starts on the last frame of the one "
-        "before it, so the clip is the scenes end to end."
+        "before it, so the video is the scenes end to end."
     ),
     "scene_lines": (
         "What she says in this scene, spoken in the voice set under Audio. A "
@@ -241,13 +241,13 @@ PARAM_HELP: dict[str, str] = {
         "The output height in pixels."
     ),
     "frame_count": (
-        "How long the clip runs, in seconds — of real motion, at any frame rate. Pick "
+        "How long the video runs, in seconds — of real motion, at any frame rate. Pick "
         "a length or type one; it is rounded to the frames the model works in, and "
         "stops where the model stops."
     ),
     "frame_rate": (
         "How smooth the motion looks. The model always paces the action at 16 frames "
-        "a second; a higher rate fills in the frames between those, so the clip runs "
+        "a second; a higher rate fills in the frames between those, so the video runs "
         "the same length at the same speed, just less steppy. Rates are multiples of "
         "16 because the frames are filled in a whole number at a time; anything else "
         "settles onto the nearest."
@@ -287,7 +287,7 @@ RECOMMENDED: dict[str, str] = {
         "the dpmpp ones (DPM++ 2M Karras on model pages)."
     ),
     "shift_high": (
-        "8 is the usual start, 5 for a looping clip."
+        "8 is the usual start, 5 for a looping video."
     ),
     "enhance_detail_fixes": (
         "Good range: 0.3\u20130.5 for each part."
@@ -301,7 +301,7 @@ RECOMMENDED: dict[str, str] = {
         "or 1216\u00d7832; up to about two for Flux and WAN 2.2 T2I."
     ),
     "frame_count": (
-        "A longer clip is made in pieces, each starting on the last frame of the one "
+        "A longer video is made in pieces, each starting on the last frame of the one "
         "before, and can drift."
     ),
     "frame_rate": (

@@ -894,6 +894,9 @@ def test_a_seed_a_workflow_declares_splits_no_folders(monkeypatch):
         def default_params(self):
             return {"steps": 30, "variation_seed": 0}
 
+        def kept_apart_by(self, _params):
+            return {}
+
     monkeypatch.setattr(signatures_module, "workflow_named", lambda name: Workflow())
     signatures_module._workflow_instance_keys.cache_clear()
     signatures_module._workflow_enhance_keys.cache_clear()

@@ -40,7 +40,7 @@ def test_the_apps_own_background_work_interrupts_nobody():
 
 def test_an_enhancement_interrupts_nobody_however_long_it_ran():
     for ok in (True, False):
-        outcome = RunOutcome(kind="Enhance", display_name="Image Enhance", seconds=600.0, ok=ok,
+        outcome = RunOutcome(kind="Enhance", display_name="I2I Enhance", seconds=600.0, ok=ok,
                              source=GenerationSource.GENERATED, generation="alpha-1")
         assert toast_for(outcome) is None
 

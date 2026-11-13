@@ -69,8 +69,7 @@ def test_a_store_makes_no_table_of_its_own(tmp_path, attribute):
         tables = [name for (name,) in conn.execute(
             "SELECT name FROM sqlite_master WHERE type = 'table'")]
     assert tables == ["generations"], (
-        "making the file and its tables is the whole database's job, done once by Database, "
-        "never a store's")
+        "making the file and its tables is the whole database's job, never a store's")
 
 
 @pytest.mark.parametrize("attribute", sorted(STORES))

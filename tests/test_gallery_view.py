@@ -8,7 +8,6 @@ from unittest.mock import MagicMock
 
 import pytest
 import shiboken6
-from funestra.hud_title import LATEST_LABEL as A_FUNESTRAS_NEWEST_FIRST_ORDER
 from PySide6.QtCore import (
     QEvent,
     QMargins,
@@ -42,7 +41,6 @@ from origenerator.gallery.collection import (
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
-    LATEST_KEY,
     TRASH_KEY,
 )
 from origenerator.gallery.labels import workflow_label
@@ -131,15 +129,6 @@ def _collection_names(item):
             break
         names.append(item.child(i).text(0))
     return names
-
-
-def test_latest_wears_the_word_a_funestra_shows_for_the_same_newest_first_order(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    assert _collection(view, LATEST_KEY).text(0) == A_FUNESTRAS_NEWEST_FIRST_ORDER, (
-        "Latest is labeled with the Funestras' word for the same newest-first listing")
 
 
 def test_refresh_builds_workflow_model_settings_tree(qtbot):

@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from app_support.gallery_rows import made_here
 from PySide6.QtCore import QPoint, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QIcon, QPixmap
 from PySide6.QtWidgets import (
@@ -58,7 +59,6 @@ from origenerator.generation_config import (
     merge_denormalized,
     would_reproduce_a_completed_run,
 )
-from origenerator.generation_state import made_here
 from origenerator.gui import icons
 from origenerator.gui.action_button import ActionButton
 from origenerator.gui.action_row import ActionRow

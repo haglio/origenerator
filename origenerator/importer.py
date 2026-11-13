@@ -11,6 +11,7 @@ from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 
+from app_support.gallery_rows import source_of
 from app_support.subprocess_utils import hidden_subprocess_kwargs
 from PIL import Image
 from shared_ui.orientation import orientation_of_size as shape_of_size
@@ -38,7 +39,7 @@ from origenerator.gallery import (
     workflow_output_type,
 )
 from origenerator.gallery.output import place_of_its_own
-from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
+from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
 from origenerator.output_places import OutputPlaces
 from origenerator.record_fold import file_key, fold_record_into, lanes_owed

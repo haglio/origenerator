@@ -4,7 +4,9 @@ import json
 import random
 from dataclasses import dataclass
 
-from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
+from app_support.gallery_rows import source_of
+
+from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.output_files import produced_output
 
 _DENORMALIZED_COLUMNS = ("positive_prompt", "negative_prompt", "seed")

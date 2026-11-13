@@ -9,13 +9,14 @@ import weakref
 from itertools import pairwise
 from types import SimpleNamespace
 
+from app_support.gallery_rows import source_of
 from PySide6.QtCore import QCoreApplication, QEventLoop, QObject, QTimer, Signal
 
 from origenerator import comfyui_api, comfyui_launcher, gallery, queue_line
 from origenerator.completion import mark_generation_completed
 from origenerator.config import COMFYUI_DIR, COMFYUI_HOST, COMFYUI_PORT
 from origenerator.generation_config import filled_params, prepared_params
-from origenerator.generation_state import GenerationSource, GenerationStatus, source_of
+from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.gui.generation_job import GenerationJob, JobPlan, JobSpec, JobState
 from origenerator.gui.job_records import (
     insert_generation_row,

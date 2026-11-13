@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app_support.gallery_rows import source_of
+
 from origenerator.gallery import JobKind, job_kind_label
-from origenerator.generation_state import GenerationSource, source_of
+from origenerator.generation_state import GenerationSource
 from origenerator.timing import clock_duration
 from origenerator.workflows import WORKFLOW_REGISTRY
 

@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from app_support.gallery_rows import source_of
+
 from origenerator.db_connection import Store
 from origenerator.db_generations import library_paths_in
 from origenerator.db_schema import as_read
-from origenerator.generation_state import GenerationSource, source_of
+from origenerator.generation_state import GenerationSource
 from origenerator.trash import TrashedBatch
 
 

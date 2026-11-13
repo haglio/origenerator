@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from app_support.gallery_rows import source_of
 from funestra.video_families import normalized_text
 
 from origenerator.action_vocabulary import names_in, vocabulary
 from origenerator.content import load_content
 from origenerator.gallery import media_type_of_row
 from origenerator.gallery.source_image import start_images_among
-from origenerator.generation_state import GenerationSource, source_of
+from origenerator.generation_state import GenerationSource
 from origenerator.item_actions import ItemActions, columns, has_actions
 from origenerator.media import MediaType
 

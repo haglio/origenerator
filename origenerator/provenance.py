@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import NamedTuple
 
 from app_support import provenance as family
+from app_support.gallery_rows import made_here
 from app_support.subprocess_utils import hidden_subprocess_kwargs
 
 from origenerator import gallery
-from origenerator.generation_state import made_here
 from origenerator.workflows import UNRECORDED_VERSIONS, WORKFLOW_REGISTRY
 
 APP = "origenerator"

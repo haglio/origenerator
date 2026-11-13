@@ -9,12 +9,12 @@ from pathlib import Path
 from typing import NamedTuple
 
 from app_support.gallery_records import GalleryReading, size_labels
+from app_support.gallery_rows import made_here
 from app_support.kino_folder import is_ai_video
 
 from origenerator import config
 from origenerator.evolver_agreement import evolver_checkout, records_folder
 from origenerator.evolver_export import PARTIAL_MARKER
-from origenerator.generation_state import made_here
 from origenerator.media import MediaType, VideoHeader, media_type_from_filename, video_header
 
 FILE_NAME = "gallery_records.json"

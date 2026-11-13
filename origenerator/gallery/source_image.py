@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from functools import cache, partial
 
 from app_support.comfy_file_refs import frame_name
+from app_support.gallery_rows import made_here, source_of
 
 from origenerator.gallery.output import (
     frame_names_of,
@@ -16,7 +17,7 @@ from origenerator.gallery.signatures import (
     parse_params,
     settings_signature,
 )
-from origenerator.generation_state import GenerationSource, in_sight, made_here, source_of
+from origenerator.generation_state import GenerationSource, in_sight
 from origenerator.media import MediaType
 
 

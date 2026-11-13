@@ -5,6 +5,7 @@ from collections.abc import Iterator
 from functools import lru_cache
 from pathlib import Path
 
+from app_support.gallery_rows import made_here
 from PIL import Image
 from shared_ui.orientation import orientation_of_size as shape_of_size
 
@@ -13,7 +14,7 @@ from origenerator.config import OUTPUT_PLACES
 from origenerator.gallery.collection import LATEST_KEY, folder_collection
 from origenerator.gallery.shapes import LANDSCAPE, SHAPES_AND_BOTH, on_shape
 from origenerator.gallery.signatures import canonical_settings
-from origenerator.generation_state import GenerationStatus, made_here
+from origenerator.generation_state import GenerationStatus
 from origenerator.media import MediaType
 from origenerator.output_files import READINGS_KEPT
 from origenerator.workflows.derived_size import resolve_input_image_path

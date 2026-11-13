@@ -6,6 +6,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import NamedTuple
 
+from app_support.gallery_rows import made_here
+
 from origenerator import config
 from origenerator.db import Database
 from origenerator.funscript import (
@@ -15,7 +17,6 @@ from origenerator.funscript import (
     synthesize_funscript,
 )
 from origenerator.gallery import media_type_of_row, resolve_preview
-from origenerator.generation_state import made_here
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 

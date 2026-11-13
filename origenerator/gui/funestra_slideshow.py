@@ -409,7 +409,6 @@ class FunestraSlideshow(QObject):
             self._lock(False)
 
     def slideshow_cull(self) -> None:
-        """Windows will not move a file a process still has open, so the Funestra is told to drop a condemned item before the generation is."""
         item = self._set.playlist.current()
         if item is None:
             return

@@ -18,7 +18,7 @@ def test_the_everyday_launcher_is_no_branch_session():
 
 def test_both_library_windows_run_on_the_primary_checkouts_venv():
     assert {launcher.file for launcher in launchers(REPO_ROOT) if launcher.venv == "primary" and not launcher.preview} == {
-        "sort_images.vbs", "check_animations.vbs"}, (
+        "sort_images.vbs", "default_animation_settings.vbs"}, (
         "a worktree has no virtual environment of its own, and these two windows read and write "
         "the production library, so they borrow the production checkout's")
 
@@ -26,7 +26,7 @@ def test_both_library_windows_run_on_the_primary_checkouts_venv():
 @on_windows
 @pytest.mark.parametrize(("file", "module"), [
     ("sort_images.vbs", "origenerator.action_setter_tool"),
-    ("check_animations.vbs", "origenerator.check_animations"),
+    ("default_animation_settings.vbs", "origenerator.default_animation_settings"),
 ])
 def test_a_library_window_reads_the_live_library(file: str, module: str):
     report = dry_run(REPO_ROOT / file)

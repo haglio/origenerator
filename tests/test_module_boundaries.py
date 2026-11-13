@@ -158,7 +158,7 @@ def test_only_the_slideshows_fill_the_screen():
         "the full-screen slideshow window is the one way this app fills the screen with an item")
 
 
-OPENS_WINDOWS = {"action_setter_tool.py", "app.py", "check_animations.py", "downtime.py",
+OPENS_WINDOWS = {"action_setter_tool.py", "app.py", "default_animation_settings.py", "downtime.py",
                  "own_window.py"}
 
 

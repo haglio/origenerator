@@ -52,9 +52,8 @@ def _launcher(db, client):
     return submit
 
 
-def the_animation_window():
+def the_default_animation_settings_window():
     from origenerator import action_settings, animation_samples, gallery
-    from origenerator.animation_check_session import AnimationCheckSession
     from origenerator.animation_settings import AcceptedSettings
     from origenerator.comfyui_client import ComfyUIClient
     from origenerator.comfyui_folders import COMFYUI_FOLDERS
@@ -66,7 +65,8 @@ def the_animation_window():
         THUMB_DIR,
     )
     from origenerator.db import Database
-    from origenerator.gui.animation_check_window import AnimationCheckWindow
+    from origenerator.default_animation_settings_session import DefaultAnimationSettingsSession
+    from origenerator.gui.default_animation_settings_window import DefaultAnimationSettingsWindow
     from origenerator.media import MediaType
 
     db = Database(DB_PATH)
@@ -81,8 +81,8 @@ def the_animation_window():
         return (str(still[0]) if still and still[1] == MediaType.IMAGE else None,
                 gallery.animated_preview_if_made(sample, OUTPUT_PLACES, THUMB_DIR))
 
-    return AnimationCheckWindow(
-        AnimationCheckSession(
+    return DefaultAnimationSettingsWindow(
+        DefaultAnimationSettingsSession(
             list(animation_samples.paths_in_order(rows)),
             animation_samples.samples_by_path(rows),
             AcceptedSettings(),
@@ -96,8 +96,8 @@ def the_animation_window():
 def main() -> int:
     from origenerator.own_window import open_on_its_own
 
-    return open_on_its_own("Checking animations", the_animation_window,
-                           launcher="check_animations.vbs")
+    return open_on_its_own("Default animation settings", the_default_animation_settings_window,
+                           launcher="default_animation_settings.vbs")
 
 
 if __name__ == "__main__":

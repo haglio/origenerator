@@ -40,9 +40,10 @@ FROM_THE_ACTIONS_OWN = (
     "No video made this way has been favorited or sent to Genau or Evolver. "
     "The prompts below are this action's own settings, to start from.")
 ALL_DONE = "Every animation has been through."
+MAKING_THE_THUMBNAIL = "(making this video's thumbnail…)"
 
 
-class AnimationCheckWindow(QWidget):
+class DefaultAnimationSettingsWindow(QWidget):
     def __init__(self, session, look, submit, *, make_loop, off_thread=run_off_thread,
                  parent=None):
         super().__init__(parent)
@@ -52,7 +53,7 @@ class AnimationCheckWindow(QWidget):
         self._make_loop = make_loop
         self._off_thread = off_thread
         self._still = QPixmap()
-        self.setWindowTitle(titled("Origenerator — how should this be animated?"))
+        self.setWindowTitle(titled("Origenerator — default animation settings"))
 
         self._heading = QLabel(objectName=HEADING)
         self._heading.setStyleSheet("font-weight: bold;")
@@ -201,7 +202,7 @@ class AnimationCheckWindow(QWidget):
             self._play(loop)
             return
         stop_what_plays_in(self._video)
-        self._video.clear()
+        self._video.setText(MAKING_THE_THUMBNAIL)
         self._off_thread(lambda: self._make_loop(sample),
                          lambda made: self._play_if_still_shown(sample, made), owner=self)
 

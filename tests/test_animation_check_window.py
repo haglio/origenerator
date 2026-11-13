@@ -79,17 +79,37 @@ def _said(made, name) -> str:
     return made.findChild(QLabel, name).text()
 
 
+class _AtOnce:
+    def __call__(self, work, done, *, owner):
+        done(work())
+
+
+class _Held:
+    def __init__(self):
+        self.asked = []
+
+    def __call__(self, work, done, *, owner):
+        self.asked.append((work, done))
+
+    def finish(self):
+        for work, done in self.asked:
+            done(work())
+
+
 @pytest.fixture
 def window(qtbot, tmp_path):
     submitted = []
 
-    def build(samples=None, store=None, look=None, pinned=None):
+    def build(samples=None, store=None, look=None, pinned=None, make_loop=None,
+              off_thread=None):
         store = store or _Store()
         session = AnimationCheckSession(_ORDER, samples or {}, store, pinned=pinned)
         made = AnimationCheckWindow(
             session, look or (lambda row: (None, None)),
             lambda row, positive, negative: submitted.append(
-                (row["prompt_id"], positive, negative)) or "Queued it.")
+                (row["prompt_id"], positive, negative)) or "Queued it.",
+            make_loop=make_loop or (lambda row: None),
+            off_thread=off_thread or _AtOnce())
         qtbot.addWidget(made)
         return made, store, submitted
 
@@ -278,6 +298,44 @@ def test_a_step_puts_the_new_sample_in_place_of_the_one_before(window, tmp_path)
     shown = made.findChild(QLabel, SAMPLE)
     assert len(shown.findChildren(QMovie)) == 1
     assert shown.movie() is not None
+
+
+def test_a_moving_preview_not_made_yet_is_made_off_the_windows_thread(window, tmp_path):
+    made_on_the_window = []
+    held = _Held()
+    made, _store, _sent = window(
+        {_ORDER[0]: [_video()]},
+        make_loop=lambda row: made_on_the_window.append(row["prompt_id"])
+        or _loop(tmp_path / "loop.webp"),
+        off_thread=held)
+    made.show()
+
+    assert made_on_the_window == [], (
+        "sampling a video's frames takes seconds, and the window stalls if it waits for them")
+    assert made.findChild(QLabel, SAMPLE).movie() is None
+
+    held.finish()
+
+    assert made_on_the_window == ["clip"]
+    assert made.findChild(QLabel, SAMPLE).movie() is not None
+
+
+def test_a_moving_preview_made_after_a_step_away_is_not_played(window, tmp_path):
+    held = _Held()
+    made, _store, _sent = window(
+        {_ORDER[0]: [_video("first")], _ORDER[1]: [_video("second")]},
+        look=lambda row: (None, None if row["prompt_id"] == "first"
+                          else _loop(tmp_path / "second.webp")),
+        make_loop=lambda row: _loop(tmp_path / f"{row['prompt_id']}.webp"),
+        off_thread=held)
+    made.show()
+    _press(made, FORWARD).click()
+    playing = made.findChild(QLabel, SAMPLE).movie()
+
+    held.finish()
+
+    assert made.findChild(QLabel, SAMPLE).movie() is playing, (
+        "the first animation's preview, made late, would play beside the second's image")
 
 
 def test_the_arrows_are_wide_enough_to_draw_their_glyph(window):

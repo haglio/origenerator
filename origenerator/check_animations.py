@@ -79,7 +79,7 @@ def the_animation_window():
         row = db.get_generation(source) if source else None
         still = gallery.resolve_preview(row, OUTPUT_PLACES) if row else None
         return (str(still[0]) if still and still[1] == MediaType.IMAGE else None,
-                gallery.make_animated_preview(sample, OUTPUT_PLACES, THUMB_DIR))
+                gallery.animated_preview_if_made(sample, OUTPUT_PLACES, THUMB_DIR))
 
     return AnimationCheckWindow(
         AnimationCheckSession(
@@ -89,6 +89,7 @@ def the_animation_window():
             pinned=action_settings.pinned_settings),
         look,
         _launcher(db, ComfyUIClient(host=COMFYUI_HOST, port=COMFYUI_PORT, folders=COMFYUI_FOLDERS)),
+        make_loop=lambda sample: gallery.make_animated_preview(sample, OUTPUT_PLACES, THUMB_DIR),
     )
 
 

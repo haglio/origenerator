@@ -114,6 +114,8 @@ def _arm_the_crash_log(state_dir: Path, logger):
     import faulthandler
     from datetime import UTC, datetime
 
+    from origenerator import crash_notes
+
     try:
         state_dir.mkdir(parents=True, exist_ok=True)
         stream = open(  # noqa: SIM115
@@ -122,6 +124,7 @@ def _arm_the_crash_log(state_dir: Path, logger):
         stream.write(f"\n=== launched {launched} ===\n")
         stream.flush()
         faulthandler.enable(file=stream, all_threads=True)
+        crash_notes.write_notes_to(stream)
     except Exception as e:
         logger.warning("Crash log unavailable: %s", e)
         return None

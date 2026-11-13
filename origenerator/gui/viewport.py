@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 from shared_ui.message_shape import MESSAGE_PAD_H, MESSAGE_PAD_V, MESSAGE_RADIUS, MESSAGE_TOP_MARGIN
 from shared_ui.palette import BLACK, WHITE, as_hex, as_rgba
 
+from origenerator import crash_notes
 from origenerator.config import OUTPUT_PLACES
 from origenerator.funscript import funscript_of
 from origenerator.gui import omnipause
@@ -170,6 +171,8 @@ class Viewport(QWidget):
     def show_video(self, path, generation: str | None = None) -> None:
         self._take_the_pane((path, MediaType.VIDEO), generation=generation,
                             stop_player=False)
+        crash_notes.note(f"a viewer shows the video of item {generation}" if generation
+                         else "a viewer shows a video that is no item")
         self._image_label.clear()
         self._player.setSource(QUrl.fromLocalFile(str(Path(path))))
         self._stack.setCurrentWidget(self._video)

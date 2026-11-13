@@ -1585,7 +1585,7 @@ def test_each_slide_is_opened_in_its_own_right(qtbot):
     assert len(_engine(view).opened) == opened + 1
 
 
-def test_closing_the_slideshow_lets_the_engine_go(qtbot):
+def test_the_engine_is_let_go_by_the_time_closing_the_slideshow_returns(qtbot):
     view = _view(qtbot, _KEYED)
 
     view.close()
@@ -1934,19 +1934,6 @@ def test_a_scripted_clip_hands_its_motion_to_the_hud(qtbot, tmp_path):
                     synthesize_actions(2.0, hz=1.0))
     view = _view(qtbot, [(str(vid), "video")])
     assert view._pane.playback.has_funscript
-
-
-def test_closing_releases_the_video_file(qtbot, tmp_path):
-    # Windows will not move a file a held media handle keeps open
-    view = _view(qtbot, [(str(tmp_path / "c.mp4"), "video")])
-    view.close()
-    assert _engine(view).closed is True
-
-
-def test_closing_lets_the_engine_go_before_what_it_draws_into(qtbot, tmp_path):
-    view = _view(qtbot, [(str(tmp_path / "c.mp4"), "video")])
-    view.close()
-    assert _engine(view).closed is True
 
 
 def test_a_slideshow_wears_the_apps_icon_in_the_window_switcher(qtbot, qapp):

@@ -36,6 +36,7 @@ from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_api import ForeignQueue
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
+from origenerator.gallery import output as gallery_output
 from origenerator.gallery import tree as gallery_tree_module
 from origenerator.gallery.collection import (
     ENHANCED_KEY,
@@ -2836,6 +2837,26 @@ def test_a_gallery_given_no_thumbnails_folder_shows_stills(qtbot, tmp_path):
     qtbot.addWidget(view)
 
     assert view.animated_preview({"prompt_id": "p1"}) is None
+
+
+def test_a_video_with_no_moving_preview_made_is_shown_without_decoding_it(qtbot, tmp_path,
+                                                                          monkeypatch):
+    output = tmp_path / "output"
+    output.mkdir()
+    (output / "wan22_i2v_v1.mp4").write_bytes(b"fake video")
+    decoded = []
+    monkeypatch.setattr(gallery_output, "generate_animated_thumbnail",
+                        lambda video, thumb_dir, name: decoded.append(name))
+    view = GalleryView(_trash_db(), actions=FakeActions(places=OutputPlaces.in_one_folder(output),
+                                                        thumb_dir=tmp_path / "thumbs"))
+    qtbot.addWidget(view)
+
+    shown = view.animated_preview(_i2v_video("v1", "a_look"))
+
+    assert decoded == [], (
+        "making a video's moving preview samples its frames for seconds, so the window only "
+        "asks whether one is already made")
+    assert shown is None
 
 
 def test_a_folders_hover_says_its_name_and_nothing_else(qtbot):

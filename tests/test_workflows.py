@@ -41,6 +41,7 @@ from origenerator.workflows.frame_rate import (
     MAX_PLAYBACK_FPS,
     NATIVE_FPS,
     playback_rate,
+    rate_options,
 )
 from origenerator.workflows.image_enhance import ImageEnhanceWorkflow
 from origenerator.workflows.krea2_t2i import Krea2T2iWorkflow
@@ -207,7 +208,7 @@ def test_a_workflow_names_its_seed_fields_building_its_form_once(monkeypatch):
 def test_only_the_video_workflows_go_on_drawing_seeds_once_one_is_reused():
     pinning = {name for name, wf in WORKFLOW_REGISTRY.items() if wf.pins_reused_seed()}
     drawing = set(WORKFLOW_REGISTRY) - pinning
-    assert drawing == {"wan22_i2v", "wan22_flf2v_loop", "wan22_animate"}, (
+    assert drawing == {"wan22_i2v", "wan22_flf2v_loop", "wan22_animate", "minimax_h3_i2v"}, (
         "a video's seed is only one sample of its motion, and pinned it would ride every prompt "
         "edit out of that line of videos, so reusing its settings draws another")
     assert {"sdxl_t2i", "wan22_t2i", "flux_t2i_upscaled"} <= pinning, (
@@ -1924,6 +1925,7 @@ READS_AS = {
     "sdxl_pose_transfer": "sdxl_t2i",
     "image_enhance": "sdxl_t2i",
     "wan22_animate": "wan22_animate",
+    "minimax_h3_i2v": "minimax_h3_i2v",
 }
 
 
@@ -1948,18 +1950,21 @@ def test_the_graph_signatures_only_ever_name_a_registered_workflow():
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_a_video_workflow_offers_its_length_in_seconds_and_reachable_frame_rates(name):
-    defs = {pd.key: pd for pd in WORKFLOW_REGISTRY[name].param_definitions()}
+    wf = WORKFLOW_REGISTRY[name]
+    native = wf.native_fps
+    defs = {pd.key: pd for pd in wf.param_definitions()}
     frames, rate = defs["frame_count"], defs["frame_rate"]
-    assert frames.shown_in_seconds_at == NATIVE_FPS
+    assert frames.shown_in_seconds_at == native
     assert frames.options == [1, 5, 10, 15, 30, 60]
     assert frames.unit == "s"
-    assert (frames.min_val, frames.step) == (5, 4), (
-        "the options are seconds, while the minimum, maximum and step stay frames")
-    assert rate.options == [16, 32, 48, 64, 80, 96, 112]
-    assert all(playback_rate(r) == r for r in rate.options)
+    assert frames.min_val == 5, "the options are seconds, while the minimum, maximum and step stay frames"
+    assert frames.step in (4, 17)
+    assert seconds_for_frames(frames.max_val, native, frames) >= max(DURATION_OPTIONS)
+    assert rate.options == rate_options(native)
+    assert all(playback_rate(r, native) == r for r in rate.options)
     assert rate.unit == "fps"
-    assert (rate.min_val, rate.step) == (NATIVE_FPS, NATIVE_FPS)
-    assert rate.max_val == MAX_PLAYBACK_FPS == max(rate.options)
+    assert (rate.min_val, rate.step) == (native, native)
+    assert rate.max_val == max(rate.options) <= MAX_PLAYBACK_FPS
 
 
 @pytest.mark.parametrize("name", ["wan22_i2v", "wan22_flf2v_loop"])
@@ -2186,18 +2191,18 @@ def test_every_video_is_saved_as_h264_on_the_graphics_card_at_one_high_quality_s
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_a_clip_played_at_the_native_rate_carries_no_interpolation_at_all(name):
     wf = WORKFLOW_REGISTRY[name]
-    payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=NATIVE_FPS))
+    payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=wf.native_fps))
 
     assert _find_node(payload, "RIFE VFI") is None
     writer = payload[wf.output_node_id]["inputs"]
     assert writer["images"] == [_node_id(payload, "VAEDecode"), 0]
-    assert writer["frame_rate"] == 16.0
+    assert writer["frame_rate"] == wf.native_fps
 
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_a_higher_rate_interpolates_the_decoded_frames_and_writes_at_that_rate(name):
     wf = WORKFLOW_REGISTRY[name]
-    payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=48.0))
+    payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=3 * wf.native_fps))
 
     rife_id = _node_id(payload, "RIFE VFI")
     rife = payload[rife_id]["inputs"]
@@ -2207,18 +2212,19 @@ def test_a_higher_rate_interpolates_the_decoded_frames_and_writes_at_that_rate(n
 
     writer = payload[wf.output_node_id]["inputs"]
     assert writer["images"] == [rife_id, 0]
-    assert writer["frame_rate"] == 48.0
+    assert writer["frame_rate"] == 3 * wf.native_fps
 
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_the_frames_a_clip_generates_dont_move_when_its_rate_does(name):
     wf = WORKFLOW_REGISTRY[name]
     lengths = set()
-    for rate in (16.0, 32.0, 128.0):
+    for rate in (wf.native_fps, 2 * wf.native_fps, 128.0):
         payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=rate))
         conditioning = (_find_node(payload, "WanImageToVideo")
                         or _find_node(payload, "WanFirstLastFrameToVideo")
-                        or _find_node(payload, "WanAnimateToVideo"))
+                        or _find_node(payload, "WanAnimateToVideo")
+                        or _find_node(payload, "MiniMaxH3ImageToVideo"))
         lengths.add(conditioning["inputs"]["length"])
     assert lengths == {wf.default_params()["frame_count"]}
 
@@ -2226,19 +2232,20 @@ def test_the_frames_a_clip_generates_dont_move_when_its_rate_does(name):
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_a_rate_between_two_multiples_is_written_at_the_one_it_can_reach(name):
     wf = WORKFLOW_REGISTRY[name]
-    payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=60.0))
+    payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=3.75 * wf.native_fps))
 
     assert payload[_node_id(payload, "RIFE VFI")]["inputs"]["multiplier"] == 4
-    assert payload[wf.output_node_id]["inputs"]["frame_rate"] == 64.0
+    assert payload[wf.output_node_id]["inputs"]["frame_rate"] == 4 * wf.native_fps
 
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_no_payload_writes_faster_than_the_fastest_rate_the_form_offers(name):
     wf = WORKFLOW_REGISTRY[name]
+    fastest = max(rate_options(wf.native_fps))
     for asked in (128.0, 240.0, 10_000.0):
         payload = wf.build_api_payload(dict(wf.default_params(), frame_rate=asked))
-        assert payload[wf.output_node_id]["inputs"]["frame_rate"] == MAX_PLAYBACK_FPS
-        assert payload[_node_id(payload, "RIFE VFI")]["inputs"]["multiplier"] == 7
+        assert payload[wf.output_node_id]["inputs"]["frame_rate"] == fastest
+        assert payload[_node_id(payload, "RIFE VFI")]["inputs"]["multiplier"] == fastest / wf.native_fps
 
 
 @pytest.mark.parametrize("name", _SCORED_VIDEO_WORKFLOWS)
@@ -2269,11 +2276,11 @@ def test_a_loops_two_matched_ends_survive_the_frames_added_between_them():
 
 @pytest.mark.parametrize("name", _VIDEO_WORKFLOWS)
 def test_the_rate_the_form_settles_on_is_the_rate_the_file_gets(name):
-    rate_def = next(pd for pd in WORKFLOW_REGISTRY[name].param_definitions()
-                    if pd.key == "frame_rate")
+    wf = WORKFLOW_REGISTRY[name]
+    rate_def = next(pd for pd in wf.param_definitions() if pd.key == "frame_rate")
     for typed in range(200):
         shown = clamped_number(rate_def, float(typed))
-        assert shown == min(rate_def.max_val, playback_rate(typed)), typed
+        assert shown == min(rate_def.max_val, playback_rate(typed, wf.native_fps)), typed
         assert clamped_number(rate_def, shown) == shown
 
 

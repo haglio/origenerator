@@ -234,3 +234,15 @@ def test_a_video_whose_settings_never_said_its_length_shows_no_frame_counts():
     row = _row(workflow_name="wan22_flf2v_loop", params_json=json.dumps({"frame_rate": 112.0}))
 
     assert metadata_facts(row) is None
+
+
+def test_a_video_made_at_another_rate_counts_its_filled_in_frames_from_that_rate():
+    row = _row(workflow_name="minimax_h3_i2v",
+               params_json=json.dumps({"frame_count": 124, "frame_rate": 48.0}))
+
+    items = metadata_facts(row).items
+    assert _frames(items) == [("Frames from model", "124"), ("Total frames", "247")]
+    (tip,) = {item.tooltip for item in items if item.label == "Total frames"}
+    assert "MiniMax H3" in tip
+    assert "24 frames a second" in tip
+    assert "WAN" not in tip

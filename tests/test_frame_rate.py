@@ -3,8 +3,10 @@ from __future__ import annotations
 from origenerator.workflows.frame_rate import (
     MAX_PLAYBACK_FPS,
     NATIVE_FPS,
+    frames_filled_in,
     playback_rate,
     rate_multiplier,
+    rate_options,
 )
 
 
@@ -34,3 +36,14 @@ def test_a_rate_under_the_native_one_still_plays_at_true_speed():
     assert (rate_multiplier(8), playback_rate(8)) == (1, 16.0)
     assert (rate_multiplier(0), playback_rate(0)) == (1, 16.0)
 
+
+
+def test_a_model_made_at_another_rate_fills_in_whole_multiples_of_its_own_rate():
+    assert [playback_rate(r, 24.0) for r in (24, 48, 60, 72, 96)] == [24.0, 48.0, 48.0, 72.0, 96.0]
+    assert rate_multiplier(1000, 24.0) == 4
+    assert rate_options(24.0) == [24, 48, 72, 96]
+    assert rate_options(NATIVE_FPS) == [16, 32, 48, 64, 80, 96, 112]
+
+
+def test_the_frames_in_the_file_count_from_the_models_own_rate():
+    assert frames_filled_in(73, 48.0, 24.0) == 145

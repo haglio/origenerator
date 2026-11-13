@@ -168,11 +168,11 @@ def _open_the_loading(fun_time, app, logger, preview, taskbar):
     return Loading(app, logger, screen)
 
 
-def _build_window(client, db, app_state, boot, next_launch):
+def _build_window(client, library, app_state, boot, next_launch):
     from origenerator.gui.core import Core, Launch
 
-    window = Core(client, db, app_state, fun_time=boot.fun_time,
-                  launch=Launch(boot.preview, boot.taskbar, next_launch))
+    window = Core(client, library.db, app_state, fun_time=boot.fun_time,
+                  launch=Launch(boot.preview, boot.taskbar, next_launch), inbox=library.inbox)
     if boot.fun_time is not None and not boot.fun_time.in_a_headset:
         window.showMinimized()
     return window
@@ -500,7 +500,7 @@ def _boot_and_run(app, app_args, preview) -> int:
         client.start()
 
         boot.say(BUILDING_THE_INTERFACE)
-        window = _build_window(client, library.db, app_state, boot, next_launch)
+        window = _build_window(client, library, app_state, boot, next_launch)
         boot.stop_if_canceled()
     except LoadingCanceled:
         return boot.cancel(window, client)

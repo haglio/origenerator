@@ -24,6 +24,7 @@ from shared_ui.find_bar import FindBar
 from shared_ui.tick_control import TickControl
 
 from origenerator import (
+    evolver_export,
     gallery,
     outside_videos,
     timing,
@@ -292,6 +293,7 @@ class GalleryView(QWidget):
         super().__init__()
         self._db = db
         self._prompt_heights = shared.prompt_heights
+        self._inbox = shared.inbox or evolver_export.default_inbox()
         self._client = client
         self._fun_time = fun_time
         self._radio = shared.radio if shared.radio is not None else OrigeneratorRadio()
@@ -445,7 +447,7 @@ class GalleryView(QWidget):
             CombineParts(
                 jobs=self._jobs, client=client, info_tabs_of=lambda: self._generate_pane,
                 slideshows=self._slideshows, starting=self._starting,
-                names=self._item_names),
+                names=self._item_names, inbox=self._inbox),
             parent=self, db=db)
         self._enhance = EnhanceController(
             self,
@@ -657,7 +659,7 @@ class GalleryView(QWidget):
 
     def _build_generate_pane(self):
         self._generate_pane = GeneratePane(
-            self._client, self._db, fun_time=self._fun_time,
+            self._client, self._db, fun_time=self._fun_time, inbox=self._inbox,
             views=TabViews(heights=self._prompt_heights, names=self._item_names,
                            animated_preview=self.animated_preview,
                            requests=self._voice.requests))

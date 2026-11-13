@@ -9,7 +9,6 @@ from PySide6.QtCore import QObject
 from origenerator import (
     action_settings,
     combine_runs,
-    evolver_export,
     gallery,
 )
 from origenerator.animate_command import what_to_animate
@@ -67,7 +66,7 @@ class CombineController(QObject):
         self._starting = parts.starting
         self._names = parts.names or ItemNames(db)
         self._files = FilesOnly(places=OUTPUT_PLACES, input_dir=COMFYUI_INPUT_DIR)
-        self._inbox = parts.inbox or evolver_export.default_inbox()
+        self._inbox = parts.inbox
         self._generate_pane_of = parts.info_tabs_of
         self._slideshows = parts.slideshows
         shared = {"preview": self._zone_preview, "named": self._names.prompt_id_of,

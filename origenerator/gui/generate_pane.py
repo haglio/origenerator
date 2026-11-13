@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication, QMenu, QTabWidget
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
+from origenerator.evolver_export import EvolverInbox
 from origenerator.gallery import (
     build_image_config_index,
     media_type_of_row,
@@ -62,9 +63,11 @@ class GeneratePane(QTabWidget):
     folder_requested = Signal(str)
 
     def __init__(self, client: ComfyUIClient | None, db: Database,
-                 *, fun_time=None, views: TabViews = NO_VIEWS):
+                 *, fun_time=None, inbox: EvolverInbox | None = None,
+                 views: TabViews = NO_VIEWS):
         super().__init__()
         self._client = client
+        self._inbox = inbox
         self._fun_time = fun_time
         self.currentChanged.connect(self._front_tab_relayout)
         self._db = db
@@ -135,7 +138,8 @@ class GeneratePane(QTabWidget):
         return widget if isinstance(widget, GenerateTab) else None
 
     def _add_subtab(self, *, preview: bool = False) -> GenerateTab:
-        tab = GenerateTab(self._client, self._db, fun_time=self._fun_time, views=self._views)
+        tab = GenerateTab(self._client, self._db, fun_time=self._fun_time, inbox=self._inbox,
+                          views=self._views)
         index = self.addTab(tab, tab_mark(tab.tab_icon()), tab.title())
         tab.title_changed.connect(lambda _text, p=tab: self._update_tab(p))
         tab.displayed_changed.connect(lambda p=tab: self._close_if_a_second_copy(p))

@@ -305,13 +305,14 @@ def starting(qtbot):
 
 
 @pytest.fixture
-def combine(qtbot, monkeypatch, starting):
+def combine(qtbot, monkeypatch, starting, tmp_path):
     monkeypatch.setattr(module, "Combine", FakePanel)
 
     def build(host=None, *, db=None, jobs=None, slideshows=None, tabs=None):
         parts = CombineParts(
             jobs=jobs or FakeReroll(), client=_A_CLIENT, info_tabs_of=lambda: tabs or FakeTabs(),
-            slideshows=slideshows or FakeSlideshows(), starting=starting)
+            slideshows=slideshows or FakeSlideshows(), starting=starting,
+            inbox=evolver_export.EvolverInbox(tmp_path / "inbox"))
         return _assembled(qtbot, host, parts, db)
     return build
 
@@ -949,7 +950,7 @@ def test_a_spoken_clip_hands_itself_on_when_it_lands(combine, monkeypatch, tmp_p
     (output / "clip.mp4").write_bytes(b"pixels")
     monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
     sent = []
-    monkeypatch.setattr(module.evolver_export, "export_video",
+    monkeypatch.setattr(evolver_export, "export_video",
                         lambda path, destination, funscript=None: sent.append(path.name))
     db = FakeDB()
     controller, _host = combine(db=db)
@@ -979,7 +980,7 @@ def test_the_clip_lands_in_the_inbox_this_controller_was_handed(qtbot, combine, 
 
 def test_a_clip_already_handed_on_is_not_sent_twice(combine, monkeypatch, tmp_path):
     sent = []
-    monkeypatch.setattr(module.evolver_export, "export_video",
+    monkeypatch.setattr(evolver_export, "export_video",
                         lambda path, destination, funscript=None: sent.append(path))
     controller, _host = combine()
 
@@ -999,7 +1000,7 @@ def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(combine, monkeypatch,
     def boom(path, destination, funscript=None):
         raise OSError("the inbox is not there")
 
-    monkeypatch.setattr(module.evolver_export, "export_video", boom)
+    monkeypatch.setattr(evolver_export, "export_video", boom)
     db = FakeDB()
     controller, _host = combine(db=db)
 

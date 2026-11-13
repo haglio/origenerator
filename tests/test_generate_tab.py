@@ -77,6 +77,8 @@ from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import LIT
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.enhance_versions import RunningEnhancement, _AddRow, _PendingRow, _VersionRow
+from origenerator.gui.gallery_view import GalleryView
+from origenerator.gui.gallery_view_parts import Shared
 from origenerator.gui.generate_tab import TYPICAL_TIME, GenerateTab
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.label_cells import LabelCell
@@ -5147,3 +5149,22 @@ def test_the_drive_target_looks_the_video_up_at_each_ask(saved_panel, monkeypatc
 
     assert tab.osr2_drive_target() is None, (
         "the file is looked for afresh at each ask, so one deleted since it was shown is caught")
+
+
+def test_a_tab_the_gallery_opens_sends_into_the_inbox_the_gallery_was_handed(
+        qtbot, tmp_path, monkeypatch):
+    db = Database(tmp_path / "t.db")
+    inbox = tmp_path / "the gallery's inbox"
+    view = GalleryView(db, shared=Shared(inbox=evolver_export.EvolverInbox(inbox)))
+    qtbot.addWidget(view)
+    tab = view._generate_pane.current_generate_tab()
+    tab._viewport.show_media = MagicMock()
+    video = tmp_path / "vid1.mp4"
+    video.write_bytes(b"pixels")
+    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (video, "video"))
+    lane = export_lane_module.KINO
+
+    tab.show_saved_generation(_lane_video(db, lane), [])
+    _press(tab, lane.send_caption)
+
+    assert (inbox / lane.source / "vid1.mp4").read_bytes() == b"pixels"

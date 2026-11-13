@@ -124,12 +124,12 @@ def test_a_finished_videos_files_are_filed_together_under_one_number(tmp_path):
 
 
 def test_a_finished_video_passes_over_every_number_a_video_in_kinos_library_wears(tmp_path):
-    places = replace(_places(tmp_path), kino_library=tmp_path / "kino")
+    places = replace(_places(tmp_path), down_the_lanes=(tmp_path / "kino",))
     places.folder("video").mkdir(parents=True)
     (places.folder("video") / "beta_i2v_00002_.mp4").write_bytes(b"old")
     for shape, name in (("portrait", "beta_i2v_00004__topaz.mp4"),
                         ("landscape", "beta_i2v_00006__topaz (1).mp4")):
-        filed_by_kino = tmp_path / "kino" / shape / "sample site" / name
+        filed_by_kino = tmp_path / "kino" / "2D" / "AI" / shape / "sample site" / name
         filed_by_kino.parent.mkdir(parents=True)
         filed_by_kino.write_bytes(b"kino's")
     _saved_by_comfyui(places, "run-two", "video", "beta_i2v_00001_.mp4")
@@ -138,6 +138,23 @@ def test_a_finished_video_passes_over_every_number_a_video_in_kinos_library_wear
                               places, "run-two")
 
     assert filed[0]["filename"] == "beta_i2v_00007_.mp4"
+
+
+def test_a_finished_video_passes_over_every_number_a_copy_still_down_a_lane_wears(tmp_path):
+    lanes = (tmp_path / "evolver", tmp_path / "genau")
+    places = replace(_places(tmp_path), down_the_lanes=lanes)
+    for copy in (lanes[0] / "0_inbox" / "origenerator" / "beta_i2v_00008_ (2).mp4",
+                 lanes[1] / "flicks" / "2D" / "AI" / "beta_i2v_00011__topaz.mp4",
+                 lanes[1] / "trash" / "beta_i2v_00009__topaz.mp4"):
+        copy.parent.mkdir(parents=True, exist_ok=True)
+        copy.write_bytes(b"a sent video's copy")
+    _saved_by_comfyui(places, "run-two", "video", "beta_i2v_00001_.mp4")
+
+    filed = file_into_library([_listed("run-two", "video", "beta_i2v_00001_.mp4")],
+                              places, "run-two")
+
+    assert filed[0]["filename"] == "beta_i2v_00012_.mp4", (
+        "a name a copy down a lane still wears is the name Evolver deletes by when that send is taken back")
 
 
 def test_a_file_comfyui_reports_outside_the_runs_own_folder_is_left_where_it_is(tmp_path):

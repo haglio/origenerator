@@ -9,6 +9,7 @@ from PySide6.QtCore import QSignalBlocker, Qt
 from PySide6.QtWidgets import QComboBox, QLineEdit, QWidget
 from shared_ui.tick_control import TickControl
 from shared_ui.toggle_switch import ToggleSwitch
+from shared_ui.tooltip_shape import shaped
 
 from origenerator.gui.drop_zone import DropZone, ZoneLookups, placeholder_for
 from origenerator.gui.file_pick import AUDIO_FILE_FILTER, FILE_FILTERS
@@ -314,7 +315,7 @@ def offer_options(dropdown: QComboBox, options, tip=lambda _option: None) -> Non
     for option in options:
         dropdown.addItem(option_title(option), option)
         explained = " ".join(filter(None, (tip(option), model_help(option))))
-        dropdown.setItemData(dropdown.count() - 1, explained or None, Qt.ItemDataRole.ToolTipRole)
+        dropdown.setItemData(dropdown.count() - 1, shaped(explained) or None, Qt.ItemDataRole.ToolTipRole)
 
 
 def offer_only(pd: ParamDef, dropdown: QComboBox, options: list) -> None:

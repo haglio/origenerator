@@ -477,7 +477,7 @@ class ParamForm(QWidget):
                     dropdown.setItemIcon(index, icons.thumbs_up_icon() if recommended
                                          else icons.unmarked_icon())
                     dropdown.setItemData(index, shaped(help_text, lead="Recommended.")
-                                         if recommended else help_text or None,
+                                         if recommended else shaped(help_text) or None,
                                          Qt.ItemDataRole.ToolTipRole)
 
     def set_warnings(self, advice: dict[str, Advice | MissingTriggerWords]) -> None:

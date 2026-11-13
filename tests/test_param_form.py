@@ -2154,8 +2154,8 @@ def test_each_sampler_in_the_dropdown_explains_itself_on_hover(qtbot):
     qtbot.addWidget(form)
     dropdown = form._widgets["sampler_name"]
     tips = [dropdown.itemData(row, Qt.ItemDataRole.ToolTipRole) for row in range(dropdown.count())]
-    assert tips == [option_help("sampler_name", "euler"),
-                    option_help("sampler_name", "euler_ancestral")]
+    assert tips == [shaped(option_help("sampler_name", "euler")),
+                    shaped(option_help("sampler_name", "euler_ancestral"))]
     assert all(tips)
 
 
@@ -2519,7 +2519,7 @@ def test_a_model_whose_title_names_its_size_explains_it_on_hover(qtbot, titled_m
     qtbot.addWidget(form)
     dropdown = form._widgets["unet"]
 
-    assert _item_tooltip(dropdown, "Example Model (full size)").startswith("Full size: ")
+    assert "Full size: " in _item_tooltip(dropdown, "Example Model (full size)")
     assert _item_tooltip(dropdown, "Other Model") is None
 
 
@@ -2536,10 +2536,10 @@ def test_a_recommended_choices_tooltip_opens_with_recommended(qtbot):
 
     assert _item_tooltip(samplers, "euler_ancestral") == shaped(
         option_help("sampler_name", "euler_ancestral"), lead="Recommended.")
-    assert _item_tooltip(samplers, "heun") == option_help("sampler_name", "heun")
+    assert _item_tooltip(samplers, "heun") == shaped(option_help("sampler_name", "heun"))
     form.mark_recommended({"sampler_name": (), "scheduler": ()})
-    assert _item_tooltip(samplers, "euler_ancestral") == option_help(
-        "sampler_name", "euler_ancestral")
+    assert _item_tooltip(samplers, "euler_ancestral") == shaped(option_help(
+        "sampler_name", "euler_ancestral"))
 
 
 class _Lends:
@@ -2662,6 +2662,21 @@ def test_a_lora_dropdowns_tooltip_says_what_its_picked_lora_is_for(
 
     form.set_values({"lora": "example_style.safetensors"})
     assert dropdown.toolTip() == f"{param_help('lora')} Gives an image the example style."
+
+
+def test_a_long_tooltip_in_a_dropdowns_list_is_stored_already_wrapped(
+        qtbot, installed_models, titled_models, described_models):
+    long_description = "Gives an image the example look, " * 6
+    described_models({"example_look": long_description.strip()})
+    installed_models.add("loras", "example_look.safetensors", arch="krea2", lora=True)
+    form = ParamForm([ParamDef("lora", "LoRA", "dropdown", NO_LORA, options=[
+        NO_LORA, "example_look.safetensors"])], WorkflowTraits(lora_keys=("lora",)))
+    qtbot.addWidget(form)
+    dropdown = form._widgets["lora"]
+
+    stored = dropdown.itemData(dropdown.findData("example_look.safetensors"), Qt.ItemDataRole.ToolTipRole)
+
+    assert stored == shaped(long_description.strip())
 
 
 def _lora_form(qtbot, traits=NO_TRAITS):

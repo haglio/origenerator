@@ -277,6 +277,9 @@ class WorkflowTemplate(ABC):
     def _takes_an_input_image(self) -> bool:
         return "input_image" in self.default_params()
 
+    def kept_apart_by(self, _params: dict) -> dict:
+        return {}
+
     def pins_reused_seed(self) -> bool:
         return self.output_type != MediaType.VIDEO
 

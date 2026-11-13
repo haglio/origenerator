@@ -99,7 +99,7 @@ def canonical_settings(workflow_name: str | None, params: dict) -> dict:
             settings.pop(key, None)
     if "scene_frames" in settings and len(settings["scene_frames"] or []) <= 1:
         settings["scene_frames"] = [settings.get("frame_count", params.get("frame_count"))]
-    return settings
+    return {**settings, **wf.kept_apart_by(params)}
 
 
 def enhance_settings(workflow_name: str | None, params: dict) -> dict:

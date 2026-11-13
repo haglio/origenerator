@@ -85,6 +85,9 @@ class OutsideWorkflow(WorkflowTemplate):
     def pins_reused_seed(self) -> bool:
         return True
 
+    def kept_apart_by(self, params: dict) -> dict:
+        return {} if params.get("positive_prompt") else {"input_image": params.get("input_image")}
+
     def starts_from_an_image(self) -> bool:
         return self.kind == VideoKind.IMAGE_TO_VIDEO
 

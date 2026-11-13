@@ -567,13 +567,14 @@ def test_videos_made_from_words_that_differ_only_by_seed_or_action_share_a_folde
                                      ["c4_topaz.mp4"]]
 
 
-def test_videos_whose_records_name_no_prompt_share_one_folder_each_keeping_its_action(tmp_path):
+def test_each_video_whose_record_names_no_prompt_is_a_folder_of_its_own_keeping_its_action(
+        tmp_path):
     db = _brought_in_with_records(tmp_path, {
         "c1_topaz.mp4": {"video": {"action": "Wave", "duration_seconds": 5.0}},
         "c2_topaz.mp4": {"video": {"action": "Wave", "orientation": "portrait"}},
         "c3_topaz.mp4": {"video": {"action": "Bow"}}})
 
-    assert _leaves(db, "Videos") == [["c1_topaz.mp4", "c2_topaz.mp4", "c3_topaz.mp4"]]
+    assert _leaves(db, "Videos") == [["c1_topaz.mp4"], ["c2_topaz.mp4"], ["c3_topaz.mp4"]]
     assert sorted(row["action"] for row in _videos(db)) == ["Bow", "Wave", "Wave"]
 
 

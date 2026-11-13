@@ -25,7 +25,7 @@ from funestra.hud_title import SHUFFLE_LABEL
 from funestra.loop_cycle import ACTION, LOCK, SEED
 from funestra.on_screen_history import OnScreenHistory
 from funestra.playlist import PlaylistItem
-from funestra.status import parse_status
+from funestra.status import STATUS_INTERVAL_S, parse_status
 from PySide6.QtCore import QObject, QTimer, Signal
 
 from origenerator.gui.action_presses import ActionPresses
@@ -50,7 +50,7 @@ from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
 
 logger = logging.getLogger(__name__)
 
-_POLL_MS = 200
+_POLL_MS = round(STATUS_INTERVAL_S * 1000)
 
 
 @dataclass(frozen=True)

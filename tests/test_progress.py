@@ -178,7 +178,7 @@ def test_the_minutes_before_the_first_step_are_named_too():
     assert names[the_high_noise_model] == "Loading models"
     assert names["10"] == "Reading the prompt"
     assert names["12"] == "Loading the image"
-    assert names["14"] == "Preparing the clip"
+    assert names["14"] == "Preparing the video"
     assert names["17"] == "Decoding frames"
     assert names["19"] == "Writing the video"
 

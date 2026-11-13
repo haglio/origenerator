@@ -258,7 +258,7 @@ def _say_what_evolver_no_longer_agrees_with(fun_time) -> None:
     if not said:
         return
     message = ("Origenerator and Evolver no longer agree about the hand-off, so a "
-               "sent clip may arrive where nothing reads it:\n\n"
+               "sent video may arrive where nothing reads it:\n\n"
                + "\n".join(f"    {line}" for line in said))
     print(f"Origenerator: {message}", file=sys.stderr)
     if fun_time is None:

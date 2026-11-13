@@ -36,7 +36,7 @@ def _launcher(db, client):
     def submit(sample: dict, positive: str, negative: str) -> str:
         workflow = WORKFLOW_REGISTRY.get(sample.get("workflow_name") or "")
         if workflow is None:
-            return "That clip's workflow is not one this app still has."
+            return "That video's workflow is not one this app still has."
         params = dict(gallery.parse_params(sample.get("params_json")))
         params.update(positive_prompt=positive, negative_prompt=negative)
         params = randomize_seeds(params, workflow.seed_keys())

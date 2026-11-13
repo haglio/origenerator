@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 
 import shiboken6
-from app_support.frame_channel import FrameWriter
+from app_support.frame_channel import FrameLooks, FrameWriter
 from funestra.file_channel import consume_command_file
 from PySide6.QtCore import QObject, QPoint, QPointF, Qt, QTimer
 from PySide6.QtGui import QContextMenuEvent, QImage, QMouseEvent, QPainter, QWheelEvent
@@ -26,8 +26,6 @@ from origenerator.win32 import keep_out_of_sight
 logger = logging.getLogger(__name__)
 
 _POLL_MS = 15
-
-_IDLE_LOOK_S = 0.1
 
 HEARTBEAT_S = 10.0
 
@@ -118,10 +116,8 @@ class HeadsetWindow(QObject):
         self._pointer = QPoint(0, 0)
         self._pressed: QWidget | None = None
         self._windows_pointed_into: list[QWidget] = []
-        self._sent: bytes | None = None
         self._published: tuple[int, int] | None = None
-        self._looked_at: float | None = None
-        self._asked = False
+        self._looks = FrameLooks()
         self._taken = 0
         self._threw = False
         self._said_at: float | None = None
@@ -171,18 +167,19 @@ class HeadsetWindow(QObject):
                 return
             self._pointer = self._in_the_window(x, y)
             self._point(kind)
-            self._asked = self._asked or kind != HEADSET_HOVER
+            if kind != HEADSET_HOVER:
+                self._looks.ask()
         elif kind == HEADSET_RELEASE:
             self._mouse(self._pressed, QMouseEvent.Type.MouseButtonRelease,
                         Qt.MouseButton.NoButton)
             self._pressed = None
-            self._asked = True
+            self._looks.ask()
         elif kind == HEADSET_SCROLL:
             try:
                 self._scroll(int(rest))
             except ValueError:
                 logger.warning("A headset scroll of nothing: %r", line)
-            self._asked = True
+            self._looks.ask()
 
     def _in_the_window(self, x: int, y: int) -> QPoint:
         if self._published is None:
@@ -256,17 +253,14 @@ class HeadsetWindow(QObject):
         if not self._window.isVisible():
             return
         now = time.monotonic() if now is None else now
-        if not self._asked and self._looked_at is not None and now - self._looked_at < _IDLE_LOOK_S:
+        if not self._looks.due(now):
             return
-        self._asked = False
-        self._looked_at = now
         self._keep_its_menus_off_the_monitors()
         grabbed = self._window.grab().toImage().convertToFormat(QImage.Format.Format_RGBA8888)
         image = within_the_cap(painted_over(grabbed, windows_opened_over(
             self._window, scale=pixels_per_coordinate(grabbed, self._window))))
         pixels = bytes(image.constBits())
-        if pixels == self._sent:
+        if not self._looks.worth_sending(pixels):
             return
         self._frames.write(0, image.width(), image.height(), pixels)
-        self._sent = pixels
         self._published = (image.width(), image.height())

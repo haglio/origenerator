@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from origenerator.evolver_export import EvolverInbox
 from origenerator.osr2_motion_driver import Osr2MotionDriver
 from origenerator.radio import OrigeneratorRadio
 
@@ -11,6 +12,7 @@ class Shared:
     osr2_motion: Osr2MotionDriver | None = None
     radio: OrigeneratorRadio | None = None
     prompt_heights: object = None
+    inbox: EvolverInbox | None = None
 
 
 NO_SHARED = Shared()

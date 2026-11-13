@@ -16,6 +16,7 @@ from PySide6.QtCore import (
 from origenerator import (
     action_settings,
     config,
+    evolver_export,
     gallery,
     motion_engine,
 )
@@ -1089,7 +1090,7 @@ def test_a_spoken_loop_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
                         lambda row, out: (video, "video"))
     sent = []
-    monkeypatch.setattr(combine_controller.evolver_export, "export_video",
+    monkeypatch.setattr(evolver_export, "export_video",
                         lambda src, dest, funscript=None:
                         sent.append((src, dest)) or dest / src.name)
 
@@ -1108,7 +1109,7 @@ def test_a_clip_already_handed_on_is_not_sent_twice(qtbot, tmp_path, monkeypatch
     monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
                         lambda row, out: (Path("C:/out/flf2v_loop_1.mp4"), "video"))
     sent = []
-    monkeypatch.setattr(combine_controller.evolver_export, "export_video",
+    monkeypatch.setattr(evolver_export, "export_video",
                         lambda src, dest, funscript=None: sent.append(src))
 
     view._on_reroll_finished("k", "loop")
@@ -1125,7 +1126,7 @@ def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(qtbot, tmp_path, monke
     def boom(src, dest, funscript=None):
         raise OSError("the inbox is not there")
 
-    monkeypatch.setattr(combine_controller.evolver_export, "export_video", boom)
+    monkeypatch.setattr(evolver_export, "export_video", boom)
 
     view._on_reroll_finished("k", "loop")
 

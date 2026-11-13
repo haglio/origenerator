@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, GAP_MEDIUM, GAP_SMALL
 from shared_ui.tick_control import TickControl
+from shared_ui.tooltip_shape import shaped
 
 from origenerator.action_settings import GENAU, VIDEO, as_sentence, no_past_video
 from origenerator.action_vocabulary import vocabulary
@@ -270,7 +271,7 @@ class Combine(QWidget):
             reason = as_sentence(no_past_video(action, lane))
             model.item(index).setEnabled(usable)
             self._category.setItemData(
-                index, "" if usable else reason, Qt.ItemDataRole.ToolTipRole,
+                index, "" if usable else shaped(reason), Qt.ItemDataRole.ToolTipRole,
             )
             if not usable and self._category.currentIndex() == index:
                 self._category.setCurrentIndex(0)

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from funestra import learned_motion
+from funestra.hand_motion import HandMotion, ways_the_hand_moves
 from funestra.learned_motion import LearnedMotionState, load_default_model
 from funestra.robot_hand import (
     MAX_SPEED,
@@ -18,14 +19,12 @@ from funestra.robot_hand import (
     bpm_for_speed,
     cycle_shape,
     phase_advanced,
-    position_fraction,
     set_amplitude,
     set_bars,
     set_center,
     set_max_intensity,
     set_speed,
 )
-from funestra.robot_hand import trace_window as wave_trace_window
 
 _SHAPES_BY_NAME = {shape.value: shape for shape in WaveformShape}
 
@@ -68,6 +67,10 @@ class Motion:
     def bpm(self) -> float:
         return self.state.bpm
 
+    @property
+    def hand(self) -> HandMotion:
+        return HandMotion(self.state, ways_the_hand_moves(self.learned))
+
 
 def advance(motion: Motion, dt_s: float) -> None:
     motion.phase = phase_advanced(motion.phase, motion.state.bpm, dt_s)
@@ -75,8 +78,7 @@ def advance(motion: Motion, dt_s: float) -> None:
 
 
 def tick_learned_motion(motion: Motion, now: float) -> None:
-    learned_motion.tick_learned_motion(
-        motion.state, motion.learned, now, start_fraction=_envelope_fraction(motion))
+    motion.hand.tick(now, start_fraction=_envelope_fraction(motion))
 
 
 def toggle_learned_motion(motion: Motion) -> None:
@@ -115,9 +117,7 @@ def take_settings(motion: Motion, saved) -> None:
 
 
 def position(motion: Motion) -> float:
-    if motion.learned.active:
-        return learned_motion.position(motion.learned, motion.state)
-    return _at(motion, motion.phase)
+    return motion.hand.height(motion.phase)
 
 
 def _envelope_fraction(motion: Motion) -> float:
@@ -131,21 +131,12 @@ def _envelope_fraction(motion: Motion) -> float:
 
 def position_ahead(motion: Motion, lead_s: float) -> float:
     # The OSR2 is told a place and how long to take getting there; aimed at the present it only chases.
-    if motion.learned.active:
-        return learned_motion.position(motion.learned, motion.state, lead_s)
-    return _at(motion, motion.phase + lead_s * motion.state.bpm / 60.0)
+    return motion.hand.height(motion.phase, lead_s=lead_s)
 
 
 def trace_window(motion: Motion, samples: int, span_s: float) -> tuple[list[float], float]:
-    if motion.learned.active:
-        return learned_motion.trace_window(motion.learned, motion.state, samples, span_s)
-    state = motion.state
-    return wave_trace_window(
-        Waveform(state.shape, state.amplitude, state.center),
-        TraceSpan(motion.phase_total, state.bpm, samples, span_s))
+    return motion.hand.trace(TraceSpan(motion.phase_total, motion.state.bpm, samples, span_s))
 
 
 def _at(motion: Motion, phase: float) -> float:
-    state = motion.state
-    return 100.0 * position_fraction(
-        phase, shape=state.shape, amplitude=state.amplitude, center=state.center)
+    return 100.0 * Waveform.of(motion.state).height_at(phase)

@@ -28,7 +28,7 @@ from origenerator.gallery.collection import (
     FolderCollection,
     folder_collection,
 )
-from origenerator.gui import icons
+from origenerator.gui import folder_icons, icons
 from origenerator.gui.collapsible_section import FOLD, FoldHeader
 from origenerator.gui.corner_buttons import enhance_state
 from origenerator.gui.deferred import defer
@@ -378,7 +378,7 @@ class GalleryPane(QObject):
         tile = FolderTile(
             group.key, group.label, self._preview_paths(group),
             len(gallery.rows_under(group)),
-            FolderMarks(favorite, context, icons.folder_kind_icon(group)),
+            FolderMarks(favorite, context, folder_icons.folder_kind_icon(group)),
         )
         tile.clicked.connect(self._drill_into)
         tile.context_requested.connect(self.folder_menu_requested)
@@ -421,7 +421,7 @@ class GalleryPane(QObject):
         rows = self.rows_for_collection(key)
         collection = folder_collection(base_of(key))
         tile = FolderTile(key, COLLECTION_LABELS[collection.which], _thumbnails_of(rows), len(rows),
-                          FolderMarks(kind_icon=icons.collection_kind_icon(collection.which)))
+                          FolderMarks(kind_icon=folder_icons.collection_kind_icon(collection.which)))
         tile.clicked.connect(self._drill_into)
         flow.addWidget(tile)
 

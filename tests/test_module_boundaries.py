@@ -266,6 +266,12 @@ def test_the_app_own_machinery_is_not_in_the_widget_package(module):
         " to know to look among the widgets to find it")
 
 
+def test_the_folder_tree_draws_folders_it_is_handed_and_knows_no_gallery():
+    assert _loaded_after_importing("origenerator.gui.folder_tree", "origenerator.gallery") is False, (
+        "it is handed the role its rows carry their folders in, which of them is All, and what each"
+        " row takes, so it draws any tree of folders")
+
+
 def test_populate_is_run_with_no_gallery_and_no_job():
     assert _loaded_after_importing(
         "origenerator.gui.populate_controller", "origenerator.gui.gallery_view") is False, (

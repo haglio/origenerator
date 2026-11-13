@@ -26,7 +26,7 @@ from origenerator.base_models import loras_offered_beside
 from origenerator.box_breaks import unboxed
 from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES
 from origenerator.gallery.shapes import SHAPE_LABELS
-from origenerator.gui import diff_text, icons, param_sections, tracked_prompt
+from origenerator.gui import diff_text, folder_icons, icons, param_sections, tracked_prompt
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import CopyButton
 from origenerator.gui.drop_zone import DropZone
@@ -210,7 +210,7 @@ class ParamForm(QWidget):
         tip = SHAPE_LABELS[shape]
         if size[0] == size[1]:
             tip = f"Square, so it goes under {tip}"
-        self._sections["Size"].set_mark(icons.shape_mark(shape), tip)
+        self._sections["Size"].set_mark(folder_icons.shape_mark(shape), tip)
 
     def _wire_row_rules(self):
         self.changed.connect(self._refresh_row_rules)

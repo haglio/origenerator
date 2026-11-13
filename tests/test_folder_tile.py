@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import QLabel
 
 from origenerator import gallery
-from origenerator.gui import icons, tile_shape
+from origenerator.gui import folder_icons, tile_shape
 from origenerator.gui.folder_tile import FolderMarks, FolderTile
 
 
@@ -45,7 +45,7 @@ def test_folder_tile_without_context_omits_the_folder_path_line(qtbot):
 
 def test_folder_tile_shows_its_toc_initial(qtbot):
     tile = FolderTile("k", "wan model", [], 3, FolderMarks(
-        kind_icon=icons.folder_kind_icon(gallery.ModelGroup("k", "wan model", []))))
+        kind_icon=folder_icons.folder_kind_icon(gallery.ModelGroup("k", "wan model", []))))
     qtbot.addWidget(tile)
 
     initials = [w for w in tile.findChildren(QLabel) if w.toolTip() == "Model"]

@@ -12,9 +12,15 @@ from shared_ui.icons import icon_pixmap, qt_icon
 from shared_ui.spacing import BUTTON_FILLING_ICON
 
 import origenerator
-from origenerator.gallery.collection import LATEST_KEY
+from origenerator.gallery.collection import (
+    ENHANCED_KEY,
+    EXPERIMENTS_KEY,
+    FAVORITES_KEY,
+    LATEST_KEY,
+    TRASH_KEY,
+)
 from origenerator.gallery.shapes import BOTH, LANDSCAPE, PORTRAIT
-from origenerator.gui import icons
+from origenerator.gui import folder_icons, icons
 from origenerator.media import MediaType
 
 
@@ -28,10 +34,10 @@ def _drawn_by(monkeypatch, drawing: str) -> list:
 
 def test_a_collections_mark_is_drawn_once_however_many_folders_wear_it(qtbot, monkeypatch):
     drawn = _drawn_by(monkeypatch, "qt_icon")
-    icons.collection_icon.cache_clear()
+    folder_icons.collection_icon.cache_clear()
 
     for _ in range(3):
-        icons.collection_icon(icons.EXPERIMENTS_KEY)
+        folder_icons.collection_icon(EXPERIMENTS_KEY)
 
     assert drawn == [("flask",)]
 
@@ -54,11 +60,11 @@ def test_tab_close_icon_is_the_familys_cross(qtbot):
 
 
 def test_toc_initial_icons_render_for_each_level(qtbot):
-    assert set(icons.LEVEL_LABELS) == {
+    assert set(folder_icons.LEVEL_LABELS) == {
         "workflow", "model", "lora", "source_image"}
-    assert icons.LEVEL_LABELS["lora"] == "LoRA"
-    assert icons.LEVEL_LABELS["source_image"] == "Source Image"
-    for level in icons.LEVEL_LABELS:
+    assert folder_icons.LEVEL_LABELS["lora"] == "LoRA"
+    assert folder_icons.LEVEL_LABELS["source_image"] == "Source Image"
+    for level in folder_icons.LEVEL_LABELS:
         icon = icons.toc_initial_icon(level)
         assert not icon.isNull()
         assert not icon.pixmap(QSize(16, 16)).isNull()
@@ -71,7 +77,7 @@ def test_a_lora_folder_wears_an_l(qtbot):
 
 def test_each_toc_initial_is_tellable_from_its_siblings(qtbot):
     drawn = [icons.toc_initial_icon(level).pixmap(48, 48).toImage()
-             for level in icons.LEVEL_LABELS]
+             for level in folder_icons.LEVEL_LABELS]
     for i, one in enumerate(drawn):
         for other in drawn[i + 1:]:
             assert one != other, (
@@ -124,8 +130,8 @@ def test_a_folder_lately_worked_in_wears_a_dot_in_the_familys_accent_color(qtbot
 
 
 def test_the_side_marks_are_one_frame_and_its_quarter_turn(qtbot):
-    portrait = icons.shape_mark("portrait")
-    landscape = icons.shape_mark("landscape")
+    portrait = folder_icons.shape_mark("portrait")
+    landscape = folder_icons.shape_mark("landscape")
     assert portrait.size() == landscape.size(), (
         "both marks are drawn on one square canvas, so the words beside them start at the same "
         "x")
@@ -140,38 +146,38 @@ def test_the_side_marks_are_one_frame_and_its_quarter_turn(qtbot):
 
 
 def test_a_side_mark_is_a_frame_and_not_a_filled_block(qtbot):
-    image = icons.shape_mark("portrait").toImage()
+    image = folder_icons.shape_mark("portrait").toImage()
     middle = image.pixelColor(image.width() // 2, image.height() // 2)
     assert middle.alpha() == 0, (
         "a frame stands for a region an image goes in; filled, it would read as a swatch")
-    assert _dominant_color(icons.shape_mark("portrait")) == TEXT_PRIMARY.rgb()
+    assert _dominant_color(folder_icons.shape_mark("portrait")) == TEXT_PRIMARY.rgb()
 
 
 def test_the_separate_mark_fits_the_square_it_is_drawn_on(qtbot):
-    assert not _ink_at_the_edges(icons.separate_mark(BUTTON_FILLING_ICON))
+    assert not _ink_at_the_edges(folder_icons.separate_mark(BUTTON_FILLING_ICON))
 
 
 def test_each_side_wears_the_familys_mark_of_its_shape_at_the_size_it_is_shown(qtbot):
     marks = {PORTRAIT: "portrait", LANDSCAPE: "landscape", BOTH: "portrait_and_landscape"}
 
     for side, mark in marks.items():
-        for size in (icons.MARK_BESIDE_A_WORD, BUTTON_FILLING_ICON):
-            assert (icons.shape_mark(side, size).toImage()
+        for size in (folder_icons.MARK_BESIDE_A_WORD, BUTTON_FILLING_ICON):
+            assert (folder_icons.shape_mark(side, size).toImage()
                     == icon_pixmap(mark, size, TEXT_PRIMARY).toImage()), (side, size)
-    assert (icons.separate_mark(BUTTON_FILLING_ICON).toImage()
+    assert (folder_icons.separate_mark(BUTTON_FILLING_ICON).toImage()
             == icon_pixmap("portrait_beside_landscape", BUTTON_FILLING_ICON, TEXT_PRIMARY).toImage())
 
 
 def test_the_tocs_favorites_enhanced_and_trash_wear_their_colors(qtbot):
-    for collection, name, color in ((icons.FAVORITES_KEY, "star", GREEN),
-                                    (icons.ENHANCED_KEY, "plus", YELLOW),
-                                    (icons.TRASH_KEY, "trash", RED)):
-        drawn = icons.collection_icon(collection).pixmap(QSize(48, 48)).toImage()
+    for collection, name, color in ((FAVORITES_KEY, "star", GREEN),
+                                    (ENHANCED_KEY, "plus", YELLOW),
+                                    (TRASH_KEY, "trash", RED)):
+        drawn = folder_icons.collection_icon(collection).pixmap(QSize(48, 48)).toImage()
         assert drawn == icon_pixmap(name, 48, color).toImage(), name
 
 
 def test_a_collection_mark_is_drawn_once():
-    assert icons.collection_icon(LATEST_KEY) is icons.collection_icon(LATEST_KEY), (
+    assert folder_icons.collection_icon(LATEST_KEY) is folder_icons.collection_icon(LATEST_KEY), (
         "one redraw of the TOC asked for these 1,280 times")
 
 

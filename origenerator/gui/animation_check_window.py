@@ -16,6 +16,7 @@ from shared_ui.spacing import GAP_MEDIUM, MARGIN_STANDARD
 from origenerator.animate_command import lane_said_as
 from origenerator.branch_session import titled
 from origenerator.gui.looping_preview import play_in, stop_what_plays_in
+from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.stylesheet import COMMITS
 
 HEADING = "animation.heading"
@@ -42,11 +43,14 @@ ALL_DONE = "Every animation has been through."
 
 
 class AnimationCheckWindow(QWidget):
-    def __init__(self, session, look, submit, parent=None):
+    def __init__(self, session, look, submit, *, make_loop, off_thread=run_off_thread,
+                 parent=None):
         super().__init__(parent)
         self._session = session
         self._look = look
         self._submit = submit
+        self._make_loop = make_loop
+        self._off_thread = off_thread
         self._still = QPixmap()
         self.setWindowTitle(titled("Origenerator — how should this be animated?"))
 
@@ -193,7 +197,17 @@ class AnimationCheckWindow(QWidget):
         still, loop = self._look(sample)
         self._still = QPixmap(str(still)) if still else QPixmap()
         self._draw_the_still()
-        self._play(loop)
+        if loop:
+            self._play(loop)
+            return
+        stop_what_plays_in(self._video)
+        self._video.clear()
+        self._off_thread(lambda: self._make_loop(sample),
+                         lambda made: self._play_if_still_shown(sample, made), owner=self)
+
+    def _play_if_still_shown(self, sample: dict, loop) -> None:
+        if self._session.sample is sample:
+            self._play(loop)
 
     def _press(self, name: str) -> QPushButton:
         return self.findChild(QPushButton, name)

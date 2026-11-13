@@ -57,6 +57,23 @@ def test_a_store_works_off_the_file_with_no_database_object_in_sight(file, attri
 
 
 @pytest.mark.parametrize("attribute", sorted(STORES))
+def test_a_store_makes_no_table_of_its_own(tmp_path, attribute):
+    store_class, _ = STORES[attribute]
+    bare = SqliteFile(tmp_path / "bare.db")
+    with bare.connect() as conn:
+        conn.execute("CREATE TABLE generations (prompt_id TEXT)")
+
+    store_class(bare)
+
+    with bare.connect() as conn:
+        tables = [name for (name,) in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'")]
+    assert tables == ["generations"], (
+        "making the file and its tables is the whole database's job, done once by Database, "
+        "never a store's")
+
+
+@pytest.mark.parametrize("attribute", sorted(STORES))
 def test_the_facade_holds_one_of_each(file, attribute):
     store_class, _ = STORES[attribute]
 

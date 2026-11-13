@@ -3056,6 +3056,23 @@ def test_a_latest_slideshow_turns_down_a_run_asked_for_in_the_other_shape(slides
     assert made[0].generating == []
 
 
+def test_a_latest_slideshow_on_together_takes_a_new_run_of_either_shape(slideshows):
+    tall, wide = _row("tall-run"), _row("wide-run")
+    tall["params_json"] = json.dumps({"width": 768, "height": 1024})
+    wide["params_json"] = json.dumps({"width": 1024, "height": 768})
+    latest_together = shaped_key(LATEST_KEY, BOTH)
+    gallery_pane = FakeGalleryPane(collections={latest_together: [_row("g1")]})
+    director, _host, made = slideshows(gallery_pane=gallery_pane, db=FakeDB([tall, wide]))
+    director.open([("a.png", "image", "g1", None)], location=latest_together, shape=BOTH)
+
+    director.note_generating("tall-run", b"frame")
+    director.note_generating("wide-run", b"frame")
+
+    assert made[0].generating == [("tall-run", b"frame"), ("wide-run", b"frame")], (
+        "an item's shape is never compared with a side: Both is a side holding two shapes, "
+        "and that comparison once left every queued item off Together's Latest")
+
+
 def test_a_run_double_clicked_while_hosted_opens_its_folder_on_a_funestra_following_it(slideshows):
     host = FakeHost(rows=[_row("g1"), _row("g-run")])
     director, host, made = slideshows(host, db=FakeDB([_row("g-run")]), fun_time=FakeSession(

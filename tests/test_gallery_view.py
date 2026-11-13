@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 import shiboken6
+from funestra.hud_title import LATEST_LABEL as A_FUNESTRAS_NEWEST_FIRST_ORDER
 from PySide6.QtCore import (
     QEvent,
     QMargins,
@@ -41,6 +42,7 @@ from origenerator.gallery.collection import (
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
+    LATEST_KEY,
     TRASH_KEY,
 )
 from origenerator.gallery.labels import workflow_label
@@ -129,6 +131,15 @@ def _collection_names(item):
             break
         names.append(item.child(i).text(0))
     return names
+
+
+def test_latest_wears_the_word_a_funestra_shows_for_the_same_newest_first_order(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert _collection(view, LATEST_KEY).text(0) == A_FUNESTRAS_NEWEST_FIRST_ORDER, (
+        "Latest is labeled with the Funestras' word for the same newest-first listing")
 
 
 def test_refresh_builds_workflow_model_settings_tree(qtbot):
@@ -2965,6 +2976,20 @@ def test_a_folder_saved_under_its_own_key_alone_is_still_the_one_a_rebuild_reope
     assert _key(view._tree.currentItem()) == saved, (
         "a session saved before the TOC grew shapes names a folder by its own key, and "
         "reopening must still land on that folder")
+
+
+@pytest.mark.parametrize("saved", ["__recents__", "__starred__", "__enhanced__",
+                                   "__experiments__", "__trash__"])
+def test_a_session_saved_on_a_collection_reopens_on_that_collection(qtbot, saved):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+
+    view.select_folder(shaped_key(saved, LANDSCAPE))
+    view.refresh()
+
+    assert view._tree_view.selected_folder_key() == shaped_key(saved, LANDSCAPE), (
+        "a collection's key never changes, even when its label is renamed, because saved "
+        "sessions name the folder they reopen on by it")
 
 
 def test_what_a_delete_takes_off_the_tree_is_a_folders_row_on_each_side_and_under_it(qtbot):

@@ -285,10 +285,10 @@ class JobQueue(QObject):
         job.origin = plan.origin or job.prompt_id
         job.run_media_type = plan.run_media_type or job.media_type
         job.shielded = plan.shielded
+        self._register(key, job, on_finished)
         start_image = self._enhanced_start_image_of(job)
         if start_image:
             job.start_from(start_image)
-        self._register(key, job, on_finished)
         insert_generation_row(self._db, job)
         return job
 

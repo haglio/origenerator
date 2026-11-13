@@ -4,7 +4,7 @@
 """
 from __future__ import annotations
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QRect, QSize, Qt
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import (
     QLabel,
@@ -100,10 +100,27 @@ class ElidingLabel(QLabel):
         opt = QStyleOption()
         opt.initFrom(self)
         painter.drawPrimitive(QStyle.PrimitiveElement.PE_Widget, opt)
-        rect = self.contentsRect()
+        self.drawFrame(painter)
+        rect = self._text_rect()
         self.style().drawItemText(
             painter, rect, int(self.alignment()), self.palette(), self.isEnabled(),
             self.display_text(rect.width()), QPalette.ColorRole.WindowText,
+        )
+
+    def _text_rect(self) -> QRect:
+        margin = self.margin()
+        rect = self.contentsRect().adjusted(margin, margin, -margin, -margin)
+        indent = self.indent()
+        if indent < 0 and self.frameWidth():
+            indent = self.fontMetrics().horizontalAdvance("x") // 2 - margin
+        if indent <= 0:
+            return rect
+        align = QStyle.visualAlignment(self.layoutDirection(), self.alignment())
+        return rect.adjusted(
+            indent if align & Qt.AlignmentFlag.AlignLeft else 0,
+            indent if align & Qt.AlignmentFlag.AlignTop else 0,
+            -indent if align & Qt.AlignmentFlag.AlignRight else 0,
+            -indent if align & Qt.AlignmentFlag.AlignBottom else 0,
         )
 
 

@@ -99,6 +99,18 @@ def test_a_sites_folder_wears_a_blue_s_where_a_workflows_wears_a_blue_w(qtbot):
         icons._render_toc_initial("S", BLUE)).pixmap(48, 48).toImage()
 
 
+def _letter_height(letter, color) -> int:
+    image = icons._render_toc_initial(letter, color).toImage()
+    rows = {y for x in range(image.width()) for y in range(image.height())
+            if image.pixelColor(x, y).alpha() > 200
+            and abs(image.pixelColor(x, y).lightness() - color.lightness()) > 80}
+    return max(rows) - min(rows) + 1
+
+
+def test_a_sites_s_is_drawn_bigger_than_a_workflows_w_so_it_reads_as_easily(qtbot):
+    assert _letter_height("S", BLUE) > _letter_height("W", BLUE)
+
+
 def test_each_toc_initial_is_tellable_from_its_siblings(qtbot):
     worn = [(letter, color.name()) for letter, color in
             (icons._TOC_INITIALS[level] for level in folder_icons.LEVEL_LABELS)]

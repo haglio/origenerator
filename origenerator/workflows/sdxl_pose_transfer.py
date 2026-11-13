@@ -30,7 +30,7 @@ class SdxlPoseTransferWorkflow(WorkflowTemplate):
     """
     name = "sdxl_pose_transfer"
     version = "v004"
-    display_name = "SDXL Pose Transfer"
+    display_name = "I2I SDXL (Pose Transfer)"
     output_type = MediaType.IMAGE
     derives_size_from_input = True
     model_keys = ("checkpoint",)

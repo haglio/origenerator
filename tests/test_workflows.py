@@ -1019,6 +1019,11 @@ def test_a_workflow_name_that_says_what_it_makes_from_what_says_it_first():
             if KINDS.search(name) and not KINDS.match(name)] == []
 
 
+def test_every_workflow_of_this_apps_names_what_it_makes_from_what_first():
+    assert [wf.display_name for wf in WORKFLOW_REGISTRY.values()
+            if not KINDS.match(wf.display_name)] == []
+
+
 def test_enhance_keys_cover_every_param_only_the_tail_reads():
     for name in ("sdxl_t2i", "sdxl_pose_transfer", "wan22_t2i", "krea2_t2i"):
         wf = WORKFLOW_REGISTRY[name]
@@ -2312,8 +2317,8 @@ def test_a_wan_2_2_form_offers_one_composition_focus_for_both_passes(name):
 
 
 @pytest.mark.parametrize("name", list(WORKFLOW_REGISTRY))
-def test_a_workflow_name_uses_no_model_tile_shorthand_but_t2i_i2v_and_t2v(name):
-    assert not re.search(r"\b(FLF2V|ATI|I2I|S2V)\b", WORKFLOW_REGISTRY[name].display_name)
+def test_a_workflow_name_uses_no_model_tile_shorthand_but_t2i_i2i_i2v_and_t2v(name):
+    assert not re.search(r"\b(FLF2V|ATI|S2V)\b", WORKFLOW_REGISTRY[name].display_name)
 
 
 def test_wan22_i2v_stages_take_their_own_prompt_strength_with_no_shared_one():

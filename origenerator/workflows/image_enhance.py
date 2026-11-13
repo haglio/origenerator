@@ -29,7 +29,7 @@ FORMS_THAT_REDRAW = {form.name: form for form in (
 class ImageEnhanceWorkflow(WorkflowTemplate):
     name = "image_enhance"
     version = "v005"
-    display_name = "Image Enhance"
+    display_name = "I2I Enhance"
     output_type = MediaType.IMAGE
     derives_size_from_input = True
     selectable = False

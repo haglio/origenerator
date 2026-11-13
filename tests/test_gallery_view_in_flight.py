@@ -918,6 +918,29 @@ def test_i2v_reroll_regenerates_its_input_image_enhances_it_then_makes_the_video
     assert gallery.find_source_image_id(new_video, image_rows) == new_image["prompt_id"]
 
 
+def test_a_video_made_on_a_fresh_image_lands_in_the_tab_that_launched_the_run(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_i2v_db(tmp_path), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_leaf_of(view, "vid")
+    _new_tile(view).add_requested.emit()
+    launcher = view._generate_pane.current_generate_tab()
+    client.job_completed.emit(view._live_jobs[key].prompt_id, _IMG_REROLL_HISTORY)
+    (enhance_job,) = [job for job in view._jobs.all_jobs if job.enhances]
+    enhance_job.finished.emit(
+        [{"filename": "image_enhance_new.png", "subfolder": "image", "type": "output"}],
+        None, 1.0)
+    view._jobs.start_now()
+    vid_job = view._live_jobs[key]
+
+    client.job_completed.emit(vid_job.prompt_id, _VID_REROLL_HISTORY)
+
+    assert (launcher.displayed_row() or {}).get("prompt_id") == vid_job.prompt_id, (
+        "asking for the fresh image's enhancement announces a change to the queue, and the "
+        "run's video has to be in the queue by then, or the tab lets go of the run")
+
+
 def _tooltips(view, prompt_id):
     return [b.toolTip() for b in view._gallery_pane._thumb_widgets[prompt_id]._corner_buttons]
 

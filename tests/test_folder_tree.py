@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import Counter
+
 import pytest
 from PySide6.QtCore import (
     QEvent,
@@ -28,7 +30,7 @@ from PySide6.QtWidgets import (
     QStyleOptionViewItem,
     QTreeWidgetItem,
 )
-from shared_ui.colors import BLUE, BORDER_SUBTLE
+from shared_ui.colors import BLUE, BORDER_SUBTLE, TEXT_MUTED
 from shared_ui.testing import appending_to
 
 from origenerator.gallery.collection import COLLECTION_LABELS, FAVORITES_KEY, LATEST_KEY
@@ -271,16 +273,16 @@ def test_siblings_names_start_after_one_column_wide_enough_for_the_widest_count(
         "a figure space is as wide as a digit, so the same run of them puts every name in one place"
 
 
-def test_a_smaller_count_is_centered_in_its_siblings_column(qtbot, monkeypatch):
+def test_siblings_counts_share_one_column(qtbot, monkeypatch):
     tree, _rows = _siblings_counting(qtbot, 3, 12000)
 
     drawn = _drawn_counts(monkeypatch, tree)
 
-    assert drawn["(3)"].center().x() == pytest.approx(drawn["(12000)"].center().x())
-    assert drawn["(3)"].width() == drawn["(12000)"].width()
+    assert (drawn["(3)"].left(), drawn["(3)"].width()) \
+        == (drawn["(12000)"].left(), drawn["(12000)"].width())
 
 
-def test_a_count_is_drawn_in_the_middle_of_its_place(qtbot):
+def test_a_count_is_drawn_in_gray_against_the_right_of_its_place(qtbot):
     tree, (leaf,) = _siblings_counting(qtbot, 3)
     option = QStyleOptionViewItem()
     tree.itemDelegate().initStyleOption(option, tree.indexFromItem(leaf))
@@ -291,9 +293,11 @@ def test_a_count_is_drawn_in_the_middle_of_its_place(qtbot):
     painter.end()
 
     ground = image.pixelColor(0, 0)
-    inked = [x for x in range(200) for y in range(40) if image.pixelColor(x, y) != ground]
+    inked = [(x, image.pixelColor(x, y).name()) for x in range(200) for y in range(40)
+             if image.pixelColor(x, y) != ground]
 
-    assert (min(inked) + max(inked)) / 2 == pytest.approx(100, abs=1.5)
+    assert max(x for x, _color in inked) == pytest.approx(159, abs=2)
+    assert Counter(color for _x, color in inked).most_common(1)[0][0] == TEXT_MUTED.name()
 
 
 def test_the_column_follows_a_siblings_count_as_it_changes(qtbot):

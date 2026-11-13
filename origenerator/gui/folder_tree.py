@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 
 from PySide6.QtCore import QEvent, QItemSelectionModel, QMimeData, QRect, QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QDrag, QDragLeaveEvent, QFontMetricsF, QIcon, QPainter, QPalette
+from PySide6.QtGui import QDrag, QDragLeaveEvent, QFontMetricsF, QIcon, QPainter
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QStyleOptionViewItem,
     QTreeWidget,
 )
-from shared_ui.colors import BLUE, BORDER_SUBTLE
+from shared_ui.colors import BLUE, BORDER_SUBTLE, TEXT_MUTED
 from shared_ui.spacing import BUTTON_ICON, GAP_SMALL
 
 from origenerator.gui import drop_style, icons
@@ -128,12 +128,10 @@ class _CountBeforeName(QStyledItemDelegate):
 
 
 def _draw_count(painter, option, place: QRectF, count: str) -> None:
-    selected = bool(option.state & QStyle.StateFlag.State_Selected)
     painter.save()
     painter.setFont(option.font)
-    painter.setPen(option.palette.color(
-        QPalette.ColorRole.HighlightedText if selected else QPalette.ColorRole.Text))
-    painter.drawText(place, Qt.AlignmentFlag.AlignCenter, count)
+    painter.setPen(TEXT_MUTED)
+    painter.drawText(place, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, count)
     painter.restore()
 
 

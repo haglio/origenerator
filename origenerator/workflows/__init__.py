@@ -15,6 +15,7 @@ from origenerator.workflows.wan22_animate import Wan22AnimateWorkflow
 from origenerator.workflows.wan22_flf2v_loop import Wan22Flf2vLoopWorkflow
 from origenerator.workflows.wan22_i2v import Wan22I2vWorkflow
 from origenerator.workflows.wan22_t2i import Wan22T2iWorkflow
+from origenerator.workflows.wan22_t2v import Wan22T2vWorkflow
 
 UNRECORDED_VERSIONS = frozenset({"imported", "unknown"})
 
@@ -26,6 +27,7 @@ WORKFLOW_REGISTRY: dict[str, WorkflowTemplate] = {
     "wan22_t2i": Wan22T2iWorkflow(),
     "image_enhance": ImageEnhanceWorkflow(),
     "wan22_flf2v_loop": Wan22Flf2vLoopWorkflow(),
+    "wan22_t2v": Wan22T2vWorkflow(),
     "wan22_i2v": Wan22I2vWorkflow(),
     "wan22_animate": Wan22AnimateWorkflow(),
     "minimax_h3_i2v": MiniMaxH3I2vWorkflow(),

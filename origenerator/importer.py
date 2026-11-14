@@ -486,6 +486,7 @@ def _scalars(inputs: dict) -> dict:
 
 _GRAPH_SIGNATURES = (
     ("minimax_h3_i2v", (frozenset({"MiniMaxH3ImageToVideo"}),)),
+    ("wan22_t2v", (frozenset({"EmptyHunyuanLatentVideo", "VHS_VideoCombine"}),)),
     ("wan22_animate", (frozenset({"WanAnimateToVideo"}),)),
     ("wan22_flf2v_loop", (frozenset({"WanFirstLastFrameToVideo"}),)),
     ("wan22_i2v", (frozenset({"WanImageToVideo"}),)),

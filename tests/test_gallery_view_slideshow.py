@@ -200,10 +200,14 @@ def test_a_standalone_slideshow_wears_the_funestras_own_hud(qtbot, monkeypatch):
     slideshow.close()
 
 
-def test_a_standalone_hud_draws_no_minimize(qtbot, monkeypatch):
+def test_minimize_this_funestra_on_a_standalone_hud_minimizes_the_slideshows_window(
+        qtbot, monkeypatch):
     slideshow = _standalone_slideshow(qtbot, monkeypatch)
+    assert "minimize" in hud_button_names(slideshow.shown)
 
-    assert "minimize" not in hud_button_names(slideshow.shown)
+    assert slideshow.shown.press(f"{slideshow.shown.hud_shape}_minimize")
+
+    assert slideshow.shown.isMinimized()
     slideshow.close()
 
 
@@ -758,16 +762,16 @@ def test_filter_enhanced_needs_a_slideshow_to_narrow(qtbot, monkeypatch):
     assert not view._buttons.slideshow.isHidden()
 
 
-def test_a_slideshow_wears_one_hud_with_the_device_on_it(qtbot, monkeypatch):
+def test_a_slideshow_wears_one_hud_and_leaves_the_osr2_to_core(qtbot, monkeypatch):
     slideshow = _standalone_slideshow(qtbot, monkeypatch)
     assert slideshow.findChildren(Osr2Controls) == [], (
         "a slideshow used to float two, the HUD and the OSR2 controls under it: between them "
         "the status was said twice and disagreed, and previous, next, lock and trash were drawn "
         "on both")
     posted = [button.command for _rect, button in hud_targets(slideshow.shown).buttons]
-    assert "robot_hand_cycle_shape" in posted
+    assert "robot_hand_cycle_shape" not in posted
     assert any(command.endswith("_clip_seconds_up") for command in posted)
-    assert slideshow.shown._hud_model().drive is not None
+    assert slideshow.shown._hud_model().drive is None
     slideshow.close()
 
 

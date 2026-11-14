@@ -635,7 +635,7 @@ def test_the_hud_this_app_publishes_is_the_slideshows_own_band(qtbot, tmp_path):
         "a set with no library under it maps the slide alone")
     assert [[button.command for button in row] for row in model.rows] == [
         ["portrait_prev", "portrait_nudge_prev", "portrait_nudge_next", "portrait_next",
-         "portrait_funscript_jump", "portrait_lock", "portrait_trash", "portrait_fmode",
+         "portrait_funscript_jump", "portrait_trash", "portrait_lock", "portrait_fmode",
          "portrait_reset", "portrait_shuffle", "portrait_latest", "portrait_media_videos",
          "portrait_media_images", "portrait_enhancement_originals",
          "portrait_enhancement_enhanced", "portrait_cycle_version"],

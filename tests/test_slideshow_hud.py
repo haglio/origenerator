@@ -4,13 +4,10 @@ import json
 
 import numpy as np
 import pytest
-from app_support.osr2_device import Osr2Mode, Osr2Trouble
 from funestra.hud_corners import CORNER_PLUS_OVERLAY_ID
 from funestra.hud_overlay import HUD_OVERLAY_ID
 from funestra.hud_placement import HudCorner
 from funestra.hud_title import ENHANCED_LABEL
-from funestra.main_hud import BROKER_PRESS
-from funestra.modes import Osr2State
 from funestra.satellite_hud import MARGIN
 from funestra.scrubber_bar import SCRUBBER_HEIGHT
 from funestra.testing import FakeEngine
@@ -171,27 +168,24 @@ class TestTheOneHudASlideshowWears:
 
     def test_the_slideshow_floats_no_second_hud(self, qtbot):
         assert self._window(qtbot).findChildren(Osr2Controls) == [], (
-            "the HUD a slideshow wears already carries the OSR2's line and readout; a second "
-            "set of controls under it said the status twice, and the two disagreed")
+            "the OSR2 is driven from Core's own OSR2 part; a second set of controls under the "
+            "slideshow said the status twice, and the two disagreed")
 
     def _model(self, qtbot):
         window = self._window(qtbot)
-        return slideshow_hud_model("portrait", window.slideshow, device=window.hud_device)
+        return slideshow_hud_model("portrait", window.slideshow, HudPlacement(drives_the_osr2=True))
 
-    def test_the_device_is_on_the_one_hud(self, qtbot):
-        model = self._model(qtbot)
-
-        assert model.osr2 != ""
-        assert model.drive is not None
-
-    def test_the_osr2_line_carries_the_max_intensity_the_motion_is_held_to(self, qtbot):
+    @pytest.mark.parametrize("hosted", [True, False])
+    def test_no_slideshow_hud_carries_the_osr2_part(self, qtbot, tmp_path, hosted):
         window = self._window(qtbot)
-        window._motion.set_max_intensity(35)
+        window.wear_the_hud("portrait", HudWear(
+            dashboard_cmd_file=tmp_path / "dashboard_cmd.txt" if hosted else None))
 
-        assert slideshow_hud_model("portrait", window.slideshow, device=window.hud_device).max_intensity == 35
+        model = window._hud_model()
 
-    def test_a_slideshow_that_is_not_driving_the_device_carries_no_max_intensity(self, qtbot):
-        assert slideshow_hud_model("portrait", self._window(qtbot).slideshow).max_intensity is None
+        assert (model.osr2, model.osr2_rows, model.osr2_controls, model.drive,
+                model.max_intensity) == ("", (), (), None, None), (
+            "his decision: the slideshow's OSR2 part was redundant with the one in Core")
 
     def test_the_window_driving_the_device_is_the_funestra_skip_ahead_can_act_on(self, qtbot):
         def skip_ahead(model):
@@ -204,6 +198,15 @@ class TestTheOneHudASlideshowWears:
         assert driving.tooltip.endswith("(this slide has no funscript)")
         assert idle.tooltip.endswith(
             "(this Funestra doesn't have the OSR2 and this slide has no funscript)")
+
+    def test_a_window_wearing_the_hud_over_the_device_lets_skip_ahead_act(self, qtbot):
+        window = self._window(qtbot)
+        window.wear_the_hud("portrait")
+
+        (jump,) = [button for row in window._hud_model().rows for button in row
+                   if button.command == "portrait_funscript_jump"]
+
+        assert jump.tooltip.endswith("(this slide has no funscript)")
 
     def test_the_pace_rides_with_the_rows_that_step_the_set(self, qtbot):
         posted = [button.command for row in self._model(qtbot).rows for button in row]
@@ -219,36 +222,6 @@ class TestTheOneHudASlideshowWears:
         assert ("portrait_clip_seconds_down", "4s", "portrait_clip_seconds_up") in [
             tuple(button.command or button.icon for button in row[1:4]) for row in rows]
 
-    @pytest.mark.parametrize("running", [True, False])
-    def test_the_broker_button_rides_on_the_osr2_line_lit_while_the_broker_runs(
-            self, qtbot, monkeypatch, running):
-        monkeypatch.setattr("origenerator.osr2.broker_running", lambda: running)
-
-        (broker,) = self._model(qtbot).osr2_controls
-
-        assert broker.command == BROKER_PRESS
-        assert (broker.lit, broker.warn) == (running, not running)
-
-    def test_a_press_on_the_broker_button_presses_the_broker(self, qtbot, monkeypatch):
-        presses = []
-        monkeypatch.setattr("origenerator.osr2.press_the_broker", lambda: presses.append(True))
-
-        self._window(qtbot).press(BROKER_PRESS)
-
-        assert presses == [True]
-
-    def test_a_slideshow_on_a_sessions_funestra_leaves_the_broker_button_to_the_session(
-            self, qtbot):
-        assert slideshow_hud_model("portrait", self._window(qtbot).slideshow).osr2_controls == ()
-
-    def test_everything_that_aims_the_device_rides_with_the_device(self, qtbot):
-        model = self._model(qtbot)
-        aiming = [button.command for row in model.osr2_rows for button in row]
-
-        assert "robot_hand_toggle_learned" in aiming
-        assert "robot_hand_cycle_shape" in aiming
-        assert "robot_hand_release" in aiming
-
     def test_the_transport_is_drawn_once(self, qtbot):
         posted = [button.command for row in self._model(qtbot).rows for button in row]
 
@@ -256,20 +229,6 @@ class TestTheOneHudASlideshowWears:
         assert "genau_prev_clip" not in posted
         assert "main_lock" not in posted
         assert "genau_trash_clip" not in posted
-
-    def test_the_readout_the_slideshow_composes_reaches_the_hud_the_funestra_draws(self, qtbot):
-        window = self._window(qtbot)
-        window.wear_the_hud("portrait")
-
-        assert hud_targets(window).tracks
-
-    def test_a_press_on_the_motion_row_reaches_the_motion(self, qtbot):
-        window = self._window(qtbot)
-        window.wear_the_hud("portrait")
-
-        window.press("robot_hand_cycle_shape")
-
-        assert "shape" in window._motion.calls
 
     def test_a_press_on_the_clip_seconds_pair_paces_the_slideshow(self, qtbot):
         window = self._window(qtbot)
@@ -298,9 +257,7 @@ class TestTheOneHudASlideshowWears:
 
         window.press("portrait_next")
 
-        assert channel.read_text(encoding="utf-8").split() == ["portrait_next"], (
-            "the device's rows are checked before the session's own, so a command for one side "
-            "that fell into them would be swallowed instead of posted")
+        assert channel.read_text(encoding="utf-8").split() == ["portrait_next"]
 
     def test_a_press_on_the_transport_still_reaches_the_slideshow(self, qtbot):
         window = self._window(qtbot)
@@ -312,51 +269,17 @@ class TestTheOneHudASlideshowWears:
 
         assert window.slideshow._set.playlist.index != before
 
-    def test_a_press_on_the_motion_row_under_a_session_still_reaches_the_motion(
-            self, qtbot, tmp_path):
-        window = self._window(qtbot)
-        channel = tmp_path / "dashboard_cmd.txt"
-        window.wear_the_hud("portrait", HudWear(dashboard_cmd_file=channel))
-
-        window.press("robot_hand_cycle_shape")
-
-        assert "shape" in window._motion.calls, (
-            "the OSR2 is this app's to drive wherever the slideshow is drawn, so the device's "
-            "presses land on this window even under a session")
-
-    def _worn_on_a_device_that_is_on(self, qtbot, monkeypatch, now):
-        monkeypatch.setattr("origenerator.gui.slideshow_view.osr2_device.device_mode",
-                            lambda: Osr2Mode.CONTROLLED)
+    def test_the_hud_is_rebuilt_on_its_resting_beat(self, qtbot):
+        now = [0.0]
         window = self._window(qtbot, clock=lambda: now[0])
         window.wear_the_hud("portrait")
-        return window
-
-    def test_the_hud_says_why_the_broker_cannot_hear_the_osr2(self, qtbot, monkeypatch):
-        monkeypatch.setattr("origenerator.gui.slideshow_view.osr2_device.device_mode",
-                            lambda: Osr2Mode.OFF)
-        monkeypatch.setattr("origenerator.gui.slideshow_view.osr2_device.device_trouble",
-                            lambda: Osr2Trouble.NOT_ANSWERING)
-        window = self._window(qtbot)
-
-        assert window.hud_device.osr2 is Osr2State.NO_ANSWER
-
-    def test_an_idle_device_leaves_the_hud_on_its_resting_beat(self, qtbot, monkeypatch):
-        now = [0.0]
-        window = self._worn_on_a_device_that_is_on(qtbot, monkeypatch, now)
-        first = window._hud_model()
-
-        now[0] = 0.15
-
-        assert window._hud_model() is first
-
-    def test_a_moving_trace_rebuilds_the_hud_on_the_fast_beat(self, qtbot, monkeypatch):
-        now = [0.0]
-        window = self._worn_on_a_device_that_is_on(qtbot, monkeypatch, now)
         window._motion.active = True
         first = window._hud_model()
 
         now[0] = 0.15
+        assert window._hud_model() is first
 
+        now[0] = 0.35
         assert window._hud_model() is not first
 
 

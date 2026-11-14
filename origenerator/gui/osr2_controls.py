@@ -84,10 +84,12 @@ class Osr2Controls(PressableDrawing):
 
     def drawing(self) -> tuple[bytes, tuple[int, int]]:
         self._drawn_device = self._device()
-        device, trouble, broker_running = self._drawn_device
-        return self._painter.rgba(osr2_controls_hud(
-            self._motion, Osr2Situation(device=device, trouble=trouble,
-            control=self._osr2_control(), script=self._script(), broker_running=broker_running)))
+        return self._painter.rgba(osr2_controls_hud(self._motion, self.situation()))
+
+    def situation(self) -> Osr2Situation:
+        device, trouble, broker_running = self._drawn_device or self._device()
+        return Osr2Situation(device=device, trouble=trouble, control=self._osr2_control(),
+                             script=self._script(), broker_running=broker_running)
 
     def _redraw_if_the_device_switched(self) -> bool:
         if self._device() == self._drawn_device:

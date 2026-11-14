@@ -82,3 +82,15 @@ def test_with_audio_on_the_sound_is_made_for_the_whole_video_and_written_with_it
     ((_, writer),) = _all(payload, VIDEO_WRITER)
     assert writer["inputs"]["audio"][0] in payload
     assert sampler_id in payload
+
+
+def test_its_lora_rows_leave_out_a_lora_made_for_image_to_video_which_the_i2v_form_offers(
+        installed_models, recorded_base_models):
+    installed_models.add("loras", "example_i2v_look.safetensors", arch="wan", lora=True)
+    recorded_base_models({"example_i2v_look": "Wan Video 2.2 I2V-A14B"})
+
+    t2v = {pd.key: pd for pd in Wan22T2vWorkflow().param_definitions()}
+    i2v = {pd.key: pd for pd in WORKFLOW_REGISTRY["wan22_i2v"].param_definitions()}
+
+    assert "example_i2v_look.safetensors" not in t2v["lora_high"].options
+    assert "example_i2v_look.safetensors" in i2v["lora_high"].options

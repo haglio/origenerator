@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.lora_rows import lora_defaults, lora_rows, numbered_lora_keys
-from origenerator.workflows.model_arch import WAN
+from origenerator.workflows.model_arch import WAN, WAN_I2V
 from origenerator.workflows.model_dropdowns import model_dropdown
 
 FIRST_PASS_LORA_KEYS = numbered_lora_keys("_high")
@@ -30,7 +30,7 @@ def wan_expert_shift_param(defaults: dict) -> ParamDef:
                     min_val=0.0, max_val=20.0, step=0.5, also_sets=("shift_low",), good=(5, 12))
 
 
-def wan_expert_lora_params(defaults: dict, accepts=(WAN,)) -> list[ParamDef]:
+def wan_expert_lora_params(defaults: dict, accepts=(WAN, WAN_I2V)) -> list[ParamDef]:
     return [
         *lora_rows(defaults, FIRST_PASS_LORA_KEYS, accepts=accepts, expert="high",
                    qualifier=" (First Pass)"),

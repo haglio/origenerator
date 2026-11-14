@@ -6,6 +6,7 @@ from origenerator import config
 from origenerator.model_titles import kept_by_stem, model_stem
 
 _TEXT_TO_VIDEO = re.compile(r"\bt2v\b", re.IGNORECASE)
+_IMAGE_TO_VIDEO = re.compile(r"\bi2v\b", re.IGNORECASE)
 _KIND_OF = {"Krea 2 Raw": "Krea 2", "Krea 2 Turbo": "Krea 2"}
 
 
@@ -15,6 +16,10 @@ def base_model_of(value) -> str:
 
 def made_for_text_to_video(value) -> bool:
     return _TEXT_TO_VIDEO.search(base_model_of(value)) is not None
+
+
+def made_for_image_to_video(value) -> bool:
+    return _IMAGE_TO_VIDEO.search(base_model_of(value)) is not None
 
 
 def loras_offered_beside(model, loras) -> list:

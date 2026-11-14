@@ -15,8 +15,9 @@ from funestra.main_hud import (
     OSR2_DRIVING,
     OSR2_PARKED,
 )
-from funestra.main_hud_painter import MainHudPainter, hud_xy
+from funestra.main_hud_painter import hud_xy
 from funestra.modes import MainMode, Osr2State
+from funestra.osr2_part_painter import Osr2PartPainter
 from funestra.osr2_visualizer import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
 from funestra.robot_hand import POSITION_MAX
 from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, Qt, Signal
@@ -79,7 +80,7 @@ def test_the_osr2_controls_are_up_while_nothing_drives_since_their_switch_is_wha
 def test_the_drawing_is_the_one_funestras_console_painter_paints(qtbot):
     controls, motion = _controls(qtbot)
     raw, size = controls.drawing()
-    expected, expected_size = MainHudPainter(device_only=True).rgba(osr2_controls_hud(motion))
+    expected, expected_size = Osr2PartPainter().rgba(osr2_controls_hud(motion))
     assert (raw, size) == (expected, expected_size)
 
 
@@ -154,7 +155,7 @@ def test_the_readouts_speed_amp_and_center_buttons_take_presses_while_the_room_i
     motion.active = True
     motion.state.state.amplitude = 60
     motion.parked_by_the_pause = True
-    painter = MainHudPainter()
+    painter = Osr2PartPainter()
     painter.rgba(osr2_controls_hud(motion, Osr2Situation(control=OSR2_DRIVING)))
     left, top = hud_xy()
 
@@ -591,7 +592,7 @@ def test_no_state_draws_the_osr2_controls_outside_the_room_kept_for_them():
             (*OSR2_CONTROL_BUTTONS, OSR2_CONTROL_UNANSWERED), (False, True), Osr2Mode,
             (None, FakeScript())):
         motion.active = active
-        _raw, (width, height) = MainHudPainter(device_only=True).rgba(
+        _raw, (width, height) = Osr2PartPainter().rgba(
             osr2_controls_hud(motion, Osr2Situation(device=device, control=control, script=script)))
 
         fit = (control, active, device)

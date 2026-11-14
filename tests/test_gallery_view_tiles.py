@@ -638,7 +638,7 @@ def test_the_star_enhance_and_trash_at_the_top_are_grayed_out_where_no_leaf_fold
     for place in (_collection(view, LATEST_KEY), _image_workflow(view._tree)):
         view._tree.setCurrentItem(place)
         assert not view._buttons.favorite.isEnabled()
-        assert view._buttons.favorite.toolTip() == ""
+        assert view._buttons.favorite.toolTip() == "Only a leaf folder can be favorited"
         assert not view._buttons.enhance.isEnabled()
         assert view._buttons.enhance.toolTip() == "Only a leaf folder can be enhanced as a whole"
         assert not view._buttons.delete.isEnabled()

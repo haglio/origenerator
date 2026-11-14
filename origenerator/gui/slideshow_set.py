@@ -103,7 +103,7 @@ class SlideshowSet:
         return [item for item in self.all_items if self.passes(item)]
 
     def set_filters(self, filters: SlideshowFilters) -> bool:
-        if filters == self.filters or not self._leaves_something(filters):
+        if filters == self.filters or not self.leaves_something(filters):
             return False
         self._narrow_to(filters)
         self._tell_of_the_filters()
@@ -113,12 +113,16 @@ class SlideshowSet:
         kept = SlideshowFilters()
         for field in fields(SlideshowFilters):
             trial = replace(kept, **{field.name: getattr(filters, field.name)})
-            if trial != kept and self._leaves_something(trial):
+            if trial != kept and self.leaves_something(trial):
                 kept = trial
         if kept != self.filters:
             self._narrow_to(kept, keep_the_slide=keep_the_slide)
 
-    def _leaves_something(self, filters: SlideshowFilters) -> bool:
+    def hold_the_slide_under(self, filters: SlideshowFilters) -> None:
+        self._narrow_to(filters, keep_the_slide=True)
+        self._tell_of_the_filters()
+
+    def leaves_something(self, filters: SlideshowFilters) -> bool:
         return any(self.passes(item, filters) for item in self.all_items)
 
     def _narrow_to(self, filters: SlideshowFilters, *, keep_the_slide: bool = False) -> None:
@@ -176,6 +180,10 @@ class SlideshowSet:
         if filters.enhanced and prompt_id not in self.enhanced_ids:
             return False
         if filters.originals and prompt_id in self.enhanced_ids:
+            return False
+        if not filters.images and item.media_type == MediaType.IMAGE:
+            return False
+        if not filters.videos and item.media_type == MediaType.VIDEO:
             return False
         return not filters.action or actions_are_filtered(self._named_for(prompt_id), filters.action)
 

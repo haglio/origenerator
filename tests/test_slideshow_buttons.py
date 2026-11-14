@@ -14,7 +14,8 @@ from origenerator.slideshow_buttons import HUD_FACTS, SlideshowFacts, answer, sl
 
 THE_ROW = [
     "prev", "nudge_prev", "nudge_next", "next", "funscript_jump", "lock", "trash", "fmode",
-    "enhanced", "reset", "shuffle", "latest", "cycle_version"]
+    "reset", "shuffle", "latest", "media_videos", "media_images", "enhancement_originals",
+    "enhancement_enhanced", "cycle_version"]
 
 
 def _button_row(**fields) -> tuple:
@@ -47,22 +48,45 @@ def test_every_button_posts_that_sides_own_verb_and_names_itself():
 
 def test_the_band_breaks_into_groups_where_the_controls_stop_being_about_one_thing():
     assert [name for name, button in zip(_names(_button_row()), _button_row(), strict=True) if button.group_break] == [
-        "lock", "enhanced", "shuffle", "cycle_version"]
+        "lock", "reset", "shuffle", "media_videos", "enhancement_originals", "cycle_version"]
 
 
 def test_the_switches_light_and_the_things_done_never_do():
-    row = _by_name(locked=True, favorites_filter=True, enhanced=True)
+    row = _by_name(locked=True, favorites_filter=True)
 
     assert row["lock"].lit
     assert row["lock"].favorite
     assert row["fmode"].lit
     assert row["fmode"].favorite
-    assert row["enhanced"].lit
-    assert row["enhanced"].enhanced
     assert row["trash"].danger
     assert not any(row[name].lit for name in ("prev", "next", "trash", "reset"))
     at_rest = _by_name()
-    assert not any(at_rest[name].lit for name in ("lock", "fmode", "enhanced"))
+    assert not any(at_rest[name].lit for name in ("lock", "fmode"))
+
+
+def _pair_buttons(row, word: str) -> tuple:
+    return tuple(button for button in row if button.tooltip.endswith(word))
+
+
+def test_each_pair_lights_the_kinds_it_includes():
+    row = _button_row(media=(True, False), enhancement=(False, True))
+
+    (images,) = _pair_buttons(row, " images")
+    (videos,) = _pair_buttons(row, " videos")
+    (enhanced,) = _pair_buttons(row, "enhanced items")
+    (originals,) = _pair_buttons(row, "original items")
+    assert [images.lit, videos.lit, enhanced.lit, originals.lit] == [True, False, False, True]
+    at_rest = _button_row()
+    assert all(button.lit for word in (" images", " videos", "enhanced items", "original items")
+               for button in _pair_buttons(at_rest, word))
+
+
+def test_the_enhanced_button_keeps_the_enhanced_color_and_the_originals_button_wears_none():
+    row = _button_row()
+
+    (enhanced,) = _pair_buttons(row, "enhanced items")
+    (originals,) = _pair_buttons(row, "original items")
+    assert (enhanced.enhanced, originals.enhanced) == (True, False)
 
 
 def test_the_order_the_set_plays_in_is_the_one_lit_of_the_pair():
@@ -88,9 +112,13 @@ class TestTheWords:
         assert row["latest"].tooltip == f"{LATEST_LABEL} — reload it newest-first"
         assert row["cycle_version"].tooltip == "Another version of this slide"
 
-    def test_enhanced_says_it_plays_every_item_that_has_been_enhanced_videos_included(self):
-        assert _by_name()["enhanced"].tooltip == (
-            "Enhanced only — play just the items that have been enhanced")
+    def test_each_pair_says_what_it_includes_as_two_d_and_vr_do(self):
+        row = _by_name(media=(True, False), enhancement=(False, True))
+
+        assert [row[name].tooltip for name in (
+            "media_none", "media_both", "enhancement_both", "enhancement_none")] == [
+            "Including images", "Not including videos", "Not including enhanced items",
+            "Including original items"]
 
     def test_the_lock_and_the_trash_read_as_kinos_and_reset_says_what_it_does_here(self):
         row = _by_name()
@@ -196,8 +224,11 @@ class _Host:
     def toggle_favorites_filter(self):
         self.calls.append("fmode")
 
-    def toggle_enhanced_mode(self):
-        self.calls.append("enhanced")
+    def set_media(self, included):
+        self.calls.append(("media", included))
+
+    def set_enhancement(self, included):
+        self.calls.append(("enhancement", included))
 
     def show_item(self, path, *, lock=False):
         self.calls.append(("item", path, lock))
@@ -264,9 +295,12 @@ def test_every_declared_button_is_answered_by_the_slideshow():
         assert answer(host, button.command.removeprefix("portrait_")), button.command
 
     assert host.calls == [("step", -1), ("nudge", -1), ("nudge", 1), ("step", 1),
-                          "funscript jump", "lock", "cull", "fmode", "enhanced",
+                          "funscript jump", "lock", "cull", "fmode",
                           "normal speed", "reset",
-                          ("order", False), ("order", True), ("version", -1)]
+                          ("order", False), ("order", True),
+                          ("media", (False, True)), ("media", (True, False)),
+                          ("enhancement", (False, True)), ("enhancement", (True, False)),
+                          ("version", -1)]
 
 
 def test_the_next_scripted_slide_is_a_key_and_a_spoken_word_with_no_button():

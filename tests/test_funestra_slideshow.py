@@ -636,8 +636,9 @@ def test_the_hud_this_app_publishes_is_the_slideshows_own_band(qtbot, tmp_path):
     assert [[button.command for button in row] for row in model.rows] == [
         ["portrait_prev", "portrait_nudge_prev", "portrait_nudge_next", "portrait_next",
          "portrait_funscript_jump", "portrait_lock", "portrait_trash", "portrait_fmode",
-         "portrait_enhanced", "portrait_reset", "portrait_shuffle", "portrait_latest",
-         "portrait_cycle_version"],
+         "portrait_reset", "portrait_shuffle", "portrait_latest", "portrait_media_videos",
+         "portrait_media_images", "portrait_enhancement_originals",
+         "portrait_enhancement_enhanced", "portrait_cycle_version"],
         ["", "portrait_clip_seconds_down", "", "portrait_clip_seconds_up",
          "", "portrait_speed_down", "", "portrait_speed_up"]], (
         "the session draws the HUD on the Funestra, so this app publishes the model for it, and "
@@ -1059,15 +1060,79 @@ def test_enhanced_and_original_lifts_either_and_leaves_f_mode_and_the_action_fil
         assert (slideshow.hud_favorites_filter, slideshow.hud_action_filter) == (True, "alpha")
 
 
-def test_the_enhanced_button_pressed_under_original_only_turns_enhanced_only_on(qtbot, tmp_path):
+def test_the_enhanced_button_pressed_under_original_only_includes_the_enhanced_items_too(
+        qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(enhanced_ids={"id-2", "id-3"}))
     slideshow.show_originals_only()
 
-    assert answer(slideshow, "enhanced")
+    assert answer(slideshow, "enhancement_both")
+
+    assert slideshow.hud_enhancement == (True, True)
+    assert len(read_playlist(slideshow.channel.playlist)) == 3
+
+
+def test_turning_originals_off_plays_the_enhanced_items_alone(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(enhanced_ids={"id-2", "id-3"}))
+
+    assert answer(slideshow, "enhancement_enhanced")
 
     assert (slideshow.hud_enhanced_mode, slideshow.hud_originals_mode) == (True, False)
+    assert slideshow.hud_enhancement == (True, False)
     assert [str(item.path) for item in read_playlist(slideshow.channel.playlist)] == [
         "two.png", "three.png"]
+
+
+def test_turning_enhanced_off_plays_the_originals_alone(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(enhanced_ids={"id-2", "id-3"}))
+
+    assert answer(slideshow, "enhancement_originals")
+
+    assert slideshow.hud_enhancement == (False, True)
+    assert [str(item.path) for item in read_playlist(slideshow.channel.playlist)] == ["one.png"]
+
+
+_IMAGES_AND_A_VIDEO = [("one.png", "image", "id-1"), ("two.mp4", "video", "id-2"),
+                       ("three.png", "image", "id-3")]
+
+
+def test_turning_videos_off_plays_the_images_alone_and_images_off_the_videos(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, _IMAGES_AND_A_VIDEO)
+
+    assert answer(slideshow, "media_images")
+    assert slideshow.hud_media == (True, False)
+    assert [str(item.path) for item in read_playlist(slideshow.channel.playlist)] == [
+        "one.png", "three.png"]
+
+    assert answer(slideshow, "media_videos")
+    assert slideshow.hud_media == (False, True)
+    assert [str(item.path) for item in read_playlist(slideshow.channel.playlist)] == ["two.mp4"]
+
+
+def test_turning_off_the_one_kind_still_included_holds_the_slide_on_screen_and_says_so(
+        qtbot, tmp_path):
+    said = []
+    slideshow = _slideshow(qtbot, tmp_path, _IMAGES_AND_A_VIDEO, say=_into(said))
+    answer(slideshow, "media_images")
+    on_screen = slideshow._set.playlist.current()
+
+    answer(slideshow, "media_none")
+
+    assert slideshow.hud_media == (False, False)
+    assert slideshow.locked
+    assert slideshow._set.playlist.current() == on_screen
+    assert said[-1] == "Including no other items"
+
+
+def test_each_press_of_a_pair_says_what_is_now_included(qtbot, tmp_path):
+    said = []
+    slideshow = _slideshow(qtbot, tmp_path, _IMAGES_AND_A_VIDEO, say=_into(said),
+                           hud=HudFacts(enhanced_ids={"id-2"}))
+
+    answer(slideshow, "media_images")
+    answer(slideshow, "media_both")
+    answer(slideshow, "enhancement_originals")
+
+    assert said == ["Images only", "Images + Videos", "Originals only"]
 
 
 def test_what_a_slideshow_hands_over_is_the_whole_set_standing_where_the_funestra_is(

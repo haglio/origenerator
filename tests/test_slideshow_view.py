@@ -131,13 +131,13 @@ def test_the_enhanced_switch_narrows_the_pass_and_keeps_the_slide_showing(qtbot,
     _settle(view)
     assert view.slideshow._set.playlist.current()[2] == "b"
 
-    assert view.slideshow.toggle_enhanced_mode() is True
+    assert view.slideshow.set_enhanced_mode(True) is True
 
     assert view.slideshow.hud_enhanced_mode is True
     assert [item[2] for item in view.slideshow._set.playlist._items] == ["b", "c"]
     assert view.slideshow._set.playlist.current()[2] == "b"
 
-    assert view.slideshow.toggle_enhanced_mode() is True
+    assert view.slideshow.set_enhanced_mode(False) is True
     assert view.slideshow.hud_enhanced_mode is False
     assert len(view.slideshow._set.playlist) == 3
     assert view.slideshow._set.playlist.current()[2] == "b", (
@@ -171,7 +171,7 @@ def test_both_switches_together_keep_what_answers_both_and_enhanced_and_original
 
     view.slideshow.toggle_favorites_filter()
     _settle(view)
-    view.slideshow.toggle_enhanced_mode()
+    view.slideshow.set_enhanced_mode(True)
     _settle(view)
 
     assert [item[2] for item in view.slideshow._set.playlist._items] == ["b"]
@@ -246,7 +246,7 @@ def test_reset_drops_both_switches(qtbot, tmp_path):
                  favorite_ids={"a"}, enhanced_ids={"a"})
     view.slideshow.toggle_favorites_filter()
     _settle(view)
-    view.slideshow.toggle_enhanced_mode()
+    view.slideshow.set_enhanced_mode(True)
     _settle(view)
     assert len(view.slideshow._set.playlist) == 1
 

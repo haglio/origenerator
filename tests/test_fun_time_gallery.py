@@ -1797,7 +1797,8 @@ def test_an_item_no_row_claims_is_named_nothing_at_all(qtbot):
     assert _hud_label_for(view)("") == ""
 
 
-def test_a_hosted_slideshows_hud_carries_the_enhanced_switch_beside_f_mode(qtbot, tmp_path, monkeypatch):
+def test_a_hosted_slideshows_hud_carries_the_two_pairs_after_shuffle_and_latest(
+        qtbot, tmp_path, monkeypatch):
     view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view._slideshows, "_enhanced_ids_of", lambda rows: {"id-tall-1"})
@@ -1805,18 +1806,20 @@ def test_a_hosted_slideshows_hud_carries_the_enhanced_switch_beside_f_mode(qtbot
     slideshow = view._slideshows._region_slideshows["portrait"]
     qtbot.addWidget(slideshow.shown)
     names = hud_button_names(slideshow.shown)
-    assert names.index("enhanced") == names.index("fmode") + 1
+    assert names[names.index("latest") + 1:names.index("latest") + 5] == [
+        "media_videos", "media_images", "enhancement_originals", "enhancement_enhanced"]
 
-    slideshow.shown.press("portrait_enhanced")
+    slideshow.shown.press("portrait_enhancement_enhanced")
 
     assert slideshow.hud_enhanced_mode is True
     assert slideshow.pass_size() == 1
     model = slideshow_hud_model("portrait", slideshow)
-    assert _lit(model, "portrait_enhanced")
+    assert _lit(model, "portrait_enhancement_none")
+    assert not _lit(model, "portrait_enhancement_both")
     assert "Enhanceds" in model.title
     assert not (tmp_path / "dashboard_cmd.txt").exists()
 
-    slideshow.shown.press("portrait_enhanced")
+    slideshow.shown.press("portrait_enhancement_both")
     assert slideshow.pass_size() == 3
 
 
@@ -1866,7 +1869,7 @@ def test_a_regions_reset_drops_the_enhanced_switch_with_the_rest(qtbot, tmp_path
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
     slideshow = view._slideshows._region_slideshows["portrait"]
     qtbot.addWidget(slideshow.shown)
-    slideshow.toggle_enhanced_mode()
+    slideshow.set_enhanced_mode(True)
     assert slideshow.hud_enhanced_mode is True
 
     slideshow.slideshow_reset()

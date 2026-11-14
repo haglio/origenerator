@@ -42,10 +42,8 @@ class SlideshowFilters:
     enhanced: bool = False
     action: str = ""
     originals: bool = False
-
-    def __post_init__(self) -> None:
-        if self.enhanced and self.originals:
-            raise ValueError("enhanced only and original only cannot both be on")
+    images: bool = True
+    videos: bool = True
 
     def saved(self) -> dict:
         return {_SAVED_FILTER_NAMES.get(name, name): value for name, value in asdict(self).items()}
@@ -55,10 +53,11 @@ class SlideshowFilters:
         if not isinstance(saved, dict):
             return cls()
         action = saved.get(_SAVED_FILTER_NAMES["action"])
-        enhanced = saved.get("enhanced") is True
-        return cls(favorites=saved.get("favorites") is True, enhanced=enhanced,
+        return cls(favorites=saved.get("favorites") is True, enhanced=saved.get("enhanced") is True,
                    action=action if isinstance(action, str) else "",
-                   originals=saved.get("originals") is True and not enhanced)
+                   originals=saved.get("originals") is True,
+                   images=saved.get("images") is not False,
+                   videos=saved.get("videos") is not False)
 
 
 @dataclass(frozen=True)

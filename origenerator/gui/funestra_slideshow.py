@@ -22,6 +22,7 @@ from funestra.funestra_verbs import (
     step_version,
 )
 from funestra.hud_title import SHUFFLE_LABEL
+from funestra.inclusion_pair import Included, InclusionPair, answer_to_a_narrowing
 from funestra.loop_cycle import ACTION, LOCK, SEED
 from funestra.on_screen_history import OnScreenHistory
 from funestra.playlist import PlaylistItem
@@ -47,6 +48,7 @@ from origenerator.library_views import Version
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
+from origenerator.slideshow_buttons import enhancement_pair, media_pair
 
 logger = logging.getLogger(__name__)
 
@@ -615,9 +617,6 @@ class FunestraSlideshow(QObject):
     def set_favorites_filter(self, on: bool) -> bool:
         return self._set.set_filters(replace(self._set.filters, favorites=bool(on)))
 
-    def toggle_enhanced_mode(self) -> bool:
-        return self.set_enhanced_mode(not self._set.filters.enhanced)
-
     def set_enhanced_mode(self, on: bool) -> bool:
         return self._narrow_by_enhancement(
             enhanced=bool(on), originals=self._set.filters.originals and not on)
@@ -631,6 +630,41 @@ class FunestraSlideshow(QObject):
 
     def show_enhanced_and_original(self) -> bool:
         return self._narrow_by_enhancement()
+
+    @property
+    def hud_enhancement(self) -> Included:
+        filters = self._set.filters
+        return (not filters.originals, not filters.enhanced)
+
+    def set_enhancement(self, included: Included) -> bool:
+        enhanced, originals = included
+        return self._include(enhancement_pair(""), included, replace(
+            self._set.filters, enhanced=not originals, originals=not enhanced))
+
+    @property
+    def hud_media(self) -> Included:
+        filters = self._set.filters
+        return (filters.images, filters.videos)
+
+    def set_media(self, included: Included) -> bool:
+        images, videos = included
+        return self._include(media_pair(""), included,
+                             replace(self._set.filters, images=images, videos=videos))
+
+    def _include(self, pair: InclusionPair, included: Included,
+                 filters: SlideshowFilters) -> bool:
+        if filters == self._set.filters:
+            return False
+        answer = answer_to_a_narrowing(
+            pair.flash(included), nothing_left=not self._set.leaves_something(filters),
+            things="items")
+        if answer.holds_what_is_on_screen:
+            self._set.hold_the_slide_under(filters)
+            self.set_locked(True)
+        else:
+            self._set.set_filters(filters)
+        self._flash(answer.says, kind=WARNING if answer.warns else INFO)
+        return True
 
     def _narrow_by_enhancement(self, *, enhanced: bool = False, originals: bool = False) -> bool:
         return self._set.set_filters(replace(self._set.filters, enhanced=enhanced,

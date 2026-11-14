@@ -520,7 +520,8 @@ def _trash_collection_view(qtbot, actions, held=(("d1", "a cat"),)):
     return view
 
 
-def _click_tile(view, prompt_id):
+def _pick_by_clicking(view, prompt_id):
+    view._gallery_pane.clear_thumbnail_selection()
     QTest.mouseClick(view._gallery_pane._thumb_widgets[prompt_id], Qt.MouseButton.LeftButton, _NO_MOD)
 
 

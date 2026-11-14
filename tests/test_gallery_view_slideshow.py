@@ -40,7 +40,6 @@ from tests.gallery_view_support import (
     _a_slideshow_standing_on_its_own,
     _alls,
     _at,
-    _click_tile,
     _collection,
     _collection_row,
     _double_click_slideshow,
@@ -57,6 +56,7 @@ from tests.gallery_view_support import (
     _on_screen,
     _open_latest,
     _open_leaf,
+    _pick_by_clicking,
     _press_enter,
     _reroll_client,
     _resolve_by_id,
@@ -998,7 +998,7 @@ def test_the_image_a_locked_slideshow_ends_on_stays_picked_and_in_view_as_the_li
     far = view.listed_prompt_ids()[-3]
     _scroll_bar(view).setValue(_scroll_bar(view).maximum())
     qtbot.wait(1)
-    _click_tile(view, far)
+    _pick_by_clicking(view, far)
     _scroll_bar(view).setValue(0)
     slideshow = _double_click_slideshow(view, qtbot)
     slideshow.shown.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))

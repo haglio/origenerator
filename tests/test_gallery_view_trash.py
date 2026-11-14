@@ -54,7 +54,6 @@ from tests.gallery_view_support import (
     _at,
     _click_beside_the_mark_of,
     _click_off,
-    _click_tile,
     _collection,
     _double_click_slideshow,
     _i2v_video,
@@ -64,6 +63,7 @@ from tests.gallery_view_support import (
     _menu_labels,
     _name_of,
     _open_leaf,
+    _pick_by_clicking,
     _resolve_by_id,
     _right_click,
     _shown_view_with_one_image,
@@ -459,7 +459,7 @@ def test_clicking_a_deleted_tile_opens_it_like_any_other_generation(qtbot):
     view.refresh()
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
 
-    _click_tile(view, "d1")
+    _pick_by_clicking(view, "d1")
 
     assert view._selected_row["prompt_id"] == "d1"
     shown = view._generate_pane.current_generate_tab().displayed_row()
@@ -805,6 +805,7 @@ def test_clicking_a_thumbnail_keeps_its_press_to_itself(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
+    view._gallery_pane.clear_thumbnail_selection()
 
     qtbot.mouseClick(view._gallery_pane._thumb_widgets["i1"], Qt.MouseButton.LeftButton)
     assert view.selected_prompt_ids() == ["i1"]
@@ -1201,6 +1202,7 @@ def test_pressing_delete_after_clicking_a_thumbnail_removes_it(qtbot, tmp_path):
     view, db, file_path = _shown_view_with_one_image(qtbot, tmp_path)
     _open_leaf(view)
     thumb = view._gallery_pane._thumb_widgets["i1"]
+    view._gallery_pane.clear_thumbnail_selection()
 
     qtbot.mouseClick(thumb, Qt.MouseButton.LeftButton)
     qtbot.keyClick(thumb, Qt.Key.Key_Delete)

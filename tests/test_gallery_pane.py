@@ -205,6 +205,30 @@ def test_a_tile_click_picks_by_the_keys_held_during_that_click(qtbot):
     assert pane.selected_prompt_ids() == ["g2"]
 
 
+def test_clicking_the_one_selected_tile_unselects_it(qtbot):
+    rows = [_row("g1", 1), _row("g2", 2)]
+    pane, _scroll = _pane(qtbot, rows)
+    _open_latest(pane, rows)
+    qtbot.mouseClick(pane._thumb_widgets["g1"], Qt.MouseButton.LeftButton, _NO_MOD)
+
+    qtbot.mouseClick(pane._thumb_widgets["g1"], Qt.MouseButton.LeftButton, _NO_MOD)
+
+    assert pane.selected_prompt_ids() == []
+
+
+def test_double_clicking_the_one_selected_tile_leaves_it_selected(qtbot):
+    rows = [_row("g1", 1)]
+    pane, _scroll = _pane(qtbot, rows)
+    _open_latest(pane, rows)
+    tile = pane._thumb_widgets["g1"]
+    qtbot.mouseClick(tile, Qt.MouseButton.LeftButton, _NO_MOD)
+
+    qtbot.mouseClick(tile, Qt.MouseButton.LeftButton, _NO_MOD)
+    qtbot.mouseDClick(tile, Qt.MouseButton.LeftButton, _NO_MOD)
+
+    assert pane.selected_prompt_ids() == ["g1"]
+
+
 def test_shift_extends_a_contiguous_run_from_the_anchor(qtbot):
     rows = [_row(f"g{n}", n) for n in range(1, 6)]
     pane, _scroll = _pane(qtbot, rows)

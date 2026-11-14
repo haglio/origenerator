@@ -405,7 +405,6 @@ def test_space_drives_the_shared_motion_not_the_lock(qtbot):
     view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None), ViewWiring(engine=FakeEngine(),
                          motion=motion))
     qtbot.addWidget(view)
-    assert view.hud_device is not None
     _press(view, Qt.Key.Key_Space)
     assert ("toggle", True) in motion.calls
     assert not view.slideshow.locked

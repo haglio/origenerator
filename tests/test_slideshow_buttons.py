@@ -1,188 +1,8 @@
 from __future__ import annotations
 
-import pytest
-from funestra.hud_button import FIT_THE_WORD
-from funestra.hud_controls import (
-    AN_IMAGE,
-    RESET_PUTS_BACK_THE_SPEED,
-    TRASH_TOOLTIP,
-    lock_tooltip,
-)
-from funestra.hud_title import F_MODE_LABEL, LATEST_LABEL, SHUFFLE_LABEL
+from funestra.hud_kinds import HudFacts, HudKind, hud_rows
 
-from origenerator.slideshow_buttons import HUD_FACTS, SlideshowFacts, answer, slideshow_rows
-
-THE_ROW = [
-    "prev", "nudge_prev", "nudge_next", "next", "funscript_jump", "lock", "trash", "fmode",
-    "reset", "shuffle", "latest", "media_videos", "media_images", "enhancement_originals",
-    "enhancement_enhanced", "cycle_version"]
-
-
-def _button_row(**fields) -> tuple:
-    return slideshow_rows("portrait", SlideshowFacts(**fields))[-1]
-
-
-def _names(buttons) -> list[str]:
-    return [button.command.removeprefix("portrait_") for button in buttons]
-
-
-def _by_name(**fields) -> dict:
-    row = _button_row(**fields)
-    return dict(zip(_names(row), row, strict=True))
-
-
-def test_the_band_is_the_controls_a_slideshow_answers_in_the_funestras_order():
-    assert _names(_button_row()) == THE_ROW
-
-
-def test_every_button_posts_that_sides_own_verb_and_names_itself():
-    for shape in ("portrait", "landscape"):
-        for button in slideshow_rows(shape)[-1]:
-            assert button.command.startswith(f"{shape}_"), (
-                "the same spelling a Satellite's button row posts, so the session routes a "
-                "slideshow's press with nothing new to learn: " + button.command)
-            assert button.tooltip, (
-                "every glyph on this HUD is cryptic on purpose, so each one names itself on "
-                "hover: " + button.command)
-
-
-def test_the_band_breaks_into_groups_where_the_controls_stop_being_about_one_thing():
-    assert [name for name, button in zip(_names(_button_row()), _button_row(), strict=True) if button.group_break] == [
-        "lock", "reset", "shuffle", "media_videos", "enhancement_originals", "cycle_version"]
-
-
-def test_the_switches_light_and_the_things_done_never_do():
-    row = _by_name(locked=True, favorites_filter=True)
-
-    assert row["lock"].lit
-    assert row["lock"].favorite
-    assert row["fmode"].lit
-    assert row["fmode"].favorite
-    assert row["trash"].danger
-    assert not any(row[name].lit for name in ("prev", "next", "trash", "reset"))
-    at_rest = _by_name()
-    assert not any(at_rest[name].lit for name in ("lock", "fmode"))
-
-
-def _pair_buttons(row, word: str) -> tuple:
-    return tuple(button for button in row if button.tooltip.endswith(word))
-
-
-def test_each_pair_lights_the_kinds_it_includes():
-    row = _button_row(media=(True, False), enhancement=(False, True))
-
-    (images,) = _pair_buttons(row, " images")
-    (videos,) = _pair_buttons(row, " videos")
-    (enhanced,) = _pair_buttons(row, "enhanced items")
-    (originals,) = _pair_buttons(row, "original items")
-    assert [images.lit, videos.lit, enhanced.lit, originals.lit] == [True, False, False, True]
-    at_rest = _button_row()
-    assert all(button.lit for word in (" images", " videos", "enhanced items", "original items")
-               for button in _pair_buttons(at_rest, word))
-
-
-def test_the_enhanced_button_keeps_the_enhanced_color_and_the_originals_button_wears_none():
-    row = _button_row()
-
-    (enhanced,) = _pair_buttons(row, "enhanced items")
-    (originals,) = _pair_buttons(row, "original items")
-    assert (enhanced.enhanced, originals.enhanced) == (True, False)
-
-
-def test_the_order_the_set_plays_in_is_the_one_lit_of_the_pair():
-    for order, lit in ((SHUFFLE_LABEL, ["shuffle"]), (LATEST_LABEL, ["latest"])):
-        row = _button_row(order=order)
-        assert [name for name, button in zip(_names(row), row, strict=True)
-                if name in ("shuffle", "latest") and button.lit] == lit, order
-
-
-class TestTheWords:
-
-    def test_the_controls_both_modes_share_read_as_kino_reads_them(self):
-        row = _by_name(has_other_versions=True)
-
-        assert row["prev"].tooltip == "Previous slide"
-        assert row["next"].tooltip == "Next slide"
-        assert row["nudge_prev"].tooltip.startswith("Back 10s")
-        assert row["nudge_next"].tooltip.startswith("Forward 10s")
-        assert row["funscript_jump"].tooltip.startswith(
-            "Skip ahead to where this slide's scripting starts up again")
-        assert row["fmode"].tooltip == f"{F_MODE_LABEL} — browse only the favorites on this Funestra"
-        assert row["shuffle"].tooltip == f"{SHUFFLE_LABEL} — reshuffle what plays"
-        assert row["latest"].tooltip == f"{LATEST_LABEL} — reload it newest-first"
-        assert row["cycle_version"].tooltip == "Another version of this slide"
-
-    def test_each_pair_says_what_it_includes_as_two_d_and_vr_do(self):
-        row = _by_name(media=(True, False), enhancement=(False, True))
-
-        assert [row[name].tooltip for name in (
-            "media_none", "media_both", "enhancement_both", "enhancement_none")] == [
-            "Including images", "Not including videos", "Not including enhanced items",
-            "Including original items"]
-
-    def test_the_lock_and_the_trash_read_as_kinos_and_reset_says_what_it_does_here(self):
-        row = _by_name()
-
-        assert row["lock"].tooltip == lock_tooltip(False, "slide")
-        assert row["trash"].tooltip == TRASH_TOOLTIP
-        assert row["reset"].tooltip.startswith("Reset — ")
-
-
-class TestTheTenSecondSteps:
-    def test_step_a_video_longer_than_ten_seconds(self):
-        row = _by_name(longer_than_a_step=True)
-
-        assert [row[step].dim for step in ("nudge_prev", "nudge_next")] == [False, False]
-
-    def test_are_faded_on_a_video_of_ten_seconds_or_shorter_and_say_so(self):
-        row = _by_name(longer_than_a_step=False)
-
-        for step in ("nudge_prev", "nudge_next"):
-            assert row[step].dim
-            assert row[step].tooltip.endswith("(this slide is 10s or shorter)")
-
-    def test_are_faded_on_an_image_and_say_so(self):
-        row = _by_name(longer_than_a_step=True, image=True)
-
-        for step in ("nudge_prev", "nudge_next"):
-            assert row[step].dim
-            assert row[step].tooltip.endswith(f"({AN_IMAGE})")
-
-
-class TestSkipAhead:
-    def test_is_live_with_the_osr2_on_this_funestra_and_a_funscript_on_screen(self):
-        assert not _by_name(has_osr2=True, has_funscript=True)["funscript_jump"].dim
-
-    @pytest.mark.parametrize(("has_osr2", "has_funscript", "why"), [
-        (False, True, "this Funestra doesn't have the OSR2"),
-        (True, False, "this slide has no funscript"),
-        (False, False, "this Funestra doesn't have the OSR2 and this slide has no funscript"),
-    ])
-    def test_is_faded_without_the_osr2_or_a_funscript_and_says_which(
-            self, has_osr2, has_funscript, why):
-        jump = _by_name(has_osr2=has_osr2, has_funscript=has_funscript)["funscript_jump"]
-
-        assert jump.dim
-        assert jump.tooltip.endswith(f"({why})")
-
-
-def test_reset_is_faded_with_nothing_to_put_back():
-    assert _by_name(nothing_to_reset=True)["reset"].dim
-    assert not _by_name(nothing_to_reset=False)["reset"].dim
-
-
-def test_a_slideshow_on_its_own_offers_no_minimize_and_no_session_to_switch():
-    rows = slideshow_rows("portrait")
-
-    assert len(rows) == 1
-    assert "minimize" not in _names(rows[-1])
-
-
-def test_a_hosted_slideshow_declares_its_band_and_nothing_around_it():
-    rows = slideshow_rows("portrait", SlideshowFacts(hosted=True))
-
-    assert len(rows) == 1
-    assert _names(rows[0]) == THE_ROW
+from origenerator.slideshow_buttons import HUD_FACTS, answer
 
 
 class _Host:
@@ -284,18 +104,14 @@ def test_filter_said_of_a_side_narrows_to_the_action_on_screen():
     assert host.calls == ["filter to the action on screen"]
 
 
-def test_the_versions_button_is_dim_where_the_item_has_only_itself():
-    assert _by_name()["cycle_version"].dim
-    assert not _by_name(has_other_versions=True)["cycle_version"].dim
-
-
 def test_every_declared_button_is_answered_by_the_slideshow():
     host = _Host()
-    for button in slideshow_rows("portrait", SlideshowFacts(hosted=True))[0]:
+    (row,) = hud_rows(HudKind.SLIDESHOW, HudFacts(funestra="portrait", hosted=True, latest=False))
+    for button in row:
         assert answer(host, button.command.removeprefix("portrait_")), button.command
 
     assert host.calls == [("step", -1), ("nudge", -1), ("nudge", 1), ("step", 1),
-                          "funscript jump", "lock", "cull", "fmode",
+                          "funscript jump", "cull", "lock", "fmode",
                           "normal speed", "reset",
                           ("order", False), ("order", True),
                           ("media", (False, True)), ("media", (True, False)),
@@ -348,36 +164,3 @@ def test_a_press_a_slideshow_has_no_answer_to_says_so():
     assert not answer(host, "minimize")
     assert not answer(host, "made_up_press")
     assert host.calls == []
-
-
-def test_reset_says_what_the_side_goes_back_to_where_it_is_being_shown():
-    hosted = next(b for b in _button_row(hosted=True) if b.command == "portrait_reset")
-    alone = next(b for b in _button_row() if b.command == "portrait_reset")
-
-    assert "library" in hosted.tooltip
-    assert "library" not in alone.tooltip
-
-
-def test_reset_says_the_speed_goes_back_in_the_words_kinos_reset_uses():
-    hosted = next(b for b in _button_row(hosted=True) if b.command == "portrait_reset")
-    alone = next(b for b in _button_row() if b.command == "portrait_reset")
-
-    assert RESET_PUTS_BACK_THE_SPEED in hosted.tooltip
-    assert RESET_PUTS_BACK_THE_SPEED in alone.tooltip
-
-
-def test_the_clip_seconds_and_the_playback_speed_share_one_row():
-    *_rows, shared = slideshow_rows("portrait", SlideshowFacts(clip_seconds=4))
-
-    assert [button.command or button.icon for button in shared] == [
-        "Clip seconds", "portrait_clip_seconds_down", "4s", "portrait_clip_seconds_up",
-        "Playback speed", "portrait_speed_down", "", "portrait_speed_up"]
-
-
-def test_each_name_on_that_row_keeps_its_controls_close_and_the_second_pair_stands_apart_from_the_first():
-    *_rows, shared = slideshow_rows("portrait", SlideshowFacts(clip_seconds=4))
-    clip_seconds, *_controls, playback_speed, _slower, _rate, _faster = shared
-
-    assert [button.group_break for button in shared] == [
-        False, False, False, False, True, False, False, False]
-    assert (clip_seconds.width, playback_speed.width) == (FIT_THE_WORD, FIT_THE_WORD)

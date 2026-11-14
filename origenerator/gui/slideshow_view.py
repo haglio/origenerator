@@ -6,6 +6,7 @@ from dataclasses import dataclass, replace
 
 from funestra.file_channel import append_command
 from funestra.funestra_verbs import SPEED_DOWN, SPEED_UP
+from funestra.hud_kinds import minimize_funestra_button
 from funestra.hud_placement import HudCorner
 from funestra.main_hud import ModeHud
 from funestra.pointer import OMNIPAUSE_TOGGLE
@@ -14,7 +15,6 @@ from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 from shared_ui.colors import BLACK
 
-from origenerator import osr2 as osr2_device
 from origenerator.config import FRAMES_BEING_MADE_DIR
 from origenerator.gui.deferred import defer
 from origenerator.gui.frame_files import FrameFiles
@@ -23,12 +23,6 @@ from origenerator.gui.funestra_slideshow import FunestraSlideshow, Hosting, Play
 from origenerator.gui.hud_queue import QueueFoot
 from origenerator.gui.message import HEARD_MARK, INFO, Message, time_to_read_ms
 from origenerator.gui.motion_hud import apply_motion_key
-from origenerator.gui.osr2_controls_state import (
-    REPAINT_MS,
-    Osr2Situation,
-    osr2_controls_state,
-    post_device_action,
-)
 from origenerator.gui.request_promise import RequestPromise
 from origenerator.gui.slideshow_hud import (
     COLLAPSES,
@@ -184,22 +178,18 @@ class SlideshowView(QWidget):
         if not self._hud_shape:
             return None
         now = self._clock()
-        beat = REPAINT_MS if self._hud_moving() else _REFRESH_MS
-        if not self._hud_stale and (now - self._hud_built_at) * 1000 < beat:
+        if not self._hud_stale and (now - self._hud_built_at) * 1000 < _REFRESH_MS:
             return self._last_hud_model
         self._hud_stale = False
         self._hud_built_at = now
         model = slideshow_hud_model(self._hud_shape, self.slideshow,
-                                    HudPlacement(hosted=self._dashboard_cmd_file is not None),
-                                    device=self.hud_device, foot=self.queue_foot.section())
+                                    HudPlacement(hosted=self._dashboard_cmd_file is not None,
+                                                 drives_the_osr2=self._motion is not None),
+                                    foot=self.queue_foot.section())
         if model is not None:
             model = replace(model, hud_corner=self._corner, hud_minimized=self._minimized)
         self._last_hud_model = model
         return model
-
-    def _hud_moving(self) -> bool:
-        drive = self._last_hud_model.drive if self._last_hud_model is not None else None
-        return drive is not None and drive.live
 
     def press(self, command: str) -> bool:
         if not self._route(command):
@@ -218,10 +208,10 @@ class SlideshowView(QWidget):
             self._place_here_or_out_there(command, action, path)
         elif action in THE_SLIDESHOWS_OWN:
             answer(self.slideshow, action, path)
-        elif self.press_osr2_controls(verb):
-            pass
         elif action in _RATE_STEPS:
             self._pane.channel.send(_RATE_STEPS[action])
+        elif self._dashboard_cmd_file is None and command == self._minimize_command():
+            self.showMinimized()
         elif self._dashboard_cmd_file is None:
             return self._action_here(action)
         elif command in _sent_to_the_dashboard(self._hud_shape):
@@ -229,6 +219,9 @@ class SlideshowView(QWidget):
         else:
             return False
         return True
+
+    def _minimize_command(self) -> str:
+        return minimize_funestra_button(self._hud_shape).command
 
     def _place_here_or_out_there(self, command: str, action: str, corner: str) -> None:
         if self._dashboard_cmd_file is not None:
@@ -248,24 +241,6 @@ class SlideshowView(QWidget):
     def set_queue(self, items, foreign_queued: int = 0) -> None:
         self.queue_foot.set(items, foreign_queued)
         self.refresh_hud()
-
-    @property
-    def hud_device(self):
-        if self._motion is None:
-            return None
-        control = self._actions.osr2_control
-        return osr2_controls_state(
-            self._motion, Osr2Situation(device=osr2_device.device_mode(),
-            trouble=osr2_device.device_trouble(),
-            control=control.state() if control is not None else "",
-            script=control.script if control is not None else None,
-            broker_running=osr2_device.broker_running()))
-
-    def press_osr2_controls(self, action: str) -> bool:
-        if self._motion is None:
-            return False
-        return post_device_action(action, motion=self._motion,
-                                  control=self._actions.osr2_control)
 
     @property
     def player(self):

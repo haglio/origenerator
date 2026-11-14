@@ -30,6 +30,7 @@ from origenerator.gui import (
     omnipause,
 )
 from origenerator.gui.gallery_view import GalleryView, Shared
+from origenerator.gui.osr2_controls_state import osr2_controls_state
 from tests import gestures
 from tests.closed_windows import is_closed
 from tests.comfyui_folders import SUITE_FOLDERS
@@ -888,20 +889,20 @@ def test_shift_esc_at_a_standalone_slideshow_closes_it_and_leaves_the_room_playi
     assert not radio.frozen
 
 
-def test_esc_at_a_standalone_slideshow_has_its_osr2_line_say_parked_until_a_second_plays(
+def test_esc_at_a_standalone_slideshow_has_cores_osr2_line_say_parked_until_a_second_plays(
         qtbot, tmp_path, monkeypatch):
     view, _radio, slideshow = _a_gallery_with_its_slideshow_in_front(qtbot, tmp_path, monkeypatch)
     view.osr2_control.setChecked(True)
 
     gestures.press_key(slideshow.shown, Qt.Key.Key_Escape)
-    assert _osr2_line(slideshow) == OSR2_PARKED
+    assert _cores_osr2_line(view) == OSR2_PARKED
 
     gestures.press_key(slideshow.shown, Qt.Key.Key_Escape)
-    assert _osr2_line(slideshow) == Osr2State.ROBOT_HAND
+    assert _cores_osr2_line(view) == Osr2State.ROBOT_HAND
 
 
-def _osr2_line(slideshow):
-    device = slideshow.shown.hud_device
+def _cores_osr2_line(view):
+    device = osr2_controls_state(view._osr2_motion, view._osr2_controls.situation())
     return state_for(device.osr2, device.osr2_control, paused=device.paused)
 
 

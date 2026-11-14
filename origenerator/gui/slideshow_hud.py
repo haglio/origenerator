@@ -2,17 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from funestra.hud_title import HudTitleFacts, hud_title, looping_label
+from funestra.hud_kinds import HudFacts, HudKind, slideshow_title
+from funestra.hud_title import LATEST_LABEL
+from funestra.inclusion_pair import enhancement_pair, media_pair
 from funestra.loop_cycle import SEED
 from funestra.satellite_hud import HudCell, HudModel
 
 from origenerator.gui.slideshow_set import thumb_of
-from origenerator.slideshow_buttons import (
-    SlideshowFacts,
-    enhancement_pair,
-    media_pair,
-    slideshow_rows,
-)
 
 THE_SLIDESHOWS_OWN = frozenset({
     *(verb.removeprefix("_") for pair in (media_pair(""), enhancement_pair(""))
@@ -36,47 +32,34 @@ def _cell(slide, label: str = "") -> HudCell:
 @dataclass(frozen=True)
 class HudPlacement:
     hosted: bool = True
+    drives_the_osr2: bool = False
 
 
 USUAL_PLACEMENT = HudPlacement()
 
 
 def slideshow_hud_model(shape: str, slideshow, placement: HudPlacement = USUAL_PLACEMENT, *,
-                        device=None, foot=None) -> HudModel | None:
+                        foot=None) -> HudModel | None:
     shown = slideshow.hud_map()
     if shown is None:
         return None
-    locked = slideshow.locked
-    favorites_filter = slideshow.hud_favorites_filter
-    media, enhancement = slideshow.hud_media, slideshow.hud_enhancement
-    order_label = slideshow.hud_order_label
     action_filter = slideshow.hud_action_filter
+    facts = HudFacts(
+        funestra=shape, locked=slideshow.locked, f_mode=slideshow.hud_favorites_filter,
+        latest=slideshow.hud_order_label == LATEST_LABEL, media=slideshow.hud_media,
+        enhancement=slideshow.hud_enhancement, hosted=placement.hosted,
+        has_other_versions=slideshow.has_other_versions, clip_seconds=slideshow.dwell_s,
+        has_osr2=placement.drives_the_osr2 or slideshow.transport.has_osr2,
+        **slideshow.transport.row_facts())
     return HudModel(
         funestra=shape,
-        locked=locked,
-        title=hud_title(HudTitleFacts(
-            playing_set=looping_label(shown.loop) if shown.loop else "",
-            locked=locked, order=order_label,
-            f_mode=favorites_filter,
-            filters=(media_pair(shape).title_word(media),
-                     enhancement_pair(shape).title_word(enhancement), action_filter))),
+        locked=facts.locked,
+        kind=HudKind.SLIDESHOW,
+        facts=facts,
+        title=slideshow_title(facts, loop=shown.loop, action_filter=action_filter),
         is_favorite=slideshow.hud_is_favorite,
         item_name=slideshow.hud_item_name,
         item_note=slideshow.hud_item_note,
-        rows=slideshow_rows(shape, SlideshowFacts(
-            locked=locked, favorites_filter=favorites_filter, media=media,
-            enhancement=enhancement,
-            order=order_label, hosted=placement.hosted,
-            has_other_versions=slideshow.has_other_versions, clip_seconds=slideshow.dwell_s,
-            has_osr2=device is not None or slideshow.transport.has_osr2,
-            **slideshow.transport.row_facts())),
-        osr2_rows=device.osr2_rows if device is not None else (),
-        osr2_controls=device.osr2_controls if device is not None else (),
-        osr2=device.osr2 if device is not None else "",
-        osr2_control=device.osr2_control if device is not None else "",
-        paused=device.paused if device is not None else False,
-        drive=device.drive if device is not None else None,
-        max_intensity=device.max_intensity if device is not None else None,
         foot=foot,
         corner=_cell(shown.corner),
         seeds=tuple(_cell(slide) for slide in shown.seeds),

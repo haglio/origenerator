@@ -22,7 +22,13 @@ from funestra.funestra_verbs import (
     step_version,
 )
 from funestra.hud_title import SHUFFLE_LABEL
-from funestra.inclusion_pair import Included, InclusionPair, answer_to_a_narrowing
+from funestra.inclusion_pair import (
+    Included,
+    InclusionPair,
+    answer_to_a_narrowing,
+    enhancement_pair,
+    media_pair,
+)
 from funestra.loop_cycle import ACTION, LOCK, SEED
 from funestra.on_screen_history import OnScreenHistory
 from funestra.playlist import PlaylistItem
@@ -48,7 +54,6 @@ from origenerator.library_views import Version
 from origenerator.media import MediaType
 from origenerator.osr2_driver import drive_target_for
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
-from origenerator.slideshow_buttons import enhancement_pair, media_pair
 
 logger = logging.getLogger(__name__)
 

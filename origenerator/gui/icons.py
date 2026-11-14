@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import cache
 
 from PySide6.QtCore import QRectF, Qt
-from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
+from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPainterPath, QPixmap
 from shared_ui import palette
 from shared_ui.colors import (
     BG_PRIMARY,
@@ -338,10 +338,13 @@ def _render_toc_initial(letter: str, color) -> QPixmap:
         font = QFont(FONT_UI)
         font.setBold(True)
         font.setPixelSize(_initial_size(letter))
-        painter.setFont(font)
-        painter.setPen(_readable_on(color))
-        painter.drawText(QRectF(0, 0, _SIZE, _SIZE),
-                         Qt.AlignmentFlag.AlignCenter, letter)
+        outline = QPainterPath()
+        outline.addText(0, 0, font, letter)
+        ink = outline.boundingRect()
+        outline.translate((_SIZE - ink.width()) / 2 - ink.left(),
+                          (_SIZE - ink.height()) / 2 - ink.top())
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.fillPath(outline, _readable_on(color))
 
     return _ground_pixmap(color, draw)
 

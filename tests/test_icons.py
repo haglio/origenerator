@@ -4,6 +4,7 @@ import ast
 from collections import Counter
 from pathlib import Path
 
+import pytest
 from PySide6.QtCore import QSize
 from PySide6.QtGui import QColor, QIcon, QPalette
 from shared_ui.colors import (
@@ -109,6 +110,21 @@ def _letter_height(letter, color) -> int:
 
 def test_a_sites_s_is_drawn_bigger_than_a_workflows_w_so_it_reads_as_easily(qtbot):
     assert _letter_height("S", BLUE) > _letter_height("W", BLUE)
+
+
+@pytest.mark.parametrize("level", ["workflow", "site", "model", "lora", "source_image"])
+def test_each_initials_letter_sits_in_the_middle_of_its_square(qtbot, level):
+    letter, color = icons._TOC_INITIALS[level]
+    image = icons._render_toc_initial(letter, color).toImage()
+    inked = [(x, y) for x in range(image.width()) for y in range(image.height())
+             if image.pixelColor(x, y).alpha() > 200
+             and abs(image.pixelColor(x, y).lightness() - color.lightness()) > 80]
+    rows = [y for _x, y in inked]
+    columns = [x for x, _y in inked]
+
+    middle = (image.height() - 1) / 2
+    assert (min(rows) + max(rows)) / 2 == pytest.approx(middle, abs=1)
+    assert (min(columns) + max(columns)) / 2 == pytest.approx(middle, abs=1)
 
 
 def test_each_toc_initial_is_tellable_from_its_siblings(qtbot):

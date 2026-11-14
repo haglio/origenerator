@@ -25,9 +25,14 @@ def _row(prompt_id, positive, **given):
     }
 
 
+def _folders_holding(names_by_row):
+    return [gallery.NamedFolder(f"{prompt_id} {name}", name, (prompt_id,))
+            for prompt_id, names in (names_by_row or {}).items() for name in names]
+
+
 def _index(rows, folder_names=None):
     index = search.GallerySearch()
-    index.update(rows, folder_names)
+    index.update(rows, folders=_folders_holding(folder_names))
     return index
 
 
@@ -203,7 +208,7 @@ def test_a_whole_name_lands_on_its_item_alone():
              "numbered alike": "77B1E0AA 004"}
     folders = {"made from it": ["3FA9C0D2 004"], "numbered alike": ["3FA9C0D2 001"]}
     index = search.GallerySearch()
-    index.update(rows, folders, item_name=names.get)
+    index.update(rows, _folders_holding(folders), item_name=names.get)
 
     assert _hits(index, "3FA9C0D2 004") == ["image"]
 
@@ -425,10 +430,10 @@ def test_a_folder_name_reaches_related_words_like_a_prompt_does():
 def test_renaming_a_folder_is_searchable_at_once():
     rows = [_row("a", "a cat")]
     index = search.GallerySearch()
-    index.update(rows, {"a": ["Rejects"]})
+    index.update(rows, _folders_holding({"a": ["Rejects"]}))
     assert _hits(index, "rejects") == ["a"]
 
-    index.update(rows, {"a": ["Keepers"]})
+    index.update(rows, _folders_holding({"a": ["Keepers"]}))
 
     assert _hits(index, "keepers") == ["a"]
     assert _hits(index, "rejects") == []
@@ -442,9 +447,48 @@ def test_a_workflow_model_or_lora_folder_is_found_by_the_name_the_toc_shows(quer
     }), _row("i1", "a dance")]
     for row, made in zip(rows, ("v1.mp4", "i1.png"), strict=True):
         row["output_files"] = json.dumps([{"filename": made}])
-    names = gallery.folder_names_by_row(gallery.build_gallery_tree(rows), {})
+    index = search.GallerySearch()
+    index.update(rows, folders=gallery.named_folders(gallery.build_gallery_tree(rows), {}))
 
-    assert _hits(_index(rows, names), query) == ["v1"]
+    assert _hits(index, query) == ["v1"]
+
+
+def _folders_index(rows, *folders):
+    index = search.GallerySearch()
+    index.update(rows, folders=[gallery.NamedFolder(*folder) for folder in folders])
+    return index
+
+
+def test_a_folder_whose_own_name_answers_every_word_is_matched_itself():
+    rows = [_row("v1", "a dance"), _row("v2", "a walk"), _row("i1", "a dance")]
+    index = _folders_index(rows, ("wan", "I2V WAN 2.2", ("v1", "v2")),
+                           ("sdxl", "T2I SDXL", ("i1",)))
+
+    assert index.search("I2V WAN 2.2").folders == ("wan",)
+    assert _hits(index, "I2V WAN 2.2") == ["v1", "v2"]
+
+
+def test_a_folder_whose_name_answers_only_some_words_is_not_matched_itself():
+    rows = [_row("v1", "a dance"), _row("v2", "a walk")]
+    index = _folders_index(rows, ("wan", "I2V WAN 2.2", ("v1", "v2")))
+
+    assert index.search("wan dance").folders == ()
+    assert _hits(index, "wan dance") == ["v1"]
+
+
+def test_a_folder_outside_the_searched_folder_is_not_matched():
+    rows = [_row("v1", "a dance"), _row("i1", "a dance")]
+    index = _folders_index(rows, ("wan", "I2V WAN 2.2", ("v1",)))
+
+    assert index.search("I2V WAN 2.2", within={"i1"}).folders == ()
+
+
+def test_matched_folders_come_in_the_order_the_toc_lists_them():
+    rows = [_row("v1", "a dance")]
+    index = _folders_index(rows, ("wan", "I2V WAN 2.2", ("v1",)),
+                           ("high", "WAN high", ("v1",)))
+
+    assert index.search("wan").folders == ("wan", "high")
 
 
 def test_an_unnamed_folders_row_is_reached_by_no_name():

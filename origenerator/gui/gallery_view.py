@@ -1121,7 +1121,7 @@ class GalleryView(QWidget):
                                              for shape in self._tree.shapes}
         self._custom_collections = [folder for folders in self._custom_collections_by_shape.values()
                                 for folder in folders]
-        self._search.index.update(rows + self._held_rows, gallery.folder_names_by_row(
+        self._search.index.update(rows + self._held_rows, gallery.named_folders(
             [folder for tree in trees.values() for folder in tree], meta,
             self._custom_collections), item_name=self._item_names.of)
         requests = self._listed_requests = self._db.list_requests()

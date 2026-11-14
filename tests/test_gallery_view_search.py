@@ -487,6 +487,19 @@ def test_a_folder_is_found_by_the_code_the_tree_shows_for_it(qtbot):
     assert view.listed_prompt_ids() == ["i2"]
 
 
+def test_the_workflow_folder_a_search_names_is_the_first_tile(qtbot):
+    view = GalleryView(FakeDB([_i2v_video("v1", "styleA"), _image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    workflow = _video_workflow(view._tree)
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
+
+    _search_for(view, workflow.text(0))
+
+    assert view._gallery_pane._listed_folders[:1] == [_key(workflow)]
+    assert view.listed_prompt_ids() == ["v1"]
+
+
 def test_an_item_is_found_by_the_name_it_wears(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)

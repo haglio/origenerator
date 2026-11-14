@@ -521,7 +521,7 @@ class GalleryPane(QObject):
             (self._add_trash_thumbnail if "days_in_trash" in tile.row
              else self._add_collection_thumbnail)(flow, tile.row)
             self._selection.note_shown(tile.row["prompt_id"])
-        self._search_rows.extend(tile.rows or [tile.row])
+        self._search_rows.extend(tile.rows if tile.group is not None else tile.rows or [tile.row])
 
     def showing_search(self) -> bool:
         return self._showing_search

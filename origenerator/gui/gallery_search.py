@@ -144,7 +144,7 @@ class GallerySearchController(QObject):
         self._outcome = self._index.search(
             self._query, expansions=self._expansions, within=scope.ids
         )
-        self._tiles = self._collapse_to_folders(self._outcome.results)
+        self._tiles = self._matched_folders_first(self._collapse_to_folders(self._outcome.results))
         self._host.name_search_on_screen(self._query, scope)
         self._count.setText(self._count_text())
         self.bar.show()
@@ -244,6 +244,16 @@ class GallerySearchController(QObject):
         if expansions or not self._tiles:
             self._expansions = expansions
             self.run()
+
+    def _matched_folders_first(self, tiles) -> list:
+        first = []
+        for key in self._outcome.folders:
+            group = self._host.group_for_key(key)
+            if group is not None:
+                first.append(next((tile for tile in tiles if tile.group is group), None)
+                             or search.SearchTile(row=gallery.rows_under(group)[0],
+                                                  group=group, rows=[]))
+        return [*first, *(tile for tile in tiles if all(tile is not led for led in first))]
 
     def _collapse_to_folders(self, results) -> list:
         image_index = self._host.image_config_index()

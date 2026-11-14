@@ -167,6 +167,7 @@ class SearchResult:
 class SearchOutcome:
     results: tuple[SearchResult, ...]
     unmatched: tuple[str, ...]
+    folders: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -180,6 +181,19 @@ class _Entry:
     tags: tuple[tuple[str, ...], ...] = ()
     folder_tags: tuple[tuple[str, ...], ...] = ()
     files: frozenset[str] = frozenset()
+
+
+@dataclass(frozen=True)
+class _Folder:
+    key: str
+    stems: frozenset[str]
+    tags: tuple[tuple[str, ...], ...]
+    prompt_ids: frozenset[str]
+
+    def answers(self, term: QueryTerm) -> bool:
+        if term.side_by_side:
+            return _said_in(self.tags, term.side_by_side)
+        return bool(_field_score(term, self.stems))
 
 
 def query_words(query: str) -> tuple[str, ...]:
@@ -258,10 +272,13 @@ def _folder_stems(names) -> frozenset[str]:
 
 
 def _says(entry: _Entry, words: tuple[str, ...]) -> bool:
+    return _said_in((*entry.tags, *entry.folder_tags), words)
+
+
+def _said_in(tags, words: tuple[str, ...]) -> bool:
     count = len(words)
     return any(tag[at:at + count] == words
-               for tag in (*entry.tags, *entry.folder_tags)
-               for at in range(len(tag) - count + 1))
+               for tag in tags for at in range(len(tag) - count + 1))
 
 
 def _starts_the_name(typed: str, name: str) -> bool:
@@ -294,29 +311,35 @@ class GallerySearch:
     def __init__(self, *, synonyms=None):
         self._entries: dict[str, _Entry] = {}
         self._order: list[str] = []
+        self._folders: list[_Folder] = []
         self._synonyms = _SYNONYMS if synonyms is None else synonyms
 
-    def update(self, rows, folder_names=None, item_name=None) -> None:
+    def update(self, rows, folders=(), item_name=None) -> None:
         entries: dict[str, _Entry] = {}
         order: list[str] = []
-        folder_names = folder_names or {}
+        folder_names: dict[str, list[str]] = {}
+        for folder in folders:
+            for prompt_id in folder.prompt_ids:
+                folder_names.setdefault(prompt_id, []).append(folder.name)
         for row in rows:
             prompt_id = row.get("prompt_id")
             if not prompt_id or prompt_id in entries \
                     or not gallery.produced_output(row) or not in_sight(row):
                 continue
             named = folder_names.get(prompt_id, ())
-            folders = _folder_stems(named)
             name = (item_name(prompt_id) if item_name else "").lower()
             known = self._entries.get(prompt_id)
             entries[prompt_id] = replace(
                 known if known is not None else _build_entry(row),
-                row=row, folders=folders, name=name,
+                row=row, folders=_folder_stems(named), name=name,
                 folder_tags=tuple(tag for folder in named for tag in _tags(folder)),
             )
             order.append(prompt_id)
         self._entries = entries
         self._order = order
+        self._folders = [_Folder(folder.key, _stems(folder.name), _tags(folder.name),
+                                 frozenset(folder.prompt_ids) & entries.keys())
+                         for folder in folders]
 
     def widens(self, query: str) -> bool:
         if self._made_as(query):
@@ -356,6 +379,9 @@ class GallerySearch:
         return SearchOutcome(
             tuple(results),
             tuple(term.text for term in terms if term.text not in reached),
+            tuple(folder.key for folder in self._folders
+                  if (folder.prompt_ids if within is None else folder.prompt_ids & within)
+                  and all(folder.answers(term) for term in terms)),
         )
 
 

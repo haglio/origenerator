@@ -59,7 +59,8 @@
     "minimax_h3_i2v": 24.0,
     "wan22_animate": 16.0,
     "wan22_flf2v_loop": 16.0,
-    "wan22_i2v": 16.0
+    "wan22_i2v": 16.0,
+    "wan22_t2v": 16.0
   },
   "downtime_command": [
     ".venv/Scripts/python.exe",

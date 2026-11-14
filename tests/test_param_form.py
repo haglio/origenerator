@@ -2677,6 +2677,21 @@ def test_a_lora_put_in_its_row_by_loaded_settings_says_what_it_is_for_too(
     assert form._widgets["lora"].toolTip() == f"{param_help('lora')} Gives an image the example look."
 
 
+def test_a_lora_rows_label_says_what_its_picked_lora_is_for_as_its_dropdown_does(
+        qtbot, installed_models, described_models):
+    described_models({"example_look": "Gives an image the example look."})
+    installed_models.add("loras", "example_look.safetensors", arch="krea2", lora=True)
+    form = ParamForm([ParamDef("lora", "LoRA", "dropdown", NO_LORA, options=[
+        NO_LORA, "example_look.safetensors"])], WorkflowTraits(lora_keys=("lora",)))
+    qtbot.addWidget(form)
+    dropdown = form._widgets["lora"]
+
+    dropdown.setCurrentIndex(dropdown.findData("example_look.safetensors"))
+
+    assert form._labels["lora"].toolTip() == dropdown.toolTip(), (
+        "the mouse rests on the row's name as often as on its dropdown, and both name one LoRA")
+
+
 def test_a_long_tooltip_in_a_dropdowns_list_is_stored_already_wrapped(
         qtbot, installed_models, titled_models, described_models):
     long_description = "Gives an image the example look, " * 6

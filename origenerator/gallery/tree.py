@@ -222,29 +222,36 @@ def favorite_folders(tree: list[MediaGroup]) -> list:
 _HOLDING_EVERYTHING = (AllGroup, MediaGroup)
 
 
-def folder_names_by_row(
+@dataclass(frozen=True)
+class NamedFolder:
+    key: str
+    name: str
+    prompt_ids: tuple[str, ...]
+
+
+def named_folders(
     tree: list, folder_meta: dict[str, dict] | None = None, custom_collections=()
-) -> dict[str, list[str]]:
-    names: dict[str, list[str]] = {}
+) -> list[NamedFolder]:
+    folders: list[NamedFolder] = []
     folder_meta = folder_meta or {}
 
-    def credit(group, name: str):
-        for row in rows_under(group):
-            names.setdefault(row["prompt_id"], []).append(name)
+    def name(group, label: str):
+        folders.append(NamedFolder(group.key, label,
+                                   tuple(row["prompt_id"] for row in rows_under(group))))
 
     def walk(groups):
         for group in groups:
-            name = folder_meta.get(group.key, {}).get("custom_name")
-            if not name and not isinstance(group, _HOLDING_EVERYTHING):
-                name = group.label
-            if name:
-                credit(group, name)
+            label = folder_meta.get(group.key, {}).get("custom_name")
+            if not label and not isinstance(group, _HOLDING_EVERYTHING):
+                label = group.label
+            if label:
+                name(group, label)
             walk(child_groups(group))
 
     walk(tree)
     for folder in custom_collections:
-        credit(folder, folder.label)
-    return names
+        name(folder, folder.label)
+    return folders
 
 
 def recent_generations(rows: list[dict], *, bumped=None) -> list[dict]:

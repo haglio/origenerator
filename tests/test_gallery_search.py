@@ -547,3 +547,35 @@ def test_the_wheel_over_the_order_is_left_for_the_results_under_it(controller):
 
 def _folder_key(row: dict) -> str:
     return gallery.settings_folder_key(row, {})
+
+
+def test_a_folder_whose_name_matches_is_the_first_tile_and_its_items_follow(controller):
+    rows = [_row("g1", "a tabby on a wall"), _row("g2", "a tabby in a box")]
+    workflow = gallery.WorkflowGroup("wf", "wan22_i2v", "I2V WAN 2.2", [
+        gallery.SettingsGroup("leaf", "3FA9C0D2", rows[:1])])
+    host = FakeHost(groups={"wf": workflow})
+    found = controller(host=host)
+    found.index.update(rows, folders=[gallery.NamedFolder("wf", "I2V WAN 2.2", ("g1",))])
+
+    _type(found, "I2V WAN 2.2")
+
+    tiles, _terms = host.shown[-1]
+    assert [tile.group for tile in tiles] == [workflow, None]
+    assert [row["prompt_id"] for tile in tiles for row in tile.rows] == ["g1"], (
+        "the folder's tile only leads to its items, which follow it, so a slideshow of the "
+        "results plays each item once")
+
+
+def test_a_matched_settings_folder_shows_once_with_its_items_inside(controller):
+    rows = [_row("g1", "a tabby on a wall"), _row("g2", "a tabby on a wall")]
+    key = gallery.settings_folder_key(rows[0], {})
+    leaf = gallery.SettingsGroup(key, "3FA9C0D2", rows)
+    host = FakeHost(groups={key: leaf})
+    found = controller(host=host)
+    found.index.update(rows, folders=[gallery.NamedFolder(key, "3FA9C0D2", ("g1", "g2"))])
+
+    _type(found, "3FA9C0D2")
+
+    tiles, _terms = host.shown[-1]
+    assert [(tile.group, [row["prompt_id"] for row in tile.rows]) for tile in tiles] == [
+        (leaf, ["g1", "g2"])]

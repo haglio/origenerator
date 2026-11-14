@@ -29,7 +29,6 @@ from origenerator.gallery import (
     folder_id,
     folder_key_at_level,
     folder_level,
-    folder_names_by_row,
     generate_tab_title,
     generation_of_file,
     group_level,
@@ -44,6 +43,7 @@ from origenerator.gallery import (
     media_type_of_row,
     model_label,
     model_signature,
+    named_folders,
     output_disk_files,
     output_file_reference,
     recent_generations,
@@ -1608,6 +1608,14 @@ def test_sites_come_before_workflows_each_in_alphabetical_order():
         "alpha-site", "zeta-site", workflow_label("wan22_i2v"), workflow_label("wan22_flf2v_loop")]
 
 
+def _names_by_row(tree, folder_meta, custom_collections=()):
+    names = {}
+    for folder in named_folders(tree, folder_meta, custom_collections):
+        for prompt_id in folder.prompt_ids:
+            names.setdefault(prompt_id, []).append(folder.name)
+    return names
+
+
 def test_a_workflow_folder_given_a_name_is_placed_by_that_name():
     newest_first = [_made_with("flux_t2i_upscaled"), _img("i1", "a cat", 50, 1)]
     renamed = {"image/sdxl_t2i": {"custom_name": "alpha stills"}}
@@ -1623,7 +1631,7 @@ def test_a_name_given_a_folder_finds_every_row_beneath_it_at_any_depth():
     workflow = _workflows(tree)[0]
     cat_leaf = workflow.children[0].children[0].children[0]
 
-    names = folder_names_by_row(
+    names = _names_by_row(
         tree, {workflow.key: {"custom_name": "Stills"},
                cat_leaf.key: {"custom_name": "Keepers"}})
 
@@ -1639,7 +1647,7 @@ def test_a_folder_the_user_composed_names_what_it_gathers():
     tree = build_gallery_tree(rows)
     cat_leaf = _workflows(tree)[0].children[0].children[0].children[0]
 
-    names = folder_names_by_row(
+    names = _names_by_row(
         tree, {}, [CustomCollection("__custom__/1", "Beach trip", [cat_leaf])])
 
     assert "Beach trip" in names["i1"]
@@ -1651,7 +1659,7 @@ def test_a_settings_folder_is_found_by_the_code_it_wears():
     tree = build_gallery_tree(rows)
     leaf = _workflows(tree)[0].children[0].children[0].children[0]
 
-    assert leaf.label in folder_names_by_row(tree, {})["i1"]
+    assert leaf.label in _names_by_row(tree, {})["i1"]
 
 
 def test_a_workflow_model_and_lora_folder_is_found_by_the_name_the_toc_shows():
@@ -1660,7 +1668,7 @@ def test_a_workflow_model_and_lora_folder_is_found_by_the_name_the_toc_shows():
     model = workflow.children[0]
     lora = model.children[0]
 
-    names = folder_names_by_row(tree, {})["v1"]
+    names = _names_by_row(tree, {})["v1"]
 
     assert {workflow.label, model.label, lora.label} <= set(names)
     assert tree[0].label not in names
@@ -1669,7 +1677,7 @@ def test_a_workflow_model_and_lora_folder_is_found_by_the_name_the_toc_shows():
 def test_a_video_with_no_start_image_is_found_by_that_folders_name():
     rows = [_i2v("v1", "styleA")]
 
-    assert "(no start image)" in folder_names_by_row(build_gallery_tree(rows), {})["v1"]
+    assert "(no start image)" in _names_by_row(build_gallery_tree(rows), {})["v1"]
 
 
 def test_favorite_folders_collects_favorite_across_every_level():

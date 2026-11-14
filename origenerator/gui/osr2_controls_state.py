@@ -15,8 +15,9 @@ from funestra.main_hud import (
     aim_row,
     osr2_controls,
 )
-from funestra.main_hud_painter import MainHud, MainHudPainter
+from funestra.main_hud_painter import MainHud
 from funestra.modes import MainMode, Osr2State
+from funestra.osr2_part_painter import Osr2PartPainter
 from funestra.osr2_visualizer import (
     DRIVEN_BY_FUNSCRIPT,
     DRIVEN_BY_NOTHING,
@@ -118,7 +119,7 @@ def osr2_controls_state(motion, situation: Osr2Situation = USUAL_SITUATION) -> O
 
 def osr2_controls_room(motion) -> tuple[int, int]:
     driving = SimpleNamespace(active=True, state=motion.state, parked_by_the_pause=False)
-    return MainHudPainter(device_only=True).rgba(osr2_controls_hud(driving, Osr2Situation(control=OSR2_DRIVING)))[1]
+    return Osr2PartPainter().rgba(osr2_controls_hud(driving, Osr2Situation(control=OSR2_DRIVING)))[1]
 
 
 def post_device_action(action: str, *, motion, control=None) -> bool:

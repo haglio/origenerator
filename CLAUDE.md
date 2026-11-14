@@ -730,9 +730,14 @@ nothing and reads as a dummy -- which is what a Fun Time session handed him on
 2026-09-20, and why fun_time's `--shortcut` now refuses a hosted checkout that
 has neither.
 
-Re-copy as the LAST step before the link goes out, and then import the window
-chain against that copy (`from origenerator.gui.core import
-Core` in a fresh interpreter, no `PYTHONPATH`): `tests/
+Re-copy it and the production checkout's `content.local.json` as the LAST
+step before the link goes out, overwriting the worktree's (never `cp -n`), and
+then, in a fresh interpreter with no `PYTHONPATH`, see
+`content.missing_overlay_keys()` return `()` and import the window chain
+(`from origenerator.gui.core import Core`). The import alone passes over an
+overlay missing a key, which the launch then refuses: a worktree kept a copy
+from before `display_names` existed, and his click on 2026-11-14 got "is
+missing 1 key(s) this version needs". `tests/
 test_launch_smoke.py` deliberately stands the committed sample in for the
 local overlay, because a public checkout has only the sample, so it cannot
 see a local overlay the code can no longer read. A copy taken two hours

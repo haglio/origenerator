@@ -33,7 +33,7 @@ _CONTINUED_LOW = ["29", 0]
 class Wan22T2vWorkflow(WorkflowTemplate):
     name = "wan22_t2v"
     version = "v001"
-    display_name = "WAN 2.2 T2V"
+    display_name = "T2V WAN 2.2"
     output_type = MediaType.VIDEO
     model_keys = ("unet_high", "unet_low")
     lora_keys = LORA_KEYS_OF_BOTH_PASSES

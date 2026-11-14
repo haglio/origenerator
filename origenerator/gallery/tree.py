@@ -219,6 +219,9 @@ def favorite_folders(tree: list[MediaGroup]) -> list:
     return found
 
 
+_HOLDING_EVERYTHING = (AllGroup, MediaGroup)
+
+
 def folder_names_by_row(
     tree: list, folder_meta: dict[str, dict] | None = None, custom_collections=()
 ) -> dict[str, list[str]]:
@@ -232,7 +235,7 @@ def folder_names_by_row(
     def walk(groups):
         for group in groups:
             name = folder_meta.get(group.key, {}).get("custom_name")
-            if not name and isinstance(group, (SettingsGroup, SourceImageGroup)):
+            if not name and not isinstance(group, _HOLDING_EVERYTHING):
                 name = group.label
             if name:
                 credit(group, name)

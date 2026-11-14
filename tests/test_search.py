@@ -434,6 +434,19 @@ def test_renaming_a_folder_is_searchable_at_once():
     assert _hits(index, "rejects") == []
 
 
+@pytest.mark.parametrize("query", ["I2V WAN 2.2", "wan_high", "styleA_low"])
+def test_a_workflow_model_or_lora_folder_is_found_by_the_name_the_toc_shows(query):
+    rows = [_row("v1", "a dance", workflow="wan22_i2v", params={
+        "unet_high": "wan_high.safetensors", "unet_low": "wan_low.safetensors",
+        "lora_high": "styleA_high.safetensors", "lora_low": "styleA_low.safetensors",
+    }), _row("i1", "a dance")]
+    for row, made in zip(rows, ("v1.mp4", "i1.png"), strict=True):
+        row["output_files"] = json.dumps([{"filename": made}])
+    names = gallery.folder_names_by_row(gallery.build_gallery_tree(rows), {})
+
+    assert _hits(_index(rows, names), query) == ["v1"]
+
+
 def test_an_unnamed_folders_row_is_reached_by_no_name():
     index = _index([_row("a", "a cat")])
 

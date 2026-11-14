@@ -190,8 +190,11 @@ class PillRow(QWidget):
                 held.deleteLater()
         self._flow.addWidget(self._adder)
         for name in names:
-            pill = Pill(name, removable=editable, partial=name in self._partial, parent=self)
+            partial = name in self._partial
+            pill = Pill(name, removable=editable, pickable=editable and partial, partial=partial,
+                        parent=self)
             pill.removed.connect(self._remove)
+            pill.picked.connect(self._add)
             self._flow.addWidget(pill)
         self._adder.setVisible(editable and bool(self._remaining()))
         self.updateGeometry()

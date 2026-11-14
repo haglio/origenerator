@@ -1627,9 +1627,11 @@ def test_a_name_given_a_folder_finds_every_row_beneath_it_at_any_depth():
         tree, {workflow.key: {"custom_name": "Stills"},
                cat_leaf.key: {"custom_name": "Keepers"}})
 
-    dog_leaf = workflow.children[0].children[0].children[1]
-    assert names["i1"] == ["Stills", "Keepers"]
-    assert names["i2"] == ["Stills", dog_leaf.label]
+    model = workflow.children[0]
+    lora = model.children[0]
+    dog_leaf = lora.children[1]
+    assert names["i1"] == ["Stills", model.label, lora.label, "Keepers"]
+    assert names["i2"] == ["Stills", model.label, lora.label, dog_leaf.label]
 
 
 def test_a_folder_the_user_composed_names_what_it_gathers():
@@ -1649,7 +1651,19 @@ def test_a_settings_folder_is_found_by_the_code_it_wears():
     tree = build_gallery_tree(rows)
     leaf = _workflows(tree)[0].children[0].children[0].children[0]
 
-    assert folder_names_by_row(tree, {}) == {"i1": [leaf.label]}
+    assert leaf.label in folder_names_by_row(tree, {})["i1"]
+
+
+def test_a_workflow_model_and_lora_folder_is_found_by_the_name_the_toc_shows():
+    tree = build_gallery_tree([_i2v("v1", "styleA")])
+    workflow = _workflows(tree)[0]
+    model = workflow.children[0]
+    lora = model.children[0]
+
+    names = folder_names_by_row(tree, {})["v1"]
+
+    assert {workflow.label, model.label, lora.label} <= set(names)
+    assert tree[0].label not in names
 
 
 def test_a_video_with_no_start_image_is_found_by_that_folders_name():

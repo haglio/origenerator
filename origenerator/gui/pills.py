@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from typing import NamedTuple
+
 from PySide6.QtCore import QPoint, QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QPainter, QPen
+from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QFrame, QToolButton, QWidget
 from shared_ui.colors import (
     BG_BUTTON,
@@ -25,6 +27,7 @@ from shared_ui.spacing import (
     MARGIN_STANDARD,
 )
 
+from origenerator.gui.dashed_edge import dashed_pen
 from origenerator.gui.flow_layout import FlowLayout
 
 _X = BUTTON_ICON
@@ -40,6 +43,22 @@ def _height(metrics) -> int:
 def _round(side: int) -> str:
     return (f"border: {HAIRLINE}px solid {BORDER_DEFAULT.name()}; border-radius: {side // 2}px;"
             f" {_NO_PADDING}")
+
+
+class PillLook(NamedTuple):
+    edge: QPen
+    ground: QColor
+    ink: QColor
+
+
+def pill_look(*, enabled: bool, partial: bool) -> PillLook:
+    if not enabled:
+        return PillLook(QPen(BORDER_SUBTLE, HAIRLINE), BG_SECONDARY, TEXT_MUTED)
+    if partial:
+        faded = QColor(BG_BUTTON)
+        faded.setAlpha(BG_BUTTON.alpha() // 2)
+        return PillLook(dashed_pen(BORDER_DEFAULT, HAIRLINE), faded, TEXT_SECONDARY)
+    return PillLook(QPen(BORDER_SUBTLE, HAIRLINE), BG_BUTTON, TEXT_PRIMARY)
 
 
 class Pill(QWidget):
@@ -106,12 +125,11 @@ class Pill(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         edge = QRectF(self.rect()).adjusted(HAIRLINE / 2, HAIRLINE / 2, -HAIRLINE / 2, -HAIRLINE / 2)
-        ground = BG_BUTTON if enabled else BG_SECONDARY
-        painter.setPen(QPen(BORDER_DEFAULT, HAIRLINE, Qt.PenStyle.DotLine) if self._partial
-                       else QPen(BORDER_SUBTLE, HAIRLINE))
-        painter.setBrush(hovered(ground) if self._hovered else ground)
+        look = pill_look(enabled=enabled, partial=self._partial)
+        painter.setPen(look.edge)
+        painter.setBrush(hovered(look.ground) if self._hovered else look.ground)
         painter.drawRoundedRect(edge, edge.height() / 2, edge.height() / 2)
-        painter.setPen(TEXT_PRIMARY if enabled else TEXT_MUTED)
+        painter.setPen(look.ink)
         words = QRectF(BUTTON_PAD_H_TIGHT, 0, self.fontMetrics().horizontalAdvance(self._text) + HAIRLINE,
                        self.height())
         painter.drawText(words, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self._text)

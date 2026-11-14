@@ -28,7 +28,7 @@ from origenerator.gui.action_row import (
     setter_button,
 )
 from origenerator.gui.label_cells import LabelForm
-from origenerator.gui.pills import Pill
+from origenerator.gui.pills import Pill, pill_look
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.item_actions import ItemActions, stored
 from origenerator.media import MediaType
@@ -560,16 +560,15 @@ def test_a_folders_setter_button_opens_the_setter_tool_on_its_folder(action, ope
     assert opened == [(MediaType.IMAGE, "one")]
 
 
-def test_a_folder_of_videos_shows_their_image_actions_grayed_beside_their_own(action):
-    image = _row("img", image=ItemActions(("alpha",)))
+def test_a_folder_of_videos_shows_only_its_video_actions(action):
     videos = [_video("one", video=ItemActions(("delta",))), _video("two")]
 
-    action.show_folder(videos, {"one": image, "two": image})
+    action.show_folder(videos)
 
-    image_part = _setter(action, MediaType.IMAGE).parentWidget()
-    assert (_listed(action, MediaType.IMAGE), image_part.isEnabled(), _named(action, MediaType.IMAGE),
+    assert (_setter(action, MediaType.IMAGE).parentWidget().isHidden(),
+            _setter(action, MediaType.VIDEO).parentWidget().isHidden(),
             [(pill.text(), _partial(pill)) for pill in _pills(action, MediaType.VIDEO)]) == (
-        ("alpha",), False, "Image Actions", [("delta", True)])
+        True, False, [("delta", True)])
 
 
 def test_an_answer_the_setter_tool_gives_for_an_item_in_the_folder_shows_at_once(action):
@@ -599,3 +598,11 @@ def test_actions_saved_somewhere_else_show_on_every_item_of_the_folder_they_reac
 
     assert (_listed(action, MediaType.IMAGE),
             [_partial(pill) for pill in _pills(action, MediaType.IMAGE)]) == (("alpha",), [False])
+
+
+def test_a_partial_pill_is_drawn_faded_with_gray_text_inside_a_dashed_edge():
+    whole, partial = (pill_look(enabled=True, partial=partial) for partial in (False, True))
+
+    assert (partial.ground.alpha() == whole.ground.alpha() // 2, partial.ink == TEXT_SECONDARY,
+            partial.edge.style(), whole.edge.style()) == (
+        True, True, Qt.PenStyle.CustomDashLine, Qt.PenStyle.SolidLine)

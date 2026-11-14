@@ -158,30 +158,38 @@ class ActionRow(QWidget):
             form.setRowVisible(shown, False)
 
     def show_row(self, row: dict, start_image: dict | None = None) -> None:
-        self.show_folder([row], {row.get("prompt_id"): start_image})
-
-    def show_folder(self, rows: list[dict], start_images: dict[str, dict | None] | None = None) -> None:
-        kind = media_type_of_row(rows[0]) if rows else None
-        if kind is None:
-            self.clear()
+        if media_type_of_row(row) != MediaType.VIDEO:
+            self.show_folder([row])
             return
-        start_images = start_images or {}
-        image, video = self._sides[MediaType.IMAGE], self._sides[MediaType.VIDEO]
-        self._names[MediaType.IMAGE].setText(
-            ACTIONS_LABEL if kind == MediaType.IMAGE else SIDE_LABELS[MediaType.IMAGE])
+        holder = image_actions_row(row, start_image)
+        inherited = inherits_image_actions(row, start_image)
+        self._show_image_actions({holder["prompt_id"]: actions_of(holder, MediaType.IMAGE)},
+                                 SIDE_LABELS[MediaType.IMAGE], editable=not inherited)
+        self._show_video_actions([row])
+
+    def show_folder(self, rows: list[dict]) -> None:
+        kind = media_type_of_row(rows[0]) if rows else None
         if kind == MediaType.IMAGE:
-            image.show_actions({row["prompt_id"]: actions_of(row, MediaType.IMAGE) for row in rows})
-            image.setEnabled(True)
+            self._show_image_actions({row["prompt_id"]: actions_of(row, MediaType.IMAGE) for row in rows},
+                                     ACTIONS_LABEL, editable=True)
+            self._form.setRowVisible(self._sides[MediaType.VIDEO], False)
+        elif kind == MediaType.VIDEO:
+            self._form.setRowVisible(self._sides[MediaType.IMAGE], False)
+            self._show_video_actions(rows)
         else:
-            starts = [start_images.get(row["prompt_id"]) for row in rows]
-            inherited = any(map(inherits_image_actions, rows, starts))
-            image.show_actions({holder["prompt_id"]: actions_of(holder, MediaType.IMAGE)
-                                for holder in map(image_actions_row, rows, starts)},
-                               editable=not inherited)
-            image.setEnabled(not inherited)
-            video.show_actions({row["prompt_id"]: actions_of(row, MediaType.VIDEO) for row in rows})
+            self.clear()
+
+    def _show_image_actions(self, held: dict, name: str, *, editable: bool) -> None:
+        image = self._sides[MediaType.IMAGE]
+        self._names[MediaType.IMAGE].setText(name)
+        image.show_actions(held, editable=editable)
+        image.setEnabled(editable)
         self._form.setRowVisible(image, True)
-        self._form.setRowVisible(video, kind == MediaType.VIDEO)
+
+    def _show_video_actions(self, rows: list[dict]) -> None:
+        video = self._sides[MediaType.VIDEO]
+        video.show_actions({row["prompt_id"]: actions_of(row, MediaType.VIDEO) for row in rows})
+        self._form.setRowVisible(video, True)
 
     def form(self) -> LabelForm:
         return self._form

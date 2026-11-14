@@ -621,7 +621,7 @@ class GalleryView(QWidget):
         gallery_pane, gallery_column = pane()
         self._folder_path = FolderPath()
         self._folder_path.folder_chosen.connect(self._go_to_folder)
-        self._folder_actions = FolderActions(self._db, lambda: self._image_rows)
+        self._folder_actions = FolderActions(self._db)
         self._folder_actions.set_setter_host(self._setter_host)
         self._buttons = GalleryPaneButtons(
             ButtonHandlers(

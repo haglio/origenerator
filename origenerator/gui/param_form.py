@@ -355,10 +355,10 @@ class ParamForm(QWidget):
             widget.setEnabled(not unused_because)
             widget.setToolTip(unused_because or help_text)
             return
+        if widget is not None and help_text and key in self._lora_keys:
+            help_text = with_the_picked_lora(help_text, self._read_field(self._defs[key]))
         label.setToolTip(help_text or label.text())
         if widget is not None and help_text and not isinstance(widget, DropZone):
-            if key in self._lora_keys:
-                help_text = with_the_picked_lora(help_text, self._read_field(self._defs[key]))
             widget.setToolTip(help_text)
 
     def _explain_lora_picks(self) -> None:

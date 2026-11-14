@@ -60,7 +60,6 @@ from tests.gallery_view_support import (
     _answer_menu,
     _at,
     _click_off,
-    _click_tile,
     _collection,
     _collection_row,
     _enhanceable_db,
@@ -73,6 +72,7 @@ from tests.gallery_view_support import (
     _on_screen,
     _open_leaf,
     _pick,
+    _pick_by_clicking,
     _reroll_client,
     _right_click,
     _row,
@@ -332,7 +332,7 @@ def test_the_go_to_folder_button_takes_a_collection_item_home_without_a_right_cl
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    _click_tile(view, "i2")
+    _pick_by_clicking(view, "i2")
     (button,) = _folder_buttons(view)
     # Qt gives an unshown button no rect for a press to land in.
     button.show()
@@ -356,7 +356,7 @@ def test_no_go_to_folder_button_inside_the_items_own_folder(qtbot):
 def test_a_deleted_item_offers_no_way_to_a_folder(qtbot):
     view = _trash_collection_view(qtbot, FakeActions())
 
-    _click_tile(view, "d1")
+    _pick_by_clicking(view, "d1")
 
     assert _folder_buttons(view) == []
 
@@ -366,7 +366,7 @@ def test_a_video_goes_to_its_folder_from_the_same_button(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    _click_tile(view, "v1")
+    _pick_by_clicking(view, "v1")
 
     (button,) = _folder_buttons(view)
     button.click()
@@ -380,7 +380,7 @@ def test_a_kind_left_off_a_collection_still_has_its_folder_to_go_to(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    _click_tile(view, "i1")
+    _pick_by_clicking(view, "i1")
     assert _folder_buttons(view)
 
     view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Videos"], "Latest"))
@@ -578,7 +578,7 @@ def test_delete_button_enables_for_a_selection_or_a_deletable_folder(qtbot):
     _select_first_leaf(view)
     assert view._buttons.delete.isEnabled()
 
-    _click_tile(view, "i1")
+    _pick_by_clicking(view, "i1")
     assert view._buttons.delete.isEnabled()
 
 
@@ -589,7 +589,7 @@ def test_delete_button_deletes_the_picked_thumbnails(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    _click_tile(view, "i1")
+    assert view._gallery_pane.selected_prompt_ids() == ["i1"]
 
     view._buttons.delete.click()
 
@@ -604,14 +604,13 @@ def test_favorite_button_aims_at_the_picked_thumbnails_and_toggles(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    _click_tile(view, "i1")
+    assert view._gallery_pane.selected_prompt_ids() == ["i1"]
 
     assert view._buttons.favorite.isEnabled()
     assert view._buttons.favorite.toolTip() == "Favorite 1 item"
     view._buttons.favorite.click()
     assert db.get_generation("i1")["starred"]
 
-    _click_tile(view, "i1")
     assert view._buttons.favorite.toolTip() == "Unfavorite 1 item"
     view._buttons.favorite.click()
     assert not db.get_generation("i1")["starred"]
@@ -634,7 +633,7 @@ def test_enhance_button_takes_the_picked_thumbnails_over_the_folder(qtbot, tmp_p
     queued = []
     view._enhance.enhance_items = queued.append
 
-    _click_tile(view, "g0")
+    _pick_by_clicking(view, "g0")
     assert view._buttons.enhance.toolTip().startswith("Enhance 1 item")
     view._buttons.enhance.click()
 
@@ -693,9 +692,7 @@ def test_enhance_is_dark_on_a_video_and_says_why(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _video_leaf(view)
-    assert not view._buttons.enhance.isEnabled()
-
-    _click_tile(view, "v1")
+    assert view._gallery_pane.selected_prompt_ids() == ["v1"]
     assert not view._buttons.enhance.isEnabled()
     assert "no video enhancer" in view._buttons.enhance.toolTip()
 
@@ -728,7 +725,7 @@ def test_enhance_goes_dark_on_an_image_already_made_at_these_settings(qtbot, tmp
     view.refresh()
     _select_first_leaf(view)
 
-    _click_tile(view, "g0")
+    _pick_by_clicking(view, "g0")
     assert not view._buttons.enhance.isEnabled()
     assert "these settings" in view._buttons.enhance.toolTip()
 
@@ -754,7 +751,7 @@ def test_a_version_dragged_onto_the_enhance_pane_grays_the_enhance_that_would_re
         {"filename": "image_enhance_00001_.png", "params": ran}]))
     view.refresh()
     _select_first_leaf(view)
-    _click_tile(view, "g0")
+    _pick_by_clicking(view, "g0")
     versions = view._generate_pane.current_generate_tab()._versions
     version = next(row for row in versions._host.findChildren(_VersionRow) if row._params)
     mime = enhance_version_mime(version._params)
@@ -845,7 +842,7 @@ def test_favoriting_the_picked_items_turns_the_favorite_button_to_unfavorite(qtb
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    _click_tile(view, "i1")
+    assert view._gallery_pane.selected_prompt_ids() == ["i1"]
     assert view._buttons.favorite.toolTip() == "Favorite 1 item"
 
     view._buttons.favorite.click()
@@ -872,7 +869,7 @@ def test_a_corner_control_acts_on_its_own_tile_not_the_selection(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    _click_tile(view, "i1")
+    _pick_by_clicking(view, "i1")
     view._gallery_pane.selected_ids.add("i2")
 
     view._gallery_pane._thumb_widgets["i1"]._controls.triggered.emit(corner_buttons.STAR)
@@ -898,7 +895,7 @@ def test_pressing_a_tabs_preview_star_turns_that_star_on(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    _click_tile(view, "g0")
+    _pick_by_clicking(view, "g0")
     star = view._generate_pane.current_generate_tab()._viewport._controls.buttons()[0]
 
     star.click()
@@ -966,7 +963,6 @@ def test_a_mixed_pick_enhances_the_images_in_it(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    _click_tile(view, "i1")
     view._gallery_pane.selected_ids.add("v1")
     view._re_aim_every_button()
     queued = []

@@ -72,7 +72,6 @@ from tests.gallery_view_support import (
     _children_by_prompt,
     _click_beside_the_mark_of,
     _click_off,
-    _click_tile,
     _collection,
     _collection_row,
     _drawn,
@@ -91,6 +90,7 @@ from tests.gallery_view_support import (
     _on_screen,
     _pane_holding,
     _pick,
+    _pick_by_clicking,
     _reroll_client,
     _resolve_by_id,
     _right_click,
@@ -1241,7 +1241,7 @@ def test_clicking_a_recent_item_previews_it_without_leaving_the_collection(qtbot
     view.refresh()
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    _click_tile(view, "i2")
+    _pick_by_clicking(view, "i2")
     assert view.selected_generation() == "i2"
     assert view._gallery_pane.showing_latest()
     assert set(view.listed_prompt_ids()) == {"i1", "i2"}
@@ -1268,7 +1268,7 @@ def test_double_clicking_a_recent_item_also_keeps_its_tab(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    _click_tile(view, "i2")
+    _pick_by_clicking(view, "i2")
     assert view._generate_pane._preview_tab is not None
 
     view._gallery_pane._thumb_widgets["i2"].double_clicked.emit("i2")
@@ -1936,7 +1936,7 @@ def test_following_a_link_lands_in_one_tab(qtbot):
     for tab in view._generate_pane.generate_tabs():
         tab._viewport.show_media = MagicMock()
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
-    _click_tile(view, "vid1")
+    _pick_by_clicking(view, "vid1")
     tabs = view._generate_pane.count()
 
     view.follow_link("img1")
@@ -1953,8 +1953,8 @@ def test_back_and_forward_walk_the_viewed_generations(qtbot):
     view.refresh()
     _select_first_leaf(view)
 
-    _click_tile(view, "i1")
-    _click_tile(view, "i2")
+    _pick_by_clicking(view, "i1")
+    _pick_by_clicking(view, "i2")
     assert view._selected["prompt_id"] == "i2"
 
     view._navigation.go_back()
@@ -1973,7 +1973,7 @@ def test_back_returns_from_a_followed_input_image_link_to_the_video(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
-    _click_tile(view, "vid1")
+    _pick_by_clicking(view, "vid1")
     view.follow_link("img1")
 
     assert view._selected["prompt_id"] == "img1"
@@ -1989,8 +1989,8 @@ def test_nav_buttons_enable_only_when_there_is_somewhere_to_go(qtbot):
     assert not view._buttons.forward.isEnabled()
 
     _select_first_leaf(view)
-    _click_tile(view, "i1")
-    _click_tile(view, "i2")
+    _pick_by_clicking(view, "i1")
+    _pick_by_clicking(view, "i2")
     assert view._buttons.back.isEnabled()
     assert not view._buttons.forward.isEnabled()
 
@@ -2015,7 +2015,7 @@ def test_undo_of_a_folder_delete_returns_to_that_folder(qtbot, tmp_path):
     view.refresh()
 
     view._tree.setCurrentItem(view._leaf_by_id["a"])
-    _click_tile(view, "a")
+    _pick_by_clicking(view, "a")
     assert view._selected["prompt_id"] == "a"
     view._confirm = lambda text: True
     view._delete_folders(view._current_deletable_folders())
@@ -2037,7 +2037,7 @@ def test_back_after_following_a_link_returns_to_the_viewed_generation(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
-    _click_tile(view, "vid1")
+    _pick_by_clicking(view, "vid1")
     assert view._selected["prompt_id"] == "vid1"
 
     view.follow_link("img1")
@@ -2055,7 +2055,7 @@ def _linked_view(qtbot, source="i7", count=12):
     view = GalleryView(FakeDB([video, *images]))
     _on_screen(qtbot, view, 1100, 1200)
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
-    _click_tile(view, "vid1")
+    _pick_by_clicking(view, "vid1")
     return view
 
 
@@ -2117,7 +2117,7 @@ def test_history_spans_folder_navigation(qtbot):
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["v1"])
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
-    _click_tile(view, "i2")
+    _pick_by_clicking(view, "i2")
     assert view._selected["prompt_id"] == "i2"
 
     view._navigation.go_back()
@@ -2243,7 +2243,7 @@ def test_back_returns_to_the_favorite_collection_after_drilling_into_a_folder(qt
 
     view._tree.setCurrentItem(_alls(view._tree)["Favorites"])
     view._gallery_pane._drill_into(view._gallery_pane._listed_folders[0])
-    _click_tile(view, "i3")
+    _pick_by_clicking(view, "i3")
     assert view._tree.currentItem() is not _collection(view, FAVORITES_KEY)
 
     view._navigation.go_back()
@@ -2257,7 +2257,7 @@ def test_back_to_latest_restores_the_item_selected_on_the_collection(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    _click_tile(view, "i2")
+    _pick_by_clicking(view, "i2")
     view._gallery_pane._thumb_widgets["i2"].double_clicked.emit("i2")
     assert view._gallery_pane.showing_latest() is False
 
@@ -2275,7 +2275,7 @@ def test_previewing_on_the_collection_is_its_own_history_step(qtbot):
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     for pid in ("i1", "i2", "i3"):
-        _click_tile(view, pid)
+        _pick_by_clicking(view, pid)
 
     view._navigation.go_back()
     assert view._gallery_pane.showing_latest()
@@ -2294,8 +2294,8 @@ def test_back_to_a_collection_item_re_highlights_its_tile(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    _click_tile(view, "i1")
-    _click_tile(view, "i2")
+    _pick_by_clicking(view, "i1")
+    _pick_by_clicking(view, "i2")
 
     view._navigation.go_back()
 
@@ -2311,8 +2311,8 @@ def test_back_to_a_folder_item_re_highlights_its_tile(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
-    _click_tile(view, "i1")
-    _click_tile(view, "i2")
+    _pick_by_clicking(view, "i1")
+    _pick_by_clicking(view, "i2")
 
     view._navigation.go_back()
 
@@ -2327,7 +2327,7 @@ def test_a_poll_redrawing_a_search_is_not_a_stop(qtbot):
     view.refresh()
 
     _search_for(view, "cat")
-    _click_tile(view, "i1")
+    _pick_by_clicking(view, "i1")
     depth = len(view._navigation._history._stack)
 
     view.refresh()
@@ -2359,7 +2359,7 @@ def test_an_item_looked_at_on_a_collection_goes_back_to_that_collection(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    _click_tile(view, "i1")
+    _pick_by_clicking(view, "i1")
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
 
     view._navigation.go_back()
@@ -2393,7 +2393,7 @@ def test_a_hit_previewed_in_the_results_is_a_stop_in_them(qtbot):
     view.refresh()
 
     _search_for(view, "cat")
-    _click_tile(view, "i1")
+    _pick_by_clicking(view, "i1")
 
     view._navigation.go_back()
 
@@ -3061,7 +3061,7 @@ def test_a_rebuild_puts_no_stop_on_the_way_back(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
-    _click_tile(view, "i2")
+    _pick_by_clicking(view, "i2")
     stops = list(view._navigation._history._stack)
     assert len(stops) > 1
 

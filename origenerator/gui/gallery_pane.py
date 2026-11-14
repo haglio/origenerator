@@ -574,8 +574,7 @@ class GalleryPane(QObject):
 
     def _add_collection_thumbnail(self, flow, row, corner_buttons=None):
         def wire(tw):
-            tw.pressed.connect(self.apply_selection)
-            tw.clicked.connect(self.thumbnail_activated)
+            self._wire_picking(tw)
             tw.double_clicked.connect(self._collection_double_clicked)
             tw.context_requested.connect(self._thumbnail_context_menu)
             tw.control_triggered.connect(self._on_tile_control)
@@ -728,8 +727,7 @@ class GalleryPane(QObject):
 
     def _add_trash_thumbnail(self, flow, row):
         def wire(tile):
-            tile.pressed.connect(self.apply_selection)
-            tile.clicked.connect(self.thumbnail_activated)
+            self._wire_picking(tile)
             tile.double_clicked.connect(self._thumbnail_double_clicked)
             tile.context_requested.connect(self._trash_context_menu)
             tile.control_triggered.connect(self.trash_action_triggered)
@@ -805,8 +803,7 @@ class GalleryPane(QObject):
             and gallery.is_image_conditioned(group.rows[0].get("workflow_name")) \
             and gallery.media_type_of_row(group.rows[0]) == MediaType.VIDEO
         def wire(tw):
-            tw.pressed.connect(self.apply_selection)
-            tw.clicked.connect(self.thumbnail_activated)
+            self._wire_picking(tw)
             tw.double_clicked.connect(self._thumbnail_double_clicked)
             tw.context_requested.connect(self._thumbnail_context_menu)
             tw.control_triggered.connect(self._on_tile_control)
@@ -886,6 +883,21 @@ class GalleryPane(QObject):
         self.thumbnail_activated.emit(prompt_id)
         self.tab_pin_requested.emit()
         self.slideshow_requested.emit(prompt_id)
+
+    def _wire_picking(self, tile):
+        tile.pressed.connect(self._press_tile)
+        tile.clicked.connect(self.thumbnail_activated)
+        tile.double_clicked.connect(self._pick_only)
+
+    def _pick_only(self, prompt_id: str):
+        self.apply_selection(prompt_id, Qt.KeyboardModifier.NoModifier)
+
+    def _press_tile(self, prompt_id: str, modifiers):
+        if modifiers == Qt.KeyboardModifier.NoModifier and self._selection.picked == {prompt_id}:
+            self._selection.clear()
+            self._refresh_selection_highlights()
+            return
+        self.apply_selection(prompt_id, modifiers)
 
     def apply_selection(self, prompt_id: str, modifiers):
         self._selection.apply(

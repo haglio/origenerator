@@ -208,7 +208,8 @@ def test_a_workflow_names_its_seed_fields_building_its_form_once(monkeypatch):
 def test_only_the_video_workflows_go_on_drawing_seeds_once_one_is_reused():
     pinning = {name for name, wf in WORKFLOW_REGISTRY.items() if wf.pins_reused_seed()}
     drawing = set(WORKFLOW_REGISTRY) - pinning
-    assert drawing == {"wan22_i2v", "wan22_flf2v_loop", "wan22_animate", "minimax_h3_i2v"}, (
+    assert drawing == {"wan22_i2v", "wan22_t2v", "wan22_flf2v_loop", "wan22_animate",
+                       "minimax_h3_i2v"}, (
         "a video's seed is only one sample of its motion, and pinned it would ride every prompt "
         "edit out of that line of videos, so reusing its settings draws another")
     assert {"sdxl_t2i", "wan22_t2i", "flux_t2i_upscaled"} <= pinning, (
@@ -972,11 +973,12 @@ def test_a_form_that_decodes_with_the_sdxl_vae_offers_no_sd15_checkpoint(install
 
 def test_every_wan_expert_slot_rejects_the_other_half(installed_models):
     for category in ("diffusion_models", "loras"):
-        for half in ("high", "low"):
-            installed_models.add(
-                category, f"wan_{half}_noise.safetensors",
-                arch="wan", lora=(category == "loras"),
-            )
+        for arch in ("wan", "wan_t2v"):
+            for half in ("high", "low"):
+                installed_models.add(
+                    category, f"{arch}_{half}_noise.safetensors",
+                    arch=arch, lora=(category == "loras"),
+                )
 
     checked = 0
     for name, wf in WORKFLOW_REGISTRY.items():
@@ -986,8 +988,10 @@ def test_every_wan_expert_slot_rejects_the_other_half(installed_models):
             for half, other in (("high", "low"), ("low", "high")):
                 if not pd.key.endswith(f"_{half}"):
                     continue
-                assert f"wan_{half}_noise.safetensors" in pd.options, f"{name}.{pd.key}"
-                assert f"wan_{other}_noise.safetensors" not in pd.options, f"{name}.{pd.key}"
+                assert {f"wan_{half}_noise.safetensors", f"wan_t2v_{half}_noise.safetensors"} & set(
+                    pd.options), f"{name}.{pd.key}"
+                assert not {f"wan_{other}_noise.safetensors", f"wan_t2v_{other}_noise.safetensors"} & set(
+                    pd.options), f"{name}.{pd.key}"
                 checked += 1
     assert checked, "no high/low slots were exercised"
 
@@ -1926,6 +1930,7 @@ READS_AS = {
     "image_enhance": "sdxl_t2i",
     "wan22_animate": "wan22_animate",
     "minimax_h3_i2v": "minimax_h3_i2v",
+    "wan22_t2v": "wan22_t2v",
 }
 
 
@@ -2224,7 +2229,8 @@ def test_the_frames_a_clip_generates_dont_move_when_its_rate_does(name):
         conditioning = (_find_node(payload, "WanImageToVideo")
                         or _find_node(payload, "WanFirstLastFrameToVideo")
                         or _find_node(payload, "WanAnimateToVideo")
-                        or _find_node(payload, "MiniMaxH3ImageToVideo"))
+                        or _find_node(payload, "MiniMaxH3ImageToVideo")
+                        or _find_node(payload, "EmptyHunyuanLatentVideo"))
         lengths.add(conditioning["inputs"]["length"])
     assert lengths == {wf.default_params()["frame_count"]}
 

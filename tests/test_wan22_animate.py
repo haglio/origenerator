@@ -11,7 +11,7 @@ from origenerator.funscript import write_funscript
 from origenerator.workflows.derived_size import scale_to_total_pixels
 from origenerator.workflows.driving_video import driven_actions
 from origenerator.workflows.frame_rate import NATIVE_FPS
-from origenerator.workflows.model_arch import WAN, WAN_ANIMATE
+from origenerator.workflows.model_arch import WAN, WAN_ANIMATE, WAN_I2V
 from origenerator.workflows.model_files import NO_LORA
 from origenerator.workflows.wan22_animate import DISTILL_LORA, Wan22AnimateWorkflow
 
@@ -274,7 +274,7 @@ def test_the_form_offers_only_models_this_graph_can_run(monkeypatch):
     by_key = {pd.key: pd for pd in Wan22AnimateWorkflow().param_definitions()}
 
     assert asked["diffusion_models"] == (WAN_ANIMATE,)
-    assert asked["loras"] == (WAN,)
+    assert asked["loras"] == (WAN, WAN_I2V)
     assert by_key["unet"].type == "dropdown"
     assert by_key["video"].type == "video"
     assert by_key["video"].browse_dir == config.LIBRARY_VIDEOS_DIR

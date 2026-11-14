@@ -11,6 +11,7 @@ from origenerator.published_actions import (
     published,
     put_back,
     set_actions,
+    set_many_actions,
 )
 
 
@@ -97,6 +98,33 @@ def test_a_videos_actions_go_to_every_video_combined_from_it_and_on_down(tmp_pat
             for prompt_id in ("source", "combined", "combined again", "other")} == {
         "source": '["alpha"]', "combined": '["alpha"]', "combined again": '["alpha"]',
         "other": None}
+
+
+def test_videos_saved_together_say_each_video_they_gave_actions_to_and_keep_their_own(tmp_path):
+    db = Database(tmp_path / "gallery.db")
+    _item(db, "source", "source_00001_.mp4")
+    _combined_from(db, "combined", "source", 2)
+    _item(db, "other", "other_00003_.mp4")
+
+    given = set_many_actions(db, MediaType.VIDEO, {"source": ItemActions(("alpha",)),
+                                                   "combined": ItemActions(("gamma",)),
+                                                   "other": ItemActions(("beta",))}).after
+
+    assert given == {"source": ItemActions(("alpha",)), "combined": ItemActions(("gamma",)),
+                     "other": ItemActions(("beta",))}
+
+
+def test_a_video_saved_with_others_gives_its_actions_to_every_video_combined_from_it(tmp_path):
+    db = Database(tmp_path / "gallery.db")
+    _item(db, "source", "source_00001_.mp4")
+    _combined_from(db, "combined", "source", 2)
+    _item(db, "other", "other_00003_.mp4")
+
+    given = set_many_actions(db, MediaType.VIDEO, {"source": ItemActions(("alpha",)),
+                                                   "other": ItemActions(("beta",))}).after
+
+    assert (given["combined"], db.get_generation("combined")["video_actions"]) == (
+        ItemActions(("alpha",)), '["alpha"]')
 
 
 def test_putting_back_what_a_videos_actions_replaced_gives_each_video_its_own_again(tmp_path):

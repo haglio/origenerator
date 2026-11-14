@@ -16,12 +16,12 @@ def wan_expert_lora_defaults() -> dict:
     return lora_defaults(LORAS_KEYED_ONLY_WHEN_NAMED)
 
 
-def wan_expert_model_params(defaults: dict) -> list[ParamDef]:
+def wan_expert_model_params(defaults: dict, accepts=(WAN,)) -> list[ParamDef]:
     return [
         model_dropdown("unet_high", "Model (First Pass)", defaults["unet_high"],
-                     "diffusion_models", accepts=(WAN,), expert="high"),
+                     "diffusion_models", accepts=accepts, expert="high"),
         model_dropdown("unet_low", "Model (Second Pass)", defaults["unet_low"],
-                     "diffusion_models", accepts=(WAN,), expert="low"),
+                     "diffusion_models", accepts=accepts, expert="low"),
     ]
 
 
@@ -30,10 +30,10 @@ def wan_expert_shift_param(defaults: dict) -> ParamDef:
                     min_val=0.0, max_val=20.0, step=0.5, also_sets=("shift_low",), good=(5, 12))
 
 
-def wan_expert_lora_params(defaults: dict) -> list[ParamDef]:
+def wan_expert_lora_params(defaults: dict, accepts=(WAN,)) -> list[ParamDef]:
     return [
-        *lora_rows(defaults, FIRST_PASS_LORA_KEYS, accepts=(WAN,), expert="high",
+        *lora_rows(defaults, FIRST_PASS_LORA_KEYS, accepts=accepts, expert="high",
                    qualifier=" (First Pass)"),
-        *lora_rows(defaults, SECOND_PASS_LORA_KEYS, accepts=(WAN,), expert="low",
+        *lora_rows(defaults, SECOND_PASS_LORA_KEYS, accepts=accepts, expert="low",
                    qualifier=" (Second Pass)"),
     ]

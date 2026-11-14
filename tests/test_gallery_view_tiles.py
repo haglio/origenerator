@@ -630,16 +630,30 @@ def test_the_spoken_favorite_aims_at_the_picked_thumbnails_and_toggles(qtbot):
     assert not db.get_generation("i1")["starred"]
 
 
-def test_the_star_at_the_top_is_grayed_out_where_no_leaf_folder_is_open(qtbot):
+def test_the_star_enhance_and_trash_at_the_top_are_grayed_out_where_no_leaf_folder_is_open(
+        qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     for place in (_collection(view, LATEST_KEY), _image_workflow(view._tree)):
         view._tree.setCurrentItem(place)
         assert not view._buttons.favorite.isEnabled()
-        assert view._buttons.favorite.toolTip() == "Only a leaf folder can be favorited"
+        assert view._buttons.favorite.toolTip() == ""
         assert not view._buttons.enhance.isEnabled()
         assert view._buttons.enhance.toolTip() == "Only a leaf folder can be enhanced as a whole"
+        assert not view._buttons.delete.isEnabled()
+        assert view._buttons.delete.toolTip() == "Only a leaf folder can be deleted"
+
+
+def test_the_trash_at_the_top_deletes_only_a_leaf_folder(qtbot):
+    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    model = view._tree_item_for(_select_first_leaf(view)).parent().parent()
+    view._tree.setCurrentItem(model)
+
+    assert not view._buttons.delete.isEnabled()
+    assert view._buttons.delete.toolTip() == "Only a leaf folder can be deleted"
 
 
 def test_the_enhance_panes_button_takes_the_picked_thumbnails_over_the_folder(qtbot, tmp_path):

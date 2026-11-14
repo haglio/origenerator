@@ -35,7 +35,7 @@ _LONGEST_FRAMES = frames_on_the_models_steps(int(max(DURATION_OPTIONS) * H3_FPS)
 class MiniMaxH3I2vWorkflow(WorkflowTemplate):
     name = "minimax_h3_i2v"
     version = "v001"
-    display_name = "MiniMax H3 I2V"
+    display_name = "I2V MiniMax H3"
     output_type = MediaType.VIDEO
     derives_size_from_input = True
     native_fps = H3_FPS

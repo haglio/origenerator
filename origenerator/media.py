@@ -13,6 +13,10 @@ class MediaType(StrEnum):
     VIDEO = "video"
 
 
+def icon_name(media_type: str) -> str:
+    return "play" if media_type == MediaType.VIDEO else "photo"
+
+
 def media_type_from_filename(filename: str) -> MediaType | None:
     ext = Path(filename).suffix.lower()
     if ext in IMAGE_EXTS:

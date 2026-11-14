@@ -552,6 +552,25 @@ def test_picking_a_partial_action_from_the_plus_gives_it_to_every_item(action, q
     assert [_partial(pill) for pill in _pills(action, MediaType.IMAGE)] == [False, False]
 
 
+def test_clicking_a_partial_pill_gives_its_action_to_every_item(action, qtbot):
+    action.show_folder(_a_folder_of_images())
+    beta = _pills(action, MediaType.IMAGE)[1]
+
+    with qtbot.waitSignal(action.changed) as caught:
+        qtbot.mouseClick(beta, Qt.MouseButton.LeftButton)
+
+    assert [items.actions for items in caught.args[1].values()] == [("alpha", "beta")] * 2
+    assert [_partial(pill) for pill in _pills(action, MediaType.IMAGE)] == [False, False]
+
+
+def test_clicking_a_whole_pill_changes_nothing(action, qtbot):
+    action.show_folder(_a_folder_of_images())
+    alpha = _pills(action, MediaType.IMAGE)[0]
+
+    with qtbot.assertNotEmitted(action.changed):
+        qtbot.mouseClick(alpha, Qt.MouseButton.LeftButton)
+
+
 def test_a_folders_setter_button_opens_the_setter_tool_on_its_folder(action, opened):
     action.show_folder(_a_folder_of_images())
 

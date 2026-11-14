@@ -536,7 +536,7 @@ def test_images_shows_its_collections_then_its_workflow_folders_as_squares(qtbot
     assert _square_names(view) == [*_COLLECTION_NAMES, "T2I SDXL"]
 
 
-def test_a_folder_with_folders_inside_offers_its_favorite_grayed_out(qtbot, monkeypatch):
+def test_a_folder_with_folders_inside_offers_no_favorite_on_its_menu(qtbot, monkeypatch):
     view = _of_both_kinds(qtbot)
     offered = {}
     faking_exec(monkeypatch, QMenu, lambda menu, *a: offered.update(
@@ -544,7 +544,7 @@ def test_a_folder_with_folders_inside_offers_its_favorite_grayed_out(qtbot, monk
 
     _tree_menu(view, "video")
 
-    assert offered["Favorite"] is False
+    assert "Favorite" not in offered
 
 
 def test_a_folder_of_your_own_can_gather_the_videos_whole(qtbot):
@@ -566,7 +566,8 @@ def test_images_and_videos_offer_on_their_menus_what_all_offers(qtbot, monkeypat
         _tree_menu(view, key)
         menus.append(labels)
 
-    assert menus == [["Copy name", "", "Favorite", "", "Collapse all", "Expand all"]] * 3
+    assert menus == [["Copy name", "", "", "Collapse all", "Expand all"]] * 3, (
+        "Qt draws two separators side by side as one")
 
 
 def test_the_delete_key_on_images_deletes_nothing(qtbot):
@@ -2709,7 +2710,8 @@ def test_right_clicking_a_folder_tile_raises_the_folder_menu(qtbot, monkeypatch)
 
     tile.context_requested.emit(model, QPoint(1, 1))
 
-    assert "Favorite" in labels
+    assert labels[0] == "Copy name"
+    assert "Favorite" not in labels
 
 
 def test_an_i2v_tiles_video_seed_corner_starts_that_folders_reroll(

@@ -1035,35 +1035,22 @@ def test_the_hover_rows_trash_icon_deletes_the_folder_it_names(qtbot, monkeypatc
     assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1"}
 
 
-def test_a_model_folder_deletes_all_its_settings_groups(qtbot):
-    actions = FakeActions()
-    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    view = GalleryView(FakeDB(rows), actions=actions)
-    qtbot.addWidget(view)
-    view.refresh()
-    model = _at(_image_workflow(view._tree), 0)
-    view._tree.setCurrentItem(model)
-    view._confirm = lambda text: True
-
-    view._delete_selection()
-
-    assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i2"}
-
-
-def test_a_lora_folder_is_deletable_and_takes_only_its_own_rows(qtbot):
+@pytest.mark.parametrize("depth", [1, 2])
+def test_a_model_or_lora_folder_is_no_leaf_folder_and_is_not_deleted(qtbot, depth):
     actions = FakeActions()
     rows = [_i2v_video("v1", "styleA"), _i2v_video("v2", "styleB")]
     view = GalleryView(FakeDB(rows), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    lora = _at(_video_workflow(view._tree), 0, 0)
-    assert isinstance(lora.data(0, _GROUP_ROLE), gallery.LoraGroup)
-    view._tree.setCurrentItem(lora)
+    folder = _at(_video_workflow(view._tree), *([0] * depth))
+    assert isinstance(folder.data(0, _GROUP_ROLE), (gallery.ModelGroup, gallery.LoraGroup))
+    view._tree.setCurrentItem(folder)
     view._confirm = lambda text: True
 
     view._delete_selection()
 
-    assert {r["prompt_id"] for r in actions.deleted[0]} == {"v1"}
+    assert actions.deleted == []
+    assert view._buttons.delete.toolTip() == "Only a leaf folder can be deleted"
 
 
 def test_undo_button_reflects_pending_action_and_triggers_undo(qtbot):

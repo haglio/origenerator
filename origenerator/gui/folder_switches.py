@@ -8,6 +8,7 @@ from origenerator.folder_arrivals import arrivals_in
 from origenerator.gui.enhance_controller import NO_VIDEO_ENHANCER, all_video
 from origenerator.gui.gallery_pane_buttons import Button
 
+ONLY_A_LEAF_IS_FAVORITED = "Only a leaf folder can be favorited"
 ONLY_A_LEAF_IS_ENHANCED = "Only a leaf folder can be enhanced as a whole"
 
 
@@ -33,7 +34,7 @@ class FolderSwitches:
     def favorite_switch(self) -> Button:
         leaf = self._host.open_leaf_folder()
         if leaf is None:
-            return Button(enabled=False, checked=False)
+            return Button(enabled=False, tip=ONLY_A_LEAF_IS_FAVORITED, checked=False)
         if leaf.favorite:
             return Button(tip=f"Stop favoriting new items in “{leaf.label}” (their stars stay)",
                           checked=True)

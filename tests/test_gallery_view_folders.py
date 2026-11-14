@@ -952,8 +952,7 @@ def test_collapse_all_and_expand_all_come_last_on_a_folders_menu(qtbot, monkeypa
 
     _tree_menu(view, _key(_at(_image_workflow(view._tree), 0)))
 
-    assert labels == ["Copy name", "", "Favorite", "", "Delete folder…", "",
-                      "Collapse all", "Expand all"]
+    assert labels == ["Copy name", "", "", "Collapse all", "Expand all"]
 
 
 def test_a_folder_squares_menu_offers_no_collapse_all_or_expand_all(qtbot, monkeypatch):
@@ -965,7 +964,7 @@ def test_a_folder_squares_menu_offers_no_collapse_all_or_expand_all(qtbot, monke
 
     _square_menu(view, model)
 
-    assert labels == ["Copy name", "", "Favorite", "", "Delete folder…"]
+    assert labels == ["Copy name", ""]
 
 
 def _two_model_view(qtbot):
@@ -1003,7 +1002,7 @@ def test_the_picked_folders_menu_offers_collapse_all_and_expand_all_last(
     _tree_menu(view, second)
 
     assert labels == ["Copy 2 names", "", "Group 2 folders into a new collection…", "",
-                      "Delete 2 folders…", "", "Collapse all", "Expand all"]
+                      "Collapse all", "Expand all"]
 
 
 def test_the_picked_folders_menu_offers_to_delete_them(qtbot, monkeypatch):

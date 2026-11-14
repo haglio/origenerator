@@ -3,10 +3,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import NamedTuple
 
+from origenerator import config
 from origenerator.base_models import filed_apart, loras_offered_beside
 from origenerator.content import load_content
 from origenerator.lora_versions import newest_offered_version
-from origenerator.model_titles import model_title
+from origenerator.model_titles import kept_by_stem, model_stem, model_title
 from origenerator.trigger_words import (
     lacks_trigger_word,
     trigger_words,
@@ -167,7 +168,12 @@ def model_recommendations() -> dict:
 
 
 def lora_recommendations() -> dict:
-    return load_content().get("lora_recommendations") or {}
+    return kept_by_stem(config.LORA_RECOMMENDATIONS_PATH)
+
+
+def _lora_page(loras: dict, lora) -> dict | None:
+    page = loras.get(model_stem(lora or ""))
+    return None if page is None else {"name": model_title(lora), **page}
 
 
 def fresh_settings(defaults: dict, checkpoint: str | None) -> dict:
@@ -343,30 +349,36 @@ def _model_recommends(params: dict) -> dict:
 
 def _loras_recommend(params: dict) -> dict:
     loras = lora_recommendations()
-    pages = {side: loras.get(params.get(f"lora_{side}") or "") for side in _PASSES
-             if f"lora_{side}" in params}
     rules: dict = {}
     for keys in _LORA_GROUPS:
         for key in keys:
-            page = loras.get(params.get(key) or "")
+            page = _lora_page(loras, params.get(key))
             if page is not None and page.get("strength"):
                 rules[strength_key_of(key)] = _Range(
                     f"{page['name']}'s page recommends a strength of {_span(page['strength'])}.",
                     page["strength"])
-    for side, page in pages.items():
-        if page is None:
-            continue
-        if page.get("cfg"):
-            rules.setdefault(f"cfg_{side}" if f"cfg_{side}" in params else "cfg",
-                             _Range(_with(page, "cfg"), page["cfg"]))
-    shared = list(pages.values())
-    if shared and all(page is not None for page in shared):
-        page = shared[0]
+    by_pass = _pages_by_pass(loras, params)
+    for cfg_key, page in by_pass:
+        if page is not None and page.get("cfg"):
+            rules.setdefault(cfg_key, _Range(_with(page, "cfg"), page["cfg"]))
+    pages = [page for _, page in by_pass]
+    if pages and all(page is not None for page in pages):
+        page = pages[0]
         if page.get("steps"):
             rules["steps"] = _Range(_with(page, "steps", " steps"), page["steps"])
         if page.get("shift"):
             rules["shift_high"] = _Range(_with(page, "shift"), page["shift"])
     return rules
+
+
+def _pages_by_pass(loras: dict, params: dict) -> list[tuple[str, dict | None]]:
+    if any(f"lora_{side}" in params for side in _PASSES):
+        return [(f"cfg_{side}" if f"cfg_{side}" in params else "cfg",
+                 _lora_page(loras, params.get(f"lora_{side}")))
+                for side in _PASSES if f"lora_{side}" in params]
+    picked = [page for page in (_lora_page(loras, params.get(key)) for key in LORA_KEYS
+                                if not is_no_lora(params.get(key))) if page is not None]
+    return [("cfg", picked[0])] if picked else []
 
 
 def _with(page: dict, recommended: str, unit: str = "") -> str:

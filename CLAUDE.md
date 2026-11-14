@@ -308,7 +308,15 @@ model Civitai files it under, beside the titles in `trigger_words.json` and
 `base_models.json`, by running `tools/record_from_civitai.py`; a LoRA trained
 here gets its word written there by hand, from its training, and a base model
 Civitai lacks or files too broadly is written there by hand too, which the tool
-then leaves as it is.
+then leaves as it is. What a LoRA's page recommends -- its strength, steps,
+guidance and shift, each as [lowest, highest] -- is read off that page by hand
+and written in `lora_recommendations.json` beside them
+(`config.LORA_RECOMMENDATIONS_PATH`), `{}` where the page recommends nothing:
+that record is all the form's "page recommends" warnings know, and LoRAs
+installed without one went unwarned until he asked why (2026-11-13). The
+recorder ends by counting the installed LoRAs still missing a title, a
+description or page advice, so a count above zero is installing left
+unfinished.
 
 ## What a generation shows is said by hand, never read off its prompt
 
@@ -634,8 +642,9 @@ is the two hooks that call the guard, below.
   and `config.BASE_MODELS_PATH` beside the titles: `[]` and `""` for one
   Civitai does not know, so a later run skips it, and a fix's own LoRAs are
   left out. A file several versions list answers with the version it is the
-  main file of. It prints counts, never a name or a word. Run it from the
-  production checkout, where those paths are the library's files.
+  main file of. It prints counts, never a name or a word, and ends with how
+  many installed LoRAs still have no title, description or page advice. Run
+  it from the production checkout, where those paths are the library's files.
 - `tools/githooks/` — `pre-commit` and `commit-msg`, both guarding the staged
   tree and the message with `app_support.sanitize`. Each is a shim that finds an
   interpreter which can import it and gets out of the way; neither has a way of

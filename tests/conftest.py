@@ -161,6 +161,11 @@ def described_models(tmp_path, monkeypatch):
     return _kept_by_stem_in(tmp_path, monkeypatch, "MODEL_DESCRIPTIONS_PATH")
 
 
+@pytest.fixture
+def recommended_loras(tmp_path, monkeypatch):
+    return _kept_by_stem_in(tmp_path, monkeypatch, "LORA_RECOMMENDATIONS_PATH")
+
+
 class FakeCommandAndRequestListener(QObject):
     error = Signal(str)
     heard = Signal(str)

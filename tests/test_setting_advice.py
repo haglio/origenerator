@@ -15,6 +15,7 @@ from origenerator.setting_advice import (
     setting_advice,
     trigger_word_advice,
 )
+from origenerator.setting_advice import lora_recommendations as real_lora_recommendations
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.lora_rows import lora_strength
 
@@ -29,9 +30,9 @@ MODELS = {
     },
 }
 LORAS = {
-    "example_speed_high.safetensors": {"name": "Example Speed", "strength": [1, 1],
+    "example_speed_high": {"name": "Example Speed", "strength": [1, 1],
                                        "cfg": [1, 1], "steps": [4, 8], "shift": [5, 5]},
-    "example_speed_low.safetensors": {"name": "Example Speed", "strength": [1, 1],
+    "example_speed_low": {"name": "Example Speed", "strength": [1, 1],
                                       "cfg": [1, 1], "steps": [4, 8], "shift": [5, 5]},
 }
 
@@ -602,3 +603,37 @@ def test_a_lost_lora_with_no_other_version_is_answered_as_before(
     titled_models({"look_one": "Example Look 1.0"})
 
     assert _gone_look().fix == "None"
+
+
+def test_a_loras_page_advice_is_read_from_the_librarys_records_by_its_name_without_extension(
+        recommended_loras, titled_models):
+    titled_models({"example_look": "Example Look 1.0"})
+    recommended_loras({"example_look": {"strength": [0.8, 0.9], "steps": [6, 12]}})
+
+    advice = real_lora_recommendations()
+
+    assert advice == {"example_look": {"strength": [0.8, 0.9], "steps": [6, 12]}}
+
+
+def test_a_lora_page_with_no_name_of_its_own_is_quoted_under_the_loras_title(
+        monkeypatch, recommended_loras, titled_models):
+    titled_models({"example_look": "Example Look 1.0"})
+    recommended_loras({"example_look": {"strength": [0.8, 0.9]}})
+    monkeypatch.setattr(advice_module, "lora_recommendations", real_lora_recommendations)
+
+    said = _said({"lora": "example_look.safetensors", "lora_strength": 1.5})
+
+    assert said["lora_strength"] == "Example Look 1.0's page recommends a strength of 0.8" + chr(0x2013) + "0.9."
+
+
+def test_a_lora_on_a_form_of_one_pass_holds_its_steps_and_prompt_strength_to_its_page(
+        monkeypatch, recommended_loras, titled_models):
+    titled_models({"example_look": "Example Look 1.0"})
+    recommended_loras({"example_look": {"steps": [6, 12], "cfg": [1, 2]}})
+    monkeypatch.setattr(advice_module, "lora_recommendations", real_lora_recommendations)
+
+    said = _said({"lora": "example_look.safetensors", "lora_strength": 1.0, "steps": 20,
+                  "cfg": 4.0})
+
+    assert said["steps"] == "With the Example Look 1.0 LoRA, its page recommends 6" + chr(0x2013) + "12 steps."
+    assert said["cfg"] == "With the Example Look 1.0 LoRA, its page recommends 1" + chr(0x2013) + "2."

@@ -8,13 +8,16 @@ import struct
 import pytest
 
 from origenerator import config
+from tests.children import run_python
 from tools import record_from_civitai
 
 
 @pytest.fixture(autouse=True)
-def _nothing_recorded_yet(worded_loras, recorded_base_models):
-    worded_loras({})
-    recorded_base_models({})
+def _nothing_recorded_yet(worded_loras, recorded_base_models, titled_models, described_models,
+                          recommended_loras):
+    for nothing_yet in (worded_loras, recorded_base_models, titled_models, described_models,
+                        recommended_loras):
+        nothing_yet({})
 
 
 def _sha256(path) -> str:
@@ -187,9 +190,24 @@ def test_it_prints_counts_and_never_a_name_or_a_word(installed_models, capsys):
                                                       _version(wordless, []),
                                                       _version(known, [], "Example Base")])
 
-    assert capsys.readouterr().out == (
+    assert capsys.readouterr().out.splitlines()[0] == (
         "Asked Civitai about 3 LoRAs (1 with trigger words, 1 with none, 1 it does not know) "
-        "and 2 models (1 it knows).\n")
+        "and 2 models (1 it knows).")
+
+
+def test_it_counts_the_loras_still_missing_what_only_their_pages_say(
+        installed_models, capsys, titled_models, described_models, recommended_loras):
+    for name in ("example_style", "example_light", "example_look"):
+        installed_models.add("loras", f"{name}.safetensors", arch="sdxl", lora=True)
+    titled_models({"example_style": "Example Style", "example_light": "Example Light"})
+    described_models({"example_style": "Gives an image the example style."})
+    recommended_loras({"example_style": {"strength": [0.8, 1]}, "example_light": {}})
+
+    record_from_civitai.main([], ask=lambda hashes: [])
+
+    assert capsys.readouterr().out.splitlines()[1] == (
+        "Still to write by hand, read off each page: 1 LoRA with no title, 2 with no description "
+        "and 1 with no page advice ({} where its page recommends no settings).")
 
 
 def test_a_model_has_its_base_model_written_down_and_no_trigger_words(installed_models):
@@ -229,3 +247,9 @@ def test_civitai_is_sent_the_hashes_as_a_json_list_and_its_answer_read_back(monk
     assert record_from_civitai.ask_civitai(["ab" * 32]) == [{"trainedWords": ["exmplstyle"]}]
     assert sent == {"url": "https://civitai.com/api/v1/model-versions/by-hash",
                     "method": "POST", "hashes": ["ab" * 32], "named": True, "timeout": 60}
+
+
+def test_the_command_starts_in_a_fresh_interpreter_the_way_an_agent_runs_it():
+    started = run_python(["tools/record_from_civitai.py", "--help"])
+
+    assert started.returncode == 0, started.stderr

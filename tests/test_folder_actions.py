@@ -36,7 +36,7 @@ def library(tmp_path):
 
 @pytest.fixture
 def folder_actions(qtbot, library):
-    made = FolderActions(library, list, checkboxes=_BOXES, actions=_ACTIONS,
+    made = FolderActions(library, checkboxes=_BOXES, actions=_ACTIONS,
                          open_setter=lambda *_args, **_kwargs: QWidget())
     qtbot.addWidget(made)
     return made

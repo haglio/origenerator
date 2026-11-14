@@ -3,17 +3,17 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from PySide6.QtCore import QRectF, QSize
-from PySide6.QtGui import QPainter, QPen
+from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from shared_ui.colors import BORDER_PANEL, TEXT_MUTED
 from shared_ui.spacing import BUTTON_RADIUS, GAP_DIALOG, GAP_SMALL, MARGIN_STANDARD
 
 from origenerator.gui import tile_shape
+from origenerator.gui.dashed_edge import dashed_pen
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.text_color import color_text
 
 _EDGE = 1
-_DASH = 10
 _INSET = _EDGE + MARGIN_STANDARD
 TILE_GAP = GAP_DIALOG
 
@@ -57,9 +57,7 @@ class TrashBox(_TileGroup):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
-        pen = QPen(BORDER_PANEL, _EDGE)
-        pen.setDashPattern([_DASH, _DASH])
-        painter.setPen(pen)
+        painter.setPen(dashed_pen(BORDER_PANEL, _EDGE))
         half = _EDGE / 2
         painter.drawRoundedRect(QRectF(self.rect()).adjusted(half, half, -half, -half),
                                 BUTTON_RADIUS, BUTTON_RADIUS)

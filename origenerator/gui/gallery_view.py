@@ -248,6 +248,15 @@ def _saved_custom_collection(group):
     return group if isinstance(group, gallery.CustomCollection) and group.folder_id is not None else None
 
 
+ONLY_A_LEAF_IS_DELETED = "Only a leaf folder can be deleted"
+
+
+def _delete_folders_button(folders) -> Button:
+    if len(folders) == 1:
+        return Button(tip=f"Delete folder “{folders[0].label}”")
+    return Button(tip=f"Delete {len(folders)} folders")
+
+
 def _takes_a_favorite(group) -> bool:
     return isinstance(group, gallery.SettingsGroup)
 
@@ -1965,18 +1974,23 @@ class GalleryView(QWidget):
                 if count else "Pick an item to delete permanently")
         if count:
             return Button(tip=f"Delete {count} item{'s' if count != 1 else ''}")
-        return self._delete_the_folder_offer()
-
-    def _delete_the_folder_offer(self) -> Button:
         folders = self._current_deletable_folders()
         if not folders:
             return Button(enabled=False, tip="Nothing to delete")
-        if len(folders) == 1:
-            return Button(tip=f"Delete folder “{folders[0].label}”")
-        return Button(tip=f"Delete {len(folders)} folders")
+        return _delete_folders_button(folders)
+
+    def _delete_the_folder_offer(self) -> Button:
+        folders = self._leaf_folders_to_delete()
+        if not folders:
+            return Button(enabled=False, tip=ONLY_A_LEAF_IS_DELETED)
+        return _delete_folders_button(folders)
 
     def _delete_the_open_folder(self):
-        self._delete_folders(self._current_deletable_folders())
+        self._delete_folders(self._leaf_folders_to_delete())
+
+    def _leaf_folders_to_delete(self) -> list:
+        folders = self._current_deletable_folders()
+        return folders if all(_takes_a_favorite(group) for group in folders) else []
 
     def open_leaf_folder(self):
         group = self.current_group()

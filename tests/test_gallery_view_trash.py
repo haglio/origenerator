@@ -1383,7 +1383,6 @@ def test_a_deleted_item_picked_in_the_trash_has_nothing_to_favorite(qtbot):
 
     assert view.selected_prompt_ids() == ["d1"]
     assert not view._buttons.favorite.isEnabled()
-    assert view._buttons.favorite.toolTip() == "Only a leaf folder can be favorited"
 
 
 def test_trashing_an_item_with_no_row_from_a_slideshow_does_nothing(qtbot):

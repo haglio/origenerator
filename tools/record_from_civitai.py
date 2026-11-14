@@ -9,9 +9,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import origenerator.workflows  # noqa: F401  (model_titles imports from it, so it loads first)
 from origenerator import config
 from origenerator.model_titles import kept_by_stem, model_stem, write_kept
-from origenerator.workflows.model_files import ANY, is_no_lora, list_lora_files, list_model_files
+from origenerator.workflows.model_files import (
+    ANY,
+    is_a_fixs_lora,
+    is_no_lora,
+    list_lora_files,
+    list_model_files,
+)
 
 CIVITAI_BY_HASH = "https://civitai.com/api/v1/model-versions/by-hash"
 CIVITAI_HASHES_AT_A_TIME = 100
@@ -89,7 +96,20 @@ def main(argv=None, ask=ask_civitai) -> int:
           f"{len(known) - worded} with none, {len(of_loras) - len(known)} it does not know) "
           f"and {len(of_models)} models "
           f"({sum(1 for version in of_models.values() if version is not None)} it knows).")
+    print(_still_to_write_by_hand())
     return 0
+
+
+def _still_to_write_by_hand() -> str:
+    stems = [model_stem(name) for name in list_lora_files([], accepts=ANY, fix=None)
+             if not is_no_lora(name) and not is_a_fixs_lora(name)]
+    missing = [sum(1 for stem in stems if stem not in kept_by_stem(path))
+               for path in (config.MODEL_TITLES_PATH, config.MODEL_DESCRIPTIONS_PATH,
+                            config.LORA_RECOMMENDATIONS_PATH)]
+    untitled, undescribed, unadvised = missing
+    return (f"Still to write by hand, read off each page: {untitled} LoRA{'' if untitled == 1 else 's'} "
+            f"with no title, {undescribed} with no description and {unadvised} with no page advice "
+            "({} where its page recommends no settings).")
 
 
 if __name__ == "__main__":

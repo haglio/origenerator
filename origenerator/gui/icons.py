@@ -21,7 +21,7 @@ from shared_ui.icons import CANVAS, draw_icon, icon_pixmap, qt_icon
 from shared_ui.spacing import BUTTON_ICON
 from shared_ui.type_scale import FONT_UI, SIZE_TINY, in_pixels
 
-from origenerator.media import MediaType
+from origenerator.media import icon_name
 
 _SIZE = int(CANVAS)
 
@@ -187,13 +187,13 @@ def experiment_verdict_icon(verdict: str) -> QIcon:
 
 @cache
 def item_type_icon(media_type: str) -> QPixmap:
-    icon = "play" if media_type == MediaType.VIDEO else "photo"
+    icon = icon_name(media_type)
     return _display_size(_render_on_ground(_ITEM_TYPE_ICON_GROUND, icon, _ITEM_TYPE_ICON_INK))
 
 
 @cache
 def media_type_icon(media_type: str) -> QIcon:
-    return qt_icon("play" if media_type == MediaType.VIDEO else "photo", size=_SIZE)
+    return qt_icon(icon_name(media_type), size=_SIZE)
 
 
 ENHANCE_OPEN = "open"
@@ -292,7 +292,7 @@ def reroll_seed_icon(media_type: str) -> QIcon:
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-    draw_icon(painter, "play" if media_type == MediaType.VIDEO else "photo", _REROLL_GLYPH,
+    draw_icon(painter, icon_name(media_type), _REROLL_GLYPH,
               size=_REROLL_MEDIA, x=_REROLL_MEDIA_AT, y=_REROLL_MEDIA_AT)
     draw_icon(painter, "regenerate_corner", _REROLL_GLYPH, size=_SIZE)
     painter.end()

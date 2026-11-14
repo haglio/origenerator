@@ -5,7 +5,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from origenerator import config
-from origenerator.base_models import made_for_text_to_video
+from origenerator.base_models import made_for_image_to_video, made_for_text_to_video
 from origenerator.model_titles import MODEL_EXTENSIONS, fix_of, is_a_fixs_lora, model_title
 from origenerator.workflows import model_arch
 
@@ -70,8 +70,12 @@ def _names_the_other_expert(described: model_arch.ModelFile, expert: str | None)
 
 
 def _as_civitai_files_it(name: str, described: model_arch.ModelFile) -> model_arch.ModelFile:
-    if described.is_lora and described.arch == model_arch.WAN and made_for_text_to_video(name):
+    if not described.is_lora or described.arch != model_arch.WAN:
+        return described
+    if made_for_text_to_video(name):
         return replace(described, arch=model_arch.WAN_T2V)
+    if made_for_image_to_video(name):
+        return replace(described, arch=model_arch.WAN_I2V)
     return described
 
 

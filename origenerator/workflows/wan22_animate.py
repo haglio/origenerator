@@ -18,7 +18,7 @@ from origenerator.workflows.derived_size import scale_to_total_pixels
 from origenerator.workflows.driving_video import driven_actions, frames_within, start_frame
 from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS, NATIVE_FPS
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
-from origenerator.workflows.model_arch import WAN, WAN_ANIMATE
+from origenerator.workflows.model_arch import WAN, WAN_ANIMATE, WAN_I2V
 from origenerator.workflows.model_dropdowns import model_dropdown
 from origenerator.workflows.prompt_readers import UMT5
 from origenerator.workflows.video_writer import video_writer
@@ -89,7 +89,7 @@ class Wan22AnimateWorkflow(WorkflowTemplate):
                      step=0.5, good=(5, 12)),
             model_dropdown("unet", "Model", defaults["unet"], "diffusion_models",
                          accepts=(WAN_ANIMATE,)),
-            *lora_rows(defaults, LORA_KEYS, accepts=(WAN,)),
+            *lora_rows(defaults, LORA_KEYS, accepts=(WAN, WAN_I2V)),
             ParamDef("frame_rate", "Frame Rate", ParamType.FLOAT, defaults["frame_rate"],
                      min_val=NATIVE_FPS, max_val=MAX_PLAYBACK_FPS, step=NATIVE_FPS,
                      options=FRAME_RATE_OPTIONS, unit="fps"),

@@ -225,7 +225,7 @@ class Wan22I2vWorkflow(WorkflowTemplate):
         heard_so_far_in_plan_order: dict[int, int] = {}
 
         def segment(at):
-            index, scene, start, length, _last, _previous = at
+            scene, length = at.scene, at.length
             prompt_nodes, positive_ref = self.scene_prompt_nodes(at, scenes, ["1", 0], ["10", 0])
             negative_nodes, negative_ref = self.scene_prompt_nodes(
                 at, negatives, ["1", 0], ["11", 0], role="negative")
@@ -235,77 +235,10 @@ class Wan22I2vWorkflow(WorkflowTemplate):
                 nodes, frames = self._speaking_segment(
                     at, offset, (positive_ref, negative_ref), (width_ref, height_ref), params)
                 return {**prompt_nodes, **negative_nodes, **nodes}, frames
-            clip_vision_id, i2v_id, high_id, low_id, decode_id = (
-                ("13", "14", "15", "16", "17") if index == 0
-                else tuple(f"s{index}_{name}" for name in ("clip", "i2v", "high", "low", "decode"))
-            )
-            nodes = {
-                **prompt_nodes,
-                **negative_nodes,
-                clip_vision_id: {
-                    "class_type": "CLIPVisionEncode",
-                    "inputs": {
-                        "clip_vision": ["3", 0],
-                        "image": start,
-                        "crop": "center",
-                    },
-                },
-                i2v_id: {
-                    "class_type": "WanImageToVideo",
-                    "inputs": {
-                        "positive": positive_ref,
-                        "negative": negative_ref,
-                        "vae": ["2", 0],
-                        "clip_vision_output": [clip_vision_id, 0],
-                        "start_image": start,
-                        "width": width_ref,
-                        "height": height_ref,
-                        "length": length,
-                        "batch_size": params["batch_size"],
-                    },
-                },
-                high_id: {
-                    "class_type": "KSamplerAdvanced",
-                    "inputs": {
-                        "model": ["8", 0],
-                        "positive": [i2v_id, 0],
-                        "negative": [i2v_id, 1],
-                        "latent_image": [i2v_id, 2],
-                        "add_noise": "enable",
-                        "noise_seed": params["noise_seed"] + index,
-                        "steps": params["steps"],
-                        "cfg": cfg_high,
-                        "sampler_name": params["sampler_name"],
-                        "scheduler": params["scheduler"],
-                        "start_at_step": 0,
-                        "end_at_step": split_step,
-                        "return_with_leftover_noise": "enable",
-                    },
-                },
-                low_id: {
-                    "class_type": "KSamplerAdvanced",
-                    "inputs": {
-                        "model": ["9", 0],
-                        "positive": [i2v_id, 0],
-                        "negative": [i2v_id, 1],
-                        "latent_image": [high_id, 0],
-                        "add_noise": "disable",
-                        "noise_seed": params["seed"] + index,
-                        "steps": params["steps"],
-                        "cfg": cfg_low,
-                        "sampler_name": params["sampler_name"],
-                        "scheduler": params["scheduler"],
-                        "start_at_step": split_step,
-                        "end_at_step": 10000,
-                        "return_with_leftover_noise": "disable",
-                    },
-                },
-                decode_id: {
-                    "class_type": "VAEDecode",
-                    "inputs": {"samples": [low_id, 0], "vae": ["2", 0]},
-                },
-            }
-            return nodes, [decode_id, 0]
+            segment_nodes, frames = wan_i2v_segment(
+                at, (positive_ref, negative_ref), (width_ref, height_ref), params,
+                (["8", 0], ["9", 0]), (cfg_high, cfg_low, split_step))
+            return {**prompt_nodes, **negative_nodes, **segment_nodes}, frames
 
         segments, decoded_ref, total_frames = self.chain_segments(params, start_ref, segment)
         foley, audio_ref = self.foley_audio_nodes(
@@ -374,3 +307,75 @@ class Wan22I2vWorkflow(WorkflowTemplate):
             },
             self.output_node_id: video_writer(frames_ref, audio_ref, params),
         }
+
+
+def wan_i2v_segment(at, prompts, size, params: dict, models, sampling) -> tuple[dict, list]:
+    index, _scene, start, length, _last, _previous = at
+    positive_ref, negative_ref = prompts
+    width_ref, height_ref = size
+    high_model, low_model = models
+    cfg_high, cfg_low, split_step = sampling
+    clip_vision_id, i2v_id, high_id, low_id, decode_id = (
+        ("13", "14", "15", "16", "17") if index == 0
+        else tuple(f"s{index}_{name}" for name in ("clip", "i2v", "high", "low", "decode"))
+    )
+    return {
+        clip_vision_id: {
+            "class_type": "CLIPVisionEncode",
+            "inputs": {"clip_vision": ["3", 0], "image": start, "crop": "center"},
+        },
+        i2v_id: {
+            "class_type": "WanImageToVideo",
+            "inputs": {
+                "positive": positive_ref,
+                "negative": negative_ref,
+                "vae": ["2", 0],
+                "clip_vision_output": [clip_vision_id, 0],
+                "start_image": start,
+                "width": width_ref,
+                "height": height_ref,
+                "length": length,
+                "batch_size": params["batch_size"],
+            },
+        },
+        high_id: {
+            "class_type": "KSamplerAdvanced",
+            "inputs": {
+                "model": high_model,
+                "positive": [i2v_id, 0],
+                "negative": [i2v_id, 1],
+                "latent_image": [i2v_id, 2],
+                "add_noise": "enable",
+                "noise_seed": params["noise_seed"] + index,
+                "steps": params["steps"],
+                "cfg": cfg_high,
+                "sampler_name": params["sampler_name"],
+                "scheduler": params["scheduler"],
+                "start_at_step": 0,
+                "end_at_step": split_step,
+                "return_with_leftover_noise": "enable",
+            },
+        },
+        low_id: {
+            "class_type": "KSamplerAdvanced",
+            "inputs": {
+                "model": low_model,
+                "positive": [i2v_id, 0],
+                "negative": [i2v_id, 1],
+                "latent_image": [high_id, 0],
+                "add_noise": "disable",
+                "noise_seed": params["seed"] + index,
+                "steps": params["steps"],
+                "cfg": cfg_low,
+                "sampler_name": params["sampler_name"],
+                "scheduler": params["scheduler"],
+                "start_at_step": split_step,
+                "end_at_step": 10000,
+                "return_with_leftover_noise": "disable",
+            },
+        },
+        decode_id: {
+            "class_type": "VAEDecode",
+            "inputs": {"samples": [low_id, 0], "vae": ["2", 0]},
+        },
+    }, [decode_id, 0]

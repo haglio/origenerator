@@ -7,17 +7,22 @@ from funestra.loop_cycle import SEED
 from funestra.satellite_hud import HudCell, HudModel
 
 from origenerator.gui.slideshow_set import thumb_of
-from origenerator.slideshow_buttons import SlideshowFacts, slideshow_rows
+from origenerator.slideshow_buttons import (
+    SlideshowFacts,
+    enhancement_pair,
+    media_pair,
+    slideshow_rows,
+)
 
 THE_SLIDESHOWS_OWN = frozenset({
-    "fmode", "enhanced", "reset", "shuffle", "latest", "no_loop", "seed_loop",
+    *(verb.removeprefix("_") for pair in (media_pair(""), enhancement_pair(""))
+      for verb in pair.asked),
+    "fmode", "reset", "shuffle", "latest", "no_loop", "seed_loop",
     "action_loop", "loop", "more_seeds", "play_video", "lock_video", "filter",
     "no_filter", "nav_left", "nav_right", "nav_up", "nav_down", "cycle_seed",
     "cycle_action", "cycle_version", "cycle_version_back", "clip_seconds_up",
     "clip_seconds_down",
 })
-
-ORIGINALS_LABEL = "Originals"
 
 COLLAPSES = {"hud_minimize": True, "hud_restore": False}
 OPENS_IN = "hud_restore_at"
@@ -43,7 +48,7 @@ def slideshow_hud_model(shape: str, slideshow, placement: HudPlacement = USUAL_P
         return None
     locked = slideshow.locked
     favorites_filter = slideshow.hud_favorites_filter
-    enhanced = slideshow.hud_enhanced_mode
+    media, enhancement = slideshow.hud_media, slideshow.hud_enhancement
     order_label = slideshow.hud_order_label
     action_filter = slideshow.hud_action_filter
     return HudModel(
@@ -52,13 +57,15 @@ def slideshow_hud_model(shape: str, slideshow, placement: HudPlacement = USUAL_P
         title=hud_title(HudTitleFacts(
             playing_set=looping_label(shown.loop) if shown.loop else "",
             locked=locked, order=order_label,
-            f_mode=favorites_filter, enhanced=enhanced,
-            filters=(ORIGINALS_LABEL if slideshow.hud_originals_mode else "", action_filter))),
+            f_mode=favorites_filter,
+            filters=(media_pair(shape).title_word(media),
+                     enhancement_pair(shape).title_word(enhancement), action_filter))),
         is_favorite=slideshow.hud_is_favorite,
         item_name=slideshow.hud_item_name,
         item_note=slideshow.hud_item_note,
         rows=slideshow_rows(shape, SlideshowFacts(
-            locked=locked, favorites_filter=favorites_filter, enhanced=enhanced,
+            locked=locked, favorites_filter=favorites_filter, media=media,
+            enhancement=enhancement,
             order=order_label, hosted=placement.hosted,
             has_other_versions=slideshow.has_other_versions, clip_seconds=slideshow.dwell_s,
             has_osr2=device is not None or slideshow.transport.has_osr2,

@@ -78,7 +78,7 @@ def test_the_hud_lights_the_order_the_slideshow_is_playing_in(qtbot):
 
 def _the_enhanced_button(model):
     return next(button for row in model.rows for button in row
-                if button.command == "portrait_enhanced")
+                if button.tooltip.endswith("enhanced items"))
 
 
 def test_original_only_says_originals_where_enhanceds_would_stand_and_leaves_enhanced_unlit(
@@ -95,6 +95,19 @@ def test_original_only_says_originals_where_enhanceds_would_stand_and_leaves_enh
     assert original_only.title == enhanced_only.title.replace(ENHANCED_LABEL, "Originals")
     assert (_the_enhanced_button(enhanced_only).lit,
             _the_enhanced_button(original_only).lit) == (True, False)
+
+
+def test_the_title_names_the_one_kind_of_item_kept_when_images_or_videos_are_left_out(qtbot):
+    window = _window(qtbot, [("scene one.png", "image", "id-one"),
+                             ("scene two.mp4", "video", "id-two")])
+    every = slideshow_hud_model("portrait", window.slideshow).title
+
+    window.slideshow.set_media((True, False))
+    images_only = slideshow_hud_model("portrait", window.slideshow).title
+    window.slideshow.set_media((False, True))
+    videos_only = slideshow_hud_model("portrait", window.slideshow).title
+
+    assert (images_only, videos_only) == (f"{every} · Images", f"{every} · Videos")
 
 
 def test_the_hud_carries_what_is_being_made_of_the_item_on_screen(qtbot):

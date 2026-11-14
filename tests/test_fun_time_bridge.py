@@ -377,7 +377,7 @@ def test_filter_enhanced_takes_a_split_pair_of_regions_the_same_way(
         _image("p1", "a cat", 50, 1), _enhanced_image("p2", "a cat", 50, 2),
         _image("l1", "a boat", 40, 3), _enhanced_image("l2", "a boat", 40, 4)])
     portrait, landscape = _fill_both_regions_from_library_rows(qtbot, view, monkeypatch, tmp_path)
-    portrait.toggle_enhanced_mode()
+    portrait.set_enhanced_mode(True)
 
     _press_filter_enhanced(bridge, tmp_path)
 

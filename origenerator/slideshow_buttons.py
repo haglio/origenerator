@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from funestra.funestra_verbs import NEXT_FUNSCRIPTED
@@ -22,17 +22,44 @@ from funestra.hud_controls import (
 )
 from funestra.hud_icons import shared_icon
 from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
-from funestra.hud_title import LATEST_LABEL
+from funestra.hud_title import ENHANCED_LABEL, LATEST_LABEL
+from funestra.inclusion_pair import BOTH, Included, InclusionPair, Kind
 from funestra.loop_cycle import ACTION, SEED
 from funestra.main_hud import VALUE_W
 
+from origenerator.media import MediaType, icon_name
 from origenerator.osr2_controls_commands import FILTER
 
 SLIDE = "slide"
 
-ENHANCED_ICON = shared_icon("enhance_filter")
+ORIGINALS_LABEL = "Originals"
 
-ENHANCED_TOOLTIP = "Enhanced only — play just the items that have been enhanced"
+
+def _pair(shape: str, name: str, first: Kind, second: Kind,
+          spelled: tuple[str, str]) -> InclusionPair:
+    first_alone, second_alone = spelled
+    return InclusionPair(first, second, {
+        (True, True): f"{shape}_{name}_both", (True, False): f"{shape}_{name}_{first_alone}",
+        (False, True): f"{shape}_{name}_{second_alone}", (False, False): f"{shape}_{name}_none"})
+
+
+def media_pair(shape: str) -> InclusionPair:
+    return _pair(shape, "media", Kind("Images", shared_icon(icon_name(MediaType.IMAGE)), "images"),
+                 Kind("Videos", shared_icon(icon_name(MediaType.VIDEO)), "videos"),
+                 ("images", "videos"))
+
+
+def enhancement_pair(shape: str) -> InclusionPair:
+    return _pair(shape, "enhancement",
+                 Kind(ENHANCED_LABEL, shared_icon("plus"), "enhanced {things}"),
+                 Kind(ORIGINALS_LABEL, shared_icon("originals"), "original {things}"),
+                 ("enhanced", "originals"))
+
+
+def _enhancement_buttons(shape: str, included: Included) -> tuple:
+    enhanced, originals = enhancement_pair(shape).buttons(included, remembered=False,
+                                                          things="items")
+    return replace(enhanced, enhanced=True), originals
 RESET_TOOLTIPS = {
     True: ("Reset — this shape's whole library back, with both filters off, "
            f"{RESET_PUTS_BACK_THE_SPEED}"),
@@ -44,7 +71,8 @@ RESET_TOOLTIPS = {
 class SlideshowFacts:
     locked: bool = False
     favorites_filter: bool = False
-    enhanced: bool = False
+    media: Included = BOTH
+    enhancement: Included = BOTH
     order: str = ""
     hosted: bool = False
     has_other_versions: bool = False
@@ -67,11 +95,11 @@ def slideshow_rows(shape: str,
         lock_button(shape, locked=facts.locked, tooltip=lock_tooltip(facts.locked, SLIDE)),
         trash_button(shape),
         fmode_button(shape, favorites_only_tooltip(), lit=facts.favorites_filter),
-        Button(f"{shape}_enhanced", ENHANCED_ICON, ENHANCED_TOOLTIP, lit=facts.enhanced,
-               enhanced=True, group_break=True),
         reset_button(shape, nothing_to_reset=facts.nothing_to_reset,
-                     tooltip=RESET_TOOLTIPS[facts.hosted], group_break=False),
+                     tooltip=RESET_TOOLTIPS[facts.hosted]),
         *browse_order_buttons(shape, latest=facts.order == LATEST_LABEL),
+        *media_pair(shape).buttons(facts.media, remembered=False, things="items"),
+        *_enhancement_buttons(shape, facts.enhancement),
         versions_button(f"{shape}_cycle_version", noun=SLIDE,
                         has_other_versions=facts.has_other_versions),
     )
@@ -91,6 +119,12 @@ def clip_seconds_row(shape: str, seconds: int) -> tuple[Button, ...]:
 
 
 _NEWER, _OLDER = -1, 1
+
+
+def _inclusion_presses(pair: InclusionPair,
+                       press: Callable[[Any, Included], object]) -> dict:
+    return {verb.removeprefix("_"): (lambda host, kept=included: press(host, kept))
+            for verb, included in pair.asked.items()}
 
 
 def _reset(host) -> None:
@@ -115,7 +149,8 @@ _PRESSES: dict[str, Callable[[Any], object]] = {
     "fmode": lambda host: host.toggle_favorites_filter(),
     "fmode_on": lambda host: host.set_favorites_filter(True),
     "fmode_off": lambda host: host.set_favorites_filter(False),
-    "enhanced": lambda host: host.toggle_enhanced_mode(),
+    **_inclusion_presses(media_pair(""), lambda host, kept: host.set_media(kept)),
+    **_inclusion_presses(enhancement_pair(""), lambda host, kept: host.set_enhancement(kept)),
     "seed_loop": lambda host: host.slideshow_loop("seed"),
     "action_loop": lambda host: host.slideshow_loop("action"),
     "no_loop": lambda host: host.slideshow_loop(""),

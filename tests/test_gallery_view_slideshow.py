@@ -561,15 +561,16 @@ def test_the_enhanced_switch_narrows_a_slideshow_to_the_images_made_better(qtbot
     qtbot.addWidget(slideshow.shown)
     assert len(slideshow._set.playlist) == 2
 
-    slideshow.toggle_enhanced_mode()
+    slideshow.set_enhanced_mode(True)
 
     assert [item[2] for item in slideshow._set.playlist._items] == ["i2"]
-    slideshow.toggle_enhanced_mode()
+    slideshow.set_enhanced_mode(False)
     assert len(slideshow._set.playlist) == 2
     slideshow.close()
 
 
-def test_a_standalone_huds_enhanced_switch_narrows_the_slideshow(qtbot, monkeypatch):
+def test_a_standalone_huds_originals_button_turned_off_narrows_the_slideshow_to_the_enhanced(
+        qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
                                _enhanced_image("i2", "a dog", 50, 2)]))
@@ -579,16 +580,13 @@ def test_a_standalone_huds_enhanced_switch_narrows_the_slideshow(qtbot, monkeypa
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
-    names = hud_button_names(slideshow.shown)
-    assert names.index("enhanced") == names.index("fmode") + 1
-
-    slideshow.shown.press(f"{slideshow.shown.hud_shape}_enhanced")
+    slideshow.shown.press(f"{slideshow.shown.hud_shape}_enhancement_enhanced")
 
     assert slideshow.hud_enhanced_mode is True
     assert [item[2] for item in slideshow._set.playlist._items] == ["i2"]
     model = slideshow_hud_model(slideshow.shown.hud_shape, slideshow, HudPlacement(hosted=False))
     lit = {button.command: button.lit for row in model.rows for button in row}
-    assert lit[f"{slideshow.shown.hud_shape}_enhanced"]
+    assert lit[f"{slideshow.shown.hud_shape}_enhancement_none"]
     assert "Enhanceds" in model.title
     slideshow.close()
 
@@ -679,7 +677,7 @@ def test_clear_filter_leaves_f_mode_and_the_enhanced_filter_on(qtbot, monkeypatc
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
     slideshow.toggle_favorites_filter()
-    slideshow.toggle_enhanced_mode()
+    slideshow.set_enhanced_mode(True)
     assert [item[2] for item in slideshow._set.playlist._items] == ["i2"]
     assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_mode) == (True, True)
 

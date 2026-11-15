@@ -1164,6 +1164,16 @@ def test_a_switch_with_no_slideshow_up_opens_none(slideshows, monkeypatch):
     assert made == []
 
 
+def test_a_slideshow_on_the_only_monitor_fills_that_monitor_when_it_is_of_its_shape(
+        slideshows, monkeypatch):
+    monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS[:1])
+    director, _host, made = slideshows()
+
+    director.open([("a.png", "image", "g1", None)], shape=LANDSCAPE)
+
+    assert (made[0].shown.geometry, made[0].shown.fullscreen) == (LANDSCAPE_MONITOR.getRect(), 1)
+
+
 def test_a_slideshow_with_no_monitor_of_its_shape_opens_full_screen_where_it_always_did(
         slideshows, monkeypatch):
     monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS[:1])

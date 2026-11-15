@@ -14,11 +14,20 @@ def screens():
     return QGuiApplication.screens()
 
 
-def _monitors_by_shape() -> dict:
+def monitor_shaped(shape: str):
+    return _every_shapes_first_monitor().get(shape)
+
+
+def _every_shapes_first_monitor() -> dict:
     by_shape: dict = {}
     for screen in screens():
         area = screen.geometry()
         by_shape.setdefault(shape_of_size(area.width(), area.height()), screen)
+    return by_shape
+
+
+def _monitors_by_shape() -> dict:
+    by_shape = _every_shapes_first_monitor()
     return by_shape if len(by_shape) == len(_THE_OTHER) else {}
 
 

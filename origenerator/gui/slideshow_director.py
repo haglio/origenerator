@@ -610,6 +610,13 @@ class SlideshowDirector:
             finally:
                 self._asked_for_by_him = True
 
+    def take_key(self, event) -> bool:
+        up = self._window_up() if self._has_a_monitor_of_its_own() else None
+        if up is None:
+            return False
+        up.shown.keyPressEvent(event)
+        return True
+
     def _leave_for_core(self, prompt_id: str | None) -> bool:
         if not self._has_a_monitor_of_its_own():
             return False

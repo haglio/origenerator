@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 _TEXT_FIELDS = (QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox)
+_ARROWS = frozenset({Qt.Key.Key_Up, Qt.Key.Key_Down, Qt.Key.Key_Left, Qt.Key.Key_Right})
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,7 @@ class Presses:
     pause_or_play: Callable[[], None]
     open_the_tabs_slideshow: Callable[[], None]
     motion_key: Callable[[int], bool]
+    slideshows_key: Callable[[QEvent], bool]
 
 
 class AppKeys(QObject):
@@ -51,7 +53,8 @@ class AppKeys(QObject):
 
     def eventFilter(self, obj, event):  # noqa: N802 -- Qt's name
         if event.type() == QEvent.Type.KeyPress:
-            if event.key() == Qt.Key.Key_Escape and self.handle_escape(event.modifiers()):
+            if ((event.key() == Qt.Key.Key_Escape and self.handle_escape(event.modifiers()))
+                    or self._hands_the_slideshow_its_arrow(event)):
                 return True
             if (event.key() == Qt.Key.Key_Escape and self._find_bar.isVisible()
                     and not self.other_window_owns_keys()):
@@ -72,6 +75,12 @@ class AppKeys(QObject):
         # Qt hands an application-wide filter events for objects being destroyed;
         # the base class's answer for one dereferences a freed C++ pointer and aborts.
         return False
+
+    def _hands_the_slideshow_its_arrow(self, event) -> bool:
+        return (event.key() in _ARROWS and self._screen.isVisible()
+                and not self.other_window_owns_keys()
+                and not isinstance(QApplication.focusWidget(), _TEXT_FIELDS)
+                and self._presses.slideshows_key(event))
 
     def _press_for_the_gallery(self, event):
         control = event.modifiers() & Qt.KeyboardModifier.ControlModifier

@@ -296,6 +296,10 @@ class FakeWindow:
         self.full_screen = False
         self.minimized = False
         self.monitor = LANDSCAPE_MONITOR
+        self.keys = []
+
+    def keyPressEvent(self, event):
+        self.keys.append(event)
 
     def set_queue(self, items, foreign_total):
         self.queue_set = (list(items), foreign_total)
@@ -1071,6 +1075,25 @@ def test_core_coming_up_in_a_session_opens_no_slideshow_of_its_own(slideshows, m
     director.two_screens.core_is_up.emit()
 
     assert made == []
+
+
+def test_a_key_core_hands_over_reaches_the_slideshow_on_its_own_monitor(slideshows, monkeypatch):
+    director, _host, made = _core_showing_a_folder(slideshows, monkeypatch)
+    director.two_screens.core_is_up.emit()
+    pressed = object()
+
+    taken = director.take_key(pressed)
+
+    assert (taken, made[0].shown.keys) == (True, [pressed])
+
+
+def test_a_key_is_left_with_core_while_no_slideshow_has_a_monitor_of_its_own(
+        slideshows, monkeypatch):
+    director, _host, made = _core_showing_a_folder(
+        slideshows, monkeypatch, monitors=HIS_TWO_MONITORS[:1])
+    director.start()
+
+    assert (director.take_key(object()), made[0].shown.keys) == (False, [])
 
 
 def test_leaving_a_slideshow_that_has_its_own_monitor_shows_its_item_in_core_and_keeps_it_up(

@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from app_support.local_time import when_words
+
 from origenerator import config, gallery
 from origenerator.generation_config import merge_denormalized
 from origenerator.output_places import OutputPlaces
@@ -72,8 +74,8 @@ def created_item(file: dict, fallback: str = "", *,
     try:
         stamp = datetime.fromtimestamp(full.stat().st_mtime).astimezone()
     except OSError:
-        return MetadataItem("Created", str(fallback))
-    return MetadataItem("Created", stamp.strftime("%Y-%m-%d %H:%M:%S"))
+        return MetadataItem("Created", when_words(str(fallback)))
+    return MetadataItem("Created", when_words(stamp))
 
 
 def metadata_facts(row: dict, upscale: Path | None = None, *,
@@ -86,7 +88,7 @@ def metadata_facts(row: dict, upscale: Path | None = None, *,
     if files:
         held = row.get("days_in_trash")
         items += [file_item(f, held_days=held) for f in files]
-        items.append(MetadataItem("Created", str(row.get("created_at", ""))))
+        items.append(MetadataItem("Created", when_words(row.get("created_at") or "")))
     items += _frame_items(row)
     if row.get("provenance") and row.get("workflow_name") in WORKFLOW_REGISTRY:
         items.append(_version_line(json.loads(row["provenance"])))

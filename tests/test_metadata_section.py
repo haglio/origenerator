@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 import pytest
+from app_support.local_time import when_words
 from PySide6.QtCore import QPoint
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import QApplication, QLabel, QPushButton, QToolTip, QWidget
@@ -72,7 +73,7 @@ def test_shows_file_and_created(block):
     block.show_row(_row())
     texts = _texts(block)
     assert "video/out.mp4" in texts
-    assert "2026-07-01" in texts
+    assert when_words("2026-07-01") in texts
     assert "completed" not in texts
     assert "generated" not in texts
 

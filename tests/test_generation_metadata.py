@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+from app_support.local_time import when_words
+
 from origenerator import config
 from origenerator.config import OUTPUT_PLACES
 from origenerator.generation_metadata import created_item, file_item, metadata_facts
@@ -42,12 +44,12 @@ def test_an_items_name_is_what_its_copy_button_copies_and_its_video_is_left_to_i
         ("Name", "AB12CD34 007", "AB12CD34 007")]
 
 
-def test_a_file_no_version_lists_comes_before_its_date():
-    row = _row(created_at="2026-07-01", output_files=json.dumps([
+def test_a_file_no_version_lists_comes_before_its_date_said_in_local_time():
+    row = _row(created_at="2026-07-01 12:00:00", output_files=json.dumps([
         {"filename": "a.mp4", "subfolder": "video"}, {"filename": "b.mp4", "subfolder": "video"}]))
     items = metadata_facts(row).items
     assert [(item.label, item.value) for item in items] == [
-        ("File", "video/b.mp4"), ("Created", "2026-07-01")]
+        ("File", "video/b.mp4"), ("Created", when_words("2026-07-01 12:00:00"))]
 
 
 def test_file_shows_the_subfolder_path_but_copies_just_the_filename():
@@ -215,7 +217,7 @@ def test_a_file_gone_from_disk_is_created_when_the_row_says(tmp_path):
     item = created_item({"filename": "missing.png", "subfolder": "image"}, "2026-01-02 03:04:05",
                         places=OutputPlaces.in_one_folder(tmp_path / "nowhere"))
 
-    assert item.value == "2026-01-02 03:04:05"
+    assert item.value == when_words("2026-01-02 03:04:05")
 
 
 def _frames(items):

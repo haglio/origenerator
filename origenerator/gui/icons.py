@@ -60,7 +60,7 @@ def forward_icon() -> QIcon:
 
 
 def switch_icon(direction: str) -> QIcon:
-    return qt_icon(f"chevrons_{direction}", size=_SIZE)
+    return qt_icon(f"arrow_{direction}", size=_SIZE)
 
 
 def undo_icon() -> QIcon:

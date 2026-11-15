@@ -18,6 +18,15 @@ LANDED = [(datetime(2026, 4, 1, tzinfo=UTC), "v002"),
           (datetime(2026, 6, 1, tzinfo=UTC), "v003")]
 
 
+_AS_LONG_AS_GIT_TAKES = 300
+_NO_TIME_AT_ALL = 0.001
+
+
+@pytest.fixture(autouse=True)
+def _git_given_as_long_as_it_takes(monkeypatch):
+    monkeypatch.setattr(provenance, "_GIT_TIMEOUT_SECONDS", _AS_LONG_AS_GIT_TAKES)
+
+
 def _history(landed=LANDED):
     return lambda workflow: landed
 
@@ -359,13 +368,17 @@ def test_a_file_outside_any_checkout_has_no_history_rather_than_an_empty_one(
     assert provenance.version_history(loose) is None
 
 
-_AS_LONG_AS_GIT_TAKES = 300
+def test_a_git_that_runs_past_its_time_gives_no_history_rather_than_an_empty_one(
+        tmp_path, monkeypatch):
+    repo = _checkout(tmp_path)
+    _commit(repo, "v001", committed="2026-01-05T10:00:00+00:00")
+    monkeypatch.setattr(provenance, "_GIT_TIMEOUT_SECONDS", _NO_TIME_AT_ALL)
+
+    assert provenance.version_history(repo / "alpha_workflow.py") is None
 
 
 @pytest.mark.parametrize("name", sorted(WORKFLOW_REGISTRY))
-def test_every_workflow_declares_its_version_in_a_form_its_history_can_find(
-        name, tmp_path, monkeypatch):
-    monkeypatch.setattr(provenance, "_GIT_TIMEOUT_SECONDS", _AS_LONG_AS_GIT_TAKES)
+def test_every_workflow_declares_its_version_in_a_form_its_history_can_find(name, tmp_path):
     workflow = WORKFLOW_REGISTRY[name]
     source = Path(inspect.getsourcefile(type(workflow)))
     repo = _checkout(tmp_path)

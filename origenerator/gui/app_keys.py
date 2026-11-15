@@ -14,7 +14,8 @@ from PySide6.QtWidgets import (
 )
 
 _TEXT_FIELDS = (QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox)
-_ARROWS = frozenset({Qt.Key.Key_Up, Qt.Key.Key_Down, Qt.Key.Key_Left, Qt.Key.Key_Right})
+_THE_SLIDESHOWS_KEYS = frozenset({Qt.Key.Key_Up, Qt.Key.Key_Down, Qt.Key.Key_Left, Qt.Key.Key_Right,
+                                  Qt.Key.Key_W, Qt.Key.Key_A, Qt.Key.Key_S, Qt.Key.Key_D, Qt.Key.Key_E})
 
 
 @dataclass(frozen=True)
@@ -54,7 +55,7 @@ class AppKeys(QObject):
     def eventFilter(self, obj, event):  # noqa: N802 -- Qt's name
         if event.type() == QEvent.Type.KeyPress:
             if ((event.key() == Qt.Key.Key_Escape and self.handle_escape(event.modifiers()))
-                    or self._hands_the_slideshow_its_arrow(event)):
+                    or self._hands_the_slideshow_its_key(event)):
                 return True
             if (event.key() == Qt.Key.Key_Escape and self._find_bar.isVisible()
                     and not self.other_window_owns_keys()):
@@ -76,8 +77,8 @@ class AppKeys(QObject):
         # the base class's answer for one dereferences a freed C++ pointer and aborts.
         return False
 
-    def _hands_the_slideshow_its_arrow(self, event) -> bool:
-        return (event.key() in _ARROWS and self._screen.isVisible()
+    def _hands_the_slideshow_its_key(self, event) -> bool:
+        return (event.key() in _THE_SLIDESHOWS_KEYS and self._screen.isVisible()
                 and not self.other_window_owns_keys()
                 and not isinstance(QApplication.focusWidget(), _TEXT_FIELDS)
                 and self._presses.slideshows_key(event))

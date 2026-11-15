@@ -427,17 +427,6 @@ def test_closing_the_funestra_closes_nothing_in_the_window(qtbot):
         "the window is the slideshow's own, so closing the Funestra closes nothing here")
 
 
-def test_shift_esc_leaves_the_slideshow_as_a_double_click_does_and_leaves_the_room_playing(qtbot):
-    view = _view(qtbot)
-    closes = []
-    view.slideshow.closed.connect(lambda: closes.append(True))
-
-    _press(view, Qt.Key.Key_Escape, Qt.KeyboardModifier.ShiftModifier)
-
-    qtbot.waitUntil(lambda: is_closed(view))
-    assert closes == [True]
-    assert not view._paused
-
 
 @_ARROW_KEYS_OR_WASD
 def test_up_deletes_the_current_item_and_advances(qtbot, arrows):
@@ -470,18 +459,26 @@ def test_enter_leaves_for_the_shown_items_folder(qtbot):
     assert is_closed(view)
 
 
-@pytest.mark.parametrize("key", [(Qt.Key.Key_Return,),
-                                 (Qt.Key.Key_Escape, Qt.KeyboardModifier.ShiftModifier)])
-def test_a_slideshow_with_a_monitor_of_its_own_stays_up_and_hands_core_its_item(qtbot, key):
+def test_a_slideshow_with_a_monitor_of_its_own_stays_up_and_hands_core_its_item(qtbot):
     left_for = []
     view = _view(qtbot, [("a.png", "image", "id-a"), ("b.png", "image", "id-b")],
                  on_leave_for_core=lambda prompt_id: left_for.append(prompt_id) or True)
     view.show()
     _settle(view)
 
-    _press(view, *key)
+    _press(view, Qt.Key.Key_Return)
 
     assert (left_for, view.isVisible(), view.slideshow.is_showing()) == (["id-a"], True, True)
+
+
+def test_shift_esc_does_nothing_in_a_slideshow(qtbot):
+    left_for = []
+    view = _view(qtbot, on_leave_for_core=lambda prompt_id: left_for.append(prompt_id) or True)
+    view.show()
+
+    _press(view, Qt.Key.Key_Escape, Qt.KeyboardModifier.ShiftModifier)
+
+    assert (left_for, view.isVisible(), view._paused) == ([], True, False)
 
 
 def test_a_slideshow_core_will_not_take_from_closes_as_it_always_did(qtbot):

@@ -871,17 +871,6 @@ def test_esc_at_a_standalone_slideshow_pauses_the_whole_room_and_leaves_it_up(
     assert view._buttons.radio.isChecked()
 
 
-def test_shift_esc_at_a_standalone_slideshow_closes_it_and_leaves_the_room_playing(
-        qtbot, tmp_path, monkeypatch):
-    _view, radio, slideshow = _a_gallery_with_its_slideshow_in_front(qtbot, tmp_path, monkeypatch)
-
-    gestures.press_key(slideshow.shown, Qt.Key.Key_Escape, Qt.KeyboardModifier.ShiftModifier)
-
-    qtbot.waitUntil(lambda: is_closed(slideshow.shown))
-    assert not omnipause.frozen()
-    assert not radio.frozen
-
-
 def test_esc_at_a_standalone_slideshow_has_cores_osr2_line_say_parked_until_a_second_plays(
         qtbot, tmp_path, monkeypatch):
     view, _radio, slideshow = _a_gallery_with_its_slideshow_in_front(qtbot, tmp_path, monkeypatch)
@@ -964,7 +953,7 @@ def test_esc_on_a_freshly_opened_app_pauses_the_room_rather_than_starting_anythi
     assert not view.osr2.control.isChecked()
 
 
-def test_shift_esc_in_the_gallery_opens_the_slideshow_a_double_click_would_and_leaves_the_room_playing(
+def test_shift_esc_in_core_opens_no_slideshow_and_leaves_the_room_playing(
         qtbot, tmp_path, monkeypatch):
     view, _radio, _key = _startable_view(qtbot, tmp_path, monkeypatch)
     _viewport_of(view).show_frame(_png_bytes())
@@ -974,11 +963,7 @@ def test_shift_esc_in_the_gallery_opens_the_slideshow_a_double_click_would_and_l
 
     gestures.press_key(view, Qt.Key.Key_Escape, Qt.KeyboardModifier.ShiftModifier)
 
-    slideshow = view._slideshows.showing
-    assert slideshow is not None
-    qtbot.addWidget(slideshow.shown)
-    assert not omnipause.frozen()
-    slideshow.close()
+    assert (view._slideshows.showing, omnipause.frozen()) == (None, False)
 
 
 def test_esc_leaves_the_mic_listening(qtbot, tmp_path, monkeypatch):

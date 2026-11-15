@@ -2416,8 +2416,14 @@ def test_on_two_monitors_core_wears_its_logo_and_name_at_its_top_left(
     win = _window(qtbot, tmp_path)
 
     title = win._title
-    assert (title.isHidden(), title.name.text(),
-            title.mapTo(win, title.rect().topLeft())) == (False, "Origenerator", QPoint(0, 0))
+    win.show()
+    gallery_pane, generate_pane = win._gallery_view._scroll, win._gallery_view._generate_pane
+    assert (title.isHidden(), title.name.text(), title.mapTo(win, QPoint(0, 0)).x() < 20,
+            title.mapTo(win, QPoint(0, 0)).y() < 20) == (False, "Origenerator", True, True)
+    assert title.mapTo(win, QPoint(title.width(), 0)).x() <= gallery_pane.mapTo(win, QPoint(0, 0)).x(), (
+        "the name pushes down only what is in the left pane; the Gallery pane and the Generate "
+        "pane keep their full height beside it")
+    assert generate_pane.mapTo(win, QPoint(0, 0)).y() < title.mapTo(win, QPoint(0, title.height())).y()
 
 
 def test_hovering_a_previews_name_says_which_preview_it_is(qtbot, tmp_path, his_two_monitors):

@@ -75,7 +75,7 @@ from origenerator.generation_config import (
 )
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import corner_buttons, omnipause
-from origenerator.gui.app_keys import AppKeys, Presses
+from origenerator.gui.app_title import under
 from origenerator.gui.busy_cursor import working
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController, CombineParts
@@ -249,6 +249,7 @@ class GalleryView(QWidget):
         self._prompt_heights = shared.prompt_heights
         self._inbox = shared.inbox or evolver_export.default_inbox()
         self._two_screens = shared.two_screens or TwoScreens(self)
+        self._app_title = shared.app_title
         self._client = client
         self._fun_time = fun_time
         self._radio = shared.radio if shared.radio is not None else OrigeneratorRadio()
@@ -316,7 +317,6 @@ class GalleryView(QWidget):
                 delete=self._delete_selection, copy_names=self._copy_names_of_the_selection,
                 undo=self._undo, redo=self._redo, open_find=self._open_find,
                 pause_or_play=self._slideshows.pause_or_play_the_room,
-                open_the_tabs_slideshow=self._open_the_tabs_slideshow,
                 motion_key=self._motion_key,
                 slideshows_key=self._slideshows.take_key))
         self.keys.intercept(True)
@@ -427,11 +427,6 @@ class GalleryView(QWidget):
         self._gallery_pane.selection_changed.connect(
             lambda: self._voice.note_picks(self._gallery_pane.picks(), now=time.monotonic()))
 
-    def _open_the_tabs_slideshow(self) -> None:
-        tab = self._generate_pane.current_generate_tab()
-        if tab is not None:
-            tab.open_slideshow()
-
     def _motion_key(self, key) -> bool:
         if not apply_motion_key(self.osr2.motion, key, on_drive_toggle=self.osr2.toggle):
             return False
@@ -487,7 +482,7 @@ class GalleryView(QWidget):
         for section in sections:
             toc.addWidget(section)
         toc.setStretchFactor(sections.index(finding), 1)
-        return toc
+        return toc if self._app_title is None else under(self._app_title, toc)
 
     def _build_gallery_pane(self):
         gallery_pane, gallery_column = pane()

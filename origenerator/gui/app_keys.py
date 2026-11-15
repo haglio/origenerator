@@ -26,7 +26,6 @@ class Presses:
     redo: Callable[[], None]
     open_find: Callable[[], None]
     pause_or_play: Callable[[], None]
-    open_the_tabs_slideshow: Callable[[], None]
     motion_key: Callable[[int], bool]
     slideshows_key: Callable[[QEvent], bool]
 
@@ -100,8 +99,7 @@ class AppKeys(QObject):
         if self._escape_cancels_something():
             return False
         if modifiers & Qt.KeyboardModifier.ShiftModifier and self._standalone():
-            self._presses.open_the_tabs_slideshow()
-            return True
+            return False
         self._presses.pause_or_play()
         return True
 

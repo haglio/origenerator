@@ -1525,9 +1525,6 @@ class GenerateTab(DropZones):
     def set_setter_host(self, host) -> None:
         self._action.set_setter_host(host)
 
-    def open_slideshow(self):
-        return self._viewport.open_fullscreen()
-
     def set_enhance_settings(self, settings: EnhanceSettings):
         if settings == self._enhance_settings:
             return

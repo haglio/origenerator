@@ -26,7 +26,7 @@ from origenerator.experiments.background import cancel_experiments
 from origenerator.flick_finales import drop_finales_in_flight
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import WINDOW_TITLE, FunTimeSession, Rect
-from origenerator.gui.app_title import AppTitle, under
+from origenerator.gui.app_title import AppTitle
 from origenerator.gui.gallery_view import GalleryView, Shared
 from origenerator.gui.headset_window import CAP_PX, HeadsetWindow
 from origenerator.gui.osr2_driving import Osr2Driving
@@ -132,13 +132,14 @@ class Core(QMainWindow):
         self._sides = TwoScreens(self)
         self._sides.put_core_on(app_state.get(_CORE_ON_KEY))
         self._sides.switched.connect(self._fill_its_monitor)
+        self._title = AppTitle(WINDOW_TITLE, self.windowIcon(), preview)
+        self._title.hide()
         self._gallery_view = GalleryView(db, client=client, fun_time=fun_time,
                                          shared=Shared(prompt_heights=PROMPT_HEIGHTS, inbox=inbox,
                                                        device_waits_for_the_window=True,
-                                                       two_screens=self._sides))
-        self._title = AppTitle(WINDOW_TITLE, self.windowIcon(), preview)
-        self._title.hide()
-        self.setCentralWidget(under(self._title, self._gallery_view))
+                                                       two_screens=self._sides,
+                                                       app_title=self._title))
+        self.setCentralWidget(self._gallery_view)
         self._toasts = Toasts(self.windowIcon(), parent=self, shown_as=preview,
                                        video_in_front=self._gallery_view.video_in_front)
         self._gallery_view.run_ended.connect(self._toasts.note)

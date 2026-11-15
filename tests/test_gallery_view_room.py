@@ -663,10 +663,10 @@ def test_closing_a_slideshow_leaves_the_motion_running(qtbot, monkeypatch):
 def test_esc_holds_a_running_motion_still(qtbot, monkeypatch):
     view, _key = _populating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     # Qt's active window outlives the test that opened it.
-    monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
+    monkeypatch.setattr(view.keys, "other_window_owns_keys", lambda: False)
     view.osr2.control.setChecked(True)
     assert view.osr2.motion.active
-    assert view._handle_escape(Qt.KeyboardModifier.NoModifier) is True
+    assert view.keys.handle_escape(Qt.KeyboardModifier.NoModifier) is True
     assert view.osr2.motion.frozen
 
 
@@ -770,7 +770,7 @@ def _driving_the_device(qtbot):
 
 def test_esc_pauses_the_room_with_the_focus_inside_a_tab(qtbot):
     view = _driving_the_device(qtbot)
-    view._gallery_owns_keys = lambda **_kw: False
+    view.keys.gallery_owns_keys = lambda **_kw: False
 
     assert _press_escape(view) is True, (
         "the driven video usually lives in the focused Generate tab, where the gallery does not own "
@@ -793,7 +793,7 @@ def test_esc_leaves_an_open_find_its_own_key(qtbot, tmp_path, monkeypatch):
     _press_ctrl_f(view, monkeypatch)
     assert view._find_bar.isVisible()
 
-    assert view._handle_escape(Qt.KeyboardModifier.NoModifier) is False
+    assert view.keys.handle_escape(Qt.KeyboardModifier.NoModifier) is False
     assert not omnipause.frozen()
 
 
@@ -831,20 +831,20 @@ def test_another_active_window_owns_the_keys(qtbot, monkeypatch):
     view, _driver, _panel = _osr2_view(qtbot)
     # Qt's active window outlives the test that opened it.
     monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: None))
-    assert view._other_window_owns_keys() is False
+    assert view.keys.other_window_owns_keys() is False
 
     other = QWidget()
     qtbot.addWidget(other)
     monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: other))
-    assert view._other_window_owns_keys() is True
+    assert view.keys.other_window_owns_keys() is True
 
     monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: None))
     monkeypatch.setattr(QApplication, "activePopupWidget", staticmethod(lambda: other))
-    assert view._other_window_owns_keys() is True
+    assert view.keys.other_window_owns_keys() is True
 
     monkeypatch.setattr(QApplication, "activePopupWidget", staticmethod(lambda: None))
     monkeypatch.setattr(QApplication, "activeModalWidget", staticmethod(lambda: other))
-    assert view._other_window_owns_keys() is True
+    assert view.keys.other_window_owns_keys() is True
 
 
 def _a_gallery_with_its_slideshow_in_front(qtbot, tmp_path, monkeypatch):
@@ -918,7 +918,7 @@ def _press_escape_at_the_gallery(view):
 def test_esc_in_the_gallery_pauses_the_whole_room_and_a_second_plays_it_again(
         qtbot, tmp_path, monkeypatch):
     view, radio, key = _startable_view(qtbot, tmp_path, monkeypatch)
-    del view._other_window_owns_keys
+    del view.keys.other_window_owns_keys
     view._toggle_populate(True)
     view._buttons.radio.setChecked(True)
 
@@ -936,7 +936,7 @@ def test_esc_in_the_gallery_pauses_the_whole_room_and_a_second_plays_it_again(
 def test_esc_in_the_gallery_lights_the_sound_switch_yellow_and_a_second_blue_again(
         qtbot, tmp_path, monkeypatch):
     view, _bed, _key = _startable_view(qtbot, tmp_path, monkeypatch)
-    del view._other_window_owns_keys
+    del view.keys.other_window_owns_keys
     view._buttons.radio.setChecked(True)
 
     _press_escape_at_the_gallery(view)
@@ -960,7 +960,7 @@ def _startable_view(qtbot, tmp_path, monkeypatch):
 def test_esc_on_a_freshly_opened_app_pauses_the_room_rather_than_starting_anything(
         qtbot, tmp_path, monkeypatch):
     view, radio, key = _startable_view(qtbot, tmp_path, monkeypatch)
-    del view._other_window_owns_keys
+    del view.keys.other_window_owns_keys
 
     _press_escape_at_the_gallery(view)
 
@@ -990,7 +990,7 @@ def test_shift_esc_in_the_gallery_opens_the_slideshow_a_double_click_would_and_l
 
 def test_esc_leaves_the_mic_listening(qtbot, tmp_path, monkeypatch):
     view, _bed, _key = _startable_view(qtbot, tmp_path, monkeypatch)
-    del view._other_window_owns_keys
+    del view.keys.other_window_owns_keys
     view._buttons.mic.setChecked(True)
 
     _press_escape_at_the_gallery(view)

@@ -491,8 +491,8 @@ def _collection_row(folder, label):
 
 
 def _press_ctrl_f(view, monkeypatch):
-    monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
-    return view.eventFilter(
+    monkeypatch.setattr(view.keys, "other_window_owns_keys", lambda: False)
+    return view.keys.eventFilter(
         view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F, _CTRL))
 
 
@@ -1033,14 +1033,14 @@ def _press_enter(slideshow):
 
 
 def _press_escape(view):
-    return view.eventFilter(
+    return view.keys.eventFilter(
         view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier)
     )
 
 
 def _keys_are_the_gallerys(view):
     """Qt's active window outlives the test that opened it, so say that no other window owns the key."""
-    view._other_window_owns_keys = lambda: False
+    view.keys.other_window_owns_keys = lambda: False
 
 
 def _two_leaf_view(qtbot, extra=(), actions=None):

@@ -862,7 +862,7 @@ def test_ctrl_f_opens_the_find_over_the_front_tabs_prompts(qtbot, tmp_path, monk
 def test_ctrl_f_reaches_the_find_from_inside_a_prompt_field(qtbot, tmp_path, monkeypatch):
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
     _tab_with_prompts(view)
-    monkeypatch.setattr(view, "_gallery_owns_keys", lambda **_kw: False)
+    monkeypatch.setattr(view.keys, "gallery_owns_keys", lambda **_kw: False)
 
     assert _press_ctrl_f(view, monkeypatch) is True, (
         "the field being typed in is exactly where a find is reached for")
@@ -928,7 +928,7 @@ def test_esc_closes_the_find_and_leaves_no_highlights(qtbot, tmp_path, monkeypat
     _find_query(view).setText("cat")
     assert positive.extraSelections()
 
-    handled = view.eventFilter(
+    handled = view.keys.eventFilter(
         view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, _NO_MOD))
 
     assert handled is True
@@ -979,7 +979,7 @@ def test_ctrl_f_after_the_searched_prompts_are_gone_opens_over_the_ones_in_front
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
     searched = _tab_with_prompts(view).prompt_fields()
     _press_ctrl_f(view, monkeypatch)
-    view.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, _NO_MOD))
+    view.keys.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, _NO_MOD))
     view._generate_pane._close_subtab(view._generate_pane.currentIndex())
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     assert all(not shiboken6.isValid(field) for field in searched)

@@ -2845,7 +2845,7 @@ def test_an_event_about_an_object_already_gone_does_not_take_the_app_down(qtbot)
     doomed = QTimer()
     shiboken6.delete(doomed)
 
-    assert view.eventFilter(doomed, QEvent(QEvent.Type.Timer)) is False
+    assert view.keys.eventFilter(doomed, QEvent(QEvent.Type.Timer)) is False
 
 
 def test_the_view_looks_for_a_preview_where_its_actions_were_pointed(qtbot, tmp_path,

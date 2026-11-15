@@ -123,7 +123,7 @@ def test_fun_time_gallery_ignores_the_motion_keys(qtbot):
     view.show()
     event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_J,
                       Qt.KeyboardModifier.NoModifier)
-    assert view.eventFilter(view, event) is False, (
+    assert view.keys.eventFilter(view, event) is False, (
         "Space and friends belong to Fun Time's own hotkeys while hosted; nothing here may "
         "swallow them")
 

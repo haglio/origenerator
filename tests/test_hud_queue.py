@@ -3,9 +3,11 @@ from __future__ import annotations
 import time
 
 import numpy as np
-from funestra.satellite_hud import ELLIPSIS, map_block_width
+from funestra.hud import load_font, text_width
+from funestra.satellite_hud import ELLIPSIS, WORD_PAD, map_block_width
 from PIL import Image
 from shared_ui.palette import RED
+from shared_ui.type_scale import SIZE_TINY
 
 from origenerator.gui import hud_queue
 from origenerator.gui.hud_queue import (
@@ -675,3 +677,12 @@ def test_a_press_on_the_heads_frame_opens_its_folder():
     pointer.release(*at)
 
     assert opened == ["j1"], "the head's frame goes where its row goes"
+
+
+def test_a_rows_cancel_pads_its_word_as_every_hud_word_button_does():
+    section = queue_section([_item("j1", cancel=lambda: None)], 0)
+
+    _image, targets = _painted(section)
+
+    (_x, _y, width, _h), cancel = next((rect, b) for rect, b in targets if b.command == f"{CANCEL}|j1")
+    assert width == text_width(load_font(SIZE_TINY), cancel.icon) + 2 * WORD_PAD

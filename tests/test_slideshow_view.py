@@ -9,7 +9,7 @@ from funestra.testing import FakeEngine
 from funestra.volume import VolumeHud
 from PIL import Image
 from PySide6.QtCore import QPoint, QPointF, Qt
-from PySide6.QtGui import QIcon, QKeyEvent
+from PySide6.QtGui import QGuiApplication, QIcon, QKeyEvent
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QWidget
 from shared_ui.colors import GREEN, RED, TEXT_PRIMARY, YELLOW
@@ -491,6 +491,43 @@ def test_a_slideshow_core_will_not_take_from_closes_as_it_always_did(qtbot):
     _press(view, Qt.Key.Key_Return)
 
     assert is_closed(view)
+
+
+class _CoreOn:
+    def __init__(self, monitor):
+        self._monitor = monitor
+        self.raised = 0
+
+    def screen(self):
+        return self._monitor
+
+    def raise_(self):
+        self.raised += 1
+
+
+def _app_comes_to_the_front():
+    QGuiApplication.instance().applicationStateChanged.emit(Qt.ApplicationState.ApplicationActive)
+
+
+def test_coming_back_to_the_app_brings_core_forward_with_the_slideshow_on_the_other_monitor(qtbot):
+    core = _CoreOn(monitor=object())
+    view = _view(qtbot, on_core_window=lambda: core)
+    view.show()
+
+    _app_comes_to_the_front()
+
+    assert core.raised == 1
+
+
+def test_a_slideshow_sharing_cores_monitor_does_not_pull_core_up_over_itself(qtbot):
+    view = _view(qtbot)
+    core = _CoreOn(monitor=view.screen())
+    view._actions = SlideshowActions(core_window=lambda: core)
+    view.show()
+
+    _app_comes_to_the_front()
+
+    assert core.raised == 0
 
 
 def _collection_view(qtbot):

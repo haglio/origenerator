@@ -413,6 +413,17 @@ def test_reopens_in_the_osr2_control_state_it_was_left_in(qtbot, tmp_path, saved
     assert win._gallery_view.osr2_control.state() == saved
 
 
+def test_a_window_reopened_driving_moves_the_osr2_only_once_it_shows(qtbot, tmp_path):
+    state = AppState(tmp_path / "ui.json")
+    state.set("osr2_enabled", OSR2_DRIVING)
+    win = _window(qtbot, tmp_path, state)
+    motion = win._gallery_view._osr2_motion
+    assert not motion.active, "the OSR2 moved while the loading screen was still up"
+
+    win.show()
+    assert motion.active
+
+
 def test_persists_the_osr2_control_state_on_close(qtbot, tmp_path):
     state = AppState(tmp_path / "ui.json")
     win = _window(qtbot, tmp_path, state)

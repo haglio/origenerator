@@ -325,6 +325,7 @@ class GalleryView(QWidget):
         self.osr2_control.changed.connect(self.reconcile_osr2)
         self._pace = SlideshowPace(parent=self)
         self._reconciling_osr2 = False
+        self._device_waits_for_the_window = shared.device_waits_for_the_window
         self._build_the_queue_of_runs(db, client)
         self._forget_the_listing()
         self._build_the_panes(db, client)
@@ -795,11 +796,12 @@ class GalleryView(QWidget):
         self._reconciling_osr2 = True
         try:
             held = self._osr2_motion.held is not None
+            engaged = self.osr2_control.engaged() and not self._device_waits_for_the_window
             in_front = self._surface_in_front()
             target = (in_front.osr2_drive_target()
-                      if in_front is not None and self.osr2_control.engaged() and not held
+                      if in_front is not None and engaged and not held
                       else None)
-            wants_motion = self.osr2_control.engaged() and target is None
+            wants_motion = engaged and target is None
             if not wants_motion and self._osr2_motion.active:
                 self._osr2_motion.stop()
             if target is None:
@@ -1041,6 +1043,9 @@ class GalleryView(QWidget):
         self.refresh(only_if_moved=True)
         if self.radio_enabled():
             self._radio.start()
+        if self._device_waits_for_the_window:
+            self._device_waits_for_the_window = False
+            self.reconcile_osr2()
 
     def hideEvent(self, event):
         super().hideEvent(event)

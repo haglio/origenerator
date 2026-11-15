@@ -16,6 +16,7 @@ class Shared:
     prompt_heights: object = None
     inbox: EvolverInbox | None = None
     publish_names: Callable[[dict[str, str]], None] = gallery_names_file.publish
+    device_waits_for_the_window: bool = False
 
 
 NO_SHARED = Shared()

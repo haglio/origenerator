@@ -110,7 +110,8 @@ class Core(QMainWindow):
             self._wear_the_session(fun_time)
 
         self._gallery_view = GalleryView(db, client=client, fun_time=fun_time,
-                                         shared=Shared(prompt_heights=PROMPT_HEIGHTS, inbox=inbox))
+                                         shared=Shared(prompt_heights=PROMPT_HEIGHTS, inbox=inbox,
+                                                       device_waits_for_the_window=True))
         self.setCentralWidget(self._gallery_view)
         self._toasts = Toasts(self.windowIcon(), parent=self, shown_as=preview,
                                        video_in_front=self._gallery_view.video_in_front)

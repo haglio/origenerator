@@ -204,14 +204,24 @@ def _settled(qtbot, widget) -> None:
     qtbot.waitUntil(lambda: not widget._reflow.isActive(), timeout=5000)
 
 
-def _type(qtbot, widget, box: int, at: int, keys: str) -> None:
+def _caret_put(widget, box: int, at: int):
     field = widget.boxes()[box]
     field.setFocus()
     cursor = field.textCursor()
     cursor.setPosition(at)
     field.setTextCursor(cursor)
-    qtbot.keyClicks(field, keys)
+    return field
+
+
+def _type(qtbot, widget, box: int, at: int, keys: str) -> None:
+    qtbot.keyClicks(_caret_put(widget, box, at), keys)
     _settled(qtbot, widget)
+
+
+def _type_and_flow_before_anything_queued(qtbot, widget, box: int, at: int, keys: str) -> None:
+    qtbot.keyClicks(_caret_put(widget, box, at), keys)
+    widget._reflow.stop()
+    widget._reflow.timeout.emit()
 
 
 def _caret(widget) -> tuple[int, int]:
@@ -223,7 +233,7 @@ def test_a_word_typed_past_a_boxs_end_moves_whole_into_a_new_box_and_the_caret_g
         qtbot, typed_into):
     typed_into.set_value("a b c")
 
-    _type(qtbot, typed_into, 0, 5, " d")
+    _type_and_flow_before_anything_queued(qtbot, typed_into, 0, 5, " d")
     assert (_texts(typed_into), _caret(typed_into)) == (["a b c", "d"], (1, 1))
 
     qtbot.keyClicks(typed_into.boxes()[1], "d")

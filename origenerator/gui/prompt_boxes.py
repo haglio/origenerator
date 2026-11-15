@@ -289,6 +289,7 @@ class PromptBoxes(QWidget):
         countdown = Countdown()
         self._column.insertWidget(self._column.count() - 1, box, 1)
         self._column.insertWidget(self._column.count() - 1, countdown)
+        box.show()
         self._boxes.append(box)
         self._countdowns.append(countdown)
         self._shares.append(None)

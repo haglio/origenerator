@@ -71,6 +71,8 @@ _KEYS_THE_SESSION_OWNS = frozenset(
 
 SESSION_PERSIST_INTERVAL_MS = 5_000
 
+_THE_ROOMS_FLAGS = Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint
+
 
 def _run_on_its_own(chore) -> None:
     try:
@@ -267,9 +269,7 @@ class Core(QMainWindow):
 
     def _stand_where_found(self, geometry: QByteArray, scale: float, minimized: bool) -> None:
         with out_of_sight(int(self.winId())):
-            self.setWindowFlags(self.windowFlags()
-                                & ~Qt.WindowType.FramelessWindowHint
-                                & ~Qt.WindowType.WindowStaysOnTopHint)
+            self.setWindowFlag(_THE_ROOMS_FLAGS, False)
             self._device_rect = None
             ui_scale.draw_at(scale)
             self.showNormal()
@@ -285,11 +285,7 @@ class Core(QMainWindow):
             self._sit_at_the_sessions_rect(session.main_rect)
 
     def _dress_for_the_room(self, session: FunTimeSession) -> None:
-        managed = (Qt.WindowType.FramelessWindowHint
-                   | Qt.WindowType.WindowStaysOnTopHint)
-        flags = self.windowFlags()
-        self.setWindowFlags(flags & ~managed if session.in_a_headset
-                            else flags | managed)
+        self.setWindowFlag(_THE_ROOMS_FLAGS, not session.in_a_headset)
 
     def _wear_the_desktop_geometry(self) -> None:
         self.setWindowState(Qt.WindowState.WindowNoState)

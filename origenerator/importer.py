@@ -312,7 +312,7 @@ def backfill_import_params(db: Database, places: OutputPlaces) -> int:
             continue
         params = parse_params(row.get("params_json"))
         stated = _graph_params(graph_of(row))
-        if "width" not in params and "width" not in stated:
+        if not (_states_its_size(params) or _states_its_size(stated)):
             stated.update(_size_from_its_own_file(_first_output_path(row, places),
                                     row.get("workflow_name") or ""))
         missing = {k: v for k, v in stated.items() if k not in params}
@@ -566,6 +566,10 @@ def _extract_metadata(fpath: Path, suffix: str, kind: MediaType | None = None) -
         params=params,
     )
     return result
+
+
+def _states_its_size(params: dict) -> bool:
+    return "width" in params or "orientation" in params
 
 
 def _size_from_its_own_file(fpath: Path, workflow_name: str) -> dict:

@@ -257,6 +257,26 @@ def test_backfill_splits_the_imports_of_no_known_workflow_by_their_shape(tmp_pat
     assert backfill_import_params(db, OutputPlaces.in_one_folder(output_dir)) == 0
 
 
+def test_backfill_never_opens_again_a_file_whose_shape_it_already_recorded(tmp_path, monkeypatch):
+    output_dir = tmp_path / "output"
+    (output_dir / "image").mkdir(parents=True)
+    Image.new("RGB", (480, 832)).save(output_dir / "image" / "tall.png")
+    db = Database(tmp_path / "test.db")
+    db.insert_generation(NewGeneration(prompt_id="tall", workflow_name="unknown",
+                                       workflow_version="imported", params_json="{}",
+                                       workflow_json="{}", source="imported"))
+    db.update_generation("tall", output_files=json.dumps(
+        [{"filename": "tall.png", "subfolder": "image", "type": "output"}]))
+    assert backfill_import_params(db, OutputPlaces.in_one_folder(output_dir)) == 1
+
+    def opened_again(_path):
+        raise AssertionError("every launch would open this file again, a video with ffprobe")
+
+    monkeypatch.setattr(imp, "_media_size", opened_again)
+
+    assert backfill_import_params(db, OutputPlaces.in_one_folder(output_dir)) == 0
+
+
 def test_backfill_fills_the_start_frame_an_imports_graph_loaded(tmp_path):
     db = Database(tmp_path / "test.db")
     graph = {

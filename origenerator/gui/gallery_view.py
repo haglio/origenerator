@@ -80,7 +80,7 @@ from origenerator.gallery_edits import GalleryEdits, GalleryEnvironment
 from origenerator.generation_config import (
     filled_params,
     randomize_seeds,
-    seeds_of,
+    what_a_request_makes,
     would_reproduce_a_completed_run,
 )
 from origenerator.generation_state import GenerationSource
@@ -871,13 +871,15 @@ class GalleryView(QWidget):
             return None
         batch = [{**wf.default_params(), **params} for params in batch]
         if asked is not None:
-            batch = [{**batch[0], **seeds_of(self._db.get_generation(asked["source_prompt_id"]), wf)}]
+            made = what_a_request_makes(self._db.list_generations(), wf, batch[0],
+                                        self._db.get_generation(asked["source_prompt_id"]))
+            if made is None:
+                return None
+            batch = [made]
         key = self.library.folder_key_for(workflow_name, batch[0])
         if key in self._live_jobs:
             return None
-        if self.would_reproduce_a_completed_run(wf, batch[0]):
-            if asked is not None:
-                return None
+        if asked is None and self.would_reproduce_a_completed_run(wf, batch[0]):
             batch[0] = randomize_seeds(batch[0], wf.seed_keys())
             if launching is not None:
                 launching.use_random_seed()

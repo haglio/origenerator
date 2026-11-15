@@ -26,6 +26,7 @@ from origenerator.gui import (
     combine_controller,
 )
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
+from origenerator.gui.generate_button import GenerateButton
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.item_tile import ItemTile
 from origenerator.gui.modify_batch_tile import ModifyBatchTile
@@ -1185,6 +1186,29 @@ def test_generate_under_a_turn_that_would_make_an_image_already_made_makes_no_se
 
     assert not view._live_jobs
     assert not tab._param_form.seed_is_random()
+
+
+def _generate_offered(exchange) -> bool:
+    return any(not button.isHidden()
+               for button in exchange._conversation.viewport().findChildren(GenerateButton))
+
+
+def test_a_turn_whose_change_would_make_an_image_already_made_offers_no_generate(qtbot, tmp_path):
+    answer = threading.Event()
+    view, exchange = _asking_for_two_cats(qtbot, tmp_path, answer_once=answer)
+    _completed_image(view._db, "already", "two cats", 7)
+    answer.set()
+
+    qtbot.waitUntil(lambda: exchange.turns() == [("two cats", _TWO_CATS_SAID)], timeout=5000)
+
+    assert not _generate_offered(exchange)
+
+
+def test_a_turn_whose_change_would_make_a_new_image_offers_generate(qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path)
+
+    exchange = view._generate_pane.current_generate_tab()._param_form.request_exchange()
+    assert _generate_offered(exchange)
 
 
 def _request_turns_shown(view):

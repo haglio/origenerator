@@ -4,6 +4,8 @@ import json
 
 import numpy as np
 import pytest
+from funestra.funestra_verbs import NEXT
+from funestra.hud_controls import TRASH_TOOLTIP
 from funestra.hud_corners import CORNER_PLUS_OVERLAY_ID
 from funestra.hud_overlay import HUD_OVERLAY_ID
 from funestra.hud_placement import HudCorner
@@ -23,6 +25,7 @@ from origenerator.gui.slideshow_pace import MAX_S, MIN_S, STEP_S, SlideshowPace
 from origenerator.gui.slideshow_view import HudWear, SlideshowView, ViewShow, ViewWiring
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.slideshow import in_order
+from origenerator.slideshow_buttons import answer
 from tests import gestures
 from tests.closed_windows import is_closed
 from tests.motion_doubles import FakeMotion
@@ -281,6 +284,67 @@ class TestTheOneHudASlideshowWears:
 
         now[0] = 0.35
         assert window._hud_model() is not first
+
+
+class TestTheTrashOverAFavorite:
+    @staticmethod
+    def _window(qtbot, tmp_path, *, hosted: bool, favorite_ids=frozenset({"id-one"})):
+        unfavorited, deleted = [], []
+        window = _dressed(qtbot, [("scene one.png", "image", "id-one"),
+                                  ("scene two.png", "image", "id-two")],
+                          hud=HudFacts(favorite_ids=set(favorite_ids)),
+                          actions=SlideshowActions(unfavorite=unfavorited.append,
+                                                   delete=deleted.append),
+                          dashboard_cmd_file=tmp_path / "dashboard_cmd.txt" if hosted else None)
+        return window, unfavorited, deleted
+
+    @staticmethod
+    def _trash(model):
+        return next(button for row in model.rows for button in row
+                    if button.command == "portrait_trash")
+
+    @pytest.mark.parametrize("hosted", [True, False])
+    def test_a_favorite_on_screen_wears_unfavorite_where_the_trash_stands(
+            self, qtbot, tmp_path, hosted):
+        window, _unfavorited, _deleted = self._window(qtbot, tmp_path, hosted=hosted)
+
+        model = window._hud_model()
+
+        assert model.facts.favorite
+        assert self._trash(model).tooltip == "Unfavorite this slide and move on to the next"
+
+    @pytest.mark.parametrize("hosted", [True, False])
+    def test_an_item_that_is_no_favorite_keeps_the_trash(self, qtbot, tmp_path, hosted):
+        window, _unfavorited, _deleted = self._window(qtbot, tmp_path, hosted=hosted,
+                                                      favorite_ids=frozenset())
+
+        model = window._hud_model()
+
+        assert not model.facts.favorite
+        assert self._trash(model).tooltip == TRASH_TOOLTIP
+
+    def test_a_standalone_press_on_it_unfavorites_the_item_and_moves_on(
+            self, qtbot, tmp_path, monkeypatch):
+        window, unfavorited, deleted = self._window(qtbot, tmp_path, hosted=False)
+        sent = []
+        monkeypatch.setattr(window.slideshow.channel, "send", sent.append)
+
+        assert window.press("portrait_trash")
+
+        assert (unfavorited, deleted) == (["id-one"], [])
+        assert NEXT in sent
+        assert not window._hud_model().facts.favorite
+
+    def test_a_hosted_press_on_it_comes_back_from_the_session_to_unfavorite_and_move_on(
+            self, qtbot, tmp_path):
+        window, unfavorited, deleted = self._window(qtbot, tmp_path, hosted=True)
+
+        window.press("portrait_trash")
+        (posted,) = (tmp_path / "dashboard_cmd.txt").read_text(encoding="utf-8").split()
+        assert answer(window.slideshow, posted.removeprefix("portrait_"))
+
+        assert (unfavorited, deleted) == (["id-one"], [])
+        assert not window._hud_model().facts.favorite
 
 
 class TestWhereTheSlideshowsHudSits:

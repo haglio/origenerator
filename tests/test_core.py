@@ -2164,6 +2164,24 @@ def test_a_window_handed_back_from_a_session_stands_where_it_was_found(qtbot, tm
     assert win._gallery_view._fun_time is None
 
 
+def test_a_window_handed_back_from_a_session_keeps_its_title_bar_buttons(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    buttons = win.windowFlags() & (Qt.WindowType.WindowCloseButtonHint
+                                   | Qt.WindowType.WindowMinimizeButtonHint
+                                   | Qt.WindowType.WindowMaximizeButtonHint)
+    win.become_hosted(_fun_time_session())
+
+    win.become_standalone()
+
+    assert win.windowFlags() & buttons == buttons
+
+
+def test_a_window_in_a_headset_keeps_its_title_bar_buttons(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path, fun_time=_headset_session(tmp_path))
+
+    assert win.windowFlags() & Qt.WindowType.WindowCloseButtonHint
+
+
 def test_a_window_found_open_is_open_again_once_the_session_hands_it_back(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
     win.show()

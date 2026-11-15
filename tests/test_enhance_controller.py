@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from origenerator import config, gallery
+from origenerator.db import Database
 from origenerator.enhance_presets import Preset
 from origenerator.gui import enhance_controller as module
 from origenerator.gui.enhance_controller import (
@@ -20,6 +21,7 @@ from origenerator.gui.enhance_controller import (
 from origenerator.gui.message import ERROR, INFO, WARNING
 from origenerator.workflows import detail_parts
 from origenerator.workflows.detail_parts import DetailPart
+from tests.real_db import database_in, put_rows
 
 ENHANCE = gallery.ENHANCE_WORKFLOW
 
@@ -133,24 +135,26 @@ class FakeReroll:
         self.cancelled.append(prompt_id)
 
 
-class FakeDB:
-    def __init__(self, rows=()):
-        self.rows = {row["prompt_id"]: dict(row) for row in rows}
+class SpiedDB(Database):
+    def __init__(self, path):
+        super().__init__(path)
         self.targets = []
         self.looked_up = []
 
     def get_generation(self, prompt_id):
         self.looked_up.append(prompt_id)
-        return self.rows.get(prompt_id)
+        return super().get_generation(prompt_id)
 
-    def list_generations(self):
-        return [dict(row) for row in self.rows.values()]
+    def set_enhance_target(self, prompt_id, source_prompt_id):
+        self.targets.append((prompt_id, source_prompt_id))
+        super().set_enhance_target(prompt_id, source_prompt_id)
 
-    def rows_made_by(self, workflow_name):
-        return [dict(row) for row in self.rows.values() if row["workflow_name"] == workflow_name]
 
-    def set_enhance_target(self, prompt_id, target):
-        self.targets.append((prompt_id, target))
+@pytest.fixture
+def stored(tmp_path):
+    def make(rows=(), kind=SpiedDB):
+        return database_in(tmp_path, rows, kind=kind)
+    return make
 
 
 class FakeGalleryPane:
@@ -245,7 +249,6 @@ def _image(prompt_id="i1", *, files=("one.png",), enhance_of=None, params=None):
         "prompt_id": prompt_id,
         "workflow_name": "sdxl_t2i",
         "status": "completed",
-        "media_type": "image",
         "output_files": json.dumps([{"filename": name} for name in files]),
         "params_json": json.dumps(params or {}),
         "enhance_of": enhance_of,
@@ -253,7 +256,7 @@ def _image(prompt_id="i1", *, files=("one.png",), enhance_of=None, params=None):
 
 
 def _stamped_run(db, run, image):
-    db.rows[run] = {"prompt_id": run, "enhance_of": image}
+    put_rows(db, [{"prompt_id": run, "workflow_name": ENHANCE, "enhance_of": image}])
 
 
 def _video(prompt_id="v1"):
@@ -261,37 +264,36 @@ def _video(prompt_id="v1"):
         "prompt_id": prompt_id,
         "workflow_name": "wan22_i2v",
         "status": "completed",
-        "media_type": "video",
         "output_files": json.dumps([{"filename": f"{prompt_id}.mp4"}]),
         "params_json": "{}",
     }
 
 
 @pytest.fixture
-def enhance(monkeypatch):
+def enhance(monkeypatch, stored):
     monkeypatch.setattr(module, "EnhancePane", FakePanel)
 
     def build(host=None, *, db=None, jobs=None, gallery_pane=None, slideshows=None):
         parts = EnhanceParts(
             jobs=jobs or FakeReroll(), gallery_pane=gallery_pane or FakeGalleryPane(),
             slideshows=slideshows or FakeSlideshows(), info_tabs_of=FakeTabs)
-        return _assembled(host, parts, db)
+        return _assembled(host, parts, db or stored())
     return build
 
 
 def _assembled(host, parts, db):
     host = host or FakeHost()
-    return EnhanceController(host, parts, db=db or FakeDB()), host
+    return EnhanceController(host, parts, db=db), host
 
 
 
-def test_a_pick_of_images_is_what_the_button_aims_at(enhance, monkeypatch):
+def test_a_pick_of_images_is_what_the_button_aims_at(enhance, monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "version_matching_settings",
                         lambda row, settings: None)
     controller, _host = enhance(
         FakeHost(picked=["i1", "i2"]),
-        db=FakeDB([_image("i1"), _image("i2")]), gallery_pane=FakeGalleryPane(["i1", "i2"]))
+        db=stored([_image("i1"), _image("i2")]), gallery_pane=FakeGalleryPane(["i1", "i2"]))
 
     offer = controller.offer()
 
@@ -301,14 +303,9 @@ def test_a_pick_of_images_is_what_the_button_aims_at(enhance, monkeypatch):
     assert offer.tip == "Enhance 2 items (upscale + light redraw)"
 
 
-def test_a_picked_clip_is_nothing_to_run_rather_than_a_run_that_fails(enhance,
-                                                                      monkeypatch):
-    monkeypatch.setattr(module.gallery, "is_enhanceable_row",
-                        lambda row: row["media_type"] == "image")
-    monkeypatch.setattr(module.gallery, "media_type_of_row",
-                        lambda row: row["media_type"])
+def test_a_picked_clip_is_nothing_to_run_rather_than_a_run_that_fails(enhance, stored):
     controller, _host = enhance(
-        FakeHost(picked=["v1"]), db=FakeDB([_video("v1")]), gallery_pane=FakeGalleryPane(["v1"]))
+        FakeHost(picked=["v1"]), db=stored([_video("v1")]), gallery_pane=FakeGalleryPane(["v1"]))
 
     offer = controller.offer()
 
@@ -316,13 +313,13 @@ def test_a_picked_clip_is_nothing_to_run_rather_than_a_run_that_fails(enhance,
 
 
 def test_an_image_already_made_at_these_settings_says_so_rather_than_no(enhance,
-                                                                        monkeypatch):
+                                                                        monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "media_type_of_row", lambda row: "image")
     monkeypatch.setattr(module.gallery, "version_matching_settings",
                         lambda row, settings: {"file": "one-enhanced.png"})
     controller, _host = enhance(
-        FakeHost(picked=["i1"]), db=FakeDB([_image("i1")]), gallery_pane=FakeGalleryPane(["i1"]))
+        FakeHost(picked=["i1"]), db=stored([_image("i1")]), gallery_pane=FakeGalleryPane(["i1"]))
 
     assert controller.offer() == (False, ALREADY_AT_THESE_SETTINGS)
 
@@ -350,8 +347,8 @@ def test_a_whole_folder_offer_says_what_the_enhance_does_in_plain_words(enhance,
         True, "Enhance 2 not-yet-enhanced images in this folder (upscale + light redraw)")
 
 
-def test_a_folders_offer_reads_what_the_enhance_runs_made_never_the_whole_library(enhance):
-    class CountsTheWholeLibrary(FakeDB):
+def test_a_folders_offer_reads_what_the_enhance_runs_made_never_the_whole_library(enhance, stored):
+    class CountsTheWholeLibrary(SpiedDB):
         reads = 0
 
         def list_generations(self):
@@ -360,7 +357,7 @@ def test_a_folders_offer_reads_what_the_enhance_runs_made_never_the_whole_librar
 
     in_flight = {**_image("e1"), "workflow_name": ENHANCE, "enhance_of": "i2"}
     folder = gallery.SettingsGroup("k", "S", [_image("i1"), _image("i2")])
-    db = CountsTheWholeLibrary([_image("i1"), _image("i2"), in_flight])
+    db = stored([_image("i1"), _image("i2"), in_flight], kind=CountsTheWholeLibrary)
     controller, _host = enhance(FakeHost(group=folder), db=db)
     read_while_building = db.reads
 
@@ -372,14 +369,14 @@ def test_a_folders_offer_reads_what_the_enhance_runs_made_never_the_whole_librar
 
 
 
-def test_a_batch_lands_under_the_folder_its_settings_shape(enhance, monkeypatch):
+def test_a_batch_lands_under_the_folder_its_settings_shape(enhance, monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: {"input_image": "one.png", "seed": 1})
     monkeypatch.setattr(module.gallery, "settings_folder_key",
                         lambda row, index: "image/image_enhance/abc")
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
     monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
-    db = FakeDB([_image("i1"), _image("i2")])
+    db = stored([_image("i1"), _image("i2")])
     jobs = FakeReroll()
     controller, _host = enhance(db=db, jobs=jobs)
 
@@ -390,7 +387,7 @@ def test_a_batch_lands_under_the_folder_its_settings_shape(enhance, monkeypatch)
     assert db.targets == [("run-1", "i1"), ("run-1", "i2")]
 
 
-def test_each_enhance_launched_rolls_its_own_seed(enhance, monkeypatch):
+def test_each_enhance_launched_rolls_its_own_seed(enhance, monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: {"input_image": f"{row['prompt_id']}.png",
                                                "seed": 1})
@@ -398,7 +395,7 @@ def test_each_enhance_launched_rolls_its_own_seed(enhance, monkeypatch):
                         lambda row, index: "image/image_enhance/abc")
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
     jobs = FakeReroll()
-    controller, _host = enhance(db=FakeDB([_image("i1"), _image("i2")]), jobs=jobs)
+    controller, _host = enhance(db=stored([_image("i1"), _image("i2")]), jobs=jobs)
 
     controller.enhance_items(["i1", "i2"])
 
@@ -408,7 +405,7 @@ def test_each_enhance_launched_rolls_its_own_seed(enhance, monkeypatch):
         "like any variation")
 
 
-def test_a_batch_is_asked_for_once_per_folder_it_lands_in(enhance, monkeypatch):
+def test_a_batch_is_asked_for_once_per_folder_it_lands_in(enhance, monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: {"input_image": f"{row['prompt_id']}.png"})
     monkeypatch.setattr(module.gallery, "settings_folder_key",
@@ -416,7 +413,7 @@ def test_a_batch_is_asked_for_once_per_folder_it_lands_in(enhance, monkeypatch):
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
     monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
     jobs = FakeReroll()
-    controller, _host = enhance(db=FakeDB([_image("i1"), _image("i2"), _image("i3")]),
+    controller, _host = enhance(db=stored([_image("i1"), _image("i2"), _image("i3")]),
                                 jobs=jobs)
 
     controller.enhance_items(["i1", "i2", "i3"])
@@ -425,11 +422,11 @@ def test_a_batch_is_asked_for_once_per_folder_it_lands_in(enhance, monkeypatch):
 
 
 def test_an_image_with_no_file_to_enhance_is_skipped_not_launched(enhance,
-                                                                  monkeypatch):
+                                                                  monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: None)
     jobs = FakeReroll()
-    controller, _host = enhance(db=FakeDB([_image("i1")]), jobs=jobs)
+    controller, _host = enhance(db=stored([_image("i1")]), jobs=jobs)
 
     controller.enhance_items(["i1"])
 
@@ -438,13 +435,13 @@ def test_an_image_with_no_file_to_enhance_is_skipped_not_launched(enhance,
 
 def test_a_launch_the_server_refused_is_logged_rather_than_dropped(enhance,
                                                                    monkeypatch,
-                                                                   caplog):
+                                                                   caplog, stored):
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: {"input_image": "one.png"})
     monkeypatch.setattr(module.gallery, "settings_folder_key", lambda row, index: "k")
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
     monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
-    controller, _host = enhance(db=FakeDB([_image("i1")]),
+    controller, _host = enhance(db=stored([_image("i1")]),
                                 jobs=FakeReroll(launches=None))
 
     with caplog.at_level("WARNING"):
@@ -455,14 +452,14 @@ def test_a_launch_the_server_refused_is_logged_rather_than_dropped(enhance,
 
 
 def test_an_image_already_holding_an_enhancement_at_these_settings_is_not_enhanced_again(
-        enhance, monkeypatch):
+        enhance, monkeypatch, stored):
     params = {"input_image": "one.png"}
     monkeypatch.setattr(module.gallery, "enhance_params_for", lambda row, settings: params)
     asked = []
     monkeypatch.setattr(module.gallery, "version_matching_params",
                         lambda row, wanted: asked.append((row["prompt_id"], wanted)) or 0)
     jobs = FakeReroll()
-    controller, _host = enhance(db=FakeDB([_image("i1")]), jobs=jobs)
+    controller, _host = enhance(db=stored([_image("i1")]), jobs=jobs)
 
     controller.enhance_items(["i1"])
 
@@ -471,18 +468,18 @@ def test_an_image_already_holding_an_enhancement_at_these_settings_is_not_enhanc
 
 
 def test_an_image_with_an_enhancement_at_these_settings_on_its_way_is_not_enhanced_again(
-        enhance, monkeypatch):
+        enhance, monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: {"input_image": "one.png"})
     jobs = FakeReroll(jobs=[FakeJob("run-0", input_image="one.png", state="queued")])
-    controller, _host = enhance(db=FakeDB([_image("i1")]), jobs=jobs)
+    controller, _host = enhance(db=stored([_image("i1")]), jobs=jobs)
 
     controller.enhance_items(["i1"])
 
     assert jobs.prepared == []
 
 
-def test_the_auto_tick_enhances_what_just_landed(enhance, monkeypatch):
+def test_the_auto_tick_enhances_what_just_landed(enhance, monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "rows_awaiting_enhancement",
                         lambda rows, everything: list(rows))
     monkeypatch.setattr(module.gallery, "enhance_params_for",
@@ -491,7 +488,7 @@ def test_the_auto_tick_enhances_what_just_landed(enhance, monkeypatch):
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
     monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
     jobs = FakeReroll()
-    controller, _host = enhance(db=FakeDB([_image("i1")]), jobs=jobs)
+    controller, _host = enhance(db=stored([_image("i1")]), jobs=jobs)
     controller.restore_settings(json.dumps({"auto": True}))
 
     controller.enhance_when_wanted(_image("i1"))
@@ -500,7 +497,7 @@ def test_the_auto_tick_enhances_what_just_landed(enhance, monkeypatch):
 
 
 def test_pressing_the_panels_enhance_enhances_what_the_bank_button_would(enhance,
-                                                                         monkeypatch):
+                                                                         monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "version_matching_settings",
                         lambda row, settings: None)
@@ -510,7 +507,7 @@ def test_pressing_the_panels_enhance_enhances_what_the_bank_button_would(enhance
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
     monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
     jobs = FakeReroll()
-    controller, _host = enhance(FakeHost(picked=["i1"]), db=FakeDB([_image("i1")]),
+    controller, _host = enhance(FakeHost(picked=["i1"]), db=stored([_image("i1")]),
                                 gallery_pane=FakeGalleryPane(["i1"]), jobs=jobs)
 
     controller.pane.enhance_requested.emit()
@@ -528,12 +525,12 @@ def test_with_the_auto_tick_off_a_landing_enhances_nothing(enhance):
 
 
 
-def test_an_edit_reaches_every_tab_and_re_aims_the_button(enhance):
+def test_an_edit_reaches_every_tab_and_re_aims_the_button(enhance, stored):
     tab = FakeGenerateTab()
     gallery_pane = FakeGalleryPane()
     parts = EnhanceParts(jobs=FakeReroll(), gallery_pane=gallery_pane,
                          slideshows=FakeSlideshows(), info_tabs_of=lambda: FakeTabs([tab]))
-    controller, host = _assembled(None, parts, None)
+    controller, host = _assembled(None, parts, stored())
 
     settings = gallery.EnhanceSettings()
     controller.pane.on_changed(settings)
@@ -554,10 +551,10 @@ def test_the_settings_survive_a_restart(enhance):
     assert controller.settings_json() == controller.settings.to_json()
 
 
-def test_the_panel_lists_the_presets_a_library_starts_with(enhance):
+def test_the_panel_lists_the_presets_a_library_starts_with(enhance, stored):
     enhanced = dict(_image("i1"), params_json=json.dumps({"enhance": True, "enhance_steps": 30}))
 
-    controller, _host = enhance(db=FakeDB([enhanced]))
+    controller, _host = enhance(db=stored([enhanced]))
 
     assert [preset.name for preset in controller.pane.presets] == ["2x · 30 steps · 0.15 redraw"]
 
@@ -597,9 +594,7 @@ def test_the_panel_greys_out_where_nothing_it_says_could_run(enhance, monkeypatc
     assert controller.pane.applicable == (False, NO_VIDEO_ENHANCER)
 
 
-def test_a_mixed_folder_keeps_its_settings_live(enhance, monkeypatch):
-    monkeypatch.setattr(module.gallery, "media_type_of_row",
-                        lambda row: row["media_type"])
+def test_a_mixed_folder_keeps_its_settings_live(enhance):
     rows = [_video("v1"), _image("i1")]
     controller, _host = enhance(FakeHost(picked=["v1", "i1"], rows=rows),
                                 gallery_pane=FakeGalleryPane(["v1", "i1"]))
@@ -638,11 +633,11 @@ def test_with_nothing_picked_the_panel_hears_the_folder_on_screen_is_in_front(en
 
 
 def test_every_live_job_is_searched_not_each_folders_leading_one(enhance,
-                                                                 monkeypatch):
+                                                                 monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, input_image, row: target == row["prompt_id"])
     jobs = [FakeJob("run-a"), FakeJob("run-b")]
-    db = FakeDB([_image("i1"), _image("i2")])
+    db = stored([_image("i1"), _image("i2")])
     _stamped_run(db, "run-a", "i1")
     _stamped_run(db, "run-b", "i2")
     controller, _host = enhance(db=db, jobs=FakeReroll(jobs))
@@ -664,7 +659,7 @@ def test_a_queued_job_shows_as_queued_rather_than_borrowing_a_frame(enhance,
 
 
 def test_the_tile_the_version_list_and_the_slideshow_all_learn_of_a_run(enhance,
-                                                                        monkeypatch):
+                                                                        monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
     monkeypatch.setattr(module.gallery, "describe_enhance_params",
@@ -674,7 +669,7 @@ def test_the_tile_the_version_list_and_the_slideshow_all_learn_of_a_run(enhance,
     gallery_pane, slideshows = FakeGalleryPane(), FakeSlideshows()
     parts = EnhanceParts(jobs=FakeReroll([FakeJob("run-a")]), gallery_pane=gallery_pane,
                          slideshows=slideshows, info_tabs_of=lambda: FakeTabs([tab]))
-    controller, _host = _assembled(FakeHost(rows=[row]), parts, None)
+    controller, _host = _assembled(FakeHost(rows=[row]), parts, stored())
 
     controller.reconcile()
 
@@ -700,19 +695,19 @@ def test_a_slideshow_hears_of_a_run_on_an_image_outside_the_open_folder(enhance)
         "on every image in the library, not only the open folder's")
 
 
-def test_a_run_from_before_the_stamp_is_matched_by_the_file_it_reads(enhance):
+def test_a_run_from_before_the_stamp_is_matched_by_the_file_it_reads(enhance, stored):
     read, other = _image("i1", files=("one.png",)), _image("i2", files=("two.png",))
-    db = FakeDB([read, other])
+    db = stored([read, other])
     controller, _host = enhance(db=db, jobs=FakeReroll([FakeJob("run-old", input_image="one.png")]))
 
     assert controller.run_of(read) is not None
     assert controller.run_of(other) is None
 
 
-def test_a_run_over_is_nobody_s_enhance_any_more(enhance, monkeypatch):
+def test_a_run_over_is_nobody_s_enhance_any_more(enhance, monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
-    db = FakeDB([_image("i1")])
+    db = stored([_image("i1")])
     _stamped_run(db, "run-a", "i1")
     jobs = FakeReroll([FakeJob("run-a")])
     controller, _host = enhance(db=db, jobs=jobs)
@@ -725,8 +720,8 @@ def test_a_run_over_is_nobody_s_enhance_any_more(enhance, monkeypatch):
     assert "run-a" not in controller._targets
 
 
-def test_a_runs_stamp_is_read_once_however_many_frames_stream_in(enhance):
-    db = FakeDB([_image("i1")])
+def test_a_runs_stamp_is_read_once_however_many_frames_stream_in(enhance, stored):
+    db = stored([_image("i1")])
     _stamped_run(db, "run-a", "i1")
     controller, _host = enhance(FakeHost(rows=[_image("i1")]), db=db,
                                 jobs=FakeReroll([FakeJob("run-a")]))
@@ -738,8 +733,8 @@ def test_a_runs_stamp_is_read_once_however_many_frames_stream_in(enhance):
         "frames stream in several times a second, so a run's stamp is read once and kept")
 
 
-def test_which_image_a_run_is_of_is_worked_out_once_while_the_runs_stay_the_same(enhance):
-    db = FakeDB([_image("i1"), _image("i2")])
+def test_which_image_a_run_is_of_is_worked_out_once_while_the_runs_stay_the_same(enhance, stored):
+    db = stored([_image("i1"), _image("i2")])
     _stamped_run(db, "run-a", "i1")
     host = FakeHost(rows=[_image("i1"), _image("i2")])
     controller, _host = enhance(host, db=db, jobs=FakeReroll([FakeJob("run-a")]))
@@ -752,8 +747,8 @@ def test_which_image_a_run_is_of_is_worked_out_once_while_the_runs_stay_the_same
         "worked out again only when the set of runs changes")
 
 
-def test_a_run_launched_again_on_the_same_image_is_read_afresh(enhance):
-    db = FakeDB([_image("i1")])
+def test_a_run_launched_again_on_the_same_image_is_read_afresh(enhance, stored):
+    db = stored([_image("i1")])
     _stamped_run(db, "run-a", "i1")
     _stamped_run(db, "run-b", "i1")
     jobs, gallery_pane = FakeReroll([FakeJob("run-a")]), FakeGalleryPane()
@@ -769,14 +764,14 @@ def test_a_run_launched_again_on_the_same_image_is_read_afresh(enhance):
         "again on the same image is read afresh rather than off the job that is gone")
 
 
-class _StampingDB(FakeDB):
-    def set_enhance_target(self, prompt_id, target):
-        super().set_enhance_target(prompt_id, target)
-        _stamped_run(self, prompt_id, target)
+class _StampingDB(SpiedDB):
+    def set_enhance_target(self, prompt_id, source_prompt_id):
+        super().set_enhance_target(prompt_id, source_prompt_id)
+        _stamped_run(self, prompt_id, source_prompt_id)
 
 
 def test_a_launch_records_its_image_though_the_line_was_read_before_the_stamp(enhance,
-                                                                               monkeypatch):
+                                                                               monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: {"input_image": "one.png", "seed": 1})
     monkeypatch.setattr(module.gallery, "settings_folder_key",
@@ -784,7 +779,7 @@ def test_a_launch_records_its_image_though_the_line_was_read_before_the_stamp(en
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
     monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
     first, second = _image("i1", files=("one.png",)), _image("i2", files=("one.png",))
-    db, jobs, gallery_pane = _StampingDB([first, second]), FakeReroll(), FakeGalleryPane()
+    db, jobs, gallery_pane = stored([first, second], kind=_StampingDB), FakeReroll(), FakeGalleryPane()
     controller, _host = enhance(FakeHost(rows=[first, second]), db=db, jobs=jobs,
                                 gallery_pane=gallery_pane)
     line_up = jobs.start_batch
@@ -843,10 +838,10 @@ def test_cancelling_with_nothing_in_flight_redraws_nothing(enhance):
 
 
 def test_a_spoken_enhance_refuses_an_image_that_already_has_one(enhance,
-                                                                monkeypatch):
+                                                                monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "is_enhanced_row", lambda row: True)
-    controller, _host = enhance(db=FakeDB([_image("i1")]))
+    controller, _host = enhance(db=stored([_image("i1")]))
 
     assert controller.enhance_it("i1") == (None, "this one is enhanced already", WARNING), (
         "spoken over a slideshow with no view of the Enhance pane, it must not make again, at "
@@ -854,16 +849,16 @@ def test_a_spoken_enhance_refuses_an_image_that_already_has_one(enhance,
 
 
 def test_a_spoken_enhance_over_a_clip_says_there_is_nothing_to_enhance(enhance,
-                                                                       monkeypatch):
+                                                                       monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: False)
-    controller, _host = enhance(db=FakeDB([_video("v1")]))
+    controller, _host = enhance(db=stored([_video("v1")]))
 
     assert controller.enhance_it("v1") == (
         None, "only a finished image can be enhanced", WARNING)
 
 
 def test_a_spoken_fix_names_the_parts_it_is_actually_redrawing(enhance,
-                                                               monkeypatch):
+                                                               monkeypatch, stored):
     class Part:
         def __init__(self, name):
             self.name = name
@@ -884,7 +879,7 @@ def test_a_spoken_fix_names_the_parts_it_is_actually_redrawing(enhance,
     monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
     monkeypatch.setattr(module, "name_parts",
                         lambda parts: ", ".join(p.name for p in parts))
-    controller, _host = enhance(db=FakeDB([_image("i1")]))
+    controller, _host = enhance(db=stored([_image("i1")]))
 
     prompt_id, message, kind = controller.fix_parts("i1", [hands, teeth])
 
@@ -893,12 +888,12 @@ def test_a_spoken_fix_names_the_parts_it_is_actually_redrawing(enhance,
     assert kind == INFO
 
 
-def test_a_fix_already_as_hard_as_it_goes_says_so(enhance, monkeypatch):
+def test_a_fix_already_as_hard_as_it_goes_says_so(enhance, monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "fix_params_for",
                         lambda row, parts, settings: {"enhance_detail_fixes": {"hands": 1.0}})
     monkeypatch.setattr(module.gallery, "version_matching_params", lambda row, params: 0)
-    controller, _host = enhance(db=FakeDB([_image("i1")]))
+    controller, _host = enhance(db=stored([_image("i1")]))
 
     assert controller.fix_parts("i1", [DetailPart("hands", ("hands",), ("hands",))]) == (
         None, "hands already fixed as hard as a fix goes", WARNING)
@@ -908,11 +903,11 @@ def test_a_fix_already_as_hard_as_it_goes_says_so(enhance, monkeypatch):
     (DetailPart("teeth", ("teeth",), ("teeth",)), "bbox"),
     (DetailPart("skin", ("skin",), ("skin",), outline=True), "segm"),
 ])
-def test_a_fix_with_no_detector_installed_says_which_one(enhance, monkeypatch, part, folder):
+def test_a_fix_with_no_detector_installed_says_which_one(enhance, monkeypatch, part, folder, stored):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "fix_params_for",
                         lambda row, parts, settings: None)
-    controller, _host = enhance(db=FakeDB([_image("i1")]))
+    controller, _host = enhance(db=stored([_image("i1")]))
 
     _prompt_id, message, kind = controller.fix_parts("i1", [part])
 
@@ -922,48 +917,48 @@ def test_a_fix_with_no_detector_installed_says_which_one(enhance, monkeypatch, p
 
 
 def test_a_spoken_enhance_over_an_image_that_has_one_in_flight_is_refused(enhance,
-                                                                        monkeypatch):
+                                                                        monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "is_enhanced_row", lambda row: False)
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: {"input_image": "one.png"})
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
-    controller, _host = enhance(db=FakeDB([_image("i1")]),
+    controller, _host = enhance(db=stored([_image("i1")]),
                                 jobs=FakeReroll([FakeJob("run-a")]))
 
     assert controller.enhance_it("i1") == (
         None, "an enhance of this image is already running", WARNING)
 
 
-def test_a_spoken_enhance_that_cannot_launch_says_so_as_an_error(enhance, monkeypatch):
+def test_a_spoken_enhance_that_cannot_launch_says_so_as_an_error(enhance, monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "is_enhanced_row", lambda row: False)
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: {"input_image": "one.png"})
     monkeypatch.setattr(module.gallery, "describe_enhance_params", lambda p: "enhance")
-    controller, _host = enhance(db=FakeDB([_image("i1")]))
+    controller, _host = enhance(db=stored([_image("i1")]))
     monkeypatch.setattr(controller, "_launch", lambda row, params: False)
 
     assert controller.enhance_it("i1") == (
         None, "couldn't launch the enhance — see the log", ERROR)
 
 
-def test_a_locked_slide_asking_for_one_gets_a_yes_or_no(enhance, monkeypatch):
+def test_a_locked_slide_asking_for_one_gets_a_yes_or_no(enhance, monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: False)
-    controller, _host = enhance(db=FakeDB([_image("i1")]))
+    controller, _host = enhance(db=stored([_image("i1")]))
 
     assert controller.enhance_from_slideshow("i1") is False, (
         "the decision is the gallery's rather than the slideshow's, because the gallery holds "
         "the versions, and a video has none to receive")
 
 
-def test_a_lock_puts_the_enhancement_of_the_locked_image_first(enhance, monkeypatch):
+def test_a_lock_puts_the_enhancement_of_the_locked_image_first(enhance, monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "is_enhanceable_row", lambda row: True)
     monkeypatch.setattr(module.gallery, "is_enhanced_row", lambda row: False)
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: {"input_image": "one.png"})
-    db = FakeDB([_image("i1"), _image("i2")])
+    db = stored([_image("i1"), _image("i2")])
     _stamped_run(db, "run-a", "i1")
     _stamped_run(db, "run-b", "i2")
     jobs = FakeReroll([FakeJob("run-b", state="queued"), FakeJob("run-a", state="queued")])
@@ -975,14 +970,14 @@ def test_a_lock_puts_the_enhancement_of_the_locked_image_first(enhance, monkeypa
 
 
 def test_an_enhancement_launched_for_what_a_slideshow_is_locked_on_is_put_first(enhance,
-                                                                                monkeypatch):
+                                                                                monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: {"input_image": "one.png"})
     monkeypatch.setattr(module.gallery, "settings_folder_key", lambda row, index: "k")
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
     monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
     jobs = FakeReroll()
-    controller, _host = enhance(FakeHost(rows=[_image("i1")]), db=FakeDB([_image("i1")]),
+    controller, _host = enhance(FakeHost(rows=[_image("i1")]), db=stored([_image("i1")]),
                                 jobs=jobs, slideshows=FakeSlideshows(locked={"i1"}))
 
     controller.enhance_items(["i1"])
@@ -1220,10 +1215,10 @@ def _launching_for_real(monkeypatch):
 
 
 def test_a_videos_start_image_is_enhanced_at_the_basic_settings_not_the_panes(
-        enhance, monkeypatch):
+        enhance, monkeypatch, stored):
     _launching_for_real(monkeypatch)
     jobs = FakeReroll()
-    controller, _host = enhance(db=FakeDB([_image("i1")]), jobs=jobs)
+    controller, _host = enhance(db=stored([_image("i1")]), jobs=jobs)
     _pane_set_to(controller, enhance_scale=3.0, enhance_steps=35, enhance_denoise=0.4,
                  enhance_detail_fixes={"hands": 0.3})
 
@@ -1233,20 +1228,20 @@ def test_a_videos_start_image_is_enhanced_at_the_basic_settings_not_the_panes(
 
 
 def test_a_lock_enhances_the_locked_image_at_the_basic_settings_not_the_panes(
-        enhance, monkeypatch):
+        enhance, monkeypatch, stored):
     _launching_for_real(monkeypatch)
     jobs = FakeReroll()
-    controller, _host = enhance(db=FakeDB([_image("i1")]), jobs=jobs)
+    controller, _host = enhance(db=stored([_image("i1")]), jobs=jobs)
     _pane_set_to(controller, enhance_scale=3.0, enhance_steps=35, enhance_denoise=0.4)
 
     assert controller.enhance_from_slideshow("i1") is True
     assert _basic_enhancement_was_asked_for(jobs)
 
 
-def test_a_spoken_enhance_still_takes_the_panes_settings(enhance, monkeypatch):
+def test_a_spoken_enhance_still_takes_the_panes_settings(enhance, monkeypatch, stored):
     _launching_for_real(monkeypatch)
     jobs = FakeReroll()
-    controller, _host = enhance(db=FakeDB([_image("i1")]), jobs=jobs)
+    controller, _host = enhance(db=stored([_image("i1")]), jobs=jobs)
     _pane_set_to(controller, enhance_steps=35)
 
     controller.enhance_it("i1")
@@ -1255,7 +1250,7 @@ def test_a_spoken_enhance_still_takes_the_panes_settings(enhance, monkeypatch):
     assert params["enhance_steps"] == 35
 
 
-def test_a_run_is_described_by_its_jobs_settings_not_the_panes(enhance, monkeypatch):
+def test_a_run_is_described_by_its_jobs_settings_not_the_panes(enhance, monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
     monkeypatch.setattr(module.gallery, "describe_enhance_params",
@@ -1267,7 +1262,7 @@ def test_a_run_is_described_by_its_jobs_settings_not_the_panes(enhance, monkeypa
     parts = EnhanceParts(jobs=FakeReroll([launched]),
                          gallery_pane=FakeGalleryPane(), slideshows=FakeSlideshows(),
                          info_tabs_of=lambda: FakeTabs([tab]))
-    controller, _host = _assembled(FakeHost(rows=[row]), parts, None)
+    controller, _host = _assembled(FakeHost(rows=[row]), parts, stored())
 
     controller.reconcile()
 
@@ -1276,7 +1271,7 @@ def test_a_run_is_described_by_its_jobs_settings_not_the_panes(enhance, monkeypa
         "are the only true word on what is being made")
 
 
-def test_a_generate_pane_built_after_the_controller_still_hears_of_a_run(enhance, monkeypatch):
+def test_a_generate_pane_built_after_the_controller_still_hears_of_a_run(enhance, monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
     monkeypatch.setattr(module.gallery, "describe_enhance_params", lambda params: "upscale x2")
@@ -1285,7 +1280,7 @@ def test_a_generate_pane_built_after_the_controller_still_hears_of_a_run(enhance
     parts = EnhanceParts(jobs=FakeReroll([FakeJob("run-a")]), gallery_pane=FakeGalleryPane(),
                          slideshows=FakeSlideshows(),
                          info_tabs_of=lambda: built_later[0] if built_later else FakeTabs())
-    controller, _host = _assembled(FakeHost(rows=[row]), parts, None)
+    controller, _host = _assembled(FakeHost(rows=[row]), parts, stored())
     tab = FakeGenerateTab(row)
     built_later.append(FakeTabs([tab]))
 
@@ -1296,7 +1291,7 @@ def test_a_generate_pane_built_after_the_controller_still_hears_of_a_run(enhance
         "for at each run rather than held from the start")
 
 
-def test_a_tiles_cancel_clears_the_generate_tabs_waiting_row(enhance, monkeypatch):
+def test_a_tiles_cancel_clears_the_generate_tabs_waiting_row(enhance, monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
     monkeypatch.setattr(module.gallery, "describe_enhance_params", lambda params: "upscale x2")
@@ -1306,7 +1301,7 @@ def test_a_tiles_cancel_clears_the_generate_tabs_waiting_row(enhance, monkeypatc
     jobs.cancel_job = lambda prompt_id: jobs.all_jobs.clear()
     parts = EnhanceParts(jobs=jobs, gallery_pane=FakeGalleryPane(),
                          slideshows=FakeSlideshows(), info_tabs_of=lambda: FakeTabs([tab]))
-    controller, _host = _assembled(FakeHost(rows=[row]), parts, None)
+    controller, _host = _assembled(FakeHost(rows=[row]), parts, stored())
     controller.reconcile()
     assert tab.pending == ("running", b"frame", "upscale x2")
 

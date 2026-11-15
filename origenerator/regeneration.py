@@ -6,8 +6,6 @@ from origenerator.one_look import once_a_look
 from origenerator.setting_advice import named_models, not_installed, spoken_list
 from origenerator.workflows import RETIRED_WORKFLOW_NAMES, workflow_named
 
-MADE_ELSEWHERE_TIP = "Another site made this — Origenerator can't remake it"
-
 
 def workflow_gone(workflow_name: str) -> str:
     retired = RETIRED_WORKFLOW_NAMES.get(workflow_name)
@@ -33,7 +31,7 @@ def why_it_cannot_be_made_again(row: dict, folders: ComfyFolders) -> str | None:
     if workflow is None:
         return f"{workflow_gone(workflow_name)}, so it can't be made again"
     if not workflow.generates_here:
-        return MADE_ELSEWHERE_TIP
+        return workflow.why_it_cannot_be_made_again
     params = filled_params(row, workflow)
     gone = [label for key, label in workflow.input_params
             if file_named_by(str(params.get(key) or "") or None, folders) is None]

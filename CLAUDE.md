@@ -437,6 +437,29 @@ folder of those names that a save created would read to its startup repair as
 every image having vanished from a folder that still holds files. Removing
 them is safe only once no checkout that old can be started.
 
+## The gallery holds the Non-AI videos too, where they are kept
+
+Origenerator's gallery is to hold every Haglio video and image, the ones no
+model made included (his decision, 2026-11-15, which replaced his July rule that
+Origenerator never reaches into Evolver). The first step is in:
+`non_ai_videos.scan` writes an item for each video under the library's
+`videosideosD
+on_AI` (`config.NON_AI_DIR`), which is the folder Kino plays
+them from, and moves no file. The item's source is `non_ai`
+(`GenerationSource.NON_AI`), which app_support's `made_here` answers no for, and
+its workflow is `non-ai:` and the first two folders it sits under
+(`workflows/non_ai.py`), so the TOC shows one folder per pair, marked N where a
+workflow's is marked W and a site's S. A Non-AI folder holds its leaf folders
+directly, with no Model or LoRA folder between, one leaf per folder on disk, and
+a Non-AI video's one setting is that folder. The command Evolver runs for a
+Site's videos (`outside_video_entries`) brings these in too.
+
+A copy of this app older than that step never sees these items: every listing
+asks only for sources it knows. Deleting one here takes its item and thumbnail
+and leaves the video where Kino plays it; one Trash for both is a later step, as
+are its favorite, its links to the videos cut from it, and playing it on the Main
+Funestra from a Fun Time session.
+
 ## A video's filename is not the video
 
 A finished video is numbered after the highest number in the folder it is filed

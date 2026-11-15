@@ -12,6 +12,7 @@ from PySide6.QtGui import (
     QKeyEvent,
 )
 from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication
 
 from origenerator import (
     gallery,
@@ -1639,4 +1640,47 @@ def test_enter_in_a_slideshow_on_its_own_monitor_picks_its_item_in_core_and_play
     QTest.keyClick(slideshow.shown, Qt.Key.Key_Return)
 
     assert (slideshow.is_showing(), view.selected_generation()) == (True, playing)
+    slideshow.close()
+
+
+def _core_beside_its_slideshow(qtbot, monkeypatch):
+    monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)
+    _resolve_by_id(monkeypatch)
+    view = GalleryView(FakeDB([_image(f"i{n}", "a cat", 50, n) for n in (1, 2, 3)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view.show()
+    view._two_screens.core_is_up.emit()
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow.shown)
+    monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
+    steps = []
+    monkeypatch.setattr(slideshow, "slideshow_step", steps.append)
+    return view, slideshow, steps
+
+
+def _arrow_pressed_in_core(view, key=Qt.Key.Key_Right) -> bool:
+    return view.keys.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, key,
+                                            Qt.KeyboardModifier.NoModifier))
+
+
+def test_an_arrow_pressed_in_core_steps_the_slideshow_on_the_other_monitor(qtbot, monkeypatch):
+    view, slideshow, steps = _core_beside_its_slideshow(qtbot, monkeypatch)
+
+    taken = _arrow_pressed_in_core(view)
+
+    assert (taken, steps) == (True, [1])
+    slideshow.close()
+
+
+def test_an_arrow_pressed_in_a_text_field_of_cores_stays_in_the_field(qtbot, monkeypatch):
+    view, slideshow, steps = _core_beside_its_slideshow(qtbot, monkeypatch)
+    view.activateWindow()
+    view._search.field.setFocus()
+    qtbot.waitUntil(lambda: QApplication.focusWidget() is view._search.field)
+
+    taken = _arrow_pressed_in_core(view)
+
+    assert (taken, steps) == (False, [])
     slideshow.close()

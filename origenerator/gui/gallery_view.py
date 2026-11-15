@@ -317,7 +317,8 @@ class GalleryView(QWidget):
                 undo=self._undo, redo=self._redo, open_find=self._open_find,
                 pause_or_play=self._slideshows.pause_or_play_the_room,
                 open_the_tabs_slideshow=self._open_the_tabs_slideshow,
-                motion_key=self._motion_key))
+                motion_key=self._motion_key,
+                slideshows_key=self._slideshows.take_key))
         self.keys.intercept(True)
 
         self._poll_inflight = False

@@ -447,3 +447,21 @@ def test_a_database_that_carried_branch_curation_loses_the_table(tmp_path):
     with sqlite3.connect(path) as conn:
         tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert "branch_curation" not in tables
+
+
+def test_a_day_another_site_gave_comes_back_a_day_and_a_midnight_made_here_stays(tmp_path):
+    path = tmp_path / "test.db"
+    Database(path).insert_rows([
+        {"prompt_id": "from-a-site", "source": "outside", "workflow_name": "outside", "workflow_version": "v001", "params_json": "{}", "workflow_json": "{}",
+         "created_at": "2025-03-02 00:00:00"},
+        {"prompt_id": "its-frame", "source": "starting_frame", "workflow_name": "outside", "workflow_version": "v001", "params_json": "{}", "workflow_json": "{}",
+         "created_at": "2025-03-01 00:00:00"},
+        {"prompt_id": "made-here", "source": "generated", "workflow_name": "sdxl_t2i", "workflow_version": "v001", "params_json": "{}", "workflow_json": "{}",
+         "created_at": "2025-03-03 00:00:00"}])
+
+    Database(path)
+
+    with closing(sqlite3.connect(path)) as conn:
+        assert dict(conn.execute("SELECT prompt_id, created_at FROM generations")) == {
+            "from-a-site": "2025-03-02", "its-frame": "2025-03-01",
+            "made-here": "2025-03-03 00:00:00"}

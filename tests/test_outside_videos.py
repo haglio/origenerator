@@ -173,7 +173,7 @@ _IMAGE_PARAMS = {"positive_prompt": "a quiet shore", "negative_prompt": "rain", 
                    "aspect_ratio": "9:16", "quality": "Medium", "creativity": "High"}
 
 
-def test_a_video_and_the_image_it_was_made_from_come_in_with_all_their_record_says(tmp_path):
+def test_a_video_and_the_image_it_was_made_from_come_in_with_all_their_record_says_a_day_alone_kept_a_day(tmp_path):
     db, _video = _bring_in(tmp_path, Record(
         video=Made(_VIDEO_PARAMS, created="2025-03-02"),
         image=Made(_IMAGE_PARAMS, created="2025-03-01"), action="Wave"))
@@ -183,10 +183,10 @@ def test_a_video_and_the_image_it_was_made_from_come_in_with_all_their_record_sa
     assert {key: value for key, value in json.loads(shown["params_json"]).items()
             if key != "input_image"} == _VIDEO_PARAMS
     assert (shown["positive_prompt"], shown["seed"], shown["action"],
-            shown["created_at"]) == ("a slow walk on the shore", 11, "Wave", "2025-03-02 00:00:00")
+            shown["created_at"]) == ("a slow walk on the shore", 11, "Wave", "2025-03-02")
     assert json.loads(image["params_json"]) == _IMAGE_PARAMS
     assert (image["positive_prompt"], image["negative_prompt"], image["seed"],
-            image["created_at"]) == ("a quiet shore", "rain", 22, "2025-03-01 00:00:00")
+            image["created_at"]) == ("a quiet shore", "rain", 22, "2025-03-01")
 
 
 def test_a_video_made_from_words_alone_keeps_its_starting_frame_out_of_the_toc(tmp_path):
@@ -648,6 +648,14 @@ def test_a_family_animated_with_two_models_is_a_folder_of_its_own_under_each(tmp
     assert len({settings_folder_key(row) for row in _videos(db)}) == 2
 
 
+def test_a_time_another_site_gives_in_its_own_zone_is_kept_in_utc(tmp_path):
+    db, _video = _bring_in(tmp_path, Record(
+        video=Made(_VIDEO_PARAMS, created="2025-03-02T10:00:00-08:00"), action="Wave"))
+
+    [shown] = _videos(db)
+    assert shown["created_at"] == "2025-03-02 18:00:00"
+
+
 def test_videos_from_other_sites_are_on_latest_by_when_they_came_not_when_they_were_made(tmp_path):
     db, places = Database(tmp_path / "test.db"), _places(tmp_path)
     for name, made, filed in (("c1_topaz.mp4", "2025-01-01", 1_790_000_000),
@@ -661,7 +669,7 @@ def test_videos_from_other_sites_are_on_latest_by_when_they_came_not_when_they_w
              if media_type_of_row(row) == MediaType.VIDEO]
     assert [json.loads(row["output_files"])[0]["filename"] for row in shown] == [
         "c1_topaz.mp4", "c2_topaz.mp4"]
-    assert [row["created_at"] for row in shown] == ["2025-01-01 00:00:00", "2025-06-01 00:00:00"]
+    assert [row["created_at"] for row in shown] == ["2025-01-01", "2025-06-01"]
 
 
 def test_a_record_brings_a_video_already_brought_in_up_to_it(tmp_path):
@@ -674,7 +682,7 @@ def test_a_record_brings_a_video_already_brought_in_up_to_it(tmp_path):
     [shown] = _videos(db)
     image = _frame_of(db, shown)
     assert (shown["positive_prompt"], shown["seed"], shown["action"],
-            shown["created_at"]) == ("a slow walk on the shore", 11, "Wave", "2025-03-02 00:00:00")
+            shown["created_at"]) == ("a slow walk on the shore", 11, "Wave", "2025-03-02")
     assert (image["source"], image["positive_prompt"], image["seed"]) == (
         GenerationSource.OUTSIDE, "a quiet shore", 22)
 

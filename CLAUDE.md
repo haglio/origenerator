@@ -270,7 +270,9 @@ its title (`model_titles.model_title`): the name its page on Civitai or Hugging
 Face gives it, tidied, with the version where two files would otherwise read
 alike. A model's title then shows its size, full or half, read from inside the
 file, and never which pass of WAN's pair it is for, since the dropdown's label
-says so (his decision, 2026-11-10). A title that says what its model makes from what --
+says so (his decision, 2026-11-10). A LoRA's title is the other way round:
+its parentheses say only which pass it is for, High or Low, and any other
+note a title writes there shows outside them (his rule, 2026-11-14). A title that says what its model makes from what --
 T2I, I2V, T2V and the like -- shows that first (`what_from_what.kind_first`),
 as every workflow's name does, so the TOC's alphabetical order groups them (his
 rule, 2026-11-12); a title is still written down as its page gives it. Its tooltip says what the model is, from

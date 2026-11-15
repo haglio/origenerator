@@ -105,7 +105,7 @@ from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import _struck_and_lit
 from tests.marked_words import words_shown
 from tests.qt_exec import faking_exec
-from tests.real_db import database_in
+from tests.real_db import database_in, kept_on_disk
 from tests.related_links import settings_tile, source_tile
 from tests.text_readers import clap_reader, clip_reader, word_reader, word_reading
 from tests.thumbnail_rows import looping_video, painted_row, where_the_thumbnail_is
@@ -1300,13 +1300,13 @@ def test_recent_matching_row_finds_only_the_folders_own(qtbot, tmp_path):
     assert tab._recent_matching_row()["prompt_id"] == "wiz"
 
 
-def test_prefill_shows_the_recent_match_in_the_preview(qtbot, tmp_path, monkeypatch):
+def test_prefill_shows_the_recent_match_in_the_preview(qtbot, tmp_path, monkeypatch, kept):
     db = Database(tmp_path / "t.db")
     db.insert_generation(NewGeneration(
         prompt_id="g1", workflow_name="sdxl_t2i", workflow_version=_SDXL_VERSION,
         positive_prompt="a wizard", params_json=json.dumps(_wiz_params()), workflow_json="{}",
     ))
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("wiz.png", "image"))
+    kept(db, db.get_generation("g1"), tmp_path / "wiz.png")
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
     shown = []
@@ -1315,7 +1315,7 @@ def test_prefill_shows_the_recent_match_in_the_preview(qtbot, tmp_path, monkeypa
 
     tab.prefill("sdxl_t2i", _wiz_params())
 
-    assert shown[-1] == ("wiz.png", "image", "g1")
+    assert shown[-1] == (tmp_path / "wiz.png", "image", "g1")
 
 
 def test_idle_panel_with_no_matching_generation_stays_blank(qtbot, tmp_path):
@@ -1326,13 +1326,13 @@ def test_idle_panel_with_no_matching_generation_stays_blank(qtbot, tmp_path):
     assert tab._viewport._generation is None
 
 
-def test_autoshowing_a_recent_result_arms_the_preview_drag(qtbot, tmp_path, monkeypatch):
+def test_autoshowing_a_recent_result_arms_the_preview_drag(qtbot, tmp_path, kept):
     db = Database(tmp_path / "t.db")
     db.insert_generation(NewGeneration(
         prompt_id="g1", workflow_name="sdxl_t2i", workflow_version=_SDXL_VERSION,
         positive_prompt="a wizard", params_json=json.dumps(_wiz_params()), workflow_json="{}",
     ))
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("wiz.png", "image"))
+    kept(db, db.get_generation("g1"), tmp_path / "wiz.png")
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
     tab.prefill("sdxl_t2i", _wiz_params())
@@ -1341,13 +1341,13 @@ def test_autoshowing_a_recent_result_arms_the_preview_drag(qtbot, tmp_path, monk
 
 
 def test_an_image_the_tab_puts_up_itself_is_announced_like_a_clicked_one(
-        qtbot, tmp_path, monkeypatch):
+        qtbot, tmp_path, kept):
     db = Database(tmp_path / "t.db")
     db.insert_generation(NewGeneration(
         prompt_id="g1", workflow_name="sdxl_t2i", workflow_version=_SDXL_VERSION,
         positive_prompt="a wizard", params_json=json.dumps(_wiz_params()), workflow_json="{}",
     ))
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("wiz.png", "image"))
+    kept(db, db.get_generation("g1"), tmp_path / "wiz.png")
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
     announced = []
@@ -1703,6 +1703,15 @@ def _video_row(db, prompt_id="vid1", input_image=None, *, workflow_name="wan22_i
     db.update_generation(prompt_id, status="completed",
                          output_files=json.dumps([{"filename": f"{prompt_id}.mp4", "subfolder": "video"}]))
     return db.get_generation(prompt_id)
+
+
+@pytest.fixture
+def kept(tmp_path):
+    def keep(db, row, path=None):
+        files = json.loads(row.get("output_files") or "[]")
+        named = files[0]["filename"] if files else f"{row['prompt_id']}.png"
+        return kept_on_disk(db, row, path or tmp_path / "kept" / named)
+    return keep
 
 
 @pytest.fixture
@@ -2152,19 +2161,18 @@ def _version_texts(tab):
             for lbl in tab._versions.findChildren(QLabel)]
 
 
-def test_showing_a_saved_generation_arms_the_preview_drag(saved_panel, monkeypatch):
+def test_showing_a_saved_generation_arms_the_preview_drag(saved_panel, kept, tmp_path):
     tab, db = saved_panel
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("img1.png", "image"))
-    image = _image_row(db, "img1")
+    image = kept(db, _image_row(db, "img1"))
 
     tab.show_saved_generation(image, [image])
 
-    assert tab._viewport.show_media.call_args.args == ("img1.png", "image", "img1")
+    assert tab._viewport.show_media.call_args.args == (
+        tmp_path / "kept" / "sdxl_img1.png", "image", "img1")
 
 
-def test_a_generation_with_no_file_leaves_the_preview_undraggable(saved_panel, monkeypatch):
+def test_a_generation_with_no_file_leaves_the_preview_undraggable(saved_panel):
     tab, db = saved_panel
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: None)
     image = _image_row(db, "img1")
 
     tab.show_saved_generation(image, [image])
@@ -2242,7 +2250,7 @@ def test_a_video_whose_start_image_is_in_the_trash_still_shows_its_source(saved_
     assert source_tile(tab._related)._prompt_id == "img1"
 
 
-def test_showing_an_image_lists_the_videos_it_was_animated_into(saved_panel, monkeypatch):
+def test_showing_an_image_lists_the_videos_it_was_animated_into(saved_panel):
     tab, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
     _video_row(db, "vid1", input_image="sdxl_img1.png")
@@ -2257,7 +2265,7 @@ def test_showing_an_image_lists_the_videos_it_was_animated_into(saved_panel, mon
     assert tab._displayed_row is image
 
 
-def test_a_click_on_an_image_s_animation_is_a_link_clicked(saved_panel, monkeypatch):
+def test_a_click_on_an_image_s_animation_is_a_link_clicked(saved_panel):
     tab, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
     _video_row(db, "vid1", input_image="sdxl_img1.png")
@@ -2270,15 +2278,13 @@ def test_a_click_on_an_image_s_animation_is_a_link_clicked(saved_panel, monkeypa
     assert got == ["vid1"]
 
 
-def test_showing_a_video_reveals_evolver_and_source_tile(saved_panel, monkeypatch):
+def test_showing_a_video_reveals_evolver_and_source_tile(saved_panel, kept):
     tab, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
     video = _video_row(db, "vid1", input_image="sdxl_img1.png")
     name = _named(tab, image)
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
 
-    tab.show_saved_generation(video, [image])
+    tab.show_saved_generation(kept(db, video), [image])
 
     assert not tab._lane_button.isHidden()
     assert not source_tile(tab._related).isHidden()
@@ -2288,7 +2294,7 @@ def test_showing_a_video_reveals_evolver_and_source_tile(saved_panel, monkeypatc
             if not tile.isHidden()] == ["Animated from"]
 
 
-def test_a_video_from_another_source_is_never_offered_to_evolver(saved_panel, monkeypatch,
+def test_a_video_from_another_source_is_never_offered_to_evolver(saved_panel,
                                                                     tmp_path):
     tab, db = saved_panel
     file = tmp_path / "outbox" / "portrait" / "a-site" / "c1_topaz.mp4"
@@ -2299,7 +2305,6 @@ def test_a_video_from_another_source_is_never_offered_to_evolver(saved_panel, mo
         grab=lambda _path: Image.new("RGB", (64, 96))))
     [video] = [row for row in db.list_generations()
                if gallery_media_type(row) == MediaType.VIDEO]
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (file, "video"))
 
     tab.show_saved_generation(video, [])
 
@@ -2308,13 +2313,11 @@ def test_a_video_from_another_source_is_never_offered_to_evolver(saved_panel, mo
     assert tab._sent_row.isHidden()
 
 
-def test_a_click_on_a_video_s_start_frame_is_a_link_clicked(saved_panel, monkeypatch):
+def test_a_click_on_a_video_s_start_frame_is_a_link_clicked(saved_panel, kept):
     tab, db = saved_panel
     image = _image_row(db, "img1", filename="sdxl_img1.png")
     video = _video_row(db, "vid1", input_image="sdxl_img1.png")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
-    tab.show_saved_generation(video, [image])
+    tab.show_saved_generation(kept(db, video), [image])
     got = []
     tab.link_clicked.connect(appending_to(got))
 
@@ -2323,13 +2326,11 @@ def test_a_click_on_a_video_s_start_frame_is_a_link_clicked(saved_panel, monkeyp
     assert got == ["img1"]
 
 
-def test_video_without_a_known_source_hides_the_link(saved_panel, monkeypatch):
+def test_video_without_a_known_source_hides_the_link(saved_panel, kept):
     tab, db = saved_panel
     video = _video_row(db, "vid1", input_image="hand_placed.png")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
 
-    tab.show_saved_generation(video, [])
+    tab.show_saved_generation(kept(db, video), [])
 
     assert source_tile(tab._related).isHidden()
     assert not tab._lane_button.isHidden()
@@ -2344,20 +2345,19 @@ def _script_for(video_path, output_dir=None):
 
 
 def test_osr2_drive_target_gives_path_player_and_actions_for_a_scripted_video(
-    saved_panel, monkeypatch, tmp_path
-):
+    saved_panel, tmp_path
+, kept):
     tab, db = saved_panel
     video = _video_row(db, "vid1", input_image="hand.png")
     vpath = tmp_path / "vid1.mp4"
     vpath.write_bytes(b"v")
     actions = _script_for(vpath)
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (vpath, "video"))
-    tab.show_saved_generation(video, [])
+    tab.show_saved_generation(kept(db, video, vpath), [])
 
     assert tab.osr2_drive_target() == (vpath, tab._viewport.player(), actions)
 
 
-def test_osr2_drive_target_reads_the_scripts_folder(saved_panel, monkeypatch, tmp_path):
+def test_osr2_drive_target_reads_the_scripts_folder(saved_panel, monkeypatch, tmp_path, kept):
     tab, db = saved_panel
     video = _video_row(db, "vid1", input_image="hand.png")
     vpath = tmp_path / "video" / "vid1.mp4"
@@ -2365,27 +2365,25 @@ def test_osr2_drive_target_reads_the_scripts_folder(saved_panel, monkeypatch, tm
     vpath.write_bytes(b"v")
     monkeypatch.setattr(osr2_driver, "OUTPUT_PLACES", OutputPlaces.in_one_folder(tmp_path))
     actions = _script_for(vpath, output_dir=tmp_path)
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (vpath, "video"))
-    tab.show_saved_generation(video, [])
+    tab.show_saved_generation(kept(db, video, vpath), [])
 
     assert tab.osr2_drive_target() == (vpath, tab._viewport.player(), actions)
 
 
-def test_osr2_drive_target_is_none_for_a_video_without_a_funscript(saved_panel, monkeypatch, tmp_path):
+def test_osr2_drive_target_is_none_for_a_video_without_a_funscript(saved_panel, tmp_path, kept):
     tab, db = saved_panel
     video = _video_row(db, "vid1", input_image="hand.png")
     vpath = tmp_path / "vid1.mp4"
     vpath.write_bytes(b"v")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (vpath, "video"))
-    tab.show_saved_generation(video, [])
+    tab.show_saved_generation(kept(db, video, vpath), [])
 
     assert tab.osr2_drive_target() is None
 
 
-def test_osr2_drive_target_is_none_for_an_image(saved_panel, monkeypatch):
+def test_osr2_drive_target_is_none_for_an_image(saved_panel, kept):
     tab, db = saved_panel
     image = _image_row(db, "img1", filename="i.png")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (Path("C:/i.png"), "image"))
+    image = kept(db, image)
     tab.show_saved_generation(image, [image])
 
     assert tab.osr2_drive_target() is None
@@ -2398,22 +2396,22 @@ def test_osr2_drive_target_follows_an_idle_autoshow_not_just_a_selection(
     vpath = tmp_path / "auto.mp4"
     vpath.write_bytes(b"v")
     actions = _script_for(vpath)
-    monkeypatch.setattr(tab, "_recent_matching_row",
-                        lambda: {"prompt_id": "v", "workflow_name": "wan22_i2v"})
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (vpath, "video"))
+    monkeypatch.setattr(tab, "_recent_matching_row", lambda: {
+        "prompt_id": "v", "workflow_name": "wan22_i2v",
+        "output_files": json.dumps([{"filename": vpath.name, "path": str(vpath)}])})
 
     tab.show_recent_preview()
 
     assert tab.osr2_drive_target() == (vpath, tab._viewport.player(), actions)
 
 
-def test_showing_a_generation_emits_displayed_changed(saved_panel, monkeypatch, tmp_path):
+def test_showing_a_generation_emits_displayed_changed(saved_panel, tmp_path, kept):
     tab, db = saved_panel
     video = _video_row(db, "vid1", input_image="hand.png")
     vpath = tmp_path / "vid1.mp4"
     vpath.write_bytes(b"v")
     _script_for(vpath)
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (vpath, "video"))
+    video = kept(db, video, vpath)
     fired = []
     tab.displayed_changed.connect(lambda: fired.append(True))
 
@@ -2421,13 +2419,11 @@ def test_showing_a_generation_emits_displayed_changed(saved_panel, monkeypatch, 
     assert fired == [True]
 
 
-def test_showing_a_video_seeds_the_form_with_its_params(saved_panel, monkeypatch):
+def test_showing_a_video_seeds_the_form_with_its_params(saved_panel, kept):
     tab, db = saved_panel
     video = _video_row(db, "vid1", input_image="sdxl_img1.png")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
 
-    tab.show_saved_generation(video, [])
+    tab.show_saved_generation(kept(db, video), [])
 
     assert tab._workflow_dropdown.currentData() == "wan22_i2v"
     assert tab._param_form.get_values()["positive_prompt"] == "dance"
@@ -2456,7 +2452,7 @@ def test_a_seed_pinned_while_the_run_was_in_flight_stays_pinned_when_it_lands(sa
     assert tab._param_form.get_values()["seed"] == 99
 
 
-def test_showing_an_unregistered_generation_still_shows_preview_and_footer(saved_panel, monkeypatch):
+def test_showing_an_unregistered_generation_still_shows_preview_and_footer(saved_panel, kept):
     tab, db = saved_panel
     db.insert_generation(NewGeneration(
         prompt_id="u1", workflow_name="unknown", workflow_version="imported",
@@ -2464,9 +2460,7 @@ def test_showing_an_unregistered_generation_still_shows_preview_and_footer(saved
     ))
     db.update_generation("u1", status="completed",
                          output_files=json.dumps([{"filename": "u1.mp4", "subfolder": "video"}]))
-    row = db.get_generation("u1")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda r, out: (Path("C:/out/u1.mp4"), "video"))
+    row = kept(db, db.get_generation("u1"))
 
     tab.show_saved_generation(row, [])
 
@@ -2474,15 +2468,13 @@ def test_showing_an_unregistered_generation_still_shows_preview_and_footer(saved
     assert tab._displayed_row is row
 
 
-def test_showing_a_saved_generation_shows_its_preview_over_the_autoshow(saved_panel, monkeypatch):
+def test_showing_a_saved_generation_shows_its_preview_over_the_autoshow(saved_panel, kept, tmp_path):
     tab, db = saved_panel
     video = _video_row(db, "vid1")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
 
-    tab.show_saved_generation(video, [])
+    tab.show_saved_generation(kept(db, video), [])
 
-    assert tab._viewport.show_media.call_args.args == (Path("C:/out/vid1.mp4"), "video",
+    assert tab._viewport.show_media.call_args.args == (tmp_path / "kept" / "vid1.mp4", "video",
                                                          "vid1")
 
 
@@ -3093,8 +3085,8 @@ def test_a_tab_with_nothing_on_display_is_never_marked(tab):
 def _resting_on(tab, image, monkeypatch, tmp_path):
     ipath = tmp_path / "sdxl_img1.png"
     ipath.write_bytes(b"p")
-    monkeypatch.setattr(tab, "_recent_matching_row", lambda: image)
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (ipath, "image"))
+    monkeypatch.setattr(tab, "_recent_matching_row", lambda: {
+        **image, "output_files": json.dumps([{"filename": ipath.name, "path": str(ipath)}])})
     tab.show_recent_preview()
 
 
@@ -3869,12 +3861,10 @@ def test_the_tab_is_named_after_the_folder_it_asks_about(modify_batch_tab):
 
 
 def test_a_modify_batch_tab_offers_no_corners_over_its_wall_of_images(
-        saved_panel, tmp_path, monkeypatch):
+        saved_panel, tmp_path, kept):
     tab, db = saved_panel
     image = _image_row(db, "img1")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/img1.png"), "image"))
-    tab.show_saved_generation(image, [image])
+    tab.show_saved_generation(kept(db, image), [image])
     assert tab._viewport._actions_id == "img1"
     fired = []
     tab.item_action_requested.connect(lambda pid, action: fired.append(pid))
@@ -4059,12 +4049,10 @@ def _lane_offers(tab):
                                                  ("wan22_i2v", "→ Send to Kino"),
                                                  ("unknown", "→ Send to Kino")])
 def test_a_loop_is_offered_to_genau_and_any_other_video_to_kino_alone(
-        saved_panel, monkeypatch, workflow, offer):
+        saved_panel, workflow, offer, kept):
     tab, db = saved_panel
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
 
-    tab.show_saved_generation(_video_row(db, "vid1", workflow_name=workflow), [])
+    tab.show_saved_generation(kept(db, _video_row(db, "vid1", workflow_name=workflow)), [])
 
     assert _lane_offers(tab) == [offer]
 
@@ -4082,13 +4070,11 @@ def _press(tab, caption):
 
 
 def test_a_loop_already_sent_to_kino_offers_that_copy_back_before_genau(saved_panel,
-                                                                         monkeypatch):
+                                                                         kept):
     tab, db = saved_panel
     _video_row(db, "vid1", workflow_name=_LOOP)
     db.mark_evolver_exported("vid1")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
-    tab.show_saved_generation(db.get_generation("vid1"), [])
+    tab.show_saved_generation(kept(db, db.get_generation("vid1")), [])
     assert _lane_offers(tab) == ["✓ Sent to Kino"]
 
     _press(tab, "Unsend")
@@ -4097,14 +4083,12 @@ def test_a_loop_already_sent_to_kino_offers_that_copy_back_before_genau(saved_pa
 
 
 def test_a_loop_in_both_lanes_offers_its_kino_copy_back_and_then_its_genau_one(
-        saved_panel, monkeypatch):
+        saved_panel, kept):
     tab, db = saved_panel
     _video_row(db, "vid1", workflow_name=_LOOP)
     db.mark_evolver_exported("vid1")
     db.mark_genau_exported("vid1")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
-    tab.show_saved_generation(db.get_generation("vid1"), [])
+    tab.show_saved_generation(kept(db, db.get_generation("vid1")), [])
     assert _lane_offers(tab) == ["✓ Sent to Kino"]
 
     _press(tab, "Unsend")
@@ -4119,32 +4103,26 @@ def test_a_fresh_tab_offers_no_lane_at_all(saved_panel):
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_lane_offers_itself_for_a_video_and_not_for_an_image(saved_panel,
-                                                               monkeypatch, lane):
+                                                               lane, kept):
     tab, db = saved_panel
 
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
-    tab.show_saved_generation(_lane_video(db, lane), [])
+    tab.show_saved_generation(kept(db, _lane_video(db, lane)), [])
     assert _lane_offers(tab) == [lane.send_caption]
 
     image = _image_row(db, "img1")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/img1.png"), "image"))
-    tab.show_saved_generation(image, [image])
+    tab.show_saved_generation(kept(db, image), [image])
     assert _lane_offers(tab) == []
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_lane_copies_the_clip_into_its_own_folder_and_remembers_the_send(
-        saved_panel, monkeypatch, lane):
+        saved_panel, monkeypatch, lane, tmp_path, kept):
     tab, db = saved_panel
-    video_path = Path("C:/out/vid1.mp4")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (video_path, "video"))
+    video_path = tmp_path / "kept" / "vid1.mp4"
     export = MagicMock(return_value=EVOLVER_INBOX_DIR / lane.source / "vid1.mp4")
     monkeypatch.setattr(evolver_export, "export_video", export)
 
-    tab.show_saved_generation(_lane_video(db, lane), [])
+    tab.show_saved_generation(kept(db, _lane_video(db, lane)), [])
     _press(tab, lane.send_caption)
 
     export.assert_called_once_with(video_path, EVOLVER_INBOX_DIR / lane.source,
@@ -4158,18 +4136,16 @@ def test_a_lane_copies_the_clip_into_its_own_folder_and_remembers_the_send(
                           (export_lane_module.GENAU, False)],
                          ids=lambda value: getattr(value, "name", value))
 def test_the_library_lane_sends_a_clip_with_its_funscript_and_the_genau_lane_alone(
-        saved_panel, monkeypatch, lane, brings_its_funscript):
+        saved_panel, monkeypatch, lane, brings_its_funscript, tmp_path, kept):
     tab, db = saved_panel
-    video_path = Path("C:/out/vid1.mp4")
+    video_path = tmp_path / "kept" / "vid1.mp4"
     funscript = Path("C:/out/funscript/vid1.funscript")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (video_path, "video"))
     monkeypatch.setattr(export_lane_module, "funscript_of",
                         lambda video, places: funscript if video == video_path else None)
     export = MagicMock(return_value=EVOLVER_INBOX_DIR / lane.source / "vid1.mp4")
     monkeypatch.setattr(evolver_export, "export_video", export)
 
-    tab.show_saved_generation(_lane_video(db, lane), [])
+    tab.show_saved_generation(kept(db, _lane_video(db, lane)), [])
     _press(tab, lane.send_caption)
 
     export.assert_called_once_with(video_path, EVOLVER_INBOX_DIR / lane.source,
@@ -4178,7 +4154,7 @@ def test_the_library_lane_sends_a_clip_with_its_funscript_and_the_genau_lane_alo
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_lane_lands_the_clip_in_the_inbox_this_panel_was_handed(
-        qtbot, tmp_path, monkeypatch, lane):
+        qtbot, tmp_path, lane, kept):
     db = Database(tmp_path / "t.db")
     inbox = tmp_path / "somebody elses inbox"
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db,
@@ -4187,9 +4163,8 @@ def test_a_lane_lands_the_clip_in_the_inbox_this_panel_was_handed(
     tab._viewport.show_media = MagicMock()
     video = tmp_path / "vid1.mp4"
     video.write_bytes(b"pixels")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (video, "video"))
 
-    tab.show_saved_generation(_lane_video(db, lane), [])
+    tab.show_saved_generation(kept(db, _lane_video(db, lane), video), [])
     _press(tab, lane.send_caption)
 
     assert (inbox / lane.source / "vid1.mp4").read_bytes() == b"pixels"
@@ -4203,7 +4178,6 @@ def test_a_clip_sent_to_evolver_arrives_with_the_funscript_this_app_made_for_it(
     video.write_bytes(b"pixels")
     write_funscript(funscript_path_for(video, places=OutputPlaces.in_one_folder(output)), [{"at": 0, "pos": 0}])
     monkeypatch.setattr(generate_tab_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (video, "video"))
     db = Database(tmp_path / "t.db")
     inbox = tmp_path / "0_inbox"
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db,
@@ -4219,16 +4193,14 @@ def test_a_clip_sent_to_evolver_arrives_with_the_funscript_this_app_made_for_it(
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
-def test_a_lane_does_not_send_the_same_clip_twice(saved_panel, monkeypatch, lane):
+def test_a_lane_does_not_send_the_same_clip_twice(saved_panel, monkeypatch, lane, kept):
     tab, db = saved_panel
     _lane_video(db, lane)
     lane.mark(db, "vid1")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
     export = MagicMock()
     monkeypatch.setattr(evolver_export, "export_video", export)
 
-    tab.show_saved_generation(db.get_generation("vid1"), [])
+    tab.show_saved_generation(kept(db, db.get_generation("vid1")), [])
     assert _lane_offers(tab) == [f"✓ {lane.sent_caption}"]
     tab._on_send(lane)
 
@@ -4237,14 +4209,12 @@ def test_a_lane_does_not_send_the_same_clip_twice(saved_panel, monkeypatch, lane
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_lane_refuses_a_send_the_row_records_even_with_its_button_still_live(
-        saved_panel, monkeypatch, lane):
+        saved_panel, monkeypatch, lane, kept):
     tab, db = saved_panel
     _lane_video(db, lane)
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
     export = MagicMock()
     monkeypatch.setattr(evolver_export, "export_video", export)
-    tab.show_saved_generation(db.get_generation("vid1"), [])
+    tab.show_saved_generation(kept(db, db.get_generation("vid1")), [])
     assert _lane_offers(tab) == [lane.send_caption]
 
     lane.mark(db, "vid1")
@@ -4257,16 +4227,14 @@ def test_a_lane_refuses_a_send_the_row_records_even_with_its_button_still_live(
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
-def test_a_lane_says_so_loudly_when_the_copy_fails(saved_panel, monkeypatch, lane):
+def test_a_lane_says_so_loudly_when_the_copy_fails(saved_panel, monkeypatch, lane, kept):
     tab, db = saved_panel
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
     monkeypatch.setattr(evolver_export, "export_video",
                         MagicMock(side_effect=OSError("inbox unreachable")))
     warn = MagicMock()
     monkeypatch.setattr(generate_tab_module.QMessageBox, "warning", warn)
 
-    tab.show_saved_generation(_lane_video(db, lane), [])
+    tab.show_saved_generation(kept(db, _lane_video(db, lane)), [])
     _press(tab, lane.send_caption)
 
     warn.assert_called_once()
@@ -4275,14 +4243,12 @@ def test_a_lane_says_so_loudly_when_the_copy_fails(saved_panel, monkeypatch, lan
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
-def test_a_sent_video_says_so_beside_an_unsend_button(saved_panel, monkeypatch, lane):
+def test_a_sent_video_says_so_beside_an_unsend_button(saved_panel, lane, kept):
     tab, db = saved_panel
     _lane_video(db, lane)
     lane.mark(db, "vid1")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
 
-    tab.show_saved_generation(db.get_generation("vid1"), [])
+    tab.show_saved_generation(kept(db, db.get_generation("vid1")), [])
 
     assert _lane_offers(tab) == [f"✓ Sent to {lane.name}"]
     assert [button.text() for button in tab.findChildren(QPushButton)
@@ -4292,13 +4258,11 @@ def test_a_sent_video_says_so_beside_an_unsend_button(saved_panel, monkeypatch, 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_pressing_unsend_takes_the_send_back_and_offers_it_again(saved_panel,
-                                                                 monkeypatch, lane):
+                                                                 lane, kept):
     tab, db = saved_panel
     _lane_video(db, lane)
     lane.mark(db, "vid1")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
-    tab.show_saved_generation(db.get_generation("vid1"), [])
+    tab.show_saved_generation(kept(db, db.get_generation("vid1")), [])
 
     _press(tab, export_lane_module.UNSEND_CAPTION)
 
@@ -4310,15 +4274,13 @@ def test_pressing_unsend_takes_the_send_back_and_offers_it_again(saved_panel,
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_withdrawn_clip_says_so_under_the_button_that_offers_it_again(
-        saved_panel, monkeypatch, lane):
+        saved_panel, lane, kept):
     tab, db = saved_panel
     _lane_video(db, lane)
     lane.mark(db, "vid1")
     lane.unmark(db, "vid1")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
 
-    tab.show_saved_generation(db.get_generation("vid1"), [])
+    tab.show_saved_generation(kept(db, db.get_generation("vid1")), [])
 
     assert _lane_offers(tab) == [lane.send_caption]
     assert tab._lane_button.toolTip() == lane.withdrawn_tooltip, (
@@ -4328,14 +4290,12 @@ def test_a_withdrawn_clip_says_so_under_the_button_that_offers_it_again(
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_sending_again_before_the_delete_runs_calls_it_off(saved_panel,
-                                                           monkeypatch, lane):
+                                                           monkeypatch, lane, kept):
     tab, db = saved_panel
     _lane_video(db, lane)
     lane.mark(db, "vid1")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
     monkeypatch.setattr(evolver_export, "export_video", MagicMock())
-    tab.show_saved_generation(db.get_generation("vid1"), [])
+    tab.show_saved_generation(kept(db, db.get_generation("vid1")), [])
     _press(tab, export_lane_module.UNSEND_CAPTION)
 
     _press(tab, lane.send_caption)
@@ -4349,12 +4309,10 @@ def test_sending_again_before_the_delete_runs_calls_it_off(saved_panel,
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_lane_will_not_take_back_a_send_the_row_does_not_record(saved_panel,
-                                                                  monkeypatch, lane):
+                                                                  lane, kept):
     tab, db = saved_panel
     _lane_video(db, lane)
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
-    tab.show_saved_generation(db.get_generation("vid1"), [])
+    tab.show_saved_generation(kept(db, db.get_generation("vid1")), [])
 
     tab._on_unsend(lane)
 
@@ -4363,14 +4321,12 @@ def test_a_lane_will_not_take_back_a_send_the_row_does_not_record(saved_panel,
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
 def test_a_press_does_what_the_button_said_and_not_its_opposite(saved_panel,
-                                                                monkeypatch, lane):
+                                                                monkeypatch, lane, kept):
     tab, db = saved_panel
     _lane_video(db, lane)
-    monkeypatch.setattr(generate_tab_module, "resolve_preview",
-                        lambda row, out: (Path("C:/out/vid1.mp4"), "video"))
     export = MagicMock()
     monkeypatch.setattr(evolver_export, "export_video", export)
-    tab.show_saved_generation(db.get_generation("vid1"), [])
+    tab.show_saved_generation(kept(db, db.get_generation("vid1")), [])
     lane.mark(db, "vid1")
     tab._displayed_row = db.get_generation("vid1")
 
@@ -5104,13 +5060,13 @@ def test_a_videos_file_and_created_are_listed_under_enhancements_never_metadata(
 
 
 def test_a_prefill_on_the_same_workflow_shows_the_newest_result(
-        qtbot, tmp_path, monkeypatch):
+        qtbot, tmp_path, monkeypatch, kept):
     db = Database(tmp_path / "t.db")
     db.insert_generation(NewGeneration(
         prompt_id="g1", workflow_name="sdxl_t2i", workflow_version=_SDXL_VERSION,
         positive_prompt="a wizard", params_json=json.dumps(_wiz_params()), workflow_json="{}",
     ))
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("wiz.png", "image"))
+    kept(db, db.get_generation("g1"), tmp_path / "wiz.png")
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
     tab.prefill("sdxl_t2i", {**_wiz_params(), "positive_prompt": "settings no folder holds"})
@@ -5120,7 +5076,7 @@ def test_a_prefill_on_the_same_workflow_shows_the_newest_result(
 
     tab.prefill("sdxl_t2i", _wiz_params())
 
-    assert shown[-1:] == [("wiz.png", "image", "g1")], (
+    assert shown[-1:] == [(tmp_path / "wiz.png", "image", "g1")], (
         "the workflow did not change, so showing the folder's newest result cannot ride on the "
         "workflow dropdown's own signal")
 
@@ -5134,8 +5090,7 @@ def test_a_prefill_ends_the_tabs_watch_of_a_run(tab):
         "the next frame of the run would land over the item these settings just put up")
 
 
-def test_a_finished_run_with_no_file_leaves_the_frames_standing(tab, monkeypatch):
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: None)
+def test_a_finished_run_with_no_file_leaves_the_frames_standing(tab):
     tab._viewport.show_media = MagicMock()
     tab._viewport.show_message = MagicMock()
     tab._viewport.clear = MagicMock()
@@ -5147,24 +5102,23 @@ def test_a_finished_run_with_no_file_leaves_the_frames_standing(tab, monkeypatch
         "with nothing to look at, the last frames stay rather than the pane going blank")
 
 
-def test_the_drive_target_looks_the_video_up_at_each_ask(saved_panel, monkeypatch, tmp_path):
+def test_the_drive_target_looks_the_video_up_at_each_ask(saved_panel, tmp_path, kept):
     tab, db = saved_panel
     video = _video_row(db, "vid1", input_image="hand.png")
     vpath = tmp_path / "vid1.mp4"
     vpath.write_bytes(b"v")
     _script_for(vpath)
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (vpath, "video"))
-    tab.show_saved_generation(video, [])
+    tab.show_saved_generation(kept(db, video, vpath), [])
     assert tab.osr2_drive_target() is not None
 
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: None)
+    vpath.unlink()
 
     assert tab.osr2_drive_target() is None, (
         "the file is looked for afresh at each ask, so one deleted since it was shown is caught")
 
 
 def test_a_tab_the_gallery_opens_sends_into_the_inbox_the_gallery_was_handed(
-        qtbot, tmp_path, monkeypatch):
+        qtbot, tmp_path, kept):
     db = Database(tmp_path / "t.db")
     inbox = tmp_path / "the gallery's inbox"
     view = GalleryView(db, shared=Shared(inbox=evolver_export.EvolverInbox(inbox)))
@@ -5173,10 +5127,9 @@ def test_a_tab_the_gallery_opens_sends_into_the_inbox_the_gallery_was_handed(
     tab._viewport.show_media = MagicMock()
     video = tmp_path / "vid1.mp4"
     video.write_bytes(b"pixels")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: (video, "video"))
     lane = export_lane_module.KINO
 
-    tab.show_saved_generation(_lane_video(db, lane), [])
+    tab.show_saved_generation(kept(db, _lane_video(db, lane), video), [])
     _press(tab, lane.send_caption)
 
     assert (inbox / lane.source / "vid1.mp4").read_bytes() == b"pixels"

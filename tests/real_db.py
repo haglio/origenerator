@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from collections.abc import Iterable
 from pathlib import Path
+
+from PIL import Image
 
 from origenerator.db import Database
 from origenerator.db_generations import GenerationSource
@@ -37,3 +40,20 @@ def put_rows(db: Database, rows: Iterable[dict]) -> None:
             conn.execute(f"INSERT INTO generations ({', '.join(row)}) "
                          f"VALUES ({', '.join('?' * len(row))})", tuple(row.values()))
     conn.close()
+
+
+def kept_on_disk(db: Database, row: dict, path: Path) -> dict:
+    files = json.loads(row.get("output_files") or "[]") or [{"filename": path.name}]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        _write_a_stand_in(path)
+    db.update_generation(row["prompt_id"], output_files=json.dumps(
+        [{**files[0], "path": str(path)}, *files[1:]]))
+    return db.get_generation(row["prompt_id"])
+
+
+def _write_a_stand_in(path: Path) -> None:
+    if path.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}:
+        Image.new("RGB", (4, 4), "gray").save(path)
+    else:
+        path.write_bytes(b"kept")

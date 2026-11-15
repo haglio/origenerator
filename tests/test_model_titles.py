@@ -209,3 +209,13 @@ def test_the_words_a_title_holds_are_explained_in_the_order_it_holds_them():
     assert title_words.explained("Example Pony Raw") == [
         title_words.explained("Pony")[0], title_words.explained("Raw")[0]]
     assert title_words.explained("Example Model v2") == []
+
+
+def test_a_loras_rank_and_the_height_it_was_trained_at_are_explained_like_its_other_words():
+    explained = title_words.explained("Example Speed I2V 480p (rank 64)")
+
+    assert [text.split(":")[0] for text in explained] == ["I2V", "480p", "Rank"]
+
+
+def test_text_to_video_is_explained_as_image_to_video_is():
+    assert title_words.explained("Example T2V")[0].startswith("T2V: text to video.")

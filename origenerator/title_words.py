@@ -17,6 +17,12 @@ _EXPLAINED = (
     (re.compile(r"Pony"), "Pony: built on Pony Diffusion, an SDXL model that follows short lists of "
                           "tags in the prompt."),
     (re.compile(r"\bI2V\b"), "I2V: image to video. It animates a starting image."),
+    (re.compile(r"\bT2V\b"), "T2V: text to video. It makes a video from the prompt alone."),
+    (re.compile(r"\b480p\b"), "480p: trained on videos 480 pixels tall, the smaller of Wan's two "
+                              "sizes. It still works on larger videos."),
+    (re.compile(r"\brank \d+\b", re.IGNORECASE), "Rank: how much a LoRA can change in its model. "
+                                                 "A higher rank can hold finer detail and makes a "
+                                                 "bigger file."),
     (re.compile(r"\bS2V\b"), "S2V: sound to video. It moves a person's lips to a sound."),
     (re.compile(r"\b14B\b"), "14B: the model is made of 14 billion numbers. Wan 2.2 also comes in a "
                              "smaller 5B."),

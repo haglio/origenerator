@@ -12,6 +12,7 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
 from origenerator.gallery.keys import folder_id
 from origenerator.gallery.tree import settings_folder_key
+from origenerator.gui import generate_tab as generate_tab_module
 from origenerator.gui.combination import Combination
 from origenerator.gui.eliding_tab_bar import ElidingTabBar
 from origenerator.gui.generate_pane import GeneratePane, parse_tabs_state
@@ -667,7 +668,7 @@ def test_current_generate_tab_is_the_front_tab(tabs):
 def test_watching_a_folder_with_no_frame_yet_shows_a_waiting_note(tabs):
     tab = tabs.currentWidget()
     tab._viewport.show_message = MagicMock()
-    tab.watch_folder("image/sdxl_t2i/abc", None)
+    tab.watch_folder("image/sdxl_t2i/abc", None, None)
     said = tab._viewport.show_message.call_args_list
     assert said == [(("Waiting for preview…",), {"live": True})], (
         "marked live, so the preview can be double-clicked open before the first frame")
@@ -680,7 +681,7 @@ def test_a_run_with_an_image_behind_it_stands_that_instead_of_a_note(tabs):
     tab._viewport.show_combination = MagicMock()
     tab._viewport.show_message = MagicMock()
 
-    tab.watch_folder("k", None, None, Combination("frame.png", "clip.webp"))
+    tab.watch_folder("k", None, None, None, Combination("frame.png", "clip.webp"))
 
     tab._viewport.show_combination.assert_called_once_with(
         Combination("frame.png", "clip.webp"))
@@ -693,8 +694,8 @@ def test_the_pair_is_repainted_only_when_it_changes(tabs):
     tab = tabs.currentWidget()
     tab._viewport.show_combination = MagicMock()
 
-    tab.watch_folder("k", None, None, Combination("frame.png", "clip.webp"))
-    tab.watch_folder("k", None, None, Combination("frame.png", "clip.webp"))
+    tab.watch_folder("k", None, None, None, Combination("frame.png", "clip.webp"))
+    tab.watch_folder("k", None, None, None, Combination("frame.png", "clip.webp"))
 
     assert tab._viewport.show_combination.call_count == 1, (
         "the poll reads the watch again every tick, and rebuilding the pair would restart the "
@@ -706,7 +707,7 @@ def test_a_run_made_from_nothing_still_says_it_is_waiting(tabs, made_from):
     tab = tabs.currentWidget()
     tab._viewport.show_message = MagicMock()
 
-    tab.watch_folder("k", None, None, made_from)
+    tab.watch_folder("k", None, None, None, made_from)
 
     tab._viewport.show_message.assert_called_once_with("Waiting for preview…", live=True)
 
@@ -714,7 +715,7 @@ def test_a_run_made_from_nothing_still_says_it_is_waiting(tabs, made_from):
 def test_watching_prefers_a_given_wait_note(tabs):
     tab = tabs.currentWidget()
     tab._viewport.show_message = MagicMock()
-    tab.watch_folder("k", None, "Waiting on 3 jobs from another app")
+    tab.watch_folder("k", None, None, "Waiting on 3 jobs from another app")
     assert tab._viewport.show_message.call_args.args[0] == "Waiting on 3 jobs from another app"
 
 
@@ -722,7 +723,7 @@ def test_a_wait_note_is_repainted_only_when_it_changes(tabs):
     tab = tabs.currentWidget()
     tab._viewport.show_message = MagicMock()
     tab._viewport.show_frame = MagicMock()
-    tab.watch_folder("k", None, "Waiting on 3 jobs from another app")
+    tab.watch_folder("k", None, None, "Waiting on 3 jobs from another app")
     tab.show_live_wait("Waiting on 3 jobs from another app")
     assert tab._viewport.show_message.call_count == 1
     tab.show_live_wait("Waiting on 1 job from another app")
@@ -737,7 +738,7 @@ def test_a_wait_note_is_repainted_only_when_it_changes(tabs):
 def test_watching_with_a_frame_puts_it_up_at_once(tabs):
     tab = tabs.currentWidget()
     tab._viewport.show_frame = MagicMock()
-    tab.watch_folder("k", b"frame")
+    tab.watch_folder("k", None, b"frame")
     tab._viewport.show_frame.assert_called_once_with(b"frame")
 
 
@@ -745,9 +746,9 @@ def test_watchers_of_lists_only_the_tabs_following_that_folder(tabs):
     first = tabs.currentWidget()
     second = tabs._add_subtab()
     third = tabs._add_subtab()
-    first.watch_folder("k1", b"f")
-    second.watch_folder("k2", b"f")
-    third.watch_folder("k1", b"f")
+    first.watch_folder("k1", None, b"f")
+    second.watch_folder("k2", None, b"f")
+    third.watch_folder("k1", None, b"f")
 
     assert tabs.watchers_of("k1") == [first, third]
     assert tabs.tab_watching("k2") is second
@@ -760,7 +761,7 @@ def test_stop_watching_puts_the_displayed_generation_back(tabs, tmp_path):
     tabs.load_selection(cat, [cat, dog])
     tab = tabs.current_generate_tab()
     tab._viewport.show_media = MagicMock()
-    tab.watch_folder("k", b"frame")
+    tab.watch_folder("k", None, b"frame")
 
     tab.stop_watching()
 
@@ -771,7 +772,7 @@ def test_stop_watching_puts_the_displayed_generation_back(tabs, tmp_path):
 def test_stop_watching_a_blank_tab_leaves_it_blank(tabs):
     tab = tabs.currentWidget()
     tab._viewport.clear = MagicMock()
-    tab.watch_folder("k", b"frame")
+    tab.watch_folder("k", None, b"frame")
 
     tab.stop_watching()
 
@@ -783,7 +784,7 @@ def test_stop_watching_a_tab_with_settings_shows_their_newest_result(tabs, tmp_p
     cat, _dog = _two_kept_generations(tabs, tmp_path)
     tab = tabs.currentWidget()
     tab.prefill("sdxl_t2i", json.loads(cat["params_json"]))
-    tab.watch_folder("k", b"frame")
+    tab.watch_folder("k", None, b"frame")
     tab._viewport.show_media = MagicMock()
 
     tab.stop_watching()
@@ -794,7 +795,7 @@ def test_stop_watching_a_tab_with_settings_shows_their_newest_result(tabs, tmp_p
 def test_pointing_a_tab_at_a_saved_generation_ends_its_watch(tabs):
     cat, dog = _two_generations(tabs)
     tab = tabs.currentWidget()
-    tab.watch_folder("k", b"frame")
+    tab.watch_folder("k", None, b"frame")
 
     tab.show_saved_generation(dog, [cat, dog])
 
@@ -823,7 +824,7 @@ def test_a_landed_image_ends_the_wait_it_was_standing_on(tabs, tmp_path):
     cat, _dog = _two_kept_generations(tabs, tmp_path)
     tab = tabs.currentWidget()
     tab._viewport.show_media = MagicMock()
-    tab.watch_folder("k", None)
+    tab.watch_folder("k", None, None)
 
     tab.show_finished_media(cat)
 
@@ -834,14 +835,14 @@ def test_a_landed_image_ends_the_wait_it_was_standing_on(tabs, tmp_path):
 def test_a_resting_tab_following_a_run_stays_blank_for_the_next_click(tabs, tmp_path):
     cat, dog = _two_kept_generations(tabs, tmp_path)
     resting = tabs.currentWidget()
-    resting.watch_folder("k", None)
+    resting.watch_folder("k", None, None)
 
-    resting.show_finished_media(cat)
+    tabs.show_landed("k", cat)
     tabs.load_selection(dog, [cat, dog])
 
     assert (tabs.generate_tabs(), resting.displayed_row()) == ([resting], dog), (
-        "a tab only following a run shows what landed without taking it on, so the blank "
-        "resting tab stays blank and the next click fills it rather than opening a tab beside it")
+        "the blank resting tab takes on what landed the way it takes on a clicked item, as the "
+        "preview tab, so the next click fills it rather than opening a tab beside it")
 
 
 def test_a_finished_result_keeps_a_prompt_typed_while_it_ran(tabs):
@@ -1226,3 +1227,40 @@ def test_a_refreshed_row_reaches_a_tab_that_is_not_in_front(tabs):
     assert told == ["g1"], (
         "every tab is told, not only the one in front: a tab out of sight holds a row of its own, "
         "and would show it stale the next time it came forward")
+
+
+def test_a_tab_following_a_run_shows_the_whole_item_that_landed(tabs, monkeypatch):
+    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
+    cat, _dog = _two_generations(tabs)
+    following = tabs.currentWidget()
+    following.watch_folder("k", None)
+
+    tabs.show_landed("k", cat)
+
+    assert (following.shown_item(), following._metadata_section._shown[0]) == ("cat", cat)
+
+
+def test_a_tab_showing_a_finished_item_takes_no_frames_from_its_folders_next_run(
+        tabs, monkeypatch):
+    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
+    cat, _dog = _two_generations(tabs)
+    tab = tabs.currentWidget()
+    tab._viewport.show_frame = MagicMock()
+    tab.watch_folder("k", None)
+    tab.show_completed_result(cat, [cat])
+
+    for watcher in tabs.watchers_of("k"):
+        watcher.show_live_frame(b"the next run's frame")
+
+    tab._viewport.show_frame.assert_not_called()
+    assert tab.shown_item() == "cat"
+
+
+def test_an_item_gone_from_the_library_leaves_its_tab_empty_not_only_its_preview(tabs):
+    cat, _dog = _two_generations(tabs)
+    tab = tabs.currentWidget()
+    tab.show_saved_generation(cat, [cat])
+
+    tabs.reconcile_previews(live_ids=set())
+
+    assert (tab.shown_item(), tab._metadata_section._shown) == (None, None)

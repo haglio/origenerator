@@ -2035,6 +2035,7 @@ class GalleryView(QWidget):
             return
         self._enter_reroll_selection(key)
         tabs = self._generate_pane
+        row = self._db.get_generation(job.prompt_id)
         tab = tabs.tab_watching(key) or tabs.tab_that_launched(job.origin)
         if tab is None:
             front = tabs.current_generate_tab()
@@ -2043,14 +2044,13 @@ class GalleryView(QWidget):
                 tab = front
             else:
                 tab = tabs.landing_tab()
-                row = self._db.get_generation(job.prompt_id)
                 if row is not None:
                     tab.show_running_generation(row)
             if job.origin not in tab.launched_runs():
                 tab.note_launched(job.origin)
             tabs.pin_tab(tab)
             self._reconcile_generating()
-        tab.watch_folder(key, job.last_preview, self._wait_note(key),
+        tab.watch_folder(key, row, job.last_preview, self._wait_note(key),
                            self._job_made_from(job, self.animated_preview))
         tabs.setCurrentWidget(tab)
 
@@ -2166,11 +2166,8 @@ class GalleryView(QWidget):
             launcher.show_completed_result(finished_row, self._image_rows)
 
     def _show_landed_to_watchers(self, key: str, finished_row: dict | None, launcher):
-        if finished_row is None or not gallery.produced_output(finished_row):
-            return
-        for tab in self._generate_pane.watchers_of(key):
-            if tab is not launcher:
-                tab.show_finished_media(finished_row)
+        if finished_row is not None and gallery.produced_output(finished_row):
+            self._generate_pane.show_landed(key, finished_row, besides=launcher)
 
     def _on_reroll_failed(self, key: str, message: str = ""):
         self._populate.note_failed(key)

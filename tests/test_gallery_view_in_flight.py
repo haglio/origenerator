@@ -667,17 +667,13 @@ def test_selecting_a_reroll_before_any_frame_avoids_the_idle_placeholder(qtbot, 
     qtbot.addWidget(view)
     view.refresh()
     _running_reroll(view)
-    painted = []
-    _viewport_of(view).clear = MagicMock(side_effect=lambda: painted.append("(placeholder)"))
-    _viewport_of(view).show_message = MagicMock(
-        side_effect=lambda text, **kwargs: painted.append(text))
 
     _generating_tile(view).selected.emit()
 
-    assert painted[-1] == "Waiting for preview…", (
+    viewport = _viewport_of(view)
+    assert (viewport._image_label.text(), viewport._live) == ("Waiting for preview…", True), (
         "seeding the landing tab from the run's settings may pass through the placeholder; what "
         "the pane ends on is the point")
-    assert _viewport_of(view).show_message.call_args == (("Waiting for preview…",), {"live": True})
 
 
 def _waiting_view(qtbot, tmp_path, backlog):
@@ -688,7 +684,6 @@ def _waiting_view(qtbot, tmp_path, backlog):
     qtbot.addWidget(view)
     view.refresh()
     _running_reroll(view)
-    _viewport_of(view).show_message = MagicMock()
     _generating_tile(view).selected.emit()
     return view, client
 
@@ -698,7 +693,7 @@ def test_a_run_stuck_behind_another_app_says_how_much_is_ahead(qtbot, tmp_path):
 
     view._poll()
 
-    assert _viewport_of(view).show_message.call_args.args[0] == "Waiting on 3 jobs from another app"
+    assert _viewport_of(view)._image_label.text() == "Waiting on 3 jobs from another app"
 
 
 def test_the_wait_text_follows_the_queue_as_it_drains(qtbot, tmp_path):
@@ -708,7 +703,7 @@ def test_the_wait_text_follows_the_queue_as_it_drains(qtbot, tmp_path):
     client.foreign_backlog = MagicMock(return_value=1)
     view._poll()
 
-    assert _viewport_of(view).show_message.call_args.args[0] == "Waiting on 1 job from another app"
+    assert _viewport_of(view)._image_label.text() == "Waiting on 1 job from another app"
 
 
 def test_a_queue_of_the_users_own_jobs_leaves_the_plain_waiting_note(qtbot, tmp_path):
@@ -716,7 +711,7 @@ def test_a_queue_of_the_users_own_jobs_leaves_the_plain_waiting_note(qtbot, tmp_
 
     view._poll()
 
-    assert _viewport_of(view).show_message.call_args.args[0] == "Waiting for preview…", (
+    assert _viewport_of(view)._image_label.text() == "Waiting for preview…", (
         "waiting on the user's own queue means ComfyUI is generating something the user asked "
         "for, which is no mystery at all")
 
@@ -732,7 +727,7 @@ def test_a_run_waiting_out_the_minute_after_an_image_says_when_it_starts(
 
     view._poll()
 
-    assert _viewport_of(view).show_message.call_args.args[0] == "Starts in 0:43"
+    assert _viewport_of(view)._image_label.text() == "Starts in 0:43"
 
 
 def test_start_now_on_the_job_queue_starts_the_video_waiting_out_the_minute(qtbot, tmp_path):
@@ -2688,7 +2683,7 @@ def test_a_runs_tile_goes_to_the_tab_following_it_before_the_tab_that_launched_i
     (key,) = view._live_jobs
     launcher.stop_watching()
     following = view._generate_pane._add_subtab()
-    following.watch_folder(key, None)
+    following.watch_folder(key, None, None)
     view._generate_pane.setCurrentWidget(launcher)
 
     view._select_reroll(key)
@@ -2723,7 +2718,7 @@ def test_a_run_that_made_no_file_is_not_loaded_into_the_tab_that_launched_it(qtb
     tab._on_generate()
     ((key, job),) = view._live_jobs.items()
     following = view._generate_pane._add_subtab()
-    following.watch_folder(key, None)
+    following.watch_folder(key, None, None)
     shown = []
     tab.show_completed_result = lambda row, rows: shown.append(row)
     following.show_finished_media = shown.append
@@ -2775,7 +2770,7 @@ def test_a_landing_shows_in_the_tabs_following_it_and_the_launcher_only_its_end_
     launcher._on_generate()
     ((key, job),) = view._live_jobs.items()
     following = view._generate_pane._add_subtab()
-    following.watch_folder(key, None)
+    following.watch_folder(key, None, None)
     told = []
     launcher.show_finished_media = lambda row: told.append(("launcher", row["prompt_id"]))
     following.show_finished_media = lambda row: told.append(("following", row["prompt_id"]))
@@ -2783,3 +2778,19 @@ def test_a_landing_shows_in_the_tabs_following_it_and_the_launcher_only_its_end_
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
     assert told == [("following", job.prompt_id)]
+
+
+def test_generate_turns_the_whole_tab_into_the_item_being_made(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    panel, field = _edited_tab_showing_the_saved_image(view, qtbot)
+
+    panel._on_generate()
+
+    (job,) = view._live_jobs.values()
+    shown_by = {"Metadata": panel._metadata_section._shown[0]["prompt_id"],
+                "Preview": panel._viewport._generation or job.prompt_id,
+                "tab": panel.shown_item()}
+    assert shown_by == dict.fromkeys(shown_by, job.prompt_id)
+    assert _struck_and_lit(field) == ("", "")

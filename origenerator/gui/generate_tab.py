@@ -5,6 +5,7 @@ import logging
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import NamedTuple
 
 from app_support.gallery_rows import made_here
 from PySide6.QtCore import QPoint, Qt, QTimer, Signal
@@ -170,6 +171,18 @@ class _RequestAim:
             self.turns[at] = self.turns[at]._replace(made=prompt_id)
 
 
+class _BeingMade(NamedTuple):
+    key: str | None
+    row: dict | None
+    shown_before: dict | None
+    note: str | None = None
+    source: Combination | None = None
+
+
+def _same_item(one: dict | None, other: dict | None) -> bool:
+    return (one or {}).get("prompt_id") == (other or {}).get("prompt_id")
+
+
 def _nothing_to_start_from(missing_inputs: list[str]) -> str:
     named = spoken_list(missing_inputs, "and")
     article = "an" if named[:1].lower() in "aeiou" else "a"
@@ -242,9 +255,7 @@ class GenerateTab(DropZones):
         self._generating = False
         self._making_one = None
         self._launched_runs: dict[str, dict | None] = {}
-        self._watched_key: str | None = None
-        self._live_note: str | None = None
-        self._live_source: Combination | None = None
+        self._being_made: _BeingMade | None = None
         self._displayed_row: dict | None = None
         self._pending_enhancement: RunningEnhancement | None = None
         self._enhance_settings = EnhanceSettings()
@@ -819,11 +830,14 @@ class GenerateTab(DropZones):
         self._source_video_row = None
 
     def _mark_prompt_edits(self) -> None:
-        if self._live_source is None:
+        if self._live_source() is None:
             self._viewport.mark_prompt_edited(self._prompts_differ_from_source())
 
+    def _live_source(self) -> Combination | None:
+        return self._being_made.source if self._being_made is not None else None
+
     def show_combination(self, combination: Combination) -> None:
-        if self._live_source is None:
+        if self._live_source() is None:
             combination = combination._replace(
                 prompt_edited=self._prompts_differ_from_source())
         self._viewport.show_combination(combination)
@@ -958,12 +972,16 @@ class GenerateTab(DropZones):
         return bool(size) and shape_of_size(*size) == PORTRAIT
 
     def show_recent_preview(self):
-        if self._autoshow_held:
+        if self._autoshow_held or self._being_made is not None:
             return
         row = self._recent_matching_row()
         if row is not None and resolve_preview(row, OUTPUT_PLACES) is not None:
             self._display_result(row, self._image_rows())
             return
+        self._show_nothing()
+
+    def _show_nothing(self) -> None:
+        self._forget_watch()
         self._viewport.clear()
         self._set_displayed_row(None)
         self._hide_footer()
@@ -1004,7 +1022,12 @@ class GenerateTab(DropZones):
         return name
 
     def _item_name(self) -> str:
-        return self._names.of((self._displayed_row or {}).get("prompt_id"))
+        return self._names.of(self.shown_item())
+
+    def _shown_row(self) -> dict | None:
+        if self._being_made is not None:
+            return self._being_made.row
+        return self._displayed_row
 
     def reread_name(self) -> None:
         if self._displayed_row is not None:
@@ -1017,7 +1040,7 @@ class GenerateTab(DropZones):
         return () if self._param_form is None else self._param_form.drop_zones()
 
     def tab_icon(self) -> QIcon:
-        row = self._displayed_row
+        row = self._shown_row()
         thumb = (row or {}).get("thumbnail_path")
         if thumb and Path(thumb).exists():
             return QIcon(QPixmap(str(thumb)))
@@ -1122,11 +1145,8 @@ class GenerateTab(DropZones):
 
     def show_running_generation(self, row: dict):
         self._point_elsewhere(row)
-        self._hide_footer()
-        self._show_what_is_known_of(row, self._image_rows())
+        self._become_the_item_being_made(None, row)
         self._viewport.clear()
-        self._note_displayed_config(being_made=row)
-        self._emit_title()
 
     def _point_elsewhere(self, row: dict):
         self.forget_launched()
@@ -1155,20 +1175,15 @@ class GenerateTab(DropZones):
         self._display_result(row, image_rows)
 
     def show_finished_media(self, row: dict):
-        preview = resolve_preview(row, OUTPUT_PLACES)
-        if preview is None:
-            return
-        self._live_note = None
-        self._viewport.show_media(*preview, row["prompt_id"])
-        self._arm_preview_actions(row["prompt_id"])
+        if resolve_preview(row, OUTPUT_PLACES) is not None:
+            self._display_result(row, self._image_rows())
 
     def watched_key(self) -> str | None:
-        return self._watched_key
+        return self._being_made.key if self._being_made is not None else None
 
-    def watch_folder(self, key: str, frame: bytes | None, note: str | None = None,
-                     made_from: Combination | None = None):
-        self._watched_key = key
-        self._live_note = None
+    def watch_folder(self, key: str, being_made: dict | None, frame: bytes | None = None,
+                     note: str | None = None, made_from: Combination | None = None):
+        self._become_the_item_being_made(key, being_made)
         if frame:
             self.show_live_frame(frame)
         elif made_from is not None and (made_from.image or made_from.source_video):
@@ -1176,48 +1191,65 @@ class GenerateTab(DropZones):
         else:
             self.show_live_wait(note)
 
-    def show_live_source(self, made_from: Combination):
-        if made_from == self._live_source:
+    def _become_the_item_being_made(self, key: str | None, row: dict | None) -> None:
+        made = self._being_made
+        if made is not None and _same_item(made.row, row):
+            self._being_made = made._replace(key=key)
             return
-        self._live_source = made_from
+        before = made.shown_before if made is not None else self._displayed_row
+        self._being_made = _BeingMade(key, row, before)
+        self._set_displayed_row(None)
+        self._hide_footer()
+        if row is not None:
+            self._show_what_is_known_of(row, self._image_rows())
+        self._arm_preview_actions()
+        self._note_displayed_config(being_made=row)
+        self._emit_title()
+
+    def show_live_source(self, made_from: Combination):
+        made = self._being_made
+        if made is None or made_from == made.source:
+            return
+        self._being_made = made._replace(note=None, source=made_from)
         self.show_combination(made_from)
 
     def show_live_frame(self, frame: bytes):
-        self._live_note = None
-        self._live_source = None
+        made = self._being_made
+        if made is None:
+            return
+        self._being_made = made._replace(note=None, source=None)
         self._viewport.show_frame(frame)
 
     def show_live_wait(self, note: str | None):
-        text = note or _WAITING_NOTE
-        if text == self._live_note:
+        made, text = self._being_made, note or _WAITING_NOTE
+        if made is None or text == made.note:
             return
-        self._live_note = text
-        self._live_source = None
+        self._being_made = made._replace(note=text, source=None)
         self._viewport.show_message(text, live=True)
 
     def is_awaiting_frame(self) -> bool:
-        return self._watched_key is not None and self._live_note is not None
+        return self._being_made is not None and self._being_made.note is not None
 
     def stop_watching(self):
-        if self._watched_key is None:
+        if self._being_made is None:
             return
+        before = self._being_made.shown_before
         self._forget_watch()
-        if self._displayed_row is not None:
-            self._restore_preview()
-        elif self._workflow_dropdown.currentData() is not None:
-            self.show_recent_preview()
+        still_there = self._db.get_generation(before["prompt_id"]) if before else None
+        if still_there is not None:
+            self._display_result(still_there, self._image_rows(),
+                                 made_with=merge_denormalized(still_there))
         else:
-            self._viewport.clear()
+            self.show_recent_preview()
 
     def _forget_watch(self):
-        self._watched_key = None
-        self._live_note = None
-        self._live_source = None
+        self._being_made = None
 
     def _display_result(self, row: dict, image_rows: list[dict],
                         made_with: dict | None = None):
         arriving = (self._displayed_row is None
                     or self._displayed_row.get("prompt_id") != row.get("prompt_id"))
+        self._forget_watch()
         self._set_displayed_row(row)
         preview = resolve_preview(row, OUTPUT_PLACES)
         if preview is not None:
@@ -1249,7 +1281,7 @@ class GenerateTab(DropZones):
     def reconcile_preview(self, live_ids):
         shown = self._displayed_row
         if shown is not None and shown.get("prompt_id") not in live_ids:
-            self._viewport.clear()
+            self._show_nothing()
         self._reread_corners()
 
     def _reread_corners(self):
@@ -1443,6 +1475,9 @@ class GenerateTab(DropZones):
 
     def displayed_row(self) -> dict | None:
         return self._displayed_row
+
+    def shown_item(self) -> str | None:
+        return (self._shown_row() or {}).get("prompt_id")
 
     def set_pending_enhancement(self, pending: RunningEnhancement | None):
         if pending == self._pending_enhancement:

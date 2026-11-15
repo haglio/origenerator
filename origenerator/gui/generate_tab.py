@@ -1102,7 +1102,7 @@ class GenerateTab(DropZones):
         )
         self._hide_footer()
         self._set_displayed_row(None)
-        self._displayed_config = None
+        self._note_displayed_config()
         self._viewport.show_folder(thumbnails)
         self._reflow_for_the_media()
         self._mark_prompts()
@@ -1292,9 +1292,10 @@ class GenerateTab(DropZones):
         if exchange is None:
             self._request_aim = None
             return
+        offered = row is not None and self._displayed_config is not None
+        self._param_form.request_section().setVisible(offered)
         if row is None:
             self._request_aim = None
-            exchange.set_available(False)
             return
         params = self._settings_shown().params
         turns = self._db.requests.exchange_of(row["prompt_id"])
@@ -1306,7 +1307,6 @@ class GenerateTab(DropZones):
             started_on=(self._db.requests.started_on(row["prompt_id"]) if turns
                         else row["prompt_id"]))
         self._turn_being_made = None
-        exchange.set_available(self._displayed_config is not None)
         exchange.set_thumbnail_of(self._thumbnail_of)
         exchange.show_exchange(turns, started_on=self._request_aim.started_on)
 

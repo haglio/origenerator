@@ -179,6 +179,7 @@ class ParamForm(QWidget):
         self._passthrough: dict = {}
         self._sections: dict[str, CollapsibleSection] = {}
         self._request_exchange: RequestExchange | None = None
+        self._request_section: CollapsibleSection | None = None
         self._present_keys: dict[str, list[str]] = {}
         self._shut_down: dict[str, str] = {}
         self._param_defs = [pd for pd in param_defs if pd.key not in self._hidden_keys]
@@ -293,13 +294,16 @@ class ParamForm(QWidget):
         self._refresh_section_visibility()
 
     def _build_request_section(self) -> CollapsibleSection:
-        section = CollapsibleSection("Request")
+        self._request_section = CollapsibleSection("Request")
         self._request_exchange = RequestExchange()
-        section.content_form().addRow(self._request_exchange)
-        return section
+        self._request_section.content_form().addRow(self._request_exchange)
+        return self._request_section
 
     def request_exchange(self) -> RequestExchange | None:
         return self._request_exchange
+
+    def request_section(self) -> CollapsibleSection | None:
+        return self._request_section
 
     def tells_a_story(self) -> bool:
         return self._scenes is not None

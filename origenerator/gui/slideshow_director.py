@@ -66,7 +66,7 @@ from origenerator.gui.slideshow_wiring import (
     Showing,
     SlideshowActions,
 )
-from origenerator.gui.two_screens import TwoScreens
+from origenerator.gui.two_screens import TwoScreens, monitor_shaped
 from origenerator.item_shape import (
     filter_rows,
     row_shape,
@@ -589,7 +589,8 @@ class SlideshowDirector:
     def _show_on_its_monitor(self, view, *, built: bool) -> None:
         if self._asked_for_by_him:
             self.two_screens.put_the_slideshow_on(self._standalone_window_shape)
-        monitor = self.two_screens.slideshows_monitor()
+        monitor = (self.two_screens.slideshows_monitor()
+                   or monitor_shaped(self._standalone_window_shape))
         if monitor is not None and (built or view.screen().geometry() != monitor.geometry()):
             if view.isFullScreen():
                 view.showNormal()

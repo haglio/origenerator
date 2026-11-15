@@ -105,6 +105,7 @@ from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import _struck_and_lit
 from tests.marked_words import words_shown
 from tests.qt_exec import faking_exec
+from tests.real_db import database_in
 from tests.related_links import settings_tile, source_tile
 from tests.text_readers import clap_reader, clip_reader, word_reader, word_reading
 from tests.thumbnail_rows import looping_video, painted_row, where_the_thumbnail_is
@@ -1616,49 +1617,22 @@ def test_a_tab_with_no_workflow_yet_wears_no_mark(blank_panel):
         "nothing is known yet, and a mark guessing at a workflow would be the tab's most confident claim")
 
 
-class SpyDB:
-    def __init__(self, durations=None):
-        self._durations = durations or []
-
-    def list_trashed(self):
-        return []
-
-    def recent_durations(self, workflow_name, limit=10):
-        return list(self._durations)
-
-    def list_generations(self):
-        return []
-
-    def get_generation(self, prompt_id):
-        return None
-
-    def get_request(self, prompt_id):
-        return None
-
-    def requests_about(self, prompt_id):
-        return []
-
-    def library_version(self):
-        return 0
-
-    def folder_meta_map(self):
-        return {}
-
-
-def _spy_panel(qtbot, db):
+def _panel_on(qtbot, db):
     tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
     qtbot.addWidget(tab)
     tab._workflow_dropdown.setCurrentIndex(_dropdown_index(tab, "sdxl_t2i"))
     return tab
 
 
-def test_estimate_label_reflects_recent_durations(qtbot):
-    tab = _spy_panel(qtbot, SpyDB(durations=[700.0, 724.0, 800.0]))
+def test_estimate_label_reflects_recent_durations(qtbot, tmp_path):
+    tab = _panel_on(qtbot, database_in(tmp_path, [
+        {"prompt_id": f"took-{seconds}", "status": "completed", "duration_seconds": seconds}
+        for seconds in (700.0, 724.0, 800.0)]))
     assert tab._estimate_label.text() == "~12 min (based on 3 runs)"
 
 
-def test_estimate_label_when_no_history(qtbot):
-    tab = _spy_panel(qtbot, SpyDB(durations=[]))
+def test_estimate_label_when_no_history(qtbot, db):
+    tab = _panel_on(qtbot, db)
     assert tab._estimate_label.text() == "No timing data yet"
 
 

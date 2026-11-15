@@ -49,7 +49,8 @@ from origenerator.gui.action_setter_window import (
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.item_actions import ItemActions
 from origenerator.media import MediaType
-from tests.action_store_fake import ActionStore
+from tests.action_store import ActionStore
+from tests.real_db import database_in
 
 _BUTTONS = {"button one": ("alpha",), "button two": ("alpha", "beta"), "button three": ("gamma",)}
 _TILES = (Tile("button one", 0, 0), Tile("button two", 0, 1), Tile("button three", 1, 0))
@@ -105,9 +106,10 @@ def window(qtbot, tmp_path):
     def build(*prompt_ids, items=None, drawings=None, tiles=None, checkboxes=(),
               side=MediaType.IMAGE, locks=None, keep_going=None, rubbish=None, folders=None,
               confirm=lambda _parent, _text: True):
-        store = ActionStore()
         listed = folders or [_a_folder_of(item) for item in items or [
             {"prompt_id": p, "name": "3FA9C0D2 000"} for p in prompt_ids]]
+        store = ActionStore(database_in(tmp_path), side, items=[
+            item["prompt_id"] for folder in listed for item in folder["items"]])
         stage = _Stage()
         made = ActionSetterWindow(
             SetterSession(listed, store, side, rubbish),
@@ -124,7 +126,7 @@ def test_the_window_is_called_the_action_setter_tool_for_its_kind(window, qtbot,
     made, _store, _stage = window("first")
     for_videos = ActionSetterWindow(
         SetterSession([_a_folder_of({"prompt_id": "vid", "name": "3FA9C0D2 000"})],
-                      ActionStore(), MediaType.VIDEO),
+                      ActionStore(database_in(tmp_path), MediaType.VIDEO), MediaType.VIDEO),
         Vocabulary(_BUTTONS, _TILES, ("third box",), {}, {}, {}, {}), {},
         Locks(tmp_path / "locks.json"), stage=_Stage())
     qtbot.addWidget(for_videos)
@@ -298,7 +300,8 @@ def test_skipping_leaves_the_item_as_it_was_and_brings_up_the_next(window):
 
     _press(made, SKIP_BUTTON).click()
 
-    assert (store.item_actions, _said(made, STATUS_LINE)[:2]) == ({}, "2 ")
+    assert (store.item_actions, _said(made, STATUS_LINE)[:2]) == (
+        {}, "2 ")
 
 
 def test_undo_takes_the_last_answer_back_and_puts_its_item_up_again(window):
@@ -307,7 +310,7 @@ def test_undo_takes_the_last_answer_back_and_puts_its_item_up_again(window):
 
     _press(made, UNDO_BUTTON).click()
 
-    assert (store.item_actions, _said(made, STATUS_LINE)[:2]) == ({"first": None}, "2 ")
+    assert (store.item_actions, _said(made, STATUS_LINE)[:2]) == ({}, "2 ")
 
 
 def test_undo_with_nothing_answered_yet_says_so(window):
@@ -383,7 +386,7 @@ def test_the_words_under_the_buttons_said_do_what_the_buttons_do(window):
         made.hear(said)
 
     assert (store.item_actions, rubbish.thrown) == (
-        {"first": ItemActions(("gamma",)), "second": None}, [("third", None)])
+        {"first": ItemActions(("gamma",))}, [("third", None)])
 
 
 def test_words_the_setter_tool_does_not_know_are_left_for_the_rest_of_the_app(window):
@@ -738,7 +741,8 @@ def _as_it_opens(qtbot, tmp_path, side, tiles, *, set_before: bool):
     named = vocabulary(side, _the_example_overlay())
     named = Vocabulary(named.buttons, tiles or named.tiles, named.checkboxes, {}, {}, {}, {})
     item_actions = ItemActions(next(iter(named.buttons.values())), named.checkboxes) if set_before else None
-    made = ActionSetterWindow(SetterSession(_set_before(("first", item_actions)), ActionStore(), side),
+    made = ActionSetterWindow(SetterSession(_set_before(("first", item_actions)),
+                                            ActionStore(database_in(tmp_path), side), side),
                               named, {}, Locks(tmp_path / f"{set_before}.json"), stage=_Stage())
     qtbot.addWidget(made)
     made.setStyleSheet(build_stylesheet())
@@ -794,4 +798,5 @@ def test_skip_said_while_its_button_is_gray_does_nothing(window):
 
     made.hear("skip")
 
-    assert (store.item_actions, _said(made, STATUS_LINE)[:2]) == ({}, "2 ")
+    assert (store.item_actions, _said(made, STATUS_LINE)[:2]) == (
+        {}, "2 ")

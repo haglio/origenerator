@@ -7,7 +7,7 @@ from origenerator.gallery.enhance import enhance_file_stem
 from origenerator.generation_state import GenerationSource
 from origenerator.item_actions import ItemActions, stored
 from origenerator.media import MediaType
-from tests.action_store_fake import ActionStore
+from tests.action_store import ActionStore
 
 _SET = ItemActions(("alpha", "beta"), ("first box",))
 
@@ -21,8 +21,8 @@ def _folder(key, *items):
     return {"key": key, "items": list(items)}
 
 
-def test_a_press_saves_its_actions_on_every_item_in_the_folder_on_screen():
-    store = ActionStore({"set before": ItemActions(("gamma",))})
+def test_a_press_saves_its_actions_on_every_item_in_the_folder_on_screen(db):
+    store = ActionStore(db, items=("waiting", "next"), had={"set before": ItemActions(("gamma",))})
     session = SetterSession([_folder("folder", {"prompt_id": "waiting"},
                                      {"prompt_id": "set before"}), *_items("next")],
                             store, MediaType.IMAGE)
@@ -30,22 +30,23 @@ def test_a_press_saves_its_actions_on_every_item_in_the_folder_on_screen():
     session.set_as("two", _SET)
     session.undo()
 
-    assert store.item_actions == {"waiting": None, "set before": ItemActions(("gamma",))}
+    assert store.item_actions == {"set before": ItemActions(("gamma",))}
     assert (session.current["key"], session.remaining) == ("folder", 2)
 
 
-def test_a_press_saves_its_actions_on_the_item_on_screen_and_the_next_one_comes_up():
-    store = ActionStore()
+def test_a_press_saves_its_actions_on_the_item_on_screen_and_the_next_one_comes_up(db):
+    store = ActionStore(db, items=("first", "second"))
     session = SetterSession(_items("first", "second"), store, MediaType.IMAGE)
 
     session.set_as("two", _SET)
 
-    assert (store.item_actions, store.sides) == ({"first": _SET}, [MediaType.IMAGE])
+    assert (store.item_actions, store.sides) == (
+        {"first": _SET}, [MediaType.IMAGE])
     assert (session.current["key"], session.remaining) == ("second", 1)
 
 
-def test_a_press_with_nothing_on_screen_does_nothing():
-    store = ActionStore()
+def test_a_press_with_nothing_on_screen_does_nothing(db):
+    store = ActionStore(db, MediaType.VIDEO)
     session = SetterSession([], store, MediaType.VIDEO)
 
     session.set_as("two", _SET)
@@ -53,8 +54,8 @@ def test_a_press_with_nothing_on_screen_does_nothing():
     assert (store.item_actions, session.current) == ({}, None)
 
 
-def test_skipping_sends_the_item_to_the_back_of_the_line_without_actions():
-    store = ActionStore()
+def test_skipping_sends_the_item_to_the_back_of_the_line_without_actions(db):
+    store = ActionStore(db, items=("first", "second"))
     session = SetterSession(_items("first", "second"), store, MediaType.IMAGE)
 
     session.skip()
@@ -63,9 +64,9 @@ def test_skipping_sends_the_item_to_the_back_of_the_line_without_actions():
     assert (session.current["key"], session.remaining) == ("second", 2)
 
 
-def test_undo_puts_back_every_action_the_press_replaced_and_puts_the_item_on_screen_again():
+def test_undo_puts_back_every_action_the_press_replaced_and_puts_the_item_on_screen_again(db):
     before = ItemActions(("gamma",))
-    store = ActionStore({"first": before})
+    store = ActionStore(db, items=("second",), had={"first": before})
     session = SetterSession(_items("first", "second"), store, MediaType.IMAGE)
     session.set_as("two", _SET)
 
@@ -75,18 +76,18 @@ def test_undo_puts_back_every_action_the_press_replaced_and_puts_the_item_on_scr
     assert (session.current["key"], session.remaining) == ("first", 2)
 
 
-def test_undo_takes_an_item_nobody_had_given_actions_back_to_none():
-    store = ActionStore()
+def test_undo_takes_an_item_nobody_had_given_actions_back_to_none(db):
+    store = ActionStore(db, MediaType.VIDEO, items=("first",))
     session = SetterSession(_items("first"), store, MediaType.VIDEO)
     session.set_as("two", _SET)
 
     session.undo()
 
-    assert (store.item_actions, store.sides) == ({"first": None}, [MediaType.VIDEO] * 2)
+    assert (store.item_actions, store.sides) == ({}, [MediaType.VIDEO] * 2)
 
 
-def test_undo_with_nothing_pressed_yet_changes_nothing():
-    store = ActionStore()
+def test_undo_with_nothing_pressed_yet_changes_nothing(db):
+    store = ActionStore(db, items=("first",))
     session = SetterSession(_items("first"), store, MediaType.IMAGE)
 
     session.undo()
@@ -94,8 +95,8 @@ def test_undo_with_nothing_pressed_yet_changes_nothing():
     assert (store.item_actions, session.current["key"]) == ({}, "first")
 
 
-def test_the_session_says_what_the_last_press_was_and_whether_it_can_be_undone():
-    session = SetterSession(_items("first", "second"), ActionStore(), MediaType.IMAGE)
+def test_the_session_says_what_the_last_press_was_and_whether_it_can_be_undone(db):
+    session = SetterSession(_items("first", "second"), ActionStore(db), MediaType.IMAGE)
     before = (session.last, session.can_undo)
 
     session.set_as("two", _SET)
@@ -117,9 +118,9 @@ class _Bin:
         self.thrown.remove(prompt_id)
 
 
-def test_trash_throws_the_item_on_screen_away_and_the_next_one_comes_up():
+def test_trash_throws_the_item_on_screen_away_and_the_next_one_comes_up(db):
     rubbish = _Bin()
-    session = SetterSession(_items("first", "second"), ActionStore(), MediaType.IMAGE, rubbish)
+    session = SetterSession(_items("first", "second"), ActionStore(db), MediaType.IMAGE, rubbish)
 
     session.trash()
 
@@ -127,20 +128,20 @@ def test_trash_throws_the_item_on_screen_away_and_the_next_one_comes_up():
         ["first"], "second", 1)
 
 
-def test_trash_throws_away_every_item_in_the_folder_each_as_it_is_shown():
+def test_trash_throws_away_every_item_in_the_folder_each_as_it_is_shown(db):
     rubbish = _Bin()
     session = SetterSession([_folder("folder", {"prompt_id": "frame", "shown_id": "video"},
                                      {"prompt_id": "image"})],
-                            ActionStore(), MediaType.IMAGE, rubbish)
+                            ActionStore(db), MediaType.IMAGE, rubbish)
 
     session.trash()
 
     assert rubbish.thrown == ["video", "image"]
 
 
-def test_undo_brings_a_trashed_item_back_and_puts_it_on_screen_again():
+def test_undo_brings_a_trashed_item_back_and_puts_it_on_screen_again(db):
     rubbish = _Bin()
-    store = ActionStore()
+    store = ActionStore(db, items=("first", "second"))
     session = SetterSession(_items("first", "second"), store, MediaType.IMAGE, rubbish)
     session.trash()
 
@@ -150,8 +151,8 @@ def test_undo_brings_a_trashed_item_back_and_puts_it_on_screen_again():
         [], {}, "first", 2)
 
 
-def test_same_as_last_goes_by_the_last_press_past_an_item_trashed_since():
-    session = SetterSession(_items("first", "second", "third"), ActionStore(), MediaType.IMAGE,
+def test_same_as_last_goes_by_the_last_press_past_an_item_trashed_since(db):
+    session = SetterSession(_items("first", "second", "third"), ActionStore(db), MediaType.IMAGE,
                             _Bin())
     session.set_as("two", _SET)
 
@@ -160,8 +161,8 @@ def test_same_as_last_goes_by_the_last_press_past_an_item_trashed_since():
     assert (session.last, session.can_undo) == (("two", _SET), True)
 
 
-def test_with_no_trash_to_throw_into_nothing_is_thrown_away():
-    session = SetterSession(_items("first"), ActionStore(), MediaType.IMAGE)
+def test_with_no_trash_to_throw_into_nothing_is_thrown_away(db):
+    session = SetterSession(_items("first"), ActionStore(db), MediaType.IMAGE)
 
     session.trash()
 

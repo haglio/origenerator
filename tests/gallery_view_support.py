@@ -900,7 +900,7 @@ def _double_click_slideshow(view, qtbot, *, media=("shown.png", "image"), target
 
 def _aim_slideshow(view, slideshow, target):
     slideshow.osr2_drive_target = lambda: target
-    view.reconcile_osr2()
+    view.osr2.reconcile()
 
 
 class _HeldRadio:

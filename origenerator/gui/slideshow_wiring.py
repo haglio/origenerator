@@ -28,7 +28,6 @@ class SlideshowActions:
     cancel_all: Callable[[], None] | None = None
     core_window: Callable[[], object] | None = None
     drive_toggle: Callable[[], None] | None = None
-    osr2_control: object | None = None
     omnipause: Callable[[], None] | None = None
     move_hud: Callable[[str], None] | None = None
     neighbors: Callable[[str], object] | None = None
@@ -110,6 +109,7 @@ class DirectorSources:
 class DirectorSurroundings:
     pace: object
     motion: object
+    osr2: object
     fun_time: object
     radio: object = None
     buttons_of: Callable | None = None

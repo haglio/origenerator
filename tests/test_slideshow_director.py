@@ -450,6 +450,16 @@ class FakeDB:
         return {}
 
 
+class _NoOsr2:
+    control = None
+
+    def toggle(self):
+        pass
+
+    def reconcile(self):
+        pass
+
+
 class FakeHost:
     def __init__(self, *, location=None, rows=(), groups=None):
         self.location = location
@@ -462,8 +472,6 @@ class FakeHost:
         self.trashed = []
         self.favorited = []
         self.enhanced = []
-        self.drive_toggles = 0
-        self.reconciles = 0
         self.room_paused = []
         self.cleared_queue = 0
         self.started_now = 0
@@ -526,14 +534,6 @@ class FakeHost:
     def enhance_from_slideshow(self, prompt_id):
         self.enhanced.append(prompt_id)
         return True
-
-    osr2_control = None
-
-    def toggle_osr2_drive(self):
-        self.drive_toggles += 1
-
-    def reconcile_osr2(self):
-        self.reconciles += 1
 
     def set_room_paused(self, paused):
         self.room_paused.append(paused)
@@ -631,7 +631,8 @@ def slideshows(monkeypatch):
                                 "record_group_of": records.group_of,
                                 "record_loops_of": records.loops_of}
                                if records else {})),
-            DirectorSurroundings(pace=SlideshowPace(), motion=None, fun_time=fun_time))
+            DirectorSurroundings(pace=SlideshowPace(), motion=None, osr2=_NoOsr2(),
+                                 fun_time=fun_time))
         host.slideshows = director
         director.items_of = lambda rows: [
             (f"{r['prompt_id']}.png", "image", r["prompt_id"], None) for r in rows]
@@ -1385,7 +1386,7 @@ def _director():
         host,
         DirectorSources(db=db, jobs=FakeJobQueue(), names=ItemNames(db),
                         library=lambda: LibrarySnapshot([]), listing=host.listing),
-        DirectorSurroundings(pace=SlideshowPace(), motion=None, fun_time=None))
+        DirectorSurroundings(pace=SlideshowPace(), motion=None, osr2=_NoOsr2(), fun_time=None))
 
 
 def test_a_video_evolver_upscaled_plays_as_the_upscale(tmp_path, monkeypatch):

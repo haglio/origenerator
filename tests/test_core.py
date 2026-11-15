@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import sys
 import threading
 import winsound
 from contextlib import contextmanager
@@ -43,8 +44,7 @@ from origenerator.gallery.collection import LATEST_KEY, FolderCollection
 from origenerator.gallery.shapes import BOTH, SEPARATE
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import core, toasts
-from origenerator.gui.core import SESSION_UI_STATE, Core, Launch
-from origenerator.gui.gallery_view import GalleryView
+from origenerator.gui.core import SESSION_UI_STATE, Core, Launch, OwnedBy
 from origenerator.gui.headset_window import CAP_PX
 from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP
 from origenerator.gui.panes import PaneSplitter
@@ -91,14 +91,19 @@ def _the_window_before_goes():
             shiboken6.delete(before)
 
 
-def test_every_saved_preference_is_read_and_put_back_by_the_views_own_methods():
+def _is_a_method_of_its_owner(named) -> bool:
+    method = named.its_own if isinstance(named, OwnedBy) else named
+    owner = getattr(sys.modules[method.__module__], method.__qualname__.split(".")[0], None)
+    return getattr(owner, method.__name__, None) is method
+
+
+def test_every_saved_preference_is_read_and_put_back_by_its_owners_own_methods():
     named_some_other_way = [
         key for key, read, put_back in SESSION_UI_STATE
-        if getattr(GalleryView, getattr(read, "__name__", ""), None) is not read
-        or getattr(GalleryView, getattr(put_back, "__name__", ""), None) is not put_back]
+        if not (_is_a_method_of_its_owner(read) and _is_a_method_of_its_owner(put_back))]
 
     assert named_some_other_way == [], (
-        "the pair is named as the view's own methods rather than by name, so a half-wired "
+        "the pair is named as its owner's own methods rather than by name, so a half-wired "
         "preference is an import error and the dead-code check can still see who calls them")
 
 
@@ -410,14 +415,14 @@ def test_reopens_in_the_osr2_control_state_it_was_left_in(qtbot, tmp_path, saved
     state = AppState(tmp_path / "ui.json")
     state.set("osr2_enabled", saved)
     win = _window(qtbot, tmp_path, state)
-    assert win._gallery_view.osr2_control.state() == saved
+    assert win._gallery_view.osr2.control.state() == saved
 
 
 def test_a_window_reopened_driving_moves_the_osr2_only_once_it_shows(qtbot, tmp_path):
     state = AppState(tmp_path / "ui.json")
     state.set("osr2_enabled", OSR2_DRIVING)
     win = _window(qtbot, tmp_path, state)
-    motion = win._gallery_view._osr2_motion
+    motion = win._gallery_view.osr2.motion
     assert not motion.active, "the OSR2 moved while the loading screen was still up"
 
     win.show()
@@ -427,7 +432,7 @@ def test_a_window_reopened_driving_moves_the_osr2_only_once_it_shows(qtbot, tmp_
 def test_persists_the_osr2_control_state_on_close(qtbot, tmp_path):
     state = AppState(tmp_path / "ui.json")
     win = _window(qtbot, tmp_path, state)
-    win._gallery_view.osr2_control.set_state(OSR2_DRIVING)
+    win._gallery_view.osr2.control.set_state(OSR2_DRIVING)
 
     win.close()
     assert state.get("osr2_enabled") == OSR2_DRIVING
@@ -437,13 +442,13 @@ def test_reopens_with_the_osr2_held_to_the_max_intensity_it_was_left_at(qtbot, t
     state = AppState(tmp_path / "ui.json")
     state.set("max_intensity", 35)
     win = _window(qtbot, tmp_path, state)
-    assert win._gallery_view.osr2_control.max_intensity == 35
+    assert win._gallery_view.osr2.control.max_intensity == 35
 
 
 def test_persists_the_max_intensity_on_close(qtbot, tmp_path):
     state = AppState(tmp_path / "ui.json")
     win = _window(qtbot, tmp_path, state)
-    win._gallery_view.osr2_control.set_max_intensity(35)
+    win._gallery_view.osr2.control.set_max_intensity(35)
 
     win.close()
     assert state.get("max_intensity") == 35
@@ -505,7 +510,7 @@ def _shown_at_the_same_size(qtbot, win):
 def test_the_motion_reopens_at_the_speed_amp_center_and_shape_it_was_left_at(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    motion = first._gallery_view._osr2_motion
+    motion = first._gallery_view.osr2.motion
     motion.set_amplitude(60)
     motion.set_speed(70)
     motion.set_center(40)
@@ -514,7 +519,7 @@ def test_the_motion_reopens_at_the_speed_amp_center_and_shape_it_was_left_at(qtb
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    bars = reopened._gallery_view._osr2_motion.state.state
+    bars = reopened._gallery_view.osr2.motion.state.state
     assert (bars.speed, bars.amplitude, bars.intended_center, bars.shape) == (
         70, 60, 40, WaveformShape.TRIANGLE)
 
@@ -522,12 +527,12 @@ def test_the_motion_reopens_at_the_speed_amp_center_and_shape_it_was_left_at(qtb
 def test_the_motion_reopens_human_inspired_when_it_was_left_human_inspired(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    first._gallery_view._osr2_motion.set_learned(True)
+    first._gallery_view.osr2.motion.set_learned(True)
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    assert reopened._gallery_view._osr2_motion.state.learned.active
+    assert reopened._gallery_view.osr2.motion.state.learned.active
 
 
 def test_restores_the_radio_switch_from_app_state(qtbot, tmp_path):
@@ -1926,7 +1931,7 @@ def test_a_window_beside_a_live_session_may_not_drive_the_device(qtbot, tmp_path
 
     win.the_session_has_the_device(True)
 
-    assert not win._gallery_view.osr2_control.isEnabled()
+    assert not win._gallery_view.osr2.control.isEnabled()
 
 
 def test_a_window_names_the_side_its_gallerys_slideshow_is_showing_on(
@@ -1991,9 +1996,9 @@ def test_the_standalone_switches_are_kept_through_a_session_that_took_the_window
     win = _window(qtbot, tmp_path, AppState(path))
     view = win._gallery_view
     view.set_radio_enabled(True)
-    view.osr2_control.set_state(OSR2_DRIVING)
+    view.osr2.control.set_state(OSR2_DRIVING)
     view.set_mic_enabled(True)
-    view.osr2_control.set_max_intensity(35)
+    view.osr2.control.set_max_intensity(35)
 
     win.become_hosted(_fun_time_session())
     win.close()
@@ -2265,12 +2270,12 @@ def test_a_window_handed_back_listens_again_but_leaves_the_sound_and_device_off(
     view = win._gallery_view
     view.set_mic_enabled(True)
     view.set_radio_enabled(True)
-    view.osr2_control.set_state(OSR2_DRIVING)
+    view.osr2.control.set_state(OSR2_DRIVING)
     win.become_hosted(_fun_time_session())
 
     win.become_standalone()
 
-    assert (view.mic_enabled(), view.radio_enabled(), view.osr2_control.state()) == (
+    assert (view.mic_enabled(), view.radio_enabled(), view.osr2.control.state()) == (
         True, False, OSR2_PARKED)
 
 

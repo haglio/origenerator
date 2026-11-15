@@ -33,7 +33,7 @@ from origenerator import (
 )
 from origenerator.action_setter_tool import SetterHost, ThrownInto
 from origenerator.branch_session import is_branch_session
-from origenerator.comfyui_api import ForeignQueue, format_execution_error
+from origenerator.comfyui_api import format_execution_error
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     EVOLVER_SOURCE,
@@ -132,18 +132,13 @@ from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.generation_failed import GenerationFailed
 from origenerator.gui.how_many import HOW_MANY
 from origenerator.gui.inflight import (
-    CANCEL_ALL_TEXT,
     CANCEL_TEXT,
-    cancel_all_question,
     cancel_tooltip,
-    clear_queue_tooltip,
-    jobs_to_cancel,
     queue_wait_text,
     stop_populate_text,
     stop_populate_tooltip,
 )
 from origenerator.gui.job_queue import JobQueue
-from origenerator.gui.job_queue_view import JobQueueView
 from origenerator.gui.look_training_controller import LookTrainingController
 from origenerator.gui.message import ERROR, HEARD_MARK, INFO
 from origenerator.gui.modify_batch_tile import ModifyBatchTile
@@ -163,6 +158,7 @@ from origenerator.gui.panes import (
 )
 from origenerator.gui.populate_controller import PopulateController
 from origenerator.gui.prompt_reveal import reveal_prompt
+from origenerator.gui.shown_job_queue import ShownJobQueue, read_foreign_queue
 from origenerator.gui.slideshow_director import (
     DirectorSources,
     DirectorSurroundings,
@@ -334,7 +330,6 @@ class GalleryView(QWidget):
             ),
 
         )
-        self._foreign_queue = ForeignQueue(running=[], pending=[])
         self._build_ui()
         self._voice.bind_the_buttons(
             VoiceSwitches(
@@ -445,17 +440,20 @@ class GalleryView(QWidget):
         self._selection_group = None
         self._navigation = NavigationController(self, search=self._search)
         self._trail = (False, False)
+        self._starting = StartingRows(self)
+        self.job_queue = ShownJobQueue(
+            self._jobs, client, starting=self._starting,
+            in_flight=self._gallery_pane.inflight_items,
+            listed=lambda: (self._listed_rows, self._listed_requests), asks_over=self)
         self._slideshows = SlideshowDirector(
             self,
             DirectorSources.of_this_library(db=db, jobs=self._jobs, names=self._item_names,
                                             library=lambda: self._library, listing=self.listing),
             DirectorSurroundings(
                 pace=self._pace, motion=self.osr2.motion, osr2=self.osr2,
-                fun_time=self._fun_time,
+                job_queue=self.job_queue, fun_time=self._fun_time,
                 radio=self._radio, buttons_of=lambda: self._buttons))
         self._gallery_pane.slideshow_requested.connect(self._slideshows.open_on_tile)
-        self._starting = StartingRows(self)
-        self._starting.changed.connect(self._update_queue)
         self._combine = CombineController(
             self,
             CombineParts(
@@ -560,15 +558,10 @@ class GalleryView(QWidget):
         layout = QVBoxLayout(self)
         toc = self._build_toc_pane()
         gallery_pane = self._build_gallery_pane()
-        self._queue = JobQueueView()
-        self._queue.move_requested.connect(self._jobs.move)
-        self._jobs.reordered.connect(self._update_queue)
-        self._queue.clear_queue_requested.connect(self.clear_foreign_queue)
-        self._queue.start_now_requested.connect(self.start_now)
-        self._queue.cancel_all_requested.connect(self.cancel_all)
         self._arrangement = PaneArrangement(
             toc=toc, gallery_pane=gallery_pane, generate_column=self._build_generate_pane(),
-            generate_pane=self._generate_pane, queue=self._queue)
+            generate_pane=self._generate_pane, queue=self.job_queue.view)
+        self.job_queue.changed.connect(self._tell_of_the_queue)
         self._folder_actions.saved.connect(self._generate_pane.hear_actions)
         folded = self._fun_time is not None and not self._fun_time.in_a_headset
         layout.addWidget(self._arrangement.hosted() if folded
@@ -1036,7 +1029,7 @@ class GalleryView(QWidget):
                 self._slideshows.note_arrived(_arrived(self._library.rows, listed_before))
             else:
                 self._gallery_pane.refresh_inflight(rows=rows, requests=requests)
-            self._update_queue(self._inflight_items(rows=rows, requests=requests))
+            self.job_queue.update(self.job_queue.items(rows=rows, requests=requests))
             self._enhance.tell_the_slideshows()
             self._refresh_wait_note()
         finally:
@@ -1047,8 +1040,7 @@ class GalleryView(QWidget):
             job.reconcile_with(facts.histories.get(job.prompt_id))
             job.take_backlog(facts.backlogs.get(job.prompt_id))
             job.take_executing(job.prompt_id in facts.executing)
-        if facts.foreign is not None:
-            self._foreign_queue = facts.foreign
+        self.job_queue.take_foreign(facts.foreign)
 
     def _rebuild(self, rows, meta):
         self._folder_meta = meta
@@ -1103,7 +1095,7 @@ class GalleryView(QWidget):
             self._search.run()
         if standing is not None and self._tree_view.selected_folder_key() == standing:
             self._gallery_pane.return_to(place)
-        self._update_queue(self._inflight_items(rows=rows, requests=requests))
+        self.job_queue.update(self.job_queue.items(rows=rows, requests=requests))
         self._reconcile_generating()
         for tab in self._generate_pane.generate_tabs():
             tab.refresh_generate_caption()
@@ -1751,7 +1743,7 @@ class GalleryView(QWidget):
 
     def _sync_cancel_buttons(self):
         self._rerender_current_leaf()
-        self._update_queue()
+        self.job_queue.update()
         self._reconcile_generating()
 
     def say(self, message: str, *, mark: str = HEARD_MARK) -> None:
@@ -2262,68 +2254,10 @@ class GalleryView(QWidget):
     def listed_prompt_ids(self) -> list[str]:
         return self._gallery_pane.listed_prompt_ids()
 
-    def queue_now(self) -> tuple[list, int]:
-        listed = self._listed_rows
-        holds_every_job = {row["prompt_id"] for row in listed} >= set(self._jobs.queue_order)
-        items = (self._inflight_items(rows=listed, requests=self._listed_requests)
-                 if holds_every_job else self._inflight_items())
-        return items, self._foreign_queue.total
-
-    def _inflight_items(self, rows=None, requests=None) -> list:
-        return self._starting.placed_among(
-            self._gallery_pane.inflight_items(rows=rows, requests=requests), self._jobs)
-
-    def _update_queue(self, inflight=None):
-        items = self._inflight_items() if inflight is None else inflight
-        self._queue.set_items(items, self._foreign_queue.total)
+    def _tell_of_the_queue(self, items: list, foreign_total: int) -> None:
         self._generate_pane.note_in_flight(items)
-        self._slideshows.note_queue(items, self._foreign_queue.total)
+        self._slideshows.note_queue(items, foreign_total)
         self._slideshows.note_in_flight(items)
-
-    def _refresh_foreign_queue(self):
-        queue = _read_foreign_queue(self._client)
-        if queue is not None:
-            self._foreign_queue = queue
-
-    def start_now(self):
-        self._jobs.start_now()
-        self._update_queue()
-
-    def cancel_all(self):
-        items = jobs_to_cancel(self._inflight_items())
-        if not items or not _confirmed_cancel_all(self, len(items)):
-            return
-        for item in reversed(items):
-            item.cancel()
-        self._update_queue()
-
-    def clear_foreign_queue(self):
-        if self._client is None:
-            return
-        total = self._foreign_queue.total
-        if not total or not self._confirm_clear_queue(total):
-            return
-        try:
-            dropped = self._client.clear_foreign_queue()
-        except Exception as e:
-            logger.exception("Failed to clear ComfyUI's queue")
-            QMessageBox.warning(
-                self, "Could not clear the queue",
-                f"ComfyUI would not drop the other app's jobs:\n\n{e}",
-            )
-            return
-        logger.info("Dropped %d job(s) another app had queued on ComfyUI", dropped)
-        self._refresh_foreign_queue()
-        self._update_queue()
-
-    def _confirm_clear_queue(self, total: int) -> bool:
-        reply = QMessageBox.question(
-            self, "Clear ComfyUI's queue",
-            f"{clear_queue_tooltip(total)}?\n\nAnything you queued from here is left alone;"
-            " one of theirs already running is interrupted.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        return reply == QMessageBox.StandardButton.Yes
 
     def selected_folder(self) -> str | None:
         return self._tree_view.selected_folder_key() or self._pending_key
@@ -2843,25 +2777,7 @@ def _fetch_poll_facts(client, targets) -> _PollFacts:
                 executing = frozenset(client.executing_prompts())
             except Exception as e:
                 logger.debug("Could not read what ComfyUI is making: %s", e)
-    return _PollFacts(histories, backlogs, _read_foreign_queue(client), executing)
-
-
-def _confirmed_cancel_all(parent, total: int) -> bool:
-    reply = QMessageBox.question(
-        parent, CANCEL_ALL_TEXT, cancel_all_question(total),
-        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-    )
-    return reply == QMessageBox.StandardButton.Yes
-
-
-def _read_foreign_queue(client):
-    if client is None:
-        return None
-    try:
-        return client.foreign_queue()
-    except Exception as e:
-        logger.debug("Could not read ComfyUI's queue: %s", e)
-        return ForeignQueue(running=[], pending=[])
+    return _PollFacts(histories, backlogs, read_foreign_queue(client), executing)
 
 
 def _fingerprint(rows, meta) -> tuple[int, int]:

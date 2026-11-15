@@ -527,7 +527,7 @@ def test_an_inflight_tile_wears_the_item_type_icon_of_its_media_type(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    items = {it.key: it for it in view._inflight_items()}
+    items = {it.key: it for it in view.job_queue.items()}
     assert items["rr1"].media_type == "video"
 
 

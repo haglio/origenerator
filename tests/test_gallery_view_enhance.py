@@ -166,9 +166,9 @@ def test_a_queue_rows_shield_keeps_its_run_going_for_the_image_asked_for_after_i
     view.enhance_items(["g0"])
     (first,) = view._jobs.all_jobs
     client.progress.emit(first.prompt_id, "s", 1, 10)
-    view._update_queue()
+    view.job_queue.update()
 
-    view._queue.rows()[0]._shield.click()
+    view.job_queue.view.rows()[0]._shield.click()
     view.enhance_items(["g1"])
 
     client.interrupt.assert_not_called()
@@ -176,8 +176,8 @@ def test_a_queue_rows_shield_keeps_its_run_going_for_the_image_asked_for_after_i
 
 
 def _cancel_from_the_queue(view, job):
-    view._update_queue()
-    (queued,) = view._queue.rows()
+    view.job_queue.update()
+    (queued,) = view.job_queue.view.rows()
     queued._cancel.click()
 
 
@@ -549,7 +549,7 @@ def test_a_running_enhance_gets_no_tile_of_its_own_on_latest(qtbot, tmp_path):
 
     assert job.prompt_id not in view._gallery_pane._inflight_tiles
     assert view._gallery_pane._thumb_widgets["g0"]._enhancing is not None
-    assert view._queue.keys() == [job.prompt_id]
+    assert view.job_queue.view.keys() == [job.prompt_id]
 
 
 def test_enhancing_an_image_lifts_its_tile_to_the_top_of_latest(qtbot, tmp_path):

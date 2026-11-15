@@ -187,11 +187,11 @@ def test_a_queued_rows_click_opens_its_folder_across_the_split(qtbot, tmp_path):
     view = GalleryView(FakeDB([image, in_flight]))
     qtbot.addWidget(view)
     view.refresh()
-    view._update_queue()
+    view.job_queue.update()
 
     folder = gallery.settings_folder_key(
         in_flight, gallery.build_image_config_index([image]))
-    (row,) = view._queue.rows()
+    (row,) = view.job_queue.view.rows()
     qtbot.mouseDClick(row, Qt.MouseButton.LeftButton)
     assert view.selected_folder_key() == shaped_key(folder, "portrait"), (
         "each shape's tree keys a video's folder from the whole library's start frames; "

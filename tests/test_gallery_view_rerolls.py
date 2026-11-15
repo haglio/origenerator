@@ -648,8 +648,8 @@ def test_populate_rewords_the_cancel_hover_in_all_three_panes(qtbot, tmp_path):
     next_seed = "Throw away this seed and start the next"
     assert _generating_tile(view)._cancel.text() == "Cancel"
     assert _generating_tile(view)._cancel.toolTip() == next_seed
-    assert [row._cancel.text() for row in view._queue.rows()] == ["Cancel"]
-    assert [row._cancel.toolTip() for row in view._queue.rows()] == [next_seed]
+    assert [row._cancel.text() for row in view.job_queue.view.rows()] == ["Cancel"]
+    assert [row._cancel.toolTip() for row in view.job_queue.view.rows()] == [next_seed]
     assert view._generate_pane.current_generate_tab()._cancel_btn.toolTip() == next_seed
 
 
@@ -668,7 +668,7 @@ def test_turning_populate_off_hovers_a_plain_cancel_again_with_the_run_still_in_
     assert key in view._live_jobs
     plain = "Cancel this generation"
     assert _generating_tile(view)._cancel.toolTip() == plain
-    assert [row._cancel.toolTip() for row in view._queue.rows()] == [plain]
+    assert [row._cancel.toolTip() for row in view.job_queue.view.rows()] == [plain]
     assert view._generate_pane.current_generate_tab()._cancel_btn.toolTip() == plain
 
 

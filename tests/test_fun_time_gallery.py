@@ -151,7 +151,7 @@ def test_fun_time_gallery_stacks_the_generate_tabs_over_the_gallery_pane(qtbot):
     assert stack.widget(1) is view._arrangement.panes
     assert view._arrangement.panes.count() == 2
     assert view._arrangement.panes.widget(1) is view._arrangement.folder_panes
-    assert stack.widget(2) is view._queue
+    assert stack.widget(2) is view.job_queue.view
 
 
 def test_fun_time_gallery_gives_the_lower_corner_to_the_queue(qtbot):
@@ -160,10 +160,10 @@ def test_fun_time_gallery_gives_the_lower_corner_to_the_queue(qtbot):
     with qtbot.waitExposed(view):
         view.show()
     toc = view._arrangement.panes.widget(0)
-    corner = view._queue.mapTo(view, view._queue.rect().bottomLeft())
+    corner = view.job_queue.view.mapTo(view, view.job_queue.view.rect().bottomLeft())
     tree_foot = toc.mapTo(view, toc.rect().bottomLeft())
     assert tree_foot.y() < corner.y()
-    assert view._queue.mapTo(view, view._queue.rect().topLeft()).x() <= (
+    assert view.job_queue.view.mapTo(view, view.job_queue.view.rect().topLeft()).x() <= (
         toc.mapTo(view, toc.rect().topLeft()).x()
     )
 
@@ -1385,7 +1385,7 @@ def test_a_gallery_taken_into_a_session_stands_as_a_hosted_one_is_built(qtbot):
     assert stack.count() == built._arrangement.stack.count() == 3
     assert stack.widget(0).findChild(type(view._generate_pane)) is view._generate_pane
     assert stack.widget(1) is view._arrangement.panes
-    assert stack.widget(2) is view._queue
+    assert stack.widget(2) is view.job_queue.view
     assert view._arrangement.panes.count() == built._arrangement.panes.count()
     assert view._arrangement.panes.widget(1) is view._arrangement.folder_panes
     assert view._arrangement.folder_panes.count() == built._arrangement.folder_panes.count()
@@ -1449,7 +1449,7 @@ def test_a_gallery_handed_back_from_a_session_stands_as_a_standalone_one_is_buil
     assert generate_pane.findChild(type(view._generate_pane)) is view._generate_pane
     assert generate_pane.minimumWidth() == view._generate_pane.minimumWidth() == 0
     assert arrangement.left_column.widget(0) is arrangement.folder_panes
-    assert arrangement.left_column.widget(1) is view._queue
+    assert arrangement.left_column.widget(1) is view.job_queue.view
     assert arrangement.folder_panes.count() == built._arrangement.folder_panes.count() == 2
 
 

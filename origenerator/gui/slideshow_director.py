@@ -110,14 +110,6 @@ class SlideshowHost(Protocol):
 
     def off_thread(self, work, done) -> None: ...
 
-    def queue_now(self) -> tuple[list, int]: ...
-
-    def clear_foreign_queue(self) -> None: ...
-
-    def start_now(self) -> None: ...
-
-    def cancel_all(self) -> None: ...
-
     def window(self): ...
 
     def follow_link(self, prompt_id: str) -> None: ...
@@ -224,6 +216,7 @@ class SlideshowDirector:
         self._region_paces: dict[str, SlideshowPace] = {}
         self._motion = surroundings.motion
         self._osr2 = surroundings.osr2
+        self._job_queue = surroundings.job_queue
         fun_time = self._fun_time = surroundings.fun_time
         self._slideshow = None
         self._standalone_shape: str | None = None
@@ -470,7 +463,7 @@ class SlideshowDirector:
         if carrying.resume is not None:
             slideshow.resume(carrying.resume, opened_on_it=keep_the_slide)
         if not keep_the_slide:
-            self._offer_the_frames(slideshow, location, self._host.queue_now()[0])
+            self._offer_the_frames(slideshow, location, self._job_queue.now()[0])
             if follows_a_run:
                 slideshow.follow_what_is_being_made()
             else:
@@ -489,7 +482,7 @@ class SlideshowDirector:
             return shown_on is None or where == self.base_location(shown_on)
 
         return SlideshowActions(
-            queue_now=self._host.queue_now,
+            queue_now=self._job_queue.now,
             delete=self._host.trash_generation,
             enhance=self._host.enhance_from_slideshow,
             favorite=self._host.favorite_generation,
@@ -503,9 +496,9 @@ class SlideshowDirector:
             reorder=self.reorder_slideshow,
             browse_all=self.browse_it_all,
             move=self._jobs.move,
-            clear_queue=self._host.clear_foreign_queue,
-            start_now=self._host.start_now,
-            cancel_all=self._host.cancel_all,
+            clear_queue=self._job_queue.clear_foreign,
+            start_now=self._job_queue.start_now,
+            cancel_all=self._job_queue.cancel_all,
             core_window=self._host.window,
             drive_toggle=self._osr2.toggle,
             omnipause=self._ask_the_room_to_pause(),
@@ -1083,7 +1076,7 @@ class SlideshowDirector:
             or self._would_play(item.key, location))]
 
     def _run_being_made_at(self, location) -> dict | None:
-        shown = self._runs_shown_at(location, self._host.queue_now()[0])
+        shown = self._runs_shown_at(location, self._job_queue.now()[0])
         return self._db.get_generation(shown[0].key) if shown else None
 
     def note_enhanced(self, row: dict | None):

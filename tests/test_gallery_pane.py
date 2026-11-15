@@ -470,6 +470,17 @@ def test_revealing_an_item_past_the_first_page_draws_and_picks_its_tile(qtbot, d
     assert "g60" in [tile.prompt_id for tile in _drawn(scroll)]
 
 
+def test_an_item_many_pages_down_is_not_drawn_down_to_since_that_holds_the_whole_app_still(
+        qtbot, db):
+    rows = [_row(f"g{n}", n) for n in range(400)]
+    pane, scroll = _pane(qtbot, db, rows)
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+    drawn_before = len(_drawn(scroll))
+
+    assert not pane.reveal_tile("g399")
+    assert (len(_drawn(scroll)), pane.selected_prompt_ids()) == (drawn_before, [])
+
+
 def test_latest_heads_each_batch_with_when_it_was_made(qtbot, db):
     rows = [_row("g1", 1, "2026-09-12 23:00:00"), _row("g2", 2, "2026-09-12 22:50:00"),
             _row("g3", 3, "2026-09-12 19:00:00")]

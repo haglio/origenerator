@@ -73,6 +73,7 @@ _PAGE = 50
 _ROWS_PAST_A_REVEAL = 3
 _MOST_TILES_ACROSS = 4
 _NEIGHBORS_PAST_A_REVEAL = _ROWS_PAST_A_REVEAL * _MOST_TILES_ACROSS
+_MOST_TILES_DRAWN_FOR_A_REVEAL = 4 * _PAGE
 _REACH = 600
 _ROOM_ABOVE_A_SECTIONS_HEADING = GAP_DIALOG
 SEARCH_DRAW_LIMIT = 200
@@ -152,7 +153,7 @@ class _Pages:
 
     def draw_past(self, shows, neighbors: int = 0) -> None:
         at = self._index(shows)
-        if at is not None:
+        if at is not None and at - self.drawn < _MOST_TILES_DRAWN_FOR_A_REVEAL:
             self.draw(at + 1 + neighbors - self.drawn)
 
     def catch_up(self, earlier: _Pages) -> None:

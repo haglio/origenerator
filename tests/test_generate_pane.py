@@ -12,7 +12,6 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
 from origenerator.gallery.keys import folder_id
 from origenerator.gallery.tree import settings_folder_key
-from origenerator.gui import generate_tab as generate_tab_module
 from origenerator.gui.combination import Combination
 from origenerator.gui.eliding_tab_bar import ElidingTabBar
 from origenerator.gui.generate_pane import GeneratePane, parse_tabs_state
@@ -22,6 +21,7 @@ from origenerator.library_views import TabViews
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.qt_exec import faking_exec
+from tests.real_db import kept_on_disk
 
 
 @pytest.fixture
@@ -264,11 +264,11 @@ def test_copy_name_on_a_modify_batch_tab_copies_the_folders_name_alone(tabs):
     assert QApplication.clipboard().text() == "AB12CD34"
 
 
-def test_modify_batch_opens_while_another_tab_shows_the_folders_newest_item(tabs, monkeypatch):
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
+def test_modify_batch_opens_while_another_tab_shows_the_folders_newest_item(tabs, tmp_path):
     params = _sdxl_full(positive_prompt="a wizard", seed=1)
     _complete_gen(tabs._db, "older", params, "sdxl_older.png")
-    newest = _complete_gen(tabs._db, "newest", dict(params, seed=2), "sdxl_newest.png")
+    newest = kept_on_disk(tabs._db, _complete_gen(
+        tabs._db, "newest", dict(params, seed=2), "sdxl_newest.png"), tmp_path / "sdxl_newest.png")
     for tab in tabs.generate_tabs():
         tab._viewport.show_media = MagicMock()
     tabs.load_selection(newest, [newest])
@@ -468,6 +468,12 @@ def test_a_click_reads_the_table_no_more_than_the_tab_it_lands_in(tabs):
     assert reads.call_count == shown_alone
 
 
+def _two_kept_generations(tabs, folder):
+    cat, dog = _two_generations(tabs)
+    return (kept_on_disk(tabs._db, cat, folder / "cat.png"),
+            kept_on_disk(tabs._db, dog, folder / "dog.png"))
+
+
 def _two_generations(tabs):
     cat = _complete_gen(tabs._db, "cat", _sdxl_full(positive_prompt="cat", seed=1), "cat.png")
     dog = _complete_gen(tabs._db, "dog", _sdxl_full(positive_prompt="dog", seed=1), "dog.png")
@@ -515,9 +521,8 @@ def test_clicking_an_item_another_tab_shows_brings_that_tab_forward(tabs):
     assert [tab._displayed_row["prompt_id"] for tab in tabs.generate_tabs()] == ["cat", "dog"]
 
 
-def test_a_tab_whose_settings_bring_it_to_an_item_another_tab_shows_closes(tabs, monkeypatch):
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
-    cat, dog = _two_generations(tabs)
+def test_a_tab_whose_settings_bring_it_to_an_item_another_tab_shows_closes(tabs, tmp_path):
+    cat, dog = _two_kept_generations(tabs, tmp_path)
     tabs.load_selection(cat, [cat, dog])
     showing_cat = tabs.current_generate_tab()
     tabs.pin_current_tab()
@@ -529,9 +534,8 @@ def test_a_tab_whose_settings_bring_it_to_an_item_another_tab_shows_closes(tabs,
     assert tabs.generate_tabs() == [showing_cat]
 
 
-def test_a_restored_session_opens_one_tab_per_item(tabs, monkeypatch):
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
-    cat, _dog = _two_generations(tabs)
+def test_a_restored_session_opens_one_tab_per_item(tabs, tmp_path):
+    cat, _dog = _two_kept_generations(tabs, tmp_path)
     same = _generate_tab("sdxl_t2i", json.loads(cat["params_json"]))
 
     tabs.restore_state({"tabs": [same, same], "current": 1})
@@ -751,9 +755,8 @@ def test_watchers_of_lists_only_the_tabs_following_that_folder(tabs):
     assert tabs.tab_watching("elsewhere") is None
 
 
-def test_stop_watching_puts_the_displayed_generation_back(tabs, monkeypatch):
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
-    cat, dog = _two_generations(tabs)
+def test_stop_watching_puts_the_displayed_generation_back(tabs, tmp_path):
+    cat, dog = _two_kept_generations(tabs, tmp_path)
     tabs.load_selection(cat, [cat, dog])
     tab = tabs.current_generate_tab()
     tab._viewport.show_media = MagicMock()
@@ -762,7 +765,7 @@ def test_stop_watching_puts_the_displayed_generation_back(tabs, monkeypatch):
     tab.stop_watching()
 
     assert tab.watched_key() is None
-    tab._viewport.show_media.assert_called_once_with("cat.png", "image", cat["prompt_id"])
+    tab._viewport.show_media.assert_called_once_with(tmp_path / "cat.png", "image", cat["prompt_id"])
 
 
 def test_stop_watching_a_blank_tab_leaves_it_blank(tabs):
@@ -776,9 +779,8 @@ def test_stop_watching_a_blank_tab_leaves_it_blank(tabs):
     assert tab.is_blank()
 
 
-def test_stop_watching_a_tab_with_settings_shows_their_newest_result(tabs, monkeypatch):
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
-    cat, _dog = _two_generations(tabs)
+def test_stop_watching_a_tab_with_settings_shows_their_newest_result(tabs, tmp_path):
+    cat, _dog = _two_kept_generations(tabs, tmp_path)
     tab = tabs.currentWidget()
     tab.prefill("sdxl_t2i", json.loads(cat["params_json"]))
     tab.watch_folder("k", b"frame")
@@ -786,7 +788,7 @@ def test_stop_watching_a_tab_with_settings_shows_their_newest_result(tabs, monke
 
     tab.stop_watching()
 
-    tab._viewport.show_media.assert_called_once_with("cat.png", "image", cat["prompt_id"])
+    tab._viewport.show_media.assert_called_once_with(tmp_path / "cat.png", "image", cat["prompt_id"])
 
 
 def test_pointing_a_tab_at_a_saved_generation_ends_its_watch(tabs):
@@ -817,9 +819,8 @@ def test_show_running_generation_seeds_the_form_and_shows_no_file(tabs):
         "next open forks rather than taking it over")
 
 
-def test_a_landed_image_ends_the_wait_it_was_standing_on(tabs, monkeypatch):
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
-    cat, _dog = _two_generations(tabs)
+def test_a_landed_image_ends_the_wait_it_was_standing_on(tabs, tmp_path):
+    cat, _dog = _two_kept_generations(tabs, tmp_path)
     tab = tabs.currentWidget()
     tab._viewport.show_media = MagicMock()
     tab.watch_folder("k", None)
@@ -827,12 +828,11 @@ def test_a_landed_image_ends_the_wait_it_was_standing_on(tabs, monkeypatch):
     tab.show_finished_media(cat)
 
     assert not tab.is_awaiting_frame()
-    tab._viewport.show_media.assert_called_once_with("cat.png", "image", cat["prompt_id"])
+    tab._viewport.show_media.assert_called_once_with(tmp_path / "cat.png", "image", cat["prompt_id"])
 
 
-def test_a_resting_tab_following_a_run_stays_blank_for_the_next_click(tabs, monkeypatch):
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
-    cat, dog = _two_generations(tabs)
+def test_a_resting_tab_following_a_run_stays_blank_for_the_next_click(tabs, tmp_path):
+    cat, dog = _two_kept_generations(tabs, tmp_path)
     resting = tabs.currentWidget()
     resting.watch_folder("k", None)
 

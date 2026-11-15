@@ -749,7 +749,6 @@ def test_an_opened_combination_prefills_a_tab_with_both_its_halves(combine,
     monkeypatch.setitem(WORKFLOW_REGISTRY, VIDEO_WORKFLOW, workflow)
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
     monkeypatch.setattr(module.gallery, "combined_params", lambda v, i, wf: {"seed": 7})
-    monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
     tab = FakeGenerateTab()
     tabs = FakeTabs(tab)
     controller, _host = combine(rows=([_image("img"), _video("clip")]), tabs=tabs)
@@ -774,7 +773,6 @@ def _a_curated_action_opened(combine, monkeypatch):
 
 
 def test_a_curated_action_opened_shows_the_frame_alone(combine, monkeypatch):
-    monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
 
     tab = _a_curated_action_opened(combine, monkeypatch)
 
@@ -810,7 +808,6 @@ def _apart_from_the_image_and_the_seeds(params, workflow):
 def test_an_action_with_no_settings_assigned_opens_the_lanes_workflow_as_it_starts(
         combine, monkeypatch, state):
     _nothing_assigned(monkeypatch)
-    monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
     tab = FakeGenerateTab()
     tabs = FakeTabs(tab)
     controller, host = combine(
@@ -841,7 +838,6 @@ def test_the_lanes_workflow_opens_with_its_prompts_empty_whatever_it_starts_with
     _nothing_assigned(monkeypatch)
     monkeypatch.setitem(WORKFLOW_REGISTRY, VIDEO_WORKFLOW, StartsWithWords())
     monkeypatch.setattr(module.gallery, "is_image_conditioned", lambda name: True)
-    monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
     tabs = FakeTabs(FakeGenerateTab())
     controller, _host = combine(rows=([_image("img", state="state one")]), tabs=tabs)
 
@@ -855,7 +851,6 @@ def test_the_lanes_workflow_opens_with_its_prompts_empty_whatever_it_starts_with
 def _what_the_press_runs(combine, monkeypatch, *, edit_first, lane, assigned):
     monkeypatch.setattr(animation_settings, "settings_for", lambda *_: assigned)
     monkeypatch.setattr(module.action_settings, "pinned_settings", lambda c, i: None)
-    monkeypatch.setattr(module.gallery, "resolve_preview", lambda row, out: None)
     jobs, tabs = FakeReroll(), FakeTabs(FakeGenerateTab())
     controller, _host = combine(rows=([_image("img", state="state one")]),
                                 jobs=jobs, tabs=tabs)

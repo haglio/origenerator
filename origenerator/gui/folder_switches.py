@@ -10,6 +10,7 @@ from origenerator.gui.gallery_pane_buttons import Button
 
 ONLY_A_LEAF_IS_FAVORITED = "Only a leaf folder can be favorited"
 ONLY_A_LEAF_IS_ENHANCED = "Only a leaf folder can be enhanced as a whole"
+_NEVER_SWITCHED = {"custom_name": None, "starred": False}
 
 
 class FolderSwitchesHost(Protocol):
@@ -56,6 +57,16 @@ class FolderSwitches:
     def enhancing(self, key: str) -> bool:
         return (self._host.folder_meta().get(key) or {}).get("enhance_after_id") is not None
 
+    def set_favorite(self, key: str, favorite: bool) -> bool:
+        meta = self._host.folder_meta()
+        if bool(meta.get(key, {}).get("starred")) == favorite:
+            return False
+        after_id = self._host.highest_id_listed() if favorite else None
+        self._db.set_folder_favorite(key, favorite, after_id=after_id)
+        meta[key] = {**meta.get(key, _NEVER_SWITCHED), "starred": favorite,
+                     "favorite_after_id": after_id}
+        return True
+
     def star_what_is_in(self, key: str) -> None:
         self._host.set_items_favorite(
             [row["prompt_id"] for row in self._host.leaf_folders().get(key, [])
@@ -64,7 +75,7 @@ class FolderSwitches:
     def set_enhancing(self, key: str, on: bool) -> None:
         after_id = self._host.highest_id_listed() if on else None
         self._db.set_folder_enhance(key, after_id=after_id)
-        self._host.folder_meta().setdefault(key, {"custom_name": None, "starred": False})[
+        self._host.folder_meta().setdefault(key, dict(_NEVER_SWITCHED))[
             "enhance_after_id"] = after_id
         if on:
             self._enhance.enhance_what_awaits(self._host.leaf_folders().get(key, []))

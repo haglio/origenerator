@@ -5,6 +5,7 @@ import json
 import pytest
 
 from origenerator import gallery
+from origenerator.db import Database, NewRequest
 from origenerator.gallery import JobKind
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.inflight import RunReading
@@ -16,6 +17,7 @@ from origenerator.gui.inflight_items import (
     requested_of,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY
+from tests.real_db import database_in
 
 
 def _row(prompt_id, *, status="pending", workflow="sdxl_t2i", params=None, **extra):
@@ -24,30 +26,28 @@ def _row(prompt_id, *, status="pending", workflow="sdxl_t2i", params=None, **ext
         "workflow_name": workflow,
         "workflow_version": "v004",
         "status": status,
-        "media_type": "image",
         "params_json": json.dumps(params or {"positive_prompt": "a tabby", "seed": 1}),
         "thumbnail_path": f"{prompt_id}.jpg",
         **extra,
     }
 
 
-class FakeDb:
-    def __init__(self, rows=(), requests=()):
-        self._rows = list(rows)
-        self._requests = list(requests)
+class ReadsCounted(Database):
+    def __init__(self, path):
+        super().__init__(path)
         self.asked = []
 
     def list_generations(self):
         self.asked.append("list_generations")
-        return list(self._rows)
+        return super().list_generations()
 
     def list_requests(self):
         self.asked.append("list_requests")
-        return list(self._requests)
+        return super().list_requests()
 
-    def recent_durations(self, workflow_name):
+    def recent_durations(self, workflow_name, limit=10):
         self.asked.append("recent_durations")
-        return [30.0, 32.0, 34.0] if workflow_name == "sdxl_t2i" else []
+        return super().recent_durations(workflow_name, limit)
 
 
 class FakeJob:
@@ -129,10 +129,10 @@ class FakeTree:
 
 
 @pytest.fixture
-def build():
-    def make(rows=(), *, sources=None, image_rows=(), image_index=None, callbacks=None):
+def build(sources):
+    def make(rows=(), *, sources_given=None, image_rows=(), image_index=None, callbacks=None):
         model = InFlightItems(
-            sources or _sources(rows),
+            sources_given or sources(rows),
             image_rows=lambda: list(image_rows),
             image_index=lambda: (gallery.build_image_config_index(list(image_rows))
                                  if image_index is None else image_index),
@@ -142,10 +142,16 @@ def build():
     return make
 
 
-def _sources(rows=(), requests=(), jobs=None, populating=(), groups=None):
-    return InFlightSources(
-        db=FakeDb(rows, requests), jobs=jobs or FakeJobQueue(),
-        populate=FakeAuto(populating), tree=FakeTree(groups))
+@pytest.fixture
+def sources(tmp_path):
+    def make(rows=(), requests=(), jobs=None, populating=(), groups=None):
+        db = database_in(tmp_path, rows, kind=ReadsCounted)
+        for request in requests:
+            db.record_request(NewRequest(**request))
+        return InFlightSources(
+            db=db, jobs=jobs or FakeJobQueue(),
+            populate=FakeAuto(populating), tree=FakeTree(groups))
+    return make
 
 
 def _callbacks(cancelled=None, revealed=None, went_to=None, shielded=None):
@@ -184,42 +190,42 @@ def test_a_running_row_no_live_job_holds_still_gets_a_plain_tile(build):
     assert tile.reading.status == "running"
 
 
-def test_a_tracked_run_grafts_its_live_reading_onto_the_row(build):
+def test_a_tracked_run_grafts_its_live_reading_onto_the_row(build, sources):
     job = FakeJob("g1")
-    items = build(sources=_sources([_row("g1", status="running")], jobs=FakeJobQueue(jobs_by_folder={"image/sdxl_t2i/aaa": [job]})))
+    items = build(sources_given=sources([_row("g1", status="running")], jobs=FakeJobQueue(jobs_by_folder={"image/sdxl_t2i/aaa": [job]})))
 
     tile, = items
     assert (tile.reading.frame, tile.reading.progress, tile.reading.stage) == (b"frame", (5, 20), "Render")
     assert tile.cancel is not None
 
 
-def test_a_video_waiting_out_the_minute_after_an_image_carries_when_it_starts(build):
+def test_a_video_waiting_out_the_minute_after_an_image_carries_when_it_starts(build, sources):
     job = FakeJob("g1", state="queued", starts_at=1060.0)
-    items = build(sources=_sources([_row("g1", status="pending")], jobs=FakeJobQueue(jobs_by_folder={"video/wan22_i2v/aaa": [job]})))
+    items = build(sources_given=sources([_row("g1", status="pending")], jobs=FakeJobQueue(jobs_by_folder={"video/wan22_i2v/aaa": [job]})))
 
     tile, = items
     assert tile.starts_at == 1060.0
 
 
-def test_a_run_whose_lines_are_being_spoken_says_so_rather_than_running(build):
+def test_a_run_whose_lines_are_being_spoken_says_so_rather_than_running(build, sources):
     job = FakeJob("g1", state="speaking")
-    items = build(sources=_sources([_row("g1", status="running")], jobs=FakeJobQueue(jobs_by_folder={"image/sdxl_t2i/aaa": [job]})))
+    items = build(sources_given=sources([_row("g1", status="running")], jobs=FakeJobQueue(jobs_by_folder={"image/sdxl_t2i/aaa": [job]})))
 
     assert items[0].reading.status == "speaking"
 
 
-def test_a_run_comfyui_holds_but_has_not_started_says_queued(build):
+def test_a_run_comfyui_holds_but_has_not_started_says_queued(build, sources):
     job = FakeJob("g1", state="queued")
-    items = build(sources=_sources([_row("g1", status="running")], jobs=FakeJobQueue(jobs_by_folder={"video/wan22_i2v/aaa": [job]})))
+    items = build(sources_given=sources([_row("g1", status="running")], jobs=FakeJobQueue(jobs_by_folder={"video/wan22_i2v/aaa": [job]})))
 
     assert items[0].reading.status == "queued", (
         "a row says running from the moment its run is sent, though ComfyUI may still hold it in line")
 
 
-def test_a_tile_moves_its_job_up_and_down_the_queues_own_line(build):
+def test_a_tile_moves_its_job_up_and_down_the_queues_own_line(build, sources):
     jobs = FakeJobQueue({"image/sdxl_t2i/aaa": [FakeJob("g1"), FakeJob("g2", state="queued")]},
                         order=["g1", "g2"], stuck={("g1", "up"), ("g2", "down")})
-    head, behind = build(sources=_sources([_row("g1", status="running"), _row("g2")], jobs=jobs))
+    head, behind = build(sources_given=sources([_row("g1", status="running"), _row("g2")], jobs=jobs))
 
     behind.move_up()
     head.move_down()
@@ -234,25 +240,25 @@ def test_a_run_no_live_job_holds_cannot_be_moved(build):
     assert (item.move_up, item.move_down) == (None, None)
 
 
-def test_the_queues_own_line_orders_the_tiles(build):
+def test_the_queues_own_line_orders_the_tiles(build, sources):
     rows = [_row("g1"), _row("g2"), _row("g3")]
-    items = build(sources=_sources(rows, jobs=FakeJobQueue(order=["g3", "g1", "g2"])))
+    items = build(sources_given=sources(rows, jobs=FakeJobQueue(order=["g3", "g1", "g2"])))
 
     assert [item.key for item in items] == ["g3", "g1", "g2"], (
         "no row records a job moved up or dragged, so only the queue's own line knows the order")
 
 
-def test_a_row_the_line_holds_no_job_for_sorts_to_the_back(build):
-    items = build(sources=_sources([_row("g1"), _row("unadopted")], jobs=FakeJobQueue(order=["g1"])))
+def test_a_row_the_line_holds_no_job_for_sorts_to_the_back(build, sources):
+    items = build(sources_given=sources([_row("g1"), _row("unadopted")], jobs=FakeJobQueue(order=["g1"])))
 
     assert [item.key for item in items] == ["g1", "unadopted"], (
         "a row a restart has not taken back would otherwise jump the queue on screen")
 
 
-def test_a_training_holding_the_line_waits_after_what_comfyui_holds_and_before_the_rest(build):
+def test_a_training_holding_the_line_waits_after_what_comfyui_holds_and_before_the_rest(build, sources):
     training = FakeTraining()
 
-    items = build(sources=_sources([_row("g1", status="running"), _row("g2", status="pending")], jobs=FakeJobQueue(order=["g1", "g2"], training=training)))
+    items = build(sources_given=sources([_row("g1", status="running"), _row("g2", status="pending")], jobs=FakeJobQueue(order=["g1", "g2"], training=training)))
 
     assert [item.key for item in items] == ["g1", TRAINING_KEY, "g2"]
     item = items[1]
@@ -264,24 +270,24 @@ def test_a_training_holding_the_line_waits_after_what_comfyui_holds_and_before_t
     assert (training.canceled, training.revealed) == (1, 1)
 
 
-def test_a_trainings_row_offers_no_shield_since_nothing_is_sent_while_it_runs(build):
-    items = build(sources=_sources([], jobs=FakeJobQueue(training=FakeTraining())))
+def test_a_trainings_row_offers_no_shield_since_nothing_is_sent_while_it_runs(build, sources):
+    items = build(sources_given=sources([], jobs=FakeJobQueue(training=FakeTraining())))
 
     assert (items[0].shield, items[0].shielded) == (None, False)
 
 
-def test_an_populating_folders_run_offers_next_seed_rather_than_stop(build):
+def test_an_populating_folders_run_offers_next_seed_rather_than_stop(build, sources):
     key = "image/sdxl_t2i/aaa"
-    items = build(sources=_sources([_row("g1", status="running")], populating=[key], jobs=FakeJobQueue(jobs_by_folder={key: [FakeJob("g1")]})))
+    items = build(sources_given=sources([_row("g1", status="running")], populating=[key], jobs=FakeJobQueue(jobs_by_folder={key: [FakeJob("g1")]})))
 
     assert items[0].populating
     assert items[0].stop_populate is not None
 
 
-def test_a_tiles_cancel_and_reveal_are_the_callers_own(build):
+def test_a_tiles_cancel_and_reveal_are_the_callers_own(build, sources):
     cancelled, revealed = [], []
     key = "image/sdxl_t2i/aaa"
-    items = build(sources=_sources([_row("g1", status="running")], jobs=FakeJobQueue(jobs_by_folder={key: [FakeJob("g1")]})), callbacks=_callbacks(cancelled=cancelled.append, revealed=revealed.append))
+    items = build(sources_given=sources([_row("g1", status="running")], jobs=FakeJobQueue(jobs_by_folder={key: [FakeJob("g1")]})), callbacks=_callbacks(cancelled=cancelled.append, revealed=revealed.append))
 
     items[0].cancel()
     items[0].reveal()
@@ -299,20 +305,20 @@ def test_an_enhancements_tile_goes_nowhere_once_its_image_is_gone(build):
     assert (went_to, revealed) == ([], [])
 
 
-def test_a_tiles_shield_is_its_jobs_and_is_set_through_the_caller(build):
+def test_a_tiles_shield_is_its_jobs_and_is_set_through_the_caller(build, sources):
     shielded = []
     job = FakeJob("g1")
     job.shielded = True
-    items = build(sources=_sources([_row("g1", status="running")], jobs=FakeJobQueue(jobs_by_folder={"image/sdxl_t2i/aaa": [job]})), callbacks=_callbacks(shielded=lambda prompt_id, on: shielded.append((prompt_id, on))))
+    items = build(sources_given=sources([_row("g1", status="running")], jobs=FakeJobQueue(jobs_by_folder={"image/sdxl_t2i/aaa": [job]})), callbacks=_callbacks(shielded=lambda prompt_id, on: shielded.append((prompt_id, on))))
 
     assert items[0].shielded
     items[0].shield(False)
     assert shielded == [("g1", False)]
 
 
-def test_a_run_a_folders_modify_batch_queued_stands_under_the_image_it_rewrites(build):
+def test_a_run_a_folders_modify_batch_queued_stands_under_the_image_it_rewrites(build, sources):
     rows = [_row("asked-of"), _row("g1")]
-    items = build(sources=_sources(rows, requests=[{"prompt_id": "g1", "source_prompt_id": "asked-of",
+    items = build(sources_given=sources(rows, requests=[{"prompt_id": "g1", "source_prompt_id": "asked-of",
                                    "heard": ""}]))
 
     tile = next(item for item in items if item.key == "g1")
@@ -321,9 +327,9 @@ def test_a_run_a_folders_modify_batch_queued_stands_under_the_image_it_rewrites(
     assert tile.source_file == "asked-of.jpg"
 
 
-def test_a_run_a_typed_request_queued_is_marked_as_one(build):
+def test_a_run_a_typed_request_queued_is_marked_as_one(build, sources):
     rows = [_row("asked-of"), _row("g1")]
-    items = build(sources=_sources(rows, requests=[{"prompt_id": "g1", "source_prompt_id": "asked-of",
+    items = build(sources_given=sources(rows, requests=[{"prompt_id": "g1", "source_prompt_id": "asked-of",
                                    "heard": "", "asked": "two women"}]))
 
     tile = next(item for item in items if item.key == "g1")
@@ -331,9 +337,9 @@ def test_a_run_a_typed_request_queued_is_marked_as_one(build):
     assert not tile.batch_modified
 
 
-def test_a_run_a_request_queued_is_marked_as_one(build):
+def test_a_run_a_request_queued_is_marked_as_one(build, sources):
     rows = [_row("asked-of"), _row("g1")]
-    items = build(sources=_sources(rows, requests=[{"prompt_id": "g1", "source_prompt_id": "asked-of",
+    items = build(sources_given=sources(rows, requests=[{"prompt_id": "g1", "source_prompt_id": "asked-of",
                                    "heard": "Request, no hat, over."}]))
 
     tile = next(item for item in items if item.key == "g1")
@@ -341,9 +347,9 @@ def test_a_run_a_request_queued_is_marked_as_one(build):
     assert not tile.batch_modified
 
 
-def test_the_row_standing_in_for_a_request_is_the_row_its_run_will_get(build):
+def test_the_row_standing_in_for_a_request_is_the_row_its_run_will_get(build, sources):
     asked_of = _row("asked-of", status="completed")
-    items = build(sources=_sources([asked_of, _row("g1")], requests=[{
+    items = build(sources_given=sources([asked_of, _row("g1")], requests=[{
         "prompt_id": "g1", "source_prompt_id": "asked-of", "heard": "Request, no hat, over."}]))
     tile = next(item for item in items if item.key == "g1")
 
@@ -372,31 +378,33 @@ def test_a_run_made_from_a_chosen_action_shows_no_source_video(build):
     assert tile.source_video_thumbnail is None
 
 
-def test_a_queued_run_whose_folder_holds_nothing_yet_shows_no_thumbnails(build):
+def test_a_queued_run_whose_folder_holds_nothing_yet_shows_no_thumbnails(build, sources):
     key = "image/sdxl_t2i/aaa"
-    items = build(sources=_sources([_row("g1")], jobs=FakeJobQueue(jobs_by_folder={key: [FakeJob("g1", state="queued")]})))
+    items = build(sources_given=sources([_row("g1")], jobs=FakeJobQueue(jobs_by_folder={key: [FakeJob("g1", state="queued")]})))
 
     assert items[0].folder_thumbnails == (), (
         "no block, rather than an empty grid")
 
 
 def test_a_workflows_recent_runs_are_what_the_countdown_reads(build):
-    items = build([_row("g1", status="running")])
+    finished = [_row(f"done-{seconds}", status="completed", duration_seconds=seconds)
+                for seconds in (30.0, 32.0, 34.0)]
+    items = build([*finished, _row("g1", status="running")])
 
     assert items[0].reading.typical_seconds == pytest.approx(32.0)
 
 
-def _three_runs_of_one_folder():
+def _three_runs_of_one_folder(sources):
     key = "image/sdxl_t2i/aaa"
     pids = ("g1", "g2", "g3")
-    return _sources([_row(pid, status="running") for pid in pids],
+    return sources([_row(pid, status="running") for pid in pids],
                     jobs=FakeJobQueue(jobs_by_folder={key: [FakeJob(pid) for pid in pids]}))
 
 
-def test_a_pass_lists_each_table_once_however_many_runs_the_queue_shows(build):
-    sources = _three_runs_of_one_folder()
+def test_a_pass_lists_each_table_once_however_many_runs_the_queue_shows(build, sources):
+    sources = _three_runs_of_one_folder(sources)
 
-    build(sources=sources)
+    build(sources_given=sources)
 
     assert sorted(name for name in sources.db.asked if name.startswith("list_")) == [
         "list_generations", "list_requests"], (
@@ -404,20 +412,20 @@ def test_a_pass_lists_each_table_once_however_many_runs_the_queue_shows(build):
         "a pass costs one listing of each table rather than a lookup per run")
 
 
-def test_a_pass_reads_a_workflows_usual_time_once_for_all_its_runs(build):
-    sources = _three_runs_of_one_folder()
+def test_a_pass_reads_a_workflows_usual_time_once_for_all_its_runs(build, sources):
+    sources = _three_runs_of_one_folder(sources)
 
-    build(sources=sources)
+    build(sources_given=sources)
 
     assert sources.db.asked.count("recent_durations") == 1, (
         "the line often holds many runs of one workflow, so its usual time is worked out once "
         "a pass")
 
 
-def test_a_pass_gathers_a_folders_thumbnails_once_for_all_its_runs(build):
-    sources = _three_runs_of_one_folder()
+def test_a_pass_gathers_a_folders_thumbnails_once_for_all_its_runs(build, sources):
+    sources = _three_runs_of_one_folder(sources)
 
-    build(sources=sources)
+    build(sources_given=sources)
 
     assert sources.tree.asked == list(sources.jobs.jobs_by_folder), (
         "Auto-generate fills the line with runs of one folder, so its thumbnails are gathered "

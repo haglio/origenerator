@@ -47,6 +47,7 @@ from origenerator.gui import (
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.workflows import detail_parts
+from tests.real_db import database_in
 
 pytest_plugins = ("shared_ui.testing",)
 
@@ -538,6 +539,11 @@ def pytest_configure(config):
         "markers",
         "real_thread_hop: leave the gallery's off-thread work on its pool thread")
     qInstallMessageHandler(_print_qt_message)
+
+
+@pytest.fixture
+def db(tmp_path):
+    return database_in(tmp_path)
 
 
 @pytest.fixture

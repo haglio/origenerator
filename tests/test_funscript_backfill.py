@@ -18,14 +18,7 @@ from origenerator.funscript import (
 from origenerator.funscript_backfill import Steps, backfill
 from origenerator.output_places import OutputPlaces
 from tests.media_files import write_mp4
-
-
-class FakeDB:
-    def __init__(self, rows):
-        self._rows = rows
-
-    def list_generations(self):
-        return list(self._rows)
+from tests.real_db import database_in
 
 
 def _row(prompt_id, workflow_name, filename, subfolder=""):
@@ -51,7 +44,7 @@ def test_backfill_scripts_each_video_and_skips_images(tmp_path):
     (tmp_path / "v_i2v.mp4").write_bytes(b"v")
     (tmp_path / "v_loop.mp4").write_bytes(b"v")
     (tmp_path / "still.png").write_bytes(b"p")
-    db = FakeDB([
+    db = database_in(tmp_path, [
         _row("1", "wan22_i2v", "v_i2v.mp4"),
         _row("2", "wan22_flf2v_loop", "v_loop.mp4"),
         _row("3", "sdxl_t2i", "still.png"),
@@ -71,7 +64,7 @@ def test_backfill_rewrites_the_scripts_synthesized_at_an_older_pace_and_says_how
     write_funscript(older, synthesize_actions(5.0, hz=1.2))
     write_funscript(funscript_path_for(tmp_path / "todays_pace.mp4", places=OutputPlaces.in_one_folder(tmp_path)),
                     synthesize_actions(5.0, hz=0.5))
-    db = FakeDB([_row("1", "wan22_i2v", "older_pace.mp4"),
+    db = database_in(tmp_path, [_row("1", "wan22_i2v", "older_pace.mp4"),
                  _row("2", "wan22_i2v", "todays_pace.mp4")])
 
     result = backfill(db, OutputPlaces.in_one_folder(tmp_path), hz=0.5,
@@ -84,7 +77,7 @@ def test_backfill_rewrites_the_scripts_synthesized_at_an_older_pace_and_says_how
 
 def test_backfill_is_idempotent(tmp_path):
     (tmp_path / "v.mp4").write_bytes(b"v")
-    db = FakeDB([_row("1", "wan22_i2v", "v.mp4")])
+    db = database_in(tmp_path, [_row("1", "wan22_i2v", "v.mp4")])
     backfill(db, OutputPlaces.in_one_folder(tmp_path), steps=Steps(write=_recording_write([])))
 
     seen = []
@@ -98,7 +91,7 @@ def test_videos_sharing_a_name_are_each_scripted_for_their_own_length(tmp_path):
     beta = write_mp4(tmp_path / "beta" / "one" / "clip.mp4", seconds=5.0)
     write_funscript(tmp_path / "funscript" / "clip.funscript",
                     synthesize_actions(2.0, hz=1.0))
-    db = FakeDB([_row("1", "unknown", "clip.mp4", subfolder="alpha"),
+    db = database_in(tmp_path, [_row("1", "unknown", "clip.mp4", subfolder="alpha"),
                  _row("2", "unknown", "clip.mp4", subfolder="beta/one")])
 
     backfill(db, OutputPlaces.in_one_folder(tmp_path), hz=1.0)
@@ -116,7 +109,7 @@ def test_two_types_of_one_video_name_in_one_folder_are_each_scripted(tmp_path):
                     synthesize_actions(2.0, hz=1.0))
     seen = []
 
-    result = backfill(FakeDB([_row("1", "unknown", "clip.mp4", subfolder="alpha"),
+    result = backfill(database_in(tmp_path, [_row("1", "unknown", "clip.mp4", subfolder="alpha"),
                               _row("2", "unknown", "clip.webm", subfolder="alpha")]),
                       OutputPlaces.in_one_folder(tmp_path), steps=Steps(write=_recording_write(seen)))
 
@@ -136,7 +129,7 @@ def test_a_video_no_other_shares_a_name_with_keeps_the_script_an_older_version_f
     older.write_text("keep me", encoding="utf-8")
     seen = []
 
-    result = backfill(FakeDB([_row("1", "wan22_i2v", "clip.mp4", subfolder="video")]),
+    result = backfill(database_in(tmp_path, [_row("1", "wan22_i2v", "clip.mp4", subfolder="video")]),
                       OutputPlaces.in_one_folder(tmp_path), steps=Steps(write=_recording_write(seen)))
 
     assert seen == [], "written again beside the video, it would leave one video two scripts"
@@ -154,7 +147,7 @@ def test_a_script_an_older_version_filed_at_another_pace_is_rewritten_where_it_i
              "beside it": video.with_suffix(".funscript")}[older_place]
     write_funscript(older, synthesize_actions(5.0, hz=1.2))
 
-    result = backfill(FakeDB([_row("1", "wan22_i2v", "clip.mp4", subfolder="video")]),
+    result = backfill(database_in(tmp_path, [_row("1", "wan22_i2v", "clip.mp4", subfolder="video")]),
                       OutputPlaces.in_one_folder(tmp_path), hz=0.5,
                       steps=Steps(rewrite=partial(resynthesize_funscript, duration_provider=lambda _v: 5.0)))
 
@@ -164,7 +157,7 @@ def test_a_script_an_older_version_filed_at_another_pace_is_rewritten_where_it_i
 
 
 def test_backfill_counts_a_video_whose_file_is_missing(tmp_path):
-    db = FakeDB([_row("1", "wan22_i2v", "gone.mp4")])
+    db = database_in(tmp_path, [_row("1", "wan22_i2v", "gone.mp4")])
     seen = []
     result = backfill(db, OutputPlaces.in_one_folder(tmp_path), steps=Steps(write=_recording_write(seen)))
     assert seen == []
@@ -177,7 +170,7 @@ def test_the_output_places_are_resolved_when_the_sweep_runs(tmp_path, monkeypatc
     seen = []
 
     funscript_backfill.backfill(
-        FakeDB([_row("gen-alpha", "wan22_i2v", "alpha.mp4")]),
+        database_in(tmp_path, [_row("gen-alpha", "wan22_i2v", "alpha.mp4")]),
         steps=Steps(resolve=lambda row, places: seen.append(places) or None),
     )
 
@@ -191,7 +184,7 @@ def test_the_cadence_is_resolved_when_the_sweep_runs_too(tmp_path, monkeypatch):
     rates = []
 
     funscript_backfill.backfill(
-        FakeDB([_row("gen-alpha", "wan22_i2v", "alpha.mp4")]),
+        database_in(tmp_path, [_row("gen-alpha", "wan22_i2v", "alpha.mp4")]),
         steps=Steps(resolve=lambda row, places: (video, "video"),
                     write=lambda path, *, hz, places: rates.append(hz) or None),
     )

@@ -24,11 +24,6 @@ def _code(row: dict) -> str:
     return gallery.folder_id(gallery.settings_folder_key(row))
 
 
-@pytest.fixture
-def db(tmp_path) -> Database:
-    return Database(tmp_path / "origenerator.db")
-
-
 def test_each_item_is_named_by_its_folder_and_the_order_it_was_made_in_there(db):
     first, second = _image("gen-one", 1), _image("gen-two", 2)
     elsewhere = _image("gen-three", 3, prompt="a blue kite")

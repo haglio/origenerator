@@ -21,11 +21,6 @@ def tall_image(tmp_path):
     return str(path)
 
 
-@pytest.fixture
-def db(tmp_path):
-    return Database(tmp_path / "library.db")
-
-
 def _added(db, prompt_id, *, params=None, thumbnail=None, status=GenerationStatus.COMPLETED):
     db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="made_up",
                                        workflow_version="v001",

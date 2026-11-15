@@ -32,6 +32,7 @@ from origenerator.voice.commands import (
 from origenerator.voice.dictation import COMPLETED
 from origenerator.voice.slideshow_commands import SlideshowCommand
 from tests.marked_words import words
+from tests.real_db import database_in
 
 _A_CLIENT = object()
 
@@ -217,14 +218,6 @@ class FakeMotion:
         return f"speed {self.speed}, amp {self.amplitude}"
 
 
-class FakeDB:
-    def __init__(self, rows=()):
-        self.rows = {row["prompt_id"]: row for row in rows}
-
-    def get_generation(self, prompt_id):
-        return self.rows.get(prompt_id)
-
-
 class FakeHost:
     def __init__(self, *, collections=("__recents__",), selected=None):
         self.collections = set(collections)
@@ -289,18 +282,18 @@ def starting(qtbot):
 
 
 @pytest.fixture
-def router(qtbot, monkeypatch, starting):
+def router(qtbot, monkeypatch, starting, tmp_path):
     monkeypatch.setattr(module, "CommandAndRequestListener", FakeListener)
     # Once Python collects a QObject's parent, PyQt deletes the QObject with it, timers and all.
     built = []
 
-    def build(host=None, *, slideshows=None, db=None, buttons=None, setters=None, **parts):
+    def build(host=None, *, slideshows=None, rows=(), buttons=None, setters=None, **parts):
         host = host or FakeHost()
         slideshows = slideshows or FakeSlideshows()
         parent = QWidget()
         qtbot.addWidget(parent)
         router = VoiceRouter(
-            host, VoiceSources(db=db or FakeDB(), slideshows=slideshows,
+            host, VoiceSources(db=database_in(tmp_path, rows), slideshows=slideshows,
                                client=parts.get("client", _A_CLIENT), starting=starting,
                                requests=parts.get("requests") or AnswererThatAsksNoLocalModel(),
                                setters=setters),
@@ -323,7 +316,7 @@ def router(qtbot, monkeypatch, starting):
 
 
 def _row(prompt_id="g1", *, workflow_name="sdxl_t2i"):
-    return {"prompt_id": prompt_id, "workflow_name": workflow_name, "params": "{}"}
+    return {"prompt_id": prompt_id, "workflow_name": workflow_name}
 
 
 
@@ -827,7 +820,7 @@ def test_an_open_request_reminds_the_speaker_that_over_submits_it(router):
 def test_the_target_is_taken_at_the_opening_step_and_kept(router):
     slideshow = FakeSlideshow(target="g1")
     voice, _host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow),
-                                       db=FakeDB([_row("g1")]))
+                                       rows=[_row("g1")])
     begun = []
     voice._begin_request = lambda prompt_id, spoken, shape=None: begun.append(prompt_id)
     voice.on_spoken_request(Spoken("no hat", listening=True))
@@ -844,7 +837,7 @@ def test_the_target_is_taken_at_the_opening_step_and_kept(router):
 def test_a_request_is_about_the_image_it_was_opened_over_and_puts_it_back(router):
     slideshow = FakeSlideshow(target="g2", said_over={7.5: "g1"})
     voice, _host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow),
-                                       db=FakeDB([_row("g1"), _row("g2")]))
+                                       rows=[_row("g1"), _row("g2")])
     begun = []
     voice._begin_request = lambda prompt_id, spoken, shape=None: begun.append(prompt_id)
 
@@ -857,7 +850,7 @@ def test_a_request_is_about_the_image_it_was_opened_over_and_puts_it_back(router
 def test_words_in_a_request_are_a_request_even_when_they_name_a_fix(router):
     slideshow = FakeSlideshow(target="g1")
     voice, host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow),
-                                      db=FakeDB([_row("g1")]))
+                                      rows=[_row("g1")])
     begun = []
     voice._begin_request = lambda prompt_id, spoken, shape=None: begun.append(prompt_id)
     voice.on_spoken_request(Spoken("fix hands", listening=True))
@@ -886,7 +879,7 @@ def test_a_request_whose_terminator_never_came_is_dropped_and_says_so(router):
 
 
 def test_a_request_over_nothing_is_answered_rather_than_queued(router):
-    voice, host, _slideshows = router(db=FakeDB())
+    voice, host, _slideshows = router(rows=[])
 
     voice._begin_request(None, Spoken("no hat"))
 
@@ -895,7 +888,7 @@ def test_a_request_over_nothing_is_answered_rather_than_queued(router):
 
 
 def test_a_video_this_app_cannot_rebuild_is_answered_here(router):
-    voice, host, _slideshows = router(db=FakeDB([_row("g1", workflow_name="a_stranger")]))
+    voice, host, _slideshows = router(rows=[_row("g1", workflow_name="a_stranger")])
 
     voice._begin_request("g1", Spoken("no hat"))
 
@@ -905,7 +898,7 @@ def test_a_video_this_app_cannot_rebuild_is_answered_here(router):
 
 
 def test_a_request_being_worked_out_stands_in_the_job_queue_at_once(router, starting):
-    voice, _host, _slideshows = router(db=FakeDB([_row("g1")]))
+    voice, _host, _slideshows = router(rows=[_row("g1")])
 
     voice._begin_request("g1", Spoken("no hat"))
 
@@ -915,7 +908,7 @@ def test_a_request_being_worked_out_stands_in_the_job_queue_at_once(router, star
 
 
 def test_a_requests_row_in_the_job_queue_goes_whatever_its_answer(router, starting):
-    voice, _host, _slideshows = router(db=FakeDB([_row("g1")]))
+    voice, _host, _slideshows = router(rows=[_row("g1")])
     voice._begin_request("g1", Spoken("no hat"))
     (standing,) = starting.rows()
 
@@ -926,7 +919,7 @@ def test_a_requests_row_in_the_job_queue_goes_whatever_its_answer(router, starti
 
 def test_a_finished_request_is_asked_of_the_model_about_the_image_it_was_said_over(router):
     requests = AnswererThatAsksNoLocalModel()
-    voice, _host, _slideshows = router(db=FakeDB([_row("g1")]), requests=requests)
+    voice, _host, _slideshows = router(rows=[_row("g1")], requests=requests)
 
     voice._begin_request("g1", Spoken("no hat"))
 

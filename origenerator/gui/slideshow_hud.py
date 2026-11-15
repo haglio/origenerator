@@ -45,7 +45,8 @@ def slideshow_hud_model(shape: str, slideshow, placement: HudPlacement = USUAL_P
         return None
     action_filter = slideshow.hud_action_filter
     facts = HudFacts(
-        funestra=shape, locked=slideshow.locked, f_mode=slideshow.hud_favorites_filter,
+        funestra=shape, locked=slideshow.locked, favorite=slideshow.hud_is_favorite,
+        f_mode=slideshow.hud_favorites_filter,
         latest=slideshow.hud_order_label == LATEST_LABEL, media=slideshow.hud_media,
         enhancement=slideshow.hud_enhancement, hosted=placement.hosted,
         has_other_versions=slideshow.has_other_versions, clip_seconds=slideshow.dwell_s,
@@ -57,7 +58,7 @@ def slideshow_hud_model(shape: str, slideshow, placement: HudPlacement = USUAL_P
         kind=HudKind.SLIDESHOW,
         facts=facts,
         title=slideshow_title(facts, loop=shown.loop, action_filter=action_filter),
-        is_favorite=slideshow.hud_is_favorite,
+        is_favorite=facts.favorite,
         item_name=slideshow.hud_item_name,
         item_note=slideshow.hud_item_note,
         foot=foot,

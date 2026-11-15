@@ -336,7 +336,7 @@ def test_reroll_seed_icons_render_and_differ_by_media(qtbot):
 
 def test_gallery_pane_button_icons_render_with_normal_and_disabled_modes(qtbot):
     makers = (icons.back_icon, icons.forward_icon, icons.undo_icon, icons.redo_icon,
-              icons.delete_icon, icons.latest_icon, icons.radio_icon,
+              icons.delete_icon, icons.radio_icon,
               icons.populate_icon, icons.slideshow_icon, icons.enhance_icon,
               icons.custom_collection_icon,
               lambda: icons.star_icon(filled=True), lambda: icons.star_icon(filled=False))
@@ -411,7 +411,7 @@ def _dominant_color(pixmap) -> int:
 
 
 def test_experiment_icons_render_and_verdicts_differ(qtbot):
-    flask = icons.flask_icon()
+    flask = folder_icons.collection_icon(EXPERIMENTS_KEY)
     size = QSize(24, 24)
     assert not flask.pixmap(size, QIcon.Mode.Normal).isNull()
     assert not flask.pixmap(size, QIcon.Mode.Disabled).isNull()
@@ -438,8 +438,8 @@ def test_every_gallery_pane_button_mark_is_the_familys_shared_glyph(qtbot):
         (icons.delete_icon(), "trash", RED),
         (icons.star_icon(filled=True), "star", GREEN),
         (icons.star_icon(filled=False), "star_outline", TEXT_PRIMARY),
-        (icons.latest_icon(), "latest", TEXT_PRIMARY),
-        (icons.flask_icon(), "flask", TEXT_PRIMARY),
+        (folder_icons.collection_icon(LATEST_KEY), "latest", TEXT_PRIMARY),
+        (folder_icons.collection_icon(EXPERIMENTS_KEY), "flask", TEXT_PRIMARY),
         (icons.custom_collection_icon(), "folder", TEXT_PRIMARY),
         (icons.all_icon(), "database", TEXT_PRIMARY),
     )

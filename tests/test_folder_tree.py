@@ -33,7 +33,7 @@ from PySide6.QtWidgets import (
 from shared_ui.colors import BLUE, BORDER_SUBTLE, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.testing import appending_to
 
-from origenerator.gallery.collection import COLLECTION_LABELS, FAVORITES_KEY, LATEST_KEY
+from origenerator.gallery.collection import FAVORITES_KEY, LATEST_KEY, collection
 from origenerator.gallery.shapes import LANDSCAPE
 from origenerator.gallery.tree import ALL_KEY
 from origenerator.gui import folder_icons, folder_tree, icons
@@ -913,15 +913,15 @@ def _tree_with_a_collection(qtbot, which=LATEST_KEY):
     top = _folder_row("All", "all")
     folder = _folder_row("Workflow", "wf")
     folder.setIcon(0, icons.toc_initial_icon("workflow"))
-    collection = QTreeWidgetItem([COLLECTION_LABELS[which]])
-    collection.setIcon(0, folder_icons.collection_icon(which))
-    folder.addChild(collection)
+    row = QTreeWidgetItem([collection(which).label])
+    row.setIcon(0, folder_icons.collection_icon(which))
+    folder.addChild(row)
     top.addChild(folder)
     tree.addTopLevelItem(top)
     tree.expandAll()
     with qtbot.waitExposed(tree):
         tree.show()
-    return tree, collection
+    return tree, row
 
 
 def test_a_picked_collection_row_is_blue_from_its_mark_to_its_name(qtbot):

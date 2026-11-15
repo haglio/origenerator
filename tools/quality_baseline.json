@@ -3,7 +3,6 @@
   "mutables_imported": {
     "origenerator/db_schema.py": 1,
     "origenerator/export_lane.py": 1,
-    "origenerator/gallery/collection.py": 1,
     "origenerator/gallery/labels.py": 1,
     "origenerator/gallery/shapes.py": 1,
     "origenerator/gallery_contract.py": 1,

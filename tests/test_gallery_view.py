@@ -44,6 +44,7 @@ from origenerator.gallery.collection import (
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
+    LATEST_KEY,
     TRASH_KEY,
 )
 from origenerator.gallery.labels import workflow_label
@@ -52,6 +53,7 @@ from origenerator.gallery_edits import GalleryEdits
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import (
     corner_buttons,
+    folder_icons,
     icons,
     off_thread,
 )
@@ -341,7 +343,7 @@ def test_the_latest_square_wears_the_calendar_its_row_wears(qtbot):
     (mark,) = [label for label in square.findChildren(QLabel)
                if label.toolTip() == "Latest" and not label.pixmap().isNull()]
     size = mark.pixmap().size()
-    assert mark.pixmap().toImage() == icons.latest_icon().pixmap(size).toImage()
+    assert mark.pixmap().toImage() == folder_icons.collection_icon(LATEST_KEY).pixmap(size).toImage()
 
 
 def test_branch_shows_folder_tiles_and_leaf_shows_thumbnails(qtbot):

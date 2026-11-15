@@ -19,13 +19,12 @@ from shared_ui.spacing import GAP_DIALOG, GAP_MEDIUM, MARGIN_DIALOG
 
 from origenerator import gallery, search
 from origenerator.gallery.collection import (
-    COLLECTION_LABELS,
-    ENHANCED_KEY,
     EXPERIMENTS_KEY,
-    FAVORITES_KEY,
     LATEST_KEY,
     TRASH_KEY,
     FolderCollection,
+    all_collections,
+    collection,
     folder_collection,
 )
 from origenerator.gui import folder_icons, icons
@@ -208,10 +207,6 @@ def _time_heading(text: str) -> QLabel:
 
 
 _NOW_HEADING = "Now"
-_NO_FAVORITES = ("No bookmarks yet.\n\nStar an image or video from its right-click menu, "
-                 "or favorite a folder from the list, to collect them here.")
-_NO_ENHANCED = ("No enhanced images yet.\n\nEnhance one from its right-click menu or the plus "
-                "in its corner to see it here.")
 
 
 def _open_sections(flow, headings, *, opens_now=False, draw_leading=lambda: None):
@@ -296,13 +291,6 @@ class GalleryPane(QObject):
         )
         self._renders = {
             LATEST_KEY: self._render_latest,
-            FAVORITES_KEY: lambda: self._show_gathered(
-                self._favorite_items(self._collection_shape, self._collection_folder),
-                self._favorite_folders(self._collection_shape, self._collection_folder),
-                show_favorites=False, empty=_NO_FAVORITES),
-            ENHANCED_KEY: lambda: self._show_gathered(
-                self._open_collection_rows(ENHANCED_KEY), (),
-                show_favorites=False, empty=_NO_ENHANCED),
             EXPERIMENTS_KEY: self._render_experiments,
             TRASH_KEY: self._render_trash,
         }
@@ -419,9 +407,9 @@ class GalleryPane(QObject):
 
     def _add_collection_tile(self, flow, key: str):
         rows = self.rows_for_collection(key)
-        collection = folder_collection(base_of(key))
-        tile = FolderTile(key, COLLECTION_LABELS[collection.which], _thumbnails_of(rows), len(rows),
-                          FolderMarks(kind_icon=folder_icons.collection_kind_icon(collection.which)))
+        which = folder_collection(base_of(key)).which
+        tile = FolderTile(key, collection(which).label, _thumbnails_of(rows), len(rows),
+                          FolderMarks(kind_icon=folder_icons.collection_kind_icon(which)))
         tile.clicked.connect(self._drill_into)
         flow.addWidget(tile)
 
@@ -527,12 +515,23 @@ class GalleryPane(QObject):
         return self._showing_search
 
     def show_collection(self, key: str, shape: str | None = None):
-        collection = folder_collection(key)
-        if collection is None:
+        in_folder = folder_collection(key)
+        if in_folder is None:
             return
         self._collection_shape = shape
-        self._collection_folder = collection.folder
-        self._renders[collection.which]()
+        self._collection_folder = in_folder.folder
+        render = self._renders.get(in_folder.which)
+        if render is not None:
+            render()
+        else:
+            self._show_gathered_collection(in_folder.which)
+
+    def _show_gathered_collection(self, which: str):
+        gathered = collection(which)
+        folders = (self._favorite_folders(self._collection_shape, self._collection_folder)
+                   if gathered.gathers_folders else ())
+        self._show_gathered(self._open_collection_rows(which), folders,
+                            show_favorites=False, empty=gathered.empty)
 
     def _render_latest(self):
         container, flow = self._fresh_tile_pane()
@@ -756,10 +755,6 @@ class GalleryPane(QObject):
     def showing_trash(self) -> bool:
         return base_of(self._tree.selected_folder_key()) == TRASH_KEY
 
-    def _favorite_items(self, shape: str | None, folder: str) -> list[dict]:
-        return self._model.placement(shape).held_by(folder, gallery.favorite_generations(
-            self._model.on_shape(shape)))
-
     def _favorite_folders(self, shape: str | None, folder: str) -> list:
         group = self._model.placement(shape).folder(folder)
         return gallery.favorite_folders(gallery.child_groups(group)) if group else []
@@ -780,11 +775,11 @@ class GalleryPane(QObject):
 
     def collection_counts(self, shape: str) -> dict[str, int]:
         placement = self._model.placement(shape)
-        tallies = {collection: placement.tally(
-                       self._model.in_collection(collection, shape, gallery.ALL_KEY))
-                   for collection in (FAVORITES_KEY, ENHANCED_KEY, EXPERIMENTS_KEY, TRASH_KEY)}
-        return {FolderCollection(collection, folder).key: count
-                for collection, tally in tallies.items() for folder, count in tally.items()}
+        tallies = {counted.key: placement.tally(
+                       self._model.in_collection(counted.key, shape, gallery.ALL_KEY))
+                   for counted in all_collections() if counted.counted}
+        return {FolderCollection(which, folder).key: count
+                for which, tally in tallies.items() for folder, count in tally.items()}
 
     def selected_collection_rows(self) -> list[dict] | None:
         return self.rows_for_collection(self._tree.selected_folder_key())

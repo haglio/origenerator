@@ -20,6 +20,7 @@ from origenerator.setter_voice import setter_phrases
 from origenerator.voice.app_commands import (
     AppCommand,
     BarSetting,
+    GoToCollection,
     phrases_heard_only_outright,
 )
 from origenerator.voice.commands import (
@@ -496,7 +497,7 @@ def test_a_transcription_with_no_letters_in_it_says_nothing(router):
 def test_a_collection_name_stands_you_in_that_collection(router):
     voice, host, slideshows = router()
 
-    voice.on_command(AppCommand.LATEST)
+    voice.on_command(GoToCollection(LATEST_KEY))
 
     assert host.stood_in == [(LATEST_KEY, None)]
     assert slideshows.answers == ["Latest"]
@@ -505,7 +506,7 @@ def test_a_collection_name_stands_you_in_that_collection(router):
 def test_a_collection_the_tree_has_not_got_says_so_rather_than_doing_nothing(router):
     voice, _host, slideshows = router(FakeHost(collections=()))
 
-    voice.on_command(AppCommand.LATEST)
+    voice.on_command(GoToCollection(LATEST_KEY))
 
     assert slideshows.answers == ["no Latest collection yet"]
     assert slideshows.answer_kinds == [WARNING]
@@ -514,7 +515,7 @@ def test_a_collection_the_tree_has_not_got_says_so_rather_than_doing_nothing(rou
 def test_a_named_side_picks_that_sides_copy_of_the_collection(router):
     voice, host, _slideshows = router()
 
-    voice.on_command(SurfaceCommand(AppCommand.LATEST, "portrait"))
+    voice.on_command(SurfaceCommand(GoToCollection(LATEST_KEY), "portrait"))
 
     assert host.stood_in == [(LATEST_KEY, "portrait")]
 
@@ -1012,7 +1013,7 @@ def test_what_the_listener_answers_with_is_left_to_the_listener_to_log(router, c
 
 def test_a_whole_utterance_command_from_the_session_outranks_the_rest(router):
     voice, _host, slideshows = router()
-    voice.listener.bare = AppCommand.LATEST
+    voice.listener.bare = GoToCollection(LATEST_KEY)
 
     assert voice.run_spoken_command("recents") is True
     assert slideshows.answers == ["Latest"]
@@ -1020,7 +1021,7 @@ def test_a_whole_utterance_command_from_the_session_outranks_the_rest(router):
 
 def test_the_sessions_words_go_to_an_open_request_before_any_command(router):
     voice, _host, slideshows = router()
-    voice.listener.bare = AppCommand.LATEST
+    voice.listener.bare = GoToCollection(LATEST_KEY)
     voice.listener.dictated = Spoken("recents", listening=True)
 
     assert voice.run_spoken_command("portrait recents") is True

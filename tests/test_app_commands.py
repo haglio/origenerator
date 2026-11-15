@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from origenerator.gallery.collection import FAVORITES_KEY
+from origenerator.gallery.collection import EXPERIMENTS_KEY, FAVORITES_KEY, LATEST_KEY
 from origenerator.voice.app_commands import (
     _PHRASES,
     AppCommand,
     BarSetting,
+    GoToCollection,
     _say,
     match_app_command,
     phrases_heard_only_outright,
@@ -16,17 +17,17 @@ from origenerator.voice.commands import CollectionCommand, match_voice_command
 
 
 @pytest.mark.parametrize(("said", "wanted"), [
-    ("experiments", AppCommand.EXPERIMENTS),
-    ("recents", AppCommand.LATEST),
+    ("experiments", GoToCollection(EXPERIMENTS_KEY)),
+    ("recents", GoToCollection(LATEST_KEY)),
 ])
 def test_a_collection_answers_to_its_own_bare_name(said, wanted):
-    assert match_app_command(said) is wanted
+    assert match_app_command(said) == wanted
 
 
 @pytest.mark.parametrize("said", ["go to experiments", "open experiments",
                                   "show experiments", "experiments collection"])
 def test_a_collection_also_answers_to_a_sentence_shaped_ask(said):
-    assert match_app_command(said) is AppCommand.EXPERIMENTS
+    assert match_app_command(said) == GoToCollection(EXPERIMENTS_KEY)
 
 
 def test_the_words_fun_times_funestras_answer_to_mean_the_same_here():
@@ -107,7 +108,7 @@ def test_a_two_word_command_is_not_shadowed_by_its_first_word():
     ("group", AppCommand.GROUP),
 ])
 def test_each_bank_button_has_a_word(said, wanted):
-    assert match_app_command(said) is wanted
+    assert match_app_command(said) == wanted
 
 
 def test_a_switch_takes_a_flip_and_an_explicit_way():
@@ -162,8 +163,8 @@ def test_original_only_and_enhanced_and_original_are_said_as_fun_time_says_them(
 
 def test_marking_a_favorite_and_standing_in_the_favorites_collection_are_different_words():
     assert match_app_command("favorite") is AppCommand.FAVORITE
-    assert match_app_command("go to favorites") is AppCommand.FAVORITES
-    assert match_app_command("favorites collection") is AppCommand.FAVORITES
+    assert match_app_command("go to favorites") == GoToCollection(FAVORITES_KEY)
+    assert match_app_command("favorites collection") == GoToCollection(FAVORITES_KEY)
 
 
 def test_favorites_on_its_own_is_left_to_the_order_that_plays_the_collection():

@@ -158,12 +158,8 @@ def unmarked_icon() -> QIcon:
     return QIcon(canvas)
 
 
-def latest_icon() -> QIcon:
-    return qt_icon("latest", size=_SIZE)
-
-
-def flask_icon() -> QIcon:
-    return qt_icon("flask", size=_SIZE)
+def collection_glyph_icon(name: str, color: QColor | None) -> QIcon:
+    return star_icon(filled=True) if name == "star" else qt_icon(name, color=color, size=_SIZE)
 
 
 def all_icon() -> QIcon:

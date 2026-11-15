@@ -5,14 +5,11 @@ from enum import Enum
 
 from voice_core.spelling import numbers_as_digits
 
+from origenerator.gallery.collection import collection, spoken_collections
 from origenerator.voice.text import words
 
 
 class AppCommand(Enum):
-    LATEST = "recents"
-    FAVORITES = "favorites"
-    EXPERIMENTS = "experiments"
-
     BACK = "back"
     FORWARD = "forward"
 
@@ -59,10 +56,15 @@ class BarSetting:
     value: int
 
 
-_PHRASES: dict[str, AppCommand | BarSetting] = {}
+@dataclass(frozen=True)
+class GoToCollection:
+    key: str
 
 
-def _say(command: AppCommand | BarSetting, *phrases: str, said: dict | None = None) -> None:
+_PHRASES: dict[str, AppCommand | BarSetting | GoToCollection] = {}
+
+
+def _say(command: AppCommand | BarSetting | GoToCollection, *phrases: str, said: dict | None = None) -> None:
     said = _PHRASES if said is None else said
     for phrase in phrases:
         taken = said.get(phrase)
@@ -73,17 +75,18 @@ def _say(command: AppCommand | BarSetting, *phrases: str, said: dict | None = No
         said[phrase] = command
 
 
-_COLLECTION_NAMES: dict[AppCommand, tuple[str, ...]] = {
-    AppCommand.LATEST: ("recents", "recent"),
-    AppCommand.FAVORITES: ("favorites",),
-    AppCommand.EXPERIMENTS: ("experiments", "experiment"),
-}
 _COLLECTION_VERBS = ("go to", "open", "show")
-_NEVER_SAID_BARE = frozenset({"favorites"})
-for _collection, _names in _COLLECTION_NAMES.items():
-    for _name in _names:
-        _say(_collection, *(() if _name in _NEVER_SAID_BARE else (_name,)), f"{_name} collection",
-             *(f"{_verb} {_name}" for _verb in _COLLECTION_VERBS))
+
+
+def say_collections(collections, said: dict | None = None) -> None:
+    for spoken in collections:
+        for name in spoken.voice.names:
+            _say(GoToCollection(spoken.key), *((name,) if spoken.voice.said_bare else ()),
+                 f"{name} collection", *(f"{verb} {name}" for verb in _COLLECTION_VERBS),
+                 said=said)
+
+
+say_collections(spoken_collections())
 
 _say(AppCommand.BACK, "back", "go back", "previous", "previous slide")
 _say(AppCommand.FORWARD, "forward", "go forward", "next", "next slide", "skip")
@@ -178,11 +181,11 @@ def phrases_heard_only_outright() -> frozenset[str]:
     return phrases_for(AppCommand.MIC_OFF, AppCommand.CULL)
 
 
-def phrases_for(*commands: AppCommand) -> frozenset[str]:
+def phrases_for(*commands: AppCommand | GoToCollection) -> frozenset[str]:
     return frozenset(phrase for command in commands for phrase in said_as(command))
 
 
-def said_as(command: AppCommand) -> tuple[str, ...]:
+def said_as(command: AppCommand | GoToCollection) -> tuple[str, ...]:
     return tuple(phrase for phrase, meant in _PHRASES.items() if meant == command)
 
 
@@ -190,8 +193,10 @@ def spoken_phrases() -> frozenset[str]:
     return frozenset(_PHRASES)
 
 
-def _answered_when_hosted(command: AppCommand | BarSetting) -> bool:
-    if isinstance(command, BarSetting) or command in MOTION_MOVES or command is AppCommand.EXPERIMENTS:
+def _answered_when_hosted(command: AppCommand | BarSetting | GoToCollection) -> bool:
+    if isinstance(command, GoToCollection):
+        return collection(command.key).voice.answered_when_hosted
+    if isinstance(command, BarSetting) or command in MOTION_MOVES:
         return False
     return command not in SWITCHES or SWITCHES[command][0] not in SWITCHES_A_HOST_HOLDS
 
@@ -201,7 +206,7 @@ def phrases_answered_when_hosted() -> frozenset[str]:
                      if _answered_when_hosted(_PHRASES[phrase]))
 
 
-def match_app_command(text: str) -> AppCommand | BarSetting | None:
+def match_app_command(text: str) -> AppCommand | BarSetting | GoToCollection | None:
     return _PHRASES_IN_DIGITS.get(_in_digits(text))
 
 

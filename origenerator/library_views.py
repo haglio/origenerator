@@ -11,14 +11,7 @@ from app_support.media_renditions import original_rendition
 from origenerator import gallery, points_of_interest, trash_collection
 from origenerator.config import EVOLVER_AI_DIR, EVOLVER_SOURCE, KINO_UPSCALES_DIR, OUTPUT_PLACES
 from origenerator.evolver_upscales import EvolverUpscales, original_stem
-from origenerator.gallery.collection import (
-    ENHANCED_KEY,
-    EXPERIMENTS_KEY,
-    FAVORITES_KEY,
-    LATEST_KEY,
-    TRASH_KEY,
-    folder_collection,
-)
+from origenerator.gallery.collection import collection, folder_collection
 from origenerator.gallery.custom import index_folders
 from origenerator.gallery.enhance import EnhanceVersion, file_at, upscale_and_original
 from origenerator.gallery.placement import Placement
@@ -167,15 +160,15 @@ class LibrarySnapshot:
         return index
 
     def on_shape(self, shape: str | None, listing: str | None = None) -> list[dict]:
+        picked = collection(listing).picked_fresh if listing is not None else None
+        if picked is not None:
+            return picked(self.on_shape(shape))
         if (listing, shape) not in self._on_shape:
             self._on_shape[(listing, shape)] = self._on_the_shape(self._listing(listing), shape)
         return self._on_shape[(listing, shape)]
 
     def _listing(self, which: str | None) -> list[dict]:
-        if which is None:
-            return self.rows
-        return {LATEST_KEY: self.recent_rows, ENHANCED_KEY: self.enhanced_rows,
-                EXPERIMENTS_KEY: self.experiment_rows, TRASH_KEY: self.held_rows}[which]
+        return self.rows if which is None else collection(which).rows(self)
 
     def placement(self, shape: str | None) -> Placement:
         if shape not in self._placements:
@@ -199,9 +192,9 @@ class LibrarySnapshot:
 
     def rows_at(self, key: str | None) -> list[dict]:
         base, shape = split_key(key)
-        collection = folder_collection(base)
-        if collection is not None:
-            return self.in_collection(collection.which, shape, collection.folder)
+        in_folder = folder_collection(base)
+        if in_folder is not None:
+            return self.in_collection(in_folder.which, shape, in_folder.folder)
         folder = self.folder(key)
         return gallery.rows_under(folder) if folder is not None else []
 
@@ -280,9 +273,7 @@ class LibrarySnapshot:
         return self._ids_at[key]
 
     def in_collection(self, which: str, shape: str | None, folder: str) -> list[dict]:
-        listed = (gallery.favorite_generations(self.on_shape(shape)) if which == FAVORITES_KEY
-                  else self.on_shape(shape, which))
-        return self.placement(shape).held_by(folder, listed)
+        return self.placement(shape).held_by(folder, self.on_shape(shape, which))
 
     @cached_property
     def image_config_index(self) -> dict:

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from shared_ui.reference import CommandRef, ReferenceGroup, ReferenceSection
 
+from origenerator.gallery.collection import spoken_collections
 from origenerator.gallery.voice_commands import ENHANCE_COMMAND
-from origenerator.voice.app_commands import AppCommand, said_as
+from origenerator.voice.app_commands import AppCommand, GoToCollection, said_as
 from origenerator.voice.dictation import LEAD_WORDS
 from origenerator.voice.slideshow_commands import SlideshowCommand, said_to_the_slideshow
 from origenerator.workflows.detail_parts import published_fix_phrases
@@ -25,7 +26,7 @@ def _as_written(phrase: str) -> str:
     return phrase
 
 
-def _said(*commands: AppCommand) -> tuple[str, ...]:
+def _said(*commands: AppCommand | GoToCollection) -> tuple[str, ...]:
     return tuple(dict.fromkeys(_as_written(phrase) for command in commands
                                for phrase in said_as(command)))
 
@@ -50,11 +51,9 @@ def _core() -> ReferenceSection:
             _row("group the picked folders into a collection of your own",
                  said=_said(AppCommand.GROUP)),
         )),
-        ReferenceGroup("Collections", (
-            _row("Latest", said=_said(AppCommand.LATEST)),
-            _row("Favorites", said=_said(AppCommand.FAVORITES)),
-            _row("Experiments", said=_said(AppCommand.EXPERIMENTS)),
-        )),
+        ReferenceGroup("Collections", tuple(
+            _row(spoken.label, said=_said(GoToCollection(spoken.key)))
+            for spoken in spoken_collections())),
         ReferenceGroup("Switches", (
             _row("Populate on / off",
                  said=_said(AppCommand.POPULATE, AppCommand.POPULATE_ON, AppCommand.POPULATE_OFF)),

@@ -24,14 +24,12 @@ from origenerator.fun_time_bridge import (
 from origenerator.fun_time_mode import majority_shape, region_for_items
 from origenerator.funscript import funscript_of
 from origenerator.gallery.collection import (
-    ENHANCED_KEY as _ENHANCED_KEY,
-)
-from origenerator.gallery.collection import (
     FAVORITES_KEY as _FAVORITES_KEY,
 )
 from origenerator.gallery.collection import (
     LATEST_KEY as _LATEST_KEY,
 )
+from origenerator.gallery.collection import collection as _collection
 from origenerator.gallery.collection import folder_collection
 from origenerator.gallery.shapes import (
     SHAPES as _SHAPES,
@@ -105,7 +103,6 @@ _ABOUT_THE_SLIDE_SAID_OVER = frozenset({AppCommand.CULL, AppCommand.FAVORITE, Ap
 _OPENINGS_KEPT_FRESH_MS = 10 * 60 * 1000
 
 _REGION_CAPTIONS = {"portrait": "Origenerator Portrait", "landscape": "Origenerator Landscape"}
-_SWITCH_HELD_BY = {_FAVORITES_KEY: "favorites", _ENHANCED_KEY: "enhanced"}
 
 
 class SlideshowHost(Protocol):
@@ -324,7 +321,7 @@ class SlideshowDirector:
         base, located_on = _split_collection_key(location)
         collection = folder_collection(base)
         shape = shape or located_on
-        switch = _SWITCH_HELD_BY.get(collection.which) if collection is not None else None
+        switch = _collection(collection.which).slideshow_filter if collection is not None else None
         if switch is not None:
             shape = shape or listing.shape
             location = shaped_key(collection.folder, shape)

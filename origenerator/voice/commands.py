@@ -2,14 +2,7 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from origenerator.gallery.collection import (
-    EXPERIMENTS_KEY,
-    EXPERIMENTS_LABEL,
-    FAVORITES_KEY,
-    FAVORITES_LABEL,
-    LATEST_KEY,
-    LATEST_LABEL,
-)
+from origenerator.gallery.collection import spoken_collections
 from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
 from origenerator.gallery.voice_commands import command_phrases, match_command
 from origenerator.voice.app_commands import match_app_command, phrases_answered_when_hosted
@@ -24,11 +17,12 @@ from origenerator.voice.text import words
 
 SHAPES = (PORTRAIT, LANDSCAPE)
 
-COLLECTION_KEYS: dict[str, str] = {
-    LATEST_LABEL.lower(): LATEST_KEY,
-    FAVORITES_LABEL.lower(): FAVORITES_KEY,
-    EXPERIMENTS_LABEL.lower(): EXPERIMENTS_KEY,
-}
+def _heard_by_a_surface() -> tuple:
+    return tuple(spoken for spoken in spoken_collections() if spoken.voice.heard_by_a_surface)
+
+
+def _collection_words() -> dict[str, str]:
+    return {spoken.label.lower(): spoken.key for spoken in _heard_by_a_surface()}
 
 _MAX_COLLECTION_WORDS = 3
 
@@ -91,7 +85,7 @@ def shaped_app_command(text: str):
 def _collection_named(words: list[str]) -> str | None:
     if not words or len(words) > _MAX_COLLECTION_WORDS:
         return None
-    return COLLECTION_KEYS.get(" ".join(words))
+    return _collection_words().get(" ".join(words))
 
 
 def spoken_phrases() -> frozenset[str]:
@@ -100,8 +94,9 @@ def spoken_phrases() -> frozenset[str]:
 
 def hosted_phrases() -> frozenset[str]:
     return (phrases_answered_when_hosted() | command_phrases()
-            | frozenset(COLLECTION_KEYS.keys() - {EXPERIMENTS_LABEL.lower()}) | {LEAD_WORDS[0]})
+            | frozenset(spoken.label.lower() for spoken in _heard_by_a_surface()
+                        if spoken.voice.answered_when_hosted) | {LEAD_WORDS[0]})
 
 
 def _what_is_said_to_a_surface() -> frozenset[str]:
-    return command_phrases() | slideshow_command_phrases() | frozenset(COLLECTION_KEYS)
+    return command_phrases() | slideshow_command_phrases() | frozenset(_collection_words())

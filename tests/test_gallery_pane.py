@@ -12,13 +12,13 @@ from PySide6.QtWidgets import QLabel, QWidget
 
 from origenerator import gallery, search
 from origenerator.gallery.collection import (
-    COLLECTIONS,
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
     LATEST_KEY,
     TRASH_KEY,
     FolderCollection,
+    collection_keys,
 )
 from origenerator.gallery.shapes import LANDSCAPE, SHAPES_AND_BOTH
 from origenerator.gui import gallery_pane
@@ -251,7 +251,7 @@ def test_every_collection_is_both_gathered_and_drawn_on_every_shape(qtbot, db):
     pane, scroll = _pane(qtbot, db)
     pane.set_model(LibrarySnapshot([_row("a", 1)]))
     not_answered_by_both = []
-    for which in COLLECTIONS:
+    for which in collection_keys():
         for shape in SHAPES_AND_BOTH:
             pane.show_empty()
             empty_page = scroll.widget()

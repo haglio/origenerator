@@ -3,17 +3,11 @@ from __future__ import annotations
 from functools import cache
 
 from PySide6.QtGui import QColor, QIcon, QPixmap
+from shared_ui import colors
 from shared_ui.colors import TEXT_PRIMARY
 from shared_ui.icons import icon_pixmap
 
-from origenerator.gallery.collection import (
-    COLLECTION_LABELS,
-    ENHANCED_KEY,
-    EXPERIMENTS_KEY,
-    FAVORITES_KEY,
-    LATEST_KEY,
-    TRASH_KEY,
-)
+from origenerator.gallery.collection import Glyph, collection
 from origenerator.gallery.groups import MediaGroup, SettingsGroup, folder_level, rows_under
 from origenerator.gallery.labels import MEDIA_LABELS
 from origenerator.gallery.output import media_type_of_row
@@ -25,29 +19,27 @@ LEVEL_LABELS = {
     "workflow": "Workflow", "site": "Site", "model": "Model", "lora": "LoRA",
     "source_image": "Source Image",
 }
-_COLLECTION_MARKS = {
-    FAVORITES_KEY: ("star", icons.STAR_GLYPH), ENHANCED_KEY: icons.ENHANCE_MARK,
-    TRASH_KEY: icons.DELETE_MARK,
-}
 MARK_BESIDE_A_WORD = 15
 _SIDE_MARKS = {PORTRAIT: PORTRAIT, LANDSCAPE: LANDSCAPE, BOTH: "portrait_and_landscape"}
 
 
+def _color_of(glyph: Glyph) -> QColor | None:
+    return getattr(colors, glyph.color) if glyph.color is not None else None
+
+
 @cache
-def collection_icon(collection: str) -> QIcon:
-    return {
-        LATEST_KEY: icons.latest_icon, FAVORITES_KEY: lambda: icons.star_icon(filled=True),
-        ENHANCED_KEY: icons.enhance_icon, EXPERIMENTS_KEY: icons.flask_icon,
-        TRASH_KEY: icons.delete_icon,
-    }[collection]()
+def collection_icon(which: str) -> QIcon:
+    glyph = collection(which).glyph
+    return icons.collection_glyph_icon(glyph.name, _color_of(glyph))
 
 
-def collection_mark(collection: str) -> tuple[str, QColor] | None:
-    return _COLLECTION_MARKS.get(collection)
+def collection_mark(which: str) -> tuple[str, QColor] | None:
+    marked = collection(which)
+    return (marked.glyph.name, _color_of(marked.glyph)) if marked.marked else None
 
 
-def collection_kind_icon(collection: str) -> tuple[QIcon, str]:
-    return collection_icon(collection), COLLECTION_LABELS[collection]
+def collection_kind_icon(which: str) -> tuple[QIcon, str]:
+    return collection_icon(which), collection(which).label
 
 
 @cache

@@ -48,7 +48,6 @@ from origenerator.db import Database, NewRequest
 from origenerator.evolver_trash import in_the_background as delete_through_evolver
 from origenerator.fun_time_bridge import ask_for_origenerator_mode
 from origenerator.fun_time_mode import FunTimeSession
-from origenerator.gallery.collection import COLLECTION_LABELS, FolderCollection, folder_collection
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
 )
@@ -61,6 +60,7 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.collection import (
     TRASH_KEY as _TRASH_KEY,
 )
+from origenerator.gallery.collection import FolderCollection, collection, folder_collection
 from origenerator.gallery.shapes import (
     LANDSCAPE as _LANDSCAPE,
 )
@@ -1836,7 +1836,7 @@ class GalleryView(QWidget):
         self._voice.say(message, mark=mark)
 
     def collection_label(self, key: str) -> str:
-        return COLLECTION_LABELS[key]
+        return collection(key).label
 
     def stand_in_collection(self, key: str, shape: str | None) -> bool:
         item = self._tree_item_for(shaped_key(key, shape) if shape else key)

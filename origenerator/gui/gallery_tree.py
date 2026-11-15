@@ -9,14 +9,8 @@ from PySide6.QtWidgets import QTreeWidgetItem
 
 from origenerator import gallery
 from origenerator.gallery.collection import (
-    COLLECTION_LABELS,
-    COLLECTIONS,
-    ENHANCED_KEY,
-    EXPERIMENTS_KEY,
-    FAVORITES_KEY,
-    LATEST_KEY,
-    TRASH_KEY,
     FolderCollection,
+    all_collections,
     folder_collection,
 )
 from origenerator.gallery.shapes import SHAPE_LABELS
@@ -27,16 +21,6 @@ from origenerator.media import MediaType
 
 GROUP_ROLE = Qt.ItemDataRole.UserRole
 _RECENT_TIP = " · worked in recently"
-
-_COLLECTION_TIPS = {
-    LATEST_KEY: "Recently generated",
-    FAVORITES_KEY: "Your favorite folders and items — drop a folder here to add it",
-    ENHANCED_KEY: "Your enhanced images",
-    EXPERIMENTS_KEY: "Background experiments awaiting your review",
-    TRASH_KEY: "Deleted items — after a day only their thumbnails are kept, "
-               "and restoring one makes it again",
-}
-
 
 PATH_SEPARATOR = "  \u203a  "
 
@@ -77,15 +61,10 @@ def _inside(group, inside: tuple) -> tuple:
     return (*inside, group.key) if inside else ()
 
 
-def _shown_collections(shape, folder_key: str) -> list[str]:
-    left_off = set()
-    if not shape.show_latest:
-        left_off.add(LATEST_KEY)
-    if not shape.tree_model:
-        left_off |= {FAVORITES_KEY, ENHANCED_KEY}
-    if key_holds(MediaType.VIDEO, folder_key):
-        left_off.add(ENHANCED_KEY)
-    return [collection for collection in COLLECTIONS if collection not in left_off]
+def _shown_collections(shape, folder_key: str) -> list:
+    of_videos = key_holds(MediaType.VIDEO, folder_key)
+    return [shown for shown in all_collections()
+            if shown.shown_in(shape) and not (shown.images_only and of_videos)]
 
 
 @dataclass
@@ -150,14 +129,14 @@ class GalleryTree:
             self._add_children(custom, row, shape, (custom.key,))
 
     def _add_collections(self, folder_item, shape, folder_key: str, inside=()) -> None:
-        for collection in _shown_collections(shape, folder_key):
-            key = FolderCollection(collection, folder_key).key
-            item = QTreeWidgetItem([COLLECTION_LABELS[collection]])
+        for shown in _shown_collections(shape, folder_key):
+            key = FolderCollection(shown.key, folder_key).key
+            item = QTreeWidgetItem([shown.label])
             item.setData(0, COUNT_ROLE, shape.collection_counts.get(key, 0))
-            item.setIcon(0, folder_icons.collection_icon(collection))
-            item.setToolTip(0, _COLLECTION_TIPS[collection])
-            if collection == FAVORITES_KEY:
-                item.setData(0, DROP_KEY_ROLE, FAVORITES_KEY)
+            item.setIcon(0, folder_icons.collection_icon(shown.key))
+            item.setToolTip(0, shown.tooltip)
+            if shown.gathers_folders:
+                item.setData(0, DROP_KEY_ROLE, shown.key)
             self._register(item, shaped_key(key, shape.shape, inside), folder_item,
                            folder_key=key)
 

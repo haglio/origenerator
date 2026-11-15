@@ -11,15 +11,6 @@ from shared_ui.spacing import BUTTON_RADIUS, MARGIN_STANDARD
 
 from origenerator import gallery, request_settings
 from origenerator.animate_command import AnimateRequest
-from origenerator.gallery.collection import (
-    EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
-)
-from origenerator.gallery.collection import (
-    FAVORITES_KEY as _FAVORITES_KEY,
-)
-from origenerator.gallery.collection import (
-    LATEST_KEY as _LATEST_KEY,
-)
 from origenerator.gallery.voice_commands import said_in
 from origenerator.generation_config import filled_params
 from origenerator.gui.inflight_items import requested_of
@@ -58,6 +49,7 @@ from origenerator.voice.app_commands import (
     SWITCHES_A_HOST_HOLDS,
     AppCommand,
     BarSetting,
+    GoToCollection,
     phrases_heard_only_outright,
 )
 from origenerator.voice.commands import (
@@ -79,12 +71,6 @@ logger = logging.getLogger(__name__)
 _FLASH_MS = 4000
 
 _WANTS_ANIMATING = "an animation"
-
-_COLLECTIONS = {
-    AppCommand.LATEST: _LATEST_KEY,
-    AppCommand.FAVORITES: _FAVORITES_KEY,
-    AppCommand.EXPERIMENTS: _EXPERIMENTS_KEY,
-}
 
 _BARS = {
     "speed": "set_speed",
@@ -286,21 +272,21 @@ class VoiceRouter(QObject):
         elif isinstance(matched, SlideshowControl):
             self._slideshows.run_slideshow_command(matched.command, matched.shape)
         elif isinstance(matched, SurfaceCommand):
-            if isinstance(matched.command, AppCommand):
+            if isinstance(matched.command, (AppCommand, GoToCollection)):
                 self._run_app_command(matched.command, matched.shape, said_at)
             else:
                 self._on_image_command(matched, said_at)
-        elif isinstance(matched, AppCommand):
+        elif isinstance(matched, (AppCommand, GoToCollection)):
             self._run_app_command(matched, said_at=said_at)
         elif isinstance(matched, BarSetting):
             self._set_motion_bar(matched)
         else:
             logger.warning("Voice: no arm for a matched %s", type(matched).__name__)
 
-    def _run_app_command(self, command: AppCommand, shape: str | None = None,
+    def _run_app_command(self, command: AppCommand | GoToCollection, shape: str | None = None,
                          said_at: float | None = None) -> None:
-        if command in _COLLECTIONS:
-            self._go_to_collection(command, shape)
+        if isinstance(command, GoToCollection):
+            self._go_to_collection(command.key, shape)
         elif command is AppCommand.FILTER_ENHANCED:
             self._slideshows.filter_enhanced(shape)
         elif command is AppCommand.FILTER_ORIGINALS:
@@ -318,8 +304,7 @@ class VoiceRouter(QObject):
         else:
             self._run_in_gallery(command)
 
-    def _go_to_collection(self, command: AppCommand, shape: str | None = None) -> None:
-        key = _COLLECTIONS[command]
+    def _go_to_collection(self, key: str, shape: str | None = None) -> None:
         label = self._host.collection_label(key)
         if not self._host.stand_in_collection(key, shape):
             self._slideshows.answer(f"no {label} collection yet", kind=WARNING)

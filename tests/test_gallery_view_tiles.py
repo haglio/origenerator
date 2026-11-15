@@ -84,7 +84,6 @@ from tests.gallery_view_support import (
     _video_workflow,
     _write_looping_webp,
 )
-from tests.marked_words import words
 from tests.qt_exec import faking_exec
 from tests.real_db import database_of, put_rows
 from tests.related_links import source_tile
@@ -620,11 +619,9 @@ def test_the_spoken_favorite_aims_at_the_picked_thumbnails_and_toggles(qtbot):
     _pick_by_clicking(view, "i1")
 
     view._voice.listener.speak("favorite")
-    assert words(view._voice.status) == "Favorite 1 item"
     assert [bool(db.get_generation(pid).get("starred")) for pid in ("i1", "i2")] == [True, False]
 
     view._voice.listener.speak("favorite")
-    assert words(view._voice.status) == "Unfavorite 1 item"
     assert not db.get_generation("i1")["starred"]
 
 

@@ -456,7 +456,6 @@ class FakeHost:
         self.location = location
         self.rows = list(rows)
         self.groups = groups or {}
-        self.said = []
         self.followed = []
         self.shown = []
         self.revealed = []
@@ -530,8 +529,6 @@ class FakeHost:
         self.room_paused.append(paused)
         self.slideshows.set_room_paused(paused)
 
-    def say(self, message):
-        self.said.append(message)
 
 
 class _ReadingItFailsTheTest(dict):
@@ -1136,7 +1133,7 @@ def test_the_spoken_close_leaves_a_slideshow_on_its_own_monitor_up_and_shows_its
 
     director.run_slideshow_command(SlideshowCommand.STOP, None)
 
-    assert (made[0].closes, host.revealed, host.said) == (0, ["g1"], [])
+    assert (made[0].closes, host.revealed) == (0, ["g1"])
 
 
 def test_asked_to_switch_sides_on_its_own_it_trades_the_monitors(slideshows):
@@ -1965,12 +1962,11 @@ def test_a_hosted_slideshow_closing_leaves_the_sessions_pause_to_the_session(sli
     assert host.room_paused == []
 
 
-def test_the_spoken_close_with_no_slideshow_up_says_so(slideshows):
-    director, host, made = slideshows()
+def test_the_spoken_close_with_no_slideshow_up_opens_none(slideshows):
+    director, _host, made = slideshows()
 
     director.run_slideshow_command(SlideshowCommand.STOP, None)
 
-    assert host.said == ["no slideshow to close"]
     assert made == []
 
 
@@ -1981,7 +1977,6 @@ def test_the_spoken_pause_with_no_slideshow_up_pauses_the_room_as_esc_does(slide
 
     assert host.room_paused == [True]
     assert director._pace.seconds == DEFAULT_PACE_S
-    assert host.said == ["paused"]
 
 
 def test_the_spoken_pause_pauses_the_room_and_leaves_the_slideshow_up_at_its_pace(slideshows):
@@ -2048,30 +2043,21 @@ def test_a_spoken_pause_or_play_asks_a_hosting_session_for_omnipause_only_to_cha
 
 
 def test_a_spoken_word_is_answered_at_the_center_top_of_the_slideshows_own_window(slideshows):
-    director, host, made = slideshows()
+    director, _host, made = slideshows()
     director.open([("a.png", "image", "g1", None)])
 
-    director.answer("audio on")
+    director.note_voice_command("audio on")
 
     assert made[0].said == ["audio on"]
-    assert host.said == []
 
 
 def test_an_answer_keeps_its_kind_at_the_center_top_of_the_slideshow(slideshows):
     director, _host, made = slideshows()
     director.open([("a.png", "image", "g1", None)])
 
-    director.answer("no Latest collection yet", kind=WARNING)
+    director.note_voice_command("no Latest collection yet", kind=WARNING)
 
     assert made[0].said_kinds == [WARNING]
-
-
-def test_a_spoken_word_with_no_slideshow_up_is_answered_on_the_caption(slideshows):
-    director, host, _made = slideshows()
-
-    director.answer("audio on")
-
-    assert host.said == ["audio on"]
 
 
 def test_a_named_side_holding_nothing_is_an_answer_in_itself(slideshows):
@@ -2096,14 +2082,14 @@ def test_the_spoken_favorites_turns_favorites_on_rather_than_opening_a_collectio
         collection_key = FAVORITES_KEY
         shape = None
 
-    director, host, made = slideshows()
+    director, _host, made = slideshows()
     director.open([("a.png", "image", "g1", None)])
 
     director.play_collection(Spoken())
 
     assert made[0].hud_favorites_filter is True
     assert len(made) == 1
-    assert host.said == ["Favorites on"]
+    assert made[0].said == ["Favorites on"]
 
 
 def test_a_spoken_collection_with_nothing_in_it_opens_nothing(slideshows):
@@ -2111,12 +2097,11 @@ def test_a_spoken_collection_with_nothing_in_it_opens_nothing(slideshows):
         collection_key = LATEST_KEY
         shape = None
 
-    director, host, made = slideshows(gallery_pane=FakeGalleryPane(collections={}))
+    director, _host, made = slideshows(gallery_pane=FakeGalleryPane(collections={}))
 
     director.play_collection(Spoken())
 
     assert made == []
-    assert host.said == ["nothing there to play"]
 
 
 def test_the_transport_words_step_the_slide_and_say_which_way(slideshows):
@@ -2249,14 +2234,6 @@ def test_a_session_that_hands_over_its_funestras_gets_the_slideshow_on_one(slide
     assert made[0].opened_with["shape"] == PORTRAIT
     assert not isinstance(made[0].shown, FakeWindow)
     assert director.region_slideshow(PORTRAIT) is made[0]
-
-
-def test_a_slideshow_on_a_funestra_says_its_lines_in_the_gallerys_caption(slideshows):
-    director, host, made = slideshows(fun_time=FakeSession(funestras={PORTRAIT: object()}))
-
-    director.open([("a.png", "image", "g1", None)], shape=PORTRAIT)
-
-    assert made[0].opened_with["say"] == host.say
 
 
 def test_a_side_the_session_named_no_funestra_for_still_gets_a_window(slideshows):
@@ -2432,22 +2409,6 @@ def test_no_filter_said_of_a_slideshow_lifts_its_action_filter_alone(slideshows)
     assert slideshow.filters == SlideshowFilters(favorites=True, enhanced=True)
 
 
-def test_no_filter_with_no_slideshow_up_says_there_is_nothing_to_narrow(slideshows):
-    director, host, _made = slideshows()
-
-    director.clear_action_filter()
-
-    assert host.said == ["the filter needs a slideshow to narrow"]
-
-
-def test_the_filter_with_no_slideshow_up_says_there_is_nothing_to_narrow(slideshows):
-    director, host, _made = slideshows()
-
-    director.set_enhanced_filter(None, True)
-
-    assert host.said == ["the filter needs a slideshow to narrow"]
-
-
 def test_the_filter_said_with_no_slideshow_up_is_not_kept_for_the_next_one(slideshows):
     director, _host, made = slideshows()
     director.set_enhanced_filter(None, True)
@@ -2455,8 +2416,8 @@ def test_the_filter_said_with_no_slideshow_up_is_not_kept_for_the_next_one(slide
     director.open([("a.png", "image", "g1", None)], shape=LANDSCAPE)
 
     assert made[0].filters.enhanced is False, (
-        "with no slideshow up there is nothing for the word to narrow, and it says so rather "
-        "than arming the switch for the next slideshow")
+        "with no slideshow up there is nothing for the word to narrow, so it leaves the switch "
+        "unarmed for the next slideshow")
 
 
 def test_every_surface_lets_go_of_a_file_a_delete_is_about_to_move(slideshows):

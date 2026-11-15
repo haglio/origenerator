@@ -1658,7 +1658,7 @@ def test_a_gallery_taken_into_a_session_answers_its_switch_words_as_the_sessions
     view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     answers = []
-    monkeypatch.setattr(view._slideshows, "answer",
+    monkeypatch.setattr(view._slideshows, "note_voice_command",
                         lambda line, kind=None: answers.append((line, kind)))
 
     view.become_hosted(_session())
@@ -1674,7 +1674,7 @@ def test_the_drive_word_says_so_while_a_session_beside_this_one_has_the_device(
     view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     answers = []
-    monkeypatch.setattr(view._slideshows, "answer",
+    monkeypatch.setattr(view._slideshows, "note_voice_command",
                         lambda line, kind=None: answers.append((line, kind)))
 
     view.osr2.control.the_session_has_it(True)

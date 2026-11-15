@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 
 import pytest
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
 
 from origenerator import gallery
@@ -33,7 +32,6 @@ from origenerator.voice.commands import (
 )
 from origenerator.voice.dictation import COMPLETED
 from origenerator.voice.slideshow_commands import SlideshowCommand
-from tests.marked_words import words
 from tests.real_db import database_in
 
 _A_CLIENT = object()
@@ -139,8 +137,6 @@ class FakeSlideshows:
     def __init__(self, showing=None, by_shape=None):
         self.showing = showing
         self.by_shape = by_shape or {}
-        self.answers = []
-        self.answer_kinds = []
         self.said = []
         self.kinds = []
         self.collections_played = []
@@ -155,11 +151,7 @@ class FakeSlideshows:
     def surface_for(self, shape):
         return self.by_shape.get(shape) if shape is not None else self.showing
 
-    def answer(self, message, *, kind=INFO):
-        self.answers.append(message)
-        self.answer_kinds.append(kind)
-
-    def note_voice_command(self, message, *, kind):
+    def note_voice_command(self, message, *, kind=INFO):
         self.said.append(message)
         self.kinds.append(kind)
 
@@ -403,96 +395,24 @@ def test_closing_shuts_the_mic_and_waits_for_the_microphone_to_close(router):
 
     assert voice.listener.commands_on is False
     assert voice.listener.closed is True
-    assert voice.status.isHidden()
 
 
-def test_listening_with_nothing_heard_puts_no_line_in_core(router):
-    voice, _host, _slideshows = router(buttons={"mic": FakeButton(checked=True)})
-
-    voice.sync()
-
-    assert (voice.listener.commands_on, voice.status.isHidden()) == (True, True)
-
-
-def test_a_flashed_line_goes_away_once_its_moment_is_up(router):
-    voice, _host, _slideshows = router(buttons={"mic": FakeButton(checked=True)})
-    voice.sync()
-
-    voice.say("radio on")
-    assert words(voice.status) == "radio on"
-
-    voice._revert()
-    assert voice.status.isHidden()
-
-
-def test_a_line_said_with_no_mark_is_shown_as_it_is(router):
-    voice, _host, _slideshows = router()
-
-    voice.say("Locked", mark="")
-
-    assert (voice.status.textFormat(), voice.status.text()) == (Qt.TextFormat.PlainText, "Locked")
-
-
-def test_a_flash_over_a_promise_goes_back_to_the_promise(router):
-    voice, _host, _slideshows = router()
-    voice.sync()
-    voice._answer_request(None, "working out “no hat”…", Spoken(listening=False),
-                          working=True)
-
-    voice.say("heard: “something else”")
-    voice._revert()
-
-    assert words(voice.status) == "working out “no hat”…", (
-        "whatever flashed over the promise, the promise is still the truest thing this pane has "
-        "to say, and Listening over an app in the middle of a request reads as a request that "
-        "was dropped")
-
-
-def test_only_that_requests_own_answer_takes_its_promise_down(router):
-    voice, _host, _slideshows = router()
-    voice.sync()
-    mine = Spoken("no hat")
-    voice._answer_request(None, "working out “no hat”…", mine, working=True)
-
-    voice._answer_request(None, "something about another one", Spoken("no shoes"))
-    assert voice._promise.note == "working out “no hat”…"
-
-    voice._answer_request(None, "no hat — generating", mine)
-    assert voice._promise.note == ""
-
-
-def test_an_answer_given_on_a_slideshow_opened_meanwhile_ends_the_captions_promise(router):
-    voice, _host, _slideshows = router()
-    voice.sync()
-    mine = Spoken("no hat")
-    voice._answer_request(None, "working out “no hat”…", mine, working=True)
-    slideshow = FakeSlideshow()
-
-    voice._answer_request(slideshow, "no hat — generating", mine)
-
-    assert slideshow.requests == [("no hat — generating", False, INFO)]
-    assert voice.status.isHidden(), (
-        "a slideshow can open while the request is worked out, so the answer that goes to it "
-        "takes the caption's promise down at once")
-
-
-def test_what_was_heard_shows_at_the_center_top_of_the_slideshow_and_not_in_core(router):
+def test_what_was_heard_shows_at_the_center_top_of_the_slideshow(router):
     slideshow = FakeSlideshow()
     voice, _host, slideshows = router(slideshows=FakeSlideshows(showing=slideshow))
 
     voice.listener.heard.emit("start slideshow")
 
-    assert (voice.status.isHidden(), slideshows.said) == (True, ["heard: “start slideshow”"]), (
-        "what was heard is said on the slideshow, which someone watching it sees, and Core's "
-        "line stays away while a slideshow is up to say it")
+    assert slideshows.said == ["heard: “start slideshow”"]
 
 
-def test_what_was_heard_with_no_slideshow_up_shows_in_core(router):
-    voice, _host, _slideshows = router()
+def test_what_was_heard_is_spelled_the_way_the_app_knows_the_command(router):
+    voice, _host, slideshows = router(slideshows=FakeSlideshows(showing=FakeSlideshow()))
 
-    voice.listener.heard.emit("start slideshow")
+    voice.listener.heard.emit("Enhanced it.")
+    voice.listener.heard.emit("give her a wider hat")
 
-    assert words(voice.status).startswith("heard:")
+    assert slideshows.said == ["heard: “enhance it”", "heard: “give her a wider hat”"]
 
 
 def test_words_that_are_no_command_show_for_a_moment_and_are_logged_nowhere(router, caplog):
@@ -511,7 +431,6 @@ def test_a_transcription_with_no_letters_in_it_says_nothing(router):
 
     voice.listener.heard.emit("...")
 
-    assert words(voice.status) == ""
     assert slideshows.said == []
 
 
@@ -522,7 +441,7 @@ def test_a_collection_name_stands_you_in_that_collection(router):
     voice.on_command(GoToCollection(LATEST_KEY))
 
     assert host.stood_in == [(LATEST_KEY, None)]
-    assert slideshows.answers == ["Latest"]
+    assert slideshows.said == ["Latest"]
 
 
 def test_a_collection_the_tree_has_not_got_says_so_rather_than_doing_nothing(router):
@@ -530,8 +449,8 @@ def test_a_collection_the_tree_has_not_got_says_so_rather_than_doing_nothing(rou
 
     voice.on_command(GoToCollection(LATEST_KEY))
 
-    assert slideshows.answers == ["no Latest collection yet"]
-    assert slideshows.answer_kinds == [WARNING]
+    assert slideshows.said == ["no Latest collection yet"]
+    assert slideshows.kinds == [WARNING]
 
 
 def test_a_named_side_picks_that_sides_copy_of_the_collection(router):
@@ -549,7 +468,7 @@ def test_a_spoken_switch_flips_the_bank_switch_itself(router):
     voice.on_command(AppCommand.RADIO_ON)
 
     assert radio.set_to == [True]
-    assert slideshows.answers == ["Origenerator Radio on"]
+    assert slideshows.said == ["Origenerator Radio on"]
 
 
 def test_a_switch_this_window_does_not_have_says_the_session_owns_it(router):
@@ -557,8 +476,8 @@ def test_a_switch_this_window_does_not_have_says_the_session_owns_it(router):
 
     voice.on_command(AppCommand.RADIO)
 
-    assert slideshows.answers == ["Origenerator Radio is the session's here"]
-    assert slideshows.answer_kinds == [WARNING]
+    assert slideshows.said == ["Origenerator Radio is the session's here"]
+    assert slideshows.kinds == [WARNING]
 
 
 def test_a_switch_that_cannot_be_flipped_here_says_so(router):
@@ -567,8 +486,8 @@ def test_a_switch_that_cannot_be_flipped_here_says_so(router):
 
     voice.on_command(AppCommand.DRIVE_ON)
 
-    assert slideshows.answers == ["OSR2 can't be switched here"]
-    assert slideshows.answer_kinds == [WARNING]
+    assert slideshows.said == ["OSR2 can't be switched here"]
+    assert slideshows.kinds == [WARNING]
 
 
 def test_a_bar_word_moves_its_bar_the_way_its_key_does(router):
@@ -578,7 +497,7 @@ def test_a_bar_word_moves_its_bar_the_way_its_key_does(router):
     voice.on_command(AppCommand.SPEED_UP)
 
     assert motion.speed == 45
-    assert slideshows.answers == ["speed 45, amp 50"]
+    assert slideshows.said == ["speed 45, amp 50"]
 
 
 def test_a_spoken_number_puts_a_bar_where_it_says(router):
@@ -599,8 +518,8 @@ def test_a_router_taken_into_a_session_leaves_the_motion_to_the_session(router):
     voice.on_command(BarSetting("amp", 70))
 
     assert (motion.speed, motion.amplitude) == (40, 50)
-    assert slideshows.answers == ["the motion is the session's here"] * 2
-    assert slideshows.answer_kinds == [WARNING] * 2
+    assert slideshows.said == ["the motion is the session's here"] * 2
+    assert slideshows.kinds == [WARNING] * 2
 
 
 def test_a_router_handed_back_from_a_session_holds_the_motion_and_switches_again(router):
@@ -626,8 +545,8 @@ def test_a_bank_word_presses_its_button_and_answers_in_its_own_words(router):
     voice.on_command(AppCommand.UNDO)
 
     assert pressed == [1]
-    assert slideshows.answers == ["Undo: delete of 2 items"]
-    assert slideshows.answer_kinds == [INFO]
+    assert slideshows.said == ["Undo: delete of 2 items"]
+    assert slideshows.kinds == [INFO]
 
 
 def test_a_bank_word_whose_button_is_dead_says_why(router):
@@ -637,10 +556,10 @@ def test_a_bank_word_whose_button_is_dead_says_why(router):
 
     voice.on_command(AppCommand.GROUP)
 
-    assert slideshows.answers == ["pick some folders first"], (
+    assert slideshows.said == ["pick some folders first"], (
         "Group's tooltip explains the button rather than refusing it, so read back it would not "
         "say why the button cannot run")
-    assert slideshows.answer_kinds == [WARNING]
+    assert slideshows.kinds == [WARNING]
 
 
 def test_a_slideshows_word_with_none_up_says_it_is_a_slideshows(router):
@@ -648,8 +567,8 @@ def test_a_slideshows_word_with_none_up_says_it_is_a_slideshows(router):
 
     voice.on_command(AppCommand.LOCK)
 
-    assert slideshows.answers == ["No slideshow to lock"]
-    assert slideshows.answer_kinds == [WARNING]
+    assert slideshows.said == ["No slideshow to lock"]
+    assert slideshows.kinds == [WARNING]
 
 
 def test_a_transport_word_goes_to_the_slide_while_a_slideshow_is_up(router):
@@ -835,7 +754,7 @@ def test_enhance_with_no_slideshow_up_falls_to_the_bank_button_of_that_name(rout
 
     assert pressed == [1]
     assert host.enhanced == []
-    assert slideshows.answers == ["Enhance 2 images"]
+    assert slideshows.said == ["Enhance 2 images"]
 
 
 def test_an_animation_goes_to_the_image_on_screen_with_the_lane_and_action_said(router):
@@ -849,15 +768,12 @@ def test_an_animation_goes_to_the_image_on_screen_with_the_lane_and_action_said(
     assert slideshow.runs == [("g7", "animating as “alpha”…", INFO)]
 
 
-def test_an_animation_asked_for_with_no_image_on_screen_says_so(router):
+def test_an_animation_asked_for_with_no_image_on_screen_animates_nothing(router):
     voice, host, _slideshows = router()
 
     voice.on_command(SurfaceCommand(AnimateRequest(VIDEO, "alpha"), None))
 
     assert host.animated == []
-    assert words(voice.status) == "an animation needs an image on screen", (
-        "a line of its own rather than the action's name: the command is a record rather than a "
-        "word, and every action names itself differently")
 
 
 
@@ -880,14 +796,6 @@ def test_a_request_said_to_a_named_region_is_about_that_regions_slide(router):
     assert (portrait.went_back_for, landscape.went_back_for) == ([4.0], []), (
         "the region named, not the slideshow showing, says which image the request is about")
     assert portrait.pauses == [(True, "Request: no hat… — say “over” to submit")]
-
-
-def test_an_open_request_reminds_the_speaker_that_over_submits_it(router):
-    voice, _host, _slideshows = router()
-
-    voice.on_spoken_request(Spoken("no hat", listening=True))
-
-    assert words(voice.status).endswith("say “over” to submit")
 
 
 def test_the_target_is_taken_at_the_opening_step_and_kept(router):
@@ -943,31 +851,35 @@ def test_a_request_with_no_slideshow_up_is_about_the_picked_generation(router):
 
 
 def test_a_request_whose_terminator_never_came_is_dropped_and_says_so(router):
-    voice, _host, _slideshows = router()
+    slideshow = FakeSlideshow()
+    voice, _host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow))
     voice.on_spoken_request(Spoken("no hat", listening=True))
 
     voice.on_spoken_request(Spoken("no hat", state="never got there"))
 
-    assert words(voice.status) == "request dropped — never heard “over”"
+    assert slideshow.requests == [("request dropped — never heard “over”", False, INFO)]
 
 
 def test_a_request_over_nothing_is_answered_rather_than_queued(router):
-    voice, host, _slideshows = router(rows=[])
+    slideshow = FakeSlideshow()
+    voice, host, _slideshows = router(rows=[], slideshows=FakeSlideshows(showing=slideshow))
 
     voice._begin_request(None, Spoken("no hat"))
 
     assert host.queued == []
-    assert words(voice.status) == "nothing on screen to request a change to"
+    assert slideshow.requests == [("nothing on screen to request a change to", False, INFO)]
 
 
 def test_a_video_this_app_cannot_rebuild_is_answered_here(router):
-    voice, host, _slideshows = router(rows=[_row("g1", workflow_name="a_stranger")])
+    slideshow = FakeSlideshow()
+    voice, host, _slideshows = router(rows=[_row("g1", workflow_name="a_stranger")],
+                                      slideshows=FakeSlideshows(showing=slideshow))
 
     voice._begin_request("g1", Spoken("no hat"))
 
     assert host.queued == []
-    assert words(voice.status) == (
-        "this one can't be re-made, so there's nothing to revise")
+    assert slideshow.requests == [
+        ("this one can't be re-made, so there's nothing to revise", False, INFO)]
 
 
 def test_a_request_being_worked_out_stands_in_the_job_queue_at_once(router, starting):
@@ -992,13 +904,15 @@ def test_a_requests_row_in_the_job_queue_goes_whatever_its_answer(router, starti
 
 def test_a_finished_request_is_asked_of_the_model_about_the_image_it_was_said_over(router):
     requests = AnswererThatAsksNoLocalModel()
-    voice, _host, _slideshows = router(rows=[_row("g1")], requests=requests)
+    slideshow = FakeSlideshow()
+    voice, _host, _slideshows = router(rows=[_row("g1")], requests=requests,
+                                       slideshows=FakeSlideshows(showing=slideshow))
 
     voice._begin_request("g1", Spoken("no hat"))
 
     ((about, _positive, _negative, asked),) = requests.asked
     assert (about, asked) == ("g1", "no hat")
-    assert "working out" in words(voice.status)
+    assert slideshow.requests == [("working out “no hat”…", True, INFO)]
 
 
 def test_a_revision_that_changed_nothing_says_so_rather_than_generating(router):
@@ -1007,12 +921,13 @@ def test_a_revision_that_changed_nothing_says_so_rather_than_generating(router):
         term = "hat"
         answer = ""
 
-    voice, host, _slideshows = router()
+    slideshow = FakeSlideshow()
+    voice, host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow))
 
     voice._on_revised((_row("g1"), object(), {}, Spoken("no hat"), None, None), Revision())
 
     assert host.queued == []
-    assert words(voice.status) == "“hat” is already how you asked for it"
+    assert slideshow.requests == [("“hat” is already how you asked for it", False, WARNING)]
 
 
 def test_a_revision_that_changed_nothing_but_was_answered_says_the_models_sentence(router):
@@ -1021,21 +936,13 @@ def test_a_revision_that_changed_nothing_but_was_answered_says_the_models_senten
         term = "freckles"
         answer = "The freckles are already there."
 
-    voice, host, _slideshows = router()
+    slideshow = FakeSlideshow()
+    voice, host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow))
 
     voice._on_revised((_row("g1"), object(), {}, Spoken("more freckles"), None, None), Revision())
 
     assert host.queued == []
-    assert words(voice.status) == "The freckles are already there."
-
-
-def test_a_revision_nobody_could_read_says_so(router):
-    voice, host, _slideshows = router()
-
-    voice._on_revised((_row("g1"), object(), {}, Spoken("no hat"), None, None), None)
-
-    assert host.queued == []
-    assert words(voice.status) == "didn't catch what to change in “no hat”"
+    assert slideshow.requests == [("The freckles are already there.", False, INFO)]
 
 
 def test_a_real_revision_is_queued_and_answered_where_it_was_said(router):
@@ -1088,7 +995,7 @@ def test_a_whole_utterance_command_from_the_session_outranks_the_rest(router):
     voice.listener.bare = GoToCollection(LATEST_KEY)
 
     assert voice.run_spoken_command("recents") is True
-    assert slideshows.answers == ["Latest"]
+    assert slideshows.said == ["Latest"]
 
 
 def test_the_sessions_words_go_to_an_open_request_before_any_command(router):
@@ -1097,8 +1004,8 @@ def test_the_sessions_words_go_to_an_open_request_before_any_command(router):
     voice.listener.dictated = Spoken("recents", listening=True)
 
     assert voice.run_spoken_command("portrait recents") is True
-    assert slideshows.answers == []
-    assert words(voice.status) == "Request: recents… — say “over” to submit"
+    assert slideshows.said == []
+    assert [text for text, _said_at in voice.listener.dictation_fed] == ["recents"]
 
 
 def test_a_requests_own_words_from_the_session_go_to_the_dictation(router):
@@ -1106,7 +1013,6 @@ def test_a_requests_own_words_from_the_session_go_to_the_dictation(router):
     voice.listener.dictated = Spoken("no hat", listening=True)
 
     assert voice.run_spoken_command("portrait request no hat") is True
-    assert words(voice.status) == "Request: no hat… — say “over” to submit"
     assert [text for text, _said_at in voice.listener.dictation_fed] == ["request no hat"], (
         "the shape is split off a spoken request too, so the dictation is not fed the shape word"
         " as if it were the request's first word")
@@ -1129,18 +1035,6 @@ def test_words_that_match_nothing_here_are_handed_back_and_logged_only_by_count(
         assert voice.run_spoken_command("put the kettle on") is False
 
     assert caplog.messages == ["Voice (from the session): a 4-word utterance matched no command"]
-
-
-def test_a_requests_answer_on_the_caption_stays_up_long_enough_to_be_read(router):
-    voice, _host, _slideshows = router()
-    long_answer = ("Moved her to a tropical beach at golden hour, the way your beach prompts "
-                   "usually have it, and kept the pose and the lighting as they were.")
-
-    voice._answer_request(None, "Request submitted", Spoken("no hat"))
-    short = voice._flash_timer.interval()
-    voice._answer_request(None, long_answer, Spoken("a beach"))
-
-    assert voice._flash_timer.interval() > short
 
 
 def test_the_word_switch_trades_the_monitors_core_and_the_slideshow_are_on(router):

@@ -12,6 +12,8 @@ from origenerator.osr2_controls_commands import FILTER
 
 _NEWER, _OLDER = -1, 1
 
+LOCK_ON_LED_BY_THE_SESSION = "lock_on_led_by_the_session"
+
 
 def _inclusion_presses(pair: InclusionPair,
                        press: Callable[[Any, Included], object]) -> dict:
@@ -33,6 +35,7 @@ _PRESSES: dict[str, Callable[[Any], object]] = {
     "next_funscripted": lambda host: host.slideshow_step(1, verb=NEXT_FUNSCRIPTED),
     "lock": lambda host: host.slideshow_toggle_lock(),
     "lock_on": lambda host: host.set_locked(True),
+    LOCK_ON_LED_BY_THE_SESSION: lambda host: host.set_locked(True, the_session_leads=True),
     "lock_off": lambda host: host.set_locked(False),
     "trash": lambda host: host.slideshow_cull(),
     "reset": _reset,

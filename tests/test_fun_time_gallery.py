@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from typing import NamedTuple
 
 import shiboken6
-from funestra.hud_title import F_MODE_LABEL
+from funestra.hud_title import FAVORITES_LABEL
 from funestra.main_hud import OSR2_PARKED, OSR2_RETRACTED
 from PIL import Image
 from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
@@ -649,7 +649,7 @@ def test_a_latest_slideshow_plays_newest_first_not_shuffled(qtbot, tmp_path, mon
     assert slideshow.hud_order_label == "Latest"
 
 
-def test_f_mode_on_a_slideshow_narrows_the_set_to_the_favorites(qtbot, tmp_path, monkeypatch):
+def test_favorites_on_a_slideshow_narrows_the_set_to_the_favorites(qtbot, tmp_path, monkeypatch):
     view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view._slideshows, "_favorite_prompt_ids", lambda: {"id-tall-1"})
@@ -657,15 +657,15 @@ def test_f_mode_on_a_slideshow_narrows_the_set_to_the_favorites(qtbot, tmp_path,
     slideshow = view._slideshows._region_slideshows["portrait"]
     qtbot.addWidget(slideshow.shown)
 
-    slideshow.shown.press("portrait_fmode")
+    slideshow.shown.press("portrait_favorites")
 
     assert slideshow.hud_favorites_filter is True
     assert slideshow.pass_size() == 1
     model = slideshow_hud_model("portrait", slideshow)
-    assert _lit(model, "portrait_fmode")
-    assert F_MODE_LABEL in model.title
+    assert _lit(model, "portrait_favorites")
+    assert FAVORITES_LABEL in model.title
 
-    slideshow.shown.press("portrait_fmode")
+    slideshow.shown.press("portrait_favorites")
     assert slideshow.pass_size() == 3
     slideshow._set.playlist.jump_to(1)
     assert slideshow.hud_is_favorite is True, (
@@ -857,7 +857,7 @@ def test_a_region_the_session_wants_never_stays_empty(qtbot, tmp_path, monkeypat
     assert view.region_slideshow("portrait") is None
 
 
-def test_a_spoken_favorites_is_the_slideshows_own_f_mode(qtbot, tmp_path, monkeypatch):
+def test_a_spoken_favorites_is_the_slideshows_own_favorites_switch(qtbot, tmp_path, monkeypatch):
     view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view._slideshows, "_favorite_prompt_ids", lambda: {"id-tall-1"})
@@ -867,11 +867,14 @@ def test_a_spoken_favorites_is_the_slideshows_own_f_mode(qtbot, tmp_path, monkey
 
     view._voice.on_command(CollectionCommand("__starred__", "portrait"))
     assert slideshow.hud_favorites_filter is True, (
-        "on a Funestra the word favorites is F-mode, which the HUD has a button for; opening "
+        "on a Funestra the word favorites is the Favorites switch, which the HUD has a button for; opening "
         "the collection as a fresh slideshow would answer it with something else entirely")
     assert slideshow.pass_size() == 1
 
     view._voice.on_command(CollectionCommand("__starred__", "portrait"))
+    assert slideshow.hud_favorites_filter is True, "said again, favorites stays on"
+
+    assert view.run_spoken_command("portrait favorites off")
     assert slideshow.hud_favorites_filter is False
 
 
@@ -1003,7 +1006,7 @@ def test_reset_on_a_slideshow_puts_the_side_back_how_it_started(qtbot, tmp_path,
     slideshow = view._slideshows._region_slideshows["portrait"]
     qtbot.addWidget(slideshow.shown)
 
-    slideshow.shown.press("portrait_fmode")
+    slideshow.shown.press("portrait_favorites")
     slideshow._set.playlist.jump_to(1)
     slideshow.slideshow_toggle_lock()
     assert slideshow.hud_favorites_filter is True
@@ -1798,7 +1801,7 @@ def test_an_item_no_row_claims_is_named_nothing_at_all(qtbot):
     assert _hud_label_for(view)("") == ""
 
 
-def test_a_hosted_slideshows_hud_carries_the_two_pairs_after_shuffle_and_latest(
+def test_a_hosted_slideshows_hud_carries_the_media_pair_then_enhanceds_and_favorites(
         qtbot, tmp_path, monkeypatch):
     view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
@@ -1808,19 +1811,18 @@ def test_a_hosted_slideshows_hud_carries_the_two_pairs_after_shuffle_and_latest(
     qtbot.addWidget(slideshow.shown)
     names = hud_button_names(slideshow.shown)
     assert names[names.index("latest") + 1:names.index("latest") + 5] == [
-        "media_videos", "media_images", "enhancement_originals", "enhancement_enhanced"]
+        "media_videos", "media_images", "enhanced", "favorites"]
 
-    slideshow.shown.press("portrait_enhancement_enhanced")
+    slideshow.shown.press("portrait_enhanced")
 
-    assert slideshow.hud_enhanced_mode is True
+    assert slideshow.hud_enhanced_filter is True
     assert slideshow.pass_size() == 1
     model = slideshow_hud_model("portrait", slideshow)
-    assert _lit(model, "portrait_enhancement_none")
-    assert not _lit(model, "portrait_enhancement_both")
+    assert _lit(model, "portrait_enhanced")
     assert "Enhanceds" in model.title
     assert not (tmp_path / "dashboard_cmd.txt").exists()
 
-    slideshow.shown.press("portrait_enhancement_both")
+    slideshow.shown.press("portrait_enhanced")
     assert slideshow.pass_size() == 3
 
 
@@ -1834,33 +1836,17 @@ def test_a_spoken_enhanced_only_narrows_the_named_regions_slideshow(qtbot, tmp_p
     qtbot.addWidget(slideshow.shown)
 
     assert view.run_spoken_command("portrait enhanced only")
-    assert slideshow.hud_enhanced_mode is True, (
+    assert slideshow.hud_enhanced_filter is True, (
         "hosted, a named shape takes that region's slideshow, since two run at once and neither "
         "is the active window")
     assert slideshow.pass_size() == 1
 
     assert view.run_spoken_command("portrait favorites")
-    assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_mode) == (True, True)
+    assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_filter) == (True, True)
 
     assert view.run_spoken_command("portrait clear filter")
-    assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_mode) == (True, True)
+    assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_filter) == (True, True)
     assert slideshow.pass_size() == 1
-
-
-def test_a_spoken_original_only_and_enhanced_and_original_reach_the_named_regions_slideshow(
-        qtbot, tmp_path, monkeypatch):
-    view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
-    qtbot.addWidget(view)
-    monkeypatch.setattr(view._slideshows, "_enhanced_ids_of", lambda rows: {"id-tall-1"})
-    _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
-    slideshow = view.region_slideshow("portrait")
-    qtbot.addWidget(slideshow.shown)
-
-    assert view.run_spoken_command("portrait original only")
-    assert (slideshow.hud_originals_mode, slideshow.pass_size()) == (True, 2)
-
-    assert view.run_spoken_command("portrait enhanced and original")
-    assert (slideshow.hud_originals_mode, slideshow.pass_size()) == (False, 3)
 
 
 def test_a_regions_reset_drops_the_enhanced_switch_with_the_rest(qtbot, tmp_path, monkeypatch):
@@ -1870,10 +1856,10 @@ def test_a_regions_reset_drops_the_enhanced_switch_with_the_rest(qtbot, tmp_path
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
     slideshow = view._slideshows._region_slideshows["portrait"]
     qtbot.addWidget(slideshow.shown)
-    slideshow.set_enhanced_mode(True)
-    assert slideshow.hud_enhanced_mode is True
+    slideshow.set_enhanced_filter(True)
+    assert slideshow.hud_enhanced_filter is True
 
     slideshow.slideshow_reset()
 
-    assert slideshow.hud_enhanced_mode is False
+    assert slideshow.hud_enhanced_filter is False
 

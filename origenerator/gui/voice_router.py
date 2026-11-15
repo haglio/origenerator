@@ -74,6 +74,8 @@ _FLASH_MS = 4000
 
 _WANTS_ANIMATING = "an animation"
 
+_ENHANCED_SAID = {AppCommand.ENHANCED_ON: True, AppCommand.ENHANCED_OFF: False}
+
 _BARS = {
     "speed": "set_speed",
     "amp": "set_amplitude",
@@ -301,12 +303,10 @@ class VoiceRouter(QObject):
                          said_at: float | None = None) -> None:
         if isinstance(command, GoToCollection):
             self._go_to_collection(command.key, shape)
-        elif command is AppCommand.FILTER_ENHANCED:
-            self._slideshows.filter_enhanced(shape)
-        elif command is AppCommand.FILTER_ORIGINALS:
-            self._slideshows.filter_originals(shape)
-        elif command is AppCommand.ENHANCED_AND_ORIGINAL:
-            self._slideshows.show_enhanced_and_original(shape)
+        elif command in _ENHANCED_SAID:
+            self._slideshows.set_enhanced_filter(shape, _ENHANCED_SAID[command])
+        elif command is AppCommand.FAVORITES_OFF:
+            self._slideshows.set_favorites_filter(shape, False)
         elif command is AppCommand.FILTER_OFF:
             self._slideshows.clear_action_filter(shape)
         elif command in _SWITCHES:

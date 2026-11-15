@@ -26,7 +26,6 @@ from funestra.inclusion_pair import (
     Included,
     InclusionPair,
     answer_to_a_narrowing,
-    enhancement_pair,
     media_pair,
 )
 from funestra.loop_cycle import ACTION, LOCK, SEED
@@ -617,7 +616,7 @@ class FunestraSlideshow(QObject):
         return self._set.filters.favorites
 
     @property
-    def hud_enhanced_mode(self) -> bool:
+    def hud_enhanced_filter(self) -> bool:
         return self._set.filters.enhanced
 
     @property
@@ -634,29 +633,11 @@ class FunestraSlideshow(QObject):
     def set_favorites_filter(self, on: bool) -> bool:
         return self._set.set_filters(replace(self._set.filters, favorites=bool(on)))
 
-    def set_enhanced_mode(self, on: bool) -> bool:
-        return self._narrow_by_enhancement(
-            enhanced=bool(on), originals=self._set.filters.originals and not on)
+    def toggle_enhanced_filter(self) -> bool:
+        return self.set_enhanced_filter(not self._set.filters.enhanced)
 
-    @property
-    def hud_originals_mode(self) -> bool:
-        return self._set.filters.originals
-
-    def show_originals_only(self) -> bool:
-        return self._narrow_by_enhancement(originals=True)
-
-    def show_enhanced_and_original(self) -> bool:
-        return self._narrow_by_enhancement()
-
-    @property
-    def hud_enhancement(self) -> Included:
-        filters = self._set.filters
-        return (not filters.originals, not filters.enhanced)
-
-    def set_enhancement(self, included: Included) -> bool:
-        enhanced, originals = included
-        return self._include(enhancement_pair(""), included, replace(
-            self._set.filters, enhanced=not originals, originals=not enhanced))
+    def set_enhanced_filter(self, on: bool) -> bool:
+        return self._set.set_filters(replace(self._set.filters, enhanced=bool(on)))
 
     @property
     def hud_media(self) -> Included:
@@ -682,10 +663,6 @@ class FunestraSlideshow(QObject):
             self._set.set_filters(filters)
         self._flash(answer.says, kind=WARNING if answer.warns else INFO)
         return True
-
-    def _narrow_by_enhancement(self, *, enhanced: bool = False, originals: bool = False) -> bool:
-        return self._set.set_filters(replace(self._set.filters, enhanced=enhanced,
-                                             originals=originals))
 
     def voice_target(self):
         return self._set.current_prompt_id()

@@ -109,8 +109,8 @@ class FakeSlideshow:
         self.visible = True
         self.ids = set()
         self.hud_favorites_filter = False
-        self.hud_enhanced_mode = self.hud_originals_mode = False
-        self.enhanced_items, self.original_items = [], []
+        self.hud_enhanced_filter = False
+        self.enhanced_items = []
         self.steps = []
         self.culled = 0
         self.favoritable = True
@@ -160,7 +160,7 @@ class FakeSlideshow:
         self.taken_up = (filters, keep_the_slide)
         self.filters = filters
         self.hud_favorites_filter = filters.favorites
-        self.hud_enhanced_mode = filters.enhanced
+        self.hud_enhanced_filter = filters.enhanced
 
     def retune(self, items, *, enhanced_ids):
         self.retuned = (list(items), set(enhanced_ids))
@@ -228,20 +228,9 @@ class FakeSlideshow:
         self.hud_favorites_filter = bool(on)
         return True
 
-    def set_enhanced_mode(self, on):
-        self.hud_enhanced_mode = on and bool(self.enhanced_items)
-        return self.hud_enhanced_mode
-
-    def show_originals_only(self):
-        if not self.original_items:
-            return False
-        self.hud_enhanced_mode, self.hud_originals_mode = False, True
-        return True
-
-    def show_enhanced_and_original(self):
-        narrowed = self.hud_enhanced_mode or self.hud_originals_mode
-        self.hud_enhanced_mode = self.hud_originals_mode = False
-        return narrowed
+    def set_enhanced_filter(self, on):
+        self.hud_enhanced_filter = on and bool(self.enhanced_items)
+        return self.hud_enhanced_filter
 
     @property
     def action_presses(self):
@@ -251,7 +240,7 @@ class FakeSlideshow:
         self.filters = replace(self.filters, action="")
 
     def pass_size(self):
-        return len(self.original_items if self.hud_originals_mode else self.enhanced_items)
+        return len(self.enhanced_items)
 
     def slideshow_step(self, delta):
         self.steps.append(delta)
@@ -1928,7 +1917,7 @@ def test_standalone_a_named_shape_is_accepted_and_ignored(slideshows):
         " goes to that slideshow")
 
 
-def test_the_spoken_favorites_flips_f_mode_rather_than_opening_a_collection(slideshows):
+def test_the_spoken_favorites_turns_favorites_on_rather_than_opening_a_collection(slideshows):
     class Spoken:
         collection_key = FAVORITES_KEY
         shape = None
@@ -1940,7 +1929,7 @@ def test_the_spoken_favorites_flips_f_mode_rather_than_opening_a_collection(slid
 
     assert made[0].hud_favorites_filter is True
     assert len(made) == 1
-    assert host.said == ["F-mode on"]
+    assert host.said == ["Favorites on"]
 
 
 def test_a_spoken_collection_with_nothing_in_it_opens_nothing(slideshows):
@@ -2214,9 +2203,9 @@ def test_the_spoken_filter_narrows_the_slideshow_and_says_what_is_left(slideshow
     director, _host, _made = slideshows()
     director._slideshow = slideshow
 
-    director.filter_enhanced()
+    director.set_enhanced_filter(None, True)
 
-    assert slideshow.said == ["enhanced only — 2 to play"]
+    assert slideshow.said == ["Enhanceds — 2 to play"]
 
 
 def test_a_slideshow_with_nothing_enhanced_in_it_says_so(slideshows):
@@ -2224,7 +2213,7 @@ def test_a_slideshow_with_nothing_enhanced_in_it_says_so(slideshows):
     director, _host, _made = slideshows()
     director._slideshow = slideshow
 
-    director.filter_enhanced()
+    director.set_enhanced_filter(None, True)
 
     assert slideshow.said == ["nothing here is enhanced"]
     assert slideshow.said_kinds == [WARNING]
@@ -2233,53 +2222,29 @@ def test_a_slideshow_with_nothing_enhanced_in_it_says_so(slideshows):
 def test_the_spoken_filter_answers_even_when_the_switch_was_already_on(slideshows):
     slideshow = FakeSlideshow()
     slideshow.enhanced_items = ["a", "b"]
-    slideshow.hud_enhanced_mode = True
-    slideshow.set_enhanced_mode = lambda on: False
+    slideshow.hud_enhanced_filter = True
+    slideshow.set_enhanced_filter = lambda on: False
     director, _host, _made = slideshows()
     director._slideshow = slideshow
 
-    director.filter_enhanced()
+    director.set_enhanced_filter(None, True)
 
-    assert slideshow.said == ["enhanced only — 2 to play"], (
+    assert slideshow.said == ["Enhanceds — 2 to play"], (
         "said even when the switch was already that way: a word that did nothing and said "
         "nothing reads as a mic that missed it")
 
 
-def test_original_only_narrows_the_slideshow_and_says_what_is_left(slideshows):
-    slideshow = FakeSlideshow()
-    slideshow.original_items = ["a"]
-    director, _host, _made = slideshows()
-    director._slideshow = slideshow
-
-    director.filter_originals()
-
-    assert slideshow.hud_originals_mode is True
-    assert slideshow.said == ["original only — 1 to play"]
-
-
-def test_original_only_on_a_slideshow_where_everything_is_enhanced_says_so_and_stays_off(
-        slideshows):
-    slideshow = FakeSlideshow()
-    director, _host, _made = slideshows()
-    director._slideshow = slideshow
-
-    director.filter_originals()
-
-    assert slideshow.hud_originals_mode is False
-    assert (slideshow.said, slideshow.said_kinds) == (["everything here is enhanced"], [WARNING])
-
-
-def test_enhanced_and_original_shows_all_of_them_and_leaves_f_mode_on(slideshows):
+def test_enhanced_off_shows_all_of_them_and_leaves_favorites_on(slideshows):
     slideshow = FakeSlideshow()
     slideshow.hud_favorites_filter = True
-    slideshow.hud_enhanced_mode = True
+    slideshow.hud_enhanced_filter = True
     director, _host, _made = slideshows()
     director._slideshow = slideshow
 
-    director.show_enhanced_and_original()
+    director.set_enhanced_filter(None, False)
 
-    assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_mode) == (True, False)
-    assert slideshow.said == ["showing all of them"]
+    assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_filter) == (True, False)
+    assert slideshow.said == ["Enhanceds off"]
 
 
 def test_no_filter_said_of_a_slideshow_lifts_its_action_filter_alone(slideshows):
@@ -2304,14 +2269,14 @@ def test_no_filter_with_no_slideshow_up_says_there_is_nothing_to_narrow(slidesho
 def test_the_filter_with_no_slideshow_up_says_there_is_nothing_to_narrow(slideshows):
     director, host, _made = slideshows()
 
-    director.filter_enhanced()
+    director.set_enhanced_filter(None, True)
 
     assert host.said == ["the filter needs a slideshow to narrow"]
 
 
 def test_the_filter_said_with_no_slideshow_up_is_not_kept_for_the_next_one(slideshows):
     director, _host, made = slideshows()
-    director.filter_enhanced()
+    director.set_enhanced_filter(None, True)
 
     director.open([("a.png", "image", "g1", None)], shape=LANDSCAPE)
 

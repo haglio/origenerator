@@ -42,13 +42,13 @@ class _Host:
         self.calls.append(("order", latest))
 
     def toggle_favorites_filter(self):
-        self.calls.append("fmode")
+        self.calls.append("favorites")
+
+    def toggle_enhanced_filter(self):
+        self.calls.append("enhanced")
 
     def set_media(self, included):
         self.calls.append(("media", included))
-
-    def set_enhancement(self, included):
-        self.calls.append(("enhancement", included))
 
     def show_item(self, path, *, lock=False):
         self.calls.append(("item", path, lock))
@@ -87,7 +87,7 @@ class _Host:
 def test_a_state_said_of_a_side_is_asked_for_by_name_rather_than_flipped():
     host = _Host()
 
-    for action in ("lock_on", "lock_off", "fmode_on", "fmode_off"):
+    for action in ("lock_on", "lock_off", "favorites_on", "favorites_off"):
         assert answer(host, action), action
 
     assert host.calls == [("locked", True), ("locked", False),
@@ -106,16 +106,16 @@ def test_filter_said_of_a_side_narrows_to_the_action_on_screen():
 
 def test_every_declared_button_is_answered_by_the_slideshow():
     host = _Host()
-    (row,) = hud_rows(HudKind.SLIDESHOW, HudFacts(funestra="portrait", hosted=True, latest=False))
+    (row,) = hud_rows(HudKind.SLIDESHOW, HudFacts(funestra="portrait", hosted=True, latest=False, favorites=False))
     for button in row:
         assert answer(host, button.command.removeprefix("portrait_")), button.command
 
     assert host.calls == [("step", -1), ("nudge", -1), ("nudge", 1), ("step", 1),
-                          "funscript jump", "cull", "lock", "fmode",
+                          "funscript jump", "cull", "lock",
                           "normal speed", "reset",
                           ("order", False), ("order", True),
                           ("media", (False, True)), ("media", (True, False)),
-                          ("enhancement", (False, True)), ("enhancement", (True, False)),
+                          "enhanced", "favorites",
                           ("version", -1)]
 
 

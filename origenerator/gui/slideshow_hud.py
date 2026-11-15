@@ -4,16 +4,15 @@ from dataclasses import dataclass
 
 from funestra.hud_kinds import HudFacts, HudKind, slideshow_title
 from funestra.hud_title import LATEST_LABEL
-from funestra.inclusion_pair import enhancement_pair, media_pair
+from funestra.inclusion_pair import media_pair
 from funestra.loop_cycle import SEED
 from funestra.satellite_hud import HudCell, HudModel
 
 from origenerator.gui.slideshow_set import thumb_of
 
 THE_SLIDESHOWS_OWN = frozenset({
-    *(verb.removeprefix("_") for pair in (media_pair(""), enhancement_pair(""))
-      for verb in pair.asked),
-    "fmode", "reset", "shuffle", "latest", "no_loop", "seed_loop",
+    *(verb.removeprefix("_") for verb in media_pair("").asked),
+    "favorites", "enhanced", "reset", "shuffle", "latest", "no_loop", "seed_loop",
     "action_loop", "loop", "more_seeds", "play_video", "lock_video", "filter",
     "no_filter", "nav_left", "nav_right", "nav_up", "nav_down", "cycle_seed",
     "cycle_action", "cycle_version", "cycle_version_back", "clip_seconds_up",
@@ -46,9 +45,9 @@ def slideshow_hud_model(shape: str, slideshow, placement: HudPlacement = USUAL_P
     action_filter = slideshow.hud_action_filter
     facts = HudFacts(
         funestra=shape, locked=slideshow.locked, favorite=slideshow.hud_is_favorite,
-        f_mode=slideshow.hud_favorites_filter,
+        favorites=slideshow.hud_favorites_filter, enhanced=slideshow.hud_enhanced_filter,
         latest=slideshow.hud_order_label == LATEST_LABEL, media=slideshow.hud_media,
-        enhancement=slideshow.hud_enhancement, hosted=placement.hosted,
+        hosted=placement.hosted,
         has_other_versions=slideshow.has_other_versions, clip_seconds=slideshow.dwell_s,
         has_osr2=placement.drives_the_osr2 or slideshow.transport.has_osr2,
         **slideshow.transport.row_facts())

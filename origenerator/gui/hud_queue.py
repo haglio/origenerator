@@ -25,6 +25,7 @@ from funestra.satellite_hud import (
     CTRL_BTN,
     ELLIPSIS,
     MAP_THUMB_H,
+    WORD_PAD,
     PaintedFoot,
     map_block_width,
 )
@@ -41,14 +42,17 @@ from shared_ui.palette import (
 )
 from shared_ui.spacing import (
     BUTTON_ICON_INSET,
-    BUTTON_PAD_H_TIGHT,
     BUTTON_RADIUS_HUD,
     GAP_MEDIUM,
     HAIRLINE,
 )
 from shared_ui.type_scale import SIZE_TINY
 
-from origenerator.gui.hud_queue_thumbnails import empty_thumbnail, fitted_frame, fitted_thumbnail
+from origenerator.gui.hud_queue_thumbnails import (
+    empty_thumbnail,
+    fitted_frame,
+    fitted_thumbnail,
+)
 from origenerator.gui.inflight import (
     CANCEL_ALL_TEXT,
     CANCEL_ALL_TIP,
@@ -95,7 +99,7 @@ FRAME_TOOLTIP = "Open the folder this run will land in"
 ROWS = 4
 _DRAG_START = 6
 
-_WORD_PAD = BUTTON_PAD_H_TIGHT
+_WORD_PAD = WORD_PAD
 _GAP = GAP_MEDIUM
 _ROW_H = CTRL_BTN + BLOCK_GAP
 _BAR_H = CTRL_BTN

@@ -1674,6 +1674,28 @@ def test_an_arrow_pressed_in_core_steps_the_slideshow_on_the_other_monitor(qtbot
     slideshow.close()
 
 
+@pytest.mark.parametrize(("key", "step"), [(Qt.Key.Key_D, 1), (Qt.Key.Key_A, -1)])
+def test_the_letters_that_stand_for_arrows_step_the_slideshow_from_core_too(
+        qtbot, monkeypatch, key, step):
+    view, slideshow, steps = _core_beside_its_slideshow(qtbot, monkeypatch)
+
+    taken = _arrow_pressed_in_core(view, key)
+
+    assert (taken, steps) == (True, [step])
+    slideshow.close()
+
+
+def test_e_pressed_in_core_cycles_the_slideshows_loop(qtbot, monkeypatch):
+    view, slideshow, _steps = _core_beside_its_slideshow(qtbot, monkeypatch)
+    cycles = []
+    monkeypatch.setattr(slideshow, "slideshow_loop_cycle", lambda: cycles.append(True))
+
+    taken = _arrow_pressed_in_core(view, Qt.Key.Key_E)
+
+    assert (taken, cycles) == (True, [True])
+    slideshow.close()
+
+
 def test_an_arrow_pressed_in_a_text_field_of_cores_stays_in_the_field(qtbot, monkeypatch):
     view, slideshow, steps = _core_beside_its_slideshow(qtbot, monkeypatch)
     view.activateWindow()

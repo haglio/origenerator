@@ -1300,6 +1300,24 @@ def test_a_generation_that_lands_joins_the_open_slideshow(qtbot, monkeypatch):
     slideshow.close()
 
 
+def test_a_generation_that_lands_joins_a_slideshow_opened_from_a_double_clicked_tile(
+        qtbot, monkeypatch):
+    _resolve_by_id(monkeypatch)
+    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    slideshow = view._slideshows.open_on_tile("i1")
+    qtbot.addWidget(slideshow.shown)
+
+    db.add(_image("i3", "a cat", 50, 3))
+    view._on_reroll_finished("some-key", "i3")
+
+    assert "i3" in {item[2] for item in slideshow._set.playlist._items}
+    slideshow.close()
+
+
 def test_a_generation_from_a_folder_the_slideshow_is_not_playing_stays_out(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     db = FakeDB([_image("i1", "a cat", 50, 1)])

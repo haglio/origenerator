@@ -386,17 +386,20 @@ class SlideshowDirector:
     def open_in_its_folder(self, media, generation):
         listed = self._listed_rows()
         hud = HudFacts(order_label=LATEST_LABEL, favorite_ids=self._favorite_prompt_ids())
-        rows = (listed if any(row["prompt_id"] == generation for row in listed)
-                else self.rows_at(self._location_of(self._row_for(generation))))
+        if any(row["prompt_id"] == generation for row in listed):
+            location, rows = self._listing().location, listed
+        else:
+            location = self._location_of(self._row_for(generation))
+            rows = self.rows_at(location)
         opened_on = [row for row in rows if row["prompt_id"] == generation]
         items = self.items_of(opened_on)
         if not items:
             return self.open([(media[0], media[1], generation, None)], start=0, shuffle=in_order,
                              rows=[row for row in [self._row_for(generation)] if row],
-                             hud=hud)
+                             location=location, hud=hud)
         shape = majority_shape(map(row_shape, rows))
-        slideshow = self.open(items, rows=opened_on, start=0, shape=shape, shuffle=in_order,
-                              hud=hud)
+        slideshow = self.open(items, rows=opened_on, location=location, start=0, shape=shape,
+                              shuffle=in_order, hud=hud)
 
         def fill_in(folder) -> None:
             if folder is None or slideshow is not self._slideshow or _still_up(slideshow) is None:
@@ -404,8 +407,8 @@ class SlideshowDirector:
             folder_items, versions = folder
             start = _place_of(generation, folder_items)
             if start is not None:
-                self.open(folder_items, rows=rows, start=start, shape=shape, shuffle=in_order,
-                          hud=hud, carrying=Carrying(versions=versions))
+                self.open(folder_items, rows=rows, location=location, start=start, shape=shape,
+                          shuffle=in_order, hud=hud, carrying=Carrying(versions=versions))
 
         if slideshow is not None and len(rows) > 1:
             self._host.off_thread(

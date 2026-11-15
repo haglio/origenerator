@@ -34,6 +34,7 @@ from origenerator.gui.slideshow_hud import HudPlacement, slideshow_hud_model
 from origenerator.item_shape import key_holds, shaped_key
 from origenerator.slideshow import LIVE
 from origenerator.voice.app_commands import AppCommand
+from origenerator.workflows.non_ai import non_ai_workflow
 from tests import gestures
 from tests.gallery_view_support import (
     _CTRL,
@@ -369,6 +370,24 @@ def test_a_slideshow_started_on_a_sites_folder_plays_what_it_holds(qtbot, monkey
     funestra_of(slideshow.shown)
 
     assert _playing(slideshow) == ["o1"]
+    slideshow.close()
+
+
+def test_a_double_click_on_a_non_ai_video_starts_a_slideshow_on_it(qtbot, monkeypatch):
+    keep_rows_on_disk(monkeypatch)
+    non_ai ={**_row("n1", non_ai_workflow("sample full"), {"folder": "sample/full"},
+                     "video one.mp4"),
+              "source": "non_ai", "workflow_version": "non_ai"}
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), non_ai]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._gallery_pane.slideshow_requested.emit("n1")
+    slideshow = view._slideshows.showing
+    qtbot.addWidget(slideshow.shown)
+    funestra_of(slideshow.shown)
+
+    assert _playing(slideshow) == ["n1"]
     slideshow.close()
 
 

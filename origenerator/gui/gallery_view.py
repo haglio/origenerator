@@ -4,19 +4,16 @@ import logging
 from functools import partial
 from typing import NamedTuple
 
-from PySide6.QtCore import QEvent, QPoint, Qt, QTimer, Signal
+from PySide6.QtCore import QPoint, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
-    QAbstractSpinBox,
     QApplication,
     QHBoxLayout,
     QInputDialog,
     QLabel,
-    QLineEdit,
     QMenu,
     QMessageBox,
     QPlainTextEdit,
     QScrollArea,
-    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -81,6 +78,7 @@ from origenerator.generation_config import (
 )
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import corner_buttons, omnipause
+from origenerator.gui.app_keys import AppKeys, Presses
 from origenerator.gui.busy_cursor import working
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController, CombineParts
@@ -198,7 +196,6 @@ logger = logging.getLogger(__name__)
 
 
 _POLL_INTERVAL_MS = 1500
-_TEXT_FIELDS = (QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox)
 
 
 class _SearchScope(NamedTuple):
@@ -266,17 +263,6 @@ def _is_one_of_the_picked(selection_group, group) -> bool:
 
 def _is_deletable_folder(group) -> bool:
     return isinstance(group, gallery.SettingsGroup)
-
-
-def _press_for_the_gallery(event, *, delete, copy_names, undo, redo):
-    control = event.modifiers() & Qt.KeyboardModifier.ControlModifier
-    if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Insert):
-        return delete
-    if event.key() == Qt.Key.Key_C and control:
-        return copy_names
-    if event.key() == Qt.Key.Key_Z and control:
-        return redo if event.modifiers() & Qt.KeyboardModifier.ShiftModifier else undo
-    return None
 
 
 def _top_section(folder_path: QWidget, buttons: QWidget, folder_actions: QWidget) -> QHBoxLayout:
@@ -350,7 +336,16 @@ class GalleryView(QWidget):
             },
         )
         self._re_aim_every_button()
-        self._intercept_the_rooms_keys(True)
+        self.keys = AppKeys(
+            self, find_bar=self._find_bar, generate_pane=self._generate_pane,
+            standalone=lambda: self._fun_time is None,
+            presses=Presses(
+                delete=self._delete_selection, copy_names=self._copy_names_of_the_selection,
+                undo=self._undo, redo=self._redo, open_find=self._open_find,
+                pause_or_play=self._slideshows.pause_or_play_the_room,
+                open_the_tabs_slideshow=self._open_the_tabs_slideshow,
+                motion_key=self._motion_key))
+        self.keys.intercept(True)
 
         self._poll_inflight = False
         self._poll_timer = QTimer(self)
@@ -482,77 +477,16 @@ class GalleryView(QWidget):
             parent=self, motion=self.osr2.motion)
         self._folder_history: list[str] = []
 
-    def _intercept_the_rooms_keys(self, intercepting: bool):
-        """Take (or hand back) every key the application delivers; Qt installs a filter already on its list once."""
-        app = QApplication.instance()
-        if app is None:
-            return
-        if intercepting:
-            # Qt's scroll area keeps a clicked thumbnail's key press from the view, so neither keyPressEvent nor a shortcut delivers it.
-            app.installEventFilter(self)
-        else:
-            app.removeEventFilter(self)
+    def _open_the_tabs_slideshow(self) -> None:
+        tab = self._generate_pane.current_generate_tab()
+        if tab is not None:
+            tab.open_slideshow()
 
-    def eventFilter(self, obj, event):
-        if event.type() == QEvent.Type.KeyPress:
-            if event.key() == Qt.Key.Key_Escape and self._handle_escape(event.modifiers()):
-                return True
-            if (event.key() == Qt.Key.Key_Escape and self._find_bar.isVisible()
-                    and not self._other_window_owns_keys()):
-                self._find_bar.close_find()
-                return True
-            if (event.key() == Qt.Key.Key_F
-                    and event.modifiers() & Qt.KeyboardModifier.ControlModifier
-                    and self.isVisible() and not self._other_window_owns_keys()):
-                self._open_find()
-                return True
-            if self._gallery_owns_keys() and (press := _press_for_the_gallery(
-                    event, delete=self._delete_selection, copy_names=self._copy_names_of_the_selection,
-                    undo=self._undo, redo=self._redo)):
-                press()
-                return True
-            if (self._gallery_owns_keys(even_from_the_generate_pane=True)
-                    and not event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
-                    and apply_motion_key(self.osr2.motion, event.key(),
-                                         on_drive_toggle=self.osr2.toggle)):
-                self._osr2_controls.refresh()
-                return True
-        # Qt hands an application-wide filter events for objects being destroyed;
-        # the base class's answer for one dereferences a freed C++ pointer and aborts.
-        return False
-
-    def _handle_escape(self, modifiers) -> bool:
-        if self._other_window_owns_keys():
+    def _motion_key(self, key) -> bool:
+        if not apply_motion_key(self.osr2.motion, key, on_drive_toggle=self.osr2.toggle):
             return False
-        if self._escape_cancels_something():
-            return False
-        if modifiers & Qt.KeyboardModifier.ShiftModifier and self._fun_time is None:
-            tab = self._generate_pane.current_generate_tab()
-            if tab is not None:
-                tab.open_slideshow()
-            return True
-        self._slideshows.pause_or_play_the_room()
+        self._osr2_controls.refresh()
         return True
-
-    def _escape_cancels_something(self) -> bool:
-        if self._find_bar.isVisible():
-            return True
-        return isinstance(QApplication.focusWidget(), _TEXT_FIELDS)
-
-    def _other_window_owns_keys(self) -> bool:
-        if QApplication.activeModalWidget() or QApplication.activePopupWidget():
-            return True
-        active = QApplication.activeWindow()
-        return active is not None and active is not self.window()
-
-    def _gallery_owns_keys(self, *, even_from_the_generate_pane: bool = False) -> bool:
-        if not self.isVisible() or self._other_window_owns_keys():
-            return False
-        focus = QApplication.focusWidget()
-        if isinstance(focus, _TEXT_FIELDS):
-            return False
-        return even_from_the_generate_pane or not (
-            focus is not None and self._generate_pane.isAncestorOf(focus))
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
@@ -956,7 +890,7 @@ class GalleryView(QWidget):
     def showEvent(self, event):
         super().showEvent(event)
         self._poll_timer.start()
-        self._intercept_the_rooms_keys(True)
+        self.keys.intercept(True)
         self.refresh(only_if_moved=True)
         if self.radio_enabled():
             self._radio.start()
@@ -970,7 +904,7 @@ class GalleryView(QWidget):
     def closeEvent(self, event):
         """Qt never hides a widget that was never shown, so ``hideEvent`` alone leaves the poll and the key filter armed."""
         self._poll_timer.stop()
-        self._intercept_the_rooms_keys(False)
+        self.keys.intercept(False)
         self.close_the_slideshows()
         self._voice.close()
         self._jobs.close()

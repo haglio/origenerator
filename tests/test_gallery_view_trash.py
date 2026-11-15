@@ -1097,16 +1097,16 @@ def test_ctrl_shift_z_redoes_where_ctrl_z_undoes(qtbot, monkeypatch):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(view, "_gallery_owns_keys", lambda **_kw: True)
+    monkeypatch.setattr(view.keys, "gallery_owns_keys", lambda **_kw: True)
     _open_leaf(view)
     view._gallery_pane.apply_selection("i1", _NO_MOD)
     view._delete_selection()
 
     ctrl = Qt.KeyboardModifier.ControlModifier
-    view.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Z, ctrl))
+    view.keys.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Z, ctrl))
     assert (actions.undo_count, actions.redo_count) == (1, 0)
 
-    view.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Z,
+    view.keys.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Z,
                                      ctrl | Qt.KeyboardModifier.ShiftModifier))
     assert (actions.undo_count, actions.redo_count) == (1, 1)
 

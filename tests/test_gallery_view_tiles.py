@@ -256,8 +256,8 @@ def test_an_item_the_gallery_has_not_named_yet_offers_no_name_to_copy(qtbot, mon
 
 
 def _press_ctrl_c(view, monkeypatch):
-    monkeypatch.setattr(view, "_gallery_owns_keys", lambda **_kw: True)
-    return view.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_C, _CTRL))
+    monkeypatch.setattr(view.keys, "gallery_owns_keys", lambda **_kw: True)
+    return view.keys.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_C, _CTRL))
 
 
 def test_ctrl_c_copies_the_names_of_the_picked_items_one_to_a_line(qtbot, monkeypatch):
@@ -309,14 +309,14 @@ def test_ctrl_c_in_a_focused_text_field_is_left_to_the_field(qtbot, tmp_path, mo
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
     _open_leaf(view)
     view._gallery_pane.apply_selection("i1", _NO_MOD)
-    monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
+    monkeypatch.setattr(view.keys, "other_window_owns_keys", lambda: False)
     editor = QLineEdit()
     monkeypatch.setattr(
         "origenerator.gui.gallery_view.QApplication.focusWidget", lambda: editor
     )
     QApplication.clipboard().setText("words copied from the field")
 
-    taken = view.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_C, _CTRL))
+    taken = view.keys.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_C, _CTRL))
 
     assert (taken, QApplication.clipboard().text()) == (False, "words copied from the field")
 

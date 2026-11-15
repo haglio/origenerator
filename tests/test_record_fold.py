@@ -99,3 +99,15 @@ def test_a_combine_made_from_the_folded_record_names_the_one_that_stays(tmp_path
 
     combined = db.get_generation("combined")
     assert (combined["action"], combined["source_video"]) == ("alpha", "first")
+
+
+def test_a_folder_keyed_from_the_folded_record_keeps_its_new_arrival_switches(tmp_path):
+    db = _two_records(tmp_path)
+    db.upsert_folder_meta("sdxl_t2i/sample/abc123", custom_name=None, favorite=False,
+                          level="settings", ref_prompt_id="repeat",
+                          favorite_after_id=7, enhance_after_id=9)
+
+    _fold_repeat_into_first(db)
+
+    (folder_meta,) = db.folder_meta_full()
+    assert (folder_meta["favorite_after_id"], folder_meta["enhance_after_id"]) == (7, 9)

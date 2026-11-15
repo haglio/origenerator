@@ -21,6 +21,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 QT_FREE = (
     "origenerator.prompt_diff",
     "origenerator.prompt_edit",
+    "origenerator.request_seed_remake",
     "origenerator.generation_config",
     "origenerator.action_settings",
     "origenerator.gallery",

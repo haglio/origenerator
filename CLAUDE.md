@@ -654,6 +654,13 @@ is the two hooks that call the guard, below.
   finished video that has none, one run from the production checkout: a video is
   not complete until its thumbnail is ready to animate, and the ones from before
   that was so have none. No `--apply` is a dry run that prints the count.
+- `tools/remake_request_images.py` — counts the Request images that took a new
+  seed where they should have kept the seed of the item they were asked of
+  (`request_seed_remake.wrong_seed_request_images`), reading a copy of the
+  database it opens read-only. It changes nothing: production Origenerator makes
+  each of them again by itself at launch, through its own Job Queue, and the
+  remade image takes the wrong one's place. Once this count is zero on
+  production, the launch pass and this command come out of the code.
 - `tools/speech_worker.py` — the voice: speaks a story's scene lines with
   Qwen3-TTS, one WAV per scene at exactly the scene's length, from a JSON job
   `origenerator.speech` writes. Run by path under the `speech_python` the

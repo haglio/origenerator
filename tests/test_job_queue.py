@@ -2620,3 +2620,17 @@ def test_closing_sends_a_model_left_loaded_away_at_once(qtbot, tmp_path):
     queue.close()
 
     assert handed_when_it_left == [0]
+
+
+def test_a_remake_he_never_asked_for_fails_without_a_word_to_him(qtbot, tmp_path):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    queue.start_prepared("k", _I2V, _params(), source=GenerationSource.REMAKE)
+    told = []
+    queue.failed.connect(lambda *said: told.append(said))
+
+    queue.job_for("k").failed.emit("the sampler ran out of memory")
+
+    assert told == []
+    assert db.list_generations()[0]["status"] == "error"

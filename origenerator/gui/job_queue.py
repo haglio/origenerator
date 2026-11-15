@@ -832,7 +832,8 @@ class JobQueue(QObject):
             self._db.update_generation(ended_job.prompt_id, status=GenerationStatus.ERROR,
                                        error_message=why)
             logger.warning("Re-roll failed for %s: %s", ended_key, why)
-            self.failed.emit(ended_key, why)
+            if ended_job.source != GenerationSource.REMAKE:
+                self.failed.emit(ended_key, why)
             self.run_ended.emit(_outcome_of(self._db, ended_job, ok=False))
 
     def _videos_waiting_for(self, enhancement) -> list[GenerationJob]:

@@ -99,6 +99,12 @@ class Database:
     def set_source(self, prompt_id: str, source: str):
         return self.generations.set_source(prompt_id, source)
 
+    def set_backfill_of(self, prompt_id: str, item_prompt_id: str):
+        return self.generations.set_backfill_of(prompt_id, item_prompt_id)
+
+    def remake_in_place(self, prompt_id: str, remade: dict):
+        return self.generations.remake_in_place(prompt_id, remade)
+
     def set_evolver_upscale(self, prompt_id: str, path: str, upscaled_at: str | None):
         return self.generations.set_evolver_upscale(prompt_id, path, upscaled_at)
 

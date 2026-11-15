@@ -206,6 +206,7 @@ from origenerator.one_look import looking_once
 from origenerator.prompt_tokens import boxed_as_typed
 from origenerator.published_actions import give_the_launch_its_actions
 from origenerator.radio import OrigeneratorRadio
+from origenerator.request_seed_remake import RemakesInTheQueue
 from origenerator.setting_advice import files_not_installed, made_with_files_not_installed
 from origenerator.trash import Genau, KeptBesideItsTrash, Kino, Trash
 from origenerator.voice.app_commands import AppCommand
@@ -406,6 +407,8 @@ class GalleryView(QWidget):
 
     def _build_the_queue_of_runs(self, db, client):
         self._jobs = JobQueue(db, client)
+        self._remakes = RemakesInTheQueue(db, self._jobs, client=client, places=OUTPUT_PLACES,
+                                          trash_dir=TRASH_DIR)
         self._jobs.changed.connect(self._rerender_current_leaf)
         self._jobs.changed.connect(self._reconcile_generating)
         self._jobs.preview.connect(self._on_reroll_preview)
@@ -1890,6 +1893,7 @@ class GalleryView(QWidget):
         self.enhance.take_up_trainings()
         self._look_training.take_up_trainings()
         self._jobs.reconnect_running()
+        self._remakes.start()
 
     def _cancel_reroll(self, key: str):
         self._jobs.cancel(key)
@@ -1923,8 +1927,8 @@ class GalleryView(QWidget):
                     else self.generate_pane.tab_that_launched(run))
         self._populate_origins.discard(run)
         finished_row = self._db.get_generation(prompt_id)
-        if (finished_row is not None
-                and finished_row.get("source") == GenerationSource.EXPERIMENT):
+        if finished_row is None or finished_row.get("source") in (GenerationSource.EXPERIMENT,
+                                                                  GenerationSource.REMAKE):
             self.refresh()
             self._populate.note_finished(key)
             return

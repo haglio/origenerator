@@ -24,11 +24,12 @@ class GenerationSource(StrEnum):
     LEFT_OUT = gallery_rows.LEFT_OUT
     REPLACED = "replaced"
     NON_AI = "non_ai"
+    REMAKE = "remake"
 
 
 MADE_ELSEWHERE = tuple(sorted(GenerationSource(source) for source in gallery_rows.MADE_ELSEWHERE))
 OUT_OF_SIGHT = (GenerationSource.STARTING_FRAME, GenerationSource.LEFT_OUT,
-                GenerationSource.REPLACED)
+                GenerationSource.REPLACED, GenerationSource.REMAKE)
 UNLISTED = (GenerationSource.LEFT_OUT, GenerationSource.REPLACED)
 
 

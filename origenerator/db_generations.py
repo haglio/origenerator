@@ -237,6 +237,20 @@ class GenerationStore(Store):
     def set_source(self, prompt_id: str, source: str):
         self._set(prompt_id, "source", source)
 
+    def set_backfill_of(self, prompt_id: str, item_prompt_id: str):
+        self._set(prompt_id, "backfill_of", item_prompt_id)
+
+    def remake_in_place(self, prompt_id: str, remade: dict):
+        taken = ("workflow_version", "positive_prompt", "negative_prompt", "seed", "params_json",
+                 "workflow_json", "provenance", "output_files", "thumbnail_path",
+                 "duration_seconds")
+        with self._connect() as conn:
+            conn.execute(
+                f"UPDATE generations SET {', '.join(f'{column} = ?' for column in taken)},"
+                " remade_at = datetime('now') WHERE prompt_id = ?",
+                [*(remade.get(column) for column in taken), prompt_id])
+            conn.execute("DELETE FROM generations WHERE prompt_id = ?", (remade["prompt_id"],))
+
     def set_evolver_upscale(self, prompt_id: str, path: str, upscaled_at: str | None):
         with self._connect() as conn:
             conn.execute(

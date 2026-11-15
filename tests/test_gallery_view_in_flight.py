@@ -33,6 +33,7 @@ from origenerator.db import Database, NewGeneration, NewRequest
 from origenerator.gallery.collection import (
     LATEST_KEY,
 )
+from origenerator.gallery.tree import placeable_rows, recent_generations
 from origenerator.gallery_edits import GalleryEdits
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.combine import CombineRequest
@@ -58,6 +59,7 @@ from tests.gallery_view_support import (
     _collection,
     _combine_db,
     _comfyui_finishes,
+    _completed_image,
     _double_click_slideshow,
     _enhanceable_db,
     _FakeRerollJob,
@@ -2963,3 +2965,39 @@ def test_generate_turns_the_whole_tab_into_the_item_being_made(qtbot, tmp_path):
                 "tab": panel.shown_item()}
     assert shown_by == dict.fromkeys(shown_by, job.prompt_id)
     assert _struck_and_lit(field) == ("", "")
+
+
+def _asked_with_the_wrong_seed(db):
+    _completed_image(db, "asked", "two cats", 9)
+    db.record_request(NewRequest(prompt_id="asked", source_prompt_id="orig", heard="two cats",
+                                 asked="two cats"))
+
+
+def test_at_launch_a_request_image_that_took_the_wrong_seed_is_made_again_with_the_right_one(
+        qtbot, tmp_path):
+    db = _seeded_db(tmp_path, seed=7)
+    _asked_with_the_wrong_seed(db)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+
+    view.reconnect_running_jobs()
+
+    [run] = [row for row in db.list_generations() if row.get("backfill_of") == "asked"]
+    assert (run["source"], json.loads(run["params_json"])["seed"]) == ("remake", 7)
+
+
+def test_a_remake_that_lands_is_never_an_item_of_its_own_in_the_gallery(qtbot, tmp_path):
+    db = _seeded_db(tmp_path, seed=7)
+    _asked_with_the_wrong_seed(db)
+    client = _reroll_client()
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.reconnect_running_jobs()
+    [run] = [row["prompt_id"] for row in db.list_generations() if row.get("backfill_of")]
+
+    client.job_completed.emit(run, _IMG_REROLL_HISTORY)
+
+    view.refresh()
+    shown = [*recent_generations(view.library.reading.rows),
+             *placeable_rows(view.library.reading.rows)]
+    assert run not in [row["prompt_id"] for row in shown]

@@ -1286,7 +1286,7 @@ class _ComfyUIStillStarting:
         return self.comes_up
 
 
-def test_a_hosted_boot_builds_its_window_while_comfyui_is_still_starting(qapp):
+def test_a_hosted_boot_builds_its_window_before_it_tidies_its_library_or_comfyui_starts(qapp):
     ran = []
     starting = _ComfyUIStillStarting()
     core = MagicMock(side_effect=lambda *a, **k: ran.append("Core") or MagicMock())
@@ -1301,8 +1301,9 @@ def test_a_hosted_boot_builds_its_window_while_comfyui_is_still_starting(qapp):
         starting.answer.set()
 
     ensure.assert_not_called()
-    assert ran == [name for _, name in _MAINTENANCE_PASSES
-                   if name != "reconcile_in_flight"] + ["Core"]
+    assert ran == ["Core"] + [name for _, name in _MAINTENANCE_PASSES
+                              if name != "reconcile_in_flight"], (
+        "the Satellites wait for the window, and only Core needs a tidied library")
 
 
 def test_a_hosted_boot_says_core_is_ready_only_once_comfyui_answered_and_the_late_passes_ran(

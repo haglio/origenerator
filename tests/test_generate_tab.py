@@ -3336,21 +3336,20 @@ def test_an_image_a_request_is_still_making_shows_the_exchange_in_the_request_se
     assert tab._param_form.request_exchange().turns() == [("no hat", "Done.")]
 
 
-def test_an_image_still_being_made_is_asked_no_change_of_until_it_lands(saved_panel):
+def test_an_image_still_being_made_shows_no_request_section_until_it_lands(saved_panel):
     tab, db = saved_panel
     running = _image_being_made(db, "img1", prompt="a cat")
     _request_made(db, "img1")
     tab.show_running_generation(running)
-    exchange = tab._param_form.request_exchange()
-    assert not exchange._line.isEnabled()
+    assert not _request_shown(tab)
 
     db.update_generation("img1", status="completed", output_files=json.dumps(
         [{"filename": "sdxl_img1.png", "subfolder": "image"}]))
     landed = db.get_generation("img1")
     tab.show_completed_result(landed, [landed])
 
-    assert exchange._line.isEnabled()
-    assert exchange.turns() == [("no hat", "Done.")]
+    assert _request_shown(tab)
+    assert tab._param_form.request_exchange().turns() == [("no hat", "Done.")]
 
 
 def test_an_image_a_request_is_still_making_shows_the_requests_change_on_its_entry(
@@ -3506,11 +3505,27 @@ def test_any_image_on_display_can_be_asked_a_change_of(saved_panel):
 
     exchange = tab._param_form.request_exchange()
     assert exchange.turns() == []
+    assert _request_shown(tab)
     assert exchange._line.isEnabled()
 
 
-def test_a_tab_showing_nothing_has_nothing_to_ask_a_change_of(tab):
-    assert not tab._param_form.request_exchange()._line.isEnabled()
+def test_a_tab_showing_nothing_shows_no_request_section(tab):
+    assert not _request_shown(tab)
+
+
+def test_a_modify_batch_shows_no_request_section(saved_panel, tmp_path):
+    tab, db = saved_panel
+    image = _image_row(db, "img1", prompt="a cat")
+    tab.show_saved_generation(image, [image])
+
+    tab.open_modify_batch(_FOLDER_KEY, _FOLDER_LABEL, "sdxl_t2i",
+                          _folder_params(), _images(tmp_path, 3))
+
+    assert not _request_shown(tab)
+
+
+def _request_shown(tab) -> bool:
+    return not tab._param_form.request_section().isHidden()
 
 
 def test_asking_rewrites_the_prompts_of_the_image_on_display_and_shows_the_models_sentence(

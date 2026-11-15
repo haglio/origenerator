@@ -175,22 +175,6 @@ def test_a_turn_with_no_change_recorded_has_nothing_to_show_when_hovered(qtbot):
     assert exchange._entries()[0].tip == ""
 
 
-def test_with_no_image_there_is_nothing_to_ask_of(qtbot):
-    exchange = _exchange(qtbot)
-    exchange.show_exchange(EXCHANGE)
-
-    exchange.set_available(False)
-
-    assert not exchange._line.isEnabled()
-    assert exchange.turns() == []
-    assert exchange._line.placeholderText() == "Pick an image to ask a change of"
-
-    exchange.set_available(True)
-
-    assert exchange._line.isEnabled()
-    assert exchange._line.placeholderText() == "What to change, e.g. two women"
-
-
 def test_an_answer_coming_back_grows_the_box_so_no_scroll_bar_shows_on_two_lines(qtbot):
     exchange = _shown_at(qtbot, 400)
 

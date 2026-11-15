@@ -30,7 +30,6 @@ from origenerator.gui.inflight import RunReading
 from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
 
 _ASK = "What to change, e.g. two women"
-_NOTHING_TO_ASK_OF = "Pick an image to ask a change of"
 _UPDATING = "updating…"
 _FAILED = "couldn't work that into the prompts"
 _LINES_AT_MOST = 20
@@ -234,7 +233,6 @@ class RequestExchange(QWidget):
         self._auto_generate.clicked.connect(self.auto_generate_chosen)
         row.addWidget(self._auto_generate)
         column.addLayout(row)
-        self._available = True
 
     def _ask(self) -> None:
         words = self._line.text().strip()
@@ -276,7 +274,7 @@ class RequestExchange(QWidget):
 
     def _settle(self, status: str = "", *, ready: bool = True) -> None:
         _say(self._status, status)
-        self._line.setEnabled(self._available and ready)
+        self._line.setEnabled(ready)
 
     def show_exchange(self, turns, *, started_on: str | None = None) -> None:
         self._held = [_Entry(turn) for turn in turns]
@@ -303,10 +301,3 @@ class RequestExchange(QWidget):
         self._held.pop()
         self._draw()
         self._settle(_FAILED)
-
-    def set_available(self, available: bool) -> None:
-        self._available = available
-        if not available:
-            self.show_exchange([])
-        self._settle()
-        self._line.setPlaceholderText(_ASK if available else _NOTHING_TO_ASK_OF)

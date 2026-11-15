@@ -51,7 +51,7 @@ from origenerator.gui.hud_places import (
     restore,
     told,
 )
-from origenerator.gui.message import FAVORITE, HEARD_MARK, INFO, WARNING
+from origenerator.gui.message import FAVORITE, INFO, WARNING
 from origenerator.gui.region_openings import RegionOpening, RegionOpenings
 from origenerator.gui.regions_left import RegionLeft, restored_regions, saved_regions
 from origenerator.gui.slideshow_lock import LockedOn, lock_held
@@ -126,8 +126,6 @@ class SlideshowHost(Protocol):
     def enhance_from_slideshow(self, prompt_id: str) -> bool: ...
 
     def set_room_paused(self, paused: bool) -> None: ...
-
-    def say(self, message: str, *, mark: str = HEARD_MARK) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -556,7 +554,7 @@ class SlideshowDirector:
             Playing(items, actions=showing.actions, hud=showing.hud, versions=showing.versions,
                     opening=showing.opening, **kwargs),
             Seat(shape, channel, FrameFiles(FRAMES_BEING_MADE_DIR / shape)),
-            Hosting(pace=self._pace_on(shape), say=self._host.say))
+            Hosting(pace=self._pace_on(shape)))
         self._region_slideshows[shape] = slideshow
         if self._room_paused:
             slideshow.set_paused(True)
@@ -1161,36 +1159,20 @@ class SlideshowDirector:
         for surface in self.surfaces():
             surface.release_media(paths, the_item_stays=the_item_stays)
 
-    def answer(self, message: str, *, kind: str = INFO) -> None:
-        slideshow = self._slideshow
-        if slideshow is not None:
-            slideshow.note_voice_command(message, kind=kind)
-        else:
-            self._host.say(message)
-
     def run_slideshow_command(self, command: SlideshowCommand, shape: str | None):
         slideshow = self.surface_for(shape)
         if command is SlideshowCommand.STOP:
-            if slideshow is None:
-                self._host.say("no slideshow to close")
-                return
-            if self._leave_for_core(slideshow.hud_prompt_id):
-                return
-            slideshow.close()
-            self._host.say("slideshow closed")
+            if slideshow is not None and not self._leave_for_core(slideshow.hud_prompt_id):
+                slideshow.close()
             return
         if command is SlideshowCommand.PAUSE:
             self._ask_for_the_room(paused=True)
-            if slideshow is None:
-                self._host.say("paused")
-            else:
+            if slideshow is not None:
                 slideshow.note_voice_command("slideshow paused")
             return
         self._ask_for_the_room(paused=False)
         if slideshow is None:
             self.start(shape=shape)
-            if self._slideshow is None:
-                self._host.say("nothing here to play")
             return
         slideshow.note_voice_command(f"slideshow at {slideshow.dwell_s}s")
 
@@ -1204,7 +1186,6 @@ class SlideshowDirector:
         rows = self.rows_at(key)
         items = self.items_of(rows)
         if not items:
-            self._host.say("nothing there to play")
             return
         self.open(items, rows=rows, location=key, shape=command.shape,
                   **self._order(command.collection_key == _LATEST_KEY))
@@ -1212,18 +1193,17 @@ class SlideshowDirector:
     def set_favorites_filter(self, shape, on: bool) -> None:
         slideshow = self.surface_for(shape)
         if slideshow is None:
-            self._host.say("Favorites needs a slideshow to narrow")
             return
         slideshow.set_favorites_filter(on)
-        self._host.say("Favorites on" if on else "Favorites off")
+        slideshow.note_voice_command("Favorites on" if on else "Favorites off")
 
     def clear_action_filter(self, shape: str | None = None) -> None:
-        slideshow = self._slideshow_to_narrow(shape)
+        slideshow = self.surface_for(shape)
         if slideshow is not None:
             slideshow.action_presses.clear_filter()
 
     def set_enhanced_filter(self, shape: str | None, on: bool) -> None:
-        slideshow = self._slideshow_to_narrow(shape)
+        slideshow = self.surface_for(shape)
         if slideshow is None:
             return
         if not on:
@@ -1234,11 +1214,6 @@ class SlideshowDirector:
         else:
             slideshow.note_voice_command("nothing here is enhanced", kind=WARNING)
 
-    def _slideshow_to_narrow(self, shape: str | None):
-        slideshow = self.surface_for(shape)
-        if slideshow is None:
-            self._host.say("the filter needs a slideshow to narrow")
-        return slideshow
 
     def run_on_slide(self, command: AppCommand, said_at: float | None = None) -> None:
         slideshow = self._slideshow
@@ -1266,7 +1241,7 @@ class SlideshowDirector:
         else:
             said, kind = (("let go", INFO) if slideshow.set_locked(False)
                           else ("nothing was locked", WARNING))
-        self.answer(said, kind=kind)
+        self.note_voice_command(said, kind=kind)
 
     def _favorite_prompt_ids(self) -> set[str]:
         return self._library().favorite_ids

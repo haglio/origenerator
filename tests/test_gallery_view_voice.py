@@ -8,8 +8,6 @@ from funestra.main_hud import (
     OSR2_PARKED,
 )
 from PySide6.QtCore import (
-    QPoint,
-    QRect,
     Qt,
 )
 
@@ -26,7 +24,7 @@ from origenerator.config import (
     EVOLVER_INBOX_DIR,
     GENAU_SOURCE,
 )
-from origenerator.db import Database, NewGeneration
+from origenerator.db import NewGeneration
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
@@ -37,9 +35,9 @@ from origenerator.gui import (
     omnipause,
     voice_router,
 )
-from origenerator.gui.enhance_controller import NOTHING_LEFT_TO_ENHANCE
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.message import INFO, WARNING
+from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.slideshow_pace import DEFAULT_S
 from origenerator.gui.source_tile import SourceTile
 from origenerator.item_actions import ItemActions
@@ -62,7 +60,6 @@ from tests.gallery_view_support import (
     _finish_reroll,
     _genau_db,
     _genau_view,
-    _on_screen,
     _requesting_view,
     _reroll_client,
     _seeded_db,
@@ -95,7 +92,6 @@ def test_words_that_are_no_command_leave_a_running_populate_as_it_was(
 
     assert list(view._live_jobs) == [key]
     assert view._live_jobs[key].params["positive_prompt"] == prompt
-    assert words(view._voice.status) == "heard: “make it a dog”"
 
 
 def test_populate_ending_leaves_an_open_mic_open(qtbot, tmp_path):
@@ -130,85 +126,19 @@ def test_the_mic_button_is_the_only_thing_that_opens_the_mic(qtbot, tmp_path):
     assert not view._voice.listener.commands_on
 
 
-def test_with_no_slideshow_up_cores_line_shows_what_was_heard_and_nothing_while_idle(
+def test_cores_left_pane_holds_its_osr2_controls_the_toc_and_the_combine_and_nothing_else(
         qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
-    view.refresh()
-    _select_first_leaf(view)
+    sections = view.findChild(PaneSplitter, "left_pane_sections")
 
-    view._buttons.mic.setChecked(True)
-    assert view._voice.status.isHidden()
+    held = [sections.widget(index) for index in range(sections.count())]
 
-    view._voice.listener.heard.emit("no hat")
-    assert "no hat" in words(view._voice.status)
-
-    view._buttons.mic.setChecked(False)
-    assert view._voice.status.isHidden()
-
-
-def test_the_captions_section_is_up_only_while_the_caption_is(qtbot, tmp_path):
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    view.show()
-    section = view._voice.status.parentWidget()
-    assert not section.isVisible()
-
-    view._buttons.mic.setChecked(True)
-    assert not section.isVisible()
-
-    view._voice.listener.heard.emit("no hat")
-    assert section.isVisible()
-
-    view._buttons.mic.setChecked(False)
-    assert not section.isVisible()
-
-
-def test_what_was_heard_gives_way_after_a_few_seconds(qtbot, tmp_path):
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    _select_first_leaf(view)
-    view._buttons.mic.setChecked(True)
-    view._voice.listener.heard.emit("no hat")
-
-    view._voice._flash_timer.timeout.emit()
-
-    assert view._voice.status.isHidden()
-
-
-def test_the_caption_spells_a_command_the_way_the_app_knows_it(qtbot, tmp_path):
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    _select_first_leaf(view)
-    view._buttons.mic.setChecked(True)
-
-    view._voice.listener.heard.emit("Enhanced it.")
-    assert "enhance it" in words(view._voice.status)
-    assert "Enhanced" not in words(view._voice.status)
-
-    view._voice.listener.heard.emit("give her a wider hat")
-    assert "give her a wider hat" in words(view._voice.status)
-
-
-def test_voice_status_caption_keeps_clear_of_the_header_buttons(qtbot, tmp_path):
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
-    _on_screen(qtbot, view, 1200, 800)
-    _select_first_leaf(view)
-
-    view._buttons.mic.setChecked(True)
-    view._voice.listener.heard.emit("give her a much longer caption than the idle one")
-    # Qt lays out around a caption that has grown only on a later turn of the event loop.
-    qtbot.wait(1)
-
-    caption = QRect(view._voice.status.mapTo(view, QPoint(0, 0)), view._voice.status.size())
-    for button in (view._buttons.back, view._buttons.forward, view._buttons.undo, view._buttons.delete):
-        assert not caption.intersects(
-            QRect(button.mapTo(view, QPoint(0, 0)), button.size())
-        )
-    assert caption.bottomLeft().y() <= view._search.field.mapTo(view, QPoint(0, 0)).y()
-
+    assert held == [section for section in (view._motion_pane, view._tree.parentWidget(),
+                                            view._combine.widget.parentWidget())
+                    if section is not None], (
+        "a slideshow shows what was heard at its top center, so Core keeps no line of its own "
+        "for it")
 
 
 class _VoiceSurface:
@@ -489,16 +419,7 @@ def test_stopping_the_slideshow_closes_it(qtbot, tmp_path, monkeypatch, said):
     assert view._slideshows.showing is None
 
 
-def test_a_slideshow_command_with_no_slideshow_up_answers_in_the_gallery(
-        qtbot, tmp_path, monkeypatch):
-    view = _voiceable(qtbot, tmp_path, monkeypatch)
-
-    view._voice.listener.speak_command("close slideshow")
-
-    assert "no slideshow" in words(view._voice.status)
-
-
-def test_a_spoken_fix_with_no_slideshow_up_says_so_rather_than_vanishing(
+def test_a_spoken_fix_with_no_slideshow_up_makes_nothing(
         qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr(detail_parts, "list_detector_files",
                         lambda: ["teeth_yolov8n.pt"])
@@ -507,7 +428,6 @@ def test_a_spoken_fix_with_no_slideshow_up_says_so_rather_than_vanishing(
     view._voice.listener.speak_command("fix teeth")
 
     assert view._live_jobs == {}
-    assert "image on screen" in words(view._voice.status)
 
 
 def test_start_slideshow_is_heard_with_no_slideshow_and_no_populate(qtbot, tmp_path,
@@ -1051,15 +971,13 @@ def test_a_spoken_enhance_with_no_slideshow_up_presses_the_bank_button(qtbot, tm
     assert job.params["enhance_steps"] == 29
 
 
-def test_a_spoken_enhance_with_nothing_to_enhance_says_so(qtbot, tmp_path):
+def test_a_spoken_enhance_with_nothing_to_enhance_queues_nothing(qtbot, tmp_path):
     view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
 
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
-    assert words(view._voice.status) == NOTHING_LEFT_TO_ENHANCE, (
-        "answered in the button's own words, which is what the user, not looking at it, needs told back")
     assert view._live_jobs == {}
 
 
@@ -1159,18 +1077,6 @@ def test_a_collection_name_said_over_a_slideshow_still_moves_the_toc(
         "standing in, so the word moves it rather than being refused")
 
 
-def test_a_collection_the_tree_has_not_got_says_so_rather_than_doing_nothing(
-        qtbot, tmp_path):
-    db = Database(tmp_path / "empty.db")
-    view = _listening(qtbot, tmp_path, db=db)
-
-    view._voice.listener.speak("go to favorites")
-
-    assert words(view._voice.status) == "no Favorites collection yet", (
-        "Favorites appears only once there are folders, and a word already taken as a command must "
-        "not vanish because its row is not there yet")
-
-
 def test_fun_times_own_words_do_here_what_they_do_there(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
@@ -1223,42 +1129,15 @@ def test_the_same_two_words_walk_the_history_with_no_slideshow_up(qtbot, tmp_pat
     assert _selected_folder(view) == first
 
 
-def test_a_step_with_nowhere_to_go_says_so(qtbot, tmp_path):
-    view = _listening(qtbot, tmp_path)
-
-    view._voice.listener.speak("forward")
-
-    assert words(view._voice.status) == "nowhere forward", (
-        "Back and Forward wear bare labels, so they carry a refusal of their own rather than "
-        "reading a tooltip back")
-
-
-def test_a_bank_word_acts_on_the_folder_with_nothing_picked_and_answers_in_its_own_words(
+def test_a_bank_word_acts_on_the_folder_with_nothing_picked(
         qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
-    key = _select_first_leaf(view)
+    _select_first_leaf(view)
     _click_off(view)
 
     view._voice.listener.speak("favorite")
 
-    assert words(view._voice.status) == f"Favorite folder “{view.group_for_key(key).label}”"
     assert view._buttons.favorite.isChecked()
-
-
-def test_a_bank_word_with_nothing_to_do_says_why(qtbot, tmp_path):
-    view = _listening(qtbot, tmp_path)
-
-    view._voice.listener.speak("undo")
-
-    assert words(view._voice.status) == "Nothing to undo"
-
-
-def test_locking_is_a_slideshows_word_and_says_so_with_none_up(qtbot, tmp_path):
-    view = _listening(qtbot, tmp_path)
-
-    view._voice.listener.speak("lock")
-
-    assert words(view._voice.status) == "No slideshow to lock"
 
 
 def test_a_spoken_switch_flips_the_bank_switch_itself(qtbot, tmp_path):
@@ -1266,7 +1145,6 @@ def test_a_spoken_switch_flips_the_bank_switch_itself(qtbot, tmp_path):
 
     view._voice.listener.speak("drive on")
     assert view.osr2.control.isChecked()
-    assert words(view._voice.status) == "OSR2 on"
 
     view._voice.listener.speak("drive")
     assert not view.osr2.control.isChecked()
@@ -1282,7 +1160,6 @@ def test_osr2_off_parks_the_device_as_the_osr2_controls_switch_does(qtbot, tmp_p
     view._voice.listener.speak("OSR2 off")
 
     assert view.osr2.control.state() == OSR2_PARKED
-    assert words(view._voice.status) == "OSR2 off"
 
 
 def test_the_mic_can_be_shut_by_voice(qtbot, tmp_path):
@@ -1305,8 +1182,6 @@ def test_a_spoken_bar_word_moves_its_bar_the_way_its_key_does(qtbot, tmp_path):
 
     assert bars.amplitude == widest_travel - 10
     assert bars.center == center + 5
-    assert words(view._voice.status) == view.osr2.motion.status_text(), (
-        "answered with what the device now reads")
 
 
 def test_a_spoken_number_puts_a_bar_where_it_says(qtbot, tmp_path):
@@ -1323,7 +1198,6 @@ def test_a_spoken_number_puts_a_bar_where_it_says(qtbot, tmp_path):
 
     view._voice.listener.speak("max speed")
     assert bars.speed == motion_engine.MAX_SPEED
-    assert words(view._voice.status) == view.osr2.motion.status_text()
 
 
 def test_min_speed_lands_on_the_slowest_the_bar_actually_moves(qtbot, tmp_path):

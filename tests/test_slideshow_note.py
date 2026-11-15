@@ -6,7 +6,7 @@ from shared_ui.colors import RED, TEXT_PRIMARY, YELLOW
 from origenerator.gui.message import ERROR, WARNING
 from origenerator.gui.slideshow_view import SlideshowView, ViewShow, ViewWiring
 from tests.gallery_view_support import _requesting_view
-from tests.marked_words import words, words_shown
+from tests.marked_words import words_shown
 
 _ITEMS = [("one.png", "image"), ("two.png", "image")]
 
@@ -23,12 +23,9 @@ def _view(qtbot):
     return view
 
 
-def _mid_request(qtbot, tmp_path, monkeypatch, *, showing=True):
+def _mid_request(qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     monkeypatch.setattr(view._voice.requests, "ask", lambda *a, **kw: None)
-    if not showing:
-        view._slideshows.showing.close()
-        view.select_generation("orig")
     view._voice.listener.speak("Request.")
     view._voice.listener.speak("no hat. Over.")
     return view
@@ -144,15 +141,3 @@ def test_the_mic_going_on_hearing_does_not_empty_the_corner(qtbot, tmp_path, mon
     assert "heard" in words_shown(window._note)
     _fade(window)
     assert "working out" in words_shown(window._note)
-
-
-def test_the_pane_says_it_is_working_too_when_no_slideshow_is_up(qtbot, tmp_path,
-                                                                 monkeypatch):
-    view = _mid_request(qtbot, tmp_path, monkeypatch, showing=False)
-    assert "working out" in words(view._voice.status)
-
-    view._voice.listener.heard.emit("something else entirely")
-    assert "heard" in words(view._voice.status)
-    view._voice._flash_timer.timeout.emit()
-
-    assert "working out" in words(view._voice.status)

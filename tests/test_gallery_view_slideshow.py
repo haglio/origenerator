@@ -758,7 +758,7 @@ def test_filter_enhanced_says_so_where_nothing_here_is_enhanced(qtbot, monkeypat
     slideshow.close()
 
 
-def test_filter_enhanced_needs_a_slideshow_to_narrow(qtbot, monkeypatch):
+def test_filter_enhanced_with_no_slideshow_up_opens_none(qtbot, monkeypatch):
     keep_rows_on_disk(monkeypatch)
     view = GalleryView(database_of([_enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
@@ -767,7 +767,6 @@ def test_filter_enhanced_needs_a_slideshow_to_narrow(qtbot, monkeypatch):
 
     view._voice._run_app_command(AppCommand.ENHANCED_ON)
 
-    assert "needs a slideshow" in words(view._voice.status)
     assert not view._buttons.slideshow.isHidden()
 
 

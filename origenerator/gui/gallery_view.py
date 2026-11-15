@@ -135,7 +135,7 @@ from origenerator.gui.inflight import (
 )
 from origenerator.gui.job_queue import JobQueue
 from origenerator.gui.look_training_controller import LookTrainingController
-from origenerator.gui.message import ERROR, HEARD_MARK, INFO
+from origenerator.gui.message import ERROR, INFO
 from origenerator.gui.modify_batch_tile import ModifyBatchTile
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.new_tile import NewTile
@@ -149,7 +149,6 @@ from origenerator.gui.panes import (
     PaneSplitter,
     hold_the_borders_still,
     pane,
-    pane_following,
 )
 from origenerator.gui.picking import Picks
 from origenerator.gui.populate_controller import PopulateController
@@ -457,8 +456,6 @@ class GalleryView(QWidget):
         self._tree.currentItemChanged.connect(self._on_folder_selected)
         # Qt emits itemSelectionChanged after currentItemChanged, so the selection has the last word on what the panes show.
         self._tree.itemSelectionChanged.connect(self._on_tree_selection_changed)
-        listening = pane_following(self._voice.status)
-        self._voice.caption_shown.connect(listening.setVisible)
         finding, toc_column = pane()
         toc_column.addWidget(self._search.row)
         toc_column.addWidget(self._tree, 1)
@@ -466,7 +463,7 @@ class GalleryView(QWidget):
         combining_column.addWidget(self._combine.widget)
         if self._combine.widget.isHidden():
             combining.hide()
-        sections = [listening, finding, combining]
+        sections = [finding, combining]
         self._osr2_controls = None
         self._motion_pane = None
         if self.osr2.motion is not None:
@@ -1462,9 +1459,6 @@ class GalleryView(QWidget):
         self._rerender_current_leaf()
         self.job_queue.update()
         self._reconcile_generating()
-
-    def say(self, message: str, *, mark: str = HEARD_MARK) -> None:
-        self._voice.say(message, mark=mark)
 
     def collection_label(self, key: str) -> str:
         return collection(key).label

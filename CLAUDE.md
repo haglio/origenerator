@@ -746,10 +746,11 @@ over the Gallery pane and the spoken "switch".
   sends Core to the other monitor (his answer, 2026-11-12). The slideshow the
   app brings up by itself, at launch or handed back from a session, leaves
   Core where it was left.
-- Nothing inside that slideshow closes it: Enter, Shift+Esc, a second press on
-  the slide and "stop slideshow" show its item in Core and leave it playing.
-- So Core draws no OSR2 controls, which are on the slideshow's HUD, and
-  Core's line for what was heard shows only while no slideshow is up.
+- Nothing inside that slideshow closes it: Enter, a second press on the slide
+  and "stop slideshow" show its item in Core and leave it playing.
+- Core has no line for what was heard: a slideshow shows it at its top
+  center, and in a Fun Time session the Dashboard's log does. The OSR2
+  controls are Core's alone, and no slideshow's HUD carries them.
 - With one monitor, or two of one shape, none of this applies: Core keeps its
   title bar and its saved place, and a slideshow opens and closes on demand.
 - A Fun Time session places Core and its slideshows itself and has no switch.

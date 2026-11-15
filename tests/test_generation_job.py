@@ -29,6 +29,7 @@ from origenerator.output_places import OutputPlaces
 from origenerator.provenance import BASIS, WORKFLOW, WORKFLOW_VERSION
 from origenerator.thumbnail import animated_thumbnail_path
 from origenerator.workflows import WORKFLOW_REGISTRY
+from tests.children import HANG_AFTER_S
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.media_files import write_mp4
 
@@ -297,7 +298,7 @@ def test_a_video_making_its_thumbnail_on_a_real_thread_finishes_without_holding_
     job._client.job_completed.emit("comfy-A", history)
 
     assert finished == []
-    qtbot.waitUntil(lambda: bool(finished))
+    qtbot.waitUntil(lambda: bool(finished), timeout=HANG_AFTER_S * 1000)
 
 
 def test_a_video_canceled_while_making_its_thumbnail_stays_where_comfyui_saved_it(qtbot, tmp_path):

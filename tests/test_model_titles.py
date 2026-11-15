@@ -160,6 +160,19 @@ def test_a_loras_title_keeps_which_pass_it_is_for(installed_models, titled_model
     assert model_title("example_look.safetensors") == "Example Look (High)"
 
 
+@pytest.mark.parametrize(("title", "shown"), [
+    ("Example Speed 480p (rank 64)", "Example Speed 480p rank 64"),
+    ("Example Look (High, rank 32)", "Example Look rank 32 (High)"),
+    ("Example Look (Example Maker v2)", "Example Look Example Maker v2"),
+])
+def test_a_loras_parentheses_say_only_which_pass_it_is_for(installed_models, titled_models,
+                                                           title, shown):
+    installed_models.add("loras", "example_look.safetensors", lora=True)
+    titled_models({"example_look": title})
+
+    assert model_title("example_look.safetensors") == shown
+
+
 def test_the_precision_shown_is_the_one_inside_the_file_whatever_its_title_says(
         installed_models, titled_models):
     installed_models.add("diffusion_models", "example_model.safetensors")
@@ -212,7 +225,7 @@ def test_the_words_a_title_holds_are_explained_in_the_order_it_holds_them():
 
 
 def test_a_loras_rank_and_the_height_it_was_trained_at_are_explained_like_its_other_words():
-    explained = title_words.explained("Example Speed I2V 480p (rank 64)")
+    explained = title_words.explained("Example Speed I2V 480p rank 64")
 
     assert [text.split(":")[0] for text in explained] == ["I2V", "480p", "Rank"]
 

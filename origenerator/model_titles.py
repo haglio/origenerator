@@ -73,6 +73,7 @@ def _title_and_size(value) -> tuple[str, Precision | None]:
     installed = _installed(value)
     inside = None if installed is None else precision.tagged(describe(installed).precision)
     if _is_a_lora(value, installed):
+        title = _with_only_its_pass_in_parentheses(title)
         named = precision.named_in(title)
         return title, named and (inside or named)
     return _without_its_pass(title), inside or precision.named_in(title)
@@ -89,12 +90,22 @@ def _is_a_lora(value, installed: Path | None) -> bool:
 
 
 def _without_its_pass(title: str) -> str:
+    head, _passes, others = _notes_of(title)
+    return head + (f" ({', '.join(others)})" if others else "")
+
+
+def _with_only_its_pass_in_parentheses(title: str) -> str:
+    head, passes, others = _notes_of(title)
+    return " ".join([head, *others]) + (f" ({', '.join(passes)})" if passes else "")
+
+
+def _notes_of(title: str) -> tuple[str, list[str], list[str]]:
     noted = _NOTES.search(title)
     if noted is None:
-        return title
-    kept = [note for note in noted["notes"].split(",") if note.strip().casefold() not in _PASSES]
-    notes = ",".join(kept).strip()
-    return title[:noted.start()] + (f" ({notes})" if notes else "")
+        return title, [], []
+    notes = [note.strip() for note in noted["notes"].split(",") if note.strip()]
+    passes = [note for note in notes if note.casefold() in _PASSES]
+    return title[:noted.start()], passes, [note for note in notes if note not in passes]
 
 
 def _installed(value) -> Path | None:

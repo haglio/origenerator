@@ -2637,7 +2637,7 @@ def test_a_lora_dropdowns_tooltip_ends_with_when_its_picked_lora_was_trained(
     assert dropdown.toolTip() == param_help("lora")
 
     dropdown.setCurrentIndex(dropdown.findData("example_look.safetensors"))
-    assert dropdown.toolTip() == f"{param_help('lora')} {trained}"
+    assert dropdown.toolTip() == f"{param_help('lora')}\n\nExample Look 1.0: {trained}"
 
     form.set_values({"lora": "example_style.safetensors"})
     assert dropdown.toolTip() == param_help("lora")
@@ -2658,10 +2658,13 @@ def test_a_lora_dropdowns_tooltip_says_what_its_picked_lora_is_for(
     trained = f"Trained {datetime.fromtimestamp(1792851468.891).astimezone():%Y-%m-%d %H:%M}."
 
     dropdown.setCurrentIndex(dropdown.findData("example_look.safetensors"))
-    assert dropdown.toolTip() == f"{param_help('lora')} Gives an image the example look. {trained}"
+    assert dropdown.toolTip() == (
+        f"{param_help('lora')}\n\nExample Look 1.0: Gives an image the example look. {trained}"), (
+        "what a LoRA is and what the picked one does are two things, told apart by a paragraph "
+        "and by the picked LoRA's name")
 
     form.set_values({"lora": "example_style.safetensors"})
-    assert dropdown.toolTip() == f"{param_help('lora')} Gives an image the example style."
+    assert dropdown.toolTip() == f"{param_help('lora')}\n\nexample_style: Gives an image the example style."
 
 
 def test_a_lora_put_in_its_row_by_loaded_settings_says_what_it_is_for_too(
@@ -2674,7 +2677,8 @@ def test_a_lora_put_in_its_row_by_loaded_settings_says_what_it_is_for_too(
 
     form.set_values({"lora": "example_look.safetensors"})
 
-    assert form._widgets["lora"].toolTip() == f"{param_help('lora')} Gives an image the example look."
+    assert form._widgets["lora"].toolTip() == (
+        f"{param_help('lora')}\n\nexample_look: Gives an image the example look.")
 
 
 def test_a_lora_rows_label_says_what_its_picked_lora_is_for_as_its_dropdown_does(

@@ -19,7 +19,7 @@ from funestra.file_channel import append_command
 from funestra.hud_placement import HudCorner
 from funestra.main_hud import OSR2_DRIVING, OSR2_PARKED
 from funestra.robot_hand import WaveformShape
-from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtCore import QEvent, QObject, QPoint, Qt
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import QApplication, QMessageBox, QWidget
 from shared_ui.hard_to_miss import FadedBackground
@@ -2409,3 +2409,30 @@ def test_core_handed_back_from_a_session_says_it_is_up_again(qtbot, tmp_path):
     win.become_standalone()
 
     assert said
+
+
+def test_on_two_monitors_core_wears_its_logo_and_name_at_its_top_left(
+        qtbot, tmp_path, his_two_monitors):
+    win = _window(qtbot, tmp_path)
+
+    title = win._title
+    assert (title.isHidden(), title.name.text(),
+            title.mapTo(win, title.rect().topLeft())) == (False, "Origenerator", QPoint(0, 0))
+
+
+def test_hovering_a_previews_name_says_which_preview_it_is(qtbot, tmp_path, his_two_monitors):
+    win = _window(qtbot, tmp_path, launch=Launch(preview=Preview(feature="a made-up feature")))
+
+    assert win._title.toolTip() == "Origenerator — preview of a made-up feature"
+
+
+def test_with_a_title_bar_of_its_own_core_wears_no_second_name(qtbot, tmp_path):
+    assert _window(qtbot, tmp_path)._title.isHidden()
+
+
+def test_core_taken_into_a_session_takes_its_name_off(qtbot, tmp_path, his_two_monitors):
+    win = _window(qtbot, tmp_path)
+
+    win.become_hosted(_fun_time_session())
+
+    assert win._title.isHidden()

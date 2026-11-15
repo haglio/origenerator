@@ -111,6 +111,11 @@ def would_reproduce_a_completed_run(rows, workflow, params: dict, *,
     return find_duplicate_generation(rows, snapshot) is not None
 
 
+def what_a_request_makes(rows, workflow, params: dict, asked_of: dict | None) -> dict | None:
+    made = {**workflow.default_params(), **params, **seeds_of(asked_of, workflow)}
+    return None if would_reproduce_a_completed_run(rows, workflow, made) else made
+
+
 def seeds_of(row: dict | None, workflow) -> dict:
     params = merge_denormalized(row or {})
     return {key: params[key] for key in workflow.seed_keys() if params.get(key) not in (None, "")}

@@ -59,6 +59,7 @@ from origenerator.generation_config import (
     ConfigSnapshot,
     configs_match,
     merge_denormalized,
+    what_a_request_makes,
     would_reproduce_a_completed_run,
 )
 from origenerator.gui.action_button import ActionButton
@@ -1366,6 +1367,7 @@ class GenerateTab(DropZones):
         self._request_aim = aim
         self._turn_being_made = None
         exchange.set_thumbnail_of(self._thumbnail_of)
+        exchange.set_generate_offered(self._turn_makes_a_new_image)
         exchange.show_exchange(aim.every_turn(), started_on=aim.started_on, asking=aim.asking)
         if aim.turns:
             self._param_form.set_prompts(aim.turns[-1].new_positive, aim.turns[-1].new_negative,
@@ -1399,10 +1401,10 @@ class GenerateTab(DropZones):
         return {"asked": turns[-1].said, "source_prompt_id": source,
                 "old_positive": old[0], "old_negative": old[1], "turns": list(turns)}
 
-    def _generate_from_turn(self, index: int) -> None:
+    def _turn_launch(self, index: int) -> tuple[str, dict, dict] | None:
         aim = self._request_aim
         if aim is None or index >= len(aim.every_turn()):
-            return
+            return None
         turn = aim.every_turn()[index]
         if index < len(aim.earlier):
             item = self._db.get_generation(aim.asked_into[index]) or {}
@@ -1413,11 +1415,23 @@ class GenerateTab(DropZones):
             params = aim.values[index - len(aim.earlier)]
         asked = self._asked_up_to(index)
         if not workflow or asked is None:
+            return None
+        return workflow, {**params, "positive_prompt": turn.new_positive,
+                          "negative_prompt": turn.new_negative}, asked
+
+    def _turn_makes_a_new_image(self, index: int) -> bool:
+        launch = self._turn_launch(index)
+        workflow = workflow_named(launch[0]) if launch is not None else None
+        return workflow is not None and what_a_request_makes(
+            self._library.now().rows, workflow, launch[1],
+            self._db.get_generation(launch[2]["source_prompt_id"])) is not None
+
+    def _generate_from_turn(self, index: int) -> None:
+        launch = self._turn_launch(index)
+        if launch is None:
             return
         self._turn_being_made = index
-        self.turn_generate_requested.emit(workflow, {
-            **params, "positive_prompt": turn.new_positive, "negative_prompt": turn.new_negative},
-            asked)
+        self.turn_generate_requested.emit(*launch)
 
     def note_in_flight(self, readings: dict) -> None:
         exchange = self._param_form.request_exchange() if self._param_form else None

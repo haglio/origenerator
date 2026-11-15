@@ -103,6 +103,7 @@ def _paragraph(cursor: QTextCursor, words: str, color, *, indent: int = 0, above
 class _Made:
     thumbnail: str | None = None
     reading: RunReading | None = None
+    generate: bool = False
 
 
 class _Conversation(QTextEdit):
@@ -155,7 +156,7 @@ class _Conversation(QTextEdit):
                 _block(cursor, indent=MARGIN_STANDARD, above=GAP_SMALL)
                 cursor.insertImage(image_format)
                 self._tips.append(entry.tip)
-        elif entry.changed_anything():
+        elif made.generate:
             button = GenerateButton(self.viewport())
             button.clicked.connect(lambda _checked=False, at=index: self.generate_asked.emit(at))
             self._reserve(cursor, button, entry)
@@ -223,6 +224,7 @@ class RequestExchange(QWidget):
         self._held: list[_Entry] = []
         self._started_on: str | None = None
         self._thumbnail_of: Callable[[str], str | None] | None = None
+        self._generate_offered: Callable[[int], bool] = lambda _index: True
         column.addWidget(self._conversation)
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
@@ -255,16 +257,25 @@ class RequestExchange(QWidget):
     def set_thumbnail_of(self, thumbnail_of: Callable[[str], str | None]) -> None:
         self._thumbnail_of = thumbnail_of
 
+    def set_generate_offered(self, offered: Callable[[int], bool]) -> None:
+        self._generate_offered = offered
+
+    def _offers_generate(self, index: int) -> bool:
+        entry = self._held[index]
+        return not entry.made and entry.changed_anything() and self._generate_offered(index)
+
     def _draw(self) -> None:
         before = self._started_on or ""
         for entry in self._held:
             entry.compare(before, self._thumbnail_of)
             before = entry.made
-        self._conversation.show_entries(self._held, [self._made_of(entry) for entry in self._held])
+        self._conversation.show_entries(
+            self._held, [self._made_of(index) for index in range(len(self._held))])
 
-    def _made_of(self, entry: _Entry) -> _Made:
+    def _made_of(self, index: int) -> _Made:
+        entry = self._held[index]
         if not entry.made:
-            return _Made()
+            return _Made(generate=self._offers_generate(index))
         return _Made(thumbnail=self._thumbnail_of(entry.made) if self._thumbnail_of else None,
                      reading=self._in_flight.get(entry.made))
 
@@ -301,7 +312,7 @@ class RequestExchange(QWidget):
         self._held[-1].take(turn)
         self._draw()
         self._settle()
-        if self._auto_generate.isChecked() and self._held[-1].changed_anything():
+        if self._auto_generate.isChecked() and self._offers_generate(len(self._held) - 1):
             self.generate_asked.emit(len(self._held) - 1)
 
     def set_auto_generate(self, on: bool) -> None:

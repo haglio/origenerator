@@ -51,13 +51,26 @@ def outside_source(workflow_name: str | None) -> str | None:
     return parts[0] if parts is not None else None
 
 
-class OutsideWorkflow(WorkflowTemplate):
-    version = "outside"
+MADE_ELSEWHERE_TIP = "Another site made this — Origenerator can't remake it"
+
+
+class MadeElsewhereWorkflow(WorkflowTemplate):
+    why_it_cannot_be_made_again = MADE_ELSEWHERE_TIP
     selectable = False
     generates_here = False
+    output_node_id = ""
+
+    def default_params(self) -> dict:
+        return {pd.key: pd.default for pd in self.param_definitions()}
+
+    def build_api_payload(self, params: dict) -> dict:
+        raise NotImplementedError(f"{self.display_name} was not made here, and ComfyUI never runs it")
+
+
+class OutsideWorkflow(MadeElsewhereWorkflow):
+    version = "outside"
     model_keys = OUTSIDE_MODEL_KEYS
     lora_keys = OUTSIDE_LORA_KEYS
-    output_node_id = ""
 
     def __init__(self, source: str, made: MediaType = MediaType.VIDEO,
                  kind: VideoKind | None = None):
@@ -70,9 +83,6 @@ class OutsideWorkflow(WorkflowTemplate):
     def display_name(self) -> str:
         site = shown_name(self.source)
         return f"{self.kind} {site}" if self.kind else site
-
-    def default_params(self) -> dict:
-        return {pd.key: pd.default for pd in self.param_definitions()}
 
     def param_definitions(self) -> list[ParamDef]:
         recorded = set(PLACES[self.output_type].values())
@@ -96,6 +106,3 @@ class OutsideWorkflow(WorkflowTemplate):
 
     def starts_from_an_image(self) -> bool:
         return self.kind == VideoKind.IMAGE_TO_VIDEO
-
-    def build_api_payload(self, params: dict) -> dict:
-        raise NotImplementedError(f"{self.display_name} made this, and ComfyUI never runs it")

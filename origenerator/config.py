@@ -95,6 +95,7 @@ LIBRARY_VIDEOS_DIR = LIBRARY_ROOT / "videos" / "videos"
 LIBRARY_SCRIPTS_DIR = LIBRARY_ROOT / "videos" / "scripts" / "scripts"
 
 EVOLVER_AI_DIR = LIBRARY_VIDEOS_DIR / "2D" / "AI"
+NON_AI_DIR = LIBRARY_VIDEOS_DIR / "2D" / "non_AI"
 EVOLVER_INBOX_DIR = EVOLVER_AI_DIR / "0_inbox"
 EVOLVER_SOURCE = "origenerator"
 KINO_DIR = kino_folder.kino_dir()

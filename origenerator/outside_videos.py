@@ -381,23 +381,23 @@ def _as_brought_in() -> dict:
 
 def _frame_fields(record: Record, filed: datetime, site: str) -> dict:
     image = record.image
-    return _recorded_fields(
+    return recorded_fields(
         GenerationSource.OUTSIDE if image else GenerationSource.STARTING_FRAME,
         outside_workflow(site, MediaType.IMAGE),
         (image or record.video).params,
-        (_made_at(image or record.video, filed), filed), action=None)
+        (made_at(image or record.video, filed), filed), action=None)
 
 
 def _video_fields(record: Record, filed: datetime, frame_file: str | None, site: str,
                   kind: VideoKind | None) -> dict:
-    return _recorded_fields(
+    return recorded_fields(
         GenerationSource.OUTSIDE, outside_workflow(site, MediaType.VIDEO, kind),
         {**record.video.params, "input_image": frame_file},
-        (_made_at(record.video, filed), filed), action=record.action)
+        (made_at(record.video, filed), filed), action=record.action)
 
 
-def _recorded_fields(source: str, workflow_name: str, params: dict, when: tuple[str, datetime], *,
-                     action: str | None) -> dict:
+def recorded_fields(source: str, workflow_name: str, params: dict, when: tuple[str, datetime], *,
+                    action: str | None) -> dict:
     made, filed = when
     return {
         "source": source,
@@ -412,7 +412,7 @@ def _recorded_fields(source: str, workflow_name: str, params: dict, when: tuple[
     }
 
 
-def _made_at(made: Made, filed: datetime) -> str:
+def made_at(made: Made, filed: datetime) -> str:
     created = (made.created or "").strip()
     try:
         return date.fromisoformat(created).isoformat()

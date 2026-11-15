@@ -33,6 +33,7 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.shapes import BOTH, LANDSCAPE, PORTRAIT
 from origenerator.gui import folder_icons, icons
 from origenerator.media import MediaType
+from origenerator.workflows.non_ai import non_ai_workflow
 from origenerator.workflows.outside import outside_workflow
 
 
@@ -73,7 +74,7 @@ def test_tab_close_icon_is_the_familys_cross(qtbot):
 
 def test_toc_initial_icons_render_for_each_level(qtbot):
     assert set(folder_icons.LEVEL_LABELS) == {
-        "workflow", "site", "model", "lora", "source_image"}
+        "workflow", "site", "non_ai", "model", "lora", "source_image"}
     assert folder_icons.LEVEL_LABELS["lora"] == "LoRA"
     assert folder_icons.LEVEL_LABELS["source_image"] == "Source Image"
     for level in folder_icons.LEVEL_LABELS:
@@ -100,6 +101,17 @@ def test_a_sites_folder_wears_a_blue_s_where_a_workflows_wears_a_blue_w(qtbot):
         icons._render_toc_initial("S", BLUE)).pixmap(48, 48).toImage()
 
 
+def test_a_non_ai_folder_wears_a_blue_n(qtbot):
+    folder = gallery.WorkflowGroup("video/" + non_ai_workflow("sample full"),
+                                   non_ai_workflow("sample full"), "sample full", [])
+
+    icon, word = folder_icons.folder_kind_icon(folder)
+
+    assert word == "Non-AI"
+    assert icon.pixmap(48, 48).toImage() == QIcon(
+        icons._render_toc_initial("N", BLUE)).pixmap(48, 48).toImage()
+
+
 def _letter_height(letter, color) -> int:
     image = icons._render_toc_initial(letter, color).toImage()
     rows = {y for x in range(image.width()) for y in range(image.height())
@@ -112,7 +124,7 @@ def test_a_sites_s_is_drawn_bigger_than_a_workflows_w_so_it_reads_as_easily(qtbo
     assert _letter_height("S", BLUE) > _letter_height("W", BLUE)
 
 
-@pytest.mark.parametrize("level", ["workflow", "site", "model", "lora", "source_image"])
+@pytest.mark.parametrize("level", ["workflow", "site", "non_ai", "model", "lora", "source_image"])
 def test_each_initials_letter_sits_in_the_middle_of_its_square(qtbot, level):
     letter, color = icons._TOC_INITIALS[level]
     image = icons._render_toc_initial(letter, color).toImage()

@@ -23,6 +23,7 @@ class GenerationSource(StrEnum):
     STARTING_FRAME = gallery_rows.STARTING_FRAME
     LEFT_OUT = gallery_rows.LEFT_OUT
     REPLACED = "replaced"
+    NON_AI = "non_ai"
 
 
 MADE_ELSEWHERE = tuple(sorted(GenerationSource(source) for source in gallery_rows.MADE_ELSEWHERE))

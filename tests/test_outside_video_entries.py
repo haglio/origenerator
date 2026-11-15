@@ -6,6 +6,7 @@ import os
 from origenerator import config, gallery_contract, outside_video_entries
 from origenerator.db import Database
 from origenerator.generation_state import GenerationSource
+from origenerator.non_ai_videos import NonAiPlaces
 from origenerator.outside_videos import Places
 from tests.children import run_python
 from tests.media_files import write_mp4
@@ -17,9 +18,11 @@ def _places(tmp_path) -> Places:
                   skip_sources=frozenset({"this-app"}), library_root=tmp_path)
 
 
-def _the_command(tmp_path, places: Places | None, logged_to: list | None = None) -> int:
+def _the_command(tmp_path, places: Places | None, logged_to: list | None = None, *,
+                 non_ai: NonAiPlaces | None = None) -> int:
     logged_to = [] if logged_to is None else logged_to
     return outside_video_entries.main(tmp_path / "origenerator.db", places=lambda: places,
+                                      non_ai=lambda: non_ai,
                                       log_to=lambda *where: logged_to.append(where))
 
 
@@ -38,6 +41,17 @@ def test_the_command_evolver_runs_writes_an_entry_for_a_video_evolver_filed_and_
     assert json.loads(capsys.readouterr().out) == {"brought_in": 1}
     [video] = _outside_videos(tmp_path)
     assert json.loads(video["output_files"])[0]["library_path"] == str(filed)
+
+
+def test_the_command_evolver_runs_brings_in_the_non_ai_videos_too(tmp_path, capsys):
+    non_ai = NonAiPlaces(videos=tmp_path / "non_AI", thumb_dir=tmp_path / "thumbs")
+    write_mp4(non_ai.videos / "sample" / "full" / "video one.mp4")
+
+    assert _the_command(tmp_path, None, non_ai=non_ai) == 0
+
+    assert json.loads(capsys.readouterr().out) == {"brought_in": 1}
+    assert [row["source"] for row in Database(tmp_path / "origenerator.db").list_generations()
+            ] == [GenerationSource.NON_AI]
 
 
 def test_the_command_run_again_writes_nothing_twice(tmp_path, capsys):

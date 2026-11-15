@@ -11,7 +11,7 @@ from funestra.hud_placement import HudCorner
 from funestra.main_hud import ModeHud
 from funestra.pointer import OMNIPAUSE_TOGGLE
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QPalette
+from PySide6.QtGui import QGuiApplication, QPalette
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 from shared_ui.colors import BLACK
 
@@ -149,6 +149,7 @@ class SlideshowView(QWidget):
             audio=PaneAudio(wiring.radio, wiring.volume, self._volume_moved))
         layout.addWidget(self._pane, 1)
         self.slideshow.tick()
+        QGuiApplication.instance().applicationStateChanged.connect(self._come_forward_beside_core)
 
     def wear_the_hud(self, shape: str, wear: HudWear = NO_WEAR) -> None:
         self._hud_shape = shape
@@ -261,6 +262,13 @@ class SlideshowView(QWidget):
         self._toggle_pause()
         if self._pane.pressing_again:
             defer(self, self._leave)
+
+    def _come_forward_beside_core(self, state) -> None:
+        core = self._actions.core_window() if self._actions.core_window is not None else None
+        if (state == Qt.ApplicationState.ApplicationActive and core is not None
+                and self.isVisible() and core.screen() is not self.screen()):
+            core.raise_()
+            self.raise_()
 
     def _leave(self) -> None:
         leave_for_core = self._actions.leave_for_core

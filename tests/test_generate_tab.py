@@ -73,6 +73,7 @@ from origenerator.gui import generate_tab as generate_tab_module
 from origenerator.gui import modify_batch as modify_batch_module
 from origenerator.gui.action_row import SIDE_LABELS, action_checkbox, action_pills
 from origenerator.gui.collapsible_section import CollapsibleSection
+from origenerator.gui.combination import Combination
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import LIT
 from origenerator.gui.eliding import ElidingLabel
@@ -721,7 +722,7 @@ def test_the_outgoing_form_is_still_alive_when_the_prompt_fields_change_is_annou
 def test_a_made_from_pair_already_on_show_is_not_painted_again(tab):
     painted = []
     tab.show_combination = painted.append
-    pair = object()
+    pair = Combination("frame.png", "clip.webp")
     tab.watch_folder("k", None)
 
     tab.show_live_source(pair)
@@ -5134,3 +5135,16 @@ def test_a_tab_the_gallery_opens_sends_into_the_inbox_the_gallery_was_handed(
     _press(tab, lane.send_caption)
 
     assert (inbox / lane.source / "vid1.mp4").read_bytes() == b"pixels"
+
+
+def test_a_run_from_a_lone_image_shows_it_where_and_as_big_as_the_frames_that_follow(
+        tab, tmp_path):
+    start_image = tmp_path / "start.png"
+    start_image.write_bytes(_frame_bytes(tmp_path))
+    viewport = tab._viewport
+
+    tab.watch_folder("k", None, made_from=Combination(image=str(start_image)))
+
+    assert (viewport._stack.currentWidget(), viewport._live) == (viewport._image_label, True), (
+        "drawn in the pair's smaller square, the image shrank the moment Generate was pressed "
+        "and grew back when the first frame came")

@@ -26,6 +26,7 @@ from origenerator.experiments.background import cancel_experiments
 from origenerator.flick_finales import drop_finales_in_flight
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import WINDOW_TITLE, FunTimeSession, Rect
+from origenerator.gui.app_title import AppTitle, under
 from origenerator.gui.gallery_view import GalleryView, Shared
 from origenerator.gui.headset_window import CAP_PX, HeadsetWindow
 from origenerator.gui.osr2_driving import Osr2Driving
@@ -135,7 +136,9 @@ class Core(QMainWindow):
                                          shared=Shared(prompt_heights=PROMPT_HEIGHTS, inbox=inbox,
                                                        device_waits_for_the_window=True,
                                                        two_screens=self._sides))
-        self.setCentralWidget(self._gallery_view)
+        self._title = AppTitle(WINDOW_TITLE, self.windowIcon(), preview)
+        self._title.hide()
+        self.setCentralWidget(under(self._title, self._gallery_view))
         self._toasts = Toasts(self.windowIcon(), parent=self, shown_as=preview,
                                        video_in_front=self._gallery_view.video_in_front)
         self._gallery_view.run_ended.connect(self._toasts.note)
@@ -206,6 +209,7 @@ class Core(QMainWindow):
         if not self.windowFlags() & Qt.WindowType.FramelessWindowHint:
             self.setWindowFlags(self.windowFlags() | Qt.WindowType.FramelessWindowHint)
         self.setGeometry(monitor.availableGeometry())
+        self._title.show()
         if shown:
             self.show()
 
@@ -242,6 +246,7 @@ class Core(QMainWindow):
         self._fun_time = session
         if self._taskbar is not None and session.taskbar_identity:
             self._taskbar.join(session.taskbar_identity)
+        self._title.hide()
         self._gallery_view.become_hosted(session)
         self.setWindowState(Qt.WindowState.WindowNoState)
         ui_scale.draw_at(ui_scale.room_scale(in_a_headset=session.in_a_headset))

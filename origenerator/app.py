@@ -14,7 +14,7 @@ from app_support.process_identity import ProcessNamer
 from shared_ui.preview import Preview, taskbar_identity, window_title
 
 from origenerator import alert
-from origenerator.boot_passes import MAINTENANCE, Library, run_maintenance, without_comfyui
+from origenerator.boot_passes import MAINTENANCE, Library, run_maintenance
 from origenerator.branch_session import LAUNCHER, shown_as
 
 _CLIENT_ID_KEY = "comfyui_client_id"
@@ -299,15 +299,15 @@ class Boot:
             on_status=self.say, pump_events=self.app.processEvents,
         )
 
-    def maintenance(self):
-        return MAINTENANCE if self.waits_for_comfyui else without_comfyui(MAINTENANCE)
+    def maintenance_before_the_window(self):
+        return MAINTENANCE if self.waits_for_comfyui else ()
 
-    def bring_comfyui_up_behind(self, library: Library, window) -> None:
+    def finish_core_behind(self, library: Library, window) -> None:
         if self.waits_for_comfyui:
             return
-        from origenerator.gui.comfyui_behind import bring_comfyui_up_behind_the_window
+        from origenerator.gui.behind_the_window import finish_core_behind_the_window
 
-        bring_comfyui_up_behind_the_window(library, self.logger, owner=self.app,
+        finish_core_behind_the_window(library, self.logger, owner=self.app,
                                            then=window.core_is_ready)
 
     def say(self, step: str) -> None:
@@ -442,7 +442,7 @@ def _open_the_library(boot, client) -> Library:
     db = Database(DB_PATH)
     library = Library(db=db, client=client, places=OUTPUT_PLACES, thumb_dir=THUMB_DIR,
                       log_dir=COMFYUI_LOG_DIR, inbox=default_inbox(), in_flight=in_flight_at(db))
-    run_maintenance(library, boot.maintenance(), boot.say, boot.logger)
+    run_maintenance(library, boot.maintenance_before_the_window(), boot.say, boot.logger)
     PhoneRecords.of_this_library(db, preview=boot.preview is not None).watch()
     return library
 
@@ -511,7 +511,7 @@ def _boot_and_run(app, app_args, preview) -> int:
     except LoadingCanceled:
         return boot.cancel(window, client)
 
-    boot.bring_comfyui_up_behind(library, window)
+    boot.finish_core_behind(library, window)
     boot.show(window)
     exit_code = boot.run()
     boot.close(window, client)

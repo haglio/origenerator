@@ -431,8 +431,10 @@ def test_a_reading_after_another_works_out_only_the_changed_rows_shape(monkeypat
 def test_a_reading_after_another_judges_only_the_changed_rows_enhanced(monkeypatch):
     asked = []
     real = gallery.enhanced_generations
-    monkeypatch.setattr(gallery, "enhanced_generations",
-                        lambda rows: asked.extend(row["prompt_id"] for row in rows) or real(rows))
+    monkeypatch.setattr(
+        gallery, "enhanced_generations",
+        lambda rows, is_enhanced: asked.extend(row["prompt_id"] for row in rows)
+        or real(rows, is_enhanced))
     before = LibrarySnapshot([_listed("pic-1"), _listed("pic-2")])
     assert before.enhanced_rows == []
     asked.clear()
@@ -482,6 +484,17 @@ def test_a_video_that_plays_as_its_evolver_upscale_counts_as_enhanced(tmp_path, 
     library = LibrarySnapshot([upscaled, plain])
 
     assert library.enhanced_ids_of(library.rows) == {"vid-1"}
+
+
+def test_the_enhanced_folder_and_the_slideshows_filter_ask_one_question_two_ways(
+        tmp_path, monkeypatch):
+    upscaled = _video_upscaled_by_evolver(tmp_path, monkeypatch, "vid-1")
+    library = LibrarySnapshot([upscaled])
+
+    assert library.is_enhanced(upscaled, an_upscale_counts=True) is True
+    assert library.is_enhanced(upscaled, an_upscale_counts=False) is False
+    assert library.enhanced_ids_of([upscaled]) == {"vid-1"}
+    assert library.enhanced_rows == []
 
 
 def test_an_image_origenerator_enhanced_counts_as_enhanced_and_one_it_did_not_does_not(

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app_support.gallery_rows import MADE_ELSEWHERE
+
 from origenerator.db_seed_uses import (
     forget_the_seeds_tabs_picked_for_their_next_press,
     give_old_seed_uses_their_kind,
@@ -418,3 +420,11 @@ def migrate(conn) -> None:
     conn.execute("DROP TABLE IF EXISTS branch_curation")
     give_old_seed_uses_their_kind(conn)
     forget_the_seeds_tabs_picked_for_their_next_press(conn)
+    keep_a_day_another_site_gave_a_day(conn)
+
+
+def keep_a_day_another_site_gave_a_day(conn) -> None:
+    made_elsewhere = ", ".join(f"'{source}'" for source in sorted(MADE_ELSEWHERE))
+    conn.execute(
+        "UPDATE generations SET created_at = substr(created_at, 1, 10)"
+        f" WHERE source IN ({made_elsewhere}) AND created_at LIKE '____-__-__ 00:00:00'")

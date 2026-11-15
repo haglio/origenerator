@@ -6,7 +6,7 @@ import math
 import os
 import uuid
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import NamedTuple
 
@@ -396,7 +396,7 @@ def _video_fields(record: Record, filed: datetime, frame_file: str | None, site:
         (_made_at(record.video, filed), filed), action=record.action)
 
 
-def _recorded_fields(source: str, workflow_name: str, params: dict, when: tuple[datetime, datetime], *,
+def _recorded_fields(source: str, workflow_name: str, params: dict, when: tuple[str, datetime], *,
                      action: str | None) -> dict:
     made, filed = when
     return {
@@ -407,17 +407,23 @@ def _recorded_fields(source: str, workflow_name: str, params: dict, when: tuple[
         "negative_prompt": params.get("negative_prompt"),
         "seed": seed_number(params.get("seed")),
         "action": action,
-        "created_at": made.strftime("%Y-%m-%d %H:%M:%S"),
+        "created_at": made,
         "completed_at": filed.isoformat(),
     }
 
 
-def _made_at(made: Made, filed: datetime) -> datetime:
+def _made_at(made: Made, filed: datetime) -> str:
+    created = (made.created or "").strip()
     try:
-        when = datetime.fromisoformat(made.created or "")
+        return date.fromisoformat(created).isoformat()
     except ValueError:
-        return filed
-    return when if when.tzinfo else when.replace(tzinfo=UTC)
+        pass
+    try:
+        when = datetime.fromisoformat(created)
+    except ValueError:
+        when = filed
+    when = when if when.tzinfo else when.replace(tzinfo=UTC)
+    return when.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def leave_out_for_good(db, row: dict) -> None:

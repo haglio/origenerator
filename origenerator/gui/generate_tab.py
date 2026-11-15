@@ -1211,7 +1211,11 @@ class GenerateTab(DropZones):
         if made is None or made_from == made.source:
             return
         self._being_made = made._replace(note=None, source=made_from)
-        self.show_combination(made_from)
+        lone_image = None if made_from.source_video else Path(made_from.image or "")
+        if lone_image is not None and lone_image.is_file():
+            self._viewport.show_frame(lone_image.read_bytes())
+        else:
+            self.show_combination(made_from)
 
     def show_live_frame(self, frame: bytes):
         made = self._being_made

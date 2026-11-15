@@ -722,6 +722,7 @@ def test_a_made_from_pair_already_on_show_is_not_painted_again(tab):
     painted = []
     tab.show_combination = painted.append
     pair = object()
+    tab.watch_folder("k", None)
 
     tab.show_live_source(pair)
     tab.show_live_source(pair)
@@ -734,7 +735,7 @@ def test_a_wait_text_already_on_show_is_not_painted_again(tab):
     painted = []
     tab._viewport.show_message = lambda text, **_kwargs: painted.append(text)
 
-    tab.show_live_wait("Loading the model")
+    tab.watch_folder("k", None, note="Loading the model")
     tab.show_live_wait("Loading the model")
 
     assert painted == ["Loading the model"]
@@ -3888,7 +3889,7 @@ def test_a_settings_push_does_not_arm_corners_over_a_followed_runs_frames(
     tab, db = saved_panel
     image = _image_row(db, "img1")
     tab.show_saved_generation(image, [image])
-    tab.show_live_frame(_frame_bytes(tmp_path))
+    tab.watch_folder("k", None, _frame_bytes(tmp_path))
 
     tab.set_enhance_settings(gallery.EnhanceSettings(auto=True))
 
@@ -5082,7 +5083,7 @@ def test_a_prefill_on_the_same_workflow_shows_the_newest_result(
 
 
 def test_a_prefill_ends_the_tabs_watch_of_a_run(tab):
-    tab.watch_folder("k", b"frame")
+    tab.watch_folder("k", None, b"frame")
 
     tab.prefill("sdxl_t2i", _wiz_params())
 

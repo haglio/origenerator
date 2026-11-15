@@ -627,7 +627,7 @@ def test_a_run_from_an_edited_combination_keeps_its_source_video_in_parentheses_
     tab._on_generate()
 
     assert drawn[-1].prompt_edited
-    assert tab._live_source.prompt_edited
+    assert tab._live_source().prompt_edited
 
 
 def test_a_genau_run_straight_from_the_combine_waits_with_its_source_video_in_parentheses(
@@ -637,7 +637,7 @@ def test_a_genau_run_straight_from_the_combine_waits_with_its_source_video_in_pa
     view._combine._generate_combination("img", "vid", intent=action_settings.GENAU)
     view._select_reroll(next(iter(view._live_jobs)))
 
-    assert _front_panel(view)._live_source.prompt_edited
+    assert _front_panel(view)._live_source().prompt_edited
 
 
 @pytest.mark.parametrize(("lane", "stands_apart"), [(action_settings.VIDEO, False),

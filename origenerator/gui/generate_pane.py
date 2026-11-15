@@ -375,6 +375,15 @@ class GeneratePane(QTabWidget):
         return [tab for tab in self.generate_tabs()
                 if tab.watched_key() == key]
 
+    def show_landed(self, key: str, row: dict, *, besides: GenerateTab | None = None) -> None:
+        for tab in self.watchers_of(key):
+            if tab is besides:
+                continue
+            was_blank = tab.is_blank()
+            tab.show_finished_media(row)
+            if was_blank:
+                self._set_preview_tab(tab)
+
     def tab_watching(self, key: str) -> GenerateTab | None:
         watching = self.watchers_of(key)
         return watching[0] if watching else None

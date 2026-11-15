@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 
 import pytest
+from app_support.local_time import when_words
 from PIL import Image
 from PySide6.QtCore import QEvent, QMimeData, QPoint, QPointF, QRect, QSize, Qt
 from PySide6.QtGui import (
@@ -907,7 +908,7 @@ def test_each_version_carries_its_own_file_and_created_rows(qtbot):
     assert "File" in facts
     assert "image/e1.png" in facts
     assert "Created" in facts
-    assert "2026-08-01" in facts
+    assert when_words("2026-08-01") in facts
 
 
 def test_a_file_row_can_be_copied_and_revealed(qtbot):

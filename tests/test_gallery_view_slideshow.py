@@ -1439,7 +1439,7 @@ def test_a_run_that_stopped_being_made_leaves_the_open_slideshow(qtbot, monkeypa
     view._on_reroll_preview("some-key", "i2", b"a-frame")
 
     db.get_generation("i2")["status"] = "error"
-    view._update_queue()
+    view.job_queue.update()
 
     assert not slideshow.holds("i2")
     slideshow.close()

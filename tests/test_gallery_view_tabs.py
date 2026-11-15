@@ -122,11 +122,11 @@ def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
     assert view._arrangement.folder_panes.widget(1).isAncestorOf(view._scroll)
     assert view._arrangement.left_column.count() == 2
     assert view._arrangement.left_column.widget(0) is view._arrangement.folder_panes
-    assert view._arrangement.left_column.widget(1) is view._queue
+    assert view._arrangement.left_column.widget(1) is view.job_queue.view
     assert view._arrangement.panes.count() == 2
     assert view._arrangement.panes.widget(0) is view._arrangement.left_column
     assert view._arrangement.panes.widget(1).isAncestorOf(_viewport_of(view))
-    assert not view._arrangement.panes.widget(1).isAncestorOf(view._queue)
+    assert not view._arrangement.panes.widget(1).isAncestorOf(view.job_queue.view)
 
 
 def test_the_generate_panes_floor_is_the_tab_it_holds(qtbot):

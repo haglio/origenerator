@@ -110,6 +110,7 @@ class DirectorSurroundings:
     pace: object
     motion: object
     osr2: object
+    job_queue: object
     fun_time: object
     radio: object = None
     buttons_of: Callable | None = None

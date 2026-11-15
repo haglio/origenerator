@@ -1,0 +1,113 @@
+from __future__ import annotations
+
+import logging
+from collections.abc import Callable
+
+from PySide6.QtCore import QObject, Signal
+from PySide6.QtWidgets import QMessageBox, QWidget
+
+from origenerator.comfyui_api import ForeignQueue
+from origenerator.gui.inflight import (
+    CANCEL_ALL_TEXT,
+    cancel_all_question,
+    clear_queue_tooltip,
+    jobs_to_cancel,
+)
+from origenerator.gui.job_queue_view import JobQueueView
+
+logger = logging.getLogger(__name__)
+
+
+def read_foreign_queue(client) -> ForeignQueue | None:
+    if client is None:
+        return None
+    try:
+        return client.foreign_queue()
+    except Exception as e:
+        logger.debug("Could not read ComfyUI's queue: %s", e)
+        return ForeignQueue(running=[], pending=[])
+
+
+class ShownJobQueue(QObject):
+    changed = Signal(object, int)
+
+    def __init__(self, jobs, client, *, starting, in_flight: Callable[..., list],
+                 listed: Callable[[], tuple[list, list]], asks_over: QWidget) -> None:
+        super().__init__(asks_over)
+        self._jobs = jobs
+        self._client = client
+        self._starting = starting
+        self._in_flight = in_flight
+        self._listed = listed
+        self._asks_over = asks_over
+        self._foreign = ForeignQueue(running=[], pending=[])
+        self.view = JobQueueView()
+        self.view.move_requested.connect(jobs.move)
+        self.view.clear_queue_requested.connect(self.clear_foreign)
+        self.view.start_now_requested.connect(self.start_now)
+        self.view.cancel_all_requested.connect(self.cancel_all)
+        jobs.reordered.connect(self.update)
+        starting.changed.connect(self.update)
+
+    def items(self, rows=None, requests=None) -> list:
+        return self._starting.placed_among(
+            self._in_flight(rows=rows, requests=requests), self._jobs)
+
+    def now(self) -> tuple[list, int]:
+        rows, requests = self._listed()
+        holds_every_job = {row["prompt_id"] for row in rows} >= set(self._jobs.queue_order)
+        items = self.items(rows=rows, requests=requests) if holds_every_job else self.items()
+        return items, self._foreign.total
+
+    def update(self, items=None) -> None:
+        items = self.items() if items is None else items
+        self.view.set_items(items, self._foreign.total)
+        self.changed.emit(items, self._foreign.total)
+
+    def take_foreign(self, queue: ForeignQueue | None) -> None:
+        if queue is not None:
+            self._foreign = queue
+
+    def start_now(self) -> None:
+        self._jobs.start_now()
+        self.update()
+
+    def cancel_all(self) -> None:
+        items = jobs_to_cancel(self.items())
+        if not items or not self._confirmed(CANCEL_ALL_TEXT, cancel_all_question(len(items))):
+            return
+        for item in reversed(items):
+            item.cancel()
+        self.update()
+
+    def clear_foreign(self) -> None:
+        if self._client is None:
+            return
+        total = self._foreign.total
+        if not total or not self.confirm_clear(total):
+            return
+        try:
+            dropped = self._client.clear_foreign_queue()
+        except Exception as e:
+            logger.exception("Failed to clear ComfyUI's queue")
+            QMessageBox.warning(
+                self._asks_over, "Could not clear the queue",
+                f"ComfyUI would not drop the other app's jobs:\n\n{e}",
+            )
+            return
+        logger.info("Dropped %d job(s) another app had queued on ComfyUI", dropped)
+        self.take_foreign(read_foreign_queue(self._client))
+        self.update()
+
+    def confirm_clear(self, total: int) -> bool:
+        return self._confirmed(
+            "Clear ComfyUI's queue",
+            f"{clear_queue_tooltip(total)}?\n\nAnything you queued from here is left alone;"
+            " one of theirs already running is interrupted.")
+
+    def _confirmed(self, title: str, question: str) -> bool:
+        reply = QMessageBox.question(
+            self._asks_over, title, question,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        return reply == QMessageBox.StandardButton.Yes

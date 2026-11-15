@@ -2740,7 +2740,7 @@ def test_a_queue_items_cancel_drops_that_run(qtbot):
     view._jobs._jobs[folder_key] = [_FakeRerollJob(
         "rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, state="running")]
 
-    (item,) = [it for it in view._inflight_items() if it.key == "rr1"]
+    (item,) = [it for it in view.job_queue.items() if it.key == "rr1"]
     item.cancel()
 
     assert view._jobs.jobs_by_folder.get(folder_key, []) == []

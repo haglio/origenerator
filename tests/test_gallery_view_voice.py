@@ -303,7 +303,7 @@ def test_the_poll_runs_over_a_slideshow_being_spoken_to(qtbot, tmp_path):
     view.refresh()
     view._slideshows._slideshow = _VoiceSurface("g0")
 
-    view._update_queue()
+    view.job_queue.update()
 
     assert view._slideshows.showing.queued == []
 
@@ -558,12 +558,12 @@ def test_a_finished_request_stands_in_every_job_queue_until_its_job_does(
 
     view._voice.listener.speak("Request, no hat, over.")
 
-    (standing,) = view._queue._items
+    (standing,) = view.job_queue.view._items
     assert standing.starting
     assert standing.requested
     assert [item.key for item in shown.queue_foot.hud_queue[0]] == [standing.key]
     qtbot.waitUntil(lambda: shown._promise.note == "", timeout=5000)
-    (queued,) = view._queue._items
+    (queued,) = view.job_queue.view._items
     assert queued.requested
     assert not queued.starting
     assert [item.key for item in shown.queue_foot.hud_queue[0]] == [queued.key]

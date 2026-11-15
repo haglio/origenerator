@@ -491,7 +491,7 @@ class FakeHost:
         return Listing(location=self.location, rows=tuple(self.rows), shown=tuple(self.visible),
                        picked=tuple(self.picked), shape=LANDSCAPE, latest=self.latest)
 
-    def queue_now(self):
+    def now(self):
         return self.queue
 
     def off_thread(self, work, done):
@@ -503,7 +503,7 @@ class FakeHost:
     def window(self):
         return self.core
 
-    def clear_foreign_queue(self):
+    def clear_foreign(self):
         self.cleared_queue += 1
 
     def start_now(self):
@@ -632,7 +632,7 @@ def slideshows(monkeypatch):
                                 "record_loops_of": records.loops_of}
                                if records else {})),
             DirectorSurroundings(pace=SlideshowPace(), motion=None, osr2=_NoOsr2(),
-                                 fun_time=fun_time))
+                                 job_queue=host, fun_time=fun_time))
         host.slideshows = director
         director.items_of = lambda rows: [
             (f"{r['prompt_id']}.png", "image", r["prompt_id"], None) for r in rows]
@@ -1386,7 +1386,8 @@ def _director():
         host,
         DirectorSources(db=db, jobs=FakeJobQueue(), names=ItemNames(db),
                         library=lambda: LibrarySnapshot([]), listing=host.listing),
-        DirectorSurroundings(pace=SlideshowPace(), motion=None, osr2=_NoOsr2(), fun_time=None))
+        DirectorSurroundings(pace=SlideshowPace(), motion=None, osr2=_NoOsr2(), job_queue=host,
+                             fun_time=None))
 
 
 def test_a_video_evolver_upscaled_plays_as_the_upscale(tmp_path, monkeypatch):

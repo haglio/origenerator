@@ -748,13 +748,13 @@ def test_start_now_on_the_job_queue_starts_the_video_waiting_out_the_minute(qtbo
     view._jobs.start_prepared("video/k", _WAN_I2V, dict(_WAN_I2V.default_params(), seed=3))
     video = view._jobs.newest_job_for("video/k")
     view._jobs.cancel_job(image.prompt_id)
-    view._update_queue()
-    assert view._queue._running.status_text().startswith("Starts in")
+    view.job_queue.update()
+    assert view.job_queue.view._running.status_text().startswith("Starts in")
 
-    view._queue._running._start_now.click()
+    view.job_queue.view._running._start_now.click()
 
     assert client.submit_job.call_args_list[-1].args[1] == video.prompt_id
-    assert not view._queue._running.status_text().startswith("Starts in")
+    assert not view.job_queue.view._running.status_text().startswith("Starts in")
 
 
 def test_a_streamed_frame_ends_the_wait_text(qtbot, tmp_path):
@@ -1094,7 +1094,7 @@ def test_a_slideshow_is_handed_the_job_queue_worked_out_off_the_listing_in_hand(
     listing = db.list_generations
     db.list_generations = lambda: listings.append(1) or listing()
 
-    items, _foreign = view.queue_now()
+    items, _foreign = view.job_queue.now()
 
     assert ([item.key for item in items], listings) == (["gen1"], []), (
         "reading both tables again for each slideshow that opened held a double-click up a quarter "
@@ -1339,7 +1339,7 @@ def test_inflight_running_tiles_sort_before_queued(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert [it.key for it in view._inflight_items()] == ["going", "waiting"]
+    assert [it.key for it in view.job_queue.items()] == ["going", "waiting"]
 
 
 def _queued_job(prompt_id, state="idle"):
@@ -1359,7 +1359,7 @@ def test_inflight_items_follow_the_order_the_queue_will_run_them_in(qtbot):
     view._jobs._waiting = [_queued_job("second"), _queued_job("first")]
     view.refresh()
 
-    assert [it.key for it in view._inflight_items()] == ["second", "first"]
+    assert [it.key for it in view.job_queue.items()] == ["second", "first"]
 
 
 def test_a_row_the_line_holds_no_job_for_sorts_to_the_back(qtbot):
@@ -1374,7 +1374,7 @@ def test_a_row_the_line_holds_no_job_for_sorts_to_the_back(qtbot):
     view._jobs._waiting = [_queued_job("known")]
     view.refresh()
 
-    assert [it.key for it in view._inflight_items()] == ["known", "brand-new"], (
+    assert [it.key for it in view.job_queue.items()] == ["known", "brand-new"], (
         "a row a restart has not taken back has no place in the queue's order; it waits at the end")
 
 
@@ -1386,15 +1386,15 @@ def test_the_queue_shows_the_active_job_then_empties_when_idle(qtbot):
     with qtbot.waitExposed(view):
         view.show()
 
-    assert view._queue.isVisible()
-    assert view._queue.keys() == ["gen1"]
-    assert view._queue._running.key == "gen1"
+    assert view.job_queue.view.isVisible()
+    assert view.job_queue.view.keys() == ["gen1"]
+    assert view.job_queue.view._running.key == "gen1"
 
     db.delete_generation("gen1")
     view._poll()
-    assert view._queue.isVisible()
-    assert view._queue.keys() == []
-    assert view._queue._running.key is None
+    assert view.job_queue.view.isVisible()
+    assert view.job_queue.view.keys() == []
+    assert view.job_queue.view._running.key is None
 
 
 def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypatch):
@@ -1410,7 +1410,7 @@ def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypa
     qtbot.addWidget(view._slideshows.showing.shown)
     slideshow = view._slideshows.showing
 
-    assert [item.key for item in slideshow.shown.queue_foot.hud_queue[0]] == view._queue.keys() == ["gen1"]
+    assert [item.key for item in slideshow.shown.queue_foot.hud_queue[0]] == view.job_queue.view.keys() == ["gen1"]
     assert queue_section(*slideshow.shown.queue_foot.hud_queue).leader.key == "gen1"
 
     db.delete_generation("gen1")
@@ -1443,7 +1443,7 @@ def test_a_row_dragged_in_the_slideshows_queue_moves_the_job_and_redraws_both_at
 
     assert [item.key for item in slideshow.shown.queue_foot.hud_queue[0]] == ["gen1", "w2", "w1"], (
         "not a poll later: a row that sits still after the drop reads as one missed")
-    assert view._queue.keys() == ["gen1", "w2", "w1"]
+    assert view.job_queue.view.keys() == ["gen1", "w2", "w1"]
     view._slideshows.showing.close()
 
 
@@ -1457,7 +1457,7 @@ def test_the_queue_lists_every_waiting_job_not_just_the_running_one(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert view._queue.keys() == ["running-one", "waiting-one"]
+    assert view.job_queue.view.keys() == ["running-one", "waiting-one"]
 
 
 def test_a_queue_row_let_go_elsewhere_is_moved_there_and_redrawn_at_once(qtbot):
@@ -1474,10 +1474,10 @@ def test_a_queue_row_let_go_elsewhere_is_moved_there_and_redrawn_at_once(qtbot):
     view._jobs._waiting = [_queued_job("w1"), _queued_job("w2")]
     view.refresh()
 
-    view._queue.move_requested.emit("w2", "w1")
+    view.job_queue.view.move_requested.emit("w2", "w1")
 
     assert view._jobs.queue_order == ["running-one", "w2", "w1"]
-    assert view._queue.keys() == ["running-one", "w2", "w1"]
+    assert view.job_queue.view.keys() == ["running-one", "w2", "w1"]
 
 
 def test_clicking_a_queue_row_opens_that_jobs_folder(qtbot):
@@ -1489,7 +1489,7 @@ def test_clicking_a_queue_row_opens_that_jobs_folder(qtbot):
         db.get_generation("gen1"), gallery.build_image_config_index(view._image_rows))
     view._select_reroll = MagicMock()
 
-    view._inflight_items()[0].reveal()
+    view.job_queue.items()[0].reveal()
 
     assert _selected_folder(view) == folder, (
         "a queue row is a place in the gallery, not a settings form")
@@ -1502,8 +1502,8 @@ def test_clicking_an_enhancements_row_in_the_queue_goes_to_its_image(qtbot, tmp_
     view.refresh()
     view.enhance_items(["g1"])
     view._tree.setCurrentItem(_image_workflow(view._tree))
-    view._update_queue()
-    (row,) = view._queue.rows()
+    view.job_queue.update()
+    (row,) = view.job_queue.view.rows()
 
     qtbot.mouseClick(row, Qt.MouseButton.LeftButton)
 
@@ -1528,12 +1528,12 @@ def test_the_strip_times_the_job_against_the_workflows_recent_runs(qtbot):
         "rr1", "wan22_i2v", {}, state="running", progress=(10, 20), started_at=began
     )]
 
-    item = view._inflight_items()[0]
+    item = view.job_queue.items()[0]
     assert item.reading.started_at == began
     assert item.reading.typical_seconds == 724.0
 
-    view._update_queue()
-    assert view._queue._running.status_text() == "50% · ~6:02 left"
+    view.job_queue.update()
+    assert view.job_queue.view._running.status_text() == "50% · ~6:02 left"
 
 
 def test_the_strip_has_no_clock_for_a_job_still_queued(qtbot):
@@ -1544,10 +1544,10 @@ def test_the_strip_has_no_clock_for_a_job_still_queued(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert view._inflight_items()[0].reading.started_at is None, (
+    assert view.job_queue.items()[0].reading.started_at is None, (
         "nothing has begun, so there is no elapsed time to report: the wait on ComfyUI is the "
         "queue beside it to explain")
-    assert view._queue._running.status_text() == ""
+    assert view.job_queue.view._running.status_text() == ""
 
 
 def test_a_queued_job_carries_what_the_strip_leads_its_row_with(qtbot):
@@ -1559,7 +1559,7 @@ def test_a_queued_job_carries_what_the_strip_leads_its_row_with(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    item = view._inflight_items()[0]
+    item = view.job_queue.items()[0]
     assert item.job_kind == "Video"
     assert item.reading.typical_seconds == 120.0
 
@@ -1573,7 +1573,7 @@ def test_a_job_a_spoken_request_queued_says_so(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    items = {it.key: it for it in view._inflight_items()}
+    items = {it.key: it for it in view.job_queue.items()}
     assert items["asked"].requested
 
 
@@ -1584,7 +1584,7 @@ def test_a_job_nobody_asked_for_out_loud_is_not_marked(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert not view._inflight_items()[0].requested
+    assert not view.job_queue.items()[0].requested
 
 
 def test_an_image_conditioned_job_carries_the_frame_it_starts_from(qtbot):
@@ -1595,7 +1595,7 @@ def test_an_image_conditioned_job_carries_the_frame_it_starts_from(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert view._inflight_items()[0].source_image == "kite_00007_.png [output]"
+    assert view.job_queue.items()[0].source_image == "kite_00007_.png [output]"
 
 
 def test_an_enhancement_carries_the_image_it_is_a_second_pass_over(qtbot):
@@ -1606,7 +1606,7 @@ def test_an_enhancement_carries_the_image_it_is_a_second_pass_over(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert view._inflight_items()[0].source_image == "kite_00007_.png [output]"
+    assert view.job_queue.items()[0].source_image == "kite_00007_.png [output]"
 
 
 def test_an_image_that_takes_an_input_is_still_placed_by_its_folder(qtbot):
@@ -1617,7 +1617,7 @@ def test_an_image_that_takes_an_input_is_still_placed_by_its_folder(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    item = view._inflight_items()[0]
+    item = view.job_queue.items()[0]
     assert item.job_kind == "Image"
     assert item.source_image is None, (
         "an image workflow that takes an input, as the pose transfer takes its structure image, is"
@@ -1632,7 +1632,7 @@ def test_a_job_started_from_words_alone_names_no_frame(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    items = {it.key: it for it in view._inflight_items()}
+    items = {it.key: it for it in view.job_queue.items()}
     assert items["gen1"].source_image is None
 
 
@@ -1647,7 +1647,7 @@ def test_a_dropped_video_combine_carries_the_clip_it_follows(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    item = {it.key: it for it in view._inflight_items()}["rr1"]
+    item = {it.key: it for it in view.job_queue.items()}["rr1"]
     assert item.action == ""
     assert item.source_video_thumbnail == "thumbs/source.jpg"
 
@@ -1665,7 +1665,7 @@ def test_a_combine_whose_words_left_its_source_videos_says_so_on_its_row(qtbot, 
     qtbot.addWidget(view)
     view.refresh()
 
-    item = {it.key: it for it in view._inflight_items()}["rr1"]
+    item = {it.key: it for it in view.job_queue.items()}["rr1"]
     assert item.prompt_edited is stands_apart
 
 
@@ -1680,7 +1680,7 @@ def test_a_picked_action_shows_no_source_video_at_all(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    item = {it.key: it for it in view._inflight_items()}["rr1"]
+    item = {it.key: it for it in view.job_queue.items()}["rr1"]
     assert item.action == "dancing"
     assert item.source_video_thumbnail is None, (
         "the action names what the video will do, which is the whole of what was chosen: the "
@@ -1696,7 +1696,7 @@ def test_a_run_that_came_from_no_combine_carries_neither(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    item = view._inflight_items()[0]
+    item = view.job_queue.items()[0]
     assert item.action == ""
     assert item.source_video_thumbnail is None
 
@@ -1713,7 +1713,7 @@ def test_a_queued_job_carries_a_few_thumbnails_from_the_folder_it_joins(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    items = {it.key: it for it in view._inflight_items()}
+    items = {it.key: it for it in view.job_queue.items()}
     assert items["waiting"].folder_thumbnails == (
         "thumbs/done5.jpg", "thumbs/done4.jpg", "thumbs/done3.jpg", "thumbs/done2.jpg",
     ), (
@@ -1730,7 +1730,7 @@ def test_the_first_run_of_new_settings_has_no_folder_to_show(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    items = {it.key: it for it in view._inflight_items()}
+    items = {it.key: it for it in view.job_queue.items()}
     assert items["waiting"].folder_thumbnails == ()
 
 
@@ -2225,11 +2225,11 @@ def test_pressing_generate_shows_a_row_before_there_is_a_job(qtbot, tmp_path, mo
         CombineRequest(image_id="img", video_id="vid",
                        intent=view._combine.widget.selected_intent()))
 
-    assert len(view._queue.rows()) == 1, (
+    assert len(view.job_queue.view.rows()) == 1, (
         "checking every stored generation for a duplicate, building the settings and posting "
         "the prompt all run on the window's thread; with nothing on screen for that stretch the "
         "button reads as one that did nothing")
-    row, = view._queue.rows()
+    row, = view.job_queue.view.rows()
     assert row._note_text == "Starting…", (
         "the launch itself is left for the next turn of the event loop: run at once, nothing is "
         "painted while it works, and the stand-in row would show only once the work it stood in "
@@ -2239,7 +2239,7 @@ def test_pressing_generate_shows_a_row_before_there_is_a_job(qtbot, tmp_path, mo
     deferred[0]()
 
     assert len(view._live_jobs) == 1
-    assert not any(item.starting for item in view._queue._items)
+    assert not any(item.starting for item in view.job_queue.view._items)
 
 
 def test_the_stand_in_row_already_carries_the_action_that_was_picked(qtbot, tmp_path, monkeypatch):
@@ -2250,7 +2250,7 @@ def test_the_stand_in_row_already_carries_the_action_that_was_picked(qtbot, tmp_
 
     view._combine._on_generate_category("img", "dancing", action_settings.VIDEO)
 
-    item = view._queue._items[0]
+    item = view.job_queue.view._items[0]
     assert item.action == "dancing", (
         "it is the row that will replace it, minus the price, so the line does not blink one "
         "thing away and a different-looking one in")
@@ -2271,7 +2271,7 @@ def test_the_stand_in_row_shows_the_dropped_video(qtbot, tmp_path, monkeypatch):
         CombineRequest(image_id="img", video_id="vid",
                        intent=view._combine.widget.selected_intent()))
 
-    item = view._queue._items[0]
+    item = view.job_queue.view._items[0]
     assert item.source_video_thumbnail == "thumbs/vid.jpg"
     assert item.action == ""
 
@@ -2285,7 +2285,7 @@ def test_the_stand_in_row_goes_when_the_action_has_no_past_video(qtbot, tmp_path
 
     view._combine._on_generate_category("img", "epsilon", action_settings.VIDEO)
 
-    assert view._queue.rows() == []
+    assert view.job_queue.view.rows() == []
     assert view._live_jobs == {}
 
 
@@ -2296,7 +2296,7 @@ def test_the_stand_in_row_goes_when_the_dropped_image_is_gone(qtbot, tmp_path, m
 
     view._combine._on_generate_category("missing", "dancing", action_settings.VIDEO)
 
-    assert view._queue.rows() == []
+    assert view.job_queue.view.rows() == []
 
 
 def test_a_row_standing_in_for_an_image_waits_in_front_of_the_videos(qtbot, tmp_path):
@@ -2310,8 +2310,8 @@ def test_a_row_standing_in_for_an_image_waits_in_front_of_the_videos(qtbot, tmp_
     standing = view._starting.show(caption="An image from a Request, still being started",
                                    media_type=MediaType.IMAGE)
 
-    assert [item.key for item in view._queue._items] == [making, standing, waiting]
-    assert [item.key for item in view.queue_now()[0]] == [making, standing, waiting]
+    assert [item.key for item in view.job_queue.view._items] == [making, standing, waiting]
+    assert [item.key for item in view.job_queue.now()[0]] == [making, standing, waiting]
 
 
 
@@ -2347,9 +2347,9 @@ def test_the_strip_names_another_apps_queue_before_generate_is_pressed(qtbot):
 
     view._poll()
 
-    assert view._queue._running.status_text() == (
+    assert view.job_queue.view._running.status_text() == (
         "3 jobs from another app are queued on ComfyUI")
-    assert not view._queue._clear.isHidden()
+    assert not view.job_queue.view._clear.isHidden()
 
 
 def test_a_queue_of_our_own_leaves_the_strip_as_it_was(qtbot):
@@ -2357,8 +2357,8 @@ def test_a_queue_of_our_own_leaves_the_strip_as_it_was(qtbot):
 
     view._poll()
 
-    assert view._queue._running.status_text() == ""
-    assert view._queue._clear.isHidden()
+    assert view.job_queue.view._running.status_text() == ""
+    assert view.job_queue.view._clear.isHidden()
 
 
 def test_an_unreadable_queue_claims_nothing_rather_than_a_stale_count(qtbot):
@@ -2368,13 +2368,13 @@ def test_an_unreadable_queue_claims_nothing_rather_than_a_stale_count(qtbot):
 
     view = _queue_view(qtbot, _QueueClient(ForeignQueue(running=[], pending=["a"])))
     view._poll()
-    assert not view._queue._clear.isHidden()
+    assert not view.job_queue.view._clear.isHidden()
 
     view._client = Wedged()
     view._poll()
 
-    assert view._foreign_queue.total == 0
-    assert view._queue._clear.isHidden()
+    assert view.job_queue.now()[1] == 0
+    assert view.job_queue.view._clear.isHidden()
 
 
 def test_clearing_wipes_the_other_apps_jobs_off_comfyui(qtbot, monkeypatch):
@@ -2383,7 +2383,7 @@ def test_clearing_wipes_the_other_apps_jobs_off_comfyui(qtbot, monkeypatch):
     view._poll()
     _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
 
-    view._queue._clear.click()
+    view.job_queue.view._clear.click()
 
     assert client.cleared == 1, (
         "the user's ask: a way out from under a queue the user did not fill; the shared "
@@ -2396,7 +2396,7 @@ def test_clearing_can_be_declined_at_the_prompt(qtbot, monkeypatch):
     view._poll()
     _answer_confirmation(monkeypatch, QMessageBox.StandardButton.No)
 
-    view._queue._clear.click()
+    view.job_queue.view._clear.click()
 
     assert client.cleared == 0
 
@@ -2406,9 +2406,9 @@ def test_the_prompt_says_how_many_jobs_go(qtbot):
     view = _queue_view(qtbot, client)
     view._poll()
     asked = []
-    view._confirm_clear_queue = lambda total: asked.append(total) or False
+    view.job_queue.confirm_clear = lambda total: asked.append(total) or False
 
-    view._queue._clear.click()
+    view.job_queue.view._clear.click()
 
     assert asked == [3]
 
@@ -2427,7 +2427,7 @@ def test_the_prompt_says_what_the_user_queued_is_left_alone(qtbot, monkeypatch):
     view._poll()
     asked = _questions_asked(monkeypatch)
 
-    view._queue._clear.click()
+    view.job_queue.view._clear.click()
 
     [(_title, text)] = asked
     assert "Anything you queued from here is left alone" in text, (
@@ -2440,14 +2440,14 @@ def test_a_failed_clear_is_surfaced_not_swallowed(qtbot, monkeypatch):
                           fail=OSError("ComfyUI is not responding"))
     view = _queue_view(qtbot, client)
     view._poll()
-    view._confirm_clear_queue = lambda total: True
+    view.job_queue.confirm_clear = lambda total: True
     warned = []
     monkeypatch.setattr(
         "origenerator.gui.gallery_view.QMessageBox.warning",
         lambda *a, **k: warned.append(a),
     )
 
-    view._queue._clear.click()
+    view.job_queue.view._clear.click()
 
     assert warned
 
@@ -2456,12 +2456,12 @@ def test_a_cleared_queue_blanks_the_bar_without_waiting_for_a_poll(qtbot):
     client = _QueueClient(ForeignQueue(running=[], pending=["a", "b"]))
     view = _queue_view(qtbot, client)
     view._poll()
-    view._confirm_clear_queue = lambda total: True
+    view.job_queue.confirm_clear = lambda total: True
 
-    view._queue._clear.click()
+    view.job_queue.view._clear.click()
 
-    assert view._queue._running.status_text() == ""
-    assert view._queue._clear.isHidden()
+    assert view.job_queue.view._running.status_text() == ""
+    assert view.job_queue.view._clear.isHidden()
 
 
 
@@ -2474,8 +2474,8 @@ def _cancelable(key, cancelled):
 def _view_holding(qtbot, monkeypatch, items):
     view = GalleryView(FakeDB([]))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view, "_inflight_items", lambda rows=None, requests=None: items)
-    view._update_queue()
+    monkeypatch.setattr(view.job_queue, "items", lambda rows=None, requests=None: items)
+    view.job_queue.update()
     return view
 
 
@@ -2485,7 +2485,7 @@ def test_cancel_all_cancels_nothing_when_the_answer_is_no(qtbot, monkeypatch):
                                               _cancelable("b", cancelled)])
     _answer_confirmation(monkeypatch, QMessageBox.StandardButton.No)
 
-    view._queue._cancel_all.click()
+    view.job_queue.view._cancel_all.click()
 
     assert cancelled == []
 
@@ -2496,7 +2496,7 @@ def test_cancel_all_cancels_every_job_from_the_back_of_the_line_forward(qtbot, m
                                               for key in ("a", "b", "c")])
     _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
 
-    view._queue._cancel_all.click()
+    view.job_queue.view._cancel_all.click()
 
     assert cancelled == ["c", "b", "a"], (
         "from the back of the line forward, so nothing waiting starts only to be stopped a "
@@ -2509,7 +2509,7 @@ def test_cancel_all_asks_about_the_jobs_it_would_cancel(qtbot, monkeypatch):
                   InFlightItem(key="c", caption="Alpha Workflow \u203a a paper kite",
                                reading=RunReading(status="queued"), reveal=lambda: None)],
                  [_cancelable("a", [])]):
-        _view_holding(qtbot, monkeypatch, held)._queue._cancel_all.click()
+        _view_holding(qtbot, monkeypatch, held).job_queue.view._cancel_all.click()
 
     assert asked == [("Cancel All", "Cancel all 2 jobs in the Job Queue?"),
                      ("Cancel All", "Cancel the job in the Job Queue?")]
@@ -2526,7 +2526,7 @@ def test_cancel_all_leaves_populate_on_to_start_its_next_seed(
     view.refresh()
     _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
 
-    view._queue._cancel_all.click()
+    view.job_queue.view._cancel_all.click()
 
     assert view._populate.is_active(key), (
         "the user's call: Cancel All does not switch Populate off")

@@ -965,7 +965,7 @@ def test_reconnected_job_resumes_its_persisted_progress_on_the_bar(qtbot, tmp_pa
 
     win = _window(qtbot, tmp_path)
 
-    item = next(it for it in win._gallery_view._inflight_items() if it.key == "rr")
+    item = next(it for it in win._gallery_view.job_queue.items() if it.key == "rr")
     assert item.reading.progress == (30, 50)
 
 

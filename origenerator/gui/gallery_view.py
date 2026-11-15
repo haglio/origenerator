@@ -2573,13 +2573,9 @@ class GalleryView(QWidget):
             self._re_aim_every_button()
 
     def _set_folder_favorite(self, key: str, favorite: bool):
-        if bool(self._folder_meta.get(key, {}).get("starred")) == favorite:
+        if not self._folder_switches.set_favorite(key, favorite):
             return
-        after_id = self._library.highest_id if favorite else None
-        self._db.set_folder_favorite(key, favorite, after_id=after_id)
         self._tree_view.mark_favorite(key, favorite)
-        self._folder_meta[key] = {**self._folder_meta.get(key, {"custom_name": None}),
-                                  "starred": favorite, "favorite_after_id": after_id}
         self._fingerprint = (self._fingerprint[0],
                              _folder_meta_fingerprint(self._folder_meta))
         self._drawn_version += 1

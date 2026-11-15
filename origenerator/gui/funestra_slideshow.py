@@ -112,6 +112,7 @@ class FunestraSlideshow(QObject):
         self._locked = playing.locked
         self._keep_told: bool | None = None
         self._gesture_owed = False
+        self._the_session_leads = False
         self._refusal_checked = False
         self._loads_seen: str | None = None
         self._versions: dict[str, list[Version]] = {}
@@ -392,12 +393,13 @@ class FunestraSlideshow(QObject):
     def slideshow_toggle_lock(self) -> None:
         self.set_locked(not self.locked)
 
-    def set_locked(self, locked: bool) -> bool:
+    def set_locked(self, locked: bool, *, the_session_leads: bool = False) -> bool:
         if locked == self.locked:
             return False
         self._lock(locked, by_him=True)
         if locked:
             self._gesture_owed = True
+            self._the_session_leads = the_session_leads
             self._give_the_lock_its_gesture()
         return True
 
@@ -408,7 +410,7 @@ class FunestraSlideshow(QObject):
         self.favorite()
         self._enhance_current()
         prompt_id = self._set.current_prompt_id()
-        if self._actions.lock is not None and prompt_id is not None:
+        if self._actions.lock is not None and prompt_id is not None and not self._the_session_leads:
             self._actions.lock(prompt_id)
 
     def _lock(self, on: bool, *, by_him: bool = False) -> None:

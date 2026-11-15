@@ -32,7 +32,7 @@ from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.one_look import one_look
 from origenerator.output_places import OutputPlaces
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState, in_order
-from origenerator.slideshow_buttons import answer
+from origenerator.slideshow_buttons import LOCK_ON_LED_BY_THE_SESSION, answer
 from tests.slideshow_support import slides_named, stop_the_poll_to_tick_by_hand
 from tests.test_slideshow_hud import _inflight
 
@@ -413,6 +413,18 @@ def test_a_lock_favorites_the_item_and_asks_for_a_better_version(qtbot, tmp_path
     slideshow.tick()
 
     assert asked == _the_whole_lock_on("id-1")
+
+
+def test_a_lock_the_session_leads_favorites_and_enhances_and_leaves_where_it_leads_to_the_session(
+        qtbot, tmp_path):
+    asked = []
+    slideshow = _slideshow(qtbot, tmp_path, actions=_recording_the_lock_into(asked))
+
+    answer(slideshow, LOCK_ON_LED_BY_THE_SESSION)
+    _says(slideshow, video="one.png", locked=True)
+    slideshow.tick()
+
+    assert (slideshow.locked, asked) == (True, [("star", "id-1"), ("enhance", "id-1")])
 
 
 def test_a_slideshow_opened_locked_neither_favorites_nor_enhances(qtbot, tmp_path):

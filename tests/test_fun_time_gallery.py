@@ -109,12 +109,12 @@ def test_fun_time_gallery_builds_no_shared_appliance_switches(qtbot):
 
 def test_fun_time_gallery_builds_no_osr2_surface(qtbot):
     view = _fun_time_view(qtbot)
-    assert view._osr2_motion is None, (
+    assert view.osr2.motion is None, (
         "Fun Time's Main Funestra owns the OSR2 for the whole session, so a hosted Origenerator "
         "must offer no way to reach the device")
-    assert view._osr2_driver is None
-    assert view.osr2_control.isEnabled() is False
-    assert view.osr2_control.state() == OSR2_PARKED
+    assert view.osr2.driver is None
+    assert view.osr2.control.isEnabled() is False
+    assert view.osr2.control.state() == OSR2_PARKED
     assert view._osr2_controls is None
 
 
@@ -131,12 +131,12 @@ def test_fun_time_gallery_ignores_the_motion_keys(qtbot):
 def test_fun_time_gallery_does_not_put_the_standalone_osr2_state_on_but_hands_it_back_untouched(qtbot):
     view = _fun_time_view(qtbot)
 
-    view.restore_osr2_state(OSR2_RETRACTED)
+    view.osr2.restore_state(OSR2_RETRACTED)
 
-    assert view.osr2_control.state() == OSR2_PARKED, (
+    assert view.osr2.control.state() == OSR2_PARKED, (
         "hosted, the device is the session's, so the state the standalone app was left in "
         "cannot be put on")
-    assert view.osr2_state() == OSR2_RETRACTED, (
+    assert view.osr2.state() == OSR2_RETRACTED, (
         "handed back untouched on the way out rather than saved over, since both runs keep the "
         "one state file")
 
@@ -1375,9 +1375,10 @@ def test_a_gallery_taken_into_a_session_stands_as_a_hosted_one_is_built(qtbot):
 
     built = _fun_time_view(qtbot)
     assert (view._buttons.radio, view._buttons.mic) == (None, None)
-    assert (view._osr2_motion, view._osr2_driver, view._osr2_controls) == (None, None, None)
-    assert not view.osr2_control.isEnabled()
-    assert not built.osr2_control.isEnabled()
+    assert (view.osr2.motion, view.osr2.driver) == (None, None)
+    assert view._motion_pane.isHidden()
+    assert not view.osr2.control.isEnabled()
+    assert not built.osr2.control.isEnabled()
     assert view._motion_pane.isHidden()
     stack = view._arrangement.stack
     assert stack.orientation() == Qt.Orientation.Vertical
@@ -1394,7 +1395,7 @@ def test_a_gallery_driving_the_device_lets_go_of_it_as_a_session_takes_it_over(q
     motion = _SignalMotion()
     view = GalleryView(FakeDB([]), shared=Shared(osr2_motion=motion))
     qtbot.addWidget(view)
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
     assert motion.active
 
     view.become_hosted(_session())
@@ -1407,15 +1408,15 @@ def test_a_gallery_a_session_never_took_over_stands_off_the_device_all_the_same(
     motion = _SignalMotion()
     view = GalleryView(FakeDB([]), shared=Shared(osr2_motion=motion))
     qtbot.addWidget(view)
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
 
-    view.osr2_control.the_session_has_it(True)
+    view.osr2.control.the_session_has_it(True)
 
     assert not motion.active, (
         "the takeover can miss, and a window that kept its switch keeps streaming into the one "
         "device the session is driving")
-    assert not view.osr2_control.isEnabled()
-    view.toggle_osr2_drive()
+    assert not view.osr2.control.isEnabled()
+    view.osr2.toggle()
     assert not motion.active
 
 
@@ -1423,10 +1424,10 @@ def test_a_gallery_drives_again_once_the_session_beside_it_lets_the_device_go(qt
     motion = _SignalMotion()
     view = GalleryView(FakeDB([]), shared=Shared(osr2_motion=motion))
     qtbot.addWidget(view)
-    view.osr2_control.the_session_has_it(True)
+    view.osr2.control.the_session_has_it(True)
 
-    view.osr2_control.the_session_has_it(False)
-    view.toggle_osr2_drive()
+    view.osr2.control.the_session_has_it(False)
+    view.osr2.toggle()
 
     assert motion.active
 
@@ -1484,10 +1485,9 @@ def test_a_gallery_handed_back_from_a_session_drives_its_own_device_again(qtbot)
     view.become_hosted(_session())
 
     view.become_standalone()
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
 
     assert motion.active
-    assert view._osr2_controls is not None
     assert not view._motion_pane.isHidden()
 
 
@@ -1539,7 +1539,7 @@ def test_a_gallery_taken_into_a_session_stops_the_sound_device_and_mic_it_ran(qt
     view = GalleryView(FakeDB([]), shared=Shared(radio=radio, osr2_motion=motion))
     qtbot.addWidget(view)
     view._buttons.radio.setChecked(True)
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
     view._buttons.mic.setChecked(True)
     listener = view._voice.listener
     assert motion.active
@@ -1673,7 +1673,7 @@ def test_the_drive_word_says_so_while_a_session_beside_this_one_has_the_device(
     monkeypatch.setattr(view._slideshows, "answer",
                         lambda line, kind=None: answers.append((line, kind)))
 
-    view.osr2_control.the_session_has_it(True)
+    view.osr2.control.the_session_has_it(True)
     view._voice.on_command(AppCommand.DRIVE_ON)
 
     assert answers == [("OSR2 can't be switched here", WARNING)]

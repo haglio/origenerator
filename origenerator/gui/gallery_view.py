@@ -151,8 +151,8 @@ from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.new_tile import NewTile
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.open_setters import OpenSetters
-from origenerator.gui.osr2_control import Osr2Control
 from origenerator.gui.osr2_controls import Osr2Controls
+from origenerator.gui.osr2_driving import Osr2Driving
 from origenerator.gui.pane_arrangement import PaneArrangement
 from origenerator.gui.panes import (
     FootSplitter,
@@ -190,8 +190,6 @@ from origenerator.item_shape import (
     split_key as _split_collection_key,
 )
 from origenerator.library_views import LibrarySnapshot
-from origenerator.osr2_driver import Osr2Driver
-from origenerator.osr2_motion_driver import Osr2MotionDriver
 from origenerator.prompt_tokens import boxed_as_typed
 from origenerator.published_actions import give_the_launch_its_actions
 from origenerator.radio import OrigeneratorRadio
@@ -316,16 +314,10 @@ class GalleryView(QWidget):
         self._fun_time = fun_time
         self._radio = shared.radio if shared.radio is not None else OrigeneratorRadio()
         omnipause.holds(self._radio)
-        self._osr2_motion = None if fun_time is not None else (
-            shared.osr2_motion if shared.osr2_motion is not None else Osr2MotionDriver(parent=self))
-        if self._osr2_motion is not None:
-            omnipause.holds(self._osr2_motion)
-        self.osr2_control = Osr2Control(self._osr2_motion, parent=self)
-        self._osr2_left_in = None
-        self.osr2_control.changed.connect(self.reconcile_osr2)
+        self.osr2 = Osr2Driving(
+            self._surface_in_front, hosted=fun_time is not None, motion=shared.osr2_motion,
+            waits_for_the_window=shared.device_waits_for_the_window, parent=self)
         self._pace = SlideshowPace(parent=self)
-        self._reconciling_osr2 = False
-        self._device_waits_for_the_window = shared.device_waits_for_the_window
         self._build_the_queue_of_runs(db, client)
         self._forget_the_listing()
         self._build_the_panes(db, client)
@@ -347,8 +339,7 @@ class GalleryView(QWidget):
         self._voice.bind_the_buttons(
             VoiceSwitches(
                 populate=self._buttons.populate, radio=self._buttons.radio,
-                drive=self.osr2_control if self._osr2_motion is not None else None,
-                mic=self._buttons.mic),
+                drive=self._the_osr2_switch(), mic=self._buttons.mic),
             enhance=(OfferedPress(self._enhance_the_picked_offer),
                      self._enhance.enhance_the_selection),
             actions={
@@ -459,7 +450,8 @@ class GalleryView(QWidget):
             DirectorSources.of_this_library(db=db, jobs=self._jobs, names=self._item_names,
                                             library=lambda: self._library, listing=self.listing),
             DirectorSurroundings(
-                pace=self._pace, motion=self._osr2_motion, fun_time=self._fun_time,
+                pace=self._pace, motion=self.osr2.motion, osr2=self.osr2,
+                fun_time=self._fun_time,
                 radio=self._radio, buttons_of=lambda: self._buttons))
         self._gallery_pane.slideshow_requested.connect(self._slideshows.open_on_tile)
         self._starting = StartingRows(self)
@@ -489,7 +481,7 @@ class GalleryView(QWidget):
         self._voice = VoiceRouter(
             self, VoiceSources(db=db, slideshows=self._slideshows, client=client,
                                starting=self._starting, jobs=self._jobs, setters=open_setters),
-            parent=self, motion=self._osr2_motion)
+            parent=self, motion=self.osr2.motion)
         self._folder_history: list[str] = []
 
     def _intercept_the_rooms_keys(self, intercepting: bool):
@@ -523,8 +515,8 @@ class GalleryView(QWidget):
                 return True
             if (self._gallery_owns_keys(even_from_the_generate_pane=True)
                     and not event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
-                    and apply_motion_key(self._osr2_motion, event.key(),
-                                         on_drive_toggle=self.toggle_osr2_drive)):
+                    and apply_motion_key(self.osr2.motion, event.key(),
+                                         on_drive_toggle=self.osr2.toggle)):
                 self._osr2_controls.refresh()
                 return True
         # Qt hands an application-wide filter events for objects being destroyed;
@@ -608,8 +600,8 @@ class GalleryView(QWidget):
         sections = [listening, finding, combining]
         self._osr2_controls = None
         self._motion_pane = None
-        if self._osr2_motion is not None:
-            self._osr2_controls = Osr2Controls(self._osr2_motion, control=self.osr2_control)
+        if self.osr2.motion is not None:
+            self._osr2_controls = Osr2Controls(self.osr2.motion, control=self.osr2.control)
             self._osr2_controls.setToolTip(f"{self._osr2_controls.toolTip()} · Esc pauses")
             hud_scroll = QScrollArea()
             hud_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
@@ -688,11 +680,6 @@ class GalleryView(QWidget):
             views=TabViews(heights=self._prompt_heights, names=self._item_names,
                            animated_preview=self.animated_preview,
                            requests=self._voice.requests))
-        self._osr2_driver = Osr2Driver(parent=self) if self._osr2_motion is not None else None
-        if self._osr2_driver is not None:
-            omnipause.holds(self._osr2_driver)
-        self.osr2_control.script = self._osr2_driver
-        self._osr2_driving = None
         self._find_bar = FindBar("Find in prompts:", "a word you wrote…",
                                  dismiss_key="Esc", reveal=reveal_prompt)
         self._generate_pane.tab_added.connect(self._wire_generate_tab)
@@ -701,9 +688,6 @@ class GalleryView(QWidget):
         self._generate_pane.currentChanged.connect(self._on_front_tab_changed)
         app = QApplication.instance()
         if app is not None:
-            if self._osr2_driver is not None:
-                app.aboutToQuit.connect(self._osr2_driver.stop)
-                app.aboutToQuit.connect(self._osr2_motion.stop)
             app.aboutToQuit.connect(self._radio.stop)
         self._generate_pane.generate_requested.connect(self._on_generate_requested)
         self._generate_pane.turn_generate_requested.connect(self._on_turn_generate_requested)
@@ -720,9 +704,7 @@ class GalleryView(QWidget):
         for switch in (self._buttons.radio, self._buttons.mic):
             if switch is not None:
                 switch.setChecked(False)
-        self.osr2_control.drive_with(None, None)
-        if self._osr2_motion is not None:
-            self._osr2_motion.stop()
+        self.osr2.let_go_for_a_session()
         self._fun_time = session
         self._tree.offer_separate_and_together(False)
         self._slideshows.become_hosted(session)
@@ -731,8 +713,7 @@ class GalleryView(QWidget):
         self._buttons.become_hosted()
         if self._motion_pane is not None:
             self._motion_pane.hide()
-        self._kept_device = (self._osr2_motion, self._osr2_driver, self._osr2_controls)
-        self._osr2_motion = self._osr2_driver = self._osr2_controls = None
+        self.osr2.leave_the_device_to_the_session()
         self.wear_the_room(session)
 
     def wear_the_room(self, session) -> None:
@@ -746,18 +727,16 @@ class GalleryView(QWidget):
 
     def become_standalone(self) -> None:
         self.set_room_paused(False)
-        self._osr2_motion, self._osr2_driver, self._osr2_controls = self._kept_device
-        self.osr2_control.drive_with(self._osr2_motion, self._osr2_driver)
+        self.osr2.take_the_device_back()
         if self._motion_pane is not None:
             self._motion_pane.show()
         self._fun_time = None
         self._tree.offer_separate_and_together(True)
-        self._slideshows.become_standalone(self._osr2_motion)
+        self._slideshows.become_standalone(self.osr2.motion)
         self._generate_pane.become_standalone()
         self._buttons.become_standalone()
         self._voice.become_standalone(
-            self._osr2_motion, radio=self._buttons.radio,
-            drive=self.osr2_control if self._osr2_motion is not None else None,
+            self.osr2.motion, radio=self._buttons.radio, drive=self._the_osr2_switch(),
             mic=self._buttons.mic)
         self.wear_the_room(None)
 
@@ -770,7 +749,7 @@ class GalleryView(QWidget):
         tab.item_action_requested.connect(self.run_item_action)
         tab.context_menu_requested.connect(
             lambda prompt_id, pos: self.generation_menu([prompt_id], pos))
-        tab.displayed_changed.connect(self.reconcile_osr2)
+        tab.displayed_changed.connect(self.osr2.reconcile)
         tab.displayed_changed.connect(self._enhance.reconcile)
         tab.displayed_changed.connect(self._reconcile_generating)
         tab.enhance_requested.connect(lambda pid: self._enhance.enhance_items([pid]))
@@ -785,40 +764,8 @@ class GalleryView(QWidget):
         tab.form_edited.connect(self._find_bar.refresh)
         self._look_training.wire(tab)
 
-    def toggle_osr2_drive(self):
-        self.osr2_control.setChecked(not self.osr2_control.isChecked())
-
-    def reconcile_osr2(self):
-        if self._osr2_driver is None:
-            return
-        if self._reconciling_osr2:
-            return
-        self._reconciling_osr2 = True
-        try:
-            held = self._osr2_motion.held is not None
-            engaged = self.osr2_control.engaged() and not self._device_waits_for_the_window
-            in_front = self._surface_in_front()
-            target = (in_front.osr2_drive_target()
-                      if in_front is not None and engaged and not held
-                      else None)
-            wants_motion = engaged and target is None
-            if not wants_motion and self._osr2_motion.active:
-                self._osr2_motion.stop()
-            if target is None:
-                if self._osr2_driving is not None:
-                    self._osr2_driver.stop()
-                    self._osr2_driving = None
-            else:
-                video_path, player, actions = target
-                driving = (video_path, player)
-                if self._osr2_driving != driving:
-                    self._osr2_driver.start(player, actions)
-                    self._osr2_driving = driving
-            if wants_motion and not self._osr2_motion.active:
-                self._osr2_motion.start()
-            self.osr2_control.settled.emit()
-        finally:
-            self._reconciling_osr2 = False
+    def _the_osr2_switch(self):
+        return self.osr2.control if self.osr2.motion is not None else None
 
     def video_in_front(self) -> str | None:
         surface = self._surface_in_front()
@@ -835,32 +782,9 @@ class GalleryView(QWidget):
         return item.data(0, _GROUP_ROLE) if item is not None else None
 
     def _on_front_tab_changed(self, _index):
-        self.reconcile_osr2()
+        self.osr2.reconcile()
         self._reconcile_generating()
         self._retarget_find()
-
-    def osr2_state(self):
-        if not self.osr2_control.isEnabled():
-            return self._osr2_left_in
-        return self.osr2_control.state()
-
-    def restore_osr2_state(self, saved):
-        self._osr2_left_in = saved
-        self.osr2_control.restore(saved)
-
-    def max_intensity(self) -> int:
-        return self.osr2_control.max_intensity
-
-    def set_max_intensity(self, saved) -> None:
-        if isinstance(saved, int):
-            self.osr2_control.set_max_intensity(saved)
-
-    def motion_settings(self) -> dict | None:
-        return None if self._osr2_motion is None else self._osr2_motion.settings()
-
-    def set_motion_settings(self, saved) -> None:
-        if self._osr2_motion is not None:
-            self._osr2_motion.take_settings(saved)
 
     def _on_radio_toggle(self, on: bool):
         if on:
@@ -1043,9 +967,7 @@ class GalleryView(QWidget):
         self.refresh(only_if_moved=True)
         if self.radio_enabled():
             self._radio.start()
-        if self._device_waits_for_the_window:
-            self._device_waits_for_the_window = False
-            self.reconcile_osr2()
+        self.osr2.the_window_is_up()
 
     def hideEvent(self, event):
         super().hideEvent(event)

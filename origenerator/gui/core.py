@@ -4,6 +4,7 @@ import base64
 import contextlib
 import logging
 from dataclasses import dataclass, replace
+from operator import attrgetter
 
 from app_support.loading_screen import MeetingPlace
 from PySide6.QtCore import QByteArray, Qt, QTimer, Signal
@@ -27,6 +28,7 @@ from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import WINDOW_TITLE, FunTimeSession, Rect
 from origenerator.gui.gallery_view import GalleryView, Shared
 from origenerator.gui.headset_window import CAP_PX, HeadsetWindow
+from origenerator.gui.osr2_driving import Osr2Driving
 from origenerator.gui.panes import RememberedBorders
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.taskbar_identity import TaskbarIdentity
@@ -41,6 +43,21 @@ from origenerator.win32 import (
 
 logger = logging.getLogger(__name__)
 
+
+
+class OwnedBy:
+    def __init__(self, owner, its_own) -> None:
+        self._owner = owner
+        self.its_own = its_own
+
+    def __call__(self, view, *saved):
+        return self.its_own(self._owner(view), *saved)
+
+
+def _osr2(its_own) -> OwnedBy:
+    return OwnedBy(attrgetter("osr2"), its_own)
+
+
 SESSION_UI_STATE = (
     ("generate_tabs", GalleryView.capture_generate_tabs, GalleryView.restore_generate_tabs),
     ("toc_shapes", GalleryView.toc_shapes, GalleryView.set_toc_sides),
@@ -48,9 +65,9 @@ SESSION_UI_STATE = (
     ("gallery_folder", GalleryView.selected_folder, GalleryView.select_folder),
     ("gallery_selection", GalleryView.selected_generation, GalleryView.select_generation),
     ("gallery_combine", GalleryView.combine_selection, GalleryView.restore_combine_selection),
-    ("osr2_enabled", GalleryView.osr2_state, GalleryView.restore_osr2_state),
-    ("max_intensity", GalleryView.max_intensity, GalleryView.set_max_intensity),
-    ("motion", GalleryView.motion_settings, GalleryView.set_motion_settings),
+    ("osr2_enabled", _osr2(Osr2Driving.state), _osr2(Osr2Driving.restore_state)),
+    ("max_intensity", _osr2(Osr2Driving.max_intensity), _osr2(Osr2Driving.set_max_intensity)),
+    ("motion", _osr2(Osr2Driving.motion_settings), _osr2(Osr2Driving.set_motion_settings)),
     ("experiments_enabled", GalleryView.experiments_enabled, GalleryView.set_experiments_enabled),
     ("audio_enabled", GalleryView.radio_enabled, GalleryView.set_radio_enabled),
     ("mic_enabled", GalleryView.mic_enabled, GalleryView.set_mic_enabled),
@@ -186,7 +203,7 @@ class Core(QMainWindow):
         self._gallery_view.show_generation(prompt_id)
 
     def the_session_has_the_device(self, held: bool) -> None:
-        self._gallery_view.osr2_control.the_session_has_it(held)
+        self._gallery_view.osr2.control.the_session_has_it(held)
 
     def slideshow_showing_on(self) -> str | None:
         return self._gallery_view.slideshow_showing_on()

@@ -2637,7 +2637,7 @@ def test_with_room_to_spare_the_hud_opens_whole_at_the_top_left_even_at_its_wide
     qtbot.addWidget(view)
     view.resize(1500, 1100)
     view.show()
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
     for _ in range(4):
         QApplication.processEvents()
     (hud,) = _pane_holding(view._osr2_controls).findChildren(QScrollArea)

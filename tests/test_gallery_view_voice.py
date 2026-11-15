@@ -1279,14 +1279,14 @@ def test_a_spoken_switch_flips_the_bank_switch_itself(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
 
     view._voice.listener.speak("drive on")
-    assert view.osr2_control.isChecked()
+    assert view.osr2.control.isChecked()
     assert words(view._voice.status) == "OSR2 on"
 
     view._voice.listener.speak("drive")
-    assert not view.osr2_control.isChecked()
+    assert not view.osr2.control.isChecked()
 
     view._voice.listener.speak("drive off")
-    assert not view.osr2_control.isChecked()
+    assert not view.osr2.control.isChecked()
 
 
 def test_osr2_off_parks_the_device_as_the_osr2_controls_switch_does(qtbot, tmp_path):
@@ -1295,7 +1295,7 @@ def test_osr2_off_parks_the_device_as_the_osr2_controls_switch_does(qtbot, tmp_p
 
     view._voice.listener.speak("OSR2 off")
 
-    assert view.osr2_control.state() == OSR2_PARKED
+    assert view.osr2.control.state() == OSR2_PARKED
     assert words(view._voice.status) == "OSR2 off"
 
 
@@ -1311,7 +1311,7 @@ def test_the_mic_can_be_shut_by_voice(qtbot, tmp_path):
 
 def test_a_spoken_bar_word_moves_its_bar_the_way_its_key_does(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
-    bars = view._osr2_motion.state.state
+    bars = view.osr2.motion.state.state
     widest_travel, center = bars.amplitude, bars.center
 
     view._voice.listener.speak("amp down")
@@ -1319,13 +1319,13 @@ def test_a_spoken_bar_word_moves_its_bar_the_way_its_key_does(qtbot, tmp_path):
 
     assert bars.amplitude == widest_travel - 10
     assert bars.center == center + 5
-    assert words(view._voice.status) == view._osr2_motion.status_text(), (
+    assert words(view._voice.status) == view.osr2.motion.status_text(), (
         "answered with what the device now reads")
 
 
 def test_a_spoken_number_puts_a_bar_where_it_says(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
-    bars = view._osr2_motion.state.state
+    bars = view.osr2.motion.state.state
 
     view._voice.listener.speak("amp fifty")
     assert bars.amplitude == 50, (
@@ -1337,7 +1337,7 @@ def test_a_spoken_number_puts_a_bar_where_it_says(qtbot, tmp_path):
 
     view._voice.listener.speak("max speed")
     assert bars.speed == motion_engine.MAX_SPEED
-    assert words(view._voice.status) == view._osr2_motion.status_text()
+    assert words(view._voice.status) == view.osr2.motion.status_text()
 
 
 def test_min_speed_lands_on_the_slowest_the_bar_actually_moves(qtbot, tmp_path):
@@ -1345,20 +1345,20 @@ def test_min_speed_lands_on_the_slowest_the_bar_actually_moves(qtbot, tmp_path):
 
     view._voice.listener.speak("min speed")
 
-    assert view._osr2_motion.state.state.speed == motion_engine.MIN_SPEED
+    assert view.osr2.motion.state.state.speed == motion_engine.MIN_SPEED
 
 
 def test_human_inspired_motion_can_be_asked_for_outright_rather_than_flipped(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
 
     view._voice.listener.speak("human inspired on")
-    assert view._osr2_motion.state.learned.active
+    assert view.osr2.motion.state.learned.active
 
     view._voice.listener.speak("human inspired on")
-    assert view._osr2_motion.state.learned.active
+    assert view.osr2.motion.state.learned.active
 
     view._voice.listener.speak("human inspired off")
-    assert not view._osr2_motion.state.learned.active
+    assert not view.osr2.motion.state.learned.active
 
 
 def test_a_motion_word_answers_from_a_slideshow_too(qtbot, tmp_path):
@@ -1368,7 +1368,7 @@ def test_a_motion_word_answers_from_a_slideshow_too(qtbot, tmp_path):
 
     view._voice.listener.speak("next shape")
 
-    assert surface.said == view._osr2_motion.status_text(), (
+    assert surface.said == view.osr2.motion.status_text(), (
         "the driver belongs to the whole app, so its words belong to no surface, but the answer "
         "goes where the speaker is looking")
 

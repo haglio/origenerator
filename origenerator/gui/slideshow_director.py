@@ -132,10 +132,6 @@ class SlideshowHost(Protocol):
 
     def enhance_from_slideshow(self, prompt_id: str) -> bool: ...
 
-    def toggle_osr2_drive(self) -> None: ...
-
-    def reconcile_osr2(self) -> None: ...
-
     def set_room_paused(self, paused: bool) -> None: ...
 
     def say(self, message: str, *, mark: str = HEARD_MARK) -> None: ...
@@ -227,6 +223,7 @@ class SlideshowDirector:
         self._pace = surroundings.pace
         self._region_paces: dict[str, SlideshowPace] = {}
         self._motion = surroundings.motion
+        self._osr2 = surroundings.osr2
         fun_time = self._fun_time = surroundings.fun_time
         self._slideshow = None
         self._standalone_shape: str | None = None
@@ -481,8 +478,8 @@ class SlideshowDirector:
         if not already_live:
             slideshow.open_requested.connect(self._pick_where_it_played)
             slideshow.closed.connect(lambda s=slideshow: self._on_closed(s))
-            slideshow.media_changed.connect(self._host.reconcile_osr2)
-        self._host.reconcile_osr2()
+            slideshow.media_changed.connect(self._osr2.reconcile)
+        self._osr2.reconcile()
         return slideshow
 
     def _slideshow_actions(self, shape: str) -> SlideshowActions:
@@ -510,8 +507,7 @@ class SlideshowDirector:
             start_now=self._host.start_now,
             cancel_all=self._host.cancel_all,
             core_window=self._host.window,
-            drive_toggle=self._host.toggle_osr2_drive,
-            osr2_control=self._host.osr2_control,
+            drive_toggle=self._osr2.toggle,
             omnipause=self._ask_the_room_to_pause(),
             neighbors=partial(self.neighbors_of, shape=shape),
             widen=partial(self.beyond_the_row_of, shape=shape),
@@ -753,7 +749,7 @@ class SlideshowDirector:
                             if entry[0] is not slideshow]
         if slideshow is None or self._slideshow is slideshow:
             self._slideshow = next((s for s, _loc in reversed(self._live_slideshows)), None)
-        self._host.reconcile_osr2()
+        self._osr2.reconcile()
         if shape is not None:
             self._region_slideshows[shape] = None
             self._refill_region(shape)

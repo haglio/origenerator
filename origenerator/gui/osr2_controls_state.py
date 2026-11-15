@@ -91,7 +91,6 @@ def osr2_controls_hud(motion, situation: Osr2Situation = USUAL_SITUATION) -> Mai
 class Osr2ControlsState:
     osr2_rows: tuple
     osr2: str
-    osr2_control: str
     drive: DriveHud
     max_intensity: int
     paused: bool = False
@@ -105,7 +104,6 @@ def osr2_controls_state(motion, situation: Osr2Situation = USUAL_SITUATION) -> O
     scripted = script is not None and script.active and on
     driving = motion.active and on and not scripted
     return Osr2ControlsState(
-        osr2_control=control,
         osr2_rows=(aim_row(learned=motion.state.learned.active,
                            shape=motion.state.state.shape.value, control=control),),
         osr2_controls=osr2_controls(broker_running=broker_running),

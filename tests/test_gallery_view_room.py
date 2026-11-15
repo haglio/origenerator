@@ -95,8 +95,8 @@ def _osr2_view(qtbot):
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(folders=SUITE_FOLDERS), shared=Shared(osr2_motion=_SignalMotion()))
     qtbot.addWidget(view)
     driver = _FakeDriver()
-    view._osr2_driver = driver
-    view.osr2_control.script = driver
+    view.osr2.driver = driver
+    view.osr2.control.script = driver
     return view, driver, view._generate_pane.current_generate_tab()
 
 
@@ -104,51 +104,51 @@ def test_the_osr2_controls_control_group_is_the_apps_one_osr2_switch(qtbot):
     view, driver, tab = _osr2_view(qtbot)
     tab.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
 
-    view.osr2_control.set_state(OSR2_DRIVING)
+    view.osr2.control.set_state(OSR2_DRIVING)
     assert driver.started == [("player-A", "actions-A")]
-    assert view.osr2_control.state() == OSR2_DRIVING
+    assert view.osr2.control.state() == OSR2_DRIVING
 
-    view.osr2_control.set_state(OSR2_PARKED)
+    view.osr2.control.set_state(OSR2_PARKED)
     assert driver.stopped == 1
-    assert view.osr2_control.isChecked() is False
+    assert view.osr2.control.isChecked() is False
 
 
 def test_parking_from_the_osr2_controls_stills_the_motion_at_home_and_keeps_the_device(qtbot):
     view, _driver, _panel = _osr2_view(qtbot)
 
-    view.osr2_control.set_state(OSR2_PARKED)
+    view.osr2.control.set_state(OSR2_PARKED)
 
-    assert view.osr2_control.engaged() is True
-    assert ("hold", OSR2_PARKED) in view._osr2_motion.calls
-    assert view.osr2_control.state() == OSR2_PARKED
+    assert view.osr2.control.engaged() is True
+    assert ("hold", OSR2_PARKED) in view.osr2.motion.calls
+    assert view.osr2.control.state() == OSR2_PARKED
 
 
 def test_a_hold_stands_the_funscript_down_and_puts_the_motion_on_the_device(qtbot):
     view, driver, tab = _osr2_view(qtbot)
     tab.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
-    view.osr2_control.set_state(OSR2_DRIVING)
+    view.osr2.control.set_state(OSR2_DRIVING)
     assert driver.started
-    assert view._osr2_motion.active is False
+    assert view.osr2.motion.active is False
 
-    view.osr2_control.set_state(OSR2_PARKED)
+    view.osr2.control.set_state(OSR2_PARKED)
 
     assert driver.stopped == 1, (
         "a script driving through a hold is the device ignoring the hold, which the OSR2 controls "
         "would then be lying about")
-    assert view._osr2_motion.active is True
-    assert ("hold", OSR2_PARKED) in view._osr2_motion.calls
+    assert view.osr2.motion.active is True
+    assert ("hold", OSR2_PARKED) in view.osr2.motion.calls
 
 
 def test_driving_after_a_hold_gives_the_script_the_device_back(qtbot):
     view, driver, tab = _osr2_view(qtbot)
     tab.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
-    view.osr2_control.set_state(OSR2_PARKED)
+    view.osr2.control.set_state(OSR2_PARKED)
 
-    view.osr2_control.set_state(OSR2_DRIVING)
+    view.osr2.control.set_state(OSR2_DRIVING)
 
-    assert ("release",) in view._osr2_motion.calls
+    assert ("release",) in view.osr2.motion.calls
     assert driver.started[-1] == ("player-A", "actions-A")
-    assert view._osr2_motion.active is False
+    assert view.osr2.motion.active is False
 
 
 def _logging(log, name, inner):
@@ -162,8 +162,8 @@ def _handoff_log(view, driver):
     log = []
     for name, owner, method in (("script takes", driver, "start"),
                                 ("script lets go", driver, "stop"),
-                                ("motion takes", view._osr2_motion, "start"),
-                                ("motion lets go", view._osr2_motion, "stop")):
+                                ("motion takes", view.osr2.motion, "start"),
+                                ("motion lets go", view.osr2.motion, "stop")):
         setattr(owner, method, _logging(log, name, getattr(owner, method)))
     return log
 
@@ -171,10 +171,10 @@ def _handoff_log(view, driver):
 def test_the_motion_lets_go_before_the_script_takes_the_device(qtbot):
     view, driver, tab = _osr2_view(qtbot)
     tab.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
-    view.osr2_control.set_state(OSR2_PARKED)
+    view.osr2.control.set_state(OSR2_PARKED)
     log = _handoff_log(view, driver)
 
-    view.osr2_control.set_state(OSR2_DRIVING)
+    view.osr2.control.set_state(OSR2_DRIVING)
 
     assert log == ["motion lets go", "script takes"], (
         "each driver puts back what it found when it took the device, the OSR2's auto setting among it, so one that takes over before "
@@ -184,10 +184,10 @@ def test_the_motion_lets_go_before_the_script_takes_the_device(qtbot):
 def test_the_script_lets_go_before_the_motion_takes_the_device(qtbot):
     view, driver, tab = _osr2_view(qtbot)
     tab.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
-    view.osr2_control.set_state(OSR2_DRIVING)
+    view.osr2.control.set_state(OSR2_DRIVING)
     log = _handoff_log(view, driver)
 
-    view.osr2_control.set_state(OSR2_PARKED)
+    view.osr2.control.set_state(OSR2_PARKED)
 
     assert log == ["script lets go", "motion takes"]
 
@@ -195,9 +195,9 @@ def test_the_script_lets_go_before_the_motion_takes_the_device(qtbot):
 def test_every_osr2_controls_drawing_over_the_device_hears_that_it_was_re_aimed(qtbot):
     view, _driver, _tab = _osr2_view(qtbot)
     heard = []
-    view.osr2_control.settled.connect(lambda: heard.append(True))
+    view.osr2.control.settled.connect(lambda: heard.append(True))
 
-    view.osr2_control.set_state(OSR2_DRIVING)
+    view.osr2.control.set_state(OSR2_DRIVING)
 
     assert heard
 
@@ -206,10 +206,10 @@ def test_global_toggle_drives_the_front_video_and_untoggling_stops(qtbot):
     view, driver, tab = _osr2_view(qtbot)
     tab.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
 
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
     assert driver.started == [("player-A", "actions-A")]
 
-    view.osr2_control.setChecked(False)
+    view.osr2.control.setChecked(False)
     assert driver.stopped == 1
 
 
@@ -217,29 +217,29 @@ def test_toggle_on_with_no_video_shown_moves_instead(qtbot):
     view, driver, tab = _osr2_view(qtbot)
     tab.osr2_drive_target = lambda: None
 
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
     assert driver.started == []
-    assert view._osr2_motion.active
+    assert view.osr2.motion.active
 
-    view.osr2_control.setChecked(False)
-    assert view._osr2_motion.held == OSR2_PARKED
+    view.osr2.control.setChecked(False)
+    assert view.osr2.motion.held == OSR2_PARKED
 
 
 def test_space_flips_the_one_switch_rather_than_the_motion_alone(qtbot):
     view, driver, tab = _osr2_view(qtbot)
     tab.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     _on_screen(qtbot, view, 1400, 900)
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
     assert driver.started == [("pA", "aA")]
-    assert not view._osr2_motion.active
+    assert not view.osr2.motion.active
 
     gestures.press_key(view, Qt.Key.Key_Space)
 
-    assert not view.osr2_control.isChecked(), (
+    assert not view.osr2.control.isChecked(), (
         "sent to the motion directly, Space would start a second source beside a funscript the "
         "switch already had streaming")
     assert driver.stopped >= 1
-    assert view._osr2_motion.held == OSR2_PARKED
+    assert view.osr2.motion.held == OSR2_PARKED
 
 
 def test_space_after_a_click_in_the_generate_pane_drives_rather_than_pressing_it_again(qtbot):
@@ -252,14 +252,14 @@ def test_space_after_a_click_in_the_generate_pane_drives_rather_than_pressing_it
 
     gestures.press_key(view, Qt.Key.Key_Space)
 
-    assert view.osr2_control.isChecked()
+    assert view.osr2.control.isChecked()
     assert section.is_collapsed() == folded
 
 
 def test_a_slideshow_gets_space_wired_to_the_switch(qtbot):
     view, _driver, _panel = _osr2_view(qtbot)
     slideshow = _double_click_slideshow(view, qtbot)
-    assert slideshow._actions.drive_toggle == view.toggle_osr2_drive, (
+    assert slideshow._actions.drive_toggle == view.osr2.toggle, (
         "every surface that answers the motion keys sends Space to the one switch rather than "
         "to the motion it was handed, the slideshow as much as the main window, since a "
         "slideshow is where the device is usually driven from")
@@ -268,7 +268,7 @@ def test_a_slideshow_gets_space_wired_to_the_switch(qtbot):
 def test_browsing_to_a_new_video_retargets_the_running_driver(qtbot):
     view, driver, tab = _osr2_view(qtbot)
     tab.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
     assert driver.started[-1] == ("pA", "aA")
 
     tab.osr2_drive_target = lambda: ("B.mp4", "pB", "aB")
@@ -279,7 +279,7 @@ def test_browsing_to_a_new_video_retargets_the_running_driver(qtbot):
 def test_switching_to_a_tab_without_a_scripted_video_stops_driving(qtbot):
     view, driver, tab = _osr2_view(qtbot)
     tab.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
     assert driver.started
 
     view._generate_pane._add_subtab()
@@ -288,19 +288,19 @@ def test_switching_to_a_tab_without_a_scripted_video_stops_driving(qtbot):
 
 def test_the_control_state_round_trips_for_persistence(qtbot):
     view, _driver, _panel = _osr2_view(qtbot)
-    assert view.osr2_state() == OSR2_PARKED
+    assert view.osr2.state() == OSR2_PARKED
 
     for state in (OSR2_PARKED, OSR2_DRIVING):
-        view.restore_osr2_state(state)
-        assert view.osr2_state() == state, state
+        view.osr2.restore_state(state)
+        assert view.osr2.state() == state, state
 
 
 def test_a_session_saved_under_retracted_or_control_off_reopens_parked(qtbot):
     view, _driver, _panel = _osr2_view(qtbot)
 
     for saved in (OSR2_RETRACTED, "control_off"):
-        view.restore_osr2_state(saved)
-        assert view.osr2_state() == OSR2_PARKED, saved
+        view.osr2.restore_state(saved)
+        assert view.osr2.state() == OSR2_PARKED, saved
 
 
 def test_a_session_saved_by_the_on_off_switch_reopens_driving_or_parked(qtbot):
@@ -308,8 +308,8 @@ def test_a_session_saved_by_the_on_off_switch_reopens_driving_or_parked(qtbot):
 
     reopened = {}
     for saved in (True, False):
-        view.restore_osr2_state(saved)
-        reopened[saved] = view.osr2_state()
+        view.osr2.restore_state(saved)
+        reopened[saved] = view.osr2.state()
 
     assert reopened == {True: OSR2_DRIVING, False: OSR2_PARKED}, (
         "\"osr2_enabled\" still reads the True or False the switch held before it had four"
@@ -376,10 +376,10 @@ def test_the_rooms_pause_holds_a_scripted_videos_drive_still(qtbot, monkeypatch)
     qtbot.addWidget(view)
     tab = view._generate_pane.current_generate_tab()
     tab.osr2_drive_target = lambda: ("A.mp4", FakePlayer(pos=100), ACTIONS)
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
 
     view.set_room_paused(True)
-    view.osr2_control.script.poll()
+    view.osr2.control.script.poll()
 
     assert broker.positions == []
 
@@ -457,7 +457,7 @@ def test_a_double_click_on_an_image_from_another_folder_opens_that_folder(
 
 def test_stepping_a_double_clicked_slideshow_re_aims_the_osr2(qtbot):
     view, driver, _panel = _osr2_view(qtbot)
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
     slideshow = _double_click_slideshow(view, qtbot, target=("A.mp4", "pA", "aA"))
     assert driver.started[-1] == ("pA", "aA")
 
@@ -536,19 +536,19 @@ def test_a_slideshow_closed_before_it_became_active_asks_for_no_keyboard_focus(q
 def test_a_funscript_coming_into_view_takes_the_device_off_the_motion(qtbot, monkeypatch):
     view, _key = _populating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     driver = _FakeDriver()
-    view._osr2_driver = driver
+    view.osr2.driver = driver
     tab = view._generate_pane.current_generate_tab()
     tab.osr2_drive_target = lambda: None
 
-    view.osr2_control.setChecked(True)
-    assert view._osr2_motion.active
+    view.osr2.control.setChecked(True)
+    assert view.osr2.motion.active
     assert driver.started == []
 
     tab.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
     tab.displayed_changed.emit()
 
     assert driver.started == [("pA", "aA")]
-    assert not view._osr2_motion.active
+    assert not view.osr2.motion.active
 
 
 def test_a_slideshow_standing_on_its_own_plays_the_radio_while_its_image_is_up(
@@ -654,20 +654,20 @@ def test_closing_a_slideshow_leaves_the_motion_running(qtbot, monkeypatch):
     view, _key = _populating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     view._slideshows.start()
     qtbot.addWidget(view._slideshows.showing.shown)
-    assert view._slideshows.showing._actions.drive_toggle == view.toggle_osr2_drive
-    view.osr2_control.setChecked(True)
+    assert view._slideshows.showing._actions.drive_toggle == view.osr2.toggle
+    view.osr2.control.setChecked(True)
     view._slideshows.showing.close()
-    assert view._osr2_motion.active
+    assert view.osr2.motion.active
 
 
 def test_esc_holds_a_running_motion_still(qtbot, monkeypatch):
     view, _key = _populating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     # Qt's active window outlives the test that opened it.
     monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
-    view.osr2_control.setChecked(True)
-    assert view._osr2_motion.active
+    view.osr2.control.setChecked(True)
+    assert view.osr2.motion.active
     assert view._handle_escape(Qt.KeyboardModifier.NoModifier) is True
-    assert view._osr2_motion.frozen
+    assert view.osr2.motion.frozen
 
 
 def test_the_motion_keys_work_in_core_too(qtbot, monkeypatch):
@@ -676,7 +676,7 @@ def test_the_motion_keys_work_in_core_too(qtbot, monkeypatch):
 
     gestures.press_key(view, Qt.Key.Key_L)
 
-    assert ("speed", 5) in view._osr2_motion.calls
+    assert ("speed", 5) in view.osr2.motion.calls
 
 
 def test_the_number_pads_7_and_9_change_the_travel_as_the_row_above_the_letters_does(
@@ -686,12 +686,12 @@ def test_the_number_pads_7_and_9_change_the_travel_as_the_row_above_the_letters_
 
     gestures.press_key(view, Qt.Key.Key_9, Qt.KeyboardModifier.KeypadModifier)
 
-    assert ("amplitude", 10) in view._osr2_motion.calls
+    assert ("amplitude", 10) in view.osr2.motion.calls
 
 
 def test_watching_a_video_fullscreen_drives_nothing_with_the_toggle_off(qtbot):
     view, driver, _panel = _osr2_view(qtbot)
-    assert not view.osr2_control.isChecked()
+    assert not view.osr2.control.isChecked()
 
     slideshow = _double_click_slideshow(view, qtbot, target=("F.mp4", "pF", "aF"))
 
@@ -703,7 +703,7 @@ def test_turning_the_toggle_on_over_an_open_slideshow_drives_its_video(qtbot):
     view, driver, _panel = _osr2_view(qtbot)
     slideshow = _double_click_slideshow(view, qtbot, target=("F.mp4", "pF", "aF"))
 
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
 
     assert driver.started[-1] == ("pF", "aF")
     slideshow.close()
@@ -711,11 +711,11 @@ def test_turning_the_toggle_on_over_an_open_slideshow_drives_its_video(qtbot):
 
 def test_untoggling_while_a_slideshows_video_drives_stops_the_device(qtbot):
     view, driver, _panel = _osr2_view(qtbot)
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
     slideshow = _double_click_slideshow(view, qtbot, target=("F.mp4", "pF", "aF"))
     assert driver.started
 
-    view.osr2_control.setChecked(False)
+    view.osr2.control.setChecked(False)
 
     assert driver.stopped >= 1
     slideshow.close()
@@ -723,7 +723,7 @@ def test_untoggling_while_a_slideshows_video_drives_stops_the_device(qtbot):
 
 def test_closing_the_slideshow_stops_driving_with_no_tab_video_behind_it(qtbot):
     view, driver, _panel = _osr2_view(qtbot)
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
     slideshow = _double_click_slideshow(view, qtbot, target=("F.mp4", "pF", "aF"))
     assert driver.started
 
@@ -735,7 +735,7 @@ def test_closing_the_slideshow_stops_driving_with_no_tab_video_behind_it(qtbot):
 def test_the_slideshows_video_overrides_the_toggle_target_then_hands_back(qtbot):
     view, driver, tab = _osr2_view(qtbot)
     tab.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
     assert driver.started[-1] == ("pA", "aA")
 
     slideshow = _double_click_slideshow(view, qtbot, target=("F.mp4", "pF", "aF"))
@@ -748,7 +748,7 @@ def test_the_slideshows_video_overrides_the_toggle_target_then_hands_back(qtbot)
 def test_a_slideshow_with_nothing_scripted_takes_the_device_off_the_tabs_funscript(qtbot):
     view, driver, tab = _osr2_view(qtbot)
     tab.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
     assert driver.started == [("pA", "aA")]
 
     slideshow = _double_click_slideshow(view, qtbot)
@@ -756,7 +756,7 @@ def test_a_slideshow_with_nothing_scripted_takes_the_device_off_the_tabs_funscri
     assert driver.stopped >= 1, (
         "the surface in front answers for the device alone, the way a Funestra hands back to the "
         "motion between scripted videos")
-    assert view._osr2_motion.active
+    assert view.osr2.motion.active
     slideshow.close()
 
 
@@ -764,7 +764,7 @@ def _driving_the_device(qtbot):
     view, _driver, tab = _osr2_view(qtbot)
     _keys_are_the_gallerys(view)
     tab.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
     return view
 
 
@@ -776,7 +776,7 @@ def test_esc_pauses_the_room_with_the_focus_inside_a_tab(qtbot):
         "the driven video usually lives in the focused Generate tab, where the gallery does not own "
         "Delete and Undo")
     assert omnipause.frozen()
-    assert view.osr2_control.isChecked()
+    assert view.osr2.control.isChecked()
 
 
 def _typing_in_a_text_field(qtbot, monkeypatch):
@@ -816,7 +816,7 @@ def test_the_osr2_controls_hint_that_esc_pauses_the_room(qtbot):
 def test_esc_defers_to_a_fullscreen_window(qtbot, monkeypatch):
     view, driver, tab = _osr2_view(qtbot)
     tab.osr2_drive_target = lambda: ("A.mp4", "pA", "aA")
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
     fullscreen = QWidget()
     qtbot.addWidget(fullscreen)
     monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: fullscreen))
@@ -892,7 +892,7 @@ def test_shift_esc_at_a_standalone_slideshow_closes_it_and_leaves_the_room_playi
 def test_esc_at_a_standalone_slideshow_has_cores_osr2_line_say_parked_until_a_second_plays(
         qtbot, tmp_path, monkeypatch):
     view, _radio, slideshow = _a_gallery_with_its_slideshow_in_front(qtbot, tmp_path, monkeypatch)
-    view.osr2_control.setChecked(True)
+    view.osr2.control.setChecked(True)
 
     gestures.press_key(slideshow.shown, Qt.Key.Key_Escape)
     assert _cores_osr2_line(view) == OSR2_PARKED
@@ -902,8 +902,9 @@ def test_esc_at_a_standalone_slideshow_has_cores_osr2_line_say_parked_until_a_se
 
 
 def _cores_osr2_line(view):
-    device = osr2_controls_state(view._osr2_motion, view._osr2_controls.situation())
-    return state_for(device.osr2, device.osr2_control, paused=device.paused)
+    situation = view._osr2_controls.situation()
+    device = osr2_controls_state(view.osr2.motion, situation)
+    return state_for(device.osr2, situation.control, paused=device.paused)
 
 
 def _press_escape_at_the_gallery(view):
@@ -967,7 +968,7 @@ def test_esc_on_a_freshly_opened_app_pauses_the_room_rather_than_starting_anythi
     assert view._slideshows.showing is None
     assert radio.starts == 0
     assert not view._populate.is_active(key)
-    assert not view.osr2_control.isChecked()
+    assert not view.osr2.control.isChecked()
 
 
 def test_shift_esc_in_the_gallery_opens_the_slideshow_a_double_click_would_and_leaves_the_room_playing(
@@ -1003,9 +1004,9 @@ def test_esc_leaves_the_mic_listening(qtbot, tmp_path, monkeypatch):
 def test_a_reconcile_with_nothing_changed_leaves_the_driver_running(qtbot):
     view, driver, tab = _osr2_view(qtbot)
     tab.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
-    view.osr2_control.set_state(OSR2_DRIVING)
+    view.osr2.control.set_state(OSR2_DRIVING)
 
-    view.reconcile_osr2()
+    view.osr2.reconcile()
 
     assert driver.started == [("player-A", "actions-A")]
 
@@ -1013,10 +1014,10 @@ def test_a_reconcile_with_nothing_changed_leaves_the_driver_running(qtbot):
 def test_the_same_video_on_a_new_player_re_aims_the_driver(qtbot):
     view, driver, tab = _osr2_view(qtbot)
     tab.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
-    view.osr2_control.set_state(OSR2_DRIVING)
+    view.osr2.control.set_state(OSR2_DRIVING)
 
     tab.osr2_drive_target = lambda: ("A.mp4", "player-B", "actions-A")
-    view.reconcile_osr2()
+    view.osr2.reconcile()
 
     assert driver.started[-1] == ("player-B", "actions-A")
 
@@ -1025,9 +1026,9 @@ def test_a_listener_reconciling_on_the_settled_signal_does_not_land_back_in_the_
     view, driver, tab = _osr2_view(qtbot)
     tab.osr2_drive_target = lambda: ("A.mp4", "player-A", "actions-A")
     heard = []
-    view.osr2_control.settled.connect(lambda: heard.append(view.reconcile_osr2()))
+    view.osr2.control.settled.connect(lambda: heard.append(view.osr2.reconcile()))
 
-    view.osr2_control.set_state(OSR2_DRIVING)
+    view.osr2.control.set_state(OSR2_DRIVING)
 
     assert heard
     assert driver.started == [("player-A", "actions-A")]
@@ -1037,13 +1038,13 @@ def test_quitting_lets_go_of_the_script_the_motion_and_the_radio(qtbot):
     radio = _FakeRadio()
     view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), shared=Shared(osr2_motion=_SignalMotion(), radio=radio))
     qtbot.addWidget(view)
-    view._osr2_driver.start(FakePlayer(), ACTIONS)
-    view._osr2_motion.active = True
+    view.osr2.driver.start(FakePlayer(), ACTIONS)
+    view.osr2.motion.active = True
 
     QApplication.instance().aboutToQuit.emit()
 
-    assert not view._osr2_driver.active
-    assert not view._osr2_motion.active
+    assert not view.osr2.driver.active
+    assert not view.osr2.motion.active
     assert radio.stops == 1
 
 

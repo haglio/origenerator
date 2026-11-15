@@ -18,7 +18,6 @@ from PySide6.QtWidgets import QApplication
 
 from origenerator.gui.hud_queue import CANCEL, OPEN
 from origenerator.gui.inflight import EMPTY_QUEUE_TEXT, InFlightItem, RunReading
-from origenerator.gui.osr2_control import Osr2Control
 from origenerator.gui.osr2_controls import Osr2Controls
 from origenerator.gui.slideshow_hud import HudPlacement, slideshow_hud_model
 from origenerator.gui.slideshow_pace import MAX_S, MIN_S, STEP_S, SlideshowPace
@@ -165,9 +164,7 @@ def test_a_hud_with_no_one_to_name_its_items_names_none(qtbot):
 class TestTheOneHudASlideshowWears:
     @staticmethod
     def _window(qtbot, **kwargs):
-        motion = FakeMotion()
-        return _window(qtbot, motion=motion, actions=SlideshowActions(osr2_control=Osr2Control(motion)),
-                          **kwargs)
+        return _window(qtbot, motion=FakeMotion(), **kwargs)
 
     def test_the_slideshow_floats_no_second_hud(self, qtbot):
         assert self._window(qtbot).findChildren(Osr2Controls) == [], (

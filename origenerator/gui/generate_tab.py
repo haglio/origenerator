@@ -113,7 +113,6 @@ from origenerator.osr2_driver import drive_target_for
 from origenerator.prompt_tokens import prompt_readings
 from origenerator.published_actions import set_many_actions
 from origenerator.regeneration import (
-    MADE_ELSEWHERE_TIP,
     told_why_it_cannot_be_made_again,
     workflow_gone,
 )
@@ -513,7 +512,7 @@ class GenerateTab(DropZones):
     def _why_generate_is_blocked(self) -> str | None:
         workflow = workflow_named(self._workflow_dropdown.currentData())
         if workflow is not None and not workflow.generates_here:
-            return MADE_ELSEWHERE_TIP
+            return workflow.why_it_cannot_be_made_again
         told = self._told_why_the_shown_item_cannot_be_remade()
         if told is not None:
             return told

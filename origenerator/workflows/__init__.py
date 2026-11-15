@@ -8,6 +8,7 @@ from origenerator.workflows.flux_t2i_upscaled import FluxT2iUpscaledWorkflow
 from origenerator.workflows.image_enhance import ImageEnhanceWorkflow
 from origenerator.workflows.krea2_t2i import Krea2T2iWorkflow
 from origenerator.workflows.minimax_h3_i2v import MiniMaxH3I2vWorkflow
+from origenerator.workflows.non_ai import NonAiWorkflow, non_ai_folder
 from origenerator.workflows.outside import OutsideWorkflow, VideoKind, outside_parts
 from origenerator.workflows.sdxl_pose_transfer import SdxlPoseTransferWorkflow
 from origenerator.workflows.sdxl_t2i import SdxlT2iWorkflow
@@ -48,7 +49,15 @@ def workflow_named(name: str | None) -> WorkflowTemplate | None:
     if name in WORKFLOW_REGISTRY:
         return WORKFLOW_REGISTRY[name]
     parts = outside_parts(name)
-    return _outside(*parts) if parts is not None else None
+    if parts is not None:
+        return _outside(*parts)
+    folder = non_ai_folder(name)
+    return _non_ai(folder) if folder is not None else None
+
+
+@cache
+def _non_ai(folder: str) -> NonAiWorkflow:
+    return NonAiWorkflow(folder)
 
 
 @cache

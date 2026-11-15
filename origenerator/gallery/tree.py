@@ -56,6 +56,7 @@ from origenerator.gallery.source_image import build_image_config_index
 from origenerator.generation_state import GenerationSource, in_sight
 from origenerator.media import MediaType
 from origenerator.output_files import produced_output
+from origenerator.workflows.non_ai import non_ai_folder
 from origenerator.workflows.outside import outside_source
 
 
@@ -110,11 +111,20 @@ def folder_key_at_level(row: dict, level: str, image_index: dict | None = None) 
 
 def folder_chain(row: dict, image_index: dict | None = None) -> tuple[str, ...]:
     workflow_name = row.get("workflow_name") or "unknown"
-    levels = ("media", "workflow", "model", "lora",
-              *(("source_image",) if _grows_source_images(media_type_of_row(row), workflow_name)
-                else ()),
+    levels = ("media", "workflow", *_levels_between(media_type_of_row(row), workflow_name),
               "settings")
     return (ALL_KEY, *(folder_key_at_level(row, level, image_index) for level in levels))
+
+
+def _levels_between(media_type: str, workflow_name: str) -> tuple[str, ...]:
+    if not _files_by_model_and_lora(workflow_name):
+        return ()
+    return ("model", "lora",
+            *(("source_image",) if _grows_source_images(media_type, workflow_name) else ()))
+
+
+def _files_by_model_and_lora(workflow_name: str) -> bool:
+    return non_ai_folder(workflow_name) is None
 
 
 def _grows_source_images(media_type: str, workflow_name: str) -> bool:
@@ -506,7 +516,9 @@ def _media_folder(media_type, rows, folder_meta, image_index, name_of, kept) -> 
 
 def _workflow_folder(tier: _Tier, key: str, label: str, rows: list[dict],
                      favorite: bool) -> WorkflowGroup:
-    return WorkflowGroup(key, tier.workflow_name, label, _build_model_groups(tier, rows), favorite)
+    below = (_build_model_groups if _files_by_model_and_lora(tier.workflow_name)
+             else _build_settings_groups)
+    return WorkflowGroup(key, tier.workflow_name, label, below(tier, rows), favorite)
 
 
 def _unnamed(_prompt_id: str) -> str:

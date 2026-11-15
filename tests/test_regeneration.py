@@ -5,9 +5,10 @@ import json
 from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.one_look import one_look
 from origenerator.output_places import OutputPlaces
-from origenerator.regeneration import MADE_ELSEWHERE_TIP, why_it_cannot_be_made_again
+from origenerator.regeneration import why_it_cannot_be_made_again
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.outside import outside_workflow
+from origenerator.workflows.non_ai import non_ai_workflow
+from origenerator.workflows.outside import MADE_ELSEWHERE_TIP, outside_workflow
 
 
 def _folders(tmp_path):
@@ -35,6 +36,12 @@ def test_what_another_site_made_cannot_be_made_again(tmp_path):
     reason = why_it_cannot_be_made_again(_row(outside_workflow("Sample Site")), _folders(tmp_path))
 
     assert reason == MADE_ELSEWHERE_TIP
+
+
+def test_a_non_ai_video_was_never_generated_so_it_cannot_be_made_again(tmp_path):
+    reason = why_it_cannot_be_made_again(_row(non_ai_workflow("sample full")), _folders(tmp_path))
+
+    assert reason == "A Non-AI video wasn't generated, so it can't be made again"
 
 
 def test_a_model_that_is_not_installed_is_named(tmp_path):

@@ -127,6 +127,7 @@ class Combine(QWidget):
         self._build_the_intent_part()
 
         self._lay_out_the_combine()
+        self._show_the_boxes_where_they_apply()
         self._sync()
 
     def _build_the_video_part(self) -> None:
@@ -147,6 +148,7 @@ class Combine(QWidget):
             box = TickControl(name)
             box.setObjectName(combine_checkbox(name))
             box.clicked.connect(lambda _checked=False: self._on_checked_changed())
+            _keep_its_room_when_hidden(box)
             self._boxes[name] = box
             listed_with_its_boxes.addWidget(box)
 
@@ -235,6 +237,7 @@ class Combine(QWidget):
         if checked:
             if not self.selected_category():
                 self._show_dropped()
+            self._show_the_boxes_where_they_apply()
             self.intent_changed.emit(self.selected_intent())
 
     def _list_the_actions(self) -> None:
@@ -246,8 +249,22 @@ class Combine(QWidget):
 
     def set_checked_boxes(self, names) -> None:
         for name, box in self._boxes.items():
-            box.setChecked(name in names)
+            box.setChecked(name in names and self._the_boxes_apply())
         self.checked_changed.emit()
+
+    def _the_boxes_apply(self) -> bool:
+        return self.selected_intent() != GENAU and bool(self.selected_category())
+
+    def _show_the_boxes_where_they_apply(self) -> None:
+        apply = self._the_boxes_apply()
+        cleared = False
+        for box in self._boxes.values():
+            box.setVisible(apply)
+            if not apply and box.isChecked():
+                box.setChecked(False)
+                cleared = True
+        if cleared:
+            self.checked_changed.emit()
 
     def _on_checked_changed(self) -> None:
         self.checked_changed.emit()
@@ -284,6 +301,7 @@ class Combine(QWidget):
             self.video_zone.clear()
         self.video_zone.setVisible(custom)
         self._recent_videos.setVisible(custom)
+        self._show_the_boxes_where_they_apply()
         self._sync()
 
     def _on_video_changed(self):

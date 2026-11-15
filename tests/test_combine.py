@@ -328,15 +328,73 @@ def test_the_checkbox_sits_to_the_right_of_the_action_list(qtbot):
     combine = _panel(qtbot)
     combine.resize(600, 400)
     combine.show()
-    box = combine.findChild(TickControl, combine_checkbox("third box"))
+    _pick_action(combine, "beta")
+    box = _the_box(combine)
 
     assert box.mapTo(combine, QPoint()).x() > combine._category.mapTo(combine, QPoint()).x()
     assert abs(box.mapTo(combine, QPoint()).y() - combine._category.mapTo(combine, QPoint()).y()) < (
         combine._category.height())
 
 
+def _the_box(combine):
+    return combine.findChild(TickControl, combine_checkbox("third box"))
+
+
+def test_the_checkbox_shows_only_while_kino_has_an_action_picked(qtbot):
+    combine = _panel(qtbot)
+    assert _the_box(combine).isHidden()
+
+    _pick_action(combine, "beta")
+    assert not _the_box(combine).isHidden()
+
+    _pick_lane(combine, action_settings.GENAU)
+    assert _the_box(combine).isHidden()
+
+    _pick_lane(combine, action_settings.VIDEO)
+    assert not _the_box(combine).isHidden()
+
+
+@pytest.mark.parametrize("leave", ["for genau", "for custom"])
+def test_a_checked_checkbox_is_cleared_once_it_hides(qtbot, leave):
+    combine = _panel(qtbot)
+    _pick_action(combine, "beta")
+    _the_box(combine).click()
+
+    with qtbot.waitSignal(combine.checked_changed):
+        if leave == "for genau":
+            _pick_lane(combine, action_settings.GENAU)
+        else:
+            _pick_action(combine, "")
+
+    assert combine.checked_boxes() == ()
+    assert not _the_box(combine).isChecked()
+
+
+def test_a_checkbox_handed_back_checked_where_it_is_hidden_stays_clear(qtbot):
+    combine = _panel(qtbot)
+
+    combine.set_checked_boxes(("third box",))
+
+    assert combine.checked_boxes() == ()
+
+
+def test_hiding_the_checkbox_leaves_the_action_list_as_wide_as_it_was(qtbot):
+    combine = _panel(qtbot)
+    combine.resize(600, 400)
+    combine.show()
+    _pick_action(combine, "beta")
+    width = combine._category.width()
+
+    _pick_lane(combine, action_settings.GENAU)
+    combine.layout().activate()
+    combine._action_part.layout().activate()
+
+    assert combine._category.width() == width
+
+
 def test_ticking_the_checkbox_says_so_for_the_actions_to_be_offered_again(qtbot):
     combine = _panel(qtbot)
+    _pick_action(combine, "beta")
 
     with qtbot.waitSignal(combine.checked_changed):
         combine.findChild(TickControl, combine_checkbox("third box")).click()

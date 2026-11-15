@@ -38,8 +38,7 @@ def _core() -> ReferenceSection:
             _row("pause / play everything — stops and starts the audio and the animations; "
                  "the play/pause button does the same", ("Esc",),
                  said=said_to_the_slideshow(SlideshowCommand.PAUSE)),
-            _row("open the slideshow on the image a double click would", ("Shift+Esc",),
-                 said=said_to_the_slideshow(SlideshowCommand.START)),
+            _row("open the slideshow", said=said_to_the_slideshow(SlideshowCommand.START)),
             _row("find", ("Ctrl+F",)),
             _row("back / forward", said=_said(AppCommand.BACK, AppCommand.FORWARD)),
             _row("undo / redo", ("Ctrl+Z", "Ctrl+Shift+Z"),
@@ -108,7 +107,7 @@ _SLIDESHOW_NOTE = ("Add “portrait” or “landscape” before a phrase to aim
 def _slideshow() -> ReferenceSection:
     return ReferenceSection("Slideshow", (
         ReferenceGroup("", (
-            _row("go to its item in Core", ("Enter", "Shift+Esc"),
+            _row("go to its item in Core", ("Enter",),
                  said=said_to_the_slideshow(SlideshowCommand.STOP)),
         )),
         ReferenceGroup("Navigation", (

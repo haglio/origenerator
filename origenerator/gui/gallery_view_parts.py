@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from PySide6.QtWidgets import QWidget
+
 from origenerator import gallery_names_file
 from origenerator.evolver_export import EvolverInbox
 from origenerator.gui.two_screens import TwoScreens
@@ -19,6 +21,7 @@ class Shared:
     publish_names: Callable[[dict[str, str]], None] = gallery_names_file.publish
     device_waits_for_the_window: bool = False
     two_screens: TwoScreens | None = None
+    app_title: QWidget | None = None
 
 
 NO_SHARED = Shared()

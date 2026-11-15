@@ -74,13 +74,6 @@ def test_a_filter_pressed_is_told_of_and_one_taken_up_is_not():
     assert told == [SlideshowFilters()]
 
 
-def test_original_only_keeps_what_is_not_enhanced():
-    slideshow_set, _dealt = _set(hud=HudFacts(enhanced_ids={"id-2"}))
-
-    assert slideshow_set.set_filters(SlideshowFilters(originals=True)) is True
-    assert [item.prompt_id for item in slideshow_set.playlist.items] == ["id-1", "id-3"]
-
-
 def test_images_only_and_videos_only_keep_that_kind_of_item_alone():
     slideshow_set, _dealt = _set([("one.png", "image", "id-1"), ("two.mp4", "video", "id-2"),
                                   ("three.png", "image", "id-3")])

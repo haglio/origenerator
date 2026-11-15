@@ -1155,7 +1155,7 @@ class SlideshowDirector:
 
     def play_collection(self, command) -> None:
         if command.collection_key == _FAVORITES_KEY:
-            self.toggle_favorites_filter(command.shape)
+            self.set_favorites_filter(command.shape, True)
             return
         shape = (command.shape if command.shape and self._fun_time is not None
                 else self._listing().shape)
@@ -1168,44 +1168,30 @@ class SlideshowDirector:
         self.open(items, rows=rows, location=key, shape=command.shape,
                   **self._order(command.collection_key == _LATEST_KEY))
 
-    def toggle_favorites_filter(self, shape) -> None:
+    def set_favorites_filter(self, shape, on: bool) -> None:
         slideshow = self.surface_for(shape)
         if slideshow is None:
-            self._host.say("F-mode needs a slideshow to narrow")
+            self._host.say("Favorites needs a slideshow to narrow")
             return
-        slideshow.toggle_favorites_filter()
-        self._host.say("F-mode on" if slideshow.hud_favorites_filter else "F-mode off")
+        slideshow.set_favorites_filter(on)
+        self._host.say("Favorites on" if on else "Favorites off")
 
     def clear_action_filter(self, shape: str | None = None) -> None:
         slideshow = self._slideshow_to_narrow(shape)
         if slideshow is not None:
             slideshow.action_presses.clear_filter()
 
-    def filter_enhanced(self, shape: str | None = None) -> None:
+    def set_enhanced_filter(self, shape: str | None, on: bool) -> None:
         slideshow = self._slideshow_to_narrow(shape)
         if slideshow is None:
             return
-        if slideshow.set_enhanced_mode(True) or slideshow.hud_enhanced_mode:
-            slideshow.note_voice_command(
-                f"enhanced only — {slideshow.pass_size()} to play")
+        if not on:
+            slideshow.set_enhanced_filter(False)
+            slideshow.note_voice_command("Enhanceds off")
+        elif slideshow.set_enhanced_filter(True) or slideshow.hud_enhanced_filter:
+            slideshow.note_voice_command(f"Enhanceds — {slideshow.pass_size()} to play")
         else:
             slideshow.note_voice_command("nothing here is enhanced", kind=WARNING)
-
-    def filter_originals(self, shape: str | None = None) -> None:
-        slideshow = self._slideshow_to_narrow(shape)
-        if slideshow is None:
-            return
-        if slideshow.show_originals_only() or slideshow.hud_originals_mode:
-            slideshow.note_voice_command(
-                f"original only — {slideshow.pass_size()} to play")
-        else:
-            slideshow.note_voice_command("everything here is enhanced", kind=WARNING)
-
-    def show_enhanced_and_original(self, shape: str | None = None) -> None:
-        slideshow = self._slideshow_to_narrow(shape)
-        if slideshow is not None:
-            slideshow.show_enhanced_and_original()
-            slideshow.note_voice_command("showing all of them")
 
     def _slideshow_to_narrow(self, shape: str | None):
         slideshow = self.surface_for(shape)

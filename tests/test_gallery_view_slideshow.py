@@ -478,7 +478,7 @@ def test_a_slideshow_of_enhanced_lights_enhanced_only_and_the_next_slideshow_doe
     view._tree.setCurrentItem(_collection(view, ENHANCED_KEY))
     view._slideshows.start()
     qtbot.addWidget(view._slideshows.showing.shown)
-    assert view._slideshows.showing.hud_enhanced_mode
+    assert view._slideshows.showing.hud_enhanced_filter
     view._slideshows.showing.close()
 
     _select_first_leaf(view)
@@ -486,7 +486,7 @@ def test_a_slideshow_of_enhanced_lights_enhanced_only_and_the_next_slideshow_doe
 
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
-    assert not slideshow.hud_enhanced_mode
+    assert not slideshow.hud_enhanced_filter
     assert sorted(item[2] for item in slideshow._set.playlist._items) == ["i1", "i2"]
     slideshow.close()
 
@@ -573,15 +573,15 @@ def test_the_enhanced_switch_narrows_a_slideshow_to_the_images_made_better(qtbot
     qtbot.addWidget(slideshow.shown)
     assert len(slideshow._set.playlist) == 2
 
-    slideshow.set_enhanced_mode(True)
+    slideshow.set_enhanced_filter(True)
 
     assert [item[2] for item in slideshow._set.playlist._items] == ["i2"]
-    slideshow.set_enhanced_mode(False)
+    slideshow.set_enhanced_filter(False)
     assert len(slideshow._set.playlist) == 2
     slideshow.close()
 
 
-def test_a_standalone_huds_originals_button_turned_off_narrows_the_slideshow_to_the_enhanced(
+def test_a_standalone_huds_enhanceds_button_narrows_the_slideshow_to_the_enhanced(
         qtbot, monkeypatch):
     keep_rows_on_disk(monkeypatch)
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1),
@@ -592,13 +592,13 @@ def test_a_standalone_huds_originals_button_turned_off_narrows_the_slideshow_to_
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
-    slideshow.shown.press(f"{slideshow.shown.hud_shape}_enhancement_enhanced")
+    slideshow.shown.press(f"{slideshow.shown.hud_shape}_enhanced")
 
-    assert slideshow.hud_enhanced_mode is True
+    assert slideshow.hud_enhanced_filter is True
     assert [item[2] for item in slideshow._set.playlist._items] == ["i2"]
     model = slideshow_hud_model(slideshow.shown.hud_shape, slideshow, HudPlacement(hosted=False))
     lit = {button.command: button.lit for row in model.rows for button in row}
-    assert lit[f"{slideshow.shown.hud_shape}_enhancement_none"]
+    assert lit[f"{slideshow.shown.hud_shape}_enhanced"]
     assert "Enhanceds" in model.title
     slideshow.close()
 
@@ -659,7 +659,7 @@ def test_a_generation_that_lands_unenhanced_stays_out_of_a_narrowed_slideshow(qt
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
-    slideshow.set_enhanced_mode(True)
+    slideshow.set_enhanced_filter(True)
     put_rows(view._db, [_image("i3", "a cat", 50, 3), _enhanced_image("i4", "a cat", 50, 4)])
     plain, better = view._db.get_generation("i3"), view._db.get_generation("i4")
     monkeypatch.setattr(view._slideshows, "rows_at", lambda location: [plain, better])
@@ -668,7 +668,7 @@ def test_a_generation_that_lands_unenhanced_stays_out_of_a_narrowed_slideshow(qt
     view._slideshows.note_finished(better)
 
     assert sorted(item[2] for item in slideshow._set.playlist._items) == ["i2", "i4"]
-    slideshow.show_enhanced_and_original()
+    slideshow.set_enhanced_filter(False)
     assert sorted(item[2] for item in slideshow._set.playlist._items) == ["i2", "i3", "i4"]
     slideshow.close()
 
@@ -687,13 +687,13 @@ def test_clear_filter_leaves_f_mode_and_the_enhanced_filter_on(qtbot, monkeypatc
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
     slideshow.toggle_favorites_filter()
-    slideshow.set_enhanced_mode(True)
+    slideshow.set_enhanced_filter(True)
     assert [item[2] for item in slideshow._set.playlist._items] == ["i2"]
-    assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_mode) == (True, True)
+    assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_filter) == (True, True)
 
     view._voice._run_app_command(AppCommand.FILTER_OFF)
 
-    assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_mode) == (True, True)
+    assert (slideshow.hud_favorites_filter, slideshow.hud_enhanced_filter) == (True, True)
     assert [item[2] for item in slideshow._set.playlist._items] == ["i2"]
     slideshow.close()
 
@@ -709,9 +709,9 @@ def test_filter_enhanced_turns_the_slideshows_switch_on_and_says_what_is_left(qt
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
 
-    view._voice._run_app_command(AppCommand.FILTER_ENHANCED)
+    view._voice._run_app_command(AppCommand.ENHANCED_ON)
 
-    assert slideshow.hud_enhanced_mode is True, (
+    assert slideshow.hud_enhanced_filter is True, (
         "a word that set some other filter would leave the HUD's button dark over a narrowed slideshow")
     assert "1 to play" in words(slideshow.shown._note)
     slideshow.close()
@@ -728,11 +728,11 @@ def test_clear_filter_said_over_the_enhanced_filter_says_the_action_filter_is_cl
     view._slideshows.start()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
-    view._voice._run_app_command(AppCommand.FILTER_ENHANCED)
+    view._voice._run_app_command(AppCommand.ENHANCED_ON)
 
     view._voice._run_app_command(AppCommand.FILTER_OFF)
 
-    assert slideshow.hud_enhanced_mode is True
+    assert slideshow.hud_enhanced_filter is True
     assert words(slideshow.shown._note) == "Filter: cleared (1)"
     slideshow.close()
 
@@ -747,9 +747,9 @@ def test_filter_enhanced_says_so_where_nothing_here_is_enhanced(qtbot, monkeypat
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
 
-    view._voice._run_app_command(AppCommand.FILTER_ENHANCED)
+    view._voice._run_app_command(AppCommand.ENHANCED_ON)
 
-    assert slideshow.hud_enhanced_mode is False
+    assert slideshow.hud_enhanced_filter is False
     assert "nothing here is enhanced" in words(slideshow.shown._note)
     slideshow.close()
 
@@ -761,7 +761,7 @@ def test_filter_enhanced_needs_a_slideshow_to_narrow(qtbot, monkeypatch):
     view.refresh()
     _open_latest(view)
 
-    view._voice._run_app_command(AppCommand.FILTER_ENHANCED)
+    view._voice._run_app_command(AppCommand.ENHANCED_ON)
 
     assert "needs a slideshow" in words(view._voice.status)
     assert not view._buttons.slideshow.isHidden()

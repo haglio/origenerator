@@ -179,8 +179,6 @@ class SlideshowSet:
             return False
         if filters.enhanced and prompt_id not in self.enhanced_ids:
             return False
-        if filters.originals and prompt_id in self.enhanced_ids:
-            return False
         if not filters.images and item.media_type == MediaType.IMAGE:
             return False
         if not filters.videos and item.media_type == MediaType.VIDEO:

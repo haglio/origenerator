@@ -5,7 +5,7 @@ from typing import Any
 
 from funestra.funestra_verbs import NEXT_FUNSCRIPTED
 from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
-from funestra.inclusion_pair import Included, InclusionPair, enhancement_pair, media_pair
+from funestra.inclusion_pair import Included, InclusionPair, media_pair
 from funestra.loop_cycle import ACTION, SEED
 
 from origenerator.osr2_controls_commands import FILTER
@@ -41,11 +41,17 @@ _PRESSES: dict[str, Callable[[Any], object]] = {
     "reset": _reset,
     "shuffle": lambda host: host.slideshow_order(latest=False),
     "latest": lambda host: host.slideshow_order(latest=True),
-    "fmode": lambda host: host.toggle_favorites_filter(),
-    "fmode_on": lambda host: host.set_favorites_filter(True),
-    "fmode_off": lambda host: host.set_favorites_filter(False),
+    "favorites": lambda host: host.toggle_favorites_filter(),
+    "favorites_on": lambda host: host.set_favorites_filter(True),
+    "favorites_off": lambda host: host.set_favorites_filter(False),
+    "enhanced": lambda host: host.toggle_enhanced_filter(),
+    "enhanced_on": lambda host: host.set_enhanced_filter(True),
+    "enhanced_off": lambda host: host.set_enhanced_filter(False),
+    **{f"fmode{side}": press for side, press in (
+        ("", lambda host: host.toggle_favorites_filter()),
+        ("_on", lambda host: host.set_favorites_filter(True)),
+        ("_off", lambda host: host.set_favorites_filter(False)))},
     **_inclusion_presses(media_pair(""), lambda host, kept: host.set_media(kept)),
-    **_inclusion_presses(enhancement_pair(""), lambda host, kept: host.set_enhancement(kept)),
     "seed_loop": lambda host: host.slideshow_loop("seed"),
     "action_loop": lambda host: host.slideshow_loop("action"),
     "no_loop": lambda host: host.slideshow_loop(""),

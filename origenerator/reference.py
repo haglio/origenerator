@@ -125,11 +125,11 @@ def _slideshow() -> ReferenceSection:
             _row("favorite it", said=_said(AppCommand.FAVORITE)),
         )),
         ReferenceGroup("Filter", (
-            _row("show only the enhanced ones", said=_said(AppCommand.FILTER_ENHANCED)),
+            _row("Enhanceds — show only the enhanced ones",
+                 said=_said(AppCommand.ENHANCED_ON, AppCommand.ENHANCED_OFF)),
+            _row("Favorites off — show the favorites and the rest",
+                 said=_said(AppCommand.FAVORITES_OFF)),
             _row("drop the filter", said=_said(AppCommand.FILTER_OFF)),
-            _row("show only the original ones", said=_said(AppCommand.FILTER_ORIGINALS)),
-            _row("show the enhanced and the original ones",
-                 said=_said(AppCommand.ENHANCED_AND_ORIGINAL)),
         )),
         ReferenceGroup("HUD", tuple(
             _row(f"HUD {direction}", (f"Ctrl+{arrow}", f"Ctrl+{letter}"))

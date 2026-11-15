@@ -41,7 +41,6 @@ class SlideshowFilters:
     favorites: bool = False
     enhanced: bool = False
     action: str = ""
-    originals: bool = False
     images: bool = True
     videos: bool = True
 
@@ -55,7 +54,6 @@ class SlideshowFilters:
         action = saved.get(_SAVED_FILTER_NAMES["action"])
         return cls(favorites=saved.get("favorites") is True, enhanced=saved.get("enhanced") is True,
                    action=action if isinstance(action, str) else "",
-                   originals=saved.get("originals") is True,
                    images=saved.get("images") is not False,
                    videos=saved.get("videos") is not False)
 

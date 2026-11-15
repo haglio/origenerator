@@ -58,7 +58,7 @@ def _slide(controls, along: float) -> None:
 def test_the_osr2_controls_carry_no_filter_switches_of_their_own(qtbot):
     controls, _motion = _controls(qtbot)
     controls.drawing()
-    for action in ("main_fmode", "genau_filter_enhanced"):
+    for action in ("main_favorites", "main_enhanced"):
         assert action not in [b.command for _r, b in controls._painter.buttons]
 
 

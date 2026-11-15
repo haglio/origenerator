@@ -36,7 +36,6 @@ from tests.closed_windows import is_closed
 from tests.gallery_view_support import (
     _REROLL_HISTORY,
     FakeActions,
-    _enhanced_image,
     _generating_tile,
     _image,
     _png_bytes,
@@ -48,7 +47,7 @@ from tests.gallery_view_support import (
     _will_move_on,
 )
 from tests.real_db import database_of
-from tests.slideshow_hud_support import funestra_of, open_both_shapes
+from tests.slideshow_hud_support import funestra_of
 from tests.test_slideshow_hud import _inflight
 
 
@@ -359,86 +358,6 @@ def test_close_slideshows_clears_both_regions(qtbot, tmp_path, monkeypatch):
 
 
 
-def _fill_both_regions_from_library_rows(qtbot, view, monkeypatch, tmp_path):
-    tall, wide = tmp_path / "tall.png", tmp_path / "wide.png"
-    Image.new("RGB", (100, 200)).save(tall)
-    Image.new("RGB", (200, 100)).save(wide)
-    library = {
-        "__all__::portrait": [(str(tall), "image", pid, str(tall)) for pid in ("p1", "p2")],
-        "__all__::landscape": [(str(wide), "image", pid, str(wide)) for pid in ("l1", "l2")],
-    }
-    monkeypatch.setattr(view._slideshows, "rows_at", lambda key: [
-        {**(view.row_for(item[2]) or {}), **_row_of(item)}
-        for item in library.get(key, [])])
-    monkeypatch.setattr(view._slideshows, "items_of", _items_of)
-    open_both_shapes(view)
-    slideshows = [view.region_slideshow(shape) for shape in ("portrait", "landscape")]
-    for slideshow in slideshows:
-        qtbot.addWidget(slideshow.shown)
-    return slideshows
-
-
-def _press_filter_enhanced(bridge, tmp_path):
-    (tmp_path / "origenerator_cmd.txt").write_text("FILTER_ENHANCED\n", encoding="utf-8")
-    bridge._tick()
-
-
-def test_filter_enhanced_narrows_both_regions_and_widens_them_again(
-        qtbot, tmp_path, monkeypatch):
-    view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
-        _image("p1", "a cat", 50, 1), _enhanced_image("p2", "a cat", 50, 2),
-        _image("l1", "a boat", 40, 3), _enhanced_image("l2", "a boat", 40, 4)])
-    portrait, landscape = _fill_both_regions_from_library_rows(qtbot, view, monkeypatch, tmp_path)
-
-    _press_filter_enhanced(bridge, tmp_path)
-
-    assert [slideshow.hud_enhanced_mode for slideshow in (portrait, landscape)] == [True, True]
-    assert [slideshow.pass_size() for slideshow in (portrait, landscape)] == [1, 1]
-
-    _press_filter_enhanced(bridge, tmp_path)
-
-    assert [slideshow.hud_enhanced_mode for slideshow in (portrait, landscape)] == [False, False]
-    assert [slideshow.pass_size() for slideshow in (portrait, landscape)] == [2, 2]
-
-
-def test_filter_enhanced_takes_a_split_pair_of_regions_the_same_way(
-        qtbot, tmp_path, monkeypatch):
-    view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
-        _image("p1", "a cat", 50, 1), _enhanced_image("p2", "a cat", 50, 2),
-        _image("l1", "a boat", 40, 3), _enhanced_image("l2", "a boat", 40, 4)])
-    portrait, landscape = _fill_both_regions_from_library_rows(qtbot, view, monkeypatch, tmp_path)
-    portrait.set_enhanced_mode(True)
-
-    _press_filter_enhanced(bridge, tmp_path)
-
-    assert [slideshow.hud_enhanced_mode for slideshow in (portrait, landscape)] == [False, False], (
-        "one switch in the session and two regions under it: flipped side by side they could "
-        "disagree, and one lit switch cannot say that")
-
-
-def test_filter_enhanced_leaves_a_region_with_nothing_enhanced_playing_it_all(
-        qtbot, tmp_path, monkeypatch):
-    view, bridge = _view_with_bridge(qtbot, tmp_path, rows=[
-        _image("p1", "a cat", 50, 1), _enhanced_image("p2", "a cat", 50, 2),
-        _image("l1", "a boat", 40, 3), _image("l2", "a boat", 40, 4)])
-    portrait, landscape = _fill_both_regions_from_library_rows(qtbot, view, monkeypatch, tmp_path)
-
-    _press_filter_enhanced(bridge, tmp_path)
-
-    assert [slideshow.hud_enhanced_mode for slideshow in (portrait, landscape)] == [True, False]
-    assert [slideshow.pass_size() for slideshow in (portrait, landscape)] == [1, 2]
-
-
-def test_filter_enhanced_with_no_slideshow_up_is_dropped(qtbot, tmp_path):
-    view, bridge = _view_with_bridge(qtbot, tmp_path)
-
-    _press_filter_enhanced(bridge, tmp_path)
-
-    assert not (tmp_path / "origenerator_cmd.txt").exists()
-    assert view.region_slideshow("portrait") is None
-    assert view.region_slideshow("landscape") is None
-
-
 def test_the_paused_flag_freezes_and_resumes_an_open_slideshow(qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
@@ -629,7 +548,7 @@ def test_a_funestras_filter_presses_reach_the_slideshow_on_that_side(qtbot, tmp_
     monkeypatch.setattr(view._slideshows, "_favorite_prompt_ids", lambda: {"id1"})
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
 
-    _press(bridge, tmp_path, "portrait_fmode")
+    _press(bridge, tmp_path, "portrait_favorites")
 
     assert slideshow.hud_favorites_filter is True
     assert slideshow.pass_size() == 1

@@ -16,7 +16,6 @@ from origenerator.config import RADIO_DIR
 from origenerator.fun_time_mode import (
     CLOSE_SLIDESHOWS,
     CORE_READY,
-    FILTER_ENHANCED,
     GO_TO,
     HAND_OVER,
     LOCK_HELD,
@@ -93,7 +92,6 @@ class FunTimeBridge(QObject):
         self._published: str | None = None
         self._session_verbs = {
             CLOSE_SLIDESHOWS: self._close_the_slideshows,
-            FILTER_ENHANCED: self._filter_enhanced,
             RELEASE: self._release,
             TAKE_BACK: self.take_back_asked.emit,
         }
@@ -220,13 +218,6 @@ class FunTimeBridge(QObject):
         self._timer.stop()
         self.take_the_radio_back()
         self.released.emit()
-
-    def _filter_enhanced(self) -> None:
-        slideshows = [slideshow for slideshow in map(self._gallery.region_slideshow, SHAPES)
-                      if slideshow is not None]
-        enhanced_only = not any(slideshow.hud_enhanced_mode for slideshow in slideshows)
-        for slideshow in slideshows:
-            slideshow.set_enhanced_mode(enhanced_only)
 
     def _apply_shape(self, shape: str, action: str, argument: str, line: str,
                     said_at: float | None) -> None:

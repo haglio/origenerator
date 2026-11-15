@@ -676,7 +676,7 @@ def test_a_slideshow_started_after_a_relaunch_comes_back_on_enhanced_only(
     _select_first_leaf(first._gallery_view)
     first._gallery_view._slideshows.start()
     qtbot.addWidget(first._gallery_view._slideshows.showing.shown)
-    first._gallery_view._slideshows.showing.set_enhanced_mode(True)
+    first._gallery_view._slideshows.showing.set_enhanced_filter(True)
 
     first.close()
     second = _window(qtbot, tmp_path, AppState(path))
@@ -685,7 +685,7 @@ def test_a_slideshow_started_after_a_relaunch_comes_back_on_enhanced_only(
 
     slideshow = second._gallery_view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
-    assert slideshow.hud_enhanced_mode
+    assert slideshow.hud_enhanced_filter
 
 
 def test_once_closed_the_app_hands_comfyui_the_experiments_to_run_while_away(qtbot, tmp_path):

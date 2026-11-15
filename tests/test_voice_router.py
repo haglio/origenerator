@@ -165,14 +165,11 @@ class FakeSlideshows:
     def run_slideshow_command(self, command, shape):
         self.slideshow_commands.append((command, shape))
 
-    def filter_enhanced(self, shape):
-        self.filters.append(("enhanced only", shape))
+    def set_enhanced_filter(self, shape, on):
+        self.filters.append(("enhanced" if on else "enhanced off", shape))
 
-    def filter_originals(self, shape):
-        self.filters.append(("original only", shape))
-
-    def show_enhanced_and_original(self, shape):
-        self.filters.append(("enhanced and original", shape))
+    def set_favorites_filter(self, shape, on):
+        self.filters.append(("favorites" if on else "favorites off", shape))
 
     def clear_action_filter(self, shape):
         self.filters.append(("action filter off", shape))
@@ -723,19 +720,18 @@ def test_a_collection_to_play_and_a_slideshow_command_go_to_the_slideshows(route
 def test_a_filter_word_narrows_the_slideshow_rather_than_the_gallery(router):
     voice, _host, slideshows = router()
 
-    voice.on_command(AppCommand.FILTER_ENHANCED)
+    voice.on_command(AppCommand.ENHANCED_ON)
 
-    assert slideshows.filters == [("enhanced only", None)]
+    assert slideshows.filters == [("enhanced", None)]
 
 
-def test_original_only_and_enhanced_and_original_reach_the_side_they_are_said_of(router):
+def test_enhanced_off_and_favorites_off_reach_the_side_they_are_said_of(router):
     voice, _host, slideshows = router()
 
-    voice.on_command(SurfaceCommand(AppCommand.FILTER_ORIGINALS, "portrait"))
-    voice.on_command(SurfaceCommand(AppCommand.ENHANCED_AND_ORIGINAL, "landscape"))
+    voice.on_command(SurfaceCommand(AppCommand.ENHANCED_OFF, "portrait"))
+    voice.on_command(SurfaceCommand(AppCommand.FAVORITES_OFF, "landscape"))
 
-    assert slideshows.filters == [("original only", "portrait"),
-                                  ("enhanced and original", "landscape")]
+    assert slideshows.filters == [("enhanced off", "portrait"), ("favorites off", "landscape")]
 
 
 def test_no_filter_said_of_a_side_lifts_only_that_sides_action_filter(router):
@@ -763,7 +759,7 @@ def test_enhanced_only_heard_by_the_session_narrows_the_slideshow_and_enhances_n
 
     assert voice.run_spoken_command("enhanced only") is True
 
-    assert (host.enhanced, slideshows.filters) == ([], [("enhanced only", None)]), (
+    assert (host.enhanced, slideshows.filters) == ([], [("enhanced", None)]), (
         "the words are asked as a command of their own before the looser matcher, which reads "
         "enhanced only as enhance with a word after it and spends a generation on it")
 
@@ -776,7 +772,7 @@ def test_enhancements_heard_by_the_session_narrows_the_slideshow_and_enhances_no
 
     assert voice.run_spoken_command(said) is True
 
-    assert (host.enhanced, slideshows.filters) == ([], [("enhanced only", None)])
+    assert (host.enhanced, slideshows.filters) == ([], [("enhanced", None)])
 
 
 def test_an_order_about_the_image_goes_to_the_slide_filling_the_screen(router):

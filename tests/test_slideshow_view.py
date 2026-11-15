@@ -131,14 +131,14 @@ def test_the_enhanced_switch_narrows_the_pass_and_keeps_the_slide_showing(qtbot,
     _settle(view)
     assert view.slideshow._set.playlist.current()[2] == "b"
 
-    assert view.slideshow.set_enhanced_mode(True) is True
+    assert view.slideshow.set_enhanced_filter(True) is True
 
-    assert view.slideshow.hud_enhanced_mode is True
+    assert view.slideshow.hud_enhanced_filter is True
     assert [item[2] for item in view.slideshow._set.playlist._items] == ["b", "c"]
     assert view.slideshow._set.playlist.current()[2] == "b"
 
-    assert view.slideshow.set_enhanced_mode(False) is True
-    assert view.slideshow.hud_enhanced_mode is False
+    assert view.slideshow.set_enhanced_filter(False) is True
+    assert view.slideshow.hud_enhanced_filter is False
     assert len(view.slideshow._set.playlist) == 3
     assert view.slideshow._set.playlist.current()[2] == "b", (
         "a switch is a narrowing of what the user is looking through, not a new slideshow: "
@@ -149,7 +149,7 @@ def test_a_switch_that_takes_the_slide_away_moves_to_what_is_left(qtbot, tmp_pat
     view = _view(qtbot, _named(tmp_path, "a", "b", "c"), enhanced_ids={"b", "c"})
     assert view.slideshow._set.playlist.current()[2] == "a"
 
-    view.slideshow.set_enhanced_mode(True)
+    view.slideshow.set_enhanced_filter(True)
     _settle(view)
 
     assert view.slideshow._set.playlist.current()[2] == "b"
@@ -158,9 +158,9 @@ def test_a_switch_that_takes_the_slide_away_moves_to_what_is_left(qtbot, tmp_pat
 def test_a_switch_that_would_leave_nothing_is_refused(qtbot, tmp_path):
     view = _view(qtbot, _named(tmp_path, "a", "b"))
 
-    assert view.slideshow.set_enhanced_mode(True) is False
+    assert view.slideshow.set_enhanced_filter(True) is False
 
-    assert view.slideshow.hud_enhanced_mode is False
+    assert view.slideshow.hud_enhanced_filter is False
     assert len(view.slideshow._set.playlist) == 2
 
 
@@ -171,18 +171,18 @@ def test_both_switches_together_keep_what_answers_both_and_enhanced_and_original
 
     view.slideshow.toggle_favorites_filter()
     _settle(view)
-    view.slideshow.set_enhanced_mode(True)
+    view.slideshow.set_enhanced_filter(True)
     _settle(view)
 
     assert [item[2] for item in view.slideshow._set.playlist._items] == ["b"]
-    assert view.slideshow.show_enhanced_and_original() is True
-    assert (view.slideshow.hud_favorites_filter, view.slideshow.hud_enhanced_mode) == (True, False)
+    assert view.slideshow.set_enhanced_filter(False) is True
+    assert (view.slideshow.hud_favorites_filter, view.slideshow.hud_enhanced_filter) == (True, False)
     assert len(view.slideshow._set.playlist) == 2
 
 
 def test_a_narrowed_slideshow_takes_in_only_what_passes_its_switches(qtbot, tmp_path):
     view = _view(qtbot, _named(tmp_path, "a", "b"), enhanced_ids={"a"})
-    view.slideshow.set_enhanced_mode(True)
+    view.slideshow.set_enhanced_filter(True)
     _settle(view)
 
     view.slideshow.note_added(Slide(_png(tmp_path / "c.png"), "image", "c", None))
@@ -191,14 +191,14 @@ def test_a_narrowed_slideshow_takes_in_only_what_passes_its_switches(qtbot, tmp_
     _settle(view)
 
     assert sorted(item[2] for item in view.slideshow._set.playlist._items) == ["a", "d"]
-    view.slideshow.show_enhanced_and_original()
+    view.slideshow.set_enhanced_filter(False)
     _settle(view)
     assert sorted(item[2] for item in view.slideshow._set.playlist._items) == ["a", "b", "c", "d"]
 
 
 def test_an_enhancement_landing_brings_its_item_into_an_enhanced_only_pass(qtbot, tmp_path):
     view = _view(qtbot, _named(tmp_path, "a", "b"), enhanced_ids={"a"})
-    view.slideshow.set_enhanced_mode(True)
+    view.slideshow.set_enhanced_filter(True)
     _settle(view)
     assert [item[2] for item in view.slideshow._set.playlist._items] == ["a"]
 
@@ -208,20 +208,20 @@ def test_an_enhancement_landing_brings_its_item_into_an_enhanced_only_pass(qtbot
 
     assert sorted(item[2] for item in view.slideshow._set.playlist._items) == ["a", "b"]
     assert next(item for item in view.slideshow._set.playlist._items if item[2] == "b")[0] == better
-    view.slideshow.show_enhanced_and_original()
+    view.slideshow.set_enhanced_filter(False)
     _settle(view)
     assert next(item for item in view.slideshow._set.playlist._items if item[2] == "b")[0] == better
 
 
 def test_a_culled_slide_stays_gone_when_a_switch_comes_off(qtbot, tmp_path):
     view = _view(qtbot, _named(tmp_path, "a", "b", "c"), enhanced_ids={"a", "b"})
-    view.slideshow.set_enhanced_mode(True)
+    view.slideshow.set_enhanced_filter(True)
     _settle(view)
     assert view.slideshow._set.playlist.current()[2] == "a"
 
     view.slideshow.cull()
     _settle(view)
-    view.slideshow.show_enhanced_and_original()
+    view.slideshow.set_enhanced_filter(False)
     _settle(view)
 
     assert sorted(item[2] for item in view.slideshow._set.playlist._items) == ["b", "c"]
@@ -246,21 +246,21 @@ def test_reset_drops_both_switches(qtbot, tmp_path):
                  favorite_ids={"a"}, enhanced_ids={"a"})
     view.slideshow.toggle_favorites_filter()
     _settle(view)
-    view.slideshow.set_enhanced_mode(True)
+    view.slideshow.set_enhanced_filter(True)
     _settle(view)
     assert len(view.slideshow._set.playlist) == 1
 
     view.slideshow.reset_in_place()
     _settle(view)
 
-    assert (view.slideshow.hud_favorites_filter, view.slideshow.hud_enhanced_mode) == (False, False)
+    assert (view.slideshow.hud_favorites_filter, view.slideshow.hud_enhanced_filter) == (False, False)
     assert len(view.slideshow._set.playlist) == 3
 
 
 def test_a_slideshow_following_a_running_generation_has_no_set_to_narrow(qtbot, tmp_path):
     view = _following(qtbot)
 
-    assert view.slideshow.set_enhanced_mode(True) is False
+    assert view.slideshow.set_enhanced_filter(True) is False
 
     assert view.slideshow._set.current_prompt_id() == "id-run"
     assert len(view.slideshow._set.playlist) == 1
@@ -386,7 +386,7 @@ def test_a_new_set_played_in_drops_the_switches_the_last_one_left_on(qtbot):
     assert not view.slideshow.hud_favorites_filter, (
         "the favorites filter belonged to the set it was narrowing, and carrying it over would "
         "hide most of a set nobody had narrowed")
-    assert not view.slideshow.hud_enhanced_mode
+    assert not view.slideshow.hud_enhanced_filter
 
 
 def test_culling_releases_the_lock(qtbot):
@@ -817,7 +817,7 @@ def test_enhanced_and_original_leaves_the_action_filter_on(qtbot):
     view.slideshow.action_presses.filter("beta")
     _settle(view)
 
-    assert view.slideshow.show_enhanced_and_original() is False
+    assert view.slideshow.set_enhanced_filter(False) is False
 
     assert (view.slideshow.hud_action_filter, view.slideshow.pass_size()) == ("beta", 1)
 
@@ -2196,7 +2196,7 @@ def test_a_slideshow_takes_up_each_filter_that_leaves_it_something(qtbot):
     view.slideshow.take_up(SlideshowFilters(favorites=True, enhanced=True))
     _settle(view)
 
-    assert (view.slideshow.hud_favorites_filter, view.slideshow.hud_enhanced_mode) == (True, False)
+    assert (view.slideshow.hud_favorites_filter, view.slideshow.hud_enhanced_filter) == (True, False)
     assert [item[2] for item in view.slideshow._set.playlist._items] == ["id-a"]
 
 
@@ -2206,7 +2206,7 @@ def test_a_slideshow_opened_on_an_image_keeps_it_up_under_filters_that_leave_it_
     view.slideshow.take_up(SlideshowFilters(enhanced=True), keep_the_slide=True)
     _settle(view)
 
-    assert view.slideshow.hud_enhanced_mode
+    assert view.slideshow.hud_enhanced_filter
     assert view.slideshow._set.playlist.current()[2] == "id-a"
     _press(view, Qt.Key.Key_Right)
     assert view.slideshow._set.playlist.current()[2] == "id-b"

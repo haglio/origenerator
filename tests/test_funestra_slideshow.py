@@ -683,10 +683,10 @@ def test_the_hud_this_app_publishes_is_the_slideshows_own_band(qtbot, tmp_path):
         "a set with no library under it maps the slide alone")
     assert [[button.command for button in row] for row in model.rows] == [
         ["portrait_prev", "portrait_nudge_prev", "portrait_nudge_next", "portrait_next",
-         "portrait_funscript_jump", "portrait_trash", "portrait_lock", "portrait_fmode",
+         "portrait_funscript_jump", "portrait_trash", "portrait_lock",
          "portrait_reset", "portrait_shuffle", "portrait_latest", "portrait_media_videos",
-         "portrait_media_images", "portrait_enhancement_originals",
-         "portrait_enhancement_enhanced", "portrait_cycle_version"],
+         "portrait_media_images", "portrait_enhanced",
+         "portrait_favorites", "portrait_cycle_version"],
         ["", "portrait_clip_seconds_down", "", "portrait_clip_seconds_up",
          "", "portrait_speed_down", "", "portrait_speed_up"]], (
         "the session draws the HUD on the Funestra, so this app publishes the model for it, and "
@@ -742,16 +742,6 @@ def test_reset_is_faded_while_the_slideshow_is_at_its_defaults(qtbot, tmp_path):
     slideshow.set_locked(True)
 
     assert not _band_button(slideshow, "reset").dim
-
-
-def test_reset_is_offered_under_original_only_and_turns_it_off(qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(enhanced_ids={"id-2"}))
-    slideshow.show_originals_only()
-
-    assert not _band_button(slideshow, "reset").dim
-    assert answer(slideshow, "reset")
-
-    assert (slideshow.hud_originals_mode, slideshow.pass_size()) == (False, 3)
 
 
 def test_reset_is_offered_while_the_funestra_plays_off_the_normal_speed(qtbot, tmp_path):
@@ -1069,74 +1059,20 @@ def test_a_slideshow_on_a_funestra_hands_it_the_filters_it_takes_up(qtbot, tmp_p
 
     slideshow.take_up(SlideshowFilters(enhanced=True))
 
-    assert slideshow.hud_enhanced_mode
+    assert slideshow.hud_enhanced_filter
     assert [str(item.path) for item in read_playlist(slideshow.channel.playlist)] == [
         "two.png", "three.png"]
 
 
-def test_original_only_plays_what_is_not_enhanced(qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(enhanced_ids={"id-2", "id-3"}))
-
-    assert slideshow.show_originals_only() is True
-
-    assert slideshow.hud_originals_mode
-    assert [str(item.path) for item in read_playlist(slideshow.channel.playlist)] == ["one.png"]
-
-
-def test_original_only_turns_enhanced_only_off(qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(enhanced_ids={"id-2", "id-3"}))
-    slideshow.set_enhanced_mode(True)
-
-    slideshow.show_originals_only()
-
-    assert (slideshow.hud_enhanced_mode, slideshow.hud_originals_mode) == (False, True)
-
-
-def test_enhanced_and_original_lifts_either_and_leaves_f_mode_and_the_action_filter(
-        qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of),
-                           hud=HudFacts(favorite_ids={"id-1", "id-2", "id-3"},
-                                        enhanced_ids={"id-3"}))
-    slideshow.set_favorites_filter(True)
-    slideshow.action_presses.filter("alpha")
-    for narrow in (slideshow.show_originals_only, lambda: slideshow.set_enhanced_mode(True)):
-        assert narrow() is True
-
-        assert slideshow.show_enhanced_and_original() is True
-
-        assert (slideshow.hud_enhanced_mode, slideshow.hud_originals_mode) == (False, False)
-        assert (slideshow.hud_favorites_filter, slideshow.hud_action_filter) == (True, "alpha")
-
-
-def test_the_enhanced_button_pressed_under_original_only_includes_the_enhanced_items_too(
+def test_enhanceds_plays_the_enhanced_items_alone_and_a_second_press_plays_them_all(
         qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(enhanced_ids={"id-2", "id-3"}))
-    slideshow.show_originals_only()
 
-    assert answer(slideshow, "enhancement_both")
+    assert answer(slideshow, "enhanced")
 
-    assert slideshow.hud_enhancement == (True, True)
-    assert len(read_playlist(slideshow.channel.playlist)) == 3
-
-
-def test_turning_originals_off_plays_the_enhanced_items_alone(qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(enhanced_ids={"id-2", "id-3"}))
-
-    assert answer(slideshow, "enhancement_enhanced")
-
-    assert (slideshow.hud_enhanced_mode, slideshow.hud_originals_mode) == (True, False)
-    assert slideshow.hud_enhancement == (True, False)
+    assert slideshow.hud_enhanced_filter is True
     assert [str(item.path) for item in read_playlist(slideshow.channel.playlist)] == [
         "two.png", "three.png"]
-
-
-def test_turning_enhanced_off_plays_the_originals_alone(qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(enhanced_ids={"id-2", "id-3"}))
-
-    assert answer(slideshow, "enhancement_originals")
-
-    assert slideshow.hud_enhancement == (False, True)
-    assert [str(item.path) for item in read_playlist(slideshow.channel.playlist)] == ["one.png"]
 
 
 _IMAGES_AND_A_VIDEO = [("one.png", "image", "id-1"), ("two.mp4", "video", "id-2"),
@@ -1171,16 +1107,15 @@ def test_turning_off_the_one_kind_still_included_holds_the_slide_on_screen_and_s
     assert said[-1] == "Including no other items"
 
 
-def test_each_press_of_a_pair_says_what_is_now_included(qtbot, tmp_path):
+def test_each_press_of_the_media_pair_says_what_is_now_included(qtbot, tmp_path):
     said = []
     slideshow = _slideshow(qtbot, tmp_path, _IMAGES_AND_A_VIDEO, say=_into(said),
                            hud=HudFacts(enhanced_ids={"id-2"}))
 
     answer(slideshow, "media_images")
     answer(slideshow, "media_both")
-    answer(slideshow, "enhancement_originals")
 
-    assert said == ["Images only", "Images + Videos", "Originals only"]
+    assert said == ["Images only", "Images + Videos"]
 
 
 def test_what_a_slideshow_hands_over_is_the_whole_set_standing_where_the_funestra_is(
@@ -1768,12 +1703,12 @@ def test_no_filter_lifts_the_action_filter_and_leaves_f_mode_on(qtbot, tmp_path)
 def test_no_filter_lifts_the_action_filter_and_leaves_the_enhanced_filter_on(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of),
                            hud=HudFacts(enhanced_ids={"id-2", "id-3"}))
-    slideshow.set_enhanced_mode(True)
+    slideshow.set_enhanced_filter(True)
     slideshow.action_presses.filter("beta")
 
     assert answer(slideshow, "no_filter")
 
-    assert (slideshow.hud_enhanced_mode, slideshow.hud_action_filter) == (True, "")
+    assert (slideshow.hud_enhanced_filter, slideshow.hud_action_filter) == (True, "")
     assert slideshow.pass_size() == 2
 
 

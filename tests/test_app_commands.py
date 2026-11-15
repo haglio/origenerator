@@ -143,7 +143,7 @@ def test_the_mic_can_be_shut_by_voice_but_not_opened():
 
 def test_the_enhanced_filter_answers_to_enhancements_as_well():
     for phrase in ("enhancements", "enhancements only", "filter enhancements"):
-        assert match_app_command(phrase) is AppCommand.FILTER_ENHANCED, phrase
+        assert match_app_command(phrase) is AppCommand.ENHANCED_ON, phrase
 
 
 def test_no_spoken_phrase_says_upscale():
@@ -151,18 +151,20 @@ def test_no_spoken_phrase_says_upscale():
 
 
 def test_the_slideshow_filter_is_said_either_way_round_not_toggled():
-    assert match_app_command("filter enhanced") is AppCommand.FILTER_ENHANCED, (
+    assert match_app_command("filter enhanced") is AppCommand.ENHANCED_ON, (
         "a speaker in a slideshow is not looking at the HUD to see which way it is set, and a "
         "phrase that turned the filter off half the time is one nobody could rely on")
-    assert match_app_command("enhanced only") is AppCommand.FILTER_ENHANCED
+    assert match_app_command("enhanced only") is AppCommand.ENHANCED_ON
     assert match_app_command("clear filter") is AppCommand.FILTER_OFF
     assert match_app_command("no filter") is AppCommand.FILTER_OFF
 
 
-def test_original_only_and_enhanced_and_original_are_said_as_fun_time_says_them():
-    assert match_app_command("original only") is AppCommand.FILTER_ORIGINALS
-    assert match_app_command("enhanced and original") is AppCommand.ENHANCED_AND_ORIGINAL
-    assert match_app_command("original and enhanced") is AppCommand.ENHANCED_AND_ORIGINAL
+def test_enhanced_turns_the_enhanceds_on_and_off_is_said_after_it():
+    assert match_app_command("enhanced") is AppCommand.ENHANCED_ON
+    assert match_app_command("enhanced on") is AppCommand.ENHANCED_ON
+    assert match_app_command("enhanced off") is AppCommand.ENHANCED_OFF
+    assert match_app_command("favorites off") is AppCommand.FAVORITES_OFF
+    assert match_app_command("original only") is None
 
 
 def test_marking_a_favorite_and_standing_in_the_favorites_collection_are_different_words():

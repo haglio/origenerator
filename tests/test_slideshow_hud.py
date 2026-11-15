@@ -9,7 +9,6 @@ from funestra.hud_controls import TRASH_TOOLTIP
 from funestra.hud_corners import CORNER_PLUS_OVERLAY_ID
 from funestra.hud_overlay import HUD_OVERLAY_ID
 from funestra.hud_placement import HudCorner
-from funestra.hud_title import ENHANCED_LABEL
 from funestra.satellite_hud import MARGIN
 from funestra.scrubber_bar import SCRUBBER_HEIGHT
 from funestra.testing import FakeEngine
@@ -73,27 +72,6 @@ def test_the_hud_lights_the_order_the_slideshow_is_playing_in(qtbot):
         window = _window(qtbot, [("scene one.png", "image")], hud=HudFacts(order_label=order_label))
 
         assert _lit_order(slideshow_hud_model("portrait", window.slideshow)) == lit, order_label
-
-
-def _the_enhanced_button(model):
-    return next(button for row in model.rows for button in row
-                if button.tooltip.endswith("enhanced items"))
-
-
-def test_original_only_says_originals_where_enhanceds_would_stand_and_leaves_enhanced_unlit(
-        qtbot):
-    window = _window(qtbot, [("scene one.png", "image", "id-one"),
-                             ("scene two.png", "image", "id-two")],
-                     hud=HudFacts(enhanced_ids={"id-two"}))
-    window.slideshow.set_enhanced_mode(True)
-    enhanced_only = slideshow_hud_model("portrait", window.slideshow)
-
-    window.slideshow.show_originals_only()
-    original_only = slideshow_hud_model("portrait", window.slideshow)
-
-    assert original_only.title == enhanced_only.title.replace(ENHANCED_LABEL, "Originals")
-    assert (_the_enhanced_button(enhanced_only).lit,
-            _the_enhanced_button(original_only).lit) == (True, False)
 
 
 def test_the_title_names_the_one_kind_of_item_kept_when_images_or_videos_are_left_out(qtbot):

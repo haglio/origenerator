@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from functools import cached_property
+from functools import cached_property, partial
 from pathlib import Path
 from typing import NamedTuple
 
@@ -138,7 +138,9 @@ class LibrarySnapshot:
 
     @cached_property
     def enhanced_rows(self) -> list[dict]:
-        return self._each_alone(gallery.enhanced_generations, "enhanced")
+        in_the_folder = partial(self.is_enhanced, an_upscale_counts=False)
+        return self._each_alone(
+            lambda rows: gallery.enhanced_generations(rows, in_the_folder), "enhanced")
 
     @cached_property
     def experiment_rows(self) -> list[dict]:
@@ -209,11 +211,14 @@ class LibrarySnapshot:
 
     def enhanced_ids_of(self, rows) -> set[str]:
         with one_look():
-            return {row["prompt_id"] for row in rows if self._is_enhanced(row)}
+            return {row["prompt_id"] for row in rows
+                    if self.is_enhanced(row, an_upscale_counts=True)}
 
-    def _is_enhanced(self, row: dict) -> bool:
+    def is_enhanced(self, row: dict, *, an_upscale_counts: bool) -> bool:
         if gallery.is_enhanced_row(row):
             return True
+        if not an_upscale_counts:
+            return False
         slide = self._once(self._slides, row, self._slide_of)
         return slide is not None and original_stem(slide[0]) is not None
 

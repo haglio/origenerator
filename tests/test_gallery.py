@@ -1785,7 +1785,7 @@ def test_enhanced_generations_are_the_enhanced_images_with_a_file_in_the_order_g
     rows = [_enhanced_img("i3", 3), _img("i2", "a dog", 50, 2), being_made,
             _enhanced_img("i1", 1)]
 
-    assert [row["prompt_id"] for row in enhanced_generations(rows)] == ["i3", "i1"]
+    assert [row["prompt_id"] for row in enhanced_generations(rows, is_enhanced_row)] == ["i3", "i1"]
 
 
 def _collection(*ids_and_seeds):

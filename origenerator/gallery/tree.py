@@ -7,7 +7,7 @@ from datetime import datetime
 
 from app_support.gallery_rows import source_of
 
-from origenerator.gallery.enhance import enhancement_recency, is_enhanced_row
+from origenerator.gallery.enhance import enhancement_recency
 from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.gallery.groups import (
     AllGroup,
@@ -319,8 +319,8 @@ def favorite_generations(newest_first: list[dict]) -> list[dict]:
     return [row for row in newest_first if row.get("starred") and produced_output(row)]
 
 
-def enhanced_generations(rows: list[dict]) -> list[dict]:
-    return [row for row in placeable_rows(rows) if produced_output(row) and is_enhanced_row(row)]
+def enhanced_generations(rows: list[dict], is_enhanced) -> list[dict]:
+    return [row for row in placeable_rows(rows) if produced_output(row) and is_enhanced(row)]
 
 
 def unreviewed_experiments(rows: list[dict]) -> list[dict]:

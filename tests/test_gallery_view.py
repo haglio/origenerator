@@ -123,7 +123,7 @@ from tests.test_folder_tree import _shown
 _COLLECTION_NAMES = ["Latest", "Favorites", "Enhanced", "Experiments", "Trash"]
 
 
-_COLLECTION_NAMES_OF_VIDEOS = [name for name in _COLLECTION_NAMES if name != "Enhanced"]
+_COLLECTIONS_FILLED_WITH_BOTH_KINDS = [name for name in _COLLECTION_NAMES if name != "Enhanced"]
 
 
 def _collection_names(item):
@@ -179,7 +179,7 @@ def test_every_folder_of_folders_leads_with_collections_of_its_own(qtbot):
     model, lora, source = (_at(workflow, *[0] * depth) for depth in (1, 2, 3))
 
     for folder in (_alls(view._tree)["Videos"], workflow, model, lora, source):
-        assert _collection_names(folder) == _COLLECTION_NAMES_OF_VIDEOS
+        assert _collection_names(folder) == _COLLECTION_NAMES
     assert _at(source, 0).childCount() == 0
 
 
@@ -500,7 +500,7 @@ def _both_kinds_in_every_collection():
                          ("dv", _i2v_video("dv", "styleC"))])
 
 
-@pytest.mark.parametrize("collection", _COLLECTION_NAMES_OF_VIDEOS)
+@pytest.mark.parametrize("collection", _COLLECTIONS_FILLED_WITH_BOTH_KINDS)
 def test_each_kinds_collection_lists_that_kind_alone(qtbot, collection):
     view = GalleryView(_both_kinds_in_every_collection())
     qtbot.addWidget(view)
@@ -522,7 +522,7 @@ def test_each_kinds_collections_count_that_kind_alone(qtbot):
 
     for kind in ("Images", "Videos"):
         assert [_shown(_collection_row(_alls(view._tree)[kind], name))
-                for name in _COLLECTION_NAMES_OF_VIDEOS[1:]] == [
+                for name in _COLLECTIONS_FILLED_WITH_BOTH_KINDS[1:]] == [
             "(1) Favorites", "(1) Experiments", "(1) Trash"]
 
 
@@ -1110,8 +1110,9 @@ def test_enhanced_with_nothing_enhanced_in_it_says_how_to_enhance_one(qtbot):
 
     assert view.listed_prompt_ids() == []
     assert view._scroll.widget().text() == (
-        "No enhanced images yet.\n\nEnhance one from its right-click menu or the plus "
-        "in its corner to see it here.")
+        "No enhanced images or upscaled videos yet.\n\nEnhance an image from its right-click "
+        "menu or the plus in its corner to see it here. A video shows here once Evolver has "
+        "upscaled it.")
 
 
 def test_enhanced_shows_every_enhanced_image_under_its_folder(qtbot):

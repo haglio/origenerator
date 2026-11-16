@@ -43,7 +43,6 @@ class Collection:
     rows: Callable[[object], list[dict]] | None = None
     picked_fresh: Callable[[list[dict]], list[dict]] | None = None
     shown_in: Callable[[object], bool] = lambda shape: True
-    images_only: bool = False
     marked: bool = False
     counted: bool = True
     gathers_folders: bool = False
@@ -67,11 +66,13 @@ ALL_COLLECTIONS: tuple[Collection, ...] = (
                "or favorite a folder from the list, to collect them here."),
         voice=Voice(("favorites",), said_bare=False), slideshow_filter="favorites"),
     Collection(
-        ENHANCED_KEY, ENHANCED_LABEL, "Your enhanced images", Glyph("plus", "YELLOW"),
+        ENHANCED_KEY, ENHANCED_LABEL, "Your enhanced images and upscaled videos",
+        Glyph("plus", "YELLOW"),
         rows=lambda library: library.enhanced_rows,
-        shown_in=lambda shape: bool(shape.tree_model), images_only=True, marked=True,
-        empty=("No enhanced images yet.\n\nEnhance one from its right-click menu or the plus "
-               "in its corner to see it here."),
+        shown_in=lambda shape: bool(shape.tree_model), marked=True,
+        empty=("No enhanced images or upscaled videos yet.\n\nEnhance an image from its "
+               "right-click menu or the plus in its corner to see it here. A video shows here "
+               "once Evolver has upscaled it."),
         slideshow_filter="enhanced"),
     Collection(
         EXPERIMENTS_KEY, EXPERIMENTS_LABEL, "Background experiments awaiting your review",

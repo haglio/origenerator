@@ -17,8 +17,7 @@ from origenerator.gallery.shapes import LANDSCAPE, SHAPE_LABELS, shape_holding
 from origenerator.gui import folder_icons, icons
 from origenerator.gui.folder_tree import COUNT_ROLE, DROP_KEY_ROLE, RECENT_ROLE, TREE_KEY_ROLE
 from origenerator.gui.split_folder_tree import SplitFolderTree
-from origenerator.item_shape import base_of, key_holds, shape_of, shaped_key, split_key
-from origenerator.media import MediaType
+from origenerator.item_shape import base_of, shape_of, shaped_key, split_key
 
 GROUP_ROLE = Qt.ItemDataRole.UserRole
 _RECENT_TIP = " · worked in recently"
@@ -62,10 +61,8 @@ def _inside(group, inside: tuple) -> tuple:
     return (*inside, group.key) if inside else ()
 
 
-def _shown_collections(shape, folder_key: str) -> list:
-    of_videos = key_holds(MediaType.VIDEO, folder_key)
-    return [shown for shown in all_collections()
-            if shown.shown_in(shape) and not (shown.images_only and of_videos)]
+def _shown_collections(shape) -> list:
+    return [shown for shown in all_collections() if shown.shown_in(shape)]
 
 
 @dataclass
@@ -136,7 +133,7 @@ class GalleryTree:
             self._add_children(custom, row, shape, (custom.key,))
 
     def _add_collections(self, folder_item, shape, folder_key: str, inside=()) -> None:
-        for shown in _shown_collections(shape, folder_key):
+        for shown in _shown_collections(shape):
             key = FolderCollection(shown.key, folder_key).key
             item = QTreeWidgetItem([shown.label])
             item.setData(0, COUNT_ROLE, shape.collection_counts.get(key, 0))

@@ -1,6 +1,7 @@
 import pytest
 
 from origenerator.db import Database, NewGeneration
+from origenerator.generation_state import GenerationSource
 
 
 def _video(tmp_path):
@@ -77,3 +78,24 @@ def test_a_write_to_the_gallery_tells_whoever_asked_and_a_read_tells_no_one(tmp_
     db.set_watch_counts("vid-001", {"completions": 1})
 
     assert (reads, told) == ([], ["changed"])
+
+
+@pytest.mark.parametrize("source", [GenerationSource.REPLACED, GenerationSource.LEFT_OUT])
+def test_a_replaced_or_left_out_row_is_left_out_of_the_listing_yet_found_by_its_id(
+        tmp_path, source):
+    db = _video(tmp_path)
+    db.insert_generation(NewGeneration(
+        prompt_id="vid-002", workflow_name="wan22_i2v", workflow_version="v1",
+        params_json="{}", workflow_json="{}", source=source))
+
+    assert ([row["prompt_id"] for row in db.list_generations()],
+            db.get_generation("vid-002")["source"]) == (["vid-001"], source)
+
+
+def test_a_row_read_out_of_the_gallery_is_a_copy_so_changing_it_writes_nothing(tmp_path):
+    db = _video(tmp_path)
+
+    db.get_generation("vid-001")["status"] = "completed"
+    db.list_generations()[0]["status"] = "completed"
+
+    assert db.get_generation("vid-001")["status"] == "pending"

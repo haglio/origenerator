@@ -808,8 +808,8 @@ def test_a_tick_that_learns_when_an_upscale_was_filed_reorders_latest_by_it(qtbo
 
     view._poll()
 
-    assert view._library.recent_rows[0]["prompt_id"] == "i1"
-    assert view._library.recent_rows[0]["evolver_upscaled_at"] == "2099-01-01T00:00:00+00:00"
+    assert view.library.reading.recent_rows[0]["prompt_id"] == "i1"
+    assert view.library.reading.recent_rows[0]["evolver_upscaled_at"] == "2099-01-01T00:00:00+00:00"
 
 
 def test_a_reading_of_the_library_taken_before_a_star_does_not_take_it_back(qtbot,

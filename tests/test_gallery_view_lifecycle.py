@@ -189,10 +189,10 @@ def test_a_tick_asks_comfyui_only_inside_the_read_it_hands_off(qtbot, tmp_path):
 def test_a_listing_that_could_not_be_read_draws_nothing_and_leaves_the_next_tick_free(qtbot):
     view = _gallery(qtbot)
     view.refresh()
-    drawn = view._drawn_version
+    drawn = view.library.drawn_version
     view.off_thread = lambda work, done: done(None)
 
     view._poll()
 
-    assert view._drawn_version == drawn
+    assert view.library.drawn_version == drawn
     assert view._poll_inflight is False

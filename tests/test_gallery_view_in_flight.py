@@ -1482,7 +1482,7 @@ def test_clicking_a_queue_row_opens_that_jobs_folder(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     folder = gallery.settings_folder_key(
-        db.get_generation("gen1"), gallery.build_image_config_index(view._image_rows))
+        db.get_generation("gen1"), gallery.build_image_config_index(view.library.reading.image_rows))
     view._select_reroll = MagicMock()
 
     view.job_queue.items()[0].reveal()
@@ -1733,7 +1733,7 @@ def test_the_first_run_of_new_settings_has_no_folder_to_show(qtbot):
 def _running_folder_key(view):
     return gallery.settings_folder_key(
         view._db.get_generation("rr1"),
-        gallery.build_image_config_index(view._image_rows),
+        gallery.build_image_config_index(view.library.reading.image_rows),
     )
 
 
@@ -2670,7 +2670,7 @@ def test_a_run_in_a_folder_the_tree_has_not_drawn_yet_is_gone_to_all_the_same(qt
     view.refresh()
     put_rows(db, [_running_row("gen1", prompt="a dog")])
     folder = gallery.settings_folder_key(
-        db.get_generation("gen1"), gallery.build_image_config_index(view._image_rows))
+        db.get_generation("gen1"), gallery.build_image_config_index(view.library.reading.image_rows))
 
     view._reveal_reroll(folder)
 
@@ -2704,7 +2704,7 @@ def test_a_run_no_tab_launched_lands_in_the_front_tab_when_it_stands_on_that_fol
     key = _select_first_leaf(view)
     front = view._generate_pane.current_generate_tab()
     view._generate_pane.pin_tab(front)
-    view._jobs.start_reroll(key, view.group_for_key(key), view._image_rows)
+    view._jobs.start_reroll(key, view.group_for_key(key), view.library.reading.image_rows)
     count = view._generate_pane.count()
 
     view._select_reroll(key)

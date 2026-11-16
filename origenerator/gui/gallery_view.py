@@ -180,7 +180,7 @@ from origenerator.item_shape import (
 from origenerator.item_shape import (
     split_key as _split_collection_key,
 )
-from origenerator.library_views import LibrarySnapshot
+from origenerator.library_readings import LibraryReadings, arrived, read_whole
 from origenerator.prompt_tokens import boxed_as_typed
 from origenerator.published_actions import give_the_launch_its_actions
 from origenerator.radio import OrigeneratorRadio
@@ -288,7 +288,6 @@ class GalleryView(QWidget):
         self._db = db
         self._prompt_heights = shared.prompt_heights
         self._inbox = shared.inbox or evolver_export.default_inbox()
-        self._publish_names = shared.publish_names
         self._client = client
         self._fun_time = fun_time
         self._radio = shared.radio if shared.radio is not None else OrigeneratorRadio()
@@ -298,7 +297,8 @@ class GalleryView(QWidget):
             waits_for_the_window=shared.device_waits_for_the_window, parent=self)
         self._pace = SlideshowPace(parent=self)
         self._build_the_queue_of_runs(db, client)
-        self._forget_the_listing()
+        self._item_names = ItemNames(db)
+        self.library = LibraryReadings(db, self._item_names, shared.publish_names)
         self._build_the_panes(db, client)
         self._edits = actions or GalleryEdits(
             db, OUTPUT_PLACES, Trash(TRASH_DIR),
@@ -366,34 +366,16 @@ class GalleryView(QWidget):
         self._selected_reroll_key: str | None = None
         self._generating_tile: GeneratingTile | None = None
 
-    def _forget_the_listing(self):
-        self._library = LibrarySnapshot([])
-        self._live_ids: set[str] = set()
-        self._listed_requests: list[dict] = []
-
-    @property
-    def _image_rows(self) -> list[dict]:
-        return self._library.image_rows
-
-    @property
-    def _listed_rows(self) -> list[dict]:
-        return self._library.rows
-
-    @property
-    def _held_rows(self) -> list[dict]:
-        return self._library.held_rows
-
     def _build_the_panes(self, db, client):
         self._build_the_toc()
         self._search = GallerySearchController(self, parent=self)
         self._selected_row: dict | None = None
-        self._item_names = ItemNames(db)
         self._scroll = GalleryPaneScrollArea()
         DropTarget(self._scroll, self._landing_in_the_open_custom_collection, self._on_dropped)
         self._gallery_pane = GalleryPane(
             self._scroll, db, self._jobs, self._populate,
             PaneHost(
-                image_rows=lambda: self._image_rows,
+                image_rows=lambda: self.library.reading.image_rows,
                 animated_preview=self.animated_preview,
                 enhancing=lambda: self._enhance,
                 experiments_enabled=self.experiments_enabled,
@@ -421,15 +403,9 @@ class GalleryView(QWidget):
         self._gallery_pane.trash_action_triggered.connect(self._on_trash_action)
         self._gallery_pane.cancel_requested.connect(self._cancel_job)
         self._gallery_pane.selection_changed.connect(self._re_aim_every_button)
-        self._fingerprint = (None, None)
-        self._folder_meta: dict = {}
-        self._drawn_version = 0
         self._pending_key: str | None = None
         self._pending_selection: str | None = None
         self._pending_combine_key: str | None = None
-        self._custom_collections: list = []
-        self._custom_collections_by_shape: dict[str, list] = {}
-        self._lists_built_from = None
         self._selection_group = None
         self._navigation = NavigationController(self, search=self._search)
         self._trail = (False, False)
@@ -437,11 +413,11 @@ class GalleryView(QWidget):
         self.job_queue = ShownJobQueue(
             self._jobs, client, starting=self._starting,
             in_flight=self._gallery_pane.inflight_items,
-            listed=lambda: (self._listed_rows, self._listed_requests), asks_over=self)
+            listed=lambda: (self.library.reading.rows, self.library.requests), asks_over=self)
         self._slideshows = SlideshowDirector(
             self,
             DirectorSources.of_this_library(db=db, jobs=self._jobs, names=self._item_names,
-                                            library=lambda: self._library, listing=self.listing),
+                                            library=lambda: self.library.reading, listing=self.listing),
             DirectorSurroundings(
                 pace=self._pace, motion=self.osr2.motion, osr2=self.osr2,
                 job_queue=self.job_queue, fun_time=self._fun_time,
@@ -910,12 +886,8 @@ class GalleryView(QWidget):
         super().closeEvent(event)
 
     def refresh(self, *, only_if_moved: bool = False):
-        rows = self._db.list_generations()
-        meta = self._db.folder_meta_map()
-        fingerprint = _fingerprint(rows, meta)
-        moved = fingerprint != self._fingerprint
-        self._fingerprint = fingerprint
-        if moved or not only_if_moved:
+        rows, meta = self.library.read()
+        if self.library.moved_to(rows, meta) or not only_if_moved:
             self._rebuild(rows, meta)
             self._slideshows.library_moved()
         self._slideshows.fill_the_wanted_regions()
@@ -940,29 +912,22 @@ class GalleryView(QWidget):
             self._poll_inflight = False
             raise
         db = self._db
+        read_at = self.library.drawn_version
+        self.off_thread(lambda: read_whole(db),
+                        lambda read: self._finish_poll_rebuild(read, read_at))
 
-        def read_listing():
-            rows = db.list_generations()
-            meta = db.folder_meta_map()
-            return rows, meta, db.list_requests(), _fingerprint(rows, meta)
-
-        read_at = self._drawn_version
-        self.off_thread(read_listing,
-                        lambda listing: self._finish_poll_rebuild(listing, read_at))
-
-    def _finish_poll_rebuild(self, listing, read_at: int):
+    def _finish_poll_rebuild(self, read, read_at: int):
         try:
-            if listing is None:
+            if read is None:
                 return
-            rows, meta, requests, fingerprint = listing
-            if fingerprint != self._fingerprint and read_at == self._drawn_version:
-                self._fingerprint = fingerprint
-                listed_before = self._library.rows
-                self._rebuild(rows, meta)
-                self._slideshows.note_arrived(_arrived(self._library.rows, listed_before))
+            if self.library.is_news(read, read_at):
+                listed_before = self.library.reading.rows
+                self._rebuild(read.rows, read.meta)
+                self._slideshows.note_arrived(arrived(self.library.reading.rows, listed_before))
             else:
-                self._gallery_pane.refresh_inflight(rows=rows, requests=requests)
-            self.job_queue.update(self.job_queue.items(rows=rows, requests=requests))
+                self._gallery_pane.refresh_inflight(rows=read.rows, requests=read.requests)
+            self.job_queue.update(
+                self.job_queue.items(rows=read.rows, requests=read.requests))
             self._enhance.tell_the_slideshows()
             self._refresh_wait_note()
         finally:
@@ -976,8 +941,6 @@ class GalleryView(QWidget):
         self.job_queue.take_foreign(facts.foreign)
 
     def _rebuild(self, rows, meta):
-        self._folder_meta = meta
-        self._drawn_version += 1
         standing = self.toc.selected_folder_key()
         place = self._gallery_pane.place()
         selected_key = standing or self._pending_key
@@ -989,18 +952,13 @@ class GalleryView(QWidget):
         self._pending_key = self._pending_selection = None
         self._combine.offer_the_actions(rows)
         trash_collection.settle_regenerations(self._db)
-        library = self._library = self._reading_of(rows, meta)
+        library = self.library.take(rows, meta, self._tree.shapes)
         rows = library.rows
         trees = {shape: library.tree(shape) for shape in self._tree.shapes}
-        self._live_ids = {row["prompt_id"] for row in rows}
-        self._custom_collections_by_shape = {shape: library.custom_collections(shape)
-                                             for shape in self._tree.shapes}
-        self._custom_collections = [folder for folders in self._custom_collections_by_shape.values()
-                                for folder in folders]
-        self._search.index.update(rows + self._held_rows, gallery.named_folders(
+        self._search.index.update(rows + library.held_rows, gallery.named_folders(
             [folder for tree in trees.values() for folder in tree], meta,
-            self._custom_collections), item_name=self._item_names.of)
-        requests = self._listed_requests = self._db.list_requests()
+            self.library.customs), item_name=self._item_names.of)
+        requests = self.library.requests
         self._gallery_pane.set_model(library)
         self.toc.populate(
             self._build_sides(trees), folder_meta=meta,
@@ -1008,7 +966,7 @@ class GalleryView(QWidget):
         )
         self._selection_group = None
         self._selected_row = None
-        self._generate_pane.reconcile_previews(self._live_ids)
+        self._generate_pane.reconcile_previews(self.library.live_ids)
         self._generate_pane.reread_names()
         self._combine.reread_names()
         target = (self.toc.item_for(selected_key) if selected_key
@@ -1034,26 +992,11 @@ class GalleryView(QWidget):
             tab.refresh_generate_caption()
         self._folder_switches.take_in_the_arrivals()
 
-    def _reading_of(self, rows, meta) -> LibrarySnapshot:
-        state = _fingerprint(rows, meta)
-        unmoved = state == self._lists_built_from
-        library = LibrarySnapshot(rows, trash_collection.trash_items(self._db.list_trashed()),
-                                  folder_meta=meta, name_of=self._item_names.of,
-                                  custom_collections=self._db.list_custom_collections(),
-                                  previous=self._library,
-                                  names_version=lambda: self._item_names.version)
-        if not unmoved:
-            self._lists_built_from = state
-            self._item_names.take(library.rows, library.held_rows, library.image_index,
-                                  library.readings)
-            self._publish_names(self._item_names.by_file(library.rows))
-        return library
-
     def _build_sides(self, trees):
         return [ShapeModel(
             shape=shape,
             tree_model=trees[shape],
-            custom_collections=gallery.outermost(self._custom_collections_by_shape[shape]),
+            custom_collections=gallery.outermost(self.library.customs_by_shape[shape]),
             show_latest=bool(trees[shape]),
             collection_counts=self._gallery_pane.collection_counts(shape),
         ) for shape in self._tree.shapes]
@@ -1105,7 +1048,7 @@ class GalleryView(QWidget):
 
 
     def image_config_index(self) -> dict:
-        return self._library.image_index
+        return self.library.reading.image_index
 
     def name_search_on_screen(self, query: str, scope: _SearchScope) -> None:
         self._folder_path.show_search(f"Search: “{query}” in ", scope.steps)
@@ -1170,7 +1113,7 @@ class GalleryView(QWidget):
                             {row["prompt_id"] for row in gallery.rows_under(group)})
 
     def everything_scope(self) -> _SearchScope:
-        return _SearchScope((PathStep(gallery.ALL_LABEL, None),), self._live_ids)
+        return _SearchScope((PathStep(gallery.ALL_LABEL, None),), self.library.live_ids)
 
     def search_sort(self) -> str:
         return self._search.sort()
@@ -1587,7 +1530,7 @@ class GalleryView(QWidget):
             self._jobs.start_prepared(key, workflow,
                                       randomize_seeds(params, workflow.seed_keys()))
         else:
-            self._jobs.start_reroll(key, self.group_for_key(key), self._image_rows)
+            self._jobs.start_reroll(key, self.group_for_key(key), self.library.reading.image_rows)
         self._claim_launch(key)
         if not from_populate:
             self._select_reroll(key)
@@ -1803,13 +1746,13 @@ class GalleryView(QWidget):
         return group
 
     def leaf_folders(self) -> dict[str, list[dict]]:
-        return self._library.leaf_folders(self._tree.shapes)
+        return self.library.reading.leaf_folders(self._tree.shapes)
 
     def highest_id_listed(self) -> int:
-        return self._library.highest_id
+        return self.library.reading.highest_id
 
     def folder_meta(self) -> dict[str, dict]:
-        return self._folder_meta
+        return self.library.folder_meta
 
     def _switch_the_open_folders_favorite(self, on: bool):
         leaf = self.open_leaf_folder()
@@ -1877,7 +1820,7 @@ class GalleryView(QWidget):
         self.refresh()
         updated = self._db.get_generation(prompt_id)
         if updated is not None:
-            self._generate_pane.refresh_displayed(updated, self._image_rows)
+            self._generate_pane.refresh_displayed(updated, self.library.reading.image_rows)
             self._slideshows.note_versions_deleted(updated)
 
     def slideshow_location(self):
@@ -1932,7 +1875,7 @@ class GalleryView(QWidget):
         if which == REROLL_VIDEO:
             self._jobs.reroll_video_seed(key, row)
         else:
-            self._jobs.reroll_image_seed(key, row, self._image_rows)
+            self._jobs.reroll_image_seed(key, row, self.library.reading.image_rows)
         self._select_reroll(key)
 
     def off_thread(self, work, done):
@@ -1960,7 +1903,7 @@ class GalleryView(QWidget):
         return self._enhance.fix_parts(prompt_id, parts)
 
     def image_rows(self) -> list[dict]:
-        return self._image_rows
+        return self.library.reading.image_rows
 
     def tell(self, title: str, message: str) -> None:
         QMessageBox.information(self, title, message)
@@ -2112,7 +2055,7 @@ class GalleryView(QWidget):
         self._slideshows.note_finished(finished_row)
         self._show_reroll_result_in_tab(finished_row, launcher)
         if folded:
-            self._generate_pane.refresh_displayed(finished_row, self._image_rows)
+            self._generate_pane.refresh_displayed(finished_row, self.library.reading.image_rows)
         self._show_landed_to_watchers(key, finished_row, launcher)
         if key == self._pending_combine_key:
             self._pending_combine_key = None
@@ -2127,7 +2070,7 @@ class GalleryView(QWidget):
     def _show_reroll_result_in_tab(self, finished_row: dict | None, launcher):
         if launcher is not None and finished_row is not None \
                 and gallery.produced_output(finished_row):
-            launcher.show_completed_result(finished_row, self._image_rows)
+            launcher.show_completed_result(finished_row, self.library.reading.image_rows)
 
     def _show_landed_to_watchers(self, key: str, finished_row: dict | None, launcher):
         if finished_row is None or not gallery.produced_output(finished_row):
@@ -2255,12 +2198,12 @@ class GalleryView(QWidget):
         for pid in prompt_ids:
             self._db.set_generation_favorite(pid, favorite)
         ids = set(prompt_ids)
-        for row in self._listed_rows:
+        for row in self.library.reading.rows:
             if row["prompt_id"] in ids:
                 row["starred"] = 1 if favorite else 0
         if not self._redrew_the_favorites_collection():
             self._gallery_pane.refresh_corners()
-        self._generate_pane.reconcile_previews(self._live_ids)
+        self._generate_pane.reconcile_previews(self.library.live_ids)
         if ids & self._gallery_pane.selected_ids:
             self._re_aim_every_button()
 
@@ -2509,7 +2452,7 @@ class GalleryView(QWidget):
 
     def _add_to_folder_menu(self, menu: QMenu, key: str) -> dict:
         shape = _shape_of(key) or self.toc.shape_in_view()
-        targets = [f for f in self._custom_collections_by_shape.get(shape, ())
+        targets = [f for f in self.library.customs_by_shape.get(shape, ())
                    if not any(m.key == _base_of(key) for m in gallery.child_groups(f))]
         if not targets:
             return {}
@@ -2540,9 +2483,7 @@ class GalleryView(QWidget):
         if not self._folder_switches.set_favorite(key, favorite):
             return
         self.toc.mark_favorite(key, favorite)
-        self._fingerprint = (self._fingerprint[0],
-                             _folder_meta_fingerprint(self._folder_meta))
-        self._drawn_version += 1
+        self.library.folder_meta_edited()
         if not self._redrew_the_favorites_collection():
             self._gallery_pane.mark_folder_favorite(key, favorite)
         if favorite:
@@ -2556,10 +2497,7 @@ class GalleryView(QWidget):
             self._delete_folders([group])
 
     def row_for(self, prompt_id: str) -> dict | None:
-        row = self._db.get_generation(prompt_id)
-        if row:
-            return row
-        return next((r for r in self._held_rows if r["prompt_id"] == prompt_id), None)
+        return self.library.row_for(prompt_id)
 
     def _on_thumbnail_clicked(self, prompt_id: str):
         if not self._show_generation(prompt_id):
@@ -2571,7 +2509,7 @@ class GalleryView(QWidget):
         if not row:
             return False
         self._select_saved_generation(row)
-        self._generate_pane.load_selection(row, self._image_rows)
+        self._generate_pane.load_selection(row, self.library.reading.image_rows)
         return True
 
     def _select_saved_generation(self, row: dict):
@@ -2598,7 +2536,7 @@ class GalleryView(QWidget):
         self.follow_link(prompt_id)
 
     def _go_to_generation(self, prompt_id: str):
-        prompt_id = gallery.landing_for(prompt_id, self._listed_rows, self.image_config_index())
+        prompt_id = gallery.landing_for(prompt_id, self.library.reading.rows, self.image_config_index())
         item = self._folder_row_for(prompt_id)
         if item is not None:
             with self._navigation.off_the_record():
@@ -2674,26 +2612,3 @@ def _fetch_poll_facts(client, targets) -> _PollFacts:
     return _PollFacts(histories, backlogs, read_foreign_queue(client), executing)
 
 
-def _fingerprint(rows, meta) -> tuple[int, int]:
-    return _rows_fingerprint(rows), _folder_meta_fingerprint(meta)
-
-
-def _rows_fingerprint(rows) -> int:
-    return hash(tuple(
-        (r.get("prompt_id"), r.get("status"), r.get("thumbnail_path"),
-         r.get("workflow_name"), r.get("params_json"), r.get("output_files"),
-         r.get("evolver_upscale"), r.get("evolver_upscaled_at"))
-        for r in rows
-    ))
-
-
-def _arrived(rows, before) -> list[dict]:
-    upscale_before = {row["prompt_id"]: row.get("evolver_upscale") for row in before}
-    return [row for row in rows if row["prompt_id"] not in upscale_before
-            or upscale_before[row["prompt_id"]] != row.get("evolver_upscale")]
-
-
-def _folder_meta_fingerprint(meta) -> int:
-    return hash(tuple(sorted(
-        (k, v.get("custom_name"), v.get("starred")) for k, v in meta.items()
-    )))

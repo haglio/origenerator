@@ -266,7 +266,7 @@ def test_every_sides_latest_leads_with_the_runs_in_flight_it_holds(qtbot, shape)
     view = _view_of_runs(qtbot)
     _drawing(view, shape)
 
-    view._tree.setCurrentItem(view._item_by_key[shaped_key(LATEST_KEY, shape)])
+    view._tree.setCurrentItem(view.toc.item_by_key[shaped_key(LATEST_KEY, shape)])
 
     assert set(view._gallery_pane._inflight_tiles) == {
         run for run, of_item in _RUNS.items() if shape_holds(shape, of_item)}
@@ -285,12 +285,12 @@ def test_a_folder_shows_its_waiting_runs_whichever_latest_was_opened_before_it(
     qtbot.addWidget(view)
     view.refresh()
     _drawing(view, opened_first)
-    view._tree.setCurrentItem(view._item_by_key[shaped_key(LATEST_KEY, opened_first)])
+    view._tree.setCurrentItem(view.toc.item_by_key[shaped_key(LATEST_KEY, opened_first)])
     holding_the_folder = next(shape for shape in view._tree.shapes
                               if shape_holds(shape, PORTRAIT))
     folder = gallery.settings_folder_key(finished, gallery.build_image_config_index([finished]))
 
-    view._tree.setCurrentItem(view._item_by_key[shaped_key(folder, holding_the_folder)])
+    view._tree.setCurrentItem(view.toc.item_by_key[shaped_key(folder, holding_the_folder)])
 
     assert set(view._gallery_pane._inflight_tiles) == {"t2", "t3"}
 
@@ -431,12 +431,12 @@ def test_a_folder_open_on_together_is_open_again_after_a_turn_on_separate(qtbot,
     view.refresh()
     view._tree.together_button.click()
     folder = shaped_key("image/sdxl_t2i", BOTH)
-    view._tree_item_for(folder).setExpanded(True)
+    view.toc.item_for(folder).setExpanded(True)
 
     view._tree.separate_button.click()
     view._tree.together_button.click()
 
-    assert view._tree_item_for(folder).isExpanded()
+    assert view.toc.item_for(folder).isExpanded()
 
 
 def test_each_half_is_labelled_where_the_label_cannot_scroll_away(qtbot, tmp_path):
@@ -594,8 +594,8 @@ def test_picking_in_one_half_lets_the_other_go(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    portrait_all = view._item_by_key[shaped_key("__all__", "portrait")]
-    landscape_all = view._item_by_key[shaped_key("__all__", "landscape")]
+    portrait_all = view.toc.item_by_key[shaped_key("__all__", "portrait")]
+    landscape_all = view.toc.item_by_key[shaped_key("__all__", "landscape")]
     view._tree.setCurrentItem(portrait_all)
     assert view.selected_folder_key() == shaped_key("__all__", "portrait")
 
@@ -612,8 +612,8 @@ def _view_with_a_row_on_each_side(qtbot, tmp_path):
     view = GalleryView(database_of([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()
-    return (view, view._item_by_key[shaped_key("__all__", "portrait")],
-            view._item_by_key[shaped_key("__all__", "landscape")])
+    return (view, view.toc.item_by_key[shaped_key("__all__", "portrait")],
+            view.toc.item_by_key[shaped_key("__all__", "landscape")])
 
 
 def test_the_half_that_lets_go_when_the_other_is_picked_reports_no_change_of_its_own(qtbot, tmp_path):
@@ -663,7 +663,7 @@ def test_a_collection_belongs_to_one_side(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(view._item_by_key[shaped_key(LATEST_KEY, "portrait")])
+    view._tree.setCurrentItem(view.toc.item_by_key[shaped_key(LATEST_KEY, "portrait")])
 
     assert view._gallery_pane.listed_prompt_ids() == ["t1"]
     assert [row["prompt_id"] for row in view.rows_to_play()] == ["t1"]
@@ -680,7 +680,7 @@ def test_favorites_collects_the_favorites_of_its_own_side(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(view._item_by_key[shaped_key(FAVORITES_KEY, "landscape")])
+    view._tree.setCurrentItem(view.toc.item_by_key[shaped_key(FAVORITES_KEY, "landscape")])
 
     assert view._gallery_pane.listed_prompt_ids() == ["w1"]
     assert [row["prompt_id"] for row in view.rows_to_play()] == ["w1"]
@@ -698,9 +698,9 @@ def test_the_trash_collection_splits_too(qtbot, tmp_path):
 
     assert sorted(held["prompt_id"] for held in view._held_rows) == ["t1", "w1"]
     for shape in ("portrait", "landscape"):
-        assert _shown(view._item_by_key[shaped_key(TRASH_KEY, shape)]) == f"(1) {TRASH_LABEL}"
+        assert _shown(view.toc.item_by_key[shaped_key(TRASH_KEY, shape)]) == f"(1) {TRASH_LABEL}"
 
-    view._tree.setCurrentItem(view._item_by_key[shaped_key(TRASH_KEY, "portrait")])
+    view._tree.setCurrentItem(view.toc.item_by_key[shaped_key(TRASH_KEY, "portrait")])
     assert view._current_collection_key() == shaped_key(TRASH_KEY, "portrait")
     assert view.listed_prompt_ids() == ["t1"]
 
@@ -716,8 +716,8 @@ def test_a_side_counts_only_its_own_waiting_work(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert _shown(view._item_by_key[shaped_key(EXPERIMENTS_KEY, "portrait")]) == "(1) Experiments"
-    assert _shown(view._item_by_key[shaped_key(EXPERIMENTS_KEY, "landscape")]) == "(2) Experiments"
+    assert _shown(view.toc.item_by_key[shaped_key(EXPERIMENTS_KEY, "portrait")]) == "(1) Experiments"
+    assert _shown(view.toc.item_by_key[shaped_key(EXPERIMENTS_KEY, "landscape")]) == "(2) Experiments"
 
 
 def test_each_half_scrolls_on_its_own(qtbot, tmp_path):
@@ -738,7 +738,7 @@ def test_a_folder_holding_both_shapes_is_drawn_on_both_sides(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    drawn = view._tree_view.keys_for_folder("image/sdxl_t2i")
+    drawn = view.toc.keys_for_folder("image/sdxl_t2i")
     assert drawn == [shaped_key("image/sdxl_t2i", "portrait"),
                      shaped_key("image/sdxl_t2i", "landscape")]
     for key, expected in zip(drawn, (["t1"], ["w1"]), strict=True):
@@ -760,7 +760,7 @@ def test_a_slideshow_goes_to_the_region_its_side_names(qtbot, tmp_path):
         return stub
 
     view._slideshows.open = record
-    view._tree.setCurrentItem(view._item_by_key[shaped_key(LATEST_KEY, "portrait")])
+    view._tree.setCurrentItem(view.toc.item_by_key[shaped_key(LATEST_KEY, "portrait")])
     view._slideshows.start()
 
     assert opened
@@ -777,5 +777,5 @@ def test_a_regions_base_state_is_its_side_of_the_library(qtbot, tmp_path):
 
     for shape, expected in (("portrait", ["t1"]), ("landscape", ["w1"])):
         key = view._slideshows.base_location(shape)
-        assert key in view._item_by_key
+        assert key in view.toc.item_by_key
         assert [row["prompt_id"] for row in view._slideshows.rows_at(key)] == expected

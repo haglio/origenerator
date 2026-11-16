@@ -72,7 +72,7 @@ def test_the_enhance_panes_button_lives_on_but_goes_dark_with_nothing_awaiting(q
                          output_files=json.dumps([{"filename": "image_enhance_e0.png"}]))
     view.refresh()
     key = gallery.settings_folder_key(db.get_generation("g0"))
-    view._tree.setCurrentItem(view._tree_item_for(key))
+    view._tree.setCurrentItem(view.toc.item_for(key))
     assert not view._enhance.pane._enhance_button.isHidden(), (
         "a button that vanishes is one the user has to go looking for")
     assert not view._enhance.pane._enhance_button.isEnabled()

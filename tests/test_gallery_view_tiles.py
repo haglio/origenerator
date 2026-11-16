@@ -163,7 +163,7 @@ def test_go_to_folder_is_left_off_inside_the_items_own_folder(qtbot, monkeypatch
     view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     labels = []
     _menu_labels(monkeypatch, labels)
 
@@ -177,7 +177,7 @@ def test_enhance_is_grayed_for_an_image_that_already_has_that_enhancement(qtbot,
     view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     monkeypatch.setattr("origenerator.gui.enhance_controller.gallery.version_matching_settings",
                         lambda row, settings: 0)
     offered = {}
@@ -203,7 +203,7 @@ def test_go_to_folder_from_a_collection_opens_the_folder_and_lands_on_the_item(
 
     _right_click(view, "i2")
 
-    assert view._tree.currentItem() is view._leaf_by_id["i2"]
+    assert view._tree.currentItem() is view.toc.leaf_by_id["i2"]
     assert view.selected_prompt_ids() == ["i2"]
 
 
@@ -212,7 +212,7 @@ def test_copy_name_puts_the_items_name_on_the_clipboard(qtbot, monkeypatch):
     view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     QApplication.clipboard().clear()
     _answer_menu(monkeypatch, "Copy name")
 
@@ -338,7 +338,7 @@ def test_the_go_to_folder_button_takes_a_collection_item_home_without_a_right_cl
 
     qtbot.mouseClick(button, Qt.MouseButton.LeftButton)
 
-    assert view._tree.currentItem() is view._leaf_by_id["i2"]
+    assert view._tree.currentItem() is view.toc.leaf_by_id["i2"]
     assert view.selected_prompt_ids() == ["i2"]
 
 
@@ -347,7 +347,7 @@ def test_no_go_to_folder_button_inside_the_items_own_folder(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
 
     assert _folder_buttons(view) == []
 
@@ -370,7 +370,7 @@ def test_a_video_goes_to_its_folder_from_the_same_button(qtbot):
     (button,) = _folder_buttons(view)
     button.click()
 
-    assert view._tree.currentItem() is view._leaf_by_id["v1"]
+    assert view._tree.currentItem() is view.toc.leaf_by_id["v1"]
 
 
 def test_a_kind_left_off_a_collection_still_has_its_folder_to_go_to(qtbot):
@@ -386,14 +386,14 @@ def test_a_kind_left_off_a_collection_still_has_its_folder_to_go_to(qtbot):
 
     (button,) = _folder_buttons(view)
     button.click()
-    assert view._tree.currentItem() is view._leaf_by_id["i1"]
+    assert view._tree.currentItem() is view.toc.leaf_by_id["i1"]
 
 
 def test_leaving_the_items_folder_puts_the_go_to_folder_back_on_what_it_shows(qtbot):
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     assert _folder_buttons(view) == []
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -484,7 +484,7 @@ def test_settings_folder_video_tiles_animate(qtbot, tmp_path, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(view._leaf_by_id["v1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["v1"])
     assert view._gallery_pane._thumb_widgets["v1"].findChildren(QMovie)
 
 
@@ -647,7 +647,7 @@ def test_the_trash_at_the_top_deletes_only_a_leaf_folder(qtbot):
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    model = view._tree_item_for(_select_first_leaf(view)).parent().parent()
+    model = view.toc.item_for(_select_first_leaf(view)).parent().parent()
     view._tree.setCurrentItem(model)
 
     assert not view._buttons.delete.isEnabled()

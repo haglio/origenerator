@@ -13,10 +13,10 @@ from origenerator.gallery.collection import (
     all_collections,
     folder_collection,
 )
-from origenerator.gallery.shapes import SHAPE_LABELS
+from origenerator.gallery.shapes import LANDSCAPE, SHAPE_LABELS, shape_holding
 from origenerator.gui import folder_icons, icons
 from origenerator.gui.folder_tree import COUNT_ROLE, DROP_KEY_ROLE, RECENT_ROLE, TREE_KEY_ROLE
-from origenerator.item_shape import key_holds, shape_of, shaped_key, split_key
+from origenerator.item_shape import base_of, key_holds, shape_of, shaped_key, split_key
 from origenerator.media import MediaType
 
 GROUP_ROLE = Qt.ItemDataRole.UserRole
@@ -288,6 +288,34 @@ class GalleryTree:
     def selected_folder_key(self) -> str | None:
         item = self._tree.currentItem()
         return item.data(0, TREE_KEY_ROLE) if item is not None else None
+
+    def shape_in_view(self) -> str:
+        return (shape_of(self.selected_folder_key())
+                or shape_holding(LANDSCAPE, self._tree.shapes))
+
+    def item_for(self, key: str) -> QTreeWidgetItem | None:
+        item = self.item_by_key.get(key)
+        if item is not None:
+            return item
+        folder = base_of(key)
+        drawn = self.keys_for_folder(folder)
+        if shape_of(key) in self._tree.shapes:
+            return next((self.item_by_key[row] for row in drawn
+                         if shape_of(row) == shape_of(key)), None)
+        if not drawn:
+            return None
+        here = shaped_key(folder, self.shape_in_view())
+        return self.item_by_key[here if here in drawn else drawn[0]]
+
+    def group_for_key(self, key: str):
+        item = self.item_for(key)
+        return item.data(0, GROUP_ROLE) if item is not None else None
+
+    def folder_context(self, key: str) -> str:
+        item = self.item_for(key)
+        if item is None or item.parent() is None:
+            return ""
+        return self.folder_path(item.parent())
 
     def path_steps(self, item) -> list[PathStep]:
         steps = []

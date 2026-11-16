@@ -1394,7 +1394,7 @@ def test_a_folder_left_open_on_together_is_open_again_after_a_restart(qtbot, tmp
     first._gallery_view.refresh()
     first._gallery_view._tree.together_button.click()
     folder = shaped_key("image/sdxl_t2i", BOTH)
-    first._gallery_view._tree.setCurrentItem(first._gallery_view._tree_item_for(folder))
+    first._gallery_view._tree.setCurrentItem(first._gallery_view.toc.item_for(folder))
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
@@ -1410,7 +1410,7 @@ def test_the_videos_latest_left_open_is_open_on_its_videos_after_a_restart(qtbot
     view = first._gallery_view
     view.refresh()
     latest = shaped_key(FolderCollection(LATEST_KEY, MediaType.VIDEO).key, SEPARATE[1])
-    view._tree.setCurrentItem(view._tree_item_for(latest))
+    view._tree.setCurrentItem(view.toc.item_for(latest))
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
@@ -1427,13 +1427,13 @@ def test_a_folder_left_open_in_the_toc_is_open_after_a_restart(qtbot, tmp_path):
     first._gallery_view.refresh()
     first._gallery_view._tree.together_button.click()
     folder = shaped_key("image/sdxl_t2i", BOTH)
-    first._gallery_view._tree_item_for(folder).setExpanded(True)
+    first._gallery_view.toc.item_for(folder).setExpanded(True)
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
     reopened._gallery_view.refresh()
 
-    assert reopened._gallery_view._tree_item_for(folder).isExpanded()
+    assert reopened._gallery_view.toc.item_for(folder).isExpanded()
 
 
 def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):

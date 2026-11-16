@@ -1347,7 +1347,7 @@ def test_a_restore_that_cannot_run_is_drawn_dimmer_than_the_delete_beside_it(qtb
 
 def test_redoing_a_delete_draws_the_folder_without_the_item_at_once(qtbot, tmp_path):
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     (row,) = view._db.list_generations()
     view._delete_rows([row])
     view._undo()

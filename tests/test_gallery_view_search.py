@@ -323,12 +323,12 @@ def test_the_field_says_what_it_would_search(qtbot):
 
     videos = _video_workflow(view._tree)
     view._tree.setCurrentItem(videos)
-    assert view._search.field.placeholderText() ==         f"Search {view._tree_view.folder_path(videos)}…"
+    assert view._search.field.placeholderText() ==         f"Search {view.toc.folder_path(videos)}…"
 
     leaf = _at(videos, 0, 0, 0, 0)
     view._tree.setCurrentItem(leaf)
     placeholder = view._search.field.placeholderText()
-    assert placeholder == f"Search {view._tree_view.folder_path(leaf)}…"
+    assert placeholder == f"Search {view.toc.folder_path(leaf)}…"
     assert leaf.text(0) in placeholder
     assert videos.text(0) in placeholder
 

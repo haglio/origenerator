@@ -82,7 +82,7 @@ def test_dropping_back_to_one_folder_returns_to_that_folder(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
     _pick(view, cat, dog)
 
-    view._tree.setCurrentItem(view._tree_item_for(cat))
+    view._tree.setCurrentItem(view.toc.item_for(cat))
 
     assert view._selection_group is None
     assert view.listed_prompt_ids() == ["i1"]
@@ -191,7 +191,7 @@ def test_a_custom_folder_is_not_where_the_gallery_lands_by_default(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
     _make_folder(view, "Favorites", [cat])
 
-    assert view._tree_view.default_item() is _top_level(view._tree)["All"]
+    assert view.toc.default_item() is _top_level(view._tree)["All"]
 
 
 def test_dropping_a_folder_onto_a_custom_folder_adds_it(qtbot):
@@ -284,7 +284,7 @@ def test_an_item_dropped_into_an_open_custom_folder_goes_in(qtbot):
 
 def _folder_drag(view, key):
     mime = QMimeData()
-    mime.setData(FOLDER_KEYS_MIME, view._tree_item_for(key).data(0, TREE_KEY_ROLE).encode())
+    mime.setData(FOLDER_KEYS_MIME, view.toc.item_for(key).data(0, TREE_KEY_ROLE).encode())
     return mime
 
 
@@ -425,11 +425,11 @@ def test_a_folder_the_user_made_dropped_onto_favorites_takes_no_favorite(qtbot):
 
 def test_dropping_a_folder_onto_favorite_stars_it_where_it_stands(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
-    row = view._tree_item_for(cat)
+    row = view.toc.item_for(cat)
 
     view._on_dropped(FAVORITES_KEY, [cat])
 
-    assert view._tree_item_for(cat) is row
+    assert view.toc.item_for(cat) is row
     assert row.data(0, _GROUP_ROLE).favorite
 
 
@@ -664,13 +664,13 @@ def test_copy_name_on_a_folder_given_a_name_copies_that_name(qtbot, monkeypatch)
 
 def test_a_folder_squares_menu_copies_its_name_too(qtbot, monkeypatch):
     view, _cat, dog = _two_leaf_view(qtbot)
-    view._tree.setCurrentItem(view._tree_item_for(dog).parent())
+    view._tree.setCurrentItem(view.toc.item_for(dog).parent())
     QApplication.clipboard().clear()
     _answer_menu(monkeypatch, "Copy name")
 
     _square_menu(view, dog)
 
-    assert QApplication.clipboard().text() == view._tree_item_for(dog).text(0)
+    assert QApplication.clipboard().text() == view.toc.item_for(dog).text(0)
 
 
 def test_a_workflows_menu_offers_no_delete(qtbot, monkeypatch):
@@ -723,7 +723,7 @@ def test_a_folder_squares_menu_offers_the_folders_of_your_own_on_the_side_browse
         qtbot, monkeypatch):
     view, cat, dog = _two_leaf_view(qtbot)
     _make_folder(view, "Keepers", [cat])
-    view._tree.setCurrentItem(view._tree_item_for(dog).parent())
+    view._tree.setCurrentItem(view.toc.item_for(dog).parent())
     labels = []
     _menu_labels(monkeypatch, labels)
 
@@ -983,7 +983,7 @@ def test_expand_all_opens_every_picked_folder_and_every_folder_inside_each(
 
     _tree_menu(view, first)
 
-    models = [view._tree_item_for(key) for key in (first, second)]
+    models = [view.toc.item_for(key) for key in (first, second)]
     assert [row.isExpanded() for model in models for row in (model, _at(model, 0))] == [
         True] * 4
 
@@ -1031,7 +1031,7 @@ def _pick_by_clicks(view, first, *others):
     _tall_on_screen(view)
     for key, modifiers in ((first, Qt.KeyboardModifier.NoModifier),
                            *((key, Qt.KeyboardModifier.ControlModifier) for key in others)):
-        row = view._tree_item_for(key)
+        row = view.toc.item_for(key)
         tree = row.treeWidget()
         tree.scrollToItem(row)
         gestures.click(tree.viewport(), tree.visualItemRect(row).center(), modifiers)
@@ -1080,7 +1080,7 @@ def test_the_trash_can_on_a_row_outside_the_picked_folders_deletes_only_its_own(
 
 
 def _trash_can_drawn_on(view, key) -> bool:
-    row = view._tree_item_for(key)
+    row = view.toc.item_for(key)
     tree = row.treeWidget()
     trash = _action_rects(tree.visualItemRect(row))[1]
     gestures.move(tree.viewport(), trash.center())
@@ -1131,11 +1131,11 @@ def test_a_further_folder_picked_into_several_loads_nothing_of_its_own(qtbot):
     _pick(view, cat, dog)
     view._selected_row = None
 
-    view._tree.setCurrentItem(view._tree_item_for(bird))
-    view._tree_item_for(cat).setSelected(True)
-    view._tree_item_for(dog).setSelected(True)
+    view._tree.setCurrentItem(view.toc.item_for(bird))
+    view.toc.item_for(cat).setSelected(True)
+    view.toc.item_for(dog).setSelected(True)
     view._selected_row = None
-    view._on_folder_selected(view._tree_item_for(bird), None)
+    view._on_folder_selected(view.toc.item_for(bird), None)
 
     assert view.selected_generation() is None
 

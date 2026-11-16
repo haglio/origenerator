@@ -146,7 +146,7 @@ def test_enhance_stays_switched_on_for_its_folder_after_a_restart(qtbot, tmp_pat
     again = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(again)
     again.refresh()
-    again._tree.setCurrentItem(again._tree_item_for(key))
+    again._tree.setCurrentItem(again.toc.item_for(key))
 
     assert again._buttons.enhance.isChecked()
     assert again._buttons.enhance.toolTip().startswith("Stop enhancing new images in")

@@ -282,7 +282,7 @@ def _a_gallery_with_another_sites_picture(qtbot, monkeypatch):
 
 def _stand_on_the_folder_of(view, prompt_id) -> None:
     folder = view.folder_key_of(view._db.get_generation(prompt_id))
-    view._tree.setCurrentItem(view._tree_item_for(shaped_key(folder, LANDSCAPE)))
+    view._tree.setCurrentItem(view.toc.item_for(shaped_key(folder, LANDSCAPE)))
 
 
 def _playing(slideshow) -> list[str]:
@@ -322,7 +322,7 @@ def test_a_slideshow_started_on_latest_leaves_out_what_other_sites_made(qtbot, m
 
 def test_a_slideshow_of_a_searchs_hits_plays_what_it_found(qtbot, monkeypatch):
     view = _a_gallery_with_another_sites_picture(qtbot, monkeypatch)
-    view._tree.setCurrentItem(view._tree_item_for(shaped_key(gallery.ALL_KEY, LANDSCAPE)))
+    view._tree.setCurrentItem(view.toc.item_for(shaped_key(gallery.ALL_KEY, LANDSCAPE)))
     _search_for(view, "cat")
 
     view._slideshows.start()
@@ -919,7 +919,7 @@ def _laid_out_folder(qtbot, count=60):
     db = database_of([_image(f"i{n}", "a cat", 50, n) for n in range(1, count + 1)])
     view = GalleryView(db)
     _on_screen(qtbot, view, 1800, 1300)
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     qtbot.wait(1)
     return view, db
 
@@ -1080,7 +1080,7 @@ def test_a_slideshow_reopened_on_a_locked_slide_comes_back_locked(qtbot, monkeyp
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     view._slideshows.start()
     first = view._slideshows.showing
     qtbot.addWidget(first.shown)
@@ -1111,7 +1111,7 @@ def _slideshow_of_the_folder_of(qtbot, monkeypatch, rows, image):
     qtbot.addWidget(view)
     _keys_are_the_gallerys(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id[image])
+    view._tree.setCurrentItem(view.toc.leaf_by_id[image])
     view._buttons.slideshow.click()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
@@ -1198,7 +1198,7 @@ def test_the_slideshow_button_on_another_folder_plays_that_folder_not_the_loop_l
         qtbot, monkeypatch, elsewhere=[_image("q1", "a dog", 50, 3)])
 
     _press_enter(slideshow)
-    view._tree.setCurrentItem(view._leaf_by_id["q1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["q1"])
     view._buttons.slideshow.click()
 
     reopened = view._slideshows.showing
@@ -1573,7 +1573,7 @@ def test_a_folder_of_one_video_is_armed_like_any_other(qtbot, monkeypatch):
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["v1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["v1"])
     view._on_thumbnail_clicked("v1")
 
     video = kept_file("wan22_i2v_v1.mp4")

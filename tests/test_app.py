@@ -1286,7 +1286,8 @@ class _ComfyUIStillStarting:
         return self.comes_up
 
 
-def test_a_hosted_boot_builds_its_window_before_it_tidies_its_library_or_comfyui_starts(qapp):
+def test_a_hosted_boot_builds_its_window_before_it_tidies_its_library_or_comfyui_starts(
+        qapp, qtbot):
     ran = []
     starting = _ComfyUIStillStarting()
     core = MagicMock(side_effect=lambda *a, **k: ran.append("Core") or MagicMock())
@@ -1296,7 +1297,7 @@ def test_a_hosted_boot_builds_its_window_before_it_tidies_its_library_or_comfyui
                                    "origenerator.gui.job_queue.BRING_UP_COMFYUI": starting}) as _, \
              patch("origenerator.comfyui_launcher.ensure_comfyui_server") as ensure:
             assert main(hosted_launch()) == 0
-            assert starting.asked.wait(5)
+            qtbot.waitUntil(starting.asked.is_set, timeout=5000)
     finally:
         starting.answer.set()
 
@@ -1317,7 +1318,7 @@ def test_a_hosted_boot_says_core_is_ready_only_once_comfyui_answered_and_the_lat
         with _a_faked_boot(ran, **{"origenerator.gui.core.Core": MagicMock(return_value=window),
                                    "origenerator.gui.job_queue.BRING_UP_COMFYUI": starting}):
             assert main(hosted_launch()) == 0
-            assert starting.asked.wait(5)
+            qtbot.waitUntil(starting.asked.is_set, timeout=5000)
             assert "core is ready" not in ran
             starting.answer.set()
             qtbot.waitUntil(lambda: "core is ready" in ran, timeout=5000)

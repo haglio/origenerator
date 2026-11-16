@@ -51,7 +51,6 @@ from tests.gallery_view_support import (
     _press_enter,
     _press_escape,
     _reroll_client,
-    _resolve_by_id,
     _seeded_db,
     _select_first_leaf,
     _selected_folder,
@@ -62,13 +61,10 @@ from tests.gallery_view_support import (
 )
 from tests.lit_switches import lit_in
 from tests.osr2_fakes import FakeBroker
-from tests.real_db import database_of
+from tests.real_db import database_of, keep_on_disk, keep_rows_on_disk, kept_file
 from tests.slideshow_hud_support import engine_of, funestra_of
 from tests.test_fun_time_gallery import _session
 from tests.test_osr2_driver import ACTIONS, FakePlayer
-
-pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
-
 
 
 class _FakeDriver:
@@ -385,14 +381,11 @@ def test_the_rooms_pause_holds_a_scripted_videos_drive_still(qtbot, monkeypatch)
 
 
 def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeypatch):
+    keep_rows_on_disk(monkeypatch)
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _image("i3", "a cat", 50, 3)]
     view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
-    monkeypatch.setattr(
-        gallery, "resolve_preview",
-        lambda row, places: (f"{row['prompt_id']}.png", "image"),
-    )
     view.refresh()
     _open_leaf(view)
     view._on_thumbnail_clicked("i2")
@@ -400,8 +393,8 @@ def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeyp
     slideshow = _double_click_slideshow(view, qtbot)
 
     order = view._gallery_pane.listed_prompt_ids()
-    assert slideshow._set.playlist._items == [(f"{pid}.png", "image", pid, None)
-                                          for pid in order]
+    assert slideshow._set.playlist._items == [
+        (kept_file(f"sdxl_t2i_{pid}.png"), "image", pid, None) for pid in order]
     assert slideshow._set.playlist.order == list(range(len(order)))
     assert slideshow._set.playlist.current()[2] == "i2"
     slideshow.close()
@@ -437,7 +430,7 @@ def test_a_double_click_while_populate_runs_opens_on_the_shown_image_alone(
 
 def test_a_double_click_on_an_image_from_another_folder_opens_that_folder(
         qtbot, monkeypatch):
-    _resolve_by_id(monkeypatch)
+    keep_rows_on_disk(monkeypatch)
     rows = [_image("a1", "a cat", 50, 1), _image("b1", "a dog", 50, 1),
             _image("b2", "a dog", 50, 2)]
     view = GalleryView(database_of(rows))
@@ -505,7 +498,7 @@ def _populating_view(qtbot, monkeypatch, rows):
 
 
 def test_double_clicking_a_generating_preview_opens_it_fullscreen(qtbot, monkeypatch):
-    _resolve_by_id(monkeypatch)
+    keep_rows_on_disk(monkeypatch)
     view, _key = _populating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     tab = view._generate_pane.current_generate_tab()
     tab._viewport.show_frame(_png_bytes())
@@ -650,7 +643,7 @@ def test_leaving_a_paused_slideshow_leaves_the_room_paused(qtbot, monkeypatch, l
 
 
 def test_closing_a_slideshow_leaves_the_motion_running(qtbot, monkeypatch):
-    _resolve_by_id(monkeypatch)
+    keep_rows_on_disk(monkeypatch)
     view, _key = _populating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     view._slideshows.start()
     qtbot.addWidget(view._slideshows.showing.shown)
@@ -848,10 +841,10 @@ def test_another_active_window_owns_the_keys(qtbot, monkeypatch):
 
 
 def _a_gallery_with_its_slideshow_in_front(qtbot, tmp_path, monkeypatch):
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, places: ("g0.png", "image"))
+    db = _seeded_db(tmp_path)
+    keep_on_disk(db)
     radio = _FakeRadio()
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client(), shared=Shared(radio=radio))
+    view = GalleryView(db, client=_reroll_client(), shared=Shared(radio=radio))
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
@@ -947,10 +940,10 @@ def test_esc_in_the_gallery_lights_the_sound_switch_yellow_and_a_second_blue_aga
 
 
 def _startable_view(qtbot, tmp_path, monkeypatch):
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, places: ("g0.png", "image"))
+    db = _seeded_db(tmp_path)
+    keep_on_disk(db)
     radio = _FakeRadio()
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client(), shared=Shared(radio=radio))
+    view = GalleryView(db, client=_reroll_client(), shared=Shared(radio=radio))
     qtbot.addWidget(view)
     _keys_are_the_gallerys(view)
     view.refresh()

@@ -47,7 +47,7 @@ from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
 from origenerator.video_records import FiledLoops
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.slideshow_commands import SlideshowCommand
-from tests.real_db import database_of
+from tests.real_db import database_of, on_disk
 from tests.slideshow_hud_support import open_both_shapes
 
 PORTRAIT = "portrait"
@@ -540,28 +540,24 @@ class FakeHost:
         self.said.append(message)
 
 
-def test_asking_whether_anything_can_play_stops_at_the_first_item(slideshows, monkeypatch):
-    director, _host, _made = slideshows(FakeHost(rows=[_row(f"g{n}") for n in range(50)]))
+class _ReadingItFailsTheTest(dict):
+    def get(self, key, default=None):
+        raise AssertionError(
+            "reading every row's files to answer it is what made one click on the TOC redraw for "
+            "seconds")
+
+
+def test_asking_whether_anything_can_play_stops_at_the_first_item(slideshows):
+    director, _host, _made = slideshows(FakeHost(rows=[
+        on_disk(_row("g0")), *(_ReadingItFailsTheTest(_row(f"g{n}")) for n in range(1, 50))]))
     del director.items_of
-    read = []
-
-    def resolve(row, _output_dir):
-        read.append(row["prompt_id"])
-        return (f"{row['prompt_id']}.png", "image")
-
-    monkeypatch.setattr(module.gallery, "resolve_preview", resolve)
 
     assert director.anything_to_play()
-    assert read == ["g0"], (
-        "reading every row's files to answer it is what made one click on the TOC redraw for "
-        "seconds")
 
 
 def test_asking_whether_anything_can_play_lists_no_folder_of_upscales(slideshows, monkeypatch):
-    director, _host, _made = slideshows(FakeHost(rows=[_row("g0")]))
+    director, _host, _made = slideshows(FakeHost(rows=[on_disk(_row("g0"))]))
     del director.items_of
-    monkeypatch.setattr(module.gallery, "resolve_preview",
-                        lambda row, _places: (f"{row['prompt_id']}.png", "image"))
     scanned = []
     monkeypatch.setattr(library_views.EvolverUpscales, "scan",
                         lambda *args: scanned.append(args) or library_views.EvolverUpscales({}))

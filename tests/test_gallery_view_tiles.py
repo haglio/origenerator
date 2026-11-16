@@ -91,8 +91,6 @@ from tests.related_links import source_tile
 from tests.test_enhance_pane import _dropped_on
 from tests.test_folder_tree import _shown
 
-pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
-
 
 def _two_images_on_screen(qtbot):
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]))

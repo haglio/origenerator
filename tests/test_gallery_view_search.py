@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 import shiboken6
 from PySide6.QtCore import (
     QCoreApplication,
@@ -55,9 +54,6 @@ from tests.gallery_view_support import (
 )
 from tests.real_db import database_of, put_rows
 from tests.text_readers import clip_reader
-
-pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
-
 
 _WIDE_ENOUGH_THAT_NO_PATH_ELIDES = 2000
 

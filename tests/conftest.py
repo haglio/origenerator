@@ -28,7 +28,6 @@ from origenerator import (
     card_claim,
     config,
     enhance_presets,
-    gallery,
     graphics_card,
     osr2_driver,
     osr2_motion_driver,
@@ -347,8 +346,8 @@ def _this_tests_own_folder(_a_folder_for_each_test) -> Path:
 
 
 @pytest.fixture(autouse=True)
-def _databases_in_this_tests_own_folder(monkeypatch, _this_tests_own_folder):
-    monkeypatch.setattr(real_db, "DATABASES", _this_tests_own_folder / "databases")
+def _real_databases_in_this_tests_own_folder(monkeypatch, _this_tests_own_folder):
+    monkeypatch.setattr(real_db, "THIS_TESTS_FOLDER", _this_tests_own_folder)
 
 
 @pytest.fixture(autouse=True)
@@ -550,11 +549,6 @@ def pytest_configure(config):
 @pytest.fixture
 def db(tmp_path):
     return database_in(tmp_path)
-
-
-@pytest.fixture
-def _stub_preview_resolution(monkeypatch):
-    monkeypatch.setattr(gallery, "resolve_preview", lambda row, places: None)
 
 
 @pytest.fixture(autouse=True)

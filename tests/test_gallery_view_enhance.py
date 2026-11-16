@@ -45,13 +45,11 @@ from tests.gallery_view_support import (
     _open_latest,
     _png_bytes,
     _reroll_client,
-    _resolve_by_id,
     _select_first_leaf,
     _set_enhance,
 )
+from tests.real_db import keep_on_disk, keep_rows_on_disk
 from tests.slideshow_hud_support import funestra_of
-
-pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 
 
 def test_the_enhance_panes_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_path):
@@ -594,9 +592,8 @@ def test_an_enhance_still_queued_lends_its_tile_no_frame(qtbot, tmp_path):
 
 def test_a_locked_slide_says_queued_until_comfyui_picks_its_run_up(qtbot, tmp_path,
                                                                  monkeypatch):
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, places: (f"{row['prompt_id']}.png", "image"))
     db = _enhanceable_db(tmp_path, count=1)
+    keep_on_disk(db)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -804,8 +801,9 @@ def test_a_tab_turned_to_an_image_being_enhanced_shows_that_run(qtbot, tmp_path)
 
 def test_a_tick_tells_a_locked_slide_its_run_began_though_no_frame_has_come(qtbot, tmp_path,
                                                                             monkeypatch):
-    _resolve_by_id(monkeypatch)
+    keep_rows_on_disk(monkeypatch)
     db = _enhanceable_db(tmp_path, count=1)
+    keep_on_disk(db)
     client = _reroll_client()
     view = GalleryView(db, client=client)
     qtbot.addWidget(view)

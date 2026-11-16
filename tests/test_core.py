@@ -60,6 +60,7 @@ from tests import gestures
 from tests.closed_windows import is_closed
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import _collection, _select_first_leaf, _selected_folder
+from tests.real_db import keep_on_disk
 from tests.test_combine import _listed_under_recent
 
 _CTRL_ALT = Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier
@@ -255,9 +256,9 @@ def test_ctrl_alt_q_closes_without_asking(qtbot, tmp_path, monkeypatch):
 def test_ctrl_alt_q_in_a_slideshow_takes_the_slideshow_down_with_the_app(
         qtbot, tmp_path, monkeypatch):
     _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.Yes)
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, places: (f"{row['prompt_id']}.png", "image"))
-    _completed_image(Database(tmp_path / "t.db"))
+    db = Database(tmp_path / "t.db")
+    _completed_image(db)
+    keep_on_disk(db)
     win = _window(qtbot, tmp_path)
     win.show()
     win._gallery_view.refresh()
@@ -666,9 +667,9 @@ def _completed_image(db, prompt_id="g-1", prompt="a cat", seed=1, **params):
 
 def test_a_slideshow_started_after_a_relaunch_comes_back_on_enhanced_only(
         qtbot, tmp_path, monkeypatch):
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, places: (f"{row['prompt_id']}.png", "image"))
-    _completed_image(Database(tmp_path / "t.db"), enhance=True)
+    db = Database(tmp_path / "t.db")
+    _completed_image(db, enhance=True)
+    keep_on_disk(db)
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
     first._gallery_view.refresh()

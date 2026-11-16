@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 from PIL import Image
 from PySide6.QtCore import (
     Qt,
@@ -20,7 +18,6 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui import (
     combine_controller,
 )
-from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.item_tile import ItemTile
@@ -53,10 +50,7 @@ from tests.gallery_view_support import (
     _selected_folder,
     _tile_kinds_in_order,
 )
-from tests.real_db import database_of
-
-pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
-
+from tests.real_db import database_of, kept_on_disk
 
 
 def test_leaf_shows_add_tile_when_client_present(qtbot):
@@ -1138,8 +1132,7 @@ def test_the_view_asks_the_video_lane_unless_told_otherwise(qtbot, tmp_path, mon
 
 def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path)
-    monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
-                        lambda row, out: (Path("C:/out/flf2v_loop_1.mp4"), "video"))
+    kept_on_disk(view._db, view._db.get_generation("loop"), tmp_path / "flf2v_loop_1.mp4")
     sent = []
     monkeypatch.setattr(evolver_export, "export_video",
                         lambda src, dest, funscript=None: sent.append(src))

@@ -70,7 +70,6 @@ from tests.gallery_view_support import (
     _open_latest,
     _png_bytes,
     _reroll_client,
-    _resolve_by_id,
     _row,
     _running_reroll,
     _running_row,
@@ -84,11 +83,8 @@ from tests.gallery_view_support import (
     _viewport_of,
 )
 from tests.qt_exec import faking_exec
-from tests.real_db import database_of, put_rows
+from tests.real_db import database_of, keep_rows_on_disk, put_rows
 from tests.slideshow_hud_support import engine_of, funestra_of
-
-pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
-
 
 _IMG_REROLL_HISTORY = {"outputs": {"7": {"images": [
     {"filename": "sdxl_new.png", "subfolder": "image", "type": "output"}]}}}
@@ -1398,9 +1394,9 @@ def test_the_queue_shows_the_active_job_then_empties_when_idle(qtbot):
 
 
 def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypatch):
-    _resolve_by_id(monkeypatch)
+    keep_rows_on_disk(monkeypatch)
     db = database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
-    put_rows(db, [_running_row("gen1", prompt="a dog")])
+    put_rows(db, [_running_row("gen1", prompt="a cat")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1422,12 +1418,12 @@ def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypa
 
 def test_a_row_dragged_in_the_slideshows_queue_moves_the_job_and_redraws_both_at_once(
         qtbot, monkeypatch):
-    _resolve_by_id(monkeypatch)
+    keep_rows_on_disk(monkeypatch)
     db = database_of([_image("i1", "a cat", 50, 1)])
-    put_rows(db, [_running_row("gen1", prompt="a dog")])
-    put_rows(db, [_row("w1", "sdxl_t2i", {"positive_prompt": "w"}, "w.png",
+    put_rows(db, [_running_row("gen1", prompt="a cat")])
+    put_rows(db, [_row("w1", "sdxl_t2i", {"positive_prompt": "a cat"}, "w.png",
                 status="pending", output_files="[]")])
-    put_rows(db, [_row("w2", "sdxl_t2i", {"positive_prompt": "x"}, "x.png",
+    put_rows(db, [_row("w2", "sdxl_t2i", {"positive_prompt": "a cat"}, "x.png",
                 status="pending", output_files="[]")])
     view = GalleryView(db)
     qtbot.addWidget(view)

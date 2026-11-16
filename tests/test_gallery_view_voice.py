@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from functools import partial
-from pathlib import Path
 
 import pytest
 from funestra.main_hud import (
@@ -37,7 +36,6 @@ from origenerator.gui import (
     omnipause,
     voice_router,
 )
-from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.enhance_controller import NOTHING_LEFT_TO_ENHANCE
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.message import INFO, WARNING
@@ -73,10 +71,8 @@ from tests.gallery_view_support import (
     _will_move_on,
 )
 from tests.marked_words import words
+from tests.real_db import keep_on_disk, kept_file, kept_on_disk
 from tests.text_readers import clip_reader
-
-pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
-
 
 
 def test_words_that_are_no_command_leave_a_running_populate_as_it_was(
@@ -310,9 +306,8 @@ def test_the_poll_runs_over_a_slideshow_being_spoken_to(qtbot, tmp_path):
 
 def test_a_slideshow_opening_and_closing_leaves_the_mic_as_it_found_it(
         qtbot, tmp_path, monkeypatch):
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, places: ("g0.png", "image"))
     db = _enhanceable_db(tmp_path, count=1)
+    keep_on_disk(db)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -354,11 +349,10 @@ def test_a_slideshow_with_the_mic_off_hears_nothing(qtbot, tmp_path):
 
 
 def _fix_slideshow(qtbot, tmp_path, monkeypatch, *detectors):
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, places: ("g0.png", "image"))
     monkeypatch.setattr(detail_parts, "list_detector_files",
                         lambda: list(detectors))
     db = _enhanceable_db(tmp_path, count=1)
+    keep_on_disk(db)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -420,9 +414,8 @@ def test_a_spoken_fix_with_nothing_to_find_it_answers_on_the_slideshow(
 
 
 def _voiceable(qtbot, tmp_path, monkeypatch):
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, places: ("g0.png", "image"))
     db = _enhanceable_db(tmp_path, count=1)
+    keep_on_disk(db)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -771,7 +764,7 @@ def test_a_request_landing_takes_the_place_of_its_image_on_a_slideshow_locked_on
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     _speak_request(view, qtbot, "Request, no hat, over.")
     slideshow = view._slideshows.showing
-    slideshow.show_item("orig.png", lock=True)
+    slideshow.show_item(kept_file("sdxl_t2i_orig.png"), lock=True)
     (job,) = view._live_jobs.values()
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, output_dir: (f"{row['prompt_id']}.png", "image"))
@@ -1086,9 +1079,8 @@ def test_the_voice_surface_is_given_the_whole_spoken_vocabulary():
 def test_a_spoken_loop_hands_its_finished_clip_on(qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path)
     view._db.mark_genau_requested("loop")
-    video = Path("C:/out/flf2v_loop_1.mp4")
-    monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
-                        lambda row, out: (video, "video"))
+    video = tmp_path / "flf2v_loop_1.mp4"
+    kept_on_disk(view._db, view._db.get_generation("loop"), video)
     sent = []
     monkeypatch.setattr(evolver_export, "export_video",
                         lambda src, dest, funscript=None:
@@ -1106,8 +1098,7 @@ def test_a_clip_already_handed_on_is_not_sent_twice(qtbot, tmp_path, monkeypatch
     view = _genau_view(qtbot, tmp_path)
     view._db.mark_genau_requested("loop")
     view._db.mark_genau_exported("loop")
-    monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
-                        lambda row, out: (Path("C:/out/flf2v_loop_1.mp4"), "video"))
+    kept_on_disk(view._db, view._db.get_generation("loop"), tmp_path / "flf2v_loop_1.mp4")
     sent = []
     monkeypatch.setattr(evolver_export, "export_video",
                         lambda src, dest, funscript=None: sent.append(src))
@@ -1120,8 +1111,7 @@ def test_a_clip_already_handed_on_is_not_sent_twice(qtbot, tmp_path, monkeypatch
 def test_a_failed_hand_off_leaves_the_clip_in_the_gallery(qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path)
     view._db.mark_genau_requested("loop")
-    monkeypatch.setattr(gallery_view_module.gallery, "resolve_preview",
-                        lambda row, out: (Path("C:/out/flf2v_loop_1.mp4"), "video"))
+    kept_on_disk(view._db, view._db.get_generation("loop"), tmp_path / "flf2v_loop_1.mp4")
 
     def boom(src, dest, funscript=None):
         raise OSError("the inbox is not there")
@@ -1159,9 +1149,9 @@ def test_a_spoken_collection_name_stands_you_in_that_collection(qtbot, tmp_path,
 
 def test_a_collection_name_said_over_a_slideshow_still_moves_the_toc(
         qtbot, tmp_path, monkeypatch):
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, places: ("g0.png", "image"))
-    view = _listening(qtbot, tmp_path, db=_enhanceable_db(tmp_path, count=1))
+    db = _enhanceable_db(tmp_path, count=1)
+    keep_on_disk(db)
+    view = _listening(qtbot, tmp_path, db=db)
     _select_first_leaf(view)
     view._slideshows.start()
     qtbot.addWidget(view._slideshows.showing.shown)

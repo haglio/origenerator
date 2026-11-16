@@ -38,6 +38,7 @@ from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.commands import CollectionCommand, SurfaceCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import part_table
+from origenerator.workflows.non_ai import non_ai_workflow
 from tests.gallery_view_support import (
     _FakeRadio,
     _image,
@@ -471,6 +472,24 @@ def _session_with_dashboard(tmp_path):
         command_file=None, paused_file=None, status_file=None,
         dashboard_cmd_file=tmp_path / "dashboard_cmd.txt", **_funestras(),
     )
+
+
+def test_a_double_click_on_a_non_ai_video_in_a_session_plays_it_on_the_main_funestra(
+        qtbot, tmp_path):
+    video = tmp_path / "non_AI" / "sample" / "full" / "video one.mp4"
+    non_ai = {**_image("n1", "", 50, 1), "workflow_name": non_ai_workflow("sample full"),
+              "source": "non_ai", "workflow_version": "non_ai",
+              "params_json": json.dumps({"folder": "sample/full"}),
+              "output_files": json.dumps([{"filename": video.name, "library_path": str(video)}])}
+    view = GalleryView(database_of([non_ai]), fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view._gallery_pane.slideshow_requested.emit("n1")
+
+    assert (tmp_path / "dashboard_cmd.txt").read_text(encoding="utf-8").splitlines() == [
+        f"kino_play|{video}"]
+    assert not any(view.slideshows._region_slideshows.values())
 
 
 def _fox_library(tmp_path):

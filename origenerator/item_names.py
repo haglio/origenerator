@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from origenerator import gallery
 from origenerator.gallery.item_numbers import item_name, number_items
+from origenerator.gallery.non_ai import recorded_title
 from origenerator.gallery.output import stems_made_as
 from origenerator.gallery.tree import rows_with_a_folder
 from origenerator.row_readings import RowReadings
@@ -34,7 +35,7 @@ class ItemNames:
                                         image_index)
         folders: dict[str, list[str]] = defaultdict(list)
         for row in _items_oldest_first(rows, held_rows):
-            if row["prompt_id"] not in video_of_frame:
+            if row["prompt_id"] not in video_of_frame and recorded_title(row) is None:
                 folders[folder_of(row)].append(row["prompt_id"])
         recorded = self._numbers.list_item_numbers()
         numbering = number_items(folders, recorded)
@@ -44,6 +45,8 @@ class ItemNames:
         if changed:
             self._numbers.record_item_numbers(changed)
         names = {prompt_id: item_name(item) for prompt_id, item in numbering.items()}
+        names.update({row["prompt_id"]: title for row in rows
+                      if (title := recorded_title(row)) is not None})
         self._wearing = {name: prompt_id for prompt_id, name in names.items()}
         names.update({frame: names[video] for frame, video in video_of_frame.items()
                       if video in names})

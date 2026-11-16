@@ -12,9 +12,12 @@ from origenerator import alert
 from origenerator.comfyui_api import ForeignQueue
 from origenerator.gui.asked_at_the_cursor import asked_at
 from origenerator.gui.inflight import (
+    CANCEL_ALL_BELOW_TEXT,
     CANCEL_ALL_TEXT,
     cancel_all_question,
+    cancel_below_question,
     clear_queue_tooltip,
+    jobs_below,
     jobs_to_cancel,
 )
 from origenerator.gui.job_queue_view import JobQueueView
@@ -52,6 +55,7 @@ class ShownJobQueue(QObject):
         self.view.clear_queue_requested.connect(self.clear_foreign)
         self.view.start_now_requested.connect(self.start_now)
         self.view.cancel_all_requested.connect(self.cancel_all)
+        self.view.cancel_below_requested.connect(self.cancel_below)
         jobs.reordered.connect(self.update)
         starting.changed.connect(self.update)
 
@@ -89,7 +93,14 @@ class ShownJobQueue(QObject):
 
     def cancel_all(self) -> None:
         items = jobs_to_cancel(self.items())
-        if not items or not self._confirmed(CANCEL_ALL_TEXT, cancel_all_question(len(items))):
+        self._cancel_once_asked(items, CANCEL_ALL_TEXT, cancel_all_question(len(items)))
+
+    def cancel_below(self, key: str) -> None:
+        items = jobs_below(self.items(), key)
+        self._cancel_once_asked(items, CANCEL_ALL_BELOW_TEXT, cancel_below_question(len(items)))
+
+    def _cancel_once_asked(self, items: list, title: str, question: str) -> None:
+        if not items or not self._confirmed(title, question):
             return
         for item in reversed(items):
             item.cancel()

@@ -36,7 +36,6 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import part_table
 from tests.closed_windows import is_closed
 from tests.gallery_view_support import (
-    FakeDB,
     _FakeRadio,
     _image,
     _keys_are_the_gallerys,
@@ -47,6 +46,7 @@ from tests.gallery_view_support import (
     _will_move_on,
 )
 from tests.marked_words import words
+from tests.real_db import database_of
 from tests.slideshow_hud_support import (
     engine_of,
     funestra_of,
@@ -87,7 +87,7 @@ def _a_gallery_showing(webp):
 
 
 def _fun_time_view(qtbot, rows=()):
-    view = GalleryView(FakeDB(list(rows)), fun_time=_session())
+    view = GalleryView(database_of(list(rows)), fun_time=_session())
     qtbot.addWidget(view)
     return view
 
@@ -202,7 +202,7 @@ def test_fun_time_gallery_draws_neither_separate_nor_together_over_its_folder_li
 
 
 def test_standalone_gallery_keeps_its_panes_side_by_side(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     assert view._arrangement.panes.count() == 2
     assert view._arrangement.panes.widget(0) is view._arrangement.left_column
@@ -211,7 +211,7 @@ def test_standalone_gallery_keeps_its_panes_side_by_side(qtbot):
 
 
 def test_a_headset_gallery_keeps_the_standalone_panes_side_by_side(qtbot):
-    view = GalleryView(FakeDB([]), fun_time=replace(
+    view = GalleryView(database_of([]), fun_time=replace(
         _session(), frames_file=Path("frame.bin"), input_file=Path("input.txt")))
     qtbot.addWidget(view)
 
@@ -352,7 +352,7 @@ def test_a_slideshow_in_a_session_begins_on_the_one_item_picked(qtbot, tmp_path,
 
 def test_esc_reaching_a_gallery_in_a_session_asks_the_session_for_omnipause(
         qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     _keys_are_the_gallerys(view)
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("wide", 200, 100))
@@ -406,7 +406,7 @@ def test_a_region_slideshow_is_muted_like_every_satellite(qtbot, tmp_path):
 
 def _a_region_slideshow_beside_the_gallerys_radio(qtbot, tmp_path):
     radio = _FakeRadio()
-    view = GalleryView(FakeDB([]), fun_time=_session(), shared=Shared(radio=radio))
+    view = GalleryView(database_of([]), fun_time=_session(), shared=Shared(radio=radio))
     qtbot.addWidget(view)
     wide = tmp_path / "wide.png"
     Image.new("RGB", (200, 100)).save(wide)
@@ -470,7 +470,7 @@ def test_a_preview_double_click_opens_the_slideshow_on_a_region(qtbot, tmp_path)
 
 
 def test_a_presented_slideshow_wears_the_funestras_own_hud(qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200))
     slideshow = view._slideshows._region_slideshows["portrait"]
@@ -487,7 +487,7 @@ def test_a_presented_slideshow_wears_the_funestras_own_hud(qtbot, tmp_path, monk
 
 
 def test_a_click_on_a_hosted_slideshow_asks_the_room_for_omnipause(qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
     slideshow = view.region_slideshow("portrait")
@@ -504,7 +504,7 @@ def test_a_click_on_a_hosted_slideshow_asks_the_room_for_omnipause(qtbot, tmp_pa
 
 def test_a_spoken_pause_slideshow_asks_the_room_for_omnipause_and_play_slideshow_asks_it_back(
         qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
     qtbot.addWidget(view.region_slideshow("portrait").shown)
@@ -559,7 +559,7 @@ def _open_the_fox_slideshow(qtbot, view, monkeypatch, rows):
 
 def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, monkeypatch):
     rows = _fox_library(tmp_path)
-    view = GalleryView(FakeDB(rows), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of(rows), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     slideshow = _open_the_fox_slideshow(qtbot, view, monkeypatch, rows)
 
@@ -583,7 +583,7 @@ def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, m
 
 def test_the_map_re_homes_on_whatever_the_slideshow_moves_to(qtbot, tmp_path, monkeypatch):
     rows = _fox_library(tmp_path)
-    view = GalleryView(FakeDB(rows), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of(rows), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     slideshow = _open_the_fox_slideshow(qtbot, view, monkeypatch, rows)
 
@@ -596,7 +596,7 @@ def test_the_map_re_homes_on_whatever_the_slideshow_moves_to(qtbot, tmp_path, mo
 
 def test_a_map_click_on_a_cell_the_set_never_held_plays_it_all_the_same(qtbot, tmp_path, monkeypatch):
     rows = _fox_library(tmp_path)
-    view = GalleryView(FakeDB(rows), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of(rows), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     view.refresh()
     monkeypatch.setattr(view, "rows_to_play", lambda: rows[:2])
@@ -614,7 +614,7 @@ def test_a_map_click_on_a_cell_the_set_never_held_plays_it_all_the_same(qtbot, t
 
 
 def test_a_hud_map_click_jumps_the_slideshow_to_that_item(qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     still_b = tmp_path / "b.png"
     Image.new("RGB", (100, 200)).save(still_b)
@@ -637,7 +637,7 @@ def test_a_hud_map_click_jumps_the_slideshow_to_that_item(qtbot, tmp_path, monke
 
 
 def test_a_latest_slideshow_plays_newest_first_not_shuffled(qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view, "_current_collection_key", lambda: LATEST_KEY)
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
@@ -649,7 +649,7 @@ def test_a_latest_slideshow_plays_newest_first_not_shuffled(qtbot, tmp_path, mon
 
 
 def test_f_mode_on_a_slideshow_narrows_the_set_to_the_favorites(qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view._slideshows, "_favorite_prompt_ids", lambda: {"id-tall-1"})
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
@@ -756,7 +756,7 @@ def test_a_spoken_side_and_collection_leaves_the_gallery_pane_where_it_was(qtbot
 def test_the_maps_loop_button_loops_the_seed_row_and_the_next_press_ends_it(
         qtbot, tmp_path, monkeypatch):
     rows = _fox_library(tmp_path)
-    view = GalleryView(FakeDB(rows), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of(rows), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     slideshow = _open_the_fox_slideshow(qtbot, view, monkeypatch, rows)
 
@@ -787,7 +787,7 @@ def test_the_maps_loop_button_loops_the_seed_row_and_the_next_press_ends_it(
 def test_more_seeds_widens_the_row_to_the_nearest_configurations_and_loops_it(
         qtbot, tmp_path, monkeypatch):
     rows = _fox_library(tmp_path)
-    view = GalleryView(FakeDB(rows), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of(rows), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     slideshow = _open_the_fox_slideshow(qtbot, view, monkeypatch, rows)
 
@@ -857,7 +857,7 @@ def test_a_region_the_session_wants_never_stays_empty(qtbot, tmp_path, monkeypat
 
 
 def test_a_spoken_favorites_is_the_slideshows_own_f_mode(qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view._slideshows, "_favorite_prompt_ids", lambda: {"id-tall-1"})
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
@@ -902,7 +902,7 @@ def test_a_spoken_fix_names_which_region_it_means(qtbot, tmp_path, monkeypatch):
 
 def test_a_lock_on_a_hosted_slideshow_opens_its_generate_tab(qtbot, tmp_path, monkeypatch):
     row = _image("id-tall-0", "a cat", 50, 1)
-    view = GalleryView(FakeDB([row]), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of([row]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     opened, navigated = [], []
     monkeypatch.setattr(view._generate_pane, "load_selection",
@@ -935,7 +935,7 @@ def test_a_lock_on_a_hosted_slideshow_opens_its_generate_tab(qtbot, tmp_path, mo
 
 def test_a_lock_on_a_hosted_slideshow_asks_the_room_to_show_this_app_once(
         qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([_image("id-tall-0", "a cat", 50, 1)]),
+    view = GalleryView(database_of([_image("id-tall-0", "a cat", 50, 1)]),
                        fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200))
@@ -955,7 +955,7 @@ def test_a_lock_on_a_hosted_slideshow_asks_the_room_to_show_this_app_once(
 
 def test_a_standalone_slideshow_lock_opens_no_tab(qtbot, tmp_path, monkeypatch):
     row = _image("id-tall-0", "a cat", 50, 1)
-    view = GalleryView(FakeDB([row]))
+    view = GalleryView(database_of([row]))
     qtbot.addWidget(view)
     opened = []
     monkeypatch.setattr(view._generate_pane, "load_selection",
@@ -972,7 +972,7 @@ def test_a_standalone_slideshow_lock_opens_no_tab(qtbot, tmp_path, monkeypatch):
 
 
 def test_closing_the_gallery_closes_the_slideshow_it_opened(qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([_image("id-tall-0", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("id-tall-0", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200))
     slideshow = view._slideshows.showing
@@ -984,7 +984,7 @@ def test_closing_the_gallery_closes_the_slideshow_it_opened(qtbot, tmp_path, mon
 
 
 def test_a_closed_slideshows_window_is_deleted(qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([_image("id-tall-0", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("id-tall-0", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200))
     window = view._slideshows.showing.shown
@@ -995,7 +995,7 @@ def test_a_closed_slideshows_window_is_deleted(qtbot, tmp_path, monkeypatch):
 
 
 def test_reset_on_a_slideshow_puts_the_side_back_how_it_started(qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view._slideshows, "_favorite_prompt_ids", lambda: {"id-tall-1"})
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
@@ -1129,7 +1129,7 @@ def test_a_key_can_name_a_place_and_a_shape_at_once(qtbot, tmp_path):
 
 def test_reset_puts_a_region_back_on_the_library_not_on_its_own_folder(
         qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     tall = tmp_path / "tall.png"
     Image.new("RGB", (100, 200)).save(tall)
@@ -1156,7 +1156,7 @@ def test_reset_puts_a_region_back_on_the_library_not_on_its_own_folder(
 
 def test_latest_on_a_hosted_slideshows_hud_plays_its_side_newest_first(
         qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     tall = tmp_path / "tall.png"
     Image.new("RGB", (100, 200)).save(tall)
@@ -1180,7 +1180,7 @@ def test_latest_on_a_hosted_slideshows_hud_plays_its_side_newest_first(
 
 
 def test_reset_stays_local_when_a_slideshow_holds_no_region(qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
     slideshow = view._slideshows.showing
@@ -1216,7 +1216,7 @@ def _moving_thumbnails(view):
 
 def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path):
     rows, webp = _a_looping_video(tmp_path)
-    view = _a_gallery_showing(webp)(FakeDB(rows), fun_time=_session())
+    view = _a_gallery_showing(webp)(database_of(rows), fun_time=_session())
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._tree_view.leaf_by_id["v-1"])
@@ -1263,7 +1263,7 @@ def test_a_frozen_slideshow_does_not_walk_past_an_unplayable_video(qtbot, tmp_pa
 
 
 def test_a_portrait_image_stands_beside_the_form_when_hosted(qtbot):
-    tab = GenerateTab(None, FakeDB([]), fun_time=_session())
+    tab = GenerateTab(None, database_of([]), fun_time=_session())
     qtbot.addWidget(tab)
     assert tab._media_split.orientation() == Qt.Orientation.Vertical
 
@@ -1279,7 +1279,7 @@ def test_a_portrait_image_stands_beside_the_form_when_hosted(qtbot):
 
 
 def test_a_landscape_image_stays_stacked_when_hosted(qtbot):
-    tab = GenerateTab(None, FakeDB([]), fun_time=_session())
+    tab = GenerateTab(None, database_of([]), fun_time=_session())
     qtbot.addWidget(tab)
 
     tab._viewport._pixmap = QPixmap(1200, 700)
@@ -1292,7 +1292,7 @@ def test_a_landscape_image_stays_stacked_when_hosted(qtbot):
 
 
 def test_a_panel_taken_into_a_session_stands_its_portrait_image_beside_the_form(qtbot):
-    tab = GenerateTab(None, FakeDB([]))
+    tab = GenerateTab(None, database_of([]))
     qtbot.addWidget(tab)
     tab._viewport._pixmap = QPixmap(400, 900)
     tab._reflow_for_the_media()
@@ -1304,7 +1304,7 @@ def test_a_panel_taken_into_a_session_stands_its_portrait_image_beside_the_form(
 
 
 def test_a_panel_handed_back_from_a_session_stacks_its_portrait_image_over_the_form(qtbot):
-    tab = GenerateTab(None, FakeDB([]), fun_time=_session())
+    tab = GenerateTab(None, database_of([]), fun_time=_session())
     qtbot.addWidget(tab)
     tab._viewport._pixmap = QPixmap(400, 900)
     tab._reflow_for_the_media()
@@ -1317,7 +1317,7 @@ def test_a_panel_handed_back_from_a_session_stacks_its_portrait_image_over_the_f
 
 
 def test_an_image_back_from_beside_the_form_takes_the_larger_share_again(qtbot):
-    tab = GenerateTab(None, FakeDB([]), fun_time=_session())
+    tab = GenerateTab(None, database_of([]), fun_time=_session())
     qtbot.addWidget(tab)
     tab.resize(600, 1000)
     tab._viewport._pixmap = QPixmap(1200, 700)
@@ -1337,7 +1337,7 @@ def test_an_image_back_from_beside_the_form_takes_the_larger_share_again(qtbot):
 
 
 def test_tabs_taken_into_a_session_lay_out_the_tabs_they_have_and_the_ones_opened_after(qtbot):
-    tabs = GeneratePane(None, FakeDB([]))
+    tabs = GeneratePane(None, database_of([]))
     qtbot.addWidget(tabs)
     first = tabs.currentWidget()
     first._viewport._pixmap = QPixmap(400, 900)
@@ -1352,7 +1352,7 @@ def test_tabs_taken_into_a_session_lay_out_the_tabs_they_have_and_the_ones_opene
 
 
 def test_tabs_handed_back_from_a_session_stack_the_tabs_they_have_and_the_ones_opened_after(qtbot):
-    tabs = GeneratePane(None, FakeDB([]), fun_time=_session())
+    tabs = GeneratePane(None, database_of([]), fun_time=_session())
     qtbot.addWidget(tabs)
     first = tabs.currentWidget()
     first._viewport._pixmap = QPixmap(400, 900)
@@ -1368,7 +1368,7 @@ def test_tabs_handed_back_from_a_session_stack_the_tabs_they_have_and_the_ones_o
 
 
 def test_a_gallery_taken_into_a_session_stands_as_a_hosted_one_is_built(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
 
     view.become_hosted(_session())
@@ -1393,7 +1393,7 @@ def test_a_gallery_taken_into_a_session_stands_as_a_hosted_one_is_built(qtbot):
 
 def test_a_gallery_driving_the_device_lets_go_of_it_as_a_session_takes_it_over(qtbot):
     motion = _SignalMotion()
-    view = GalleryView(FakeDB([]), shared=Shared(osr2_motion=motion))
+    view = GalleryView(database_of([]), shared=Shared(osr2_motion=motion))
     qtbot.addWidget(view)
     view.osr2.control.setChecked(True)
     assert motion.active
@@ -1406,7 +1406,7 @@ def test_a_gallery_driving_the_device_lets_go_of_it_as_a_session_takes_it_over(q
 
 def test_a_gallery_a_session_never_took_over_stands_off_the_device_all_the_same(qtbot):
     motion = _SignalMotion()
-    view = GalleryView(FakeDB([]), shared=Shared(osr2_motion=motion))
+    view = GalleryView(database_of([]), shared=Shared(osr2_motion=motion))
     qtbot.addWidget(view)
     view.osr2.control.setChecked(True)
 
@@ -1422,7 +1422,7 @@ def test_a_gallery_a_session_never_took_over_stands_off_the_device_all_the_same(
 
 def test_a_gallery_drives_again_once_the_session_beside_it_lets_the_device_go(qtbot):
     motion = _SignalMotion()
-    view = GalleryView(FakeDB([]), shared=Shared(osr2_motion=motion))
+    view = GalleryView(database_of([]), shared=Shared(osr2_motion=motion))
     qtbot.addWidget(view)
     view.osr2.control.the_session_has_it(True)
 
@@ -1433,9 +1433,9 @@ def test_a_gallery_drives_again_once_the_session_beside_it_lets_the_device_go(qt
 
 
 def test_a_gallery_handed_back_from_a_session_stands_as_a_standalone_one_is_built(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
-    built = GalleryView(FakeDB([]))
+    built = GalleryView(database_of([]))
     qtbot.addWidget(built)
     view.become_hosted(_session())
 
@@ -1454,7 +1454,7 @@ def test_a_gallery_handed_back_from_a_session_stands_as_a_standalone_one_is_buil
 
 
 def test_a_gallery_taken_into_a_session_hides_separate_and_together_until_handed_back(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     buttons = (view._tree.separate_button, view._tree.together_button)
 
@@ -1467,7 +1467,7 @@ def test_a_gallery_taken_into_a_session_hides_separate_and_together_until_handed
 
 
 def test_a_gallery_handed_back_from_a_session_draws_the_toc_as_it_was_left(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     view._tree.together_button.click()
 
@@ -1480,7 +1480,7 @@ def test_a_gallery_handed_back_from_a_session_draws_the_toc_as_it_was_left(qtbot
 
 def test_a_gallery_handed_back_from_a_session_drives_its_own_device_again(qtbot):
     motion = _SignalMotion()
-    view = GalleryView(FakeDB([]), shared=Shared(osr2_motion=motion))
+    view = GalleryView(database_of([]), shared=Shared(osr2_motion=motion))
     qtbot.addWidget(view)
     view.become_hosted(_session())
 
@@ -1493,7 +1493,7 @@ def test_a_gallery_handed_back_from_a_session_drives_its_own_device_again(qtbot)
 
 def test_a_gallery_handed_back_from_a_session_answers_its_switch_words_itself_again(qtbot):
     radio = _FakeRadio()
-    view = GalleryView(FakeDB([]), shared=Shared(radio=radio))
+    view = GalleryView(database_of([]), shared=Shared(radio=radio))
     qtbot.addWidget(view)
     view.show()
     view.become_hosted(_session())
@@ -1506,7 +1506,7 @@ def test_a_gallery_handed_back_from_a_session_answers_its_switch_words_itself_ag
 
 
 def test_a_gallery_handed_back_from_a_session_opens_its_next_slideshow_over_the_monitor(qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     view.become_hosted(_session())
 
@@ -1522,7 +1522,7 @@ def test_a_gallery_handed_back_from_a_session_opens_its_next_slideshow_over_the_
 
 def test_a_gallery_handed_back_from_a_frozen_session_lets_its_thumbnails_move_again(qtbot, tmp_path):
     rows, webp = _a_looping_video(tmp_path)
-    view = _a_gallery_showing(webp)(FakeDB(rows))
+    view = _a_gallery_showing(webp)(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._tree_view.leaf_by_id["v-1"])
@@ -1536,7 +1536,7 @@ def test_a_gallery_handed_back_from_a_frozen_session_lets_its_thumbnails_move_ag
 
 def test_a_gallery_taken_into_a_session_stops_the_sound_device_and_mic_it_ran(qtbot):
     radio, motion = _FakeRadio(), _SignalMotion()
-    view = GalleryView(FakeDB([]), shared=Shared(radio=radio, osr2_motion=motion))
+    view = GalleryView(database_of([]), shared=Shared(radio=radio, osr2_motion=motion))
     qtbot.addWidget(view)
     view._buttons.radio.setChecked(True)
     view.osr2.control.setChecked(True)
@@ -1553,7 +1553,7 @@ def test_a_gallery_taken_into_a_session_stops_the_sound_device_and_mic_it_ran(qt
 
 
 def test_a_gallery_taken_into_a_session_opens_its_next_slideshow_on_a_region(qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
 
     view.become_hosted(_session())
@@ -1567,7 +1567,7 @@ def test_a_gallery_taken_into_a_session_opens_its_next_slideshow_on_a_region(qtb
 
 def test_a_slideshow_up_when_the_gallery_is_taken_into_a_session_goes_on_on_its_shapes_side(
         qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([_row(f"id-tall-{n}", "sdxl_t2i", {"width": 832, "height": 1216},
+    view = GalleryView(database_of([_row(f"id-tall-{n}", "sdxl_t2i", {"width": 832, "height": 1216},
                                     f"tall{n}.png") for n in range(2)]))
     qtbot.addWidget(view)
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=2))
@@ -1588,7 +1588,7 @@ def test_a_slideshow_up_when_the_gallery_is_taken_into_a_session_goes_on_on_its_
 def test_a_slideshow_moved_onto_a_set_of_the_other_shape_goes_on_as_that_set_in_a_session(
         qtbot, tmp_path, monkeypatch):
     sizes = {"wide": {"width": 1216, "height": 832}, "tall": {"width": 832, "height": 1216}}
-    view = GalleryView(FakeDB([_row(f"id-{name}-{n}", "sdxl_t2i", size, f"{name}{n}.png")
+    view = GalleryView(database_of([_row(f"id-{name}-{n}", "sdxl_t2i", size, f"{name}{n}.png")
                                for name, size in sizes.items() for n in range(2)]))
     qtbot.addWidget(view)
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("wide", 200, 100, count=2))
@@ -1618,7 +1618,7 @@ def test_a_slideshow_of_both_shapes_taken_into_a_session_goes_on_on_both_satelli
         Image.new("RGB", size).save(still)
         rows.append(_row(f"id-{name}-{n}", "sdxl_t2i", params, f"{name}{n}.png"))
         items.append((str(still), "image", f"id-{name}-{n}", str(still)))
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     monkeypatch.setattr(view, "rows_to_play", lambda: rows)
     monkeypatch.setattr(view._slideshows, "items_of", lambda rows: list(items))
@@ -1641,7 +1641,7 @@ def test_a_slideshow_of_both_shapes_taken_into_a_session_goes_on_on_both_satelli
 
 def test_a_gallery_taken_into_a_session_leaves_its_spoken_motion_words_to_the_session(qtbot):
     motion = _SignalMotion()
-    view = GalleryView(FakeDB([]), shared=Shared(osr2_motion=motion))
+    view = GalleryView(database_of([]), shared=Shared(osr2_motion=motion))
     qtbot.addWidget(view)
 
     view.become_hosted(_session())
@@ -1651,7 +1651,7 @@ def test_a_gallery_taken_into_a_session_leaves_its_spoken_motion_words_to_the_se
 
 
 def test_a_gallery_taken_into_a_session_answers_its_switch_words_as_the_sessions(qtbot, monkeypatch):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     answers = []
     monkeypatch.setattr(view._slideshows, "answer",
@@ -1667,7 +1667,7 @@ def test_a_gallery_taken_into_a_session_answers_its_switch_words_as_the_sessions
 
 def test_the_drive_word_says_so_while_a_session_beside_this_one_has_the_device(
         qtbot, monkeypatch):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     answers = []
     monkeypatch.setattr(view._slideshows, "answer",
@@ -1693,7 +1693,7 @@ def test_a_hosted_gallery_holds_every_thick_border_still(qtbot):
 
 
 def test_a_gallery_taken_into_a_session_holds_its_borders_until_handed_back(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     assert all(border.isEnabled() for border in _thick_borders(view))
 
@@ -1725,7 +1725,7 @@ def test_a_tab_opened_in_a_session_holds_its_border_still(qtbot):
 
 
 def test_a_gallery_taken_into_a_session_stands_its_open_portrait_tab_beside_the_form(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     tab = view._generate_pane.current_generate_tab()
     tab._viewport._pixmap = QPixmap(400, 900)
@@ -1736,7 +1736,7 @@ def test_a_gallery_taken_into_a_session_stands_its_open_portrait_tab_beside_the_
 
 
 def test_a_gallery_handed_back_from_a_session_stacks_its_open_portrait_tab_again(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     tab = view._generate_pane.current_generate_tab()
     tab._viewport._pixmap = QPixmap(400, 900)
@@ -1748,7 +1748,7 @@ def test_a_gallery_handed_back_from_a_session_stacks_its_open_portrait_tab_again
 
 
 def test_standalone_never_stands_them_side_by_side(qtbot):
-    tab = GenerateTab(None, FakeDB([]))
+    tab = GenerateTab(None, database_of([]))
     qtbot.addWidget(tab)
 
     tab._viewport._pixmap = QPixmap(400, 900)
@@ -1759,7 +1759,7 @@ def test_standalone_never_stands_them_side_by_side(qtbot):
 
 
 def test_a_tab_coming_to_the_front_lays_out_for_its_own_image(qtbot):
-    tabs = GeneratePane(None, FakeDB([]), fun_time=_session())
+    tabs = GeneratePane(None, database_of([]), fun_time=_session())
     qtbot.addWidget(tabs)
     portrait_tab = tabs.currentWidget()
     portrait_tab._viewport._pixmap = QPixmap(400, 900)
@@ -1799,7 +1799,7 @@ def test_an_item_no_row_claims_is_named_nothing_at_all(qtbot):
 
 def test_a_hosted_slideshows_hud_carries_the_two_pairs_after_shuffle_and_latest(
         qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view._slideshows, "_enhanced_ids_of", lambda rows: {"id-tall-1"})
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
@@ -1824,7 +1824,7 @@ def test_a_hosted_slideshows_hud_carries_the_two_pairs_after_shuffle_and_latest(
 
 
 def test_a_spoken_enhanced_only_narrows_the_named_regions_slideshow(qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view._slideshows, "_enhanced_ids_of", lambda rows: {"id-tall-1"})
     monkeypatch.setattr(view._slideshows, "_favorite_prompt_ids", lambda: {"id-tall-1", "id-tall-2"})
@@ -1848,7 +1848,7 @@ def test_a_spoken_enhanced_only_narrows_the_named_regions_slideshow(qtbot, tmp_p
 
 def test_a_spoken_original_only_and_enhanced_and_original_reach_the_named_regions_slideshow(
         qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view._slideshows, "_enhanced_ids_of", lambda rows: {"id-tall-1"})
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
@@ -1863,7 +1863,7 @@ def test_a_spoken_original_only_and_enhanced_and_original_reach_the_named_region
 
 
 def test_a_regions_reset_drops_the_enhanced_switch_with_the_rest(qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]), fun_time=_session_with_dashboard(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view._slideshows, "_enhanced_ids_of", lambda rows: {"id-tall-1"})
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))

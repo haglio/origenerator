@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import InitVar, asdict, dataclass
+from dataclasses import InitVar, dataclass
 from io import BytesIO
 from unittest.mock import MagicMock
 
@@ -45,7 +45,7 @@ from origenerator.gui.folder_tree import _action_rects
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView, Shared
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.new_tile import NewTile
-from origenerator.item_actions import ItemActions, columns, stored
+from origenerator.item_actions import ItemActions
 from origenerator.item_shape import UNMEASURABLE_SHAPE, base_of, shaped_key
 from origenerator.media import MediaType
 from origenerator.motion_engine import Motion
@@ -56,6 +56,7 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 from tests import gestures
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.qt_exec import faking_exec
+from tests.real_db import database_of
 from tests.slideshow_hud_support import funestra_of
 
 _SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
@@ -141,203 +142,6 @@ class FakeActions:
         return self._redo_label
 
 
-class FakeDB:
-    def __init__(self, rows):
-        self._rows = list(rows)
-        self._by_id = {r["prompt_id"]: r for r in rows}
-        self._issued = 0
-        for row in reversed(self._rows):
-            self._issue_an_id(row)
-        self._meta = {}
-        self._custom = {}
-        self._next_custom = 1
-        self._deletions = {}
-        self._requests = {}
-        self._seed_uses = []
-        self._combine_video_uses = []
-        self._item_numbers = {}
-
-    def _issue_an_id(self, row):
-        if "id" not in row:
-            self._issued += 1
-            row["id"] = self._issued
-        self._issued = max(self._issued, row["id"])
-
-    def list_generations(self):
-        return [dict(row) for row in self._rows]
-
-    def rows_made_by(self, workflow_name):
-        return [row for row in self._rows if row.get("workflow_name") == workflow_name]
-
-    def library_version(self):
-        return object()
-
-    def record_seed_use(self, use):
-        self._seed_uses.insert(0, asdict(use))
-
-    def list_seed_uses(self):
-        return list(self._seed_uses)
-
-    def record_combine_video_use(self, intent, video_prompt_id, generation_prompt_id=None):
-        self._combine_video_uses.insert(0, {
-            "intent": intent, "video_prompt_id": video_prompt_id,
-            "generation_prompt_id": generation_prompt_id,
-            "created_at": f"9999-{len(self._combine_video_uses):08d}"})
-
-    def list_combine_video_uses(self):
-        return list(self._combine_video_uses)
-
-    def custom_combinations(self):
-        return [{"prompt_id": row["prompt_id"], "source_video": row["source_video"],
-                 "created_at": row.get("created_at") or ""}
-                for row in self._rows
-                if row.get("source_video") and not row.get("action")]
-
-    def list_item_numbers(self):
-        return dict(self._item_numbers)
-
-    def record_item_numbers(self, numbers):
-        self._item_numbers.update(numbers)
-
-    def get_generation(self, prompt_id):
-        return self._by_id.get(prompt_id)
-
-    @property
-    def requests(self):
-        return self
-
-    def exchange_of(self, prompt_id):
-        return []
-
-    def items_asked_into(self, prompt_id):
-        return []
-
-    def recent_durations(self, workflow_name, limit=10):
-        return [
-            r["duration_seconds"] for r in self._rows
-            if r.get("workflow_name") == workflow_name
-            and r.get("status") == "completed"
-            and r.get("duration_seconds") is not None
-        ][:limit]
-
-    def folder_meta_map(self):
-        return {k: dict(v) for k, v in self._meta.items()}
-
-    def upsert_folder_meta(self, key, *, custom_name, favorite, level, ref_prompt_id):
-        self._meta[key] = {"custom_name": custom_name, "starred": bool(favorite)}
-
-    def _meta_of(self, key):
-        return self._meta.setdefault(key, {"custom_name": None, "starred": False,
-                                           "favorite_after_id": None,
-                                           "enhance_after_id": None})
-
-    def set_folder_favorite(self, key, favorite, *, after_id=None):
-        self._meta_of(key).update(starred=bool(favorite),
-                                  favorite_after_id=after_id if favorite else None)
-
-    def set_folder_enhance(self, key, *, after_id):
-        self._meta_of(key)["enhance_after_id"] = after_id
-
-    def move_folder_arrivals_on(self, key, *, favorite_after_id, enhance_after_id):
-        self._meta_of(key).update(favorite_after_id=favorite_after_id,
-                                  enhance_after_id=enhance_after_id)
-
-    def set_many_actions(self, side, actions_by_id):
-        for prompt_id, item_actions in actions_by_id.items():
-            self._by_id[prompt_id].update(zip(columns(side), stored(item_actions), strict=True))
-
-    def fill_in(self, column, values):
-        for prompt_id, value in values.items():
-            self._by_id[prompt_id][column] = value
-
-    def set_generation_favorite(self, prompt_id, favorite):
-        row = self._by_id.get(prompt_id)
-        if row is not None:
-            row["starred"] = 1 if favorite else 0
-
-    def set_experiment_verdict(self, prompt_id, verdict):
-        row = self._by_id.get(prompt_id)
-        if row is not None:
-            row["experiment_verdict"] = verdict
-
-    def delete_generation(self, prompt_id):
-        self._rows = [r for r in self._rows if r["prompt_id"] != prompt_id]
-        self._by_id.pop(prompt_id, None)
-
-    def restore_generation(self, row):
-        self._rows.insert(0, row)
-        self._by_id[row["prompt_id"]] = row
-
-
-    def record_trashed(self, prompt_id, row, batch, *, deleted_at=None):
-        self._deletions.pop(prompt_id, None)
-        self._deletions[prompt_id] = {
-            "prompt_id": prompt_id, "row": row, "batch": batch,
-            "deleted_at": "2026-08-15 03:00:00",
-        }
-
-    def list_trashed(self):
-        return list(reversed(self._deletions.values()))
-
-    def get_trashed(self, prompt_id):
-        return self._deletions.get(prompt_id)
-
-    def forget_trashed(self, prompt_id):
-        self._deletions.pop(prompt_id, None)
-
-    def record_request(self, request):
-        self._requests[request.prompt_id] = asdict(request)
-
-    def list_requests(self):
-        return list(reversed(self._requests.values()))
-
-    def get_request(self, prompt_id):
-        return self._requests.get(prompt_id)
-
-    def requests_about(self, source_prompt_id):
-        return [record for record in self.list_requests()
-                if record["source_prompt_id"] == source_prompt_id]
-
-    def create_custom_collection(self, name, folder_id=None, shape=None):
-        if folder_id is None:
-            folder_id = self._next_custom
-        self._next_custom = max(self._next_custom, folder_id) + 1
-        self._custom[folder_id] = {"name": name, "side": shape, "folders": {}, "items": {}}
-        return folder_id
-
-    def delete_custom_collection(self, folder_id):
-        self._custom.pop(folder_id, None)
-
-    def add_folders_to_custom_collection(self, folder_id, folders):
-        for folder_key, level, ref in folders:
-            self._custom[folder_id]["folders"][folder_key] = (level, ref)
-
-    def remove_folder_from_custom_collection(self, folder_id, folder_key):
-        self._custom[folder_id]["folders"].pop(folder_key, None)
-
-    def add_items_to_custom_collection(self, folder_id, prompt_ids):
-        self._custom[folder_id]["items"].update(dict.fromkeys(prompt_ids))
-
-    def remove_items_from_custom_collection(self, folder_id, prompt_ids):
-        for prompt_id in prompt_ids:
-            self._custom[folder_id]["items"].pop(prompt_id, None)
-
-    def list_custom_collections(self):
-        return [{"id": fid, "name": f["name"], "side": f["side"], "folders": list(f["folders"]),
-                 "items": list(f["items"])}
-                for fid, f in sorted(self._custom.items())]
-
-    def folders_in_custom_collections(self):
-        return [{"folder_id": fid, "folder_key": key, "level": level, "ref_prompt_id": ref}
-                for fid, f in self._custom.items()
-                for key, (level, ref) in f["folders"].items()]
-
-    def add(self, row):
-        self._issue_an_id(row)
-        self._rows.insert(0, row)
-        self._by_id[row["prompt_id"]] = row
-
-
 def _row(prompt_id, workflow_name, params, filename, **extra):
     row = {
         "prompt_id": prompt_id,
@@ -350,6 +154,7 @@ def _row(prompt_id, workflow_name, params, filename, **extra):
         "positive_prompt": params.get("positive_prompt", ""),
         "negative_prompt": "",
         "params_json": json.dumps(params),
+        "workflow_json": "{}",
         "output_files": json.dumps([{"filename": filename, "subfolder": ""}]),
         "thumbnail_path": None,
     }
@@ -478,7 +283,7 @@ def _of_both_kinds(qtbot, actions=None):
     rows = [_image("i1", "a cat", 50, 1),
             _row("v1", "wan22_i2v", {"positive_prompt": "a cat", "seed": 5},
                  "wan22_i2v_00001_.mp4")]
-    view = GalleryView(FakeDB(rows), actions=actions)
+    view = GalleryView(database_of(rows), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     return view
@@ -518,7 +323,7 @@ def _experiment_row(prompt_id, verdict=None, prompt="a cat", steps=50, seed=9, *
 
 
 def _trash_db(rows=(), held=(), inherited=()):
-    db = FakeDB(list(rows))
+    db = database_of(list(rows))
     for prompt_id, row in held:
         db.record_trashed(prompt_id, row, {"moves": [], "subdir": None})
     for prompt_id, row in inherited:
@@ -1015,7 +820,7 @@ class _SignalMotion(QObject):
 
 def _a_slideshow_standing_on_its_own(qtbot, monkeypatch, **gallery):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions(),
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), actions=FakeActions(),
                        client=ComfyUIClient(folders=SUITE_FOLDERS),
                        shared=Shared(**gallery))
     qtbot.addWidget(view)
@@ -1045,7 +850,7 @@ def _keys_are_the_gallerys(view):
 
 def _two_leaf_view(qtbot, extra=(), actions=None):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1), *extra]
-    view = GalleryView(FakeDB(rows), actions=actions)
+    view = GalleryView(database_of(rows), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)

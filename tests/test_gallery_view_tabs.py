@@ -23,7 +23,6 @@ from origenerator.gui.viewport import Viewport
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import (
     _SDXL,
-    FakeDB,
     _image,
     _image_workflow,
     _png_bytes,
@@ -32,6 +31,7 @@ from tests.gallery_view_support import (
     _video_workflow,
     _viewport_of,
 )
+from tests.real_db import database_of
 
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 
@@ -45,7 +45,7 @@ def test_selecting_an_image_lists_the_videos_it_was_animated_into(qtbot):
     video = _row("vid1", "wan22_i2v",
                  {"positive_prompt": "dance", "input_image": "sdxl_t2i_img1.png"},
                  "wan22_i2v_vid1.mp4")
-    view = GalleryView(FakeDB([image, video]), client=ComfyUIClient(folders=SUITE_FOLDERS))
+    view = GalleryView(database_of([image, video]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -62,7 +62,7 @@ def test_animation_strip_is_hidden_for_a_video_or_an_unanimated_image(qtbot):
     lonely = _image("img2", "a dog", 50, 2)
     video = _row("vid1", "wan22_i2v",
                  {"input_image": "sdxl_t2i_img1.png"}, "wan22_i2v_vid1.mp4")
-    view = GalleryView(FakeDB([image, lonely, video]), client=ComfyUIClient(folders=SUITE_FOLDERS))
+    view = GalleryView(database_of([image, lonely, video]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
     for tab in view._generate_pane.generate_tabs():
@@ -78,7 +78,7 @@ def test_animation_strip_is_hidden_for_a_video_or_an_unanimated_image(qtbot):
 
 
 def test_clicking_thumbnail_shows_resolved_preview(qtbot, monkeypatch):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     _viewport_of(view).show_media = MagicMock()
@@ -91,7 +91,7 @@ def test_clicking_thumbnail_shows_resolved_preview(qtbot, monkeypatch):
 
 
 def test_clicking_thumbnail_without_media_clears_preview(qtbot, monkeypatch):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     _viewport_of(view).clear = MagicMock()
@@ -105,13 +105,13 @@ def test_clicking_thumbnail_without_media_clears_preview(qtbot, monkeypatch):
 
 
 def test_gallery_creates_a_viewport(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     assert isinstance(_viewport_of(view), Viewport)
 
 
 def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
 
     for splitter in (view._arrangement.panes, view._arrangement.folder_panes, view._arrangement.left_column):
@@ -130,7 +130,7 @@ def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
 
 
 def test_the_generate_panes_floor_is_the_tab_it_holds(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     tab = view._generate_pane.current_generate_tab()
     assert view._arrangement.panes.widget(1).minimumWidth() == 0
@@ -139,7 +139,7 @@ def test_the_generate_panes_floor_is_the_tab_it_holds(qtbot):
 
 
 def test_the_generate_pane_is_a_tab_widget_of_editable_generate_tabs(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     assert isinstance(view._generate_pane, QTabWidget)
     assert view._arrangement.panes.widget(1).isAncestorOf(view._generate_pane)
@@ -148,7 +148,7 @@ def test_the_generate_pane_is_a_tab_widget_of_editable_generate_tabs(qtbot):
 
 
 def test_selecting_a_thumbnail_loads_it_into_the_front_tab(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(folders=SUITE_FOLDERS))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -160,7 +160,7 @@ def test_selecting_a_thumbnail_loads_it_into_the_front_tab(qtbot):
 
 
 def test_a_rebuilds_reselection_leaves_the_active_tab_alone(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(folders=SUITE_FOLDERS))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
@@ -247,7 +247,7 @@ def test_a_restored_selection_leaves_the_resting_tab_empty(qtbot, monkeypatch):
     monkeypatch.setattr(gallery, "resolve_preview",
                         lambda row, places: (Path("C:/out/sdxl_t2i_i2.png"), "image"))
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    db = FakeDB(rows)
+    db = database_of(rows)
     probe = GalleryView(db)
     qtbot.addWidget(probe)
     probe.refresh()
@@ -367,7 +367,7 @@ def test_selecting_generation_shows_typical_time_in_the_loaded_tab(qtbot):
         _row("v2", "wan22_i2v", {"seed": 2}, "wan22_i2v_2.mp4", duration_seconds=724.0),
         _row("v3", "wan22_i2v", {"seed": 3}, "wan22_i2v_3.mp4", duration_seconds=800.0),
     ]
-    view = GalleryView(FakeDB(rows), client=ComfyUIClient(folders=SUITE_FOLDERS))
+    view = GalleryView(database_of(rows), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
     for tab in view._generate_pane.generate_tabs():
@@ -384,7 +384,7 @@ def test_selecting_a_folder_shows_average_time_across_its_items(qtbot):
         _row("v2", "wan22_i2v", {"seed": 2}, "wan22_i2v_2.mp4", duration_seconds=724.0),
         _row("v3", "wan22_i2v", {"seed": 3}, "wan22_i2v_3.mp4", duration_seconds=800.0),
     ]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -394,7 +394,7 @@ def test_selecting_a_folder_shows_average_time_across_its_items(qtbot):
 
 
 def test_folder_without_timed_items_shows_no_average(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -427,7 +427,7 @@ def test_untimed_prompt_folder_falls_back_to_workflow_time(qtbot):
         _row("v_timed", "wan22_i2v", {"steps": 20, "seed": 1}, "wan22_i2v_1.mp4",
              duration_seconds=1390.0),
     ]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -449,7 +449,7 @@ def test_timed_prompt_folder_uses_its_own_average_not_the_workflow(qtbot):
         _row("v2", "wan22_i2v", {"steps": 20, "seed": 2}, "wan22_i2v_2.mp4",
              duration_seconds=80.0),
     ]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -460,7 +460,7 @@ def test_timed_prompt_folder_uses_its_own_average_not_the_workflow(qtbot):
 
 
 def test_a_rebuild_takes_an_item_that_has_gone_off_the_tab_showing_it(qtbot, tmp_path):
-    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
+    db = database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()

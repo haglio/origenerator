@@ -36,7 +36,6 @@ from tests.closed_windows import is_closed
 from tests.gallery_view_support import (
     _REROLL_HISTORY,
     FakeActions,
-    FakeDB,
     _enhanced_image,
     _generating_tile,
     _image,
@@ -48,6 +47,7 @@ from tests.gallery_view_support import (
     _viewport_of,
     _will_move_on,
 )
+from tests.real_db import database_of
 from tests.slideshow_hud_support import funestra_of, open_both_shapes
 from tests.test_slideshow_hud import _inflight
 
@@ -71,7 +71,7 @@ def _as_items(rows):
 
 
 def _view_with_bridge(qtbot, tmp_path, rows=()):
-    view = GalleryView(FakeDB(list(rows)), fun_time=_session(tmp_path))
+    view = GalleryView(database_of(list(rows)), fun_time=_session(tmp_path))
     qtbot.addWidget(view)
     bridge = FunTimeBridge(view._fun_time, view, parent=view)
     return view, bridge
@@ -460,7 +460,7 @@ def test_a_status_file_cleared_under_it_is_written_again(qtbot, tmp_path):
 
 def test_a_bridge_whose_core_waits_on_comfyui_says_it_is_up_and_core_is_not_ready(
         qtbot, tmp_path):
-    view = GalleryView(FakeDB([]), fun_time=_session(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_session(tmp_path))
     qtbot.addWidget(view)
     bridge = FunTimeBridge(view._fun_time, view, parent=view, core_ready=False)
 
@@ -470,7 +470,7 @@ def test_a_bridge_whose_core_waits_on_comfyui_says_it_is_up_and_core_is_not_read
 
 
 def test_core_ready_goes_out_once_core_is_ready(qtbot, tmp_path):
-    view = GalleryView(FakeDB([]), fun_time=_session(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_session(tmp_path))
     qtbot.addWidget(view)
     bridge = FunTimeBridge(view._fun_time, view, parent=view, core_ready=False)
     bridge._tick()
@@ -662,7 +662,7 @@ def test_a_session_that_hands_over_its_funestras_gets_both_sides_on_them(
         raise AssertionError("a window of this app's opened over a region")
 
     monkeypatch.setattr(slideshow_director, "SlideshowView", no_window)
-    view = GalleryView(FakeDB([]), fun_time=_funestras_session(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_funestras_session(tmp_path))
     qtbot.addWidget(view)
     bridge = FunTimeBridge(view._fun_time, view, parent=view)
     tall, wide = tmp_path / "tall.png", tmp_path / "wide.png"
@@ -698,7 +698,7 @@ def test_the_document_names_each_press_on_the_job_queue_a_funestra_draws():
 
 def test_a_press_on_the_job_queue_a_funestra_draws_reaches_that_job(
         qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]), fun_time=_funestras_session(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_funestras_session(tmp_path))
     qtbot.addWidget(view)
     monkeypatch.setattr(view, "window", _MinimizedCore)
     bridge = FunTimeBridge(view._fun_time, view, parent=view)
@@ -737,7 +737,7 @@ def _items_of(rows) -> list:
 
 
 def _funestras_playing_their_libraries(qtbot, tmp_path, monkeypatch):
-    view = GalleryView(FakeDB([]), fun_time=_funestras_session(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_funestras_session(tmp_path))
     qtbot.addWidget(view)
     bridge = FunTimeBridge(view._fun_time, view, parent=view)
     library = {"__all__::landscape": _stills(tmp_path, "library-wide", 3, (200, 100)),
@@ -1022,7 +1022,7 @@ def test_a_clip_the_session_names_that_this_app_made_asks_the_room_to_show_this_
 
 def test_a_video_the_session_sends_to_trash_goes_to_this_apps_trash(qtbot, tmp_path):
     actions = FakeActions()
-    view = GalleryView(FakeDB([]), fun_time=_session(tmp_path), actions=actions)
+    view = GalleryView(database_of([]), fun_time=_session(tmp_path), actions=actions)
     qtbot.addWidget(view)
     bridge = FunTimeBridge(view._fun_time, view, parent=view)
 
@@ -1034,7 +1034,7 @@ def test_a_video_the_session_sends_to_trash_goes_to_this_apps_trash(qtbot, tmp_p
 def test_a_video_genau_already_moved_to_its_trash_goes_to_this_apps_trash_from_there(
         qtbot, tmp_path):
     actions = FakeActions()
-    view = GalleryView(FakeDB([]), fun_time=_session(tmp_path), actions=actions)
+    view = GalleryView(database_of([]), fun_time=_session(tmp_path), actions=actions)
     qtbot.addWidget(view)
     bridge = FunTimeBridge(view._fun_time, view, parent=view)
 
@@ -1083,7 +1083,7 @@ def _radio_videos(tmp_path, count=6):
 
 
 def _view_with_funestras_and_bridge(qtbot, tmp_path):
-    view = GalleryView(FakeDB([]), fun_time=_funestras_session(tmp_path))
+    view = GalleryView(database_of([]), fun_time=_funestras_session(tmp_path))
     qtbot.addWidget(view)
     bridge = FunTimeBridge(view._fun_time, view, parent=view, radio_dir=_radio_videos(tmp_path))
     return view, bridge

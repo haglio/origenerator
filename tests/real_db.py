@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import sqlite3
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -9,10 +8,12 @@ from PIL import Image
 
 from origenerator.db import Database
 from origenerator.db_generations import GenerationSource
-from origenerator.db_schema import STORED_NAMES
+from origenerator.db_schema import GENERATION_COLUMNS, STORED_NAMES
 
 _DEFAULTS = {"workflow_name": "sdxl_t2i", "workflow_version": "v1", "params_json": "{}",
              "workflow_json": "{}", "source": GenerationSource.GENERATED}
+
+DATABASES = Path("set for each test by conftest")
 
 
 def database_in(folder: Path, rows: Iterable[dict] = (), *,
@@ -20,6 +21,11 @@ def database_in(folder: Path, rows: Iterable[dict] = (), *,
     db = kind(_unused_folder(Path(folder) / "database") / "origenerator.db")
     put_rows(db, rows)
     return db
+
+
+def database_of(newest_first: Iterable[dict] = (), *,
+                kind: type[Database] = Database) -> Database:
+    return database_in(DATABASES, reversed(list(newest_first)), kind=kind)
 
 
 def _unused_folder(first: Path) -> Path:
@@ -31,15 +37,11 @@ def _unused_folder(first: Path) -> Path:
 
 
 def put_rows(db: Database, rows: Iterable[dict]) -> None:
-    rows = [{STORED_NAMES.get(name, name): value for name, value in {**_DEFAULTS, **row}.items()}
-            for row in rows]
-    if not rows:
-        return
-    with sqlite3.connect(db.path) as conn:
-        for row in rows:
-            conn.execute(f"INSERT INTO generations ({', '.join(row)}) "
-                         f"VALUES ({', '.join('?' * len(row))})", tuple(row.values()))
-    conn.close()
+    rows = [{**_DEFAULTS, **row} for row in rows]
+    for row in rows:
+        if unknown := set(row) - set(GENERATION_COLUMNS) - set(STORED_NAMES):
+            raise KeyError(f"{row['prompt_id']} names no column the gallery keeps: {sorted(unknown)}")
+    db.insert_rows(rows)
 
 
 def kept_on_disk(db: Database, row: dict, path: Path) -> dict:

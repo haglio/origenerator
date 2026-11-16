@@ -47,7 +47,6 @@ from tests.gallery_view_support import (
     _CTRL,
     _NO_MOD,
     FakeActions,
-    FakeDB,
     _alls,
     _answer_confirmation,
     _answer_menu,
@@ -74,6 +73,7 @@ from tests.gallery_view_support import (
     _workflow_rows,
 )
 from tests.qt_exec import faking_exec
+from tests.real_db import database_of
 from tests.test_folder_tree import _shown
 
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
@@ -84,7 +84,7 @@ _SHIFT = Qt.KeyboardModifier.ShiftModifier
 
 
 def test_the_trash_collection_is_always_reachable(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -182,7 +182,7 @@ def test_the_trash_collection_states_no_deadline_over_what_it_holds(qtbot):
 
 
 def test_an_empty_trash_collection_explains_what_it_is_for(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -665,7 +665,7 @@ def _scroll_into_view(widget):
 
 def test_delete_key_deletes_the_selected_thumbnail(qtbot):
     actions = FakeActions()
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -686,7 +686,7 @@ def test_a_branch_session_deletes_into_the_shared_trash_through_the_actions_the_
     file_path.write_bytes(b"data")
     monkeypatch.setattr(gallery_view_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
     monkeypatch.setattr(gallery_view_module, "TRASH_DIR", tmp_path / "trash")
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -704,7 +704,7 @@ def test_ctrl_click_extends_selection_and_delete_takes_all_picked(qtbot):
     actions = FakeActions()
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _image("i3", "a cat", 50, 3)]
-    view = GalleryView(FakeDB(rows), actions=actions)
+    view = GalleryView(database_of(rows), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -719,7 +719,7 @@ def test_ctrl_click_extends_selection_and_delete_takes_all_picked(qtbot):
 
 def test_ctrl_click_again_deselects_a_tile(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -732,7 +732,7 @@ def test_ctrl_click_again_deselects_a_tile(qtbot):
 
 def test_shift_click_selects_the_contiguous_range(qtbot):
     rows = [_image(f"i{i}", "a cat", 50, i) for i in range(1, 5)]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -745,7 +745,7 @@ def test_shift_click_selects_the_contiguous_range(qtbot):
 
 def test_plain_click_replaces_the_whole_selection(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -758,7 +758,7 @@ def test_plain_click_replaces_the_whole_selection(qtbot):
 
 def test_changing_folders_clears_the_selection(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     cat_leaf = _open_leaf(view)
@@ -772,7 +772,7 @@ def test_changing_folders_clears_the_selection(qtbot):
 
 def test_clicking_the_pane_background_drops_the_selection(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -788,7 +788,7 @@ def test_clicking_the_pane_background_drops_the_selection(qtbot):
 
 def test_clicking_the_pane_background_leaves_the_tiles_on_screen(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -802,7 +802,7 @@ def test_clicking_the_pane_background_leaves_the_tiles_on_screen(qtbot):
 
 
 def test_clicking_a_thumbnail_keeps_its_press_to_itself(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions())
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -814,7 +814,7 @@ def test_clicking_a_thumbnail_keeps_its_press_to_itself(qtbot):
 
 def test_right_clicking_the_pane_background_keeps_the_selection(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -830,7 +830,7 @@ def test_right_clicking_the_pane_background_keeps_the_selection(qtbot):
 
 def test_deleting_a_folder_can_be_cancelled_at_the_prompt(qtbot, monkeypatch):
     actions = FakeActions()
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -845,7 +845,7 @@ def test_deleting_a_folder_can_be_cancelled_at_the_prompt(qtbot, monkeypatch):
 def test_delete_key_on_a_workflow_folder_does_nothing(qtbot):
     actions = FakeActions()
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    view = GalleryView(FakeDB(rows), actions=actions)
+    view = GalleryView(database_of(rows), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     workflow = _image_workflow(view._tree)
@@ -862,7 +862,7 @@ def test_a_failed_delete_is_surfaced_not_swallowed(qtbot, monkeypatch):
         def delete_rows(self, rows):
             raise OSError("the file is held by another process")
 
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=BoomActions())
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), actions=BoomActions())
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -880,7 +880,7 @@ def test_a_failed_delete_is_surfaced_not_swallowed(qtbot, monkeypatch):
 
 def test_right_clicking_an_unpicked_thumbnail_selects_it(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -894,7 +894,7 @@ def test_right_clicking_an_unpicked_thumbnail_selects_it(qtbot, monkeypatch):
 def test_right_click_delete_removes_the_picked_thumbnails(qtbot, monkeypatch):
     actions = FakeActions()
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    view = GalleryView(FakeDB(rows), actions=actions)
+    view = GalleryView(database_of(rows), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -911,7 +911,7 @@ def test_right_click_delete_acts_on_the_whole_multi_selection(qtbot, monkeypatch
     actions = FakeActions()
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _image("i3", "a cat", 50, 3)]
-    view = GalleryView(FakeDB(rows), actions=actions)
+    view = GalleryView(database_of(rows), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -929,7 +929,7 @@ def test_right_click_delete_acts_on_the_whole_multi_selection(qtbot, monkeypatch
 def test_right_clicking_a_selected_tile_preserves_the_multi_selection(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _image("i3", "a cat", 50, 3)]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -1010,7 +1010,7 @@ def test_deleting_a_folder_returns_to_the_most_recent_one_still_there(qtbot, tmp
 
 def test_delete_folder_refuses_a_workflow_group(qtbot):
     actions = FakeActions()
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     view._confirm = lambda text: True
@@ -1024,7 +1024,7 @@ def test_delete_folder_refuses_a_workflow_group(qtbot):
 def test_the_hover_rows_trash_icon_deletes_the_folder_it_names(qtbot, monkeypatch):
     actions = FakeActions()
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    view = GalleryView(FakeDB(rows), actions=actions)
+    view = GalleryView(database_of(rows), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)
@@ -1039,7 +1039,7 @@ def test_the_hover_rows_trash_icon_deletes_the_folder_it_names(qtbot, monkeypatc
 def test_a_model_or_lora_folder_is_no_leaf_folder_and_is_not_deleted(qtbot, depth):
     actions = FakeActions()
     rows = [_i2v_video("v1", "styleA"), _i2v_video("v2", "styleB")]
-    view = GalleryView(FakeDB(rows), actions=actions)
+    view = GalleryView(database_of(rows), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     folder = _at(_video_workflow(view._tree), *([0] * depth))
@@ -1055,7 +1055,7 @@ def test_a_model_or_lora_folder_is_no_leaf_folder_and_is_not_deleted(qtbot, dept
 
 def test_undo_button_reflects_pending_action_and_triggers_undo(qtbot):
     actions = FakeActions()
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     assert not view._buttons.undo.isEnabled()
@@ -1073,7 +1073,7 @@ def test_undo_button_reflects_pending_action_and_triggers_undo(qtbot):
 
 def test_redo_button_sits_beside_undo_and_walks_back_the_other_way(qtbot):
     actions = FakeActions()
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     assert not view._buttons.redo.isEnabled()
@@ -1094,7 +1094,7 @@ def test_redo_button_sits_beside_undo_and_walks_back_the_other_way(qtbot):
 
 def test_ctrl_shift_z_redoes_where_ctrl_z_undoes(qtbot, monkeypatch):
     actions = FakeActions()
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=actions)
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
     monkeypatch.setattr(view.keys, "gallery_owns_keys", lambda **_kw: True)
@@ -1143,13 +1143,13 @@ def test_delete_then_undo_through_the_view_round_trips(qtbot, tmp_path):
 
 def test_a_delete_can_let_go_of_the_files_it_is_about_to_move(qtbot):
     # Windows refuses to move a file that is open.
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     assert view._edits._environment.release_files == view._release_held_media
 
 
 def test_releasing_held_media_clears_a_pane_under_the_one_in_front(qtbot, tmp_path):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     doomed = tmp_path / "doomed.png"
     doomed.write_bytes(b"x")
@@ -1163,7 +1163,7 @@ def test_releasing_held_media_clears_a_pane_under_the_one_in_front(qtbot, tmp_pa
 
 
 def test_releasing_held_media_reaches_an_open_slideshow(qtbot, tmp_path):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     view._slideshows._slideshow = MagicMock()
 
@@ -1176,7 +1176,7 @@ def test_releasing_held_media_reaches_an_open_slideshow(qtbot, tmp_path):
 
 def test_a_slideshow_hears_when_the_file_it_lets_go_of_is_a_version_of_an_item_that_stays(
         qtbot, tmp_path):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     view._slideshows._slideshow = MagicMock()
 
@@ -1386,7 +1386,7 @@ def test_trashing_an_item_with_no_row_from_a_slideshow_does_nothing(qtbot):
 
 
 def test_no_gallery_the_suite_builds_reaches_the_libraries_kino(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
 
     kino = view._edits._environment.kino
@@ -1450,7 +1450,7 @@ def test_deleting_an_items_enhancement_versions_puts_the_delete_on_the_undo_butt
             self._label = "Delete 1 version"
             return True
 
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=DeletesVersions())
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), actions=DeletesVersions())
     qtbot.addWidget(view)
     view.refresh()
     assert not view._buttons.undo.isEnabled()

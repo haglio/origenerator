@@ -36,7 +36,6 @@ from tests.gallery_view_support import (
     _NO_MOD,
     _WAN_I2V,
     FakeActions,
-    FakeDB,
     _a_slideshow_standing_on_its_own,
     _alls,
     _at,
@@ -71,6 +70,7 @@ from tests.gallery_view_support import (
     _top_level,
 )
 from tests.marked_words import words
+from tests.real_db import database_of, put_rows
 from tests.slideshow_hud_support import funestra_of, hud_button_names, hud_targets
 from tests.slideshow_support import ahead
 
@@ -85,7 +85,7 @@ def _minimized_from_the_taskbar(slideshow):
 
 def test_slideshow_opens_the_folders_media(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
@@ -99,7 +99,7 @@ def test_slideshow_opens_the_folders_media(qtbot, monkeypatch):
 
 def test_the_slideshow_begins_on_whichever_item_is_picked_in_the_folder(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image(f"i{n}", "a cat", 50, n) for n in (1, 2, 3)]))
+    view = GalleryView(database_of([_image(f"i{n}", "a cat", 50, n) for n in (1, 2, 3)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -116,7 +116,7 @@ def test_the_slideshow_begins_on_whichever_item_is_picked_in_the_folder(qtbot, m
 def test_an_item_picked_while_a_slideshow_sits_minimized_is_where_the_button_begins_it(
         qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image(f"i{n}", "a cat", 50, n) for n in (1, 2, 3)]))
+    view = GalleryView(database_of([_image(f"i{n}", "a cat", 50, n) for n in (1, 2, 3)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -137,7 +137,7 @@ def test_an_item_picked_while_a_slideshow_sits_minimized_is_where_the_button_beg
 def test_with_two_items_picked_the_slideshow_comes_back_to_where_the_last_one_closed(
         qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image(f"i{n}", "a cat", 50, n) for n in (1, 2, 3)]))
+    view = GalleryView(database_of([_image(f"i{n}", "a cat", 50, n) for n in (1, 2, 3)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -161,7 +161,7 @@ def test_with_two_items_picked_the_slideshow_comes_back_to_where_the_last_one_cl
 def test_the_item_picked_comes_first_though_another_in_the_folder_is_being_enhanced(
         qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image(f"i{n}", "a cat", 50, n) for n in (1, 2, 3)]))
+    view = GalleryView(database_of([_image(f"i{n}", "a cat", 50, n) for n in (1, 2, 3)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -183,7 +183,7 @@ def test_the_item_picked_comes_first_though_another_in_the_folder_is_being_enhan
 
 def _standalone_slideshow(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
@@ -271,7 +271,7 @@ def _a_gallery_with_another_sites_picture(qtbot, monkeypatch):
     theirs = {**_row("o1", "outside picture:a-site", {"positive_prompt": "a cat", "seed": 2},
                      "a-site_o1.png"),
               "source": "outside", "workflow_version": "outside"}
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), theirs]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), theirs]))
     qtbot.addWidget(view)
     view.refresh()
     return view
@@ -337,7 +337,7 @@ def test_a_slideshow_started_on_favorites_plays_what_other_sites_made_that_you_s
     theirs = {**_row("o1", "outside picture:a-site", {"positive_prompt": "a", "seed": 2},
                      "a-site_o1.png"),
               "source": "outside", "workflow_version": "outside", "starred": 1}
-    view = GalleryView(FakeDB([{**_image("i1", "a cat", 50, 1), "starred": 1}, theirs]))
+    view = GalleryView(database_of([{**_image("i1", "a cat", 50, 1), "starred": 1}, theirs]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
@@ -404,7 +404,7 @@ def test_locking_an_image_makes_its_waiting_enhancement_the_next_one_made(
 
 
 def test_the_slideshow_button_waits_until_there_is_something_to_play(qtbot):
-    view = GalleryView(FakeDB([_running_row("in_flight", prompt="a cat")]))
+    view = GalleryView(database_of([_running_row("in_flight", prompt="a cat")]))
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
@@ -416,7 +416,7 @@ def test_the_slideshow_button_waits_until_there_is_something_to_play(qtbot):
 
 def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1)])
     db.set_generation_favorite("i1", True)
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -439,7 +439,7 @@ def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
 def test_a_slideshow_after_one_of_the_favorites_collection_is_not_held_to_the_favorites(qtbot,
                                                                                monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1),
                                _row("i2", "sdxl_t2i",
                                     {"positive_prompt": "a cat", "steps": 50, "seed": 2},
                                     "sdxl_t2i_i2.png", starred=1)]))
@@ -464,7 +464,7 @@ def test_a_slideshow_after_one_of_the_favorites_collection_is_not_held_to_the_fa
 def test_a_slideshow_of_enhanced_lights_enhanced_only_and_the_next_slideshow_does_not(
         qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1),
                                _enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -486,7 +486,7 @@ def test_a_slideshow_of_enhanced_lights_enhanced_only_and_the_next_slideshow_doe
 
 def test_favorites_begins_on_the_favorite_picked_there(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([
+    view = GalleryView(database_of([
         _row(f"i{n}", "sdxl_t2i", {"positive_prompt": "a cat", "steps": 50, "seed": n},
              f"sdxl_t2i_i{n}.png", starred=1) for n in (1, 2, 3)]))
     qtbot.addWidget(view)
@@ -511,7 +511,7 @@ def test_favorites_begins_on_the_favorite_picked_there(qtbot, monkeypatch):
 
 def test_slideshow_plays_the_latest_collection(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, LATEST_KEY))
@@ -525,7 +525,7 @@ def test_slideshow_plays_the_latest_collection(qtbot, monkeypatch):
 
 def test_a_slideshow_of_one_kinds_latest_plays_that_kind_alone(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Images"], "Latest"))
@@ -539,7 +539,7 @@ def test_a_slideshow_of_one_kinds_latest_plays_that_kind_alone(qtbot, monkeypatc
 
 def test_latest_begins_on_its_newest_whatever_is_picked_there(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_latest(view)
@@ -556,7 +556,7 @@ def test_latest_begins_on_its_newest_whatever_is_picked_there(qtbot, monkeypatch
 
 def test_the_enhanced_switch_narrows_a_slideshow_to_the_images_made_better(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1),
                                _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -577,7 +577,7 @@ def test_the_enhanced_switch_narrows_a_slideshow_to_the_images_made_better(qtbot
 def test_a_standalone_huds_originals_button_turned_off_narrows_the_slideshow_to_the_enhanced(
         qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1),
                                _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -598,7 +598,7 @@ def test_a_standalone_huds_originals_button_turned_off_narrows_the_slideshow_to_
 
 def test_an_item_another_process_files_plays_next_on_a_slideshow_in_latest(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
+    db = database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -607,8 +607,7 @@ def test_an_item_another_process_files_plays_next_on_a_slideshow_in_latest(qtbot
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
     filed = _image("i3", "a bird", 50, 3)
-    db._rows.append(filed)
-    db._by_id["i3"] = filed
+    put_rows(db, [filed])
 
     view._poll()
 
@@ -623,7 +622,7 @@ def test_an_item_evolver_upscales_plays_next_as_its_upscale_on_a_slideshow_in_la
     filed = {}
     monkeypatch.setattr(library_views.EvolverUpscales, "scan", lambda *args: SimpleNamespace(
         upscale_of=lambda video: filed.get(str(video))))
-    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2),
+    db = database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2),
                  _image("i3", "a bird", 50, 3)])
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -635,8 +634,7 @@ def test_an_item_evolver_upscales_plays_next_as_its_upscale_on_a_slideshow_in_la
     playlist = slideshow._set.playlist
     last = playlist.order_ids()[-1]
     filed[f"{last}.png"] = f"{last}_topaz.mp4"
-    at = next(index for index, row in enumerate(db._rows) if row["prompt_id"] == last)
-    db._rows[at] = {**db._rows[at], "evolver_upscale": f"{last}_topaz.mp4"}
+    db.set_evolver_upscale(last, f"{last}_topaz.mp4", None)
 
     view._poll()
 
@@ -647,7 +645,7 @@ def test_an_item_evolver_upscales_plays_next_as_its_upscale_on_a_slideshow_in_la
 
 def test_a_generation_that_lands_unenhanced_stays_out_of_a_narrowed_slideshow(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_enhanced_image("i2", "a cat", 50, 2)]))
+    view = GalleryView(database_of([_enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_latest(view)
@@ -669,13 +667,12 @@ def test_a_generation_that_lands_unenhanced_stays_out_of_a_narrowed_slideshow(qt
 
 def test_clear_filter_leaves_f_mode_and_the_enhanced_filter_on(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1),
                                _row("i2", "sdxl_t2i",
                                     {"positive_prompt": "a dog", "steps": 50, "seed": 2,
                                      "enhance": True},
-                                    "sdxl_t2i_i2.png", favorite=1)]))
+                                    "sdxl_t2i_i2.png", starred=1)]))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view._slideshows, "_favorite_prompt_ids", lambda: {"i2"})
     view.refresh()
     _open_latest(view)
     view._slideshows.start()
@@ -695,7 +692,7 @@ def test_clear_filter_leaves_f_mode_and_the_enhanced_filter_on(qtbot, monkeypatc
 
 def test_filter_enhanced_turns_the_slideshows_switch_on_and_says_what_is_left(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1),
                                _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -715,7 +712,7 @@ def test_filter_enhanced_turns_the_slideshows_switch_on_and_says_what_is_left(qt
 def test_clear_filter_said_over_the_enhanced_filter_says_the_action_filter_is_cleared(
         qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1),
                                _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -734,7 +731,7 @@ def test_clear_filter_said_over_the_enhanced_filter_says_the_action_filter_is_cl
 
 def test_filter_enhanced_says_so_where_nothing_here_is_enhanced(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_latest(view)
@@ -751,7 +748,7 @@ def test_filter_enhanced_says_so_where_nothing_here_is_enhanced(qtbot, monkeypat
 
 def test_filter_enhanced_needs_a_slideshow_to_narrow(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_enhanced_image("i2", "a cat", 50, 2)]))
+    view = GalleryView(database_of([_enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_latest(view)
@@ -785,7 +782,7 @@ def _on_the_experiments_collection(qtbot, monkeypatch, db):
 
 
 def test_slideshow_plays_the_experiments_collection(qtbot, monkeypatch):
-    view = _on_the_experiments_collection(qtbot, monkeypatch, FakeDB([
+    view = _on_the_experiments_collection(qtbot, monkeypatch, database_of([
         _experiment_row("e1"),
         _experiment_row("e2", seed=10),
         _experiment_row("e3", verdict="up", seed=11),
@@ -802,12 +799,12 @@ def test_slideshow_plays_the_experiments_collection(qtbot, monkeypatch):
 
 
 def test_an_experiment_landing_is_lined_up_on_no_slideshow(qtbot, monkeypatch):
-    db = FakeDB([_experiment_row("e1"), _experiment_row("e2", seed=10)])
+    db = database_of([_experiment_row("e1"), _experiment_row("e2", seed=10)])
     view = _on_the_experiments_collection(qtbot, monkeypatch, db)
     view._slideshows.start()
     qtbot.addWidget(view._slideshows.showing.shown)
 
-    db.add(_experiment_row("e3", seed=11))
+    put_rows(db, [_experiment_row("e3", seed=11)])
     view._on_reroll_finished("some-key", "e3")
 
     assert {item[2] for item in view._slideshows.showing._set.playlist._items} == {"e1", "e2"}, (
@@ -817,7 +814,7 @@ def test_an_experiment_landing_is_lined_up_on_no_slideshow(qtbot, monkeypatch):
 
 
 def test_condemning_an_experiment_in_a_slideshow_rejects_it(qtbot):
-    db = FakeDB([_experiment_row("e1"), _image("i1", "a cat", 50, 1)])
+    db = database_of([_experiment_row("e1"), _image("i1", "a cat", 50, 1)])
     actions = FakeActions()
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
@@ -832,7 +829,7 @@ def test_condemning_an_experiment_in_a_slideshow_rejects_it(qtbot):
 
 def test_favorite_slideshow_plays_only_items_with_their_own_star(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2),
+    db = database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2),
                  _image("i3", "a dog", 50, 3)])
     db.set_generation_favorite("i2", True)
     view = GalleryView(db)
@@ -852,7 +849,7 @@ def test_favorite_slideshow_plays_only_items_with_their_own_star(qtbot, monkeypa
 
 def test_enter_in_a_collection_slideshow_picks_the_slide_on_that_collection(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, LATEST_KEY))
@@ -873,7 +870,7 @@ def test_enter_in_a_collection_slideshow_picks_the_slide_on_that_collection(qtbo
 def test_a_slideshow_ended_on_a_locked_slide_picks_that_slide_where_it_played(qtbot,
                                                                               monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -894,7 +891,7 @@ def test_a_slideshow_ended_on_a_locked_slide_picks_that_slide_where_it_played(qt
 def test_a_slideshow_ended_on_an_unlocked_slide_picks_that_slide_where_it_played(
         qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -910,7 +907,7 @@ def test_a_slideshow_ended_on_an_unlocked_slide_picks_that_slide_where_it_played
 
 
 def _laid_out_folder(qtbot, count=60):
-    db = FakeDB([_image(f"i{n}", "a cat", 50, n) for n in range(1, count + 1)])
+    db = database_of([_image(f"i{n}", "a cat", 50, n) for n in range(1, count + 1)])
     view = GalleryView(db)
     _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
@@ -920,7 +917,7 @@ def _laid_out_folder(qtbot, count=60):
 
 def test_a_slide_pages_down_latest_is_drawn_and_picked_on_leaving(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image(f"i{n}", f"scene {n}", 50, n)
+    view = GalleryView(database_of([_image(f"i{n}", f"scene {n}", 50, n)
                                for n in reversed(range(120))]))
     _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -957,7 +954,7 @@ def _folder_square_holding(view, prompt_id: str) -> str:
 def test_leaving_a_slideshow_of_all_picks_the_folder_square_its_slide_came_from(qtbot,
                                                                           monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     all_row = _top_level(view._tree)["All"]
@@ -990,7 +987,7 @@ def test_the_image_a_locked_slideshow_ends_on_stays_picked_and_in_view_as_the_li
     qtbot.wait(1)
     assert _in_view(view, far)
 
-    db.add(_image("fresh", "a dog", 50, 999))
+    put_rows(db, [_image("fresh", "a dog", 50, 999)])
     view.refresh()
     qtbot.wait(1)
 
@@ -1006,7 +1003,7 @@ def test_a_picked_image_holds_its_place_as_new_ones_land_above_it(qtbot):
     assert _in_view(view, far)
 
     for n in range(20):
-        db.add(_image(f"n{n}", "a cat", 50, 500 + n))
+        put_rows(db, [_image(f"n{n}", "a cat", 50, 500 + n)])
     view.refresh()
     qtbot.wait(1)
 
@@ -1019,7 +1016,7 @@ def test_a_folder_read_from_its_top_shows_what_lands_there(qtbot):
     assert view.selected_prompt_ids() == [view.listed_prompt_ids()[0]]
 
     for n in range(20):
-        db.add(_image(f"n{n}", "a cat", 50, 500 + n))
+        put_rows(db, [_image(f"n{n}", "a cat", 50, 500 + n)])
     view.refresh()
     qtbot.wait(1)
 
@@ -1028,7 +1025,7 @@ def test_a_folder_read_from_its_top_shows_what_lands_there(qtbot):
 
 
 def test_taking_a_favorite_off_the_favorites_collection_leaves_it_where_it_was(qtbot):
-    view = GalleryView(FakeDB([_image(f"i{n}", f"scene {n}", 50, n) | {"starred": 1}
+    view = GalleryView(database_of([_image(f"i{n}", f"scene {n}", 50, n) | {"starred": 1}
                                for n in range(1, 61)]))
     _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
@@ -1046,7 +1043,7 @@ def test_taking_a_favorite_off_the_favorites_collection_leaves_it_where_it_was(q
 
 def test_reopening_a_slideshow_comes_back_to_the_slide_it_was_closed_on(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1),
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1),
                                _image("i2", "a dog", 50, 2),
                                _image("i3", "a fox", 50, 3)]))
     qtbot.addWidget(view)
@@ -1071,7 +1068,7 @@ def test_reopening_a_slideshow_comes_back_to_the_slide_it_was_closed_on(qtbot, m
 
 def test_a_slideshow_reopened_on_a_locked_slide_comes_back_locked(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
@@ -1107,7 +1104,7 @@ def _animated_from(prompt_id, image, seed):
 
 def _slideshow_of_the_folder_of(qtbot, monkeypatch, rows, image):
     _resolve_each_to_its_own_kind(monkeypatch)
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     _keys_are_the_gallerys(view)
     view.refresh()
@@ -1234,7 +1231,7 @@ def test_giving_the_slideshows_back_as_the_window_closes_moves_the_gallery_nowhe
 def test_slideshow_items_carry_each_rows_thumbnail(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
     row = dict(_image("i1", "a cat", 50, 1), thumbnail_path="thumb.png")
-    view = GalleryView(FakeDB([row]))
+    view = GalleryView(database_of([row]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1243,7 +1240,7 @@ def test_slideshow_items_carry_each_rows_thumbnail(qtbot, monkeypatch):
 
 def test_favorite_slideshow_plays_a_favorite_item_in_a_favorite_folder_once(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1)])
     db.set_generation_favorite("i1", True)
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -1270,12 +1267,12 @@ def _slideshow_of_first_leaf(qtbot, view):
 
 def test_a_generation_that_lands_joins_the_open_slideshow(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     slideshow = _slideshow_of_first_leaf(qtbot, view)
 
-    db.add(_image("i2", "a cat", 50, 2))
+    put_rows(db, [_image("i2", "a cat", 50, 2)])
     view._on_reroll_finished("some-key", "i2")
 
     assert {item[2] for item in slideshow._set.playlist._items} == {"i1", "i2"}, (
@@ -1287,7 +1284,7 @@ def test_a_generation_that_lands_joins_the_open_slideshow(qtbot, monkeypatch):
 def test_a_generation_that_lands_joins_a_slideshow_opened_from_a_double_clicked_tile(
         qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
+    db = database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1295,7 +1292,7 @@ def test_a_generation_that_lands_joins_a_slideshow_opened_from_a_double_clicked_
     slideshow = view._slideshows.open_on_tile("i1")
     qtbot.addWidget(slideshow.shown)
 
-    db.add(_image("i3", "a cat", 50, 3))
+    put_rows(db, [_image("i3", "a cat", 50, 3)])
     view._on_reroll_finished("some-key", "i3")
 
     assert "i3" in {item[2] for item in slideshow._set.playlist._items}
@@ -1304,12 +1301,12 @@ def test_a_generation_that_lands_joins_a_slideshow_opened_from_a_double_clicked_
 
 def test_a_generation_from_a_folder_the_slideshow_is_not_playing_stays_out(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     slideshow = _slideshow_of_first_leaf(qtbot, view)
 
-    db.add(_i2v_video("v1", "styleA"))
+    put_rows(db, [_i2v_video("v1", "styleA")])
     view._on_reroll_finished("some-key", "v1")
 
     assert [item[2] for item in slideshow._set.playlist._items] == ["i1"]
@@ -1332,7 +1329,7 @@ def _resolve_finished_only(monkeypatch):
 
 def test_a_run_that_starts_to_look_like_something_joins_the_open_slideshow(qtbot, monkeypatch):
     _resolve_finished_only(monkeypatch)
-    db = FakeDB([_image("i1", "a cat", 50, 1), _running("i2")])
+    db = database_of([_image("i1", "a cat", 50, 1), _running("i2")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     slideshow = _slideshow_of_first_leaf(qtbot, view)
@@ -1349,7 +1346,7 @@ def test_a_run_that_starts_to_look_like_something_joins_the_open_slideshow(qtbot
 
 def test_a_run_in_a_folder_the_slideshow_is_not_playing_stays_out(qtbot, monkeypatch):
     _resolve_finished_only(monkeypatch)
-    db = FakeDB([_image("i1", "a cat", 50, 1),
+    db = database_of([_image("i1", "a cat", 50, 1),
                  _running("i2", prompt="a dog", steps=12)])
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -1363,7 +1360,7 @@ def test_a_run_in_a_folder_the_slideshow_is_not_playing_stays_out(qtbot, monkeyp
 
 def test_a_run_being_made_joins_a_latest_slideshow_too(qtbot, monkeypatch):
     _resolve_finished_only(monkeypatch)
-    db = FakeDB([_image("i1", "a cat", 50, 1), _running("i2")])
+    db = database_of([_image("i1", "a cat", 50, 1), _running("i2")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1379,7 +1376,7 @@ def test_a_run_being_made_joins_a_latest_slideshow_too(qtbot, monkeypatch):
 
 def test_an_enhancement_being_made_is_nobody_slide(qtbot, monkeypatch):
     _resolve_finished_only(monkeypatch)
-    db = FakeDB([_image("i1", "a cat", 50, 1),
+    db = database_of([_image("i1", "a cat", 50, 1),
                  _row("e1", gallery.ENHANCE_WORKFLOW, {"seed": 1}, "",
                       status="running", output_files=json.dumps([]))])
     view = GalleryView(db)
@@ -1395,15 +1392,19 @@ def test_an_enhancement_being_made_is_nobody_slide(qtbot, monkeypatch):
     view._slideshows.showing.close()
 
 
+def _lands_as(db, row):
+    db.update_generation(row["prompt_id"], status=row["status"], output_files=row["output_files"])
+
+
 def test_a_run_the_slideshow_watched_becomes_the_file_it_lands_as(qtbot, monkeypatch):
     _resolve_finished_only(monkeypatch)
-    db = FakeDB([_image("i1", "a cat", 50, 1), _running("i2")])
+    db = database_of([_image("i1", "a cat", 50, 1), _running("i2")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     slideshow = _slideshow_of_first_leaf(qtbot, view)
     view._on_reroll_preview("some-key", "i2", b"a-frame")
 
-    db.get_generation("i2").update(_image("i2", "a cat", 50, 2))
+    _lands_as(db, _image("i2", "a cat", 50, 2))
     view._on_reroll_finished("some-key", "i2")
 
     assert len(slideshow._set.playlist) == 2
@@ -1413,7 +1414,7 @@ def test_a_run_the_slideshow_watched_becomes_the_file_it_lands_as(qtbot, monkeyp
 
 def test_a_run_on_screen_when_it_lands_stays_on_screen_as_its_file(qtbot, monkeypatch):
     _resolve_finished_only(monkeypatch)
-    db = FakeDB([_image("i1", "a cat", 50, 1), _running("i2")])
+    db = database_of([_image("i1", "a cat", 50, 1), _running("i2")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     slideshow = _slideshow_of_first_leaf(qtbot, view)
@@ -1421,7 +1422,7 @@ def test_a_run_on_screen_when_it_lands_stays_on_screen_as_its_file(qtbot, monkey
     slideshow.slideshow_step(1)
     slideshow.tick()
 
-    db.get_generation("i2").update(_image("i2", "a cat", 50, 2))
+    _lands_as(db, _image("i2", "a cat", 50, 2))
     view._on_reroll_finished("some-key", "i2")
 
     assert slideshow._set.playlist.current() == ("i2.png", "image", "i2", None), (
@@ -1432,13 +1433,13 @@ def test_a_run_on_screen_when_it_lands_stays_on_screen_as_its_file(qtbot, monkey
 
 def test_a_run_that_stopped_being_made_leaves_the_open_slideshow(qtbot, monkeypatch):
     _resolve_finished_only(monkeypatch)
-    db = FakeDB([_image("i1", "a cat", 50, 1), _running("i2")])
+    db = database_of([_image("i1", "a cat", 50, 1), _running("i2")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     slideshow = _slideshow_of_first_leaf(qtbot, view)
     view._on_reroll_preview("some-key", "i2", b"a-frame")
 
-    db.get_generation("i2")["status"] = "error"
+    db.update_generation("i2", status="error")
     view.job_queue.update()
 
     assert not slideshow.holds("i2")
@@ -1535,7 +1536,7 @@ def test_a_slideshow_is_armed_with_each_images_versions(qtbot, tmp_path):
 
 def test_watching_a_generation_fullscreen_still_steps_its_folder(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     monkeypatch.setattr(
         gallery, "resolve_preview",
@@ -1553,7 +1554,7 @@ def test_watching_a_generation_fullscreen_still_steps_its_folder(qtbot, monkeypa
 
 
 def test_a_generation_still_in_flight_stays_out_of_a_slideshow(qtbot):
-    db = FakeDB([_running_row("in_flight", prompt="a cat")])
+    db = database_of([_running_row("in_flight", prompt="a cat")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1562,7 +1563,7 @@ def test_a_generation_still_in_flight_stays_out_of_a_slideshow(qtbot):
 
 
 def test_a_finished_generation_with_no_file_stays_out_of_a_slideshow(qtbot):
-    db = FakeDB([_row("gone", "sdxl_t2i", {"positive_prompt": "a cat"}, "gone.png",
+    db = database_of([_row("gone", "sdxl_t2i", {"positive_prompt": "a cat"}, "gone.png",
                       output_files="[]")])
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -1573,7 +1574,7 @@ def test_a_finished_generation_with_no_file_stays_out_of_a_slideshow(qtbot):
 
 def test_a_folder_of_one_video_is_armed_like_any_other(qtbot, monkeypatch):
     rows = [_i2v_video("v1", "styleA")]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     monkeypatch.setattr(
         gallery, "resolve_preview",
@@ -1594,7 +1595,7 @@ def test_a_folder_of_one_video_is_armed_like_any_other(qtbot, monkeypatch):
 
 def test_closing_the_gallery_closes_the_slideshow_up(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)

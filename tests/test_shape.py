@@ -42,7 +42,8 @@ from origenerator.item_shape import (
     split_key,
 )
 from origenerator.output_places import OutputPlaces
-from tests.gallery_view_support import FakeDB, _image, _row, _shape_rows
+from tests.gallery_view_support import _image, _row, _shape_rows
+from tests.real_db import database_of, put_rows
 from tests.test_folder_tree import _shown
 from tests.test_icons import (
     _ink_bounds,
@@ -184,7 +185,7 @@ def test_a_queued_rows_click_opens_its_folder_across_the_split(qtbot, tmp_path):
         tmp_path, 90, 160)
     in_flight = _video_in_flight("v3", frame)
 
-    view = GalleryView(FakeDB([image, in_flight]))
+    view = GalleryView(database_of([image, in_flight]))
     qtbot.addWidget(view)
     view.refresh()
     view.job_queue.update()
@@ -211,7 +212,7 @@ def _under_all(pane, shape) -> list[str]:
 def test_the_pane_is_one_table_of_contents_per_shape(qtbot, tmp_path):
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
-    view = GalleryView(FakeDB([tall, wide]))
+    view = GalleryView(database_of([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -226,7 +227,7 @@ def test_the_pane_is_one_table_of_contents_per_shape(qtbot, tmp_path):
 def test_the_pane_puts_both_shapes_in_one_list_when_asked(qtbot, tmp_path):
     tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     wide = _thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
-    view = GalleryView(FakeDB([tall, wide]))
+    view = GalleryView(database_of([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()
     assert view._tree.shapes == ("portrait", "landscape")
@@ -249,7 +250,7 @@ _RUNS = {"tall": PORTRAIT, "wide": LANDSCAPE}
 
 
 def _view_of_runs(qtbot):
-    view = GalleryView(FakeDB([_in_flight("tall", 720, 1280, "pending"),
+    view = GalleryView(database_of([_in_flight("tall", 720, 1280, "pending"),
                                _in_flight("wide", 1280, 720, "running")]))
     qtbot.addWidget(view)
     view.refresh()
@@ -275,7 +276,7 @@ def test_every_sides_latest_leads_with_the_runs_in_flight_it_holds(qtbot, shape)
 def test_a_folder_shows_its_waiting_runs_whichever_latest_was_opened_before_it(
         qtbot, tmp_path, opened_first):
     finished = _shaped(_image("t1", "scene six", 50, 1), tmp_path, 90, 160)
-    view = GalleryView(FakeDB([
+    view = GalleryView(database_of([
         finished,
         _in_flight("t2", 90, 160, "pending", seed=2),
         _in_flight("t3", 90, 160, "pending", seed=3),
@@ -297,7 +298,7 @@ def test_a_folder_shows_its_waiting_runs_whichever_latest_was_opened_before_it(
 @pytest.mark.parametrize("shape", SHAPES_AND_BOTH)
 def test_a_folder_composed_on_one_side_is_drawn_on_each_side_covering_it(
         qtbot, tmp_path, shape):
-    db = FakeDB([_shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)])
+    db = database_of([_shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)])
     db.create_custom_collection("Keepers", shape=PORTRAIT)
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -319,7 +320,7 @@ def _counting_builds(monkeypatch):
 def test_the_radio_builds_no_list_it_has_already_built(qtbot, tmp_path, monkeypatch):
     tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     wide = _thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
-    view = GalleryView(FakeDB([tall, wide]))
+    view = GalleryView(database_of([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()
     built = _counting_builds(monkeypatch)
@@ -335,13 +336,13 @@ def test_the_radio_builds_no_list_it_has_already_built(qtbot, tmp_path, monkeypa
 
 def test_a_library_that_has_changed_builds_its_lists_again(qtbot, tmp_path, monkeypatch):
     tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    db = FakeDB([tall])
+    db = database_of([tall])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
     built = _counting_builds(monkeypatch)
 
-    db._rows.append(_thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90))
+    put_rows(db, [_thumbed(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)])
     view.refresh()
 
     assert built
@@ -353,7 +354,7 @@ def _word_beside(button):
 
 def test_a_folder_given_a_name_builds_the_lists_again(qtbot, tmp_path, monkeypatch):
     tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    db = FakeDB([tall])
+    db = database_of([tall])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -368,7 +369,7 @@ def test_a_folder_given_a_name_builds_the_lists_again(qtbot, tmp_path, monkeypat
 
 def test_the_radio_over_the_list_wears_each_word_beside_its_button(qtbot, tmp_path):
     tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    view = GalleryView(FakeDB([tall]))
+    view = GalleryView(database_of([tall]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -412,7 +413,7 @@ def test_a_column_too_narrow_for_both_choices_gives_each_its_own_row(qtbot):
 
 def test_clicking_a_choice_s_word_picks_it(qtbot, tmp_path):
     tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    view = GalleryView(FakeDB([tall]))
+    view = GalleryView(database_of([tall]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -425,7 +426,7 @@ def test_clicking_a_choice_s_word_picks_it(qtbot, tmp_path):
 
 def test_a_folder_open_on_together_is_open_again_after_a_turn_on_separate(qtbot, tmp_path):
     tall = _thumbed(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    view = GalleryView(FakeDB([tall]))
+    view = GalleryView(database_of([tall]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.together_button.click()
@@ -440,7 +441,7 @@ def test_a_folder_open_on_together_is_open_again_after_a_turn_on_separate(qtbot,
 
 def test_each_half_is_labelled_where_the_label_cannot_scroll_away(qtbot, tmp_path):
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    view = GalleryView(FakeDB([tall]))
+    view = GalleryView(database_of([tall]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -452,7 +453,7 @@ def test_each_half_is_labelled_where_the_label_cannot_scroll_away(qtbot, tmp_pat
 
 def test_each_heading_is_led_by_a_frame_of_its_own_shape(qtbot, tmp_path):
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    view = GalleryView(FakeDB([tall]))
+    view = GalleryView(database_of([tall]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -467,7 +468,7 @@ def test_each_heading_is_led_by_a_frame_of_its_own_shape(qtbot, tmp_path):
 
 def test_a_heading_describes_its_whole_side_wherever_the_cursor_lands(qtbot, tmp_path):
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    view = GalleryView(FakeDB([tall]))
+    view = GalleryView(database_of([tall]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -480,7 +481,7 @@ def test_a_heading_describes_its_whole_side_wherever_the_cursor_lands(qtbot, tmp
 def test_together_s_one_list_wears_no_heading_since_the_choice_over_it_names_it(
         qtbot, tmp_path):
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    view = GalleryView(FakeDB([tall]))
+    view = GalleryView(database_of([tall]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -574,7 +575,7 @@ def _heading_name(section) -> QLabel:
 
 def test_both_shapes_are_drawn_even_for_one_with_nothing_in_it(qtbot, tmp_path):
     wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
-    view = GalleryView(FakeDB([wide]))
+    view = GalleryView(database_of([wide]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -589,7 +590,7 @@ def test_both_shapes_are_drawn_even_for_one_with_nothing_in_it(qtbot, tmp_path):
 def test_picking_in_one_half_lets_the_other_go(qtbot, tmp_path):
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
-    view = GalleryView(FakeDB([tall, wide]))
+    view = GalleryView(database_of([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -608,7 +609,7 @@ def test_picking_in_one_half_lets_the_other_go(qtbot, tmp_path):
 def _view_with_a_row_on_each_side(qtbot, tmp_path):
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
-    view = GalleryView(FakeDB([tall, wide]))
+    view = GalleryView(database_of([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()
     return (view, view._item_by_key[shaped_key("__all__", "portrait")],
@@ -647,7 +648,7 @@ def test_silencing_the_folder_list_silences_both_halves(qtbot, tmp_path):
 def test_each_side_holds_only_its_own_shape(qtbot, tmp_path):
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
-    view = GalleryView(FakeDB([tall, wide]))
+    view = GalleryView(database_of([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -658,7 +659,7 @@ def test_each_side_holds_only_its_own_shape(qtbot, tmp_path):
 def test_a_collection_belongs_to_one_side(qtbot, tmp_path):
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
-    view = GalleryView(FakeDB([tall, wide]))
+    view = GalleryView(database_of([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -672,7 +673,7 @@ def test_a_collection_belongs_to_one_side(qtbot, tmp_path):
 def test_favorites_collects_the_favorites_of_its_own_side(qtbot, tmp_path):
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
-    db = FakeDB([tall, wide])
+    db = database_of([tall, wide])
     db.set_generation_favorite("t1", True)
     db.set_generation_favorite("w1", True)
     view = GalleryView(db)
@@ -688,7 +689,7 @@ def test_favorites_collects_the_favorites_of_its_own_side(qtbot, tmp_path):
 def test_the_trash_collection_splits_too(qtbot, tmp_path):
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
-    view = GalleryView(FakeDB([tall, wide]))
+    view = GalleryView(database_of([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -711,7 +712,7 @@ def test_a_side_counts_only_its_own_waiting_work(qtbot, tmp_path):
     wide["source"] = "experiment"
     other = _shaped(_image("w2", "scene four", 50, 3), tmp_path, 160, 90)
     other["source"] = "experiment"
-    view = GalleryView(FakeDB([tall, wide, other]))
+    view = GalleryView(database_of([tall, wide, other]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -722,7 +723,7 @@ def test_a_side_counts_only_its_own_waiting_work(qtbot, tmp_path):
 def test_each_half_scrolls_on_its_own(qtbot, tmp_path):
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
-    view = GalleryView(FakeDB([tall, wide]))
+    view = GalleryView(database_of([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -733,7 +734,7 @@ def test_each_half_scrolls_on_its_own(qtbot, tmp_path):
 def test_a_folder_holding_both_shapes_is_drawn_on_both_sides(qtbot, tmp_path):
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
-    view = GalleryView(FakeDB([tall, wide]))
+    view = GalleryView(database_of([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -747,7 +748,7 @@ def test_a_folder_holding_both_shapes_is_drawn_on_both_sides(qtbot, tmp_path):
 
 def test_a_slideshow_goes_to_the_region_its_side_names(qtbot, tmp_path):
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
-    view = GalleryView(FakeDB([tall]))
+    view = GalleryView(database_of([tall]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -770,7 +771,7 @@ def test_a_slideshow_goes_to_the_region_its_side_names(qtbot, tmp_path):
 def test_a_regions_base_state_is_its_side_of_the_library(qtbot, tmp_path):
     tall = _shaped(_image("t1", "scene one", 50, 1), tmp_path, 90, 160)
     wide = _shaped(_image("w1", "scene two", 50, 2), tmp_path, 160, 90)
-    view = GalleryView(FakeDB([tall, wide]))
+    view = GalleryView(database_of([tall, wide]))
     qtbot.addWidget(view)
     view.refresh()
 

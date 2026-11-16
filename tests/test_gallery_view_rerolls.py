@@ -31,7 +31,6 @@ from origenerator.prompt_edit import work_out
 from tests.gallery_view_support import (
     _REROLL_HISTORY,
     _SDXL,
-    FakeDB,
     _alls,
     _at,
     _frame_shown,
@@ -54,13 +53,14 @@ from tests.gallery_view_support import (
     _selected_folder,
     _tile_kinds_in_order,
 )
+from tests.real_db import database_of
 
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 
 
 
 def test_leaf_shows_add_tile_when_client_present(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=_reroll_client())
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
@@ -69,7 +69,7 @@ def test_leaf_shows_add_tile_when_client_present(qtbot):
 
 def test_main_view_reflows_to_fill_extra_width(qtbot):
     rows = [_image(f"i{n}", "a cat", 50, n) for n in range(1, 9)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -80,7 +80,7 @@ def test_main_view_reflows_to_fill_extra_width(qtbot):
 
 def test_add_tile_leads_the_folders_images(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    view = GalleryView(FakeDB(rows), client=_reroll_client())
+    view = GalleryView(database_of(rows), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
@@ -90,7 +90,7 @@ def test_add_tile_leads_the_folders_images(qtbot):
 
 
 def test_leaf_has_no_add_tile_without_a_client(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
@@ -99,7 +99,7 @@ def test_leaf_has_no_add_tile_without_a_client(qtbot):
 
 def test_no_add_tile_for_unknown_workflow(qtbot):
     rows = [_row("x1", "unknown", {"seed": 1}, "x1.png")]
-    view = GalleryView(FakeDB(rows), client=_reroll_client())
+    view = GalleryView(database_of(rows), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
@@ -108,7 +108,7 @@ def test_no_add_tile_for_unknown_workflow(qtbot):
 
 def test_no_add_tile_for_an_import_that_never_named_its_starting_image(qtbot):
     rows = [_row("imp", "image_enhance", {"seed": 1}, "imp.png", source="imported")]
-    view = GalleryView(FakeDB(rows), client=_reroll_client())
+    view = GalleryView(database_of(rows), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
@@ -117,7 +117,7 @@ def test_no_add_tile_for_an_import_that_never_named_its_starting_image(qtbot):
 
 def test_add_tile_shows_for_imported_with_known_workflow(qtbot):
     rows = [_row("imp", "sdxl_t2i", {"seed": 1}, "imp.png", source="imported")]
-    view = GalleryView(FakeDB(rows), client=_reroll_client())
+    view = GalleryView(database_of(rows), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
@@ -275,7 +275,7 @@ def test_a_folder_offers_a_request_tile_beside_its_new_tile(qtbot, tmp_path):
 def test_a_folder_with_nothing_finished_in_it_has_nothing_to_request(qtbot):
     rows = [_row("run1", "sdxl_t2i", {"positive_prompt": "a cat", "seed": 1}, "x.png",
                  status="running", output_files=json.dumps([]))]
-    view = GalleryView(FakeDB(rows), client=_reroll_client())
+    view = GalleryView(database_of(rows), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)

@@ -7,7 +7,6 @@ from origenerator.db import NewGeneration
 from origenerator.gallery.collection import FAVORITES_KEY
 from origenerator.gui.gallery_view import GalleryView
 from tests.gallery_view_support import (
-    FakeDB,
     _at,
     _children_by_prompt,
     _enhanceable_db,
@@ -18,10 +17,11 @@ from tests.gallery_view_support import (
     _select_first_leaf,
     _set_enhance,
 )
+from tests.real_db import database_of, put_rows
 
 
 def _view_of(qtbot, *rows):
-    return _view_of_db(qtbot, FakeDB(list(rows)))
+    return _view_of_db(qtbot, database_of(list(rows)))
 
 
 def _view_of_db(qtbot, db):
@@ -52,7 +52,7 @@ def test_an_item_that_arrives_in_a_favorited_leaf_folder_is_starred(qtbot):
     view = _view_of(qtbot, _image("i1", "a cat", 50, 1))
     view._toggle_favorite(_leaf_of(view, "a cat"))
 
-    view._db.add(_image("i2", "a cat", 50, 2))
+    put_rows(view._db, [_image("i2", "a cat", 50, 2)])
     view.refresh()
 
     assert _starred(view, "i2") == [True]
@@ -63,7 +63,7 @@ def test_an_item_unstarred_after_its_folder_starred_it_stays_unstarred(qtbot):
     view._toggle_favorite(_leaf_of(view, "a cat"))
 
     view.set_items_favorite(["i1"], False)
-    view._db.add(_image("i2", "a cat", 50, 2))
+    put_rows(view._db, [_image("i2", "a cat", 50, 2)])
     view.refresh()
 
     assert _starred(view, "i1", "i2") == [False, True]
@@ -75,7 +75,7 @@ def test_unfavoriting_a_leaf_folder_leaves_its_items_stars_and_stars_no_more(qtb
     view._toggle_favorite(leaf)
 
     view._toggle_favorite(leaf)
-    view._db.add(_image("i2", "a cat", 50, 2))
+    put_rows(view._db, [_image("i2", "a cat", 50, 2)])
     view.refresh()
 
     assert _starred(view, "i1", "i2") == [True, False]
@@ -165,9 +165,9 @@ def test_a_folder_with_folders_inside_dropped_onto_favorites_takes_no_favorite(q
 
 def _a_folder_starred_before_folders_starred_their_items(monkeypatch, preview: bool):
     monkeypatch.setenv(branch_session.ENV_FLAG, "1" if preview else "0")
-    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)])
     key = gallery.settings_folder_key(db.get_generation("i1"))
-    db._meta[key] = {"custom_name": None, "starred": True}
+    db.set_folder_favorite(key, True)
     return db
 
 

@@ -11,16 +11,16 @@ from origenerator.comfyui_api import ForeignQueue
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.gui.gallery_view import GalleryView
 from tests.gallery_view_support import (
-    FakeDB,
     _image,
     _reroll_client,
     _seeded_db,
     _select_first_leaf,
 )
+from tests.real_db import database_of, put_rows
 
 
 def _gallery(qtbot, db=None):
-    view = GalleryView(db or FakeDB([_image("i1", "scene one", 50, 1)]))
+    view = GalleryView(db or database_of([_image("i1", "scene one", 50, 1)]))
     qtbot.addWidget(view)
     return view
 
@@ -84,12 +84,12 @@ def test_being_shown_again_over_an_unmoved_library_draws_nothing_afresh(qtbot, m
 
 
 def test_being_shown_again_draws_what_landed_while_it_was_away(qtbot, monkeypatch):
-    db = FakeDB([_image("i1", "scene one", 50, 1)])
+    db = database_of([_image("i1", "scene one", 50, 1)])
     view = _gallery(qtbot, db)
     view.refresh()
     drawn = []
     monkeypatch.setattr(view, "_rebuild", lambda rows, meta, **_: drawn.append(rows))
-    db._rows.append(_image("i2", "scene two", 50, 2))
+    put_rows(db, [_image("i2", "scene two", 50, 2)])
 
     view.show()
 

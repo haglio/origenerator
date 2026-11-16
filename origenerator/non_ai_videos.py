@@ -9,14 +9,14 @@ from pathlib import Path
 
 from app_support import favorites, video_ids
 from app_support.mirrored_tree import filed_record, record_path
-from app_support.video_names import title_while_playing
+from app_support.video_names import full_video_id_of, title_while_playing
 
 from origenerator import config
-from origenerator.db_generations import library_paths_in
 from origenerator.evolver_export import PARTIAL_MARKER
 from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.media import MediaType, media_type_from_filename
 from origenerator.one_at_a_time import WAIT_S
+from origenerator.output_files import library_paths_in
 from origenerator.outside_videos import (
     VIDEOS_PER_WRITE,
     Made,
@@ -32,8 +32,6 @@ from origenerator.workflows.non_ai import (
     NonAiWorkflow,
     non_ai_workflow,
 )
-
-FULL_VIDEO_ID_KEY = "full_video_id"
 
 
 @dataclass(frozen=True)
@@ -74,13 +72,8 @@ def take_up_what_the_records_say(db, places: NonAiPlaces) -> int:
     return sum(_take_up(db, row, video, record, item_of) for row, video, record in recorded)
 
 
-def _full_video_id(record: dict) -> str | None:
-    clip = record.get("clip")
-    return clip.get(FULL_VIDEO_ID_KEY) if isinstance(clip, dict) else None
-
-
 def _take_up(db, row: dict, video: Path, record: dict, item_of: dict[str, str]) -> bool:
-    cut_from = item_of.get(_full_video_id(record))
+    cut_from = item_of.get(full_video_id_of(record))
     relinked = row.get("trimmed_from") != cut_from
     if relinked:
         db.set_cut_from(row["prompt_id"], cut_from)

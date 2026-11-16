@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from origenerator.db_generations import library_paths_in
 from origenerator.gallery.signatures import parse_params
+from origenerator.output_files import library_paths_in
 from origenerator.workflows.non_ai import (
     FOLDER_KEY,
     FOLDER_PARTS_IN_A_NAME,

@@ -19,7 +19,6 @@ from funestra.video_families import seed_group_and_seed
 from PIL import Image
 
 from origenerator import config
-from origenerator.db_generations import library_paths_in
 from origenerator.evolver_export import PARTIAL_MARKER
 from origenerator.evolver_upscales import filed_under, filed_upscales
 from origenerator.gallery.output import generations_by_stem, parse_file_list
@@ -30,6 +29,7 @@ from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.media import MediaType, media_type_from_filename
 from origenerator.one_at_a_time import WAIT_S, Turn
 from origenerator.one_look import looking_once, stat_of
+from origenerator.output_files import library_paths_in
 from origenerator.thumbnail import (
     first_frame_of,
     generate_animated_thumbnail,

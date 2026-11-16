@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -18,6 +17,7 @@ from origenerator.generation_state import (
     GenerationStatus,
 )
 from origenerator.item_actions import ItemActions, columns, stored
+from origenerator.output_files import library_paths_in
 
 LIFECYCLE_COLUMNS = frozenset({
     "status", "output_files", "original_files", "enhance_history",
@@ -73,15 +73,6 @@ def was_sent(row: dict) -> bool:
 
 def was_kept(row: dict) -> bool:
     return bool(row.get("starred")) or was_sent(row)
-
-
-def library_paths_in(output_files: str | None) -> set[str]:
-    try:
-        files = json.loads(output_files or "[]")
-    except (ValueError, TypeError):
-        return set()
-    return {file["library_path"] for file in files
-            if isinstance(file, dict) and file.get("library_path")} if isinstance(files, list) else set()
 
 
 def _read_whole(prompt: str | None) -> str | None:

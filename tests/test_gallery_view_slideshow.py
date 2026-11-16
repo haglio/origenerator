@@ -1250,7 +1250,7 @@ def test_favorite_slideshow_plays_a_favorite_item_in_a_favorite_folder_once(qtbo
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    view._toggle_favorite(_select_first_leaf(view))
+    view.toc_editing.toggle_favorite(_select_first_leaf(view))
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
 
     view._slideshows.start()

@@ -719,7 +719,7 @@ def test_a_search_offers_no_folder_action_for_the_folder_behind_it(qtbot):
     _search_for(view, "cat")
 
     assert view.current_group() is None
-    assert view._current_deletable_folders() == []
+    assert view.toc_editing.deletable_folders() == []
     assert not view._buttons.populate.isVisible()
 
 

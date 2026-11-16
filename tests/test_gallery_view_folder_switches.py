@@ -43,14 +43,14 @@ def test_favoriting_a_leaf_folder_stars_every_item_in_it(qtbot):
     view = _view_of(qtbot, _image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1),
                     _image("i3", "a cat", 50, 2))
 
-    view._toggle_favorite(_leaf_of(view, "a cat"))
+    view.toc_editing.toggle_favorite(_leaf_of(view, "a cat"))
 
     assert _starred(view, "i1", "i3", "i2") == [True, True, False]
 
 
 def test_an_item_that_arrives_in_a_favorited_leaf_folder_is_starred(qtbot):
     view = _view_of(qtbot, _image("i1", "a cat", 50, 1))
-    view._toggle_favorite(_leaf_of(view, "a cat"))
+    view.toc_editing.toggle_favorite(_leaf_of(view, "a cat"))
 
     put_rows(view._db, [_image("i2", "a cat", 50, 2)])
     view.refresh()
@@ -60,7 +60,7 @@ def test_an_item_that_arrives_in_a_favorited_leaf_folder_is_starred(qtbot):
 
 def test_an_item_unstarred_after_its_folder_starred_it_stays_unstarred(qtbot):
     view = _view_of(qtbot, _image("i1", "a cat", 50, 1))
-    view._toggle_favorite(_leaf_of(view, "a cat"))
+    view.toc_editing.toggle_favorite(_leaf_of(view, "a cat"))
 
     view.set_items_favorite(["i1"], False)
     put_rows(view._db, [_image("i2", "a cat", 50, 2)])
@@ -72,9 +72,9 @@ def test_an_item_unstarred_after_its_folder_starred_it_stays_unstarred(qtbot):
 def test_unfavoriting_a_leaf_folder_leaves_its_items_stars_and_stars_no_more(qtbot):
     view = _view_of(qtbot, _image("i1", "a cat", 50, 1))
     leaf = _leaf_of(view, "a cat")
-    view._toggle_favorite(leaf)
+    view.toc_editing.toggle_favorite(leaf)
 
-    view._toggle_favorite(leaf)
+    view.toc_editing.toggle_favorite(leaf)
     put_rows(view._db, [_image("i2", "a cat", 50, 2)])
     view.refresh()
 
@@ -85,7 +85,7 @@ def test_a_folder_with_folders_inside_takes_no_favorite(qtbot):
     view = _view_of(qtbot, _image("i1", "a cat", 50, 1))
     workflow = _key(_image_workflow(view._tree))
 
-    view._toggle_favorite(workflow)
+    view.toc_editing.toggle_favorite(workflow)
 
     assert not view.group_for_key(workflow).favorite
     assert _starred(view, "i1") == [False]
@@ -157,7 +157,7 @@ def test_a_folder_with_folders_inside_dropped_onto_favorites_takes_no_favorite(q
     workflow = _key(_image_workflow(view._tree))
     leaf = _leaf_of(view, "a cat")
 
-    view._on_dropped(FAVORITES_KEY, [workflow, leaf])
+    view.toc_editing.dropped(FAVORITES_KEY, [workflow, leaf])
 
     assert (view.group_for_key(workflow).favorite, view.group_for_key(leaf).favorite) == (
         False, True)

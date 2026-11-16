@@ -14,6 +14,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QApplication,
+    QInputDialog,
 )
 
 from origenerator import (
@@ -23,7 +24,6 @@ from origenerator.gallery.collection import (
     FAVORITES_KEY,
 )
 from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
-from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import LIT
 from origenerator.gui.folder_tile import FolderTile
@@ -84,7 +84,7 @@ def test_dropping_back_to_one_folder_returns_to_that_folder(qtbot):
 
     view._tree.setCurrentItem(view.toc.item_for(cat))
 
-    assert view._selection_group is None
+    assert view.toc.picked_together is None
     assert view.listed_prompt_ids() == ["i1"]
     assert view._buttons.group.isHidden()
 
@@ -94,7 +94,7 @@ def test_delete_takes_every_picked_folder_not_only_the_current_one(qtbot):
     view, cat, dog = _two_leaf_view(qtbot, actions=actions)
     _pick(view, cat, dog)
     asked = []
-    view._confirm = lambda text: asked.append(text) or True
+    view._confirm = view.toc_editing.confirm = lambda text: asked.append(text) or True
 
     assert view._buttons.delete.toolTip() == "Delete 2 folders"
     view._buttons.delete.click()
@@ -106,10 +106,10 @@ def test_delete_takes_every_picked_folder_not_only_the_current_one(qtbot):
 def test_grouping_the_picked_folders_makes_a_named_folder_and_opens_it(qtbot, monkeypatch):
     view, cat, dog = _two_leaf_view(qtbot)
     _pick(view, cat, dog)
-    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
+    monkeypatch.setattr(QInputDialog, "getText",
                         staticmethod(lambda *a, **kw: ("Favorites", True)))
 
-    view._group_selection()
+    view.toc_editing.group_the_picked()
 
     (record,) = view._db.list_custom_collections()
     assert record["name"] == "Favorites"
@@ -122,10 +122,10 @@ def test_grouping_picked_folders_takes_a_custom_folder_among_them(qtbot, monkeyp
     view, cat, dog = _two_leaf_view(qtbot)
     mine = gallery.custom_collection_key(_make_folder(view, "Mine", [dog]))
     _pick(view, mine, cat)
-    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
+    monkeypatch.setattr(QInputDialog, "getText",
                         staticmethod(lambda *a, **kw: ("Both", True)))
 
-    view._group_selection()
+    view.toc_editing.group_the_picked()
 
     record = next(r for r in view._db.list_custom_collections() if r["name"] == "Both")
     assert sorted(record["folders"]) == sorted([mine, cat])
@@ -134,10 +134,10 @@ def test_grouping_picked_folders_takes_a_custom_folder_among_them(qtbot, monkeyp
 def test_declining_the_name_prompt_makes_no_folder(qtbot, monkeypatch):
     view, cat, dog = _two_leaf_view(qtbot)
     _pick(view, cat, dog)
-    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
+    monkeypatch.setattr(QInputDialog, "getText",
                         staticmethod(lambda *a, **kw: ("", False)))
 
-    view._group_selection()
+    view.toc_editing.group_the_picked()
 
     assert view._db.list_custom_collections() == []
 
@@ -198,7 +198,7 @@ def test_dropping_a_folder_onto_a_custom_folder_adds_it(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Favorites", [cat])
 
-    view._on_dropped(gallery.custom_collection_key(folder_id), [dog])
+    view.toc_editing.dropped(gallery.custom_collection_key(folder_id), [dog])
 
     (record,) = view._db.list_custom_collections()
     assert record["folders"] == [cat, dog]
@@ -400,16 +400,16 @@ def test_open_favorites_stays_as_it_is_while_a_folder_is_dragged(qtbot):
 def test_dropping_a_folder_onto_favorite_favorites_it(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
 
-    view._on_dropped(FAVORITES_KEY, [cat])
+    view.toc_editing.dropped(FAVORITES_KEY, [cat])
 
     assert view._db.folder_meta_map()[cat]["starred"] is True
 
 
 def test_dropping_a_favorite_folder_onto_favorites_leaves_it_a_favorite(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
-    view._toggle_favorite(cat)
+    view.toc_editing.toggle_favorite(cat)
 
-    view._on_dropped(FAVORITES_KEY, [cat])
+    view.toc_editing.dropped(FAVORITES_KEY, [cat])
 
     assert view._db.folder_meta_map()[cat]["starred"] is True
 
@@ -418,7 +418,7 @@ def test_a_folder_the_user_made_dropped_onto_favorites_takes_no_favorite(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
     made = gallery.custom_collection_key(_make_folder(view, "Mine", [cat]))
 
-    view._on_dropped(FAVORITES_KEY, [made])
+    view.toc_editing.dropped(FAVORITES_KEY, [made])
 
     assert made not in view._db.folder_meta_map()
 
@@ -427,7 +427,7 @@ def test_dropping_a_folder_onto_favorite_stars_it_where_it_stands(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
     row = view.toc.item_for(cat)
 
-    view._on_dropped(FAVORITES_KEY, [cat])
+    view.toc_editing.dropped(FAVORITES_KEY, [cat])
 
     assert view.toc.item_for(cat) is row
     assert row.data(0, _GROUP_ROLE).favorite
@@ -437,7 +437,7 @@ def test_dropped_folders_carry_the_identity_the_reconcile_needs(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Favorites", [])
 
-    view._on_dropped(gallery.custom_collection_key(folder_id), [cat])
+    view.toc_editing.dropped(gallery.custom_collection_key(folder_id), [cat])
 
     (held,) = view._db.folders_in_custom_collections()
     assert (held["level"], held["ref_prompt_id"]) == ("settings", "i1")
@@ -448,7 +448,7 @@ def test_removing_a_gathered_folder_leaves_its_items_alone(qtbot):
     folder_id = _make_folder(view, "Favorites", [cat, dog])
     group = view.group_for_key(gallery.custom_collection_key(folder_id))
 
-    view._remove_from_custom_collection(group, [dog])
+    view.toc_editing.remove_from_collection(group, [dog])
 
     (record,) = view._db.list_custom_collections()
     assert record["folders"] == [cat]
@@ -458,9 +458,9 @@ def test_removing_a_gathered_folder_leaves_its_items_alone(qtbot):
 def test_removing_a_custom_folder_keeps_every_generation_it_gathered(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Keepers", [cat, dog])
-    view._confirm = lambda text: True
+    view._confirm = view.toc_editing.confirm = lambda text: True
 
-    view._remove_custom_collection(view.group_for_key(gallery.custom_collection_key(folder_id)))
+    view.toc_editing.remove_collection(view.group_for_key(gallery.custom_collection_key(folder_id)))
 
     assert view._db.list_custom_collections() == []
     assert {r["prompt_id"] for r in view._db.list_generations()} == {"i1", "i2"}
@@ -473,9 +473,9 @@ def test_removing_a_folder_of_your_own_says_the_items_it_holds_are_kept(qtbot):
     view._db.add_items_to_custom_collection(folder_id, ["i2"])
     view.refresh()
     asked = []
-    view._confirm = lambda text: asked.append(text) and False
+    view._confirm = view.toc_editing.confirm = lambda text: asked.append(text) and False
 
-    view._remove_custom_collection(view.group_for_key(gallery.custom_collection_key(folder_id)))
+    view.toc_editing.remove_collection(view.group_for_key(gallery.custom_collection_key(folder_id)))
 
     assert asked == [("Remove the folder “Keepers”?\n\n"
                       "The 1 folder and 1 item it holds are kept.")]
@@ -504,7 +504,7 @@ def test_a_custom_folder_cannot_be_deleted_by_the_folder_delete_path(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Favorites", [cat])
     view._tree.setCurrentItem(_top_level(view._tree)["Favorites"])
-    view._confirm = lambda text: True
+    view._confirm = view.toc_editing.confirm = lambda text: True
 
     view._delete_selection()
 
@@ -531,7 +531,7 @@ def test_a_rebuild_keeps_a_live_multi_selection(qtbot):
     put_rows(view._db, [_image("i3", "a fish", 50, 3)])
     view.refresh()
 
-    assert view._selection_group is not None
+    assert view.toc.picked_together is not None
     assert len(view._gallery_pane._listed_folders) == 2
 
 
@@ -688,7 +688,7 @@ def test_deleting_a_folder_from_its_menu_trashes_what_that_folder_holds(
         qtbot, monkeypatch):
     actions = FakeActions()
     view, cat, _dog = _two_leaf_view(qtbot, actions=actions)
-    view._confirm = lambda text: True
+    view._confirm = view.toc_editing.confirm = lambda text: True
     _answer_menu(monkeypatch, "Delete folder…")
 
     _tree_menu(view, cat)
@@ -817,7 +817,7 @@ def test_removing_a_folder_of_your_own_from_its_menu_keeps_what_it_gathered(
         qtbot, monkeypatch):
     view, cat, dog = _two_leaf_view(qtbot)
     folder_id = _make_folder(view, "Keepers", [cat, dog])
-    view._confirm = lambda text: True
+    view._confirm = view.toc_editing.confirm = lambda text: True
     _answer_menu(monkeypatch, "Remove collection…")
 
     _tree_menu(view, gallery.custom_collection_key(folder_id))
@@ -830,7 +830,7 @@ def test_right_clicking_below_the_last_row_starts_a_folder_of_your_own(
         qtbot, monkeypatch):
     view, _cat, _dog = _two_leaf_view(qtbot)
     _answer_menu(monkeypatch, "New collection…")
-    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
+    monkeypatch.setattr(QInputDialog, "getText",
                         staticmethod(lambda *a, **kw: ("Keepers", True)))
 
     _tree_menu(view)
@@ -853,10 +853,10 @@ def test_grouping_picked_folders_makes_a_folder_on_their_side(qtbot, monkeypatch
     qtbot.addWidget(view)
     view.refresh()
     _pick(view, *(shaped_key(gallery.settings_folder_key(row), PORTRAIT) for row in rows))
-    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
+    monkeypatch.setattr(QInputDialog, "getText",
                         staticmethod(lambda *a, **kw: ("Keepers", True)))
 
-    view._group_selection()
+    view.toc_editing.group_the_picked()
 
     (record,) = view._db.list_custom_collections()
     assert record["side"] == PORTRAIT
@@ -865,7 +865,7 @@ def test_grouping_picked_folders_makes_a_folder_on_their_side(qtbot, monkeypatch
 def test_a_folder_started_below_the_last_row_belongs_to_that_half(qtbot, monkeypatch):
     view, _cat, _dog = _two_leaf_view(qtbot)
     _answer_menu(monkeypatch, "New collection…")
-    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
+    monkeypatch.setattr(QInputDialog, "getText",
                         staticmethod(lambda *a, **kw: ("Keepers", True)))
 
     _tree_menu(view, shape=PORTRAIT)
@@ -879,7 +879,7 @@ def test_right_clicking_a_picked_folder_offers_the_whole_selection(qtbot, monkey
     view, cat, dog = _two_leaf_view(qtbot)
     _pick(view, cat, dog)
     _answer_menu(monkeypatch, "Group 2 folders into a new collection…")
-    monkeypatch.setattr(gallery_view_module.QInputDialog, "getText",
+    monkeypatch.setattr(QInputDialog, "getText",
                         staticmethod(lambda *a, **kw: ("Keepers", True)))
 
     _tree_menu(view, cat)
@@ -1018,7 +1018,7 @@ def test_deleting_the_picked_folders_asks_first_then_takes_them_all(qtbot, monke
     view, cat, dog = _two_leaf_view(qtbot, actions=actions)
     _pick(view, cat, dog)
     asked = []
-    view._confirm = lambda text: asked.append(text) or True
+    view._confirm = view.toc_editing.confirm = lambda text: asked.append(text) or True
     _answer_menu(monkeypatch, "Delete 2 folders…")
 
     _tree_menu(view, dog)
@@ -1043,7 +1043,7 @@ def test_the_trash_can_takes_every_folder_picked_by_clicks_after_a_right_click(
     view, cat, dog = _two_leaf_view(qtbot, actions=actions)
     _pick_by_clicks(view, cat, dog)
     asked = []
-    view._confirm = lambda text: asked.append(text) or False
+    view._confirm = view.toc_editing.confirm = lambda text: asked.append(text) or False
     _answer_menu(monkeypatch, "Delete 2 folders…")
     _tree_menu(view, dog)
 
@@ -1058,7 +1058,7 @@ def test_the_trash_can_on_a_picked_row_deletes_every_picked_folder(qtbot):
     view, cat, dog = _two_leaf_view(qtbot, actions=actions)
     _pick_by_clicks(view, cat, dog)
     asked = []
-    view._confirm = lambda text: asked.append(text) or True
+    view._confirm = view.toc_editing.confirm = lambda text: asked.append(text) or True
 
     _click_beside_the_mark_of(qtbot, view, dog, which=1)
 
@@ -1072,7 +1072,7 @@ def test_the_trash_can_on_a_row_outside_the_picked_folders_deletes_only_its_own(
                                     extra=[_image("i3", "a fish", 50, 1)])
     fish = _key(_at(_image_workflow(view._tree), 0, 0, 2))
     _pick_by_clicks(view, cat, dog)
-    view._confirm = lambda text: True
+    view._confirm = view.toc_editing.confirm = lambda text: True
 
     _click_beside_the_mark_of(qtbot, view, fish, which=1)
 

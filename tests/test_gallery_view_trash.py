@@ -358,7 +358,7 @@ def test_neither_trash_action_asks_anything_of_an_empty_pick(qtbot):
     actions = _FailingActions()
     view = _trash_collection_view(qtbot, actions)
     asked = []
-    view._confirm = lambda text: asked.append(text) or False
+    view._confirm = view.toc_editing.confirm = lambda text: asked.append(text) or False
 
     view.restore_from_trash([])
     view.purge_from_trash([])
@@ -845,7 +845,7 @@ def test_delete_key_on_a_workflow_folder_does_nothing(qtbot):
     view.refresh()
     workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow)
-    view._confirm = lambda text: True
+    view._confirm = view.toc_editing.confirm = lambda text: True
 
     view._delete_selection()
 
@@ -960,7 +960,7 @@ def test_deleting_a_folder_lands_on_the_parent_not_the_top(qtbot, tmp_path):
     model = _at(_image_workflow(view._tree), 0)
     view._tree.setCurrentItem(_at(model, 0, 0))
     _click_off(view)
-    view._confirm = lambda text: True
+    view._confirm = view.toc_editing.confirm = lambda text: True
 
     view._delete_selection()
 
@@ -994,7 +994,7 @@ def test_deleting_a_folder_returns_to_the_most_recent_one_still_there(qtbot, tmp
     view._tree.setCurrentItem(first_leaf)
     view._tree.setCurrentItem(second_leaf)
     _click_off(view)
-    view._confirm = lambda text: True
+    view._confirm = view.toc_editing.confirm = lambda text: True
 
     view._delete_selection()
 
@@ -1008,9 +1008,9 @@ def test_delete_folder_refuses_a_workflow_group(qtbot):
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    view._confirm = lambda text: True
+    view._confirm = view.toc_editing.confirm = lambda text: True
 
-    view._delete_folders([_image_workflow(view._tree).data(0, _GROUP_ROLE)])
+    view.toc_editing.delete_folders([_image_workflow(view._tree).data(0, _GROUP_ROLE)])
 
     assert actions.deleted == [], (
         "a workflow's whole history can never be wiped in one action")
@@ -1040,7 +1040,7 @@ def test_a_model_or_lora_folder_is_no_leaf_folder_and_is_not_deleted(qtbot, dept
     folder = _at(_video_workflow(view._tree), *([0] * depth))
     assert isinstance(folder.data(0, _GROUP_ROLE), (gallery.ModelGroup, gallery.LoraGroup))
     view._tree.setCurrentItem(folder)
-    view._confirm = lambda text: True
+    view._confirm = view.toc_editing.confirm = lambda text: True
 
     view._delete_selection()
 
@@ -1279,7 +1279,7 @@ def test_ctrl_z_undoes_a_delete(qtbot, tmp_path):
 def test_delete_on_a_tree_folder_removes_it_via_the_keyboard(qtbot, tmp_path):
     view, db, _file = _shown_view_with_one_image(qtbot, tmp_path)
     _open_leaf(view)
-    view._confirm = lambda text: True
+    view._confirm = view.toc_editing.confirm = lambda text: True
 
     qtbot.keyClick(view._tree, Qt.Key.Key_Delete)
 

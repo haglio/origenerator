@@ -15,3 +15,9 @@ def offer_copy_names(menu: QMenu, names: list[str]) -> None:
         return
     wording = "Copy name" if len(names) == 1 else f"Copy {len(names)} names"
     menu.addAction(wording).triggered.connect(lambda: copy_names(names))
+
+
+def offer_copy_names_above_a_line(menu: QMenu, names: list[str]) -> None:
+    offer_copy_names(menu, names)
+    if not menu.isEmpty():
+        menu.addSeparator()

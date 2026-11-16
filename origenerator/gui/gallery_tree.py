@@ -16,6 +16,7 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.shapes import LANDSCAPE, SHAPE_LABELS, shape_holding
 from origenerator.gui import folder_icons, icons
 from origenerator.gui.folder_tree import COUNT_ROLE, DROP_KEY_ROLE, RECENT_ROLE, TREE_KEY_ROLE
+from origenerator.gui.split_folder_tree import SplitFolderTree
 from origenerator.item_shape import base_of, key_holds, shape_of, shaped_key, split_key
 from origenerator.media import MediaType
 
@@ -84,9 +85,14 @@ class ShapeModel:
     collection_counts: dict[str, int] = field(default_factory=dict)
 
 
+def takes_a_favorite(group) -> bool:
+    return isinstance(group, gallery.SettingsGroup)
+
+
 class GalleryTree:
-    def __init__(self, tree):
-        self._tree = tree
+    def __init__(self, tree=None):
+        self._tree = tree if tree is not None else SplitFolderTree(
+            GROUP_ROLE, takes_item=self.takes_item, takes_folder=self.takes_folder)
         self.item_by_key: dict[str, QTreeWidgetItem] = {}
         self.leaf_by_id: dict[str, QTreeWidgetItem] = {}
         self.keys_by_folder: dict[str, list[str]] = {}
@@ -96,6 +102,7 @@ class GalleryTree:
         self._drawn_workflows: dict[str, _DrawnFolder] = {}
         self._to_put_back: dict[str, _DrawnFolder] = {}
         self._drawing: _DrawnFolder | None = None
+        self.picked_together = None
 
     def populate(self, shapes, *, folder_meta=None, recently_worked=()):
         self._recently_worked = {shaped_key(key, shape)
@@ -285,6 +292,10 @@ class GalleryTree:
     def leave_folders_open(self, keys) -> None:
         self._folders_left_open = set(keys)
 
+    @property
+    def widget(self):
+        return self._tree
+
     def selected_folder_key(self) -> str | None:
         item = self._tree.currentItem()
         return item.data(0, TREE_KEY_ROLE) if item is not None else None
@@ -310,6 +321,24 @@ class GalleryTree:
     def group_for_key(self, key: str):
         item = self.item_for(key)
         return item.data(0, GROUP_ROLE) if item is not None else None
+
+    def forget_the_picking(self) -> None:
+        self._tree.clearSelection()
+        self.picked_together = None
+
+    def takes_item(self, row_key: str, prompt_id: str) -> bool:
+        folder = self.group_for_key(row_key)
+        leaf = self.leaf_by_id.get(prompt_id)
+        return (isinstance(folder, gallery.CustomCollection) and leaf is not None
+                and shape_of(leaf.data(0, TREE_KEY_ROLE)) == shape_of(row_key))
+
+    def takes_folder(self, row_key: str, folder_key: str) -> bool:
+        target, dragged = self.group_for_key(row_key), self.group_for_key(folder_key)
+        if dragged is None:
+            return False
+        if isinstance(target, gallery.CustomCollection):
+            return not gallery.holds(dragged, target)
+        return takes_a_favorite(dragged)
 
     def folder_context(self, key: str) -> str:
         item = self.item_for(key)

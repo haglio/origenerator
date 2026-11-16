@@ -20,6 +20,7 @@ from origenerator import gallery
 from origenerator.config import FRAMES_BEING_MADE_DIR, OUTPUT_PLACES
 from origenerator.fun_time_bridge import (
     ask_for_omnipause,
+    ask_the_main_funestra_to_play,
     tell_of_a_lock,
 )
 from origenerator.fun_time_mode import majority_shape, region_for_items
@@ -32,6 +33,7 @@ from origenerator.gallery.collection import (
 )
 from origenerator.gallery.collection import collection as _collection
 from origenerator.gallery.collection import folder_collection
+from origenerator.gallery.non_ai import video_kino_plays
 from origenerator.gallery.shapes import (
     SHAPES as _SHAPES,
 )
@@ -362,6 +364,9 @@ class SlideshowDirector:
     @looking_once
     def open_on_tile(self, generation):
         row = self._row_for(generation)
+        kinos = video_kino_plays(row) if row is not None else None
+        if kinos is not None and ask_the_main_funestra_to_play(self._session_channel, kinos):
+            return None
         items = self.items_of([row]) if row is not None else []
         if not items:
             return None

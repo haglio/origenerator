@@ -52,6 +52,14 @@ def ask_for_origenerator_mode(dashboard_cmd_file) -> None:
         append_command(dashboard_cmd_file, ORIGENERATOR_MODE)
 
 
+PLAY_ON_THE_MAIN_FUNESTRA = "kino_play"
+
+
+def ask_the_main_funestra_to_play(dashboard_cmd_file, video) -> bool:
+    return dashboard_cmd_file is not None and append_command(
+        dashboard_cmd_file, f"{PLAY_ON_THE_MAIN_FUNESTRA}|{video}")
+
+
 def tell_of_a_lock(dashboard_cmd_file, shape: str, file) -> bool:
     return dashboard_cmd_file is not None and append_command(
         dashboard_cmd_file, f"{spelled_for(shape, LOCK_HELD)}|{file}")

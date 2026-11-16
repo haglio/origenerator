@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from origenerator.db_generations import library_paths_in
 from origenerator.gallery.signatures import parse_params
 from origenerator.workflows.non_ai import (
     FOLDER_KEY,
@@ -16,6 +17,12 @@ def leaf_folder_label(row: dict) -> str:
 
 def started_from_no_image(row: dict) -> bool:
     return non_ai_folder(row.get("workflow_name")) is not None
+
+
+def video_kino_plays(row: dict) -> str | None:
+    if not started_from_no_image(row):
+        return None
+    return next(iter(sorted(library_paths_in(row.get("output_files")))), None)
 
 
 def recorded_title(row: dict) -> str | None:

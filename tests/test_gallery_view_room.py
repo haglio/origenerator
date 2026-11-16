@@ -37,7 +37,6 @@ from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import (
     _REROLL_HISTORY,
     FakeActions,
-    FakeDB,
     _a_slideshow_standing_on_its_own,
     _aim_slideshow,
     _double_click_slideshow,
@@ -63,6 +62,7 @@ from tests.gallery_view_support import (
 )
 from tests.lit_switches import lit_in
 from tests.osr2_fakes import FakeBroker
+from tests.real_db import database_of
 from tests.slideshow_hud_support import engine_of, funestra_of
 from tests.test_fun_time_gallery import _session
 from tests.test_osr2_driver import ACTIONS, FakePlayer
@@ -92,7 +92,7 @@ class _FakeDriver:
 
 
 def _osr2_view(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(folders=SUITE_FOLDERS), shared=Shared(osr2_motion=_SignalMotion()))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(folders=SUITE_FOLDERS), shared=Shared(osr2_motion=_SignalMotion()))
     qtbot.addWidget(view)
     driver = _FakeDriver()
     view.osr2.driver = driver
@@ -318,7 +318,7 @@ def test_a_session_saved_by_the_on_off_switch_reopens_driving_or_parked(qtbot):
 
 def _radio_view(qtbot):
     radio = _FakeRadio()
-    view = GalleryView(FakeDB([]), actions=FakeActions(), shared=Shared(radio=radio))
+    view = GalleryView(database_of([]), actions=FakeActions(), shared=Shared(radio=radio))
     qtbot.addWidget(view)
     return view, radio
 
@@ -359,7 +359,7 @@ def test_the_radio_switch_round_trips_for_persistence(qtbot):
 
 def test_the_rooms_pause_reaches_the_radio_and_the_motion(qtbot):
     radio, motion = _FakeRadio(), _SignalMotion()
-    view = GalleryView(FakeDB([]), actions=FakeActions(), shared=Shared(radio=radio, osr2_motion=motion))
+    view = GalleryView(database_of([]), actions=FakeActions(), shared=Shared(radio=radio, osr2_motion=motion))
     qtbot.addWidget(view)
 
     view.set_room_paused(True)
@@ -372,7 +372,7 @@ def test_the_rooms_pause_reaches_the_radio_and_the_motion(qtbot):
 def test_the_rooms_pause_holds_a_scripted_videos_drive_still(qtbot, monkeypatch):
     broker = FakeBroker()
     monkeypatch.setattr(osr2_driver, "Osr2Broker", lambda *a, **k: broker)
-    view = GalleryView(FakeDB([]), actions=FakeActions(), shared=Shared(osr2_motion=_SignalMotion()))
+    view = GalleryView(database_of([]), actions=FakeActions(), shared=Shared(osr2_motion=_SignalMotion()))
     qtbot.addWidget(view)
     tab = view._generate_pane.current_generate_tab()
     tab.osr2_drive_target = lambda: ("A.mp4", FakePlayer(pos=100), ACTIONS)
@@ -387,7 +387,7 @@ def test_the_rooms_pause_holds_a_scripted_videos_drive_still(qtbot, monkeypatch)
 def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _image("i3", "a cat", 50, 3)]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     monkeypatch.setattr(
         gallery, "resolve_preview",
@@ -440,7 +440,7 @@ def test_a_double_click_on_an_image_from_another_folder_opens_that_folder(
     _resolve_by_id(monkeypatch)
     rows = [_image("a1", "a cat", 50, 1), _image("b1", "a dog", 50, 1),
             _image("b2", "a dog", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["b1"])
@@ -495,7 +495,7 @@ def test_a_slideshow_up_is_what_is_in_front_of_the_tab(qtbot):
 
 
 def _populating_view(qtbot, monkeypatch, rows):
-    view = GalleryView(FakeDB(rows), actions=FakeActions(), client=ComfyUIClient(folders=SUITE_FOLDERS), shared=Shared(osr2_motion=_SignalMotion()))
+    view = GalleryView(database_of(rows), actions=FakeActions(), client=ComfyUIClient(folders=SUITE_FOLDERS), shared=Shared(osr2_motion=_SignalMotion()))
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -590,7 +590,7 @@ def test_a_standing_slideshows_volume_comes_back_after_a_restart(qtbot, monkeypa
     slideshow._actions.volume_moved(VolumeHud(volume=40, muted=True))
     saved = first.remembered_slideshows()
 
-    second = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions(), client=ComfyUIClient(folders=SUITE_FOLDERS), shared=Shared(radio=_FakeRadio()))
+    second = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), actions=FakeActions(), client=ComfyUIClient(folders=SUITE_FOLDERS), shared=Shared(radio=_FakeRadio()))
     qtbot.addWidget(second)
     second.remember_slideshows(saved)
     second.refresh()
@@ -1036,7 +1036,7 @@ def test_a_listener_reconciling_on_the_settled_signal_does_not_land_back_in_the_
 
 def test_quitting_lets_go_of_the_script_the_motion_and_the_radio(qtbot):
     radio = _FakeRadio()
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), shared=Shared(osr2_motion=_SignalMotion(), radio=radio))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), shared=Shared(osr2_motion=_SignalMotion(), radio=radio))
     qtbot.addWidget(view)
     view.osr2.driver.start(FakePlayer(), ACTIONS)
     view.osr2.motion.active = True
@@ -1049,7 +1049,7 @@ def test_quitting_lets_go_of_the_script_the_motion_and_the_radio(qtbot):
 
 
 def test_a_hosted_gallery_says_its_mic_is_off_since_the_session_owns_the_room_s_microphone(qtbot):
-    view = GalleryView(FakeDB([]), fun_time=_session())
+    view = GalleryView(database_of([]), fun_time=_session())
     qtbot.addWidget(view)
 
     assert view.mic_enabled() is False, (

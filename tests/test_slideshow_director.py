@@ -16,6 +16,8 @@ from PIL import Image
 from PySide6.QtCore import QRect, Qt
 
 from origenerator import gallery, library_views
+from origenerator.db import Database
+from origenerator.db_requests import NewRequest
 from origenerator.gallery.collection import (
     ENHANCED_KEY,
     FAVORITES_KEY,
@@ -35,7 +37,7 @@ from origenerator.gui.slideshow_director import (
 from origenerator.gui.slideshow_pace import DEFAULT_S as DEFAULT_PACE_S
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_wiring import Listing
-from origenerator.item_actions import ItemActions, actions_of, columns, stored
+from origenerator.item_actions import ItemActions, actions_of
 from origenerator.item_names import ItemNames
 from origenerator.item_shape import shaped_key
 from origenerator.library_views import LibrarySnapshot
@@ -45,6 +47,7 @@ from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
 from origenerator.video_records import FiledLoops
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.slideshow_commands import SlideshowCommand
+from tests.real_db import database_of
 from tests.slideshow_hud_support import open_both_shapes
 
 PORTRAIT = "portrait"
@@ -398,7 +401,7 @@ class FakeLibrary(LibrarySnapshot):
     @property
     def rows(self):
         return list({row["prompt_id"]: row
-                     for row in (*self._db.rows.values(), *self._host.rows)}.values())
+                     for row in (*Database.list_generations(self._db), *self._host.rows)}.values())
 
     @property
     def image_index(self):
@@ -424,30 +427,24 @@ class FakeLibrary(LibrarySnapshot):
         return list(self.at.get(key, []))
 
 
-class FakeDB:
-    def __init__(self, rows=(), requests=()):
-        self.rows = {row["prompt_id"]: row for row in rows}
-        self.requests = {record["prompt_id"]: record for record in requests}
-        self.listings = 0
-        self.gets = 0
-
-    def get_request(self, prompt_id):
-        return self.requests.get(prompt_id)
+class CountingDB(Database):
+    listings = 0
+    gets = 0
 
     def list_generations(self):
         self.listings += 1
-        return list(self.rows.values())
+        return super().list_generations()
 
     def get_generation(self, prompt_id):
         self.gets += 1
-        return self.rows.get(prompt_id)
+        return super().get_generation(prompt_id)
 
-    def set_many_actions(self, side, actions_by_id):
-        for prompt_id, item_actions in actions_by_id.items():
-            self.rows[prompt_id].update(zip(columns(side), stored(item_actions), strict=True))
 
-    def folder_meta_map(self):
-        return {}
+def _db_of(rows=(), requests=()):
+    db = database_of(rows, kind=CountingDB)
+    for request in requests:
+        db.record_request(request)
+    return db
 
 
 class _NoOsr2:
@@ -580,10 +577,9 @@ def _row(prompt_id, *, workflow_name="sdxl_t2i", favorite=False, params=None,
     return {
         "prompt_id": prompt_id,
         "workflow_name": workflow_name,
-        "workflow": workflow_name,
         "starred": favorite,
         "source": "generated",
-        "params": json.dumps(params or {}),
+        "params_json": json.dumps(params or {}),
         "output_files": json.dumps([{"filename": name} for name in files]),
         "thumbnail_path": None,
     }
@@ -617,7 +613,7 @@ def slideshows(monkeypatch):
 
     def build(host=None, *, db=None, gallery_pane=None, fun_time=None, records=None):
         host = host or FakeHost()
-        db = db or FakeDB()
+        db = db or _db_of()
         gallery_pane = gallery_pane or FakeGalleryPane()
         gallery_pane.collections.update(
             {key: gallery.rows_under(group) for key, group in host.groups.items()})
@@ -700,7 +696,7 @@ def test_a_double_clicked_item_s_slideshow_opens_on_it_before_the_rest_of_its_fo
 def test_a_double_clicked_item_plays_the_rows_the_gallery_pane_listed_without_reading_each_again(
         slideshows):
     rows = [_row("a2"), _row("a1")]
-    db = FakeDB(rows)
+    db = _db_of(rows)
     director, _host, made = slideshows(FakeHost(rows=rows), db=db)
 
     director.open_in_its_folder(("a2.png", "image"), "a2")
@@ -761,14 +757,14 @@ def test_a_slideshow_put_back_goes_on_taking_in_what_lands_where_it_plays(slides
 
 
 def _request(prompt_id, asked_of, asked="two dogs"):
-    return {"prompt_id": prompt_id, "source_prompt_id": asked_of, "heard": "", "asked": asked}
+    return NewRequest(prompt_id=prompt_id, source_prompt_id=asked_of, heard="", asked=asked)
 
 
 def test_a_request_landing_shows_on_a_slideshow_still_locked_on_what_it_was_asked_of(
         slideshows):
     asked_for = _row("g2")
     director, _host, made = slideshows(
-        db=FakeDB([_row("g1"), asked_for], requests=[_request("g2", "g1")]))
+        db=_db_of([_row("g1"), asked_for], requests=[_request("g2", "g1")]))
     director.open([("g1.png", "image", "g1", None)], location="collection/a")
     made[0].locked_on = "g1"
 
@@ -781,7 +777,7 @@ def test_a_request_landing_leaves_a_slideshow_that_moved_off_what_it_was_asked_o
         slideshows):
     asked_for = _row("g2")
     director, _host, made = slideshows(
-        db=FakeDB([_row("g1"), asked_for], requests=[_request("g2", "g1")]))
+        db=_db_of([_row("g1"), asked_for], requests=[_request("g2", "g1")]))
     director.open([("g1.png", "image", "g1", None)], location="collection/a")
     made[0].locked_on = None
 
@@ -793,7 +789,7 @@ def test_a_request_landing_leaves_a_slideshow_that_moved_off_what_it_was_asked_o
 def test_a_folder_s_modify_batch_landing_leaves_a_slideshow_locked_on_its_original(slideshows):
     modified = _row("g2")
     director, _host, made = slideshows(
-        db=FakeDB([_row("g1"), modified], requests=[_request("g2", "g1", asked="")]))
+        db=_db_of([_row("g1"), modified], requests=[_request("g2", "g1", asked="")]))
     director.open([("g1.png", "image", "g1", None)], location="collection/a")
     made[0].locked_on = "g1"
 
@@ -1250,7 +1246,7 @@ def test_an_arrival_from_outside_leaves_a_slideshow_in_shuffle_as_it_was(slidesh
 
 def test_a_run_in_another_folder_is_turned_down(slideshows):
     host = FakeHost(rows=[_row("g1")])
-    director, _host, made = slideshows(host, db=FakeDB([_row("g7")]))
+    director, _host, made = slideshows(host, db=_db_of([_row("g7")]))
     director.open([("a.png", "image", "g1", None)])
 
     director.note_generating("g7", b"frame-one")
@@ -1261,7 +1257,7 @@ def test_a_run_in_another_folder_is_turned_down(slideshows):
 
 def test_a_run_the_folder_lists_only_after_its_first_frame_joins_on_its_next(slideshows):
     host = FakeHost(rows=[_row("g1")])
-    director, _host, made = slideshows(host, db=FakeDB([_row("g1"), _row("g7")]))
+    director, _host, made = slideshows(host, db=_db_of([_row("g1"), _row("g7")]))
     director.open([("a.png", "image", "g1", None)])
 
     director.note_generating("g7", b"frame-one")
@@ -1272,11 +1268,10 @@ def test_a_run_the_folder_lists_only_after_its_first_frame_joins_on_its_next(sli
 
 
 def test_an_enhancement_is_never_a_slide_of_its_own_frames(slideshows):
-    enhance = _row("g8", workflow_name="enhance_image")
+    enhance = _row("g8", workflow_name=gallery.ENHANCE_WORKFLOW)
     host = FakeHost(rows=[_row("g1"), enhance])
-    director, _host, made = slideshows(host, db=FakeDB([enhance]),
+    director, _host, made = slideshows(host, db=_db_of([enhance]),
                                        gallery_pane=FakeGalleryPane(latest=True))
-    enhance["workflow_name"] = gallery.ENHANCE_WORKFLOW
     director.open([("a.png", "image", "g1", None)])
 
     director.note_generating("g8", b"frame")
@@ -1288,7 +1283,7 @@ def test_an_enhancement_is_never_a_slide_of_its_own_frames(slideshows):
 
 def test_a_run_turned_down_frame_after_frame_looks_at_the_slideshows_set_once(slideshows):
     gallery_pane = FakeGalleryPane(collections={"collection/a": [_row("g1")]})
-    director, _host, made = slideshows(gallery_pane=gallery_pane, db=FakeDB([_row("g-run")]),
+    director, _host, made = slideshows(gallery_pane=gallery_pane, db=_db_of([_row("g-run")]),
                                        fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location="collection/a", shape=LANDSCAPE)
     gallery_pane.library.asked = 0
@@ -1304,7 +1299,7 @@ def test_a_run_turned_down_frame_after_frame_looks_at_the_slideshows_set_once(sl
 
 def test_a_run_a_collection_lists_only_after_the_next_reading_joins_on_the_frame_after_it(slideshows):
     gallery_pane = FakeGalleryPane(collections={"collection/a": [_row("g1")]})
-    db = FakeDB([_row("g7")])
+    db = _db_of([_row("g7")])
     director, _host, made = slideshows(gallery_pane=gallery_pane, db=db, fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location="collection/a", shape=LANDSCAPE)
 
@@ -1317,7 +1312,7 @@ def test_a_run_a_collection_lists_only_after_the_next_reading_joins_on_the_frame
 
 def test_a_run_of_the_folder_on_screen_joins_on_its_first_frame(slideshows):
     host = FakeHost(rows=[_row("g1"), _row("g5")])
-    director, _host, made = slideshows(host, db=FakeDB([_row("g5")]))
+    director, _host, made = slideshows(host, db=_db_of([_row("g5")]))
     director.open([("a.png", "image", "g1", None)])
 
     director.note_generating("g5", b"frame")
@@ -1380,7 +1375,7 @@ def _evolver_upscaled_video(tmp_path, monkeypatch):
 
 
 def _director():
-    db = FakeDB()
+    db = _db_of()
     host = FakeHost()
     return SlideshowDirector(
         host,
@@ -1488,7 +1483,7 @@ def test_a_set_handed_to_a_running_slideshow_brings_its_own_versions_with_it(sli
     gallery_pane = FakeGalleryPane(collections={LATEST_LANDSCAPE: [_row("g9")],
                                        ALL_LANDSCAPE: [_row("g4")]})
     director, _host, made = slideshows(gallery_pane=gallery_pane,
-                                       db=FakeDB([_row("g9"), _row("g4")]),
+                                       db=_db_of([_row("g9"), _row("g4")]),
                                        fun_time=FakeSession())
     director.versions_of = lambda rows: {f"{row['prompt_id']}.png": ["newer", "older"]
                                          for row in rows}
@@ -2357,9 +2352,7 @@ def _image(prompt_id, prompt, *, seed, steps=50, size_in_its_settings=(100, 200)
     width, height = size_in_its_settings
     params = {"positive_prompt": prompt, "seed": seed, "steps": steps,
               "width": width, "height": height}
-    row = _row(prompt_id, params=params)
-    row["params_json"] = json.dumps(params)
-    return row
+    return _row(prompt_id, params=params)
 
 
 def _animation(prompt_id, *, frame, action, tmp_path, size_of_its_thumbnail=(100, 200)):
@@ -2387,7 +2380,7 @@ def test_the_library_of_the_slideshows_side_answers_for_the_map_around_a_generat
             _animation("v2", frame="g1.png", action="beta", tmp_path=tmp_path),
             _animation("v3", frame="g1.png", action="beta", tmp_path=tmp_path),
             _image("w1", "a red fox", seed=3, size_in_its_settings=(200, 100))]
-    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
+    director, _host, _made = slideshows(_library(rows), db=_db_of(rows))
 
     around = director.neighbors_of("g1", shape="portrait")
 
@@ -2408,7 +2401,7 @@ def test_every_row_shows_its_items_actions_and_nothing_when_it_has_none_as_in_ki
     tweaked = {**_image("c1", "a red fox", seed=1, steps=30),
                "image_actions": json.dumps(["alpha"]), "image_checked": json.dumps(["first box"])}
     rows = [_fox("g1", seed=1), tweaked, _image("c2", "a red fox", seed=1, steps=20)]
-    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
+    director, _host, _made = slideshows(_library(rows), db=_db_of(rows))
 
     around = director.neighbors_of("g1", shape="portrait")
 
@@ -2419,7 +2412,7 @@ def test_every_row_shows_its_items_actions_and_nothing_when_it_has_none_as_in_ki
 def test_the_map_is_drawn_against_the_gallerys_reading_of_the_library_never_a_reading_of_its_own(
         slideshows):
     rows = [_fox("g1", seed=1), _fox("g2", seed=2)]
-    db = FakeDB(rows)
+    db = _db_of(rows)
     director, _host, _made = slideshows(_library(rows), db=db)
 
     director.neighbors_of("g1", shape="portrait")
@@ -2434,7 +2427,7 @@ def test_the_column_is_this_seeds_other_configurations_then_the_videos_of_it(sli
     tweaked["output_files"] = json.dumps([{"filename": "g2.png"}])
     rows = [fox, tweaked, _fox("g3", seed=2),
             _animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path)]
-    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
+    director, _host, _made = slideshows(_library(rows), db=_db_of(rows))
 
     around = director.neighbors_of("g1", shape="portrait")
 
@@ -2446,7 +2439,7 @@ def test_a_video_sits_under_its_images_seed_with_the_image_down_its_column(slide
             _animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path),
             _animation("v2", frame="g2.png", action="alpha", tmp_path=tmp_path),
             _animation("v3", frame="g1.png", action="beta", tmp_path=tmp_path)]
-    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
+    director, _host, _made = slideshows(_library(rows), db=_db_of(rows))
 
     around = director.neighbors_of("v1", shape="portrait")
 
@@ -2465,7 +2458,7 @@ def test_what_another_site_made_stays_off_the_map(slideshows, tmp_path):
             _fox("g3", seed=3),
             _a_sites(_animation("o1", frame="g1.png", action="beta", tmp_path=tmp_path)),
             _animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path)]
-    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
+    director, _host, _made = slideshows(_library(rows), db=_db_of(rows))
 
     around = director.neighbors_of("g1", shape="portrait")
 
@@ -2477,7 +2470,7 @@ def test_a_sites_pictures_in_one_folder_are_each_others_seeds_and_nothing_made_h
         slideshows):
     rows = [_a_sites(_fox("o1", seed=1)), _a_sites(_fox("o2", seed=2)),
             _a_sites(_fox("o3", seed=3)), _fox("g1", seed=4)]
-    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
+    director, _host, _made = slideshows(_library(rows), db=_db_of(rows))
 
     around = director.neighbors_of("o1", shape="portrait")
 
@@ -2488,7 +2481,7 @@ def test_videos_made_from_a_sites_picture_stay_together_on_the_map(slideshows, t
     rows = [_a_sites(_fox("g1", seed=1)),
             _animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path),
             _animation("v2", frame="g1.png", action="beta", tmp_path=tmp_path)]
-    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
+    director, _host, _made = slideshows(_library(rows), db=_db_of(rows))
 
     around = director.neighbors_of("v1", shape="portrait")
 
@@ -2499,7 +2492,7 @@ def test_videos_made_from_a_sites_picture_stay_together_on_the_map(slideshows, t
 def test_widening_the_map_takes_in_nothing_another_site_made(slideshows, tmp_path):
     rows = [_fox("g1", seed=1), _a_sites(_image("o1", "a red fox", seed=2, steps=20)),
             _image("g2", "a red fox", seed=3, steps=20)]
-    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
+    director, _host, _made = slideshows(_library(rows), db=_db_of(rows))
 
     assert [slide.prompt_id
             for slide in director.beyond_the_row_of("g1", shape="portrait")] == ["g2"]
@@ -2509,7 +2502,7 @@ def test_videos_made_from_one_hidden_starting_frame_list_each_other_on_the_map(s
     frame = {**_fox("h1", seed=1), "source": GenerationSource.STARTING_FRAME}
     rows = [frame, _animation("v1", frame="h1.png", action="alpha", tmp_path=tmp_path),
             _animation("v2", frame="h1.png", action="beta", tmp_path=tmp_path)]
-    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
+    director, _host, _made = slideshows(_library(rows), db=_db_of(rows))
 
     around = director.neighbors_of("v1", shape="portrait")
 
@@ -2521,7 +2514,7 @@ def test_a_hidden_starting_frame_stays_off_the_map_of_a_video_made_from_it(slide
     frame = {**_fox("h1", seed=1), "source": GenerationSource.STARTING_FRAME}
     rows = [frame, _animation("v1", frame="h1.png", action="alpha", tmp_path=tmp_path),
             _animation("v2", frame="h1.png", action="beta", tmp_path=tmp_path)]
-    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
+    director, _host, _made = slideshows(_library(rows), db=_db_of(rows))
 
     around = director.neighbors_of("v1", shape="portrait")
 
@@ -2532,7 +2525,7 @@ def test_a_hidden_starting_frame_stays_off_the_map_of_a_video_made_from_it(slide
 def test_the_library_says_what_each_generation_an_action_filter_asks_about_is_named_for(slideshows, tmp_path):
     rows = [_fox("g1", seed=1), _fox("g2", seed=2),
             _animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path)]
-    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows))
+    director, _host, _made = slideshows(_library(rows), db=_db_of(rows))
 
     assert director.actions_of(["g1", "v1", "nobody"], shape="portrait") == {
         "g1": "Source image", "v1": "alpha"}
@@ -2540,11 +2533,11 @@ def test_the_library_says_what_each_generation_an_action_filter_asks_about_is_na
 
 def test_an_image_taken_away_leaves_the_map_its_row_draws(slideshows):
     rows = [_image("g1", "a red fox", seed=1), _image("g2", "a red fox", seed=2)]
-    host, db = FakeHost(rows=rows), FakeDB(rows)
+    host, db = FakeHost(rows=rows), _db_of(rows)
     director, _host, _made = slideshows(host, db=db)
     assert [slide.prompt_id for slide in director.neighbors_of("g1", shape="portrait").seeds] == ["g2"]
 
-    db.rows.pop("g2")
+    db.delete_generation("g2")
     host.rows = [row for row in host.rows if row["prompt_id"] != "g2"]
 
     assert director.neighbors_of("g1", shape="portrait").seeds == ()
@@ -2554,7 +2547,7 @@ def test_beyond_the_row_lies_the_nearest_of_the_models_other_configurations(slid
     rows = [_image("g1", "a red fox", seed=1), _image("g2", "a red fox", seed=2),
             _image("g3", "a red fox at dawn", seed=7),
             _image("g4", "a blue car", seed=8, steps=30)]
-    director, _host, _made = slideshows(FakeHost(rows=rows), db=FakeDB(rows))
+    director, _host, _made = slideshows(FakeHost(rows=rows), db=_db_of(rows))
 
     beyond = director.beyond_the_row_of("g1", shape="portrait")
 
@@ -2571,7 +2564,7 @@ def test_a_generation_the_gallery_has_no_row_for_maps_alone(slideshows):
 
 def test_a_slideshow_is_wired_to_the_library_of_the_side_it_opened_on(slideshows):
     rows = [_image("g1", "a red fox", seed=1), _image("g2", "a red fox", seed=2)]
-    director, host, made = slideshows(FakeHost(rows=rows), db=FakeDB(rows))
+    director, host, made = slideshows(FakeHost(rows=rows), db=_db_of(rows))
 
     director.open(director.items_of(rows), location="a-folder", shape="portrait")
 
@@ -2587,19 +2580,19 @@ def test_a_slideshow_is_wired_to_the_library_of_the_side_it_opened_on(slideshows
 
 def test_wrong_action_on_a_slide_takes_the_action_off_its_row_and_the_gallery_rereads(slideshows):
     rows = [{**_image("g1", "a red fox", seed=1), "image_actions": json.dumps(["alpha"])}]
-    db = FakeDB(rows)
+    db = _db_of(rows)
     director, host, made = slideshows(FakeHost(rows=rows), db=db)
     director.open(director.items_of(rows), location="a-folder", shape="portrait")
 
     assert made[0].actions.strike_action(Slide("g1.png", "image", "g1")) == "alpha"
 
-    assert actions_of(db.rows["g1"], MediaType.IMAGE) == ItemActions()
+    assert actions_of(db.get_generation("g1"), MediaType.IMAGE) == ItemActions()
     assert host.reread == 1
 
 
 def test_wrong_action_on_a_slide_with_no_action_leaves_the_gallery_as_it_is(slideshows):
     rows = [_image("g1", "a red fox", seed=1)]
-    director, host, made = slideshows(FakeHost(rows=rows), db=FakeDB(rows))
+    director, host, made = slideshows(FakeHost(rows=rows), db=_db_of(rows))
     director.open(director.items_of(rows), location="a-folder", shape="portrait")
 
     assert made[0].actions.strike_action(Slide("g1.png", "image", "g1")) == ""
@@ -2609,7 +2602,7 @@ def test_wrong_action_on_a_slide_with_no_action_leaves_the_gallery_as_it_is(slid
 
 def test_a_lock_on_a_hosted_slideshow_puts_the_generation_it_holds_in_front_of_him(slideshows):
     rows = [_image("g1", "a red fox", seed=1)]
-    director, host, made = slideshows(FakeHost(rows=rows), db=FakeDB(rows),
+    director, host, made = slideshows(FakeHost(rows=rows), db=_db_of(rows),
                                       fun_time=FakeSession())
     director.open(director.items_of(rows), location="a-folder", shape="portrait")
 
@@ -2623,7 +2616,7 @@ def test_a_lock_on_a_hosted_slideshow_puts_the_generation_it_holds_in_front_of_h
 def _a_video_locked_in_a_session(slideshows, tmp_path, row):
     session = FakeSession()
     session.dashboard_cmd_file = tmp_path / "dashboard_cmd.txt"
-    director, host, made = slideshows(FakeHost(rows=[row]), db=FakeDB([row]), fun_time=session)
+    director, host, made = slideshows(FakeHost(rows=[row]), db=_db_of([row]), fun_time=session)
     director.open(director.items_of([row]), location="a-folder", shape="portrait")
 
     made[0].actions.lock(row["prompt_id"])
@@ -2654,7 +2647,7 @@ def test_a_lock_on_a_video_made_here_is_left_to_the_session_so_core_shows_it_onl
 def test_a_lock_on_a_video_the_session_cannot_be_told_of_is_shown_in_core(
         slideshows, tmp_path):
     video = _a_sites(_animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path))
-    director, host, made = slideshows(FakeHost(rows=[video]), db=FakeDB([video]),
+    director, host, made = slideshows(FakeHost(rows=[video]), db=_db_of([video]),
                                       fun_time=FakeSession())
     director.open(director.items_of([video]), location="a-folder", shape="portrait")
 
@@ -2940,7 +2933,7 @@ def test_a_slideshow_opens_knowing_what_is_being_enhanced(slideshows):
 def test_a_slideshow_opened_with_no_slide_named_leads_with_the_run_being_generated(slideshows):
     host = FakeHost(rows=[_row("g1"), _row("g-run")])
     host.queue = ([_being_made("g-run")], 0)
-    director, _host, made = slideshows(host=host, db=FakeDB([_row("g1"), _row("g-run")]))
+    director, _host, made = slideshows(host=host, db=_db_of([_row("g1"), _row("g-run")]))
 
     director.open([("a.png", "image", "g1", None)])
 
@@ -2951,7 +2944,7 @@ def test_a_slideshow_opened_with_no_slide_named_leads_with_the_run_being_generat
 def test_a_run_with_no_frame_yet_is_no_slide(slideshows):
     host = FakeHost(rows=[_row("g1"), _row("g-run")])
     host.queue = ([_being_made("g-run", frame=None)], 0)
-    director, _host, made = slideshows(host=host, db=FakeDB([_row("g1"), _row("g-run")]))
+    director, _host, made = slideshows(host=host, db=_db_of([_row("g1"), _row("g-run")]))
 
     director.open([("a.png", "image", "g1", None)])
 
@@ -2963,7 +2956,7 @@ def test_a_run_with_no_frame_yet_is_no_slide(slideshows):
 def test_a_slideshow_opened_on_a_named_slide_is_led_nowhere_else(slideshows):
     host = FakeHost(rows=[_row("g1"), _row("g-run")])
     host.queue = ([_being_made("g-run")], 0)
-    director, _host, made = slideshows(host=host, db=FakeDB([_row("g1"), _row("g-run")]))
+    director, _host, made = slideshows(host=host, db=_db_of([_row("g1"), _row("g-run")]))
 
     director.open([("a.png", "image", "g1", None)], start=0)
 
@@ -2999,7 +2992,7 @@ def test_the_frames_of_the_enhancements_being_made_reach_every_slideshow_that_is
 def test_a_run_reaches_each_slideshow_whose_own_set_holds_it(slideshows):
     gallery_pane = FakeGalleryPane(collections={"collection/a": [_row("g1"), _row("g-run")],
                                        "collection/b": [_row("g2")]})
-    director, _host, made = slideshows(gallery_pane=gallery_pane, db=FakeDB([_row("g-run")]),
+    director, _host, made = slideshows(gallery_pane=gallery_pane, db=_db_of([_row("g-run")]),
                                        fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location="collection/a", shape=LANDSCAPE)
     director.open([("b.png", "image", "g2", None)], location="collection/b", shape=PORTRAIT)
@@ -3023,7 +3016,7 @@ def test_every_slideshow_that_is_up_hears_which_runs_are_still_being_made(slides
 
 def test_a_latest_slideshow_takes_a_new_run_after_the_gallery_pane_has_moved_on(slideshows):
     gallery_pane = FakeGalleryPane(collections={LATEST_LANDSCAPE: [_row("g1")]}, latest=False)
-    director, _host, made = slideshows(gallery_pane=gallery_pane, db=FakeDB([_row("g-run")]),
+    director, _host, made = slideshows(gallery_pane=gallery_pane, db=_db_of([_row("g-run")]),
                                        fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location=LATEST_LANDSCAPE,
                   shape=LANDSCAPE)
@@ -3037,7 +3030,7 @@ def test_a_slideshow_of_one_kinds_latest_takes_a_new_run_of_that_kind_alone(slid
     videos_latest = shaped_key(FolderCollection(LATEST_KEY, "video").key, LANDSCAPE)
     video_run = _row("v-run", workflow_name="wan22_i2v", files=("v-run.mp4",))
     gallery_pane = FakeGalleryPane(collections={videos_latest: [_row("v1", files=("v1.mp4",))]})
-    director, _host, made = slideshows(gallery_pane=gallery_pane, db=FakeDB([video_run, _row("i-run")]),
+    director, _host, made = slideshows(gallery_pane=gallery_pane, db=_db_of([video_run, _row("i-run")]),
                                        fun_time=FakeSession())
     director.open([("v1.mp4", "video", "v1", None)], location=videos_latest, shape=LANDSCAPE)
 
@@ -3051,7 +3044,7 @@ def test_a_latest_slideshow_turns_down_a_run_asked_for_in_the_other_shape(slides
     run = _row("g-run")
     run["params_json"] = json.dumps({"width": 1024, "height": 768})
     gallery_pane = FakeGalleryPane(collections={LATEST_PORTRAIT: [_row("g1")]})
-    director, _host, made = slideshows(gallery_pane=gallery_pane, db=FakeDB([run]),
+    director, _host, made = slideshows(gallery_pane=gallery_pane, db=_db_of([run]),
                                        fun_time=FakeSession())
     director.open([("a.png", "image", "g1", None)], location=LATEST_PORTRAIT,
                   shape=PORTRAIT)
@@ -3067,7 +3060,7 @@ def test_a_latest_slideshow_on_together_takes_a_new_run_of_either_shape(slidesho
     wide["params_json"] = json.dumps({"width": 1024, "height": 768})
     latest_together = shaped_key(LATEST_KEY, BOTH)
     gallery_pane = FakeGalleryPane(collections={latest_together: [_row("g1")]})
-    director, _host, made = slideshows(gallery_pane=gallery_pane, db=FakeDB([tall, wide]))
+    director, _host, made = slideshows(gallery_pane=gallery_pane, db=_db_of([tall, wide]))
     director.open([("a.png", "image", "g1", None)], location=latest_together, shape=BOTH)
 
     director.note_generating("tall-run", b"frame")
@@ -3080,7 +3073,7 @@ def test_a_latest_slideshow_on_together_takes_a_new_run_of_either_shape(slidesho
 
 def test_a_run_double_clicked_while_hosted_opens_its_folder_on_a_funestra_following_it(slideshows):
     host = FakeHost(rows=[_row("g1"), _row("g-run")])
-    director, host, made = slideshows(host, db=FakeDB([_row("g-run")]), fun_time=FakeSession(
+    director, host, made = slideshows(host, db=_db_of([_row("g-run")]), fun_time=FakeSession(
         funestras={PORTRAIT: object(), LANDSCAPE: object()}))
     host.queue = ([_being_made("g-run")], 0)
 
@@ -3225,7 +3218,7 @@ def test_a_slideshow_groups_what_it_made_by_its_image_and_another_sites_videos_b
             _a_sites(_animation("o1", frame="g1.png", action="beta", tmp_path=tmp_path)),
             _a_sites(_animation("o2", frame="g2.png", action="beta", tmp_path=tmp_path))]
     filed = {"o1.mp4": "img|one image", "o2.mp4": "img|one image"}
-    director, _host, made = slideshows(_library(rows), db=FakeDB(rows), records=FakeRecords(filed))
+    director, _host, made = slideshows(_library(rows), db=_db_of(rows), records=FakeRecords(filed))
 
     groups = _groups_of(_group_of_on_the_portrait_side(director, made))
 
@@ -3244,7 +3237,7 @@ def test_videos_made_from_one_hidden_starting_frame_are_one_group_in_the_list(
             _animation("v1", frame="h1.png", action="alpha", tmp_path=tmp_path),
             _animation("v2", frame="h1.png", action="beta", tmp_path=tmp_path),
             _animation("v3", frame="h2.png", action="alpha", tmp_path=tmp_path)]
-    director, _host, made = slideshows(_library(rows), db=FakeDB(rows), records=FakeRecords())
+    director, _host, made = slideshows(_library(rows), db=_db_of(rows), records=FakeRecords())
 
     groups = _groups_of(_group_of_on_the_portrait_side(director, made))
 
@@ -3258,7 +3251,7 @@ def test_a_video_made_here_from_another_sites_videos_starting_frame_is_in_that_v
             _animation("v1", frame="h1.png", action="beta", tmp_path=tmp_path),
             _a_sites(_animation("o2", frame="h2.png", action="alpha", tmp_path=tmp_path))]
     filed = {"o1.mp4": "t2v|one", "o2.mp4": "t2v|two"}
-    director, _host, made = slideshows(_library(rows), db=FakeDB(rows), records=FakeRecords(filed))
+    director, _host, made = slideshows(_library(rows), db=_db_of(rows), records=FakeRecords(filed))
 
     groups = _groups_of(_group_of_on_the_portrait_side(director, made))
 
@@ -3273,7 +3266,7 @@ def _another_sites_videos_on_file(slideshows, tmp_path, loops):
             {**_animation("v1", frame="g1.png", action="gamma", tmp_path=tmp_path),
              "workflow_name": "another_workflow"}]
     records = FakeRecords(loops=loops)
-    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows), records=records)
+    director, _host, _made = slideshows(_library(rows), db=_db_of(rows), records=records)
     director.items_of = lambda rows: [
         (f"{row['prompt_id']}.mp4", "video", row["prompt_id"], None) for row in rows]
     return director, records
@@ -3319,7 +3312,7 @@ def test_what_was_made_here_from_another_sites_video_stays_on_its_map_beside_its
             _a_sites(_animation("o2", frame="h2.png", action="beta", tmp_path=tmp_path)),
             _animation("v1", frame="h1.png", action="gamma", tmp_path=tmp_path)]
     records = FakeRecords(loops={"o1.mp4": FiledLoops(actions=("o2.mp4",))})
-    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows), records=records)
+    director, _host, _made = slideshows(_library(rows), db=_db_of(rows), records=records)
     director.items_of = lambda rows: [
         (f"{row['prompt_id']}.mp4", "video", row["prompt_id"], None) for row in rows]
 
@@ -3335,7 +3328,7 @@ def test_a_video_with_no_action_has_its_row_in_the_column_of_another_sites_video
     rows = [_a_sites(_animation("o1", frame="h1.png", action="alpha", tmp_path=tmp_path)),
             _a_sites(_animation("o2", frame="h1.png", action="", tmp_path=tmp_path))]
     records = FakeRecords(loops={"o1.mp4": FiledLoops(actions=("o2.mp4",))})
-    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows), records=records)
+    director, _host, _made = slideshows(_library(rows), db=_db_of(rows), records=records)
     director.items_of = lambda rows: [
         (f"{row['prompt_id']}.mp4", "video", row["prompt_id"], None) for row in rows]
 
@@ -3347,7 +3340,7 @@ def test_a_video_with_no_action_has_its_row_in_the_column_of_another_sites_video
 def test_an_image_another_site_made_keeps_the_map_the_gallery_gives_it(slideshows, tmp_path):
     rows = [_a_sites(_fox("g1", seed=1)),
             _animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path)]
-    director, _host, _made = slideshows(_library(rows), db=FakeDB(rows), records=FakeRecords())
+    director, _host, _made = slideshows(_library(rows), db=_db_of(rows), records=FakeRecords())
 
     around = director.neighbors_of("g1", shape="portrait")
 
@@ -3364,7 +3357,7 @@ def test_more_seeds_of_another_sites_video_are_the_ones_its_record_widens_to(sli
 
 def test_a_video_with_no_group_on_its_record_is_a_group_of_its_own(slideshows, tmp_path):
     rows = [_a_sites(_animation("o1", frame="g1.png", action="beta", tmp_path=tmp_path))]
-    director, _host, made = slideshows(_library(rows), db=FakeDB(rows), records=FakeRecords())
+    director, _host, made = slideshows(_library(rows), db=_db_of(rows), records=FakeRecords())
 
     group_of = _group_of_on_the_portrait_side(director, made)
 

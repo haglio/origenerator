@@ -32,7 +32,6 @@ from origenerator.gui.gallery_view import GalleryView
 from tests.gallery_view_support import (
     _NO_MOD,
     FakeActions,
-    FakeDB,
     _alls,
     _at,
     _children_by_prompt,
@@ -54,6 +53,7 @@ from tests.gallery_view_support import (
     _trash_db,
     _video_workflow,
 )
+from tests.real_db import database_of, put_rows
 from tests.text_readers import clip_reader
 
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
@@ -83,7 +83,7 @@ def _find_next(view):
 
 def test_search_fills_the_gallery_pane_with_the_matching_generations(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -97,7 +97,7 @@ def test_search_fills_the_gallery_pane_with_the_matching_generations(qtbot):
 
 def test_search_leaves_the_tree_exactly_as_it_was(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     workflow = _image_workflow(view._tree)
@@ -114,7 +114,7 @@ def test_search_leaves_the_tree_exactly_as_it_was(qtbot):
 
 def test_clearing_the_search_gives_the_pane_back_to_the_open_folder(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)
@@ -132,7 +132,7 @@ def test_clearing_the_search_gives_the_pane_back_to_the_open_folder(qtbot):
 
 def test_the_tree_selection_is_what_the_search_covers(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -145,7 +145,7 @@ def test_the_tree_selection_is_what_the_search_covers(qtbot):
 
 def test_picking_another_folder_re_asks_the_search_there(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_video_workflow(view._tree))
@@ -161,7 +161,7 @@ def test_picking_another_folder_re_asks_the_search_there(qtbot):
 
 def test_the_all_row_searches_the_whole_library(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -175,7 +175,7 @@ def test_the_all_row_searches_the_whole_library(qtbot):
 
 def test_search_all_searches_the_whole_library_and_keeps_the_folder_highlighted(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     videos = _video_workflow(view._tree)
@@ -191,7 +191,7 @@ def test_search_all_searches_the_whole_library_and_keeps_the_folder_highlighted(
 
 def test_picking_another_folder_after_search_all_searches_that_folder(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_video_workflow(view._tree))
@@ -205,7 +205,7 @@ def test_picking_another_folder_after_search_all_searches_that_folder(qtbot):
 
 def test_back_to_a_search_all_searches_the_whole_library_again(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     videos = _video_workflow(view._tree)
@@ -232,7 +232,7 @@ def test_standing_on_images_searches_the_images_alone(qtbot):
 def test_a_collection_scopes_the_search_like_any_other_row(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     rows[1]["starred"] = 1
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -246,7 +246,7 @@ def test_a_collection_scopes_the_search_like_any_other_row(qtbot):
 def test_a_second_search_in_a_collection_is_still_over_the_whole_collection(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2), _image("i3", "a dog", 50, 3)]
     rows[1]["starred"] = rows[2]["starred"] = 1
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
@@ -264,7 +264,7 @@ def test_a_folders_collection_scopes_the_search_and_names_its_path(qtbot):
     rows = [_image("i1", "a cat", 50, 1),
             _row("v1", "wan22_i2v", {"positive_prompt": "a cat", "seed": 5},
                  "wan22_i2v_00001_.mp4")]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view._search.field.setFixedWidth(_WIDE_ENOUGH_THAT_NO_PATH_ELIDES)
     view.refresh()
@@ -319,7 +319,7 @@ def test_a_deleted_item_is_not_an_answer_anywhere_but_the_trash(qtbot):
 
 def test_the_field_says_what_it_would_search(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view._search.field.setFixedWidth(_WIDE_ENOUGH_THAT_NO_PATH_ELIDES)
     view.refresh()
@@ -341,7 +341,7 @@ def test_the_field_says_what_it_would_search(qtbot):
 
 
 def test_the_field_shows_the_tail_of_a_path_too_long_for_it(qtbot):
-    view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
+    view = GalleryView(database_of([_i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
     videos = _video_workflow(view._tree)
@@ -364,7 +364,7 @@ def test_the_field_shows_the_tail_of_a_path_too_long_for_it(qtbot):
 
 def test_an_empty_search_names_the_folder_it_looked_in(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -383,7 +383,7 @@ def test_search_matches_words_the_prompt_did_not_use(qtbot):
         _image("i3", "a single lady in the rain", 50, 3),
         _image("i4", "an empty street", 50, 4),
     ]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -393,13 +393,13 @@ def test_search_matches_words_the_prompt_did_not_use(qtbot):
 
 
 def test_search_stays_applied_across_a_rebuild(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
     _search_for(view, "cat")
 
-    db.add(_image("i3", "a cat on a fence", 50, 9))
+    put_rows(db, [_image("i3", "a cat on a fence", 50, 9)])
     view.refresh()
 
     assert set(view.listed_prompt_ids()) == {"i1", "i3"}
@@ -407,7 +407,7 @@ def test_search_stays_applied_across_a_rebuild(qtbot):
 
 
 def test_toc_pane_holds_the_search_field_above_the_tree(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     toc = _pane_holding(view._tree)
     assert isinstance(view._search.field, QLineEdit)
@@ -417,7 +417,7 @@ def test_toc_pane_holds_the_search_field_above_the_tree(qtbot):
 
 
 def test_search_all_sits_to_the_right_of_the_search_field(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     row = view._search.row.layout()
     assert row.indexOf(view._search.field) < row.indexOf(view._search.search_all)
@@ -430,7 +430,7 @@ def test_search_matches_a_generation_by_its_seed(qtbot):
         _image("i2", "a cat", 50, 112233),
         _image("i3", "a dog", 50, 445566),
     ]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -441,7 +441,7 @@ def test_search_matches_a_generation_by_its_seed(qtbot):
 
 
 def test_a_folder_you_named_is_found_by_that_name(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
+    db = database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -458,7 +458,7 @@ def test_a_folder_you_named_is_found_by_that_name(qtbot):
 
 
 def test_a_folder_of_your_own_made_since_the_last_rebuild_is_found_by_its_name(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
+    db = database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -476,7 +476,7 @@ def test_a_folder_of_your_own_made_since_the_last_rebuild_is_found_by_its_name(q
 
 
 def test_a_folder_is_found_by_the_code_the_tree_shows_for_it(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     code = _children_by_prompt(_at(_image_workflow(view._tree), 0, 0))["a dog"].text(0)
@@ -488,7 +488,7 @@ def test_a_folder_is_found_by_the_code_the_tree_shows_for_it(qtbot):
 
 
 def test_the_workflow_folder_a_search_names_is_the_first_tile(qtbot):
-    view = GalleryView(FakeDB([_i2v_video("v1", "styleA"), _image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_i2v_video("v1", "styleA"), _image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     workflow = _video_workflow(view._tree)
@@ -501,7 +501,7 @@ def test_the_workflow_folder_a_search_names_is_the_first_tile(qtbot):
 
 
 def test_an_item_is_found_by_the_name_it_wears(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_top_level(view._tree)["All"])
@@ -515,7 +515,7 @@ def test_search_matches_a_prompt_word_no_folder_name_carries(qtbot):
     shared = "a cat asleep on a windowsill in the late afternoon sun, watching "
     rows = [_image("i1", shared + "sparrows", 50, 1),
             _image("i2", shared + "beetles", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)
@@ -531,7 +531,7 @@ def test_search_matches_a_prompt_word_no_folder_name_carries(qtbot):
 def test_search_ignores_the_negative_prompt(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     rows[1]["negative_prompt"] = "cat, blurry"
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -542,7 +542,7 @@ def test_search_ignores_the_negative_prompt(qtbot):
 
 def test_search_matches_a_generation_by_its_lora(qtbot):
     rows = [_i2v_video("v1", "styleA"), _i2v_video("v2", "styleB")]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -560,7 +560,7 @@ def test_the_model_lora_sort_bands_the_results_by_model_and_lora(qtbot):
     rows = [_i2v_video("v1", "styleA", prompt="a cat indoors"),
             _i2v_video("v2", "styleA", prompt="a cat outdoors"),
             _i2v_video("v3", "styleB", prompt="a cat on a fence")]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     _search_for(view, "cat")
@@ -578,7 +578,7 @@ def test_the_model_lora_sort_bands_the_results_by_model_and_lora(qtbot):
 
 
 def test_a_sectioned_search_in_a_tall_gallery_leaves_each_section_its_own_height(qtbot):
-    view = GalleryView(FakeDB([_i2v_video("v1", "styleA", prompt="a cat"),
+    view = GalleryView(database_of([_i2v_video("v1", "styleA", prompt="a cat"),
                                _i2v_video("v2", "styleB", prompt="a cat")]))
     qtbot.addWidget(view)
     view.refresh()
@@ -595,7 +595,7 @@ def test_a_sectioned_search_in_a_tall_gallery_leaves_each_section_its_own_height
 
 
 def test_the_model_lora_order_remembered_under_its_old_name_comes_back(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
 
     view.set_search_sort("recipe")
@@ -606,7 +606,7 @@ def test_the_model_lora_order_remembered_under_its_old_name_comes_back(qtbot):
 def test_a_model_lora_band_folds_shut_on_its_heading(qtbot):
     rows = [_i2v_video("v1", "styleA", prompt="a cat"),
             _i2v_video("v2", "styleB", prompt="a cat")]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     _search_for(view, "cat")
@@ -624,7 +624,7 @@ def test_a_model_lora_band_folds_shut_on_its_heading(qtbot):
 
 
 def test_a_bands_heading_reaches_across_the_whole_column(qtbot):
-    view = GalleryView(FakeDB([_i2v_video("v1", "styleA", prompt="a cat"),
+    view = GalleryView(database_of([_i2v_video("v1", "styleA", prompt="a cat"),
                                _i2v_video("v2", "styleB", prompt="a cat")]))
     qtbot.addWidget(view)
     view.refresh()
@@ -643,7 +643,7 @@ def test_a_bands_heading_reaches_across_the_whole_column(qtbot):
 
 
 def test_a_folded_band_stays_folded_across_a_redraw(qtbot):
-    db = FakeDB([_i2v_video("v1", "styleA", prompt="a cat"),
+    db = database_of([_i2v_video("v1", "styleA", prompt="a cat"),
                  _i2v_video("v2", "styleB", prompt="a cat")])
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -653,7 +653,7 @@ def test_a_folded_band_stays_folded_across_a_redraw(qtbot):
     shut = next(h for h in _section_headers(view) if "styleA" in h.text())
     shut.click()
 
-    db.add(_i2v_video("v3", "styleB", prompt="a cat on a fence"))
+    put_rows(db, [_i2v_video("v3", "styleB", prompt="a cat on a fence")])
     view.refresh()
 
     redrawn = next(h for h in _section_headers(view) if "styleA" in h.text())
@@ -664,7 +664,7 @@ def test_a_folded_band_stays_folded_across_a_redraw(qtbot):
 
 def test_an_empty_search_names_the_word_that_emptied_it(qtbot):
     rows = [_image("i1", "a cat", 50, 1)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -676,7 +676,7 @@ def test_an_empty_search_names_the_word_that_emptied_it(qtbot):
 
 
 def test_an_empty_search_names_nothing_until_it_has_finished(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -689,7 +689,7 @@ def test_an_empty_search_names_nothing_until_it_has_finished(qtbot):
 
 def test_the_llm_widening_re_runs_the_search_when_it_lands(qtbot):
     rows = [_image("i1", "a lone kitten", 50, 1), _image("i2", "a dog", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     _search_for(view, "cat")
@@ -702,7 +702,7 @@ def test_the_llm_widening_re_runs_the_search_when_it_lands(qtbot):
 
 def test_a_widening_for_an_abandoned_query_is_ignored(qtbot):
     rows = [_image("i1", "a lone kitten", 50, 1), _image("i2", "a dog", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     _search_for(view, "dog")
@@ -714,7 +714,7 @@ def test_a_widening_for_an_abandoned_query_is_ignored(qtbot):
 
 def test_a_search_offers_no_folder_action_for_the_folder_behind_it(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)
@@ -729,7 +729,7 @@ def test_a_search_offers_no_folder_action_for_the_folder_behind_it(qtbot):
 
 def test_a_search_too_wide_to_draw_says_so_and_says_what_to_do(qtbot):
     rows = [_image(f"i{n}", f"a cat number {n}", 50, n) for n in range(205)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -750,7 +750,7 @@ def test_a_search_too_wide_to_draw_says_so_and_says_what_to_do(qtbot):
 def test_several_hits_in_one_folder_come_back_as_that_folder(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _image("i3", "a cat", 50, 3), _image("i4", "a dog", 50, 4)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -765,7 +765,7 @@ def test_several_hits_in_one_folder_come_back_as_that_folder(qtbot):
 
 def test_a_folders_lone_hit_stays_the_item_itself(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -779,7 +779,7 @@ def test_a_folders_lone_hit_stays_the_item_itself(qtbot):
 
 def test_opening_a_result_folder_puts_the_search_away(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     _search_for(view, "cat")
@@ -794,7 +794,7 @@ def test_opening_a_result_folder_puts_the_search_away(qtbot):
 
 def test_nothing_is_searched_until_a_beat_of_quiet(qtbot):
     rows = [_image("i1", "a cat", 50, 1)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -813,7 +813,7 @@ def test_nothing_is_searched_until_a_beat_of_quiet(qtbot):
 
 def test_a_query_under_three_characters_searches_nothing(qtbot):
     rows = [_image("i1", "a cat", 50, 1)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -833,7 +833,7 @@ def test_a_query_under_three_characters_searches_nothing(qtbot):
 def test_a_searchs_hits_are_what_the_slideshow_would_play(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _image("i3", "a dog", 50, 3)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1010,7 +1010,7 @@ def test_picking_another_workflow_points_an_open_find_at_its_prompts(qtbot, tmp_
 
 
 def test_a_search_asks_its_question_once_through_a_rebuild(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _search_for(view, "cat")
@@ -1049,7 +1049,7 @@ def test_an_open_find_counts_again_as_a_prompt_is_typed_in(qtbot, tmp_path):
 
 
 def test_following_a_link_puts_a_running_search_away(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _search_for(view, "cat")

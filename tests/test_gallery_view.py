@@ -73,7 +73,6 @@ from tests import gestures
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import (
     FakeActions,
-    FakeDB,
     _alls,
     _answer_menu,
     _at,
@@ -119,6 +118,7 @@ from tests.gallery_view_support import (
     _workflow_rows,
 )
 from tests.qt_exec import faking_exec
+from tests.real_db import database_of, put_rows
 from tests.test_folder_tree import _shown
 
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
@@ -141,7 +141,7 @@ def _collection_names(item):
 
 def test_reading_the_library_hands_fun_time_each_files_gallery_name(qtbot):
     published = []
-    view = GalleryView(FakeDB([_row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5},
+    view = GalleryView(database_of([_row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5},
                                     "wan22_i2v_00001_.mp4")]),
                        shared=Shared(publish_names=published.append))
     qtbot.addWidget(view)
@@ -158,7 +158,7 @@ def test_refresh_builds_workflow_model_settings_tree(qtbot):
         _row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5},
              "wan22_i2v_00001_.mp4"),
     ]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -176,7 +176,7 @@ def test_refresh_builds_workflow_model_settings_tree(qtbot):
 
 
 def test_every_folder_of_folders_leads_with_collections_of_its_own(qtbot):
-    view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
+    view = GalleryView(database_of([_i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
     workflow = _video_workflow(view._tree)
@@ -188,7 +188,7 @@ def test_every_folder_of_folders_leads_with_collections_of_its_own(qtbot):
 
 
 def test_the_tree_marks_the_folders_the_model_says_were_worked_in_lately(qtbot, monkeypatch):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     asked = []
 
@@ -214,7 +214,7 @@ def test_the_tree_marks_the_folders_the_model_says_were_worked_in_lately(qtbot, 
 
 
 def test_tree_rows_carry_a_toc_initial(qtbot):
-    view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
+    view = GalleryView(database_of([_i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -237,7 +237,7 @@ def test_tree_rows_carry_a_toc_initial(qtbot):
 
 
 def test_every_folder_leads_with_how_many_items_are_under_it(qtbot):
-    view = GalleryView(FakeDB([
+    view = GalleryView(database_of([
         _image("i1", "a cat", 50, 1),
         _image("i2", "a cat", 50, 2),
         _image("i3", "a dog", 50, 1),
@@ -265,7 +265,7 @@ def test_a_videos_source_folder_in_the_toc_wears_its_images_name(qtbot):
     video = _row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5,
                                      "input_image": "sdxl_t2i_i1.png"},
                  "wan22_i2v_00001_.mp4")
-    view = GalleryView(FakeDB([video, image]))
+    view = GalleryView(database_of([video, image]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -277,7 +277,7 @@ def test_a_videos_source_folder_in_the_toc_wears_its_images_name(qtbot):
 def test_every_tree_level_steps_by_one_caret_width(qtbot):
     # Qt lays the text out after the icon, so the text's edge steps unevenly between rows with and without one.
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     _on_screen(qtbot, view, 1200, 800)
     tree = _shape(view._tree)
     step = tree.indentation()
@@ -307,7 +307,7 @@ def test_every_tree_level_steps_by_one_caret_width(qtbot):
 
 
 def test_selecting_a_folder_shows_its_full_name_as_a_title(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -319,7 +319,7 @@ def test_selecting_a_folder_shows_its_full_name_as_a_title(qtbot):
 
 
 def test_a_folder_of_images_wears_the_photo_mark_on_its_square_as_on_its_row(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)
@@ -332,7 +332,7 @@ def test_a_folder_of_images_wears_the_photo_mark_on_its_square_as_on_its_row(qtb
 
 
 def test_the_latest_square_wears_the_calendar_its_row_wears(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -352,7 +352,7 @@ def test_branch_shows_folder_tiles_and_leaf_shows_thumbnails(qtbot):
         _image("i2", "a cat", 50, 2),
         _image("i3", "a dog", 50, 1),
     ]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -372,7 +372,7 @@ def _square_names(view):
 
 
 def test_a_folder_of_folders_shows_its_collections_as_squares_before_its_folders(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)
@@ -383,7 +383,7 @@ def test_a_folder_of_folders_shows_its_collections_as_squares_before_its_folders
 
 
 def test_clicking_a_collection_square_opens_that_folders_collection(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     workflow = _image_workflow(view._tree)
@@ -398,7 +398,7 @@ def test_clicking_a_collection_square_opens_that_folders_collection(qtbot):
 
 def test_clicking_a_folder_tile_drills_into_it(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -415,7 +415,7 @@ def test_clicking_a_folder_tile_drills_into_it(qtbot):
 
 def test_opening_a_folder_lands_on_its_first_item(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -437,7 +437,7 @@ def _first_leaf(view):
 
 def test_the_all_row_holds_images_and_videos_and_is_where_the_gallery_lands(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -452,7 +452,7 @@ def test_each_side_grows_a_folder_for_a_kind_only_where_it_holds_that_kind(qtbot
                                          "width": 100, "height": 200}, "sdxl_t2i_i1.png")
     wide_video = _row("v1", "wan22_i2v", {"positive_prompt": "a cat", "seed": 5},
                       "wan22_i2v_00001_.mp4")
-    view = GalleryView(FakeDB([tall_image, wide_video]))
+    view = GalleryView(database_of([tall_image, wide_video]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -461,7 +461,7 @@ def test_each_side_grows_a_folder_for_a_kind_only_where_it_holds_that_kind(qtbot
 
 
 def test_clicking_videos_in_the_path_goes_to_the_videos(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_video_workflow(view._tree))
@@ -584,7 +584,7 @@ def test_the_delete_key_on_images_deletes_nothing(qtbot):
 
 
 def test_images_lend_no_one_workflows_time_when_nothing_in_them_was_timed(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1)])
     db.recent_durations = lambda workflow_name, limit=10: [600.0]
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -606,7 +606,7 @@ def test_a_folders_collection_row_counts_what_that_folder_holds(qtbot):
 
 
 def test_an_enhanced_image_counts_on_the_enhanced_of_every_folder_above_it(qtbot):
-    view = GalleryView(FakeDB([_enhanced_image("i1", "a cat", 50, 1),
+    view = GalleryView(database_of([_enhanced_image("i1", "a cat", 50, 1),
                                _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -617,7 +617,7 @@ def test_an_enhanced_image_counts_on_the_enhanced_of_every_folder_above_it(qtbot
 
 
 def test_starring_an_image_counts_it_on_the_favorites_of_every_folder_above_it(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -654,7 +654,7 @@ def test_a_folder_the_user_made_takes_no_favorite(qtbot):
 
 
 def test_the_star_at_the_top_is_a_switch_lit_while_the_open_folder_is_a_favorite(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
@@ -685,7 +685,7 @@ def test_unfavoriting_a_folder_takes_it_off_the_open_favorites_collection(qtbot)
 
 
 def _long_list_view(qtbot):
-    view = GalleryView(FakeDB([_image(f"i{n}", f"prompt {n}", 50, n) for n in range(30)]))
+    view = GalleryView(database_of([_image(f"i{n}", f"prompt {n}", 50, n) for n in range(30)]))
     _on_screen(qtbot, view, 700, 500)
     lora = _at(_image_workflow(view._tree), 0, 0)
     for item in (lora.parent().parent(), lora.parent(), lora):
@@ -715,7 +715,7 @@ def test_starring_a_folder_marks_its_row_where_it_stands(qtbot):
 
 def _a_folder_drawn_on_both_sides(qtbot, *, also=None, actions=None):
     shapes = {"i1": (1280, 720, 50), "i2": (720, 1280, 50), **(also or {})}
-    view = GalleryView(FakeDB([
+    view = GalleryView(database_of([
         _row(pid, "sdxl_t2i", {"positive_prompt": f"prompt {pid}", "steps": steps,
                                "width": width, "height": height}, f"sdxl_t2i_{pid}.png")
         for pid, (width, height, steps) in shapes.items()]), actions=actions)
@@ -729,7 +729,7 @@ def _a_folder_drawn_on_both_sides(qtbot, *, also=None, actions=None):
 
 
 def test_starring_a_folder_marks_it_on_both_sides_of_the_list(qtbot):
-    view = GalleryView(FakeDB([{**_image(pid, "a cat", 50, seed), "shape": shape}
+    view = GalleryView(database_of([{**_image(pid, "a cat", 50, seed), "shape": shape}
                                for pid, seed, shape in (("i1", 1, LANDSCAPE),
                                                         ("i2", 2, PORTRAIT))]))
     qtbot.addWidget(view)
@@ -785,8 +785,7 @@ def test_a_tick_hands_the_slideshows_each_item_another_process_filed(qtbot, monk
     monkeypatch.setattr(view._slideshows, "note_arrived",
                         lambda rows: arrived.append([row["prompt_id"] for row in rows]))
     filed = _image("i3", "a bird", 50, 1)
-    view._db._rows.append(filed)
-    view._db._by_id["i3"] = filed
+    put_rows(view._db, [filed])
 
     view._poll()
 
@@ -798,7 +797,7 @@ def test_a_tick_hands_the_slideshows_an_item_evolver_just_upscaled(qtbot, monkey
     arrived = []
     monkeypatch.setattr(view._slideshows, "note_arrived",
                         lambda rows: arrived.append([row["prompt_id"] for row in rows]))
-    view._db._rows[0] = {**view._db._rows[0], "evolver_upscale": "video_one_topaz.mp4"}
+    view._db.set_evolver_upscale("i1", "video_one_topaz.mp4", None)
 
     view._poll()
 
@@ -807,14 +806,13 @@ def test_a_tick_hands_the_slideshows_an_item_evolver_just_upscaled(qtbot, monkey
 
 def test_a_tick_that_learns_when_an_upscale_was_filed_reorders_latest_by_it(qtbot):
     view, _cat, _dog = _two_leaf_view(qtbot)
-    upscaled = {**view._db._rows[0], "evolver_upscale": "video_one_topaz.mp4"}
-    view._db._rows[0] = upscaled
+    view._db.set_evolver_upscale("i1", "video_one_topaz.mp4", None)
     view._poll()
-    view._db._rows[0] = {**upscaled, "evolver_upscaled_at": "2099-01-01T00:00:00+00:00"}
+    view._db.set_evolver_upscale("i1", "video_one_topaz.mp4", "2099-01-01T00:00:00+00:00")
 
     view._poll()
 
-    assert view._library.recent_rows[0]["prompt_id"] == upscaled["prompt_id"]
+    assert view._library.recent_rows[0]["prompt_id"] == "i1"
     assert view._library.recent_rows[0]["evolver_upscaled_at"] == "2099-01-01T00:00:00+00:00"
 
 
@@ -836,7 +834,7 @@ def test_a_reading_of_the_library_taken_before_a_star_does_not_take_it_back(qtbo
 
 def test_favoriting_a_folder_persists_without_reordering(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    db = FakeDB(rows)
+    db = database_of(rows)
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -858,7 +856,7 @@ def test_favoriting_a_folder_persists_without_reordering(qtbot):
 
 def test_a_right_click_on_a_folders_caret_leaves_it_open(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    db = FakeDB(rows)
+    db = database_of(rows)
     view = GalleryView(db)
     _on_screen(qtbot, view, 600, 600)
 
@@ -881,7 +879,7 @@ def test_a_right_click_on_a_folders_caret_leaves_it_open(qtbot, monkeypatch):
 
 def test_favorite_collection_is_pinned_first_and_collects_favorite_folders(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    db = FakeDB(rows)
+    db = database_of(rows)
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -898,7 +896,7 @@ def test_favorite_collection_is_pinned_first_and_collects_favorite_folders(qtbot
 
 
 def test_favorites_leads_with_its_count_and_latest_leaves_its_count_to_all(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
+    db = database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
                  _image("i3", "a dog", 50, 1)])
     db.set_generation_favorite("i1", True)
     view = GalleryView(db)
@@ -917,7 +915,7 @@ def test_favorites_leads_with_its_count_and_latest_leaves_its_count_to_all(qtbot
 
 
 def test_experiments_collection_is_always_reachable(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -932,7 +930,7 @@ def test_experiments_collection_label_counts_the_unreviewed(qtbot):
         _experiment_row("e2", seed=10),
         _experiment_row("e3", verdict="up", seed=11),
     ]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -940,7 +938,7 @@ def test_experiments_collection_label_counts_the_unreviewed(qtbot):
 
 
 def test_a_collection_is_called_back_by_its_plain_name_whatever_work_waits_in_it(qtbot):
-    view = GalleryView(FakeDB([_experiment_row("e1"), _experiment_row("e2", seed=10)]))
+    view = GalleryView(database_of([_experiment_row("e1"), _experiment_row("e2", seed=10)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -948,7 +946,7 @@ def test_a_collection_is_called_back_by_its_plain_name_whatever_work_waits_in_it
 
 
 def test_experiments_collection_offers_keep_and_reject_on_each_tile(qtbot):
-    view = GalleryView(FakeDB([_experiment_row("e1")]))
+    view = GalleryView(database_of([_experiment_row("e1")]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -962,7 +960,7 @@ def test_experiments_collection_offers_keep_and_reject_on_each_tile(qtbot):
 
 def test_double_clicking_an_experiment_opens_it_selected_in_its_own_folder(qtbot):
     experiment = _experiment_row("e1", steps=30)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), experiment]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), experiment]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -976,7 +974,7 @@ def test_double_clicking_an_experiment_opens_it_selected_in_its_own_folder(qtbot
 
 
 def test_keeping_an_experiment_clears_it_from_the_review_queue(qtbot):
-    db = FakeDB([_experiment_row("e1")])
+    db = database_of([_experiment_row("e1")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -991,7 +989,7 @@ def test_keeping_an_experiment_clears_it_from_the_review_queue(qtbot):
 
 
 def test_rejecting_an_experiment_goes_through_the_undoable_action(qtbot):
-    db = FakeDB([_experiment_row("e1")])
+    db = database_of([_experiment_row("e1")])
     actions = FakeActions()
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
@@ -1004,7 +1002,7 @@ def test_rejecting_an_experiment_goes_through_the_undoable_action(qtbot):
 
 
 def test_an_experiment_completion_never_hijacks_the_front_tab(qtbot, monkeypatch):
-    db = FakeDB([_experiment_row("e1"), _image("i1", "a cat", 50, 1)])
+    db = database_of([_experiment_row("e1"), _image("i1", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1020,7 +1018,7 @@ def test_an_experiment_completion_never_hijacks_the_front_tab(qtbot, monkeypatch
 
 
 def test_the_experiments_switch_reports_what_each_position_means(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     view.refresh()
     assert view.experiments_enabled() is False
@@ -1037,7 +1035,7 @@ def test_the_experiments_switch_reports_what_each_position_means(qtbot):
 
 
 def test_an_open_app_queues_no_experiments_however_the_switch_is_set(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db, client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
@@ -1049,7 +1047,7 @@ def test_an_open_app_queues_no_experiments_however_the_switch_is_set(qtbot):
 
 def test_a_branch_session_schedules_no_experiments_at_all(qtbot, monkeypatch):
     monkeypatch.setenv(ENV_FLAG, "1")
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db, client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
@@ -1069,7 +1067,7 @@ def test_a_branch_session_schedules_no_experiments_at_all(qtbot, monkeypatch):
 
 def test_a_branch_session_reviews_experiments_like_the_live_app(qtbot, monkeypatch):
     monkeypatch.setenv(ENV_FLAG, "1")
-    view = GalleryView(FakeDB([_experiment_row("e1"), _experiment_row("e2", seed=10)]))
+    view = GalleryView(database_of([_experiment_row("e1"), _experiment_row("e2", seed=10)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1081,7 +1079,7 @@ def test_a_branch_session_reviews_experiments_like_the_live_app(qtbot, monkeypat
 
 def test_clicking_a_favorite_tile_drills_into_the_real_folder(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    db = FakeDB(rows)
+    db = database_of(rows)
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1097,7 +1095,7 @@ def test_clicking_a_favorite_tile_drills_into_the_real_folder(qtbot):
 
 
 def test_favorite_collection_shows_empty_state_when_nothing_is_favorite(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1108,7 +1106,7 @@ def test_favorite_collection_shows_empty_state_when_nothing_is_favorite(qtbot):
 
 
 def test_enhanced_with_nothing_enhanced_in_it_says_how_to_enhance_one(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1121,7 +1119,7 @@ def test_enhanced_with_nothing_enhanced_in_it_says_how_to_enhance_one(qtbot):
 
 
 def test_enhanced_shows_every_enhanced_image_under_its_folder(qtbot):
-    view = GalleryView(FakeDB([_enhanced_image("i1", "a cat", 50, 1),
+    view = GalleryView(database_of([_enhanced_image("i1", "a cat", 50, 1),
                                _image("i2", "a dog", 50, 2),
                                _enhanced_image("i3", "a bird", 50, 3)]))
     qtbot.addWidget(view)
@@ -1134,7 +1132,7 @@ def test_enhanced_shows_every_enhanced_image_under_its_folder(qtbot):
 
 def test_favorite_collection_gathers_favorite_items_as_thumbnails(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
-    db = FakeDB(rows)
+    db = database_of(rows)
     db.set_generation_favorite("i2", True)
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -1148,7 +1146,7 @@ def test_favorite_collection_gathers_favorite_items_as_thumbnails(qtbot):
 
 def test_favorite_collection_shows_both_favorite_items_and_folders(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
-    db = FakeDB(rows)
+    db = database_of(rows)
     db.set_generation_favorite("i1", True)
     view = GalleryView(db)
     qtbot.addWidget(view)
@@ -1166,7 +1164,7 @@ def test_favorite_collection_shows_both_favorite_items_and_folders(qtbot):
 
 def test_unfavoriting_an_item_from_the_collection_removes_it(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1)]
-    db = FakeDB(rows)
+    db = database_of(rows)
     db.set_generation_favorite("i1", True)
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
@@ -1183,7 +1181,7 @@ def test_unfavoriting_an_item_from_the_collection_removes_it(qtbot, monkeypatch)
 
 
 def test_favorite_collection_stays_selected_across_a_refresh(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Favorites"])
@@ -1194,7 +1192,7 @@ def test_favorite_collection_stays_selected_across_a_refresh(qtbot):
 
 
 def test_favorite_collection_is_absent_until_a_folder_exists(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     view.refresh()
     alls = _alls(view._tree)
@@ -1204,7 +1202,7 @@ def test_favorite_collection_is_absent_until_a_folder_exists(qtbot):
 
 def test_a_folders_latest_lists_what_that_folder_made_under_its_path(qtbot):
     rows = [_image("i2", "a dog", 50, 2), _i2v_video("v1", "styleA"), _image("i1", "a cat", 50, 1)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     workflow = _image_workflow(view._tree)
@@ -1217,7 +1215,7 @@ def test_a_folders_latest_lists_what_that_folder_made_under_its_path(qtbot):
 
 
 def test_a_folders_collection_names_itself_by_its_path_to_the_slideshow_button(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     workflow = _image_workflow(view._tree)
@@ -1230,7 +1228,7 @@ def test_a_folders_collection_names_itself_by_its_path_to_the_slideshow_button(q
 
 def test_latest_collection_is_pinned_first_and_lists_recent_items(qtbot):
     rows = [_image("i2", "a dog", 50, 2), _image("i1", "a cat", 50, 1)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1243,7 +1241,7 @@ def test_latest_collection_is_pinned_first_and_lists_recent_items(qtbot):
 def test_latest_collection_lists_imported_files_too(qtbot):
     generated = _image("gen", "a cat", 50, 1)
     imported = _row("imp", "sdxl_t2i", {"seed": 9}, "imp.png", source="imported")
-    view = GalleryView(FakeDB([imported, generated]))
+    view = GalleryView(database_of([imported, generated]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1255,7 +1253,7 @@ def test_latest_collection_lists_imported_files_too(qtbot):
 
 def test_clicking_a_recent_item_previews_it_without_leaving_the_collection(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1268,7 +1266,7 @@ def test_clicking_a_recent_item_previews_it_without_leaving_the_collection(qtbot
 
 def test_double_clicking_a_recent_item_opens_it_selected_in_its_folder(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1283,7 +1281,7 @@ def test_double_clicking_a_recent_item_opens_it_selected_in_its_folder(qtbot):
 
 def test_double_clicking_a_recent_item_also_keeps_its_tab(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -1297,7 +1295,7 @@ def test_double_clicking_a_recent_item_also_keeps_its_tab(qtbot):
 
 def test_latest_collection_shows_empty_state_when_nothing_has_a_result(qtbot):
     pending = _row("wip", "sdxl_t2i", {"seed": 9}, "wip.png", status="running", output_files=None)
-    view = GalleryView(FakeDB([pending]))
+    view = GalleryView(database_of([pending]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1306,7 +1304,7 @@ def test_latest_collection_shows_empty_state_when_nothing_has_a_result(qtbot):
 
 
 def test_latest_collection_stays_selected_across_a_refresh(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -1321,7 +1319,7 @@ def _many_latest(count):
 
 
 def test_latest_opens_on_one_page_however_far_back_it_goes(qtbot):
-    view = GalleryView(FakeDB(_many_latest(120)))
+    view = GalleryView(database_of(_many_latest(120)))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1337,7 +1335,7 @@ def _scroll_to_the_end(view):
 
 
 def test_scrolling_to_the_end_of_latest_draws_the_next_page(qtbot):
-    view = GalleryView(FakeDB(_many_latest(120)))
+    view = GalleryView(database_of(_many_latest(120)))
     _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     opened_on = len(_drawn(view))
@@ -1352,14 +1350,14 @@ def test_scrolling_to_the_end_of_latest_draws_the_next_page(qtbot):
 
 
 def test_a_rebuild_keeps_the_pages_latest_had_been_scrolled_into(qtbot):
-    db = FakeDB(_many_latest(120))
+    db = database_of(_many_latest(120))
     view = GalleryView(db)
     _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     _scroll_to_the_end(view)
     scrolled_into = _drawn(view)
 
-    db.add(_image("fresh", "a dog", 50, 999))
+    put_rows(db, [_image("fresh", "a dog", 50, 999)])
     view.refresh()
 
     assert _drawn(view) == ["fresh", *scrolled_into]
@@ -1367,7 +1365,7 @@ def test_a_rebuild_keeps_the_pages_latest_had_been_scrolled_into(qtbot):
 
 def test_a_double_click_on_an_image_in_latest_plays_everything_latest_lists(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB(_many_latest(120)))
+    view = GalleryView(database_of(_many_latest(120)))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -1381,7 +1379,7 @@ def test_a_double_click_on_an_image_in_latest_plays_everything_latest_lists(qtbo
 
 def test_a_double_clicked_tile_plays_its_folder_from_it(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB(_many_latest(120)))
+    view = GalleryView(database_of(_many_latest(120)))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -1397,7 +1395,7 @@ def test_a_double_clicked_tile_plays_its_folder_from_it(qtbot, monkeypatch):
 
 def test_a_double_clicked_preview_plays_its_item_alone_locked(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB(_many_latest(120)))
+    view = GalleryView(database_of(_many_latest(120)))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -1411,7 +1409,7 @@ def test_a_double_clicked_preview_plays_its_item_alone_locked(qtbot, monkeypatch
 
 
 def test_alls_latest_lists_both_kinds(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1421,7 +1419,7 @@ def test_alls_latest_lists_both_kinds(qtbot):
 
 
 def test_the_shapes_radio_wears_the_waiting_cursor_while_it_redraws(qtbot, monkeypatch):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
     while_drawing = []
@@ -1438,7 +1436,7 @@ def test_the_shapes_radio_wears_the_waiting_cursor_while_it_redraws(qtbot, monke
 
 
 def test_opening_one_kinds_latest_lists_it_without_building_the_list_again(qtbot, monkeypatch):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
     built = []
@@ -1454,7 +1452,7 @@ def test_opening_one_kinds_latest_lists_it_without_building_the_list_again(qtbot
 
 
 def test_another_latest_opens_on_its_first_page(qtbot):
-    view = GalleryView(FakeDB(_many_latest(120)))
+    view = GalleryView(database_of(_many_latest(120)))
     _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     opened_on = _drawn(view)
@@ -1467,8 +1465,8 @@ def test_another_latest_opens_on_its_first_page(qtbot):
 
 
 def test_one_kinds_latest_leaves_out_the_other_kinds_work_in_flight(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
-    db.add(_running_row("rr1", workflow="wan22_i2v"))
+    db = database_of([_image("i1", "a cat", 50, 1)])
+    put_rows(db, [_running_row("rr1", workflow="wan22_i2v")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1481,34 +1479,34 @@ def test_one_kinds_latest_leaves_out_the_other_kinds_work_in_flight(qtbot):
 
 
 def test_a_new_generation_appears_at_the_top_of_latest(qtbot):
-    db = FakeDB([_image("old", "a cat", 50, 1)])
+    db = database_of([_image("old", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     assert view.listed_prompt_ids() == ["old"]
 
-    db.add(_image("new", "a dog", 50, 2))
+    put_rows(db, [_image("new", "a dog", 50, 2)])
     view._poll()
     assert view.listed_prompt_ids() == ["new", "old"]
 
 
 def test_new_generations_appear_without_manual_refresh(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
     assert set(_top_level(view._tree)) == {"All"}
     assert set(_workflow_rows(view._tree)) == {"T2I SDXL"}
 
-    db.add(_row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5},
-                "wan22_i2v_00001_.mp4"))
+    put_rows(db, [_row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5},
+                "wan22_i2v_00001_.mp4")])
     view._poll()
     assert set(_workflow_rows(view._tree)) == {"T2I SDXL", "I2V WAN 2.2"}
 
 
 def test_the_gallery_polls_on_a_timer_of_its_own(qtbot):
-    db = FakeDB([_image("old", "a cat", 50, 1)])
+    db = database_of([_image("old", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1519,14 +1517,14 @@ def test_the_gallery_polls_on_a_timer_of_its_own(qtbot):
         "the number itself: read back through the constant that set it, a gallery slowed to one "
         "tick a minute would still pass")
 
-    db.add(_image("new", "a dog", 50, 2))
+    put_rows(db, [_image("new", "a dog", 50, 2)])
     view._poll_timer.timeout.emit()
 
     assert view.listed_prompt_ids() == ["new", "old"]
 
 
 def test_a_hidden_gallery_stops_polling_and_takes_it_up_again_when_shown(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     with qtbot.waitExposed(view):
         view.show()
@@ -1550,7 +1548,7 @@ class _MinimizedCore:
 
 def _a_minimized_gallery(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     with qtbot.waitExposed(view):
         view.show()
@@ -1602,12 +1600,12 @@ def test_a_poll_answer_that_lands_after_its_gallery_is_gone_is_dropped(qtbot, mo
         return gallery_view_module._PollFacts({}, {}, None)
 
     monkeypatch.setattr(gallery_view_module, "_fetch_poll_facts", facts_once_released)
-    db = FakeDB([_image("old", "a cat", 50, 1)])
+    db = database_of([_image("old", "a cat", 50, 1)])
     view = GalleryView(db)
     view.refresh()
     before = set(off_thread._in_flight)
     view._poll()
-    db.add(_image("new", "a dog", 50, 2))
+    put_rows(db, [_image("new", "a dog", 50, 2)])
     view.close()
     shiboken6.delete(view)
     library_reads, list_generations = [], db.list_generations
@@ -1627,7 +1625,7 @@ def _counted(monkeypatch, owner, name, calls):
 
 
 def test_a_rebuild_reads_the_library_and_the_requests_once(qtbot, monkeypatch):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     reads = []
@@ -1643,7 +1641,7 @@ def test_a_rebuild_works_out_when_each_image_was_last_enhanced_once(qtbot, monke
     worked_out = []
     _counted(monkeypatch, gallery, "enhancement_recency", worked_out)
     _counted(monkeypatch, gallery_tree_module, "enhancement_recency", worked_out)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
 
     view.refresh()
@@ -1656,7 +1654,7 @@ def test_folder_keys_are_derived_against_the_index_the_rebuild_already_built(
     built = []
     _counted(monkeypatch, gallery, "build_image_config_index", built)
     _counted(monkeypatch, gallery_tree_module, "build_image_config_index", built)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
 
     view.refresh()
@@ -1673,7 +1671,7 @@ def test_folder_keys_are_derived_against_the_index_the_rebuild_already_built(
 def test_a_rebuild_builds_one_folder_tree_per_side_and_no_third(qtbot, monkeypatch):
     built = []
     _counted(monkeypatch, gallery, "build_gallery_tree", built)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
 
     view.refresh()
@@ -1684,7 +1682,7 @@ def test_a_rebuild_builds_one_folder_tree_per_side_and_no_third(qtbot, monkeypat
 
 
 def test_folders_start_collapsed(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1700,7 +1698,7 @@ def _double_click_the_name_of(qtbot, row):
 
 
 def test_double_clicking_a_folder_of_folders_opens_it_and_expands_or_collapses_it(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     _on_screen(qtbot, view, 1200, 800)
     workflow = _image_workflow(view._tree)
 
@@ -1720,7 +1718,7 @@ def _editing(row) -> bool:
 
 
 def test_double_clicking_all_collapses_it_like_the_folders_under_it(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     _on_screen(qtbot, view, 1200, 800)
     all_row = _top_level(view._tree)["All"]
     assert all_row.isExpanded()
@@ -1733,7 +1731,7 @@ def test_double_clicking_all_collapses_it_like_the_folders_under_it(qtbot):
 
 
 def test_double_clicking_a_settings_folder_opens_it_and_renames_nothing(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     _on_screen(qtbot, view, 1200, 800)
     leaf = _first_leaf(view)
     above = leaf.parent()
@@ -1749,7 +1747,7 @@ def test_double_clicking_a_settings_folder_opens_it_and_renames_nothing(qtbot):
 
 def test_opening_a_folder_of_sub_folders_picks_nothing(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1770,7 +1768,7 @@ def _click_path_step(view, name):
 
 
 def test_clicking_a_step_of_the_path_goes_to_that_folder(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     workflow = _image_workflow(view._tree)
@@ -1783,7 +1781,7 @@ def test_clicking_a_step_of_the_path_goes_to_that_folder(qtbot):
 
 
 def test_clicking_a_step_of_the_path_puts_a_running_search_away(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     workflow = _image_workflow(view._tree)
@@ -1798,7 +1796,7 @@ def test_clicking_a_step_of_the_path_puts_a_running_search_away(qtbot):
 
 
 def test_the_path_links_every_folder_above_the_one_open_and_not_its_side(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     here = _first_leaf(view)
@@ -1810,7 +1808,7 @@ def test_the_path_links_every_folder_above_the_one_open_and_not_its_side(qtbot):
 
 
 def test_a_collections_path_links_the_folders_above_it_and_wears_its_star(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1824,7 +1822,7 @@ def test_a_collections_path_links_the_folders_above_it_and_wears_its_star(qtbot)
 
 
 def test_enhanceds_path_wears_the_plus_where_favorites_wears_its_star(qtbot):
-    view = GalleryView(FakeDB([_enhanced_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_enhanced_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1836,7 +1834,7 @@ def test_enhanceds_path_wears_the_plus_where_favorites_wears_its_star(qtbot):
 
 
 def test_trashs_path_wears_its_red_can_as_the_toc_does(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1848,7 +1846,7 @@ def test_trashs_path_wears_its_red_can_as_the_toc_does(qtbot):
 
 
 def test_clicking_a_step_during_a_search_puts_the_search_away_and_goes_there(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     folders = _children_by_prompt(_at(_image_workflow(view._tree), 0, 0))
@@ -1866,7 +1864,7 @@ def test_clicking_a_step_during_a_search_puts_the_search_away_and_goes_there(qtb
 def test_a_workflow_that_made_both_kinds_has_a_folder_of_each_kind(qtbot):
     still = _row("still", "wan22_flf2v_loop", {"seed": 1}, "flf2v_loop_00001_.png")
     video = _row("clip", "wan22_flf2v_loop", {"seed": 2}, "flf2v_loop_00002_.mp4")
-    view = GalleryView(FakeDB([still, video]))
+    view = GalleryView(database_of([still, video]))
     qtbot.addWidget(view)
     view.refresh()
     looping = workflow_label("wan22_flf2v_loop")
@@ -1885,7 +1883,7 @@ def test_with_several_folders_picked_the_path_up_top_links_nothing(qtbot):
 
 def test_a_tile_and_the_tab_it_opens_both_wear_the_items_name(qtbot):
     older, newer = _image("g1", "a cat", 50, 1), _image("g2", "a cat", 50, 2)
-    view = GalleryView(FakeDB([newer, older]), client=ComfyUIClient(folders=SUITE_FOLDERS))
+    view = GalleryView(database_of([newer, older]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
     for tab in view._generate_pane.generate_tabs():
@@ -1901,7 +1899,7 @@ def test_a_tile_and_the_tab_it_opens_both_wear_the_items_name(qtbot):
 
 def test_a_tab_put_back_before_the_gallery_first_loads_takes_its_items_name_then(qtbot):
     row = _image("g1", "a cat", 50, 1)
-    view = GalleryView(FakeDB([row]), client=ComfyUIClient(folders=SUITE_FOLDERS))
+    view = GalleryView(database_of([row]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     for tab in view._generate_pane.generate_tabs():
         tab._viewport.show_media = MagicMock()
@@ -1914,7 +1912,7 @@ def test_a_tab_put_back_before_the_gallery_first_loads_takes_its_items_name_then
 
 
 def test_going_to_an_item_draws_its_folder_even_when_that_row_is_already_current(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(folders=SUITE_FOLDERS))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
@@ -1932,7 +1930,7 @@ def test_going_to_a_failed_generation_opens_the_folder_its_settings_name(qtbot):
     done = _image("i1", "a cat", 50, 1)
     failed = dict(done, prompt_id="x1", status="error", output_files="[]",
                   thumbnail_path=None)
-    view = GalleryView(FakeDB([done, failed]), client=ComfyUIClient(folders=SUITE_FOLDERS))
+    view = GalleryView(database_of([done, failed]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
     assert "x1" not in view._leaf_by_id
@@ -1949,7 +1947,7 @@ def test_following_a_link_lands_in_one_tab(qtbot):
                  {"positive_prompt": "dance", "seed": 5,
                   "input_image": "sdxl_t2i_img1.png"},
                  "wan22_i2v_00001_.mp4")
-    view = GalleryView(FakeDB([video, image]), client=ComfyUIClient(folders=SUITE_FOLDERS))
+    view = GalleryView(database_of([video, image]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
     for tab in view._generate_pane.generate_tabs():
@@ -1967,7 +1965,7 @@ def test_following_a_link_lands_in_one_tab(qtbot):
 
 
 def test_back_and_forward_walk_the_viewed_generations(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
@@ -1988,7 +1986,7 @@ def test_back_returns_from_a_followed_input_image_link_to_the_video(qtbot):
                  {"positive_prompt": "dance", "seed": 5,
                   "input_image": "sdxl_t2i_img1.png"},
                  "wan22_i2v_00001_.mp4")
-    view = GalleryView(FakeDB([video, image]))
+    view = GalleryView(database_of([video, image]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
@@ -2001,7 +1999,7 @@ def test_back_returns_from_a_followed_input_image_link_to_the_video(qtbot):
 
 
 def test_nav_buttons_enable_only_when_there_is_somewhere_to_go(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     assert not view._buttons.back.isEnabled()
@@ -2052,7 +2050,7 @@ def test_back_after_following_a_link_returns_to_the_viewed_generation(qtbot):
                  {"positive_prompt": "dance", "seed": 5,
                   "input_image": "sdxl_t2i_img1.png"},
                  "wan22_i2v_00001_.mp4")
-    view = GalleryView(FakeDB([video, image]))
+    view = GalleryView(database_of([video, image]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
@@ -2071,7 +2069,7 @@ def _linked_view(qtbot, source="i7", count=12):
                  {"positive_prompt": "dance", "seed": 5,
                   "input_image": f"sdxl_t2i_{source}.png"},
                  "wan22_i2v_00001_.mp4")
-    view = GalleryView(FakeDB([video, *images]))
+    view = GalleryView(database_of([video, *images]))
     _on_screen(qtbot, view, 1100, 1500)
     view._tree.setCurrentItem(view._leaf_by_id["vid1"])
     _pick_by_clicking(view, "vid1")
@@ -2099,7 +2097,7 @@ def test_following_a_link_to_a_word_made_videos_hidden_frame_lands_on_that_video
              "status": "completed", "params_json": json.dumps({"input_image": str(frame_file)}),
              "output_files": json.dumps([{"filename": "c1_topaz.mp4",
                                           "library_path": str(tmp_path / "outbox" / "c1_topaz.mp4")}])}
-    view = GalleryView(FakeDB([video, frame]))
+    view = GalleryView(database_of([video, frame]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -2131,7 +2129,7 @@ def test_moving_on_after_a_followed_link_leaves_the_folder_chosen_instead(qtbot)
 def test_history_spans_folder_navigation(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _i2v_video("v1", "styleA")]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["v1"])
@@ -2180,7 +2178,7 @@ def test_deleting_a_folder_returns_to_the_side_of_the_list_last_stood_on(qtbot):
 
 def test_back_returns_to_the_latest_collection_then_forward_reopens_the_folder(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -2199,7 +2197,7 @@ def test_back_returns_to_the_latest_collection_then_forward_reopens_the_folder(q
 
 def test_back_returns_to_a_collection_left_by_opening_a_folder(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -2217,7 +2215,7 @@ def test_back_returns_to_a_collection_left_by_opening_a_folder(qtbot):
 
 def test_back_walks_folders_the_way_it_walks_generations(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)
@@ -2236,7 +2234,7 @@ def test_back_walks_folders_the_way_it_walks_generations(qtbot):
 
 def test_reopening_the_same_folder_is_not_a_second_history_stop(qtbot):
     rows = [_image("i1", "a cat", 50, 1)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     leaf = _at(_image_workflow(view._tree), 0, 0, 0)
@@ -2254,7 +2252,7 @@ def test_reopening_the_same_folder_is_not_a_second_history_stop(qtbot):
 def test_back_returns_to_the_favorite_collection_after_drilling_into_a_folder(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1),
             _image("i3", "a dog", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     dog_key = _key(_at(_image_workflow(view._tree), 0, 0, 1))
@@ -2272,7 +2270,7 @@ def test_back_returns_to_the_favorite_collection_after_drilling_into_a_folder(qt
 
 def test_back_to_latest_restores_the_item_selected_on_the_collection(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -2289,7 +2287,7 @@ def test_back_to_latest_restores_the_item_selected_on_the_collection(qtbot):
 def test_previewing_on_the_collection_is_its_own_history_step(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1),
             _image("i3", "a bird", 50, 1)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -2309,7 +2307,7 @@ def test_previewing_on_the_collection_is_its_own_history_step(qtbot):
 
 def test_back_to_a_collection_item_re_highlights_its_tile(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -2326,7 +2324,7 @@ def test_back_to_a_collection_item_re_highlights_its_tile(qtbot):
 
 def test_back_to_a_folder_item_re_highlights_its_tile(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
@@ -2341,7 +2339,7 @@ def test_back_to_a_folder_item_re_highlights_its_tile(qtbot):
 
 def test_a_poll_redrawing_a_search_is_not_a_stop(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -2358,7 +2356,7 @@ def test_a_poll_redrawing_a_search_is_not_a_stop(qtbot):
 
 def test_back_onto_a_folder_of_sub_folders_drops_the_pick(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)
@@ -2374,7 +2372,7 @@ def test_back_onto_a_folder_of_sub_folders_drops_the_pick(qtbot):
 
 def test_an_item_looked_at_on_a_collection_goes_back_to_that_collection(qtbot):
     rows = [_image("i1", "a cat", 50, 1)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -2389,7 +2387,7 @@ def test_an_item_looked_at_on_a_collection_goes_back_to_that_collection(qtbot):
 
 def test_back_returns_to_the_search_results_a_hit_was_opened_from(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -2407,7 +2405,7 @@ def test_back_returns_to_the_search_results_a_hit_was_opened_from(qtbot):
 
 def test_a_hit_previewed_in_the_results_is_a_stop_in_them(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat hat", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -2422,7 +2420,7 @@ def test_a_hit_previewed_in_the_results_is_a_stop_in_them(qtbot):
 
 def test_typing_on_does_not_stack_a_stop_per_pause(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat hat", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)
@@ -2440,7 +2438,7 @@ def test_typing_on_does_not_stack_a_stop_per_pause(qtbot):
 
 
 def test_the_folder_the_gallery_is_showing_is_the_one_it_reports(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     workflow = _image_workflow(view._tree)
@@ -2452,7 +2450,7 @@ def test_the_folder_the_gallery_is_showing_is_the_one_it_reports(qtbot):
 
 def test_naming_a_workflow_version_is_what_puts_it_in_the_folder_key(qtbot):
     row = _image("i1", "a cat", 50, 1)
-    view = GalleryView(FakeDB([row]))
+    view = GalleryView(database_of([row]))
     qtbot.addWidget(view)
     view.refresh()
     params = json.loads(row["params_json"])
@@ -2463,7 +2461,7 @@ def test_naming_a_workflow_version_is_what_puts_it_in_the_folder_key(qtbot):
 
 
 def test_the_folder_key_index_is_rebuilt_when_the_image_rows_are(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -2472,7 +2470,7 @@ def test_the_folder_key_index_is_rebuilt_when_the_image_rows_are(qtbot):
         "the index is kept between uses, since it was built again at every site that asked, "
         "several of them on a click's path")
 
-    db._rows.append(_image("i2", "a dog", 50, 2))
+    put_rows(db, [_image("i2", "a dog", 50, 2)])
     view.refresh()
 
     assert view.image_config_index() is not first, (
@@ -2483,7 +2481,7 @@ def test_the_folder_key_index_is_rebuilt_when_the_image_rows_are(qtbot):
 
 def test_select_folder_restores_choice_in_a_fresh_view(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]
-    db = FakeDB(rows)
+    db = database_of(rows)
     saved = GalleryView(db)
     qtbot.addWidget(saved)
     saved.refresh()
@@ -2501,7 +2499,7 @@ def test_select_folder_restores_choice_in_a_fresh_view(qtbot):
 
 
 def test_select_folder_falls_back_to_default_when_key_gone(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.select_folder("video/ghost")
     view.refresh()
@@ -2509,7 +2507,7 @@ def test_select_folder_falls_back_to_default_when_key_gone(qtbot):
 
 
 def test_selected_folder_reports_pending_target_before_first_show(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.select_folder("image/sdxl_t2i")
     assert view.selected_folder() == "image/sdxl_t2i"
@@ -2517,7 +2515,7 @@ def test_selected_folder_reports_pending_target_before_first_show(qtbot):
 
 def test_selected_generation_tracks_thumbnail_click(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
@@ -2527,7 +2525,7 @@ def test_selected_generation_tracks_thumbnail_click(qtbot):
 
 def test_select_generation_restored_with_folder_after_refresh(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    db = FakeDB(rows)
+    db = database_of(rows)
     probe = GalleryView(db)
     qtbot.addWidget(probe)
     probe.refresh()
@@ -2545,14 +2543,14 @@ def test_select_generation_restored_with_folder_after_refresh(qtbot):
 
 def test_selected_generation_survives_a_rebuild(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    db = FakeDB(rows)
+    db = database_of(rows)
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
     view._on_thumbnail_clicked("i2")
 
-    db.add(_image("i3", "a dog", 50, 9))
+    put_rows(db, [_image("i3", "a dog", 50, 9)])
     view._poll()
 
     assert view.selected_generation() == "i2"
@@ -2560,14 +2558,14 @@ def test_selected_generation_survives_a_rebuild(qtbot):
 
 
 def test_selected_generation_reports_pending_before_show(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.select_generation("i1")
     assert view.selected_generation() == "i1"
 
 
 def test_select_generation_missing_id_is_dropped(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.select_generation("ghost")
     view.refresh()
@@ -2675,7 +2673,7 @@ def test_squeezed_smaller_than_the_hud_its_pane_scrolls_rather_than_spilling(qtb
 
 
 def test_the_experiment_tiles_keep_corner_records_the_verdict(qtbot):
-    db = FakeDB([_experiment_row("e1")])
+    db = database_of([_experiment_row("e1")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -2687,7 +2685,7 @@ def test_the_experiment_tiles_keep_corner_records_the_verdict(qtbot):
 
 
 def test_a_tiles_star_corner_favorites_that_tile(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -2700,7 +2698,7 @@ def test_a_tiles_star_corner_favorites_that_tile(qtbot):
 
 
 def test_right_clicking_a_folder_tile_raises_the_folder_menu(qtbot, monkeypatch):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_image_workflow(view._tree))
@@ -2731,8 +2729,8 @@ def test_an_i2v_tiles_video_seed_corner_starts_that_folders_reroll(
 
 
 def test_a_queue_items_cancel_drops_that_run(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
-    db.add(_running_row("rr1", prompt="a cat"))
+    db = database_of([_image("i1", "a cat", 50, 1)])
+    put_rows(db, [_running_row("rr1", prompt="a cat")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -2796,7 +2794,7 @@ def test_the_poll_asks_nothing_of_what_comfyui_is_making_while_no_job_waits_ther
 
 
 def test_the_poll_tells_each_job_whether_comfyui_is_making_it(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     jobs = [_FakeRerollJob(pid, "sdxl_t2i", {}, state="queued")
             for pid in ("made", "waiting")]
@@ -2840,7 +2838,7 @@ def test_the_poll_fetch_reads_nothing_with_no_client():
 
 
 def test_an_event_about_an_object_already_gone_does_not_take_the_app_down(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     doomed = QTimer()
     shiboken6.delete(doomed)
@@ -2893,7 +2891,7 @@ def test_a_video_with_no_moving_preview_made_is_shown_without_decoding_it(qtbot,
 
 def test_a_folders_hover_says_its_name_and_nothing_else(qtbot):
     rows = [_image("i1", "a cat asleep on a windowsill in the late sun", 50, 1)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     (leaf,) = _subs(_at(_image_workflow(view._tree), 0, 0))
@@ -2904,7 +2902,7 @@ def test_a_folders_hover_says_its_name_and_nothing_else(qtbot):
 
 
 def test_the_experiments_switch_is_up_only_in_the_experiments_collection(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -2916,7 +2914,7 @@ def test_the_experiments_switch_is_up_only_in_the_experiments_collection(qtbot):
 
 
 def test_back_returns_to_where_the_gallery_first_landed(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     landed = view._tree.currentItem()
@@ -2928,7 +2926,7 @@ def test_back_returns_to_where_the_gallery_first_landed(qtbot):
 
 
 def test_the_shapes_chosen_before_the_first_draw_read_nothing(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     read = []
@@ -2940,7 +2938,7 @@ def test_the_shapes_chosen_before_the_first_draw_read_nothing(qtbot):
 
 
 def test_a_folder_drawn_again_where_it_stands_is_one_visit(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
@@ -2965,7 +2963,7 @@ def test_going_back_to_a_folder_is_no_new_visit(qtbot):
 
 
 def test_with_nothing_selected_the_shape_in_view_is_the_one_holding_landscape(qtbot):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
 
     assert view.shape_in_view() == row_shape({"prompt_id": "of no known shape"}) == LANDSCAPE, (
@@ -2974,7 +2972,7 @@ def test_with_nothing_selected_the_shape_in_view_is_the_one_holding_landscape(qt
 
 
 def test_a_key_naming_a_drawn_shape_is_answered_by_that_shape_alone(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     key = _key(view._leaf_by_id["i1"])
@@ -2985,7 +2983,7 @@ def test_a_key_naming_a_drawn_shape_is_answered_by_that_shape_alone(qtbot):
 
 def _a_folder_on_both_sides(qtbot):
     shapes = {"i1": (1280, 720), "i2": (720, 1280)}
-    view = GalleryView(FakeDB([
+    view = GalleryView(database_of([
         _row(pid, "sdxl_t2i", {"positive_prompt": f"prompt {pid}", "steps": 50,
                                "width": width, "height": height}, f"sdxl_t2i_{pid}.png")
         for pid, (width, height) in shapes.items()]))
@@ -3004,7 +3002,7 @@ def test_a_folders_own_key_stays_on_the_shape_being_browsed(qtbot):
 
 
 def test_a_folder_saved_under_its_own_key_alone_is_still_the_one_a_rebuild_reopens(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
+    db = database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
     before = GalleryView(db)
     qtbot.addWidget(before)
     before.refresh()
@@ -3023,7 +3021,7 @@ def test_a_folder_saved_under_its_own_key_alone_is_still_the_one_a_rebuild_reope
 @pytest.mark.parametrize("saved", ["__recents__", "__starred__", "__enhanced__",
                                    "__experiments__", "__trash__"])
 def test_a_session_saved_on_a_collection_reopens_on_that_collection(qtbot, saved):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
 
     view.select_folder(shaped_key(saved, LANDSCAPE))
@@ -3045,7 +3043,7 @@ def test_what_a_delete_takes_off_the_tree_is_a_folders_row_on_each_side_and_unde
 
 
 def test_a_folder_at_the_top_of_the_list_and_one_it_has_not_got_have_no_place_to_name(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -3055,7 +3053,7 @@ def test_a_folder_at_the_top_of_the_list_and_one_it_has_not_got_have_no_place_to
 
 def test_following_a_link_stops_nowhere_on_its_way_through_a_folder(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("d1", "a dog", 50, 1), _image("d2", "a dog", 50, 2)]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
@@ -3069,7 +3067,7 @@ def test_following_a_link_stops_nowhere_on_its_way_through_a_folder(qtbot):
 
 
 def test_an_item_the_tree_has_nowhere_to_put_has_no_folder_row(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -3077,7 +3075,7 @@ def test_an_item_the_tree_has_nowhere_to_put_has_no_folder_row(qtbot):
 
 
 def test_a_rebuild_puts_no_stop_on_the_way_back(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
@@ -3097,7 +3095,7 @@ def _the_folders_actions(view) -> FolderActions:
 
 
 def test_a_leaf_folder_shows_its_actions_to_the_right_of_the_buttons_and_no_other_folder_does(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -3112,7 +3110,7 @@ def test_a_leaf_folder_shows_its_actions_to_the_right_of_the_buttons_and_no_othe
 
 def test_actions_set_for_a_folder_reach_every_item_in_it_and_the_tab_showing_one(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    db = FakeDB(rows)
+    db = database_of(rows)
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()

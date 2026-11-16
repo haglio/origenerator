@@ -47,6 +47,7 @@ from origenerator.gui import (
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.workflows import detail_parts
+from tests import real_db
 from tests.real_db import database_in
 
 pytest_plugins = ("shared_ui.testing",)
@@ -343,6 +344,11 @@ def _this_tests_own_folder(_a_folder_for_each_test) -> Path:
     folder = next(_a_folder_for_each_test)
     folder.mkdir()
     return folder
+
+
+@pytest.fixture(autouse=True)
+def _databases_in_this_tests_own_folder(monkeypatch, _this_tests_own_folder):
+    monkeypatch.setattr(real_db, "DATABASES", _this_tests_own_folder / "databases")
 
 
 @pytest.fixture(autouse=True)

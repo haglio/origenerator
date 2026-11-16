@@ -38,7 +38,6 @@ from tests import gestures
 from tests.drop_style_seen import worn
 from tests.gallery_view_support import (
     FakeActions,
-    FakeDB,
     _alls,
     _answer_menu,
     _at,
@@ -58,6 +57,7 @@ from tests.gallery_view_support import (
     _tree_menu,
     _two_leaf_view,
 )
+from tests.real_db import database_of, put_rows
 from tests.test_folder_tree import _shown
 
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
@@ -521,7 +521,7 @@ def test_a_custom_folder_survives_a_rebuild_and_follows_its_items(qtbot):
     _make_folder(view, "Favorites", [cat])
     view._tree.setCurrentItem(_top_level(view._tree)["Favorites"])
 
-    view._db.add(_image("i3", "a cat", 50, 9))
+    put_rows(view._db, [_image("i3", "a cat", 50, 9)])
     view.refresh()
 
     assert view._tree.currentItem() is _top_level(view._tree)["Favorites"]
@@ -532,7 +532,7 @@ def test_a_rebuild_keeps_a_live_multi_selection(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
     _pick(view, cat, dog)
 
-    view._db.add(_image("i3", "a fish", 50, 3))
+    put_rows(view._db, [_image("i3", "a fish", 50, 3)])
     view.refresh()
 
     assert view._selection_group is not None
@@ -853,7 +853,7 @@ def _tall(prompt_id, prompt):
 
 def test_grouping_picked_folders_makes_a_folder_on_their_side(qtbot, monkeypatch):
     rows = [_tall("t1", "a cat"), _tall("t2", "a dog")]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     _pick(view, *(shaped_key(gallery.settings_folder_key(row), PORTRAIT) for row in rows))
@@ -973,7 +973,7 @@ def _two_model_view(qtbot):
                  f"sdxl_t2i_{prompt_id}.png")
             for prompt_id, checkpoint in (("i1", "first.safetensors"),
                                           ("i2", "second.safetensors"))]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     return view, *(_key(_at(_image_workflow(view._tree), n)) for n in (0, 1))

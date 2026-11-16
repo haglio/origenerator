@@ -49,7 +49,6 @@ from tests.gallery_view_support import (
     _SDXL,
     _VID_REROLL_HISTORY,
     _WAN_I2V,
-    FakeDB,
     _alls,
     _answer_confirmation,
     _at,
@@ -85,6 +84,7 @@ from tests.gallery_view_support import (
     _viewport_of,
 )
 from tests.qt_exec import faking_exec
+from tests.real_db import database_of, put_rows
 from tests.slideshow_hud_support import engine_of, funestra_of
 
 pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
@@ -1085,8 +1085,8 @@ def test_i2v_reroll_without_a_known_source_image_reuses_the_input(qtbot, tmp_pat
 
 
 def test_a_slideshow_is_handed_the_job_queue_worked_out_off_the_listing_in_hand(qtbot):
-    db = FakeDB([_image("done", "a cat", 50, 1)])
-    db.add(_running_row("gen1", prompt="a dog"))
+    db = database_of([_image("done", "a cat", 50, 1)])
+    put_rows(db, [_running_row("gen1", prompt="a dog")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1102,8 +1102,8 @@ def test_a_slideshow_is_handed_the_job_queue_worked_out_off_the_listing_in_hand(
 
 
 def test_latest_shows_an_inflight_tile_above_finished_items(qtbot):
-    db = FakeDB([_image("done", "a cat", 50, 1)])
-    db.add(_running_row("gen1", prompt="a dog"))
+    db = database_of([_image("done", "a cat", 50, 1)])
+    put_rows(db, [_running_row("gen1", prompt="a dog")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1114,8 +1114,8 @@ def test_latest_shows_an_inflight_tile_above_finished_items(qtbot):
 
 
 def test_latest_shows_a_live_reroll_as_an_inflight_tile(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
-    db.add(_running_row("rr1", prompt="a cat"))
+    db = database_of([_image("i1", "a cat", 50, 1)])
+    put_rows(db, [_running_row("rr1", prompt="a cat")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1189,8 +1189,8 @@ def test_canceling_from_an_populating_folders_tile_ends_populate_too(
 
 
 def test_a_tile_with_no_live_job_behind_it_raises_no_menu(qtbot, monkeypatch):
-    db = FakeDB([_image("done", "a cat", 50, 1)])
-    db.add(_running_row("gen1"))
+    db = database_of([_image("done", "a cat", 50, 1)])
+    put_rows(db, [_running_row("gen1")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1257,8 +1257,8 @@ def test_open_folder_shows_a_running_generation_on_its_generating_tile(qtbot, tm
 
 
 def test_open_folder_omits_a_running_row_from_the_static_grid(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
-    db.add(_a_tabs_generate_running_in_folder("run1", "a cat", 50, 2))
+    db = database_of([_image("i1", "a cat", 50, 1)])
+    put_rows(db, [_a_tabs_generate_running_in_folder("run1", "a cat", 50, 2)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1282,8 +1282,8 @@ def test_open_folder_does_not_double_show_a_reroll_running_in_it(qtbot, tmp_path
 
 
 def test_a_reroll_finishing_drops_its_inflight_tile(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
-    db.add(_running_row("rr1", prompt="a cat"))
+    db = database_of([_image("i1", "a cat", 50, 1)])
+    put_rows(db, [_running_row("rr1", prompt="a cat")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1295,14 +1295,14 @@ def test_a_reroll_finishing_drops_its_inflight_tile(qtbot):
 
     view._live_jobs.pop(folder_key)
     db.delete_generation("rr1")
-    db.add(_row("rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, "rr1.png"))
+    put_rows(db, [_row("rr1", "sdxl_t2i", {"positive_prompt": "a cat"}, "rr1.png")])
     view._poll()
     assert "rr1" not in view._gallery_pane._inflight_tiles
 
 
 def test_inflight_tile_frame_updates_in_place_without_a_rerender(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
-    db.add(_running_row("rr1", prompt="a cat"))
+    db = database_of([_image("i1", "a cat", 50, 1)])
+    put_rows(db, [_running_row("rr1", prompt="a cat")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1319,7 +1319,7 @@ def test_inflight_tile_frame_updates_in_place_without_a_rerender(qtbot):
 
 
 def test_latest_collection_appears_for_a_running_generation(qtbot):
-    view = GalleryView(FakeDB([_running_row("gen1")]))
+    view = GalleryView(database_of([_running_row("gen1")]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1329,7 +1329,7 @@ def test_latest_collection_appears_for_a_running_generation(qtbot):
 
 
 def test_inflight_running_tiles_sort_before_queued(qtbot):
-    db = FakeDB([
+    db = database_of([
         _row("waiting", "sdxl_t2i", {"positive_prompt": "w"}, "waiting.png",
              status="pending", output_files="[]"),
         _row("going", "sdxl_t2i", {"positive_prompt": "g"}, "going.png",
@@ -1348,7 +1348,7 @@ def _queued_job(prompt_id, state="idle"):
 
 
 def test_inflight_items_follow_the_order_the_queue_will_run_them_in(qtbot):
-    db = FakeDB([
+    db = database_of([
         _row("first", "sdxl_t2i", {"positive_prompt": "a"}, "a.png",
              status="pending", output_files="[]"),
         _row("second", "sdxl_t2i", {"positive_prompt": "b"}, "b.png",
@@ -1363,7 +1363,7 @@ def test_inflight_items_follow_the_order_the_queue_will_run_them_in(qtbot):
 
 
 def test_a_row_the_line_holds_no_job_for_sorts_to_the_back(qtbot):
-    db = FakeDB([
+    db = database_of([
         _row("known", "sdxl_t2i", {"positive_prompt": "a"}, "a.png",
              status="pending", output_files="[]"),
         _row("brand-new", "sdxl_t2i", {"positive_prompt": "b"}, "b.png",
@@ -1379,8 +1379,8 @@ def test_a_row_the_line_holds_no_job_for_sorts_to_the_back(qtbot):
 
 
 def test_the_queue_shows_the_active_job_then_empties_when_idle(qtbot):
-    db = FakeDB([_image("done", "a cat", 50, 1)])
-    db.add(_running_row("gen1", prompt="a dog"))
+    db = database_of([_image("done", "a cat", 50, 1)])
+    put_rows(db, [_running_row("gen1", prompt="a dog")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     with qtbot.waitExposed(view):
@@ -1399,8 +1399,8 @@ def test_the_queue_shows_the_active_job_then_empties_when_idle(qtbot):
 
 def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
-    db.add(_running_row("gen1", prompt="a dog"))
+    db = database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
+    put_rows(db, [_running_row("gen1", prompt="a dog")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1423,12 +1423,12 @@ def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypa
 def test_a_row_dragged_in_the_slideshows_queue_moves_the_job_and_redraws_both_at_once(
         qtbot, monkeypatch):
     _resolve_by_id(monkeypatch)
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
-    db.add(_running_row("gen1", prompt="a dog"))
-    db.add(_row("w1", "sdxl_t2i", {"positive_prompt": "w"}, "w.png",
-                status="pending", output_files="[]"))
-    db.add(_row("w2", "sdxl_t2i", {"positive_prompt": "x"}, "x.png",
-                status="pending", output_files="[]"))
+    db = database_of([_image("i1", "a cat", 50, 1)])
+    put_rows(db, [_running_row("gen1", prompt="a dog")])
+    put_rows(db, [_row("w1", "sdxl_t2i", {"positive_prompt": "w"}, "w.png",
+                status="pending", output_files="[]")])
+    put_rows(db, [_row("w2", "sdxl_t2i", {"positive_prompt": "x"}, "x.png",
+                status="pending", output_files="[]")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view._jobs._on_server = [_queued_job("gen1", state="running")]
@@ -1448,7 +1448,7 @@ def test_a_row_dragged_in_the_slideshows_queue_moves_the_job_and_redraws_both_at
 
 
 def test_the_queue_lists_every_waiting_job_not_just_the_running_one(qtbot):
-    db = FakeDB([
+    db = database_of([
         _running_row("running-one", prompt="a dog"),
         _row("waiting-one", "sdxl_t2i", {"positive_prompt": "w"}, "w.png",
              status="pending", output_files="[]"),
@@ -1461,7 +1461,7 @@ def test_the_queue_lists_every_waiting_job_not_just_the_running_one(qtbot):
 
 
 def test_a_queue_row_let_go_elsewhere_is_moved_there_and_redrawn_at_once(qtbot):
-    db = FakeDB([
+    db = database_of([
         _running_row("running-one", prompt="a dog"),
         _row("w1", "sdxl_t2i", {"positive_prompt": "w"}, "w.png",
              status="pending", output_files="[]"),
@@ -1481,7 +1481,7 @@ def test_a_queue_row_let_go_elsewhere_is_moved_there_and_redrawn_at_once(qtbot):
 
 
 def test_clicking_a_queue_row_opens_that_jobs_folder(qtbot):
-    db = FakeDB([_running_row("gen1", prompt="a dog")])
+    db = database_of([_running_row("gen1", prompt="a dog")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1513,12 +1513,12 @@ def test_clicking_an_enhancements_row_in_the_queue_goes_to_its_image(qtbot, tmp_
 
 
 def test_the_strip_times_the_job_against_the_workflows_recent_runs(qtbot):
-    db = FakeDB([
+    db = database_of([
         _row("v1", "wan22_i2v", {"seed": 1}, "wan22_i2v_1.mp4", duration_seconds=700.0),
         _row("v2", "wan22_i2v", {"seed": 2}, "wan22_i2v_2.mp4", duration_seconds=724.0),
         _row("v3", "wan22_i2v", {"seed": 3}, "wan22_i2v_3.mp4", duration_seconds=800.0),
     ])
-    db.add(_running_row("rr1", workflow="wan22_i2v"))
+    put_rows(db, [_running_row("rr1", workflow="wan22_i2v")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1537,9 +1537,9 @@ def test_the_strip_times_the_job_against_the_workflows_recent_runs(qtbot):
 
 
 def test_the_strip_has_no_clock_for_a_job_still_queued(qtbot):
-    db = FakeDB([_image("done", "a cat", 50, 1)])
-    db.add(_row("waiting", "sdxl_t2i", {"positive_prompt": "w"}, "waiting.png",
-                status="pending", output_files="[]"))
+    db = database_of([_image("done", "a cat", 50, 1)])
+    put_rows(db, [_row("waiting", "sdxl_t2i", {"positive_prompt": "w"}, "waiting.png",
+                status="pending", output_files="[]")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1551,10 +1551,10 @@ def test_the_strip_has_no_clock_for_a_job_still_queued(qtbot):
 
 
 def test_a_queued_job_carries_what_the_strip_leads_its_row_with(qtbot):
-    db = FakeDB([
+    db = database_of([
         _row("v1", "wan22_i2v", {"seed": 1}, "wan22_i2v_1.mp4", duration_seconds=120.0),
     ])
-    db.add(_running_row("rr1", workflow="wan22_i2v"))
+    put_rows(db, [_running_row("rr1", workflow="wan22_i2v")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1565,8 +1565,8 @@ def test_a_queued_job_carries_what_the_strip_leads_its_row_with(qtbot):
 
 
 def test_a_job_a_spoken_request_queued_says_so(qtbot):
-    db = FakeDB([_image("src", "a kite", 50, 1)])
-    db.add(_running_row("asked", prompt="a kite, no string"))
+    db = database_of([_image("src", "a kite", 50, 1)])
+    put_rows(db, [_running_row("asked", prompt="a kite, no string")])
     db.record_request(NewRequest(prompt_id="asked", source_prompt_id="src",
                       heard="Request, no string, over."))
     view = GalleryView(db)
@@ -1578,8 +1578,8 @@ def test_a_job_a_spoken_request_queued_says_so(qtbot):
 
 
 def test_a_job_nobody_asked_for_out_loud_is_not_marked(qtbot):
-    db = FakeDB([_image("src", "a kite", 50, 1)])
-    db.add(_running_row("typed", prompt="a kite"))
+    db = database_of([_image("src", "a kite", 50, 1)])
+    put_rows(db, [_running_row("typed", prompt="a kite")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1588,9 +1588,9 @@ def test_a_job_nobody_asked_for_out_loud_is_not_marked(qtbot):
 
 
 def test_an_image_conditioned_job_carries_the_frame_it_starts_from(qtbot):
-    db = FakeDB([])
-    db.add(_row("rr1", "wan22_i2v", {"input_image": "kite_00007_.png [output]"},
-                "rr1.mp4", status="running", output_files="[]"))
+    db = database_of([])
+    put_rows(db, [_row("rr1", "wan22_i2v", {"input_image": "kite_00007_.png [output]"},
+                "rr1.mp4", status="running", output_files="[]")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1599,9 +1599,9 @@ def test_an_image_conditioned_job_carries_the_frame_it_starts_from(qtbot):
 
 
 def test_an_enhancement_carries_the_image_it_is_a_second_pass_over(qtbot):
-    db = FakeDB([])
-    db.add(_row("en1", "image_enhance", {"input_image": "kite_00007_.png [output]"},
-                "en1.png", status="running", output_files="[]"))
+    db = database_of([])
+    put_rows(db, [_row("en1", "image_enhance", {"input_image": "kite_00007_.png [output]"},
+                "en1.png", status="running", output_files="[]")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1610,9 +1610,9 @@ def test_an_enhancement_carries_the_image_it_is_a_second_pass_over(qtbot):
 
 
 def test_an_image_that_takes_an_input_is_still_placed_by_its_folder(qtbot):
-    db = FakeDB([])
-    db.add(_row("pt1", "sdxl_pose_transfer", {"input_image": "pose_00002_.png [output]"},
-                "pt1.png", status="running", output_files="[]"))
+    db = database_of([])
+    put_rows(db, [_row("pt1", "sdxl_pose_transfer", {"input_image": "pose_00002_.png [output]"},
+                "pt1.png", status="running", output_files="[]")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1626,8 +1626,8 @@ def test_an_image_that_takes_an_input_is_still_placed_by_its_folder(qtbot):
 
 
 def test_a_job_started_from_words_alone_names_no_frame(qtbot):
-    db = FakeDB([_image("done", "a kite", 50, 1)])
-    db.add(_running_row("gen1", prompt="a kite"))
+    db = database_of([_image("done", "a kite", 50, 1)])
+    put_rows(db, [_running_row("gen1", prompt="a kite")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1637,12 +1637,12 @@ def test_a_job_started_from_words_alone_names_no_frame(qtbot):
 
 
 def test_a_dropped_video_combine_carries_the_clip_it_follows(qtbot):
-    db = FakeDB([])
-    db.add(_row("source", "wan22_i2v", {"positive_prompt": "dance"}, "source.mp4",
-                thumbnail_path="thumbs/source.jpg"))
-    db.add(_row("rr1", "wan22_i2v", {"input_image": "kite_00007_.png [output]"},
+    db = database_of([])
+    put_rows(db, [_row("source", "wan22_i2v", {"positive_prompt": "dance"}, "source.mp4",
+                thumbnail_path="thumbs/source.jpg")])
+    put_rows(db, [_row("rr1", "wan22_i2v", {"input_image": "kite_00007_.png [output]"},
                 "rr1.mp4", status="running", output_files="[]",
-                source_video="source"))
+                source_video="source")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1655,12 +1655,12 @@ def test_a_dropped_video_combine_carries_the_clip_it_follows(qtbot):
 @pytest.mark.parametrize(("prompt", "stands_apart"), [("dance", False),
                                                       ("dance in the rain", True)])
 def test_a_combine_whose_words_left_its_source_videos_says_so_on_its_row(qtbot, prompt, stands_apart):
-    db = FakeDB([])
-    db.add(_row("source", "wan22_i2v", {"positive_prompt": "dance"}, "source.mp4",
-                thumbnail_path="thumbs/source.jpg"))
-    db.add(_row("rr1", "wan22_i2v",
+    db = database_of([])
+    put_rows(db, [_row("source", "wan22_i2v", {"positive_prompt": "dance"}, "source.mp4",
+                thumbnail_path="thumbs/source.jpg")])
+    put_rows(db, [_row("rr1", "wan22_i2v",
                 {"positive_prompt": prompt, "input_image": "kite_00007_.png [output]"},
-                "rr1.mp4", status="running", output_files="[]", source_video="source"))
+                "rr1.mp4", status="running", output_files="[]", source_video="source")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1670,12 +1670,12 @@ def test_a_combine_whose_words_left_its_source_videos_says_so_on_its_row(qtbot, 
 
 
 def test_a_picked_action_shows_no_source_video_at_all(qtbot):
-    db = FakeDB([])
-    db.add(_row("source", "wan22_i2v", {"positive_prompt": "dance"}, "source.mp4",
-                thumbnail_path="thumbs/source.jpg"))
-    db.add(_row("rr1", "wan22_i2v", {"input_image": "kite_00007_.png [output]"},
+    db = database_of([])
+    put_rows(db, [_row("source", "wan22_i2v", {"positive_prompt": "dance"}, "source.mp4",
+                thumbnail_path="thumbs/source.jpg")])
+    put_rows(db, [_row("rr1", "wan22_i2v", {"input_image": "kite_00007_.png [output]"},
                 "rr1.mp4", status="running", output_files="[]",
-                action="dancing", source_video="source"))
+                action="dancing", source_video="source")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1689,9 +1689,9 @@ def test_a_picked_action_shows_no_source_video_at_all(qtbot):
 
 
 def test_a_run_that_came_from_no_combine_carries_neither(qtbot):
-    db = FakeDB([])
-    db.add(_row("rr1", "wan22_i2v", {"input_image": "kite_00007_.png [output]"},
-                "rr1.mp4", status="running", output_files="[]"))
+    db = database_of([])
+    put_rows(db, [_row("rr1", "wan22_i2v", {"input_image": "kite_00007_.png [output]"},
+                "rr1.mp4", status="running", output_files="[]")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1703,12 +1703,12 @@ def test_a_run_that_came_from_no_combine_carries_neither(qtbot):
 
 def test_a_queued_job_carries_a_few_thumbnails_from_the_folder_it_joins(qtbot):
     settings = {"positive_prompt": "a kite", "steps": 50}
-    db = FakeDB([])
+    db = database_of([])
     for i in range(6):
-        db.add(_row(f"done{i}", "sdxl_t2i", {**settings, "seed": i}, f"done{i}.png",
-                    thumbnail_path=f"thumbs/done{i}.jpg"))
-    db.add(_row("waiting", "sdxl_t2i", {**settings, "seed": 99}, "waiting.png",
-                status="pending", output_files="[]"))
+        put_rows(db, [_row(f"done{i}", "sdxl_t2i", {**settings, "seed": i}, f"done{i}.png",
+                    thumbnail_path=f"thumbs/done{i}.jpg")])
+    put_rows(db, [_row("waiting", "sdxl_t2i", {**settings, "seed": 99}, "waiting.png",
+                status="pending", output_files="[]")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -1723,9 +1723,9 @@ def test_a_queued_job_carries_a_few_thumbnails_from_the_folder_it_joins(qtbot):
 
 
 def test_the_first_run_of_new_settings_has_no_folder_to_show(qtbot):
-    db = FakeDB([_image("elsewhere", "a boat", 50, 1)])
-    db.add(_row("waiting", "sdxl_t2i", {"positive_prompt": "a kite", "steps": 12},
-                "waiting.png", status="pending", output_files="[]"))
+    db = database_of([_image("elsewhere", "a boat", 50, 1)])
+    put_rows(db, [_row("waiting", "sdxl_t2i", {"positive_prompt": "a kite", "steps": 12},
+                "waiting.png", status="pending", output_files="[]")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -2335,7 +2335,7 @@ class _QueueClient(ComfyUIClient):
 
 
 def _queue_view(qtbot, client):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), client=client)
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), client=client)
     qtbot.addWidget(view)
     view.refresh()
     return view
@@ -2472,7 +2472,7 @@ def _cancelable(key, cancelled):
 
 
 def _view_holding(qtbot, monkeypatch, items):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     monkeypatch.setattr(view.job_queue, "items", lambda rows=None, requests=None: items)
     view.job_queue.update()
@@ -2628,7 +2628,7 @@ class _JobFromAFrame:
 
 
 def test_a_job_with_no_request_behind_it_stands_on_the_frame_it_starts_from(qtbot, tmp_path):
-    view = GalleryView(FakeDB([]))
+    view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     frame = tmp_path / "start_frame.png"
     frame.write_bytes(_png_bytes())
@@ -2668,11 +2668,11 @@ def test_clicking_a_runs_tile_puts_a_running_search_away(qtbot, tmp_path):
 
 
 def test_a_run_in_a_folder_the_tree_has_not_drawn_yet_is_gone_to_all_the_same(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    db.add(_running_row("gen1", prompt="a dog"))
+    put_rows(db, [_running_row("gen1", prompt="a dog")])
     folder = gallery.settings_folder_key(
         db.get_generation("gen1"), gallery.build_image_config_index(view._image_rows))
 

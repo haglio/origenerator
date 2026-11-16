@@ -54,7 +54,6 @@ from tests.gallery_view_support import (
     _ENHANCE_HISTORY,
     _NO_MOD,
     FakeActions,
-    FakeDB,
     _alls,
     _answer_confirmation,
     _answer_menu,
@@ -87,6 +86,7 @@ from tests.gallery_view_support import (
 )
 from tests.marked_words import words
 from tests.qt_exec import faking_exec
+from tests.real_db import database_of, put_rows
 from tests.related_links import source_tile
 from tests.test_enhance_pane import _dropped_on
 from tests.test_folder_tree import _shown
@@ -95,7 +95,7 @@ pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
 
 
 def _two_images_on_screen(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]))
     _on_screen(qtbot, view, 1400, 900)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     return view, view._gallery_pane._thumb_widgets["i2"]
@@ -143,7 +143,7 @@ def test_dragging_an_image_out_leaves_the_tab_as_it_was(qtbot, monkeypatch):
 def test_right_clicking_a_recent_item_offers_its_folder_its_name_favorite_enhance_and_delete(
         qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
 
@@ -162,7 +162,7 @@ def test_right_clicking_a_recent_item_offers_its_folder_its_name_favorite_enhanc
 
 def test_go_to_folder_is_left_off_inside_the_items_own_folder(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1)]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
@@ -176,7 +176,7 @@ def test_go_to_folder_is_left_off_inside_the_items_own_folder(qtbot, monkeypatch
 
 def test_enhance_is_grayed_for_an_image_that_already_has_that_enhancement(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1)]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
@@ -197,7 +197,7 @@ def test_enhance_is_grayed_for_an_image_that_already_has_that_enhancement(qtbot,
 def test_go_to_folder_from_a_collection_opens_the_folder_and_lands_on_the_item(
         qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -211,7 +211,7 @@ def test_go_to_folder_from_a_collection_opens_the_folder_and_lands_on_the_item(
 
 def test_copy_name_puts_the_items_name_on_the_clipboard(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
@@ -226,7 +226,7 @@ def test_copy_name_puts_the_items_name_on_the_clipboard(qtbot, monkeypatch):
 def test_copying_the_names_of_picked_items_puts_them_one_to_a_line(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _image("i3", "a cat", 50, 3)]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -242,11 +242,11 @@ def test_copying_the_names_of_picked_items_puts_them_one_to_a_line(qtbot, monkey
 
 
 def test_an_item_the_gallery_has_not_named_yet_offers_no_name_to_copy(qtbot, monkeypatch):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
-    db.add(_image("i2", "a cat", 50, 2))
+    put_rows(db, [_image("i2", "a cat", 50, 2)])
     labels = []
     _menu_labels(monkeypatch, labels)
 
@@ -263,7 +263,7 @@ def _press_ctrl_c(view, monkeypatch):
 def test_ctrl_c_copies_the_names_of_the_picked_items_one_to_a_line(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _image("i3", "a cat", 50, 3)]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -279,7 +279,7 @@ def test_ctrl_c_copies_the_names_of_the_picked_items_one_to_a_line(qtbot, monkey
 
 def test_ctrl_c_with_no_item_picked_copies_the_folders_name(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1)]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
@@ -329,7 +329,7 @@ def _folder_buttons(view):
 
 def test_the_go_to_folder_button_takes_a_collection_item_home_without_a_right_click(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -345,7 +345,7 @@ def test_the_go_to_folder_button_takes_a_collection_item_home_without_a_right_cl
 
 
 def test_no_go_to_folder_button_inside_the_items_own_folder(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions())
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
 
@@ -363,7 +363,7 @@ def test_a_deleted_item_offers_no_way_to_a_folder(qtbot):
 
 
 def test_a_video_goes_to_its_folder_from_the_same_button(qtbot):
-    view = GalleryView(FakeDB([_i2v_video("v1", "smooth")]), actions=FakeActions())
+    view = GalleryView(database_of([_i2v_video("v1", "smooth")]), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -377,7 +377,7 @@ def test_a_video_goes_to_its_folder_from_the_same_button(qtbot):
 
 def test_a_kind_left_off_a_collection_still_has_its_folder_to_go_to(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
-    view = GalleryView(FakeDB(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -392,7 +392,7 @@ def test_a_kind_left_off_a_collection_still_has_its_folder_to_go_to(qtbot):
 
 
 def test_leaving_the_items_folder_puts_the_go_to_folder_back_on_what_it_shows(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]), actions=FakeActions())
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view._leaf_by_id["i1"])
@@ -407,7 +407,7 @@ def test_leaving_the_items_folder_puts_the_go_to_folder_back_on_what_it_shows(qt
 def test_right_click_delete_on_the_latest_collection_removes_the_item(qtbot, monkeypatch):
     actions = FakeActions()
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
-    view = GalleryView(FakeDB(rows), actions=actions)
+    view = GalleryView(database_of(rows), actions=actions)
     qtbot.addWidget(view)
     view.refresh()
 
@@ -422,7 +422,7 @@ def test_right_click_delete_on_the_latest_collection_removes_the_item(qtbot, mon
 
 
 def test_right_click_favorite_on_the_latest_collection_favorites_the_item(qtbot, monkeypatch):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
@@ -464,7 +464,7 @@ def test_latest_video_tiles_animate_while_images_stay_still(qtbot, tmp_path, mon
         return str(webp) if gallery.media_type_of_row(row) == "video" else None
 
     monkeypatch.setattr(gallery, "animated_preview_if_made", fake_anim)
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -482,7 +482,7 @@ def test_settings_folder_video_tiles_animate(qtbot, tmp_path, monkeypatch):
         gallery, "animated_preview_if_made",
         lambda row, o, t: str(webp) if gallery.media_type_of_row(row) == "video" else None,
     )
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -495,7 +495,7 @@ def test_latest_tiles_wear_an_image_or_video_item_type_icon(qtbot):
         _image("i1", "a cat", 50, 1),
         _row("v1", "wan22_i2v", {"positive_prompt": "dance", "seed": 5}, "wan22_i2v_v1.mp4"),
     ]
-    view = GalleryView(FakeDB(rows))
+    view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -510,7 +510,7 @@ def test_latest_tiles_wear_an_image_or_video_item_type_icon(qtbot):
 
 
 def test_a_folder_of_one_kind_leaves_the_item_type_icon_off_its_tiles(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -521,8 +521,8 @@ def test_a_folder_of_one_kind_leaves_the_item_type_icon_off_its_tiles(qtbot):
 
 
 def test_an_inflight_tile_wears_the_item_type_icon_of_its_media_type(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
-    db.add(_running_row("rr1", workflow="wan22_i2v"))
+    db = database_of([_image("i1", "a cat", 50, 1)])
+    put_rows(db, [_running_row("rr1", workflow="wan22_i2v")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -541,7 +541,7 @@ def test_video_source_tile_points_to_its_image_and_navigates(qtbot):
                  {"positive_prompt": "dance", "seed": 5,
                   "input_image": "sdxl_t2i_img1.png"},
                  "wan22_i2v_00001_.mp4")
-    view = GalleryView(FakeDB([video, image]), client=ComfyUIClient(folders=SUITE_FOLDERS))
+    view = GalleryView(database_of([video, image]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
     for tab in view._generate_pane.generate_tabs():
@@ -559,7 +559,7 @@ def test_video_source_tile_points_to_its_image_and_navigates(qtbot):
 
 
 def test_the_gallery_pane_buttons_are_a_group_of_compact_icon_buttons(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     for btn in (view._buttons.back, view._buttons.forward, view._buttons.undo, view._buttons.delete):
         assert isinstance(btn, QToolButton)
@@ -568,7 +568,7 @@ def test_the_gallery_pane_buttons_are_a_group_of_compact_icon_buttons(qtbot):
 
 
 def test_the_trash_at_the_top_offers_the_open_folder_whatever_is_picked(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -585,7 +585,7 @@ def test_the_trash_at_the_top_offers_the_open_folder_whatever_is_picked(qtbot):
 
 def test_the_trash_at_the_top_deletes_the_open_folder_with_an_item_picked(qtbot, monkeypatch):
     actions = FakeActions()
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]),
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]),
                        actions=actions)
     qtbot.addWidget(view)
     view.refresh()
@@ -600,7 +600,7 @@ def test_the_trash_at_the_top_deletes_the_open_folder_with_an_item_picked(qtbot,
 
 def test_the_delete_key_deletes_the_picked_thumbnails(qtbot):
     actions = FakeActions()
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]),
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]),
                        actions=actions)
     _on_screen(qtbot, view, 1200, 900)
     _select_first_leaf(view)
@@ -613,7 +613,7 @@ def test_the_delete_key_deletes_the_picked_thumbnails(qtbot):
 
 
 def test_the_spoken_favorite_aims_at_the_picked_thumbnails_and_toggles(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
+    db = database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -632,7 +632,7 @@ def test_the_spoken_favorite_aims_at_the_picked_thumbnails_and_toggles(qtbot):
 
 def test_the_star_enhance_and_trash_at_the_top_are_grayed_out_where_no_leaf_folder_is_open(
         qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     for place in (_collection(view, LATEST_KEY), _image_workflow(view._tree)):
@@ -646,7 +646,7 @@ def test_the_star_enhance_and_trash_at_the_top_are_grayed_out_where_no_leaf_fold
 
 
 def test_the_trash_at_the_top_deletes_only_a_leaf_folder(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     model = view._tree_item_for(_select_first_leaf(view)).parent().parent()
@@ -721,7 +721,7 @@ def _video_leaf(view):
 
 
 def test_enhance_is_dark_on_a_video_and_says_why(qtbot):
-    view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]))
+    view = GalleryView(database_of([_i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
     _video_leaf(view)
@@ -731,7 +731,7 @@ def test_enhance_is_dark_on_a_video_and_says_why(qtbot):
 
 
 def test_the_enhance_pane_grays_out_on_a_video_too(qtbot):
-    view = GalleryView(FakeDB([_i2v_video("v1", "styleA"), _image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_i2v_video("v1", "styleA"), _image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -800,7 +800,7 @@ def test_a_version_dragged_onto_the_enhance_pane_grays_the_enhance_that_would_re
 
 
 def test_a_star_pressed_on_one_tile_favorites_it_at_once_and_leaves_the_rest(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
+    db = database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
@@ -814,7 +814,7 @@ def test_a_star_pressed_on_one_tile_favorites_it_at_once_and_leaves_the_rest(qtb
 
 
 def test_a_favorite_tiles_favorite_corner_takes_the_favorite_away(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1)])
     db.set_generation_favorite("i1", True)
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
@@ -827,7 +827,7 @@ def test_a_favorite_tiles_favorite_corner_takes_the_favorite_away(qtbot):
 
 
 def test_a_favorite_from_a_slideshow_marks_its_tile_without_rebuilding_the_gallery(qtbot, monkeypatch):
-    db = FakeDB([_image("i1", "a cat", 50, 1)])
+    db = database_of([_image("i1", "a cat", 50, 1)])
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
@@ -843,7 +843,7 @@ def test_a_favorite_from_a_slideshow_marks_its_tile_without_rebuilding_the_galle
 
 
 def test_the_favorites_count_follows_a_favorite_without_rebuilding_the_gallery(qtbot, monkeypatch):
-    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
+    db = database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
@@ -874,7 +874,7 @@ def test_unfavoriting_a_favorite_drops_it_from_the_collection_with_a_real_librar
 
 def test_a_tiles_trash_corner_deletes_that_tile(qtbot):
     actions = FakeActions()
-    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
+    db = database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()
@@ -886,7 +886,7 @@ def test_a_tiles_trash_corner_deletes_that_tile(qtbot):
 
 
 def test_a_corner_control_acts_on_its_own_tile_not_the_selection(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
+    db = database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)])
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
@@ -950,7 +950,7 @@ def test_an_unenhanced_image_offers_its_first_enhancement_in_the_corner(qtbot, t
 
 
 def test_a_video_tile_has_no_enhance_corner_to_offer(qtbot):
-    view = GalleryView(FakeDB([_i2v_video("v1", "styleA")]), actions=FakeActions())
+    view = GalleryView(database_of([_i2v_video("v1", "styleA")]), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
@@ -980,7 +980,7 @@ def test_the_enhance_corner_offers_another_the_moment_a_setting_moves(qtbot, tmp
 
 
 def test_a_mixed_pick_enhances_the_images_in_it(qtbot):
-    db = FakeDB([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")])
+    db = database_of([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")])
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
@@ -997,7 +997,7 @@ def test_a_mixed_pick_enhances_the_images_in_it(qtbot):
 
 
 def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
@@ -1014,7 +1014,7 @@ def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
 
 
 def test_a_group_with_nothing_showing_takes_no_space(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     view.show()
@@ -1030,7 +1030,7 @@ def test_a_group_with_nothing_showing_takes_no_space(qtbot):
 
 
 def test_the_bank_wraps_onto_another_row_rather_than_squeezing_its_buttons(qtbot):
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     view.show()
@@ -1052,7 +1052,7 @@ def test_the_bank_wraps_onto_another_row_rather_than_squeezing_its_buttons(qtbot
 
 def test_a_favorite_row_renders_a_favorite_tile(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    db = FakeDB(rows)
+    db = database_of(rows)
     db.set_generation_favorite("i2", True)
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
@@ -1065,7 +1065,7 @@ def test_a_favorite_row_renders_a_favorite_tile(qtbot):
 
 def test_right_click_favorite_favorites_the_picked_thumbnail(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
-    db = FakeDB(rows)
+    db = database_of(rows)
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
@@ -1080,7 +1080,7 @@ def test_right_click_favorite_favorites_the_picked_thumbnail(qtbot, monkeypatch)
 
 def test_right_click_unfavorite_clears_a_favorite_thumbnail(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1)]
-    db = FakeDB(rows)
+    db = database_of(rows)
     db.set_generation_favorite("i1", True)
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
@@ -1096,7 +1096,7 @@ def test_right_click_unfavorite_clears_a_favorite_thumbnail(qtbot, monkeypatch):
 def test_right_click_favorite_acts_on_the_whole_multi_selection(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _image("i3", "a cat", 50, 3)]
-    db = FakeDB(rows)
+    db = database_of(rows)
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()

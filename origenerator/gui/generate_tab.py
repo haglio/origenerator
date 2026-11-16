@@ -1132,6 +1132,9 @@ class GenerateTab(DropZones):
         self._apply_generate_caption()
         self._emit_title()
 
+    def modify_batch_folder(self) -> str | None:
+        return None if self._modify_batch is None else self._modify_batch.folder_key
+
     def _end_modify_batch(self) -> None:
         if self._modify_batch is None:
             return

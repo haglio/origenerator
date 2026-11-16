@@ -696,7 +696,7 @@ def test_the_trash_collection_splits_too(qtbot, tmp_path):
     view._edits.delete_rows([tall, wide])
     view.refresh()
 
-    assert sorted(held["prompt_id"] for held in view._held_rows) == ["t1", "w1"]
+    assert sorted(held["prompt_id"] for held in view.library.reading.held_rows) == ["t1", "w1"]
     for shape in ("portrait", "landscape"):
         assert _shown(view.toc.item_by_key[shaped_key(TRASH_KEY, shape)]) == f"(1) {TRASH_LABEL}"
 

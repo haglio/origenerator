@@ -415,7 +415,7 @@ def test_a_running_enhance_shows_in_the_strip_of_the_tab_showing_that_image(qtbo
     view.refresh()
     tab = view._generate_pane.current_generate_tab()
     row = db.get_generation("g0")
-    tab.show_saved_generation(row, view._image_rows)
+    tab.show_saved_generation(row, view.library.reading.image_rows)
 
     view.enhance_items(["g0"])
 
@@ -436,9 +436,9 @@ def test_each_tab_reads_its_own_image_out_of_a_batch_of_enhances(qtbot, tmp_path
     qtbot.addWidget(view)
     view.refresh()
     first = view._generate_pane.current_generate_tab()
-    first.show_saved_generation(db.get_generation("g0"), view._image_rows)
+    first.show_saved_generation(db.get_generation("g0"), view.library.reading.image_rows)
     second = view._generate_pane._add_subtab()
-    second.show_saved_generation(db.get_generation("g1"), view._image_rows)
+    second.show_saved_generation(db.get_generation("g1"), view.library.reading.image_rows)
 
     view.enhance_items(["g0", "g1"])
 
@@ -697,7 +697,7 @@ def test_the_version_lists_delete_trashes_that_level_and_keeps_the_image(qtbot, 
     row = _enhanced_in_place(db)
     view.refresh()
     tab = view._generate_pane.current_generate_tab()
-    tab.show_saved_generation(row, view._image_rows)
+    tab.show_saved_generation(row, view.library.reading.image_rows)
 
     tab._versions.delete_requested.emit([0])
 
@@ -718,7 +718,7 @@ def test_pressing_a_versions_trash_can_trashes_that_level_and_the_last_one_has_n
     row = _enhanced_in_place(db)
     view.refresh()
     tab = view._generate_pane.current_generate_tab()
-    tab.show_saved_generation(row, view._image_rows)
+    tab.show_saved_generation(row, view.library.reading.image_rows)
     enhancement = tab._versions._host.findChildren(_VersionRow)[0]
 
     enhancement.findChild(QPushButton, "deleteButton").click()
@@ -774,7 +774,7 @@ def test_the_add_tile_enhances_the_image_the_tab_is_showing(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     tab = view._generate_pane.current_generate_tab()
-    tab.show_saved_generation(db.get_generation("g0"), view._image_rows)
+    tab.show_saved_generation(db.get_generation("g0"), view.library.reading.image_rows)
     _set_enhance(view, params={"enhance_steps": 29})
 
     tab._versions.enhance_requested.emit()
@@ -790,11 +790,11 @@ def test_a_tab_turned_to_an_image_being_enhanced_shows_that_run(qtbot, tmp_path)
     qtbot.addWidget(view)
     view.refresh()
     tab = view._generate_pane.current_generate_tab()
-    tab.show_saved_generation(db.get_generation("g1"), view._image_rows)
+    tab.show_saved_generation(db.get_generation("g1"), view.library.reading.image_rows)
     view.enhance_items(["g0"])
     assert not tab._versions._host.findChildren(_PendingRow)
 
-    tab.show_saved_generation(db.get_generation("g0"), view._image_rows)
+    tab.show_saved_generation(db.get_generation("g0"), view.library.reading.image_rows)
 
     assert tab._versions._host.findChildren(_PendingRow)
 

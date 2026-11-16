@@ -638,7 +638,7 @@ def test_a_deleted_video_plays_its_own_file_out_of_the_trash(qtbot, tmp_path):
     view._delete_rows([db.get_generation("v1")])
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
-    (held,) = view._held_rows
+    (held,) = view.library.reading.held_rows
     resolved = real_resolve_preview(held, tmp_path / "out")
 
     assert resolved is not None

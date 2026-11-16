@@ -483,7 +483,7 @@ def _generate_in_current_tab(view, positive_prompt, seed):
     tab._on_generate()
     return gallery.settings_folder_key(
         {"workflow_name": "sdxl_t2i", "params_json": json.dumps(params)},
-        gallery.build_image_config_index(view._image_rows),
+        gallery.build_image_config_index(view.library.reading.image_rows),
     )
 
 

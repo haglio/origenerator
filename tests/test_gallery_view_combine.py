@@ -502,7 +502,7 @@ def test_a_tab_pointed_at_another_generation_drops_the_settings_source(qtbot, tm
     view._combine._open_combination("img", "vid")
     tab = _front_panel(view)
 
-    tab.show_saved_generation(view._db.get_generation("vid"), view._image_rows)
+    tab.show_saved_generation(view._db.get_generation("vid"), view.library.reading.image_rows)
 
     assert tab.settings_source() == ("", None, "", ())
 

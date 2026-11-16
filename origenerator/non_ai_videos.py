@@ -7,8 +7,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from app_support.mirrored_tree import filed_record
-from app_support.video_names import video_title
+from app_support import favorites
+from app_support.mirrored_tree import filed_record, record_path
+from app_support.video_names import title_while_playing
 
 from origenerator import config
 from origenerator.db_generations import library_paths_in
@@ -51,7 +52,6 @@ def scan_in_turn(db, places: NonAiPlaces, *, wait_s: float = WAIT_S) -> int:
 
 
 def scan(db, places: NonAiPlaces, *, videos_per_write: int = VIDEOS_PER_WRITE) -> int:
-    take_up_new_titles(db, places)
     held = db.library_paths() | db.trashed_library_paths()
     new = (video for video in non_ai_videos(places.videos) if str(video) not in held)
     brought_in = 0
@@ -59,18 +59,33 @@ def scan(db, places: NonAiPlaces, *, videos_per_write: int = VIDEOS_PER_WRITE) -
                                    videos_per_write):
         db.insert_rows(list(batch))
         brought_in += len(batch)
+    take_up_what_the_records_say(db, places)
     return brought_in
 
 
-def take_up_new_titles(db, places: NonAiPlaces) -> None:
-    for row in db.list_generations():
-        if row["source"] != GenerationSource.NON_AI:
-            continue
-        params = json.loads(row["params_json"])
-        for video in library_paths_in(row["output_files"]):
-            title = title_of(Path(video), places)
-            if params.get(TITLE_KEY) != title:
-                db.set_params_json(row["prompt_id"], json.dumps({**params, TITLE_KEY: title}))
+def take_up_what_the_records_say(db, places: NonAiPlaces) -> int:
+    return sum(_take_up(db, row, Path(video), filed_record(Path(video), places.records))
+               for row in db.list_generations() if row["source"] == GenerationSource.NON_AI
+               for video in library_paths_in(row["output_files"]))
+
+
+def _take_up(db, row: dict, video: Path, record: dict) -> bool:
+    params, title = json.loads(row["params_json"]), title_while_playing(record, video)
+    renamed = params.get(TITLE_KEY) != title
+    if renamed:
+        db.set_params_json(row["prompt_id"], json.dumps({**params, TITLE_KEY: title}))
+    favorite = favorites.is_favorite(record)
+    restarred = bool(row["starred"]) != favorite
+    if restarred:
+        db.set_generation_favorite(row["prompt_id"], favorite)
+    return renamed or restarred
+
+
+def tell_fun_time_of_favorites(rows, favorite: bool, records: Path) -> None:
+    for row in rows:
+        if row["source"] == GenerationSource.NON_AI:
+            for video in library_paths_in(row["output_files"]):
+                favorites.mark(record_path(Path(video), records), favorite)
 
 
 def non_ai_videos(folder: Path) -> list[Path]:
@@ -83,10 +98,6 @@ def named_folder(video: Path, videos: Path) -> str:
     return " ".join(video.parent.relative_to(videos).parts[:FOLDER_PARTS_IN_A_NAME])
 
 
-def title_of(video: Path, places: NonAiPlaces) -> str:
-    return video_title(filed_record(video, places.records), video)
-
-
 def row_bringing_in(video: Path, places: NonAiPlaces) -> dict:
     filed = datetime.fromtimestamp(video.stat().st_mtime, tz=UTC)
     video_id = str(uuid.uuid4())
@@ -94,8 +105,7 @@ def row_bringing_in(video: Path, places: NonAiPlaces) -> dict:
     return {
         **recorded_fields(GenerationSource.NON_AI,
                           non_ai_workflow(named_folder(video, places.videos)),
-                          {FOLDER_KEY: video.parent.relative_to(places.videos).as_posix(),
-                           TITLE_KEY: title_of(video, places)},
+                          {FOLDER_KEY: video.parent.relative_to(places.videos).as_posix()},
                           (made_at(Made(), filed), filed), action=None),
         "workflow_version": NonAiWorkflow.version, "status": GenerationStatus.COMPLETED,
         "workflow_json": "{}", "prompt_id": video_id,

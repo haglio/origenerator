@@ -7,7 +7,7 @@ from pathlib import Path
 
 from app_support.video_names import stem_of_either_copy
 
-from origenerator import trash_collection
+from origenerator import non_ai_videos, trash_collection
 from origenerator.db_generations import library_paths_in
 from origenerator.gallery import (
     counted,
@@ -35,6 +35,7 @@ class GalleryEnvironment:
     genau: Genau | None = None
     bring_in: Callable[[Path], bool] | None = None
     delete_for_good: Callable[[list[Path]], None] | None = None
+    video_records: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -60,6 +61,12 @@ class GalleryEdits:
     @property
     def thumb_dir(self) -> Path | None:
         return self._environment.thumb_dir
+
+    def tell_fun_time_of_favorites(self, prompt_ids, favorite: bool) -> None:
+        if self._environment.video_records is not None:
+            non_ai_videos.tell_fun_time_of_favorites(
+                filter(None, map(self._db.get_generation, prompt_ids)), favorite,
+                self._environment.video_records)
 
     def trash_file(self, path, already_at=None) -> None:
         pressed = Pressed(Path(path), Path(already_at) if already_at else None)

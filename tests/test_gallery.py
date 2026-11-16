@@ -165,7 +165,7 @@ def test_make_animated_preview_generates_a_cached_webp_for_a_video(tmp_path, mon
                output_files=json.dumps([{"filename": "wan22_i2v_v1.mp4"}]))
     calls = []
 
-    def fake_generate(source, thumb_dir, *, name):
+    def fake_generate(source, thumb_dir, *, name, again):
         calls.append((source, thumb_dir, name))
         return thumb_dir / f"{name}_anim.webp"
 

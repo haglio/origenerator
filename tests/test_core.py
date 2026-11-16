@@ -1486,8 +1486,10 @@ def _hosted_with_a_channel(tmp_path):
     return replace(_fun_time_session(), command_file=tmp_path / "origenerator_cmd.txt")
 
 
-def _say(tmp_path, verb: str) -> None:
+def _say(win, tmp_path, verb: str) -> None:
     append_command(tmp_path / "origenerator_cmd.txt", verb)
+    (bridge,) = win.findChildren(FunTimeBridge)
+    bridge._tick()
 
 
 def _headset_session(tmp_path, main=(10, 20, 200, 100)):
@@ -1569,8 +1571,8 @@ def test_a_session_crossing_into_the_headset_asks_for_the_window(qtbot, tmp_path
     qtbot.addWidget(win)
     assert win.hands_its_window_over is None
 
-    _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
-    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+    _say(win, tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
+    assert win.hands_its_window_over is not None
 
     assert not win.isMinimized()
 
@@ -1581,11 +1583,11 @@ def test_a_session_crossing_back_to_the_monitors_takes_the_window_back(qtbot, tm
         fun_time=_hosted_with_a_channel(tmp_path),
     )
     qtbot.addWidget(win)
-    _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
-    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+    _say(win, tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
+    assert win.hands_its_window_over is not None
 
-    _say(tmp_path, "TAKE_BACK")
-    qtbot.waitUntil(lambda: win.hands_its_window_over is None, timeout=3000)
+    _say(win, tmp_path, "TAKE_BACK")
+    assert win.hands_its_window_over is None
 
     assert win.isMinimized()
 
@@ -1600,8 +1602,8 @@ def test_a_crossing_leaves_the_panes_side_by_side(qtbot, tmp_path):
     win = _window(qtbot, tmp_path, fun_time=_hosted_with_a_channel(tmp_path))
     assert win._gallery_view._arrangement.stack is not None, "it did not open folded"
 
-    _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
-    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+    _say(win, tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
+    assert win.hands_its_window_over is not None
 
     assert win._gallery_view._arrangement.stack is None, "the room got the upright fold"
 
@@ -1610,8 +1612,8 @@ def test_a_crossing_takes_the_presses_the_room_writes(qtbot, tmp_path):
     win = _window(qtbot, tmp_path, fun_time=_hosted_with_a_channel(tmp_path))
     presses = tmp_path / "input.txt"
 
-    _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{presses}")
-    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+    _say(win, tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{presses}")
+    assert win.hands_its_window_over is not None
     qtbot.waitUntil(lambda: _frame_published(tmp_path / "frame.bin") != (0, 0),
                     timeout=3000)
     append_command(presses, "hover 10 10")
@@ -1625,8 +1627,8 @@ def test_a_window_parked_on_the_monitors_is_up_again_once_it_crosses(qtbot, tmp_
     win.showMinimized()
     frames = tmp_path / "frame.bin"
 
-    _say(tmp_path, f"HAND_OVER|{frames}|{tmp_path / 'input.txt'}")
-    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+    _say(win, tmp_path, f"HAND_OVER|{frames}|{tmp_path / 'input.txt'}")
+    assert win.hands_its_window_over is not None
 
     assert not win.isMinimized(), "the room was handed a window Windows had unmapped"
     qtbot.waitUntil(lambda: _frame_published(frames) != (0, 0), timeout=3000)
@@ -1638,8 +1640,8 @@ def test_a_window_launched_hosted_on_the_monitors_still_crosses_into_the_headset
     qtbot.addWidget(win)
     assert win.hands_its_window_over is None
 
-    _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
-    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+    _say(win, tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
+    assert win.hands_its_window_over is not None
 
 
 def _publishing_status(tmp_path):
@@ -1675,13 +1677,13 @@ def test_crossing_into_the_headset_grows_the_window_back_to_desktop_size(qtbot, 
     win.become_hosted(_hosted_with_a_channel(tmp_path))
     assert ui_scale.active_scale() == ui_scale.HOSTED_SCALE
 
-    _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
-    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+    _say(win, tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
+    assert win.hands_its_window_over is not None
 
     assert ui_scale.active_scale() == 1.0
 
-    _say(tmp_path, "TAKE_BACK")
-    qtbot.waitUntil(lambda: win.hands_its_window_over is None, timeout=3000)
+    _say(win, tmp_path, "TAKE_BACK")
+    assert win.hands_its_window_over is None
 
     assert ui_scale.active_scale() == ui_scale.HOSTED_SCALE
 
@@ -1693,8 +1695,8 @@ def test_crossing_into_the_headset_takes_the_window_off_the_sessions_rect(qtbot,
     assert (win.width(), win.height()) == (monitors.main_rect.width,
                                            monitors.main_rect.height)
 
-    _say(tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
-    qtbot.waitUntil(lambda: win.hands_its_window_over is not None, timeout=3000)
+    _say(win, tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
+    assert win.hands_its_window_over is not None
 
     assert max(win.width(), win.height()) == CAP_PX
 

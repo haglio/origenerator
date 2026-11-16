@@ -72,6 +72,7 @@ from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.model_files import NO_LORA
+from origenerator.workflows.non_ai import non_ai_workflow
 from origenerator.workflows.outside import VideoKind, outside_workflow
 
 
@@ -1608,15 +1609,17 @@ def test_a_models_lora_folders_are_in_alphabetical_order_with_no_lora_last():
         == ["alpha_look_high", "zeta_look_high", "(no LoRA)"]
 
 
-def test_sites_come_before_workflows_each_in_alphabetical_order():
+def test_non_ai_folders_come_first_then_sites_then_workflows_each_in_alphabetical_order():
     rows = [dict(_LOOP_VIDEO, prompt_id=name, workflow_name=name) for name in (
-        outside_workflow("zeta-site", MediaType.VIDEO), "wan22_i2v",
-        outside_workflow("alpha-site", MediaType.VIDEO), "wan22_flf2v_loop")]
+        outside_workflow("zeta-site", MediaType.VIDEO), "wan22_i2v", non_ai_workflow("zeta folder"),
+        outside_workflow("alpha-site", MediaType.VIDEO), "wan22_flf2v_loop",
+        non_ai_workflow("alpha folder"))]
 
     videos = build_gallery_tree(rows)[0]
 
     assert [w.label for w in videos.children] == [
-        "alpha-site", "zeta-site", workflow_label("wan22_i2v"), workflow_label("wan22_flf2v_loop")]
+        "alpha folder", "zeta folder", "alpha-site", "zeta-site",
+        workflow_label("wan22_i2v"), workflow_label("wan22_flf2v_loop")]
 
 
 def _names_by_row(tree, folder_meta, custom_collections=()):

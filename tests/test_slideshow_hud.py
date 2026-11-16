@@ -530,7 +530,7 @@ class TestTheQueueOnTheOneHud:
             self, qtbot):
         window = _core_as(qtbot, over=False)
 
-        assert window._hud_model().foot.blank
+        assert window._hud_model().foot is None
 
     def test_a_slideshow_over_core_hangs_the_job_queue_at_its_foot(self, qtbot):
         window = _core_as(qtbot, over=True)
@@ -549,26 +549,34 @@ class TestTheQueueOnTheOneHud:
             self, qtbot, tmp_path):
         window = _core_as(qtbot, over=True, dashboard_cmd_file=tmp_path / "dashboard_cmd.txt")
 
-        assert window._hud_model().foot.blank
+        assert window._hud_model().foot is None
 
     def test_a_hud_over_an_idle_job_queue_shows_it_saying_so(self, qtbot):
         window = _dressed(qtbot)
         window.set_queue([], 0)
 
         foot = window._hud_model().foot
-        assert not foot.blank
         assert foot.empty_note == EMPTY_QUEUE_TEXT
 
-    def test_the_hud_keeps_one_size_as_jobs_come_and_go_and_core_comes_into_view(
-            self, qtbot):
+    def test_the_hud_keeps_one_size_as_jobs_come_and_go(self, qtbot):
         covering_core = _core_as(qtbot, over=True)
-        sizes = {_hud(_core_as(qtbot, over=False))[2].shape}
+        sizes = set()
         for items in ([], [_inflight("j1", job_kind="Image", typical_seconds=30)],
                       [_inflight(f"j{index}", typical_seconds=30) for index in range(7)]):
             covering_core.set_queue(items, 0)
             sizes.add(_hud(covering_core)[2].shape)
 
         assert len(sizes) == 1
+
+    def test_core_coming_into_view_takes_only_the_job_queue_off_the_huds_bottom(self, qtbot):
+        with_queue = _hud(_core_as(qtbot, over=True))[2]
+        without_queue = _hud(_core_as(qtbot, over=False))[2]
+
+        assert without_queue.shape[1] == with_queue.shape[1], (
+            "he lets the HUD change size only by its bottom section appearing or disappearing "
+            "(2026-11-16), so its width stays as it was")
+        assert without_queue.shape[0] < with_queue.shape[0]
+        assert (without_queue[:-8] == with_queue[:without_queue.shape[0] - 8]).all()
 
     def test_a_press_on_the_block_reaches_the_queue_through_the_hud(self, qtbot):
         stopped = []

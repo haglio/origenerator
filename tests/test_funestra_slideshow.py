@@ -971,13 +971,22 @@ def test_a_slideshow_on_a_sessions_funestra_hangs_the_job_queue_while_core_is_hi
     assert f"{OPEN}|j1" in _pressed_on(foot)
 
 
-def test_a_slideshow_on_a_sessions_funestra_keeps_the_job_queues_room_empty_while_core_shows(
+def test_a_slideshow_on_a_sessions_funestra_leaves_the_job_queue_off_its_hud_while_core_shows(
         qtbot, tmp_path):
-    shown = _published_with_core(qtbot, tmp_path / "hidden", minimized=True)
-    blank = _published_with_core(qtbot, tmp_path / "shown", minimized=False)
+    assert _published_with_core(qtbot, tmp_path, minimized=False) is None
 
-    assert _pressed_on(blank) == []
-    assert (blank.width, blank.height) == (shown.width, shown.height)
+
+def test_the_job_queues_painted_file_goes_once_core_comes_into_view(qtbot, tmp_path):
+    core = _Core(minimized=True)
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(core_window=lambda: core))
+    slideshow.shown.set_queue([_inflight("j1")], 0)
+    painted = Path(_published_foot(slideshow).file)
+
+    core._minimized = False
+    slideshow.shown.set_queue([_inflight("j1")], 0)
+
+    assert _published_foot(slideshow) is None
+    assert not painted.exists()
 
 
 def test_a_double_click_on_the_map_gives_that_item_the_lock_buttons_whole_lock(qtbot, tmp_path):

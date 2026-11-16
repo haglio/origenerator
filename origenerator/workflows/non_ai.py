@@ -6,6 +6,8 @@ from origenerator.workflows.outside import MadeElsewhereWorkflow, outside_source
 
 _PREFIX = "non-ai:"
 FOLDER_KEY = "folder"
+TITLE_KEY = "title"
+FOLDER_PARTS_IN_A_NAME = 2
 
 
 def non_ai_workflow(folder: str) -> str:

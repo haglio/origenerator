@@ -8,7 +8,6 @@ from pathlib import Path
 from app_support.video_names import stem_of_either_copy
 
 from origenerator import non_ai_videos, trash_collection
-from origenerator.db_generations import library_paths_in
 from origenerator.gallery import (
     counted,
     output_disk_files,
@@ -18,6 +17,7 @@ from origenerator.gallery import (
 )
 from origenerator.gallery.output import stems_made_as, with_files_renamed
 from origenerator.one_look import looking_once
+from origenerator.output_files import library_paths_in
 from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.trash import Genau, Kino, TrashedBatch, take_out_of_play

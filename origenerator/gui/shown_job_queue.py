@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from dataclasses import replace
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QMessageBox, QWidget
@@ -50,8 +51,17 @@ class ShownJobQueue(QObject):
         starting.changed.connect(self.update)
 
     def items(self, rows=None, requests=None) -> list:
-        return self._starting.placed_among(
-            self._in_flight(rows=rows, requests=requests), self._jobs)
+        return [self._redrawn_on_cancel(item) for item in self._starting.placed_among(
+            self._in_flight(rows=rows, requests=requests), self._jobs)]
+
+    def _redrawn_on_cancel(self, item):
+        if item.cancel is None:
+            return item
+
+        def cancel_and_redraw(cancel=item.cancel):
+            cancel()
+            self.update()
+        return replace(item, cancel=cancel_and_redraw)
 
     def now(self) -> tuple[list, int]:
         rows, requests = self._listed()
@@ -78,7 +88,6 @@ class ShownJobQueue(QObject):
             return
         for item in reversed(items):
             item.cancel()
-        self.update()
 
     def clear_foreign(self) -> None:
         if self._client is None:

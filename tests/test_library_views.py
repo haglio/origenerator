@@ -486,15 +486,29 @@ def test_a_video_that_plays_as_its_evolver_upscale_counts_as_enhanced(tmp_path, 
     assert library.enhanced_ids_of(library.rows) == {"vid-1"}
 
 
-def test_the_enhanced_folder_and_the_slideshows_filter_ask_one_question_two_ways(
+def test_a_video_with_an_upscale_is_enhanced_in_the_enhanced_folder_and_on_a_slideshow_alike(
         tmp_path, monkeypatch):
     upscaled = _video_upscaled_by_evolver(tmp_path, monkeypatch, "vid-1")
     library = LibrarySnapshot([upscaled])
 
-    assert library.is_enhanced(upscaled, an_upscale_counts=True) is True
-    assert library.is_enhanced(upscaled, an_upscale_counts=False) is False
+    assert library.is_enhanced(upscaled) is True
     assert library.enhanced_ids_of([upscaled]) == {"vid-1"}
-    assert library.enhanced_rows == []
+    assert [row["prompt_id"] for row in library.enhanced_rows] == ["vid-1"]
+
+
+def test_a_reading_after_evolver_upscaled_a_video_judges_that_video_again(
+        tmp_path, monkeypatch):
+    video = _video_upscaled_by_evolver(tmp_path, monkeypatch, "vid-1")
+    upscaled = library_views.EvolverUpscales.scan()
+    monkeypatch.setattr(library_views.EvolverUpscales, "scan",
+                        lambda *args: library_views.EvolverUpscales({}))
+    before = LibrarySnapshot([video])
+    assert before.enhanced_rows == []
+
+    monkeypatch.setattr(library_views.EvolverUpscales, "scan", lambda *args: upscaled)
+    after = LibrarySnapshot([video], previous=before)
+
+    assert [row["prompt_id"] for row in after.enhanced_rows] == ["vid-1"]
 
 
 def test_an_image_origenerator_enhanced_counts_as_enhanced_and_one_it_did_not_does_not(

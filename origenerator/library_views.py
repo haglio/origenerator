@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from functools import cached_property, partial
+from functools import cached_property
 from pathlib import Path
 from typing import NamedTuple
 
@@ -62,6 +62,7 @@ class LibrarySnapshot:
         self.readings = RowReadings(previous.readings if previous else None)
         self._drawn_before = previous.drawn() if previous else {}
         self._image_index_before = previous.image_index if previous else None
+        self._upscales_before = vars(previous).get("upscales") if previous else None
         self._unmoved = (previous is not None and all_the_same(self.rows, previous.rows)
                          and self.folder_meta is previous.folder_meta)
         self._drawn: dict[str, tuple[KeptFolders, list]] = {}
@@ -138,16 +139,17 @@ class LibrarySnapshot:
 
     @cached_property
     def enhanced_rows(self) -> list[dict]:
-        in_the_folder = partial(self.is_enhanced, an_upscale_counts=False)
-        return self._each_alone(
-            lambda rows: gallery.enhanced_generations(rows, in_the_folder), "enhanced")
+        with one_look():
+            return self._each_alone(
+                lambda rows: gallery.enhanced_generations(rows, self.is_enhanced), "enhanced",
+                depends_on=self.upscales)
 
     @cached_property
     def experiment_rows(self) -> list[dict]:
         return self._each_alone(gallery.unreviewed_experiments, "experiment")
 
-    def _each_alone(self, keep, reading: str) -> list[dict]:
-        kept = self.readings.of(reading, lambda row: bool(keep([row])))
+    def _each_alone(self, keep, reading: str, depends_on: object = None) -> list[dict]:
+        kept = self.readings.of(reading, lambda row: bool(keep([row])), depends_on=depends_on)
         return [row for row in self.rows if kept(row)]
 
     def _on_the_shape(self, rows, shape: str | None) -> list[dict]:
@@ -202,7 +204,8 @@ class LibrarySnapshot:
 
     @cached_property
     def upscales(self) -> EvolverUpscales:
-        return EvolverUpscales.scan(KINO_UPSCALES_DIR, EVOLVER_SOURCE)
+        scanned = EvolverUpscales.scan(KINO_UPSCALES_DIR, EVOLVER_SOURCE)
+        return self._upscales_before if scanned == self._upscales_before else scanned
 
     def slides_of(self, rows) -> list[tuple]:
         with one_look():
@@ -211,13 +214,12 @@ class LibrarySnapshot:
 
     def enhanced_ids_of(self, rows) -> set[str]:
         with one_look():
-            return {row["prompt_id"] for row in rows
-                    if self.is_enhanced(row, an_upscale_counts=True)}
+            return {row["prompt_id"] for row in rows if self.is_enhanced(row)}
 
-    def is_enhanced(self, row: dict, *, an_upscale_counts: bool) -> bool:
+    def is_enhanced(self, row: dict) -> bool:
         if gallery.is_enhanced_row(row):
             return True
-        if not an_upscale_counts:
+        if gallery.media_type_of_row(row) != MediaType.VIDEO:
             return False
         slide = self._once(self._slides, row, self._slide_of)
         return slide is not None and original_stem(slide[0]) is not None

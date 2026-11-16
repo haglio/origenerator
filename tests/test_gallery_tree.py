@@ -187,7 +187,6 @@ def _children(item):
 
 
 _COLLECTIONS = ["Latest", "Favorites", "Enhanced", "Experiments", "Trash"]
-_COLLECTIONS_OF_VIDEOS = [name for name in _COLLECTIONS if name != "Enhanced"]
 
 
 def _leads_with(folder, collections) -> bool:
@@ -204,15 +203,15 @@ def test_all_leads_with_its_five_collections_then_images_then_videos(qtbot):
     assert _leads_with(all_row, _COLLECTIONS)
 
 
-def test_images_lead_with_the_five_and_videos_with_all_but_enhanced_then_their_workflows(qtbot):
+def test_images_and_videos_each_lead_with_the_five_then_their_workflows(qtbot):
     half = _table_of_contents(qtbot, [_video("v1", "style_a"), _image("i1", "a cat")])
     (all_row,) = [half.topLevelItem(i) for i in range(half.topLevelItemCount())]
     images, videos = _children(all_row)[len(_COLLECTIONS):]
 
-    for kind, collections in ((images, _COLLECTIONS), (videos, _COLLECTIONS_OF_VIDEOS)):
-        assert _leads_with(kind, collections)
+    for kind in (images, videos):
+        assert _leads_with(kind, _COLLECTIONS)
         assert [isinstance(row.data(0, GROUP_ROLE), gallery.WorkflowGroup)
-                for row in _children(kind)[len(collections):]] == [True]
+                for row in _children(kind)[len(_COLLECTIONS):]] == [True]
 
 
 def test_enhanced_wears_the_plus_an_enhanced_image_wears_and_says_what_it_holds(qtbot):
@@ -222,10 +221,10 @@ def test_enhanced_wears_the_plus_an_enhanced_image_wears_and_says_what_it_holds(
     size = QSize(48, 48)
 
     assert enhanced.icon(0).pixmap(size).toImage() == icons.enhance_icon().pixmap(size).toImage()
-    assert enhanced.toolTip(0) == "Your enhanced images"
+    assert enhanced.toolTip(0) == "Your enhanced images and upscaled videos"
 
 
-def test_every_folder_of_images_leads_with_an_enhanced_and_no_folder_of_videos_does(qtbot):
+def test_every_folder_of_folders_leads_with_an_enhanced_whether_it_holds_images_or_videos(qtbot):
     half = _table_of_contents(qtbot, [_video("v1", "style_a"), _image("i1", "a cat")])
     folders = [item for _depth, item in _rows_by_depth(half)
                if item.data(0, GROUP_ROLE) is not None
@@ -236,7 +235,7 @@ def test_every_folder_of_images_leads_with_an_enhanced_and_no_folder_of_videos_d
         collections = [row.text(0) for row in _children(folder)
                        if row.data(0, GROUP_ROLE) is None]
         inside_videos = base_of(folder.data(0, TREE_KEY_ROLE)).startswith("video")
-        assert ("Enhanced" in collections) is not inside_videos, folder.text(0)
+        assert "Enhanced" in collections, folder.text(0)
         kinds_seen.add(inside_videos)
     assert kinds_seen == {True, False}
 

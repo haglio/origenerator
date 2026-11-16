@@ -23,7 +23,6 @@ from origenerator.gui.hud_queue import (
     START_NOW,
     UP,
     QueuePointer,
-    QueueSection,
     queue_section,
 )
 from origenerator.gui.inflight import EMPTY_QUEUE_TEXT, InFlightItem, RunReading
@@ -71,17 +70,6 @@ def test_the_job_queue_fits_the_width_the_hud_already_has():
                        typical_seconds=30)]
 
     assert queue_section(long_line, 0).size()[0] == 0
-
-
-def test_a_job_queue_kept_blank_holds_its_room_and_draws_nothing():
-    shown = queue_section([_item("j1", typical_seconds=30)], 0)
-    blank = QueueSection(blank=True)
-
-    image, targets = _painted(blank)
-
-    assert blank.size() == shown.size()
-    assert targets == []
-    assert not _inked(image)
 
 
 def _inked(image) -> bool:

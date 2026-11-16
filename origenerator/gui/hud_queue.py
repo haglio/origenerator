@@ -193,7 +193,6 @@ class QueueSection:
     first: int = 0
     drop_at: int | None = None
     pointer: QueuePointer | None = field(default=None, compare=False)
-    blank: bool = False
 
     @property
     def idle_note(self) -> str:
@@ -215,8 +214,7 @@ class QueueSection:
     def paint(self, image, x: int, y: int, width: int,
               pointer: tuple[int, int] | None) -> list[tuple[tuple, Button]]:
         targets: list[tuple[tuple, Button]] = []
-        if not self.blank:
-            self._paint_whats_in_flight(_Canvas(image, ImageDraw.Draw(image), pointer, targets), x, y, width)
+        self._paint_whats_in_flight(_Canvas(image, ImageDraw.Draw(image), pointer, targets), x, y, width)
         if self.pointer is not None:
             self.pointer.painted(targets, (x, y))
         return targets
@@ -519,10 +517,10 @@ class QueueFoot:
     def hud_queue(self) -> tuple[list, int]:
         return self._items, self._foreign
 
-    def section(self) -> QueueSection:
+    def section(self) -> QueueSection | None:
         core = self._actions.core_window() if self._actions.core_window is not None else None
         if core_shows_the_queue(core, beside=self._beside()):
-            return QueueSection(blank=True)
+            return None
         return queue_section(self._items, self._foreign, first=self.pointer.first,
                              drop_at=self.pointer.drop, pointer=self.pointer)
 
@@ -554,7 +552,10 @@ class JobQueueFile:
         self._width = map_block_width(side)
         self._written: list[Path] = []
 
-    def of(self, section: QueueSection) -> PaintedFoot:
+    def of(self, section: QueueSection | None) -> PaintedFoot | None:
+        if section is None:
+            self.forget()
+            return None
         height = section.size()[1]
         image = Image.new("RGBA", (self._width, height), (0, 0, 0, 0))
         targets = section.paint(image, 0, 0, self._width, None)

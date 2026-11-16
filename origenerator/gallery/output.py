@@ -146,11 +146,12 @@ def resolve_preview(row: dict, places: OutputPlaces) -> tuple[Path, str] | None:
     return None
 
 
-def make_animated_preview(row: dict, places: OutputPlaces, thumb_dir: Path) -> str | None:
+def make_animated_preview(row: dict, places: OutputPlaces, thumb_dir: Path, *,
+                          again: bool = False) -> str | None:
     video = video_file_of(row, places)
     if video is None:
         return None
-    result = generate_animated_thumbnail(video, thumb_dir, name=row["prompt_id"])
+    result = generate_animated_thumbnail(video, thumb_dir, name=row["prompt_id"], again=again)
     return str(result) if result is not None else None
 
 

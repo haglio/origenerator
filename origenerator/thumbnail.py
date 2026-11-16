@@ -88,10 +88,10 @@ def at_its_videos_pace(animated_thumbnail: Path, video: Path) -> bool:
 
 
 def generate_animated_thumbnail(
-    source_path: Path, thumb_dir: Path, *, name: str, frames: int = 8
+    source_path: Path, thumb_dir: Path, *, name: str, frames: int = 8, again: bool = False
 ) -> Path | None:
     dest = animated_thumbnail_path(thumb_dir, name)
-    if dest.exists():
+    if dest.exists() and not again:
         return dest
     being_written = dest.with_name(f"{name}.partial.anim")
     try:

@@ -73,3 +73,23 @@ def test_a_thumbnail_whose_video_never_changes_has_no_pace_to_be_wrong(tmp_path,
     main([], **library)
 
     assert "0 video(s) whose animated thumbnail changes at the wrong pace" in capsys.readouterr().out
+
+
+def test_a_thumbnail_made_again_stays_where_it_is_until_the_new_one_takes_its_place(
+        tmp_path, monkeypatch):
+    library = _library(tmp_path)
+    frames = [Image.new("RGB", (64, 48), color) for color in ((255, 0, 0), (0, 255, 0))]
+    monkeypatch.setattr(thumbnail, "_sample_video_frames", lambda path, count, size: frames)
+    main(["--apply"], **library)
+    monkeypatch.setattr(thumbnail, "video_duration_seconds", lambda path: LONG_VIDEO_S + 1)
+    there_while_remade = []
+
+    def sampled(path, count, size):
+        there_while_remade.append(animated_thumbnail_path(library["thumb_dir"], "v1").exists())
+        return frames
+
+    monkeypatch.setattr(thumbnail, "_sample_video_frames", sampled)
+
+    main(["--apply"], **library)
+
+    assert there_while_remade == [True]

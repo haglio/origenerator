@@ -79,21 +79,42 @@ def stems_made_as(row: dict) -> frozenset[str]:
 
 
 def generations_by_stem(rows: list[dict]) -> dict[str, str]:
-    by_stem: dict[str, str] = {}
-    for row in rows:
-        for file in row_output_files(row):
-            if stem := Path(frame_name(file.get("filename"))).stem:
-                by_stem.setdefault(stem, row["prompt_id"])
-    return by_stem
+    return {stem: prompt_id for stem, (_rank, prompt_id) in FilesMade.of(rows).by_stem.items()}
 
 
 def generation_of_file(path, rows: list[dict]) -> str | None:
-    return _kept_at(Path(path), rows) or generations_by_stem(rows).get(stem_as_made(path))
+    return FilesMade.of(rows).generation_of(path)
 
 
-def _kept_at(path: Path, rows: list[dict]) -> str | None:
-    return next((row["prompt_id"] for row in rows for file in row_output_files(row)
-                 if (kept := place_of_its_own(file)) and Path(kept) == path), None)
+class FilesMade:
+    def __init__(self) -> None:
+        self.kept_at: dict[Path, tuple[int, str]] = {}
+        self.by_stem: dict[str, tuple[int, str]] = {}
+
+    @classmethod
+    def of(cls, newest_first: list[dict]) -> FilesMade:
+        made = cls()
+        made.add(newest_first)
+        return made
+
+    def add(self, newest_first: list[dict]) -> None:
+        for position, row in enumerate(newest_first):
+            rank = row.get("id", -position)
+            for file in row_output_files(row):
+                if kept := place_of_its_own(file):
+                    _keep_the_newest(self.kept_at, Path(kept), rank, row["prompt_id"])
+                if stem := Path(frame_name(file.get("filename"))).stem:
+                    _keep_the_newest(self.by_stem, stem, rank, row["prompt_id"])
+
+    def generation_of(self, path) -> str | None:
+        found = self.kept_at.get(Path(path)) or self.by_stem.get(stem_as_made(path))
+        return None if found is None else found[1]
+
+
+def _keep_the_newest(made: dict, key, rank: int, prompt_id: str) -> None:
+    held = made.get(key)
+    if held is None or rank > held[0] or held[1] == prompt_id:
+        made[key] = (rank, prompt_id)
 
 
 def resolve_preview(row: dict, places: OutputPlaces) -> tuple[Path, str] | None:

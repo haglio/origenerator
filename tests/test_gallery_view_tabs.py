@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 from PySide6.QtWidgets import (
     QSplitter,
     QTabWidget,
@@ -15,7 +13,6 @@ from origenerator import (
 )
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
-from origenerator.gui import generate_tab as generate_tab_module
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.generate_tab import GenerateTab
 from origenerator.gui.source_tile import SourceTile
@@ -31,9 +28,7 @@ from tests.gallery_view_support import (
     _video_workflow,
     _viewport_of,
 )
-from tests.real_db import database_of
-
-pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
+from tests.real_db import database_of, keep_rows_on_disk, kept_file
 
 
 def _animations(view):
@@ -78,25 +73,24 @@ def test_animation_strip_is_hidden_for_a_video_or_an_unanimated_image(qtbot):
 
 
 def test_clicking_thumbnail_shows_resolved_preview(qtbot, monkeypatch):
+    keep_rows_on_disk(monkeypatch)
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     _viewport_of(view).show_media = MagicMock()
-    resolved = (Path("C:/out/sdxl_t2i_i1.png"), "image")
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", MagicMock(return_value=resolved))
 
     view._on_thumbnail_clicked("i1")
 
-    assert _viewport_of(view).show_media.call_args.args == (resolved[0], "image", "i1")
+    assert _viewport_of(view).show_media.call_args.args == (
+        kept_file("sdxl_t2i_i1.png"), "image", "i1")
 
 
-def test_clicking_thumbnail_without_media_clears_preview(qtbot, monkeypatch):
+def test_clicking_thumbnail_without_media_clears_preview(qtbot):
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     _viewport_of(view).clear = MagicMock()
     _viewport_of(view).show_media = MagicMock()
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", MagicMock(return_value=None))
 
     view._on_thumbnail_clicked("i1")
 
@@ -244,8 +238,7 @@ def test_selecting_an_unregistered_thumbnail_leaves_no_settings_from_before(qtbo
 
 
 def test_a_restored_selection_leaves_the_resting_tab_empty(qtbot, monkeypatch):
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, places: (Path("C:/out/sdxl_t2i_i2.png"), "image"))
+    keep_rows_on_disk(monkeypatch)
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     db = database_of(rows)
     probe = GalleryView(db)

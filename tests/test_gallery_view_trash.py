@@ -63,7 +63,6 @@ from tests.gallery_view_support import (
     _name_of,
     _open_leaf,
     _pick_by_clicking,
-    _resolve_by_id,
     _right_click,
     _shown_view_with_one_image,
     _top_level,
@@ -73,11 +72,8 @@ from tests.gallery_view_support import (
     _workflow_rows,
 )
 from tests.qt_exec import faking_exec
-from tests.real_db import database_of
+from tests.real_db import database_of, keep_rows_on_disk, on_disk
 from tests.test_folder_tree import _shown
-
-pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
-
 
 _SHIFT = Qt.KeyboardModifier.ShiftModifier
 
@@ -483,7 +479,7 @@ def test_double_clicking_a_deleted_tile_keeps_its_tab(qtbot):
 
 
 def test_the_slideshow_button_is_gray_in_the_trash_and_starts_nothing(qtbot, monkeypatch):
-    _resolve_by_id(monkeypatch)
+    keep_rows_on_disk(monkeypatch)
     view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1)),
                                      ("d2", _image("d2", "a dog", 50, 2))]))
     qtbot.addWidget(view)
@@ -611,10 +607,9 @@ def test_the_right_click_menu_grays_restore_when_nothing_picked_can_be_made_agai
     assert "can't be made again" in action.toolTip()
 
 
-def test_a_deleted_item_double_clicked_open_steps_through_the_collection(qtbot, monkeypatch):
-    _resolve_by_id(monkeypatch)
-    view = GalleryView(_trash_db(held=[("d1", _image("d1", "a cat", 50, 1)),
-                                     ("d2", _image("d2", "a dog", 50, 2))]))
+def test_a_deleted_item_double_clicked_open_steps_through_the_collection(qtbot):
+    view = GalleryView(_trash_db(held=[("d1", on_disk(_image("d1", "a cat", 50, 1))),
+                                     ("d2", on_disk(_image("d2", "a dog", 50, 2)))]))
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))

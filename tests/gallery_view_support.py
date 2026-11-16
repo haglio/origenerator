@@ -56,7 +56,7 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 from tests import gestures
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.qt_exec import faking_exec
-from tests.real_db import database_of
+from tests.real_db import database_of, keep_on_disk, keep_rows_on_disk
 from tests.slideshow_hud_support import funestra_of
 
 _SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
@@ -487,10 +487,6 @@ def _generate_in_current_tab(view, positive_prompt, seed):
     )
 
 
-def _resolve_by_id(monkeypatch):
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, places: (f"{row['prompt_id']}.png", "image"))
-
 
 def _in_view(view, prompt_id) -> bool:
     tile = view._gallery_pane._thumb_widgets[prompt_id]
@@ -819,7 +815,7 @@ class _SignalMotion(QObject):
 
 
 def _a_slideshow_standing_on_its_own(qtbot, monkeypatch, **gallery):
-    _resolve_by_id(monkeypatch)
+    keep_rows_on_disk(monkeypatch)
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), actions=FakeActions(),
                        client=ComfyUIClient(folders=SUITE_FOLDERS),
                        shared=Shared(**gallery))
@@ -922,9 +918,9 @@ def _from_the_words_alone_with_no_local_model(positive, negative, words, *, in_s
 
 
 def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, places: ("orig.png", "image"))
-    view = GalleryView(_requestable_db(tmp_path, **kw), client=_reroll_client())
+    db = _requestable_db(tmp_path, **kw)
+    keep_on_disk(db)
+    view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view._voice.requests._work_out = _from_the_words_alone_with_no_local_model
     view._voice.requests._wait_for_the_graphics_card = lambda comfyui, holder, **settings: True

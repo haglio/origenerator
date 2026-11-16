@@ -55,9 +55,6 @@ from tests.qt_exec import faking_exec
 from tests.related_links import settings_tile, source_tile
 from tests.test_combine import _listed_under_recent
 
-pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
-
-
 
 def _looping_video(db, prompt_id="loop"):
     wf = WORKFLOW_REGISTRY["wan22_flf2v_loop"]

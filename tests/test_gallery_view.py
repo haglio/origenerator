@@ -98,7 +98,6 @@ from tests.gallery_view_support import (
     _pick,
     _pick_by_clicking,
     _reroll_client,
-    _resolve_by_id,
     _right_click,
     _row,
     _running_row,
@@ -118,11 +117,8 @@ from tests.gallery_view_support import (
     _workflow_rows,
 )
 from tests.qt_exec import faking_exec
-from tests.real_db import database_of, put_rows
+from tests.real_db import database_of, keep_rows_on_disk, put_rows
 from tests.test_folder_tree import _shown
-
-pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
-
 
 _COLLECTION_NAMES = ["Latest", "Favorites", "Enhanced", "Experiments", "Trash"]
 
@@ -1364,7 +1360,7 @@ def test_a_rebuild_keeps_the_pages_latest_had_been_scrolled_into(qtbot):
 
 
 def test_a_double_click_on_an_image_in_latest_plays_everything_latest_lists(qtbot, monkeypatch):
-    _resolve_by_id(monkeypatch)
+    keep_rows_on_disk(monkeypatch)
     view = GalleryView(database_of(_many_latest(120)))
     qtbot.addWidget(view)
     view.refresh()
@@ -1378,7 +1374,7 @@ def test_a_double_click_on_an_image_in_latest_plays_everything_latest_lists(qtbo
 
 
 def test_a_double_clicked_tile_plays_its_folder_from_it(qtbot, monkeypatch):
-    _resolve_by_id(monkeypatch)
+    keep_rows_on_disk(monkeypatch)
     view = GalleryView(database_of(_many_latest(120)))
     qtbot.addWidget(view)
     view.refresh()
@@ -1394,7 +1390,7 @@ def test_a_double_clicked_tile_plays_its_folder_from_it(qtbot, monkeypatch):
 
 
 def test_a_double_clicked_preview_plays_its_item_alone_locked(qtbot, monkeypatch):
-    _resolve_by_id(monkeypatch)
+    keep_rows_on_disk(monkeypatch)
     view = GalleryView(database_of(_many_latest(120)))
     qtbot.addWidget(view)
     view.refresh()
@@ -1547,7 +1543,7 @@ class _MinimizedCore:
 
 
 def _a_minimized_gallery(qtbot, monkeypatch):
-    _resolve_by_id(monkeypatch)
+    keep_rows_on_disk(monkeypatch)
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     with qtbot.waitExposed(view):

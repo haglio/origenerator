@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 from PySide6.QtCore import (
     QMimeData,
     QPoint,
@@ -59,9 +58,6 @@ from tests.gallery_view_support import (
 )
 from tests.real_db import database_of, put_rows
 from tests.test_folder_tree import _shown
-
-pytestmark = pytest.mark.usefixtures("_stub_preview_resolution")
-
 
 
 def test_picking_several_folders_shows_them_together_as_one_folder(qtbot):

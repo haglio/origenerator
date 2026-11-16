@@ -14,6 +14,7 @@ from origenerator.item_shape import filter_rows, shaped_key
 from origenerator.library_views import LibrarySnapshot, LibraryViews
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.children import run_python
+from tests.real_db import kept_file, on_disk
 
 
 def _image(db, prompt_id, seed):
@@ -331,47 +332,46 @@ def test_a_custom_collection_of_a_shape_gathers_the_folders_and_items_its_record
     assert library.custom_collections("portrait") == []
 
 
-def _resolving_by_id(monkeypatch, resolved: list):
-    def resolve(row, _places):
-        resolved.append(row["prompt_id"])
-        return (f"{row['prompt_id']}.png", "image")
-    monkeypatch.setattr(gallery, "resolve_preview", resolve)
+def _no_upscales(monkeypatch):
     monkeypatch.setattr(library_views.EvolverUpscales, "scan",
                         lambda *args: library_views.EvolverUpscales({}))
 
 
 def test_a_reading_resolves_each_slides_file_once_however_many_sets_ask_for_it(monkeypatch):
-    resolved = []
-    _resolving_by_id(monkeypatch, resolved)
-    rows = [_listed("pic-1"), _listed("pic-2")]
+    _no_upscales(monkeypatch)
+    rows = [on_disk(_listed("pic-1")), on_disk(_listed("pic-2"))]
     library = LibrarySnapshot(rows)
 
     first = library.slides_of(rows)
+    kept_file("pic-2.png").unlink()
     again = library.slides_of([rows[1]])
 
-    assert first == [("pic-1.png", "image", "pic-1", None), ("pic-2.png", "image", "pic-2", None)]
-    assert again == [first[1]]
-    assert resolved == ["pic-1", "pic-2"]
+    assert first == [(kept_file("pic-1.png"), "image", "pic-1", None),
+                     (kept_file("pic-2.png"), "image", "pic-2", None)]
+    assert again == [first[1]], "looked up again, the file taken away since would leave no slide"
 
 
 def test_a_row_whose_files_changed_is_resolved_again_within_the_same_reading(monkeypatch):
-    resolved = []
-    _resolving_by_id(monkeypatch, resolved)
-    row = _listed("pic-1")
+    _no_upscales(monkeypatch)
+    row = on_disk(_listed("pic-1"))
     library = LibrarySnapshot([row])
     library.slides_of([row])
 
-    library.slides_of([{**row, "output_files": json.dumps([{"filename": "pic-1_v2.png"}])}])
+    changed = on_disk({**row, "output_files": json.dumps([{"filename": "pic-1_v2.png"}])})
 
-    assert resolved == ["pic-1", "pic-1"]
+    assert library.slides_of([changed]) == [(kept_file("pic-1_v2.png"), "image", "pic-1", None)]
+
+
+def _a_video(prompt_id):
+    return on_disk({**_listed(prompt_id),
+                    "output_files": json.dumps([{"filename": f"{prompt_id}.mp4"}])})
 
 
 def test_a_reading_scans_evolvers_upscales_once(monkeypatch):
     scanned = []
-    monkeypatch.setattr(gallery, "resolve_preview", lambda row, _places: ("pic-1.mp4", "video"))
     monkeypatch.setattr(library_views.EvolverUpscales, "scan",
                         lambda *args: scanned.append(args) or library_views.EvolverUpscales({}))
-    library = LibrarySnapshot([_listed("pic-1"), _listed("pic-2")])
+    library = LibrarySnapshot([_a_video("pic-1"), _a_video("pic-2")])
 
     library.slides_of(library.rows)
     library.versions_of(library.rows)
@@ -499,9 +499,9 @@ def test_the_enhanced_folder_and_the_slideshows_filter_ask_one_question_two_ways
 
 def test_an_image_origenerator_enhanced_counts_as_enhanced_and_one_it_did_not_does_not(
         monkeypatch):
-    _resolving_by_id(monkeypatch, [])
-    enhanced = {**_listed("pic-1"), "params_json": json.dumps({"enhance": True})}
-    library = LibrarySnapshot([enhanced, _listed("pic-2")])
+    _no_upscales(monkeypatch)
+    enhanced = on_disk({**_listed("pic-1"), "params_json": json.dumps({"enhance": True})})
+    library = LibrarySnapshot([enhanced, on_disk(_listed("pic-2"))])
 
     assert library.enhanced_ids_of(library.rows) == {"pic-1"}
 

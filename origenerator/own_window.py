@@ -53,8 +53,9 @@ def _dress_the_taskbar_button(app, title: str, launcher: str, preview) -> None:
 
 def open_on_its_own(title: str, build, *, launcher: str, find_missing_overlay_keys=None) -> int:
     from PySide6.QtWidgets import QApplication, QMessageBox
+    from shared_ui.gui_thread_collection import the_application
 
-    app = QApplication.instance() or QApplication(sys.argv[:1])
+    app = the_application(QApplication, sys.argv[:1])
 
     if find_missing_overlay_keys is None:
         from origenerator.content import missing_overlay_keys as find_missing_overlay_keys

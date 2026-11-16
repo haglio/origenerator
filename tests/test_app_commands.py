@@ -141,9 +141,13 @@ def test_the_mic_can_be_shut_by_voice_but_not_opened():
     assert match_app_command("mic on") is None
 
 
-def test_the_enhanced_filter_answers_to_upscales_as_well():
-    for phrase in ("upscales", "upscales only", "filter upscales", "upscaled only"):
+def test_the_enhanced_filter_answers_to_enhancements_as_well():
+    for phrase in ("enhancements", "enhancements only", "filter enhancements"):
         assert match_app_command(phrase) is AppCommand.FILTER_ENHANCED, phrase
+
+
+def test_no_spoken_phrase_says_upscale():
+    assert sorted(phrase for phrase in spoken_phrases() if "upscale" in phrase) == []
 
 
 def test_the_slideshow_filter_is_said_either_way_round_not_toggled():

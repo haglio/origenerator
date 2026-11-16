@@ -107,8 +107,8 @@ for one thing cost four. So:
 - **An item made better is enhanced on the screen, whoever did it.** An image
   this app re-samples and a video Evolver ran through Topaz are both enhanced
   items to the user: the Enhanced folder, the slideshow's Enhanced filter, a
-  tooltip and an empty folder's line say enhance, enhanced or enhancement, and
-  none says upscale. That is the word this code and Evolver's use for Topaz's
+  tooltip, an empty folder's line and a phrase he says to the app say enhance,
+  enhanced or enhancement, and none says upscale. That is the word this code and Evolver's use for Topaz's
   work (`evolver_upscales`, `upscale_of`, the `evolver_upscale` column), and an
   agent who read it here put "upscaled videos" in the Enhanced folder's
   tooltip. The code keeps upscale for Topaz's step and for ComfyUI's (the

@@ -720,6 +720,17 @@ def test_enhanced_only_heard_by_the_session_narrows_the_slideshow_and_enhances_n
         "enhanced only as enhance with a word after it and spends a generation on it")
 
 
+@pytest.mark.parametrize("said", ["enhancements", "enhancements only", "filter enhancements"])
+def test_enhancements_heard_by_the_session_narrows_the_slideshow_and_enhances_nothing(router, said):
+    slideshows = FakeSlideshows(showing=FakeSlideshow(target="g7"))
+    voice, host, _slideshows = router(slideshows=slideshows)
+    voice.listener.bare = voice.listener.built_with["bare_matcher"](said)
+
+    assert voice.run_spoken_command(said) is True
+
+    assert (host.enhanced, slideshows.filters) == ([], [("enhanced only", None)])
+
+
 def test_an_order_about_the_image_goes_to_the_slide_filling_the_screen(router):
     slideshow = FakeSlideshow(target="g7")
     voice, host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow))

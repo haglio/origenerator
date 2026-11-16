@@ -117,7 +117,7 @@ for _osr2 in ("osr two", "o s r two"):
 
 _say(AppCommand.FILTER_ENHANCED, "filter enhanced", "enhanced filter",
      "filter enhanced only", "enhanced only",
-     "upscales", "upscales only", "filter upscales", "upscaled only")
+     "enhancements", "enhancements only", "filter enhancements")
 _say(AppCommand.FILTER_ORIGINALS, "original only")
 _say(AppCommand.ENHANCED_AND_ORIGINAL, "enhanced and original", "original and enhanced")
 _say(AppCommand.FILTER_OFF, "clear filter", "no filter", "filter off")

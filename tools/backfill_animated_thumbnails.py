@@ -43,11 +43,9 @@ def main(argv=None, *, db_path: Path = DB_PATH, places: OutputPlaces = OUTPUT_PL
     if not args.apply:
         print("re-run with --apply to make them")
         return 0
-    for row in mispaced:
-        animated_thumbnail_path(thumb_dir, row["prompt_id"]).unlink()
-    rows = [*rows, *mispaced]
-    made = sum(gallery.make_animated_preview(row, places, thumb_dir) is not None for row in rows)
-    print(f"made {made}; {len(rows) - made} could not be read")
+    made = sum(gallery.make_animated_preview(row, places, thumb_dir, again=row in mispaced)
+               is not None for row in [*rows, *mispaced])
+    print(f"made {made}; {len(rows) + len(mispaced) - made} could not be read")
     return 0
 
 

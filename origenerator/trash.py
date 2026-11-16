@@ -138,9 +138,11 @@ class Kino:
     library: Path
     trash: Path
     own_source: str
+    non_ai: Path | None = None
 
     def holds(self, video: Path) -> bool:
-        return video.is_relative_to(self.library)
+        return video.is_relative_to(self.library) or (
+            self.non_ai is not None and video.is_relative_to(self.non_ai))
 
     def plays(self, video: Path) -> bool:
         return self.holds(video) and is_file(video)

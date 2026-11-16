@@ -38,6 +38,7 @@ from origenerator.config import (
     GENAU_DIR,
     KINO_TRASH_DIR,
     KINO_UPSCALES_DIR,
+    NON_AI_DIR,
     OUTPUT_PLACES,
     THUMB_DIR,
     TRASH_DIR,
@@ -329,7 +330,7 @@ class GalleryView(QWidget):
             environment=GalleryEnvironment(
                 release_files=self._release_held_media, thumb_dir=THUMB_DIR,
                 cancel_enhancements=self.enhance.cancel_for_delete,
-                kino=Kino(KINO_UPSCALES_DIR, KINO_TRASH_DIR, EVOLVER_SOURCE),
+                kino=Kino(KINO_UPSCALES_DIR, KINO_TRASH_DIR, EVOLVER_SOURCE, non_ai=NON_AI_DIR),
                 genau=Genau.in_folder(GENAU_DIR),
                 bring_in=partial(outside_videos.bring_in_one, db),
                 delete_for_good=delete_through_evolver,

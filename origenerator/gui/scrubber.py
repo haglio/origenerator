@@ -40,7 +40,6 @@ class Scrubber(QWidget):
     def set_actions(self, actions) -> None:
         self._actions = list(actions or [])
         self._position = None
-        self._duration = 0
         self.update()
 
     def set_duration(self, duration_ms: int) -> None:

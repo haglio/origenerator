@@ -571,6 +571,18 @@ def test_the_timeline_takes_the_videos_length_from_the_player(qtbot, tmp_path):
     assert w._scrubber._duration == 4000
 
 
+def test_the_timeline_keeps_the_length_of_a_video_shown_again_which_the_player_says_only_once(
+        qtbot, tmp_path):
+    w = _scrubber_preview(qtbot)
+    video = _scripted_video(tmp_path)
+    w.show_video(video)
+    w._player.durationChanged.connect.call_args.args[0](4000)
+
+    w.show_video(video)
+
+    assert w._scrubber._duration == 4000
+
+
 def test_the_corners_follow_the_item_when_the_timeline_takes_its_room(qtbot, tmp_path):
     player = MagicMock()
     player.metaData.return_value.value.side_effect = (

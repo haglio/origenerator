@@ -436,6 +436,7 @@ def test_a_presented_slideshow_takes_the_keyboard(qtbot):
     # Qt's offscreen platform cannot express real activation, so the contract is pinned at the seam: presenting raises and activates the window.
 
     view = _fun_time_view(qtbot)
+    view._poll_timer.stop()
     stub = QWidget()
     qtbot.addWidget(stub)
     calls: list[str] = []

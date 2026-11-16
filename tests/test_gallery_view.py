@@ -1211,6 +1211,17 @@ def test_favorite_collection_shows_both_favorite_items_and_folders(qtbot):
     assert view._gallery_pane._listed_folders == [dog_key]
 
 
+def test_a_star_set_in_the_gallery_is_passed_on_for_fun_time_to_hear_of(qtbot):
+    actions = FakeActions()
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+
+    view.set_items_favorite(["i1"], True)
+
+    assert actions.told_fun_time == [(["i1"], True)]
+
+
 def test_unfavoriting_an_item_from_the_collection_removes_it(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1)]
     db = database_of(rows)

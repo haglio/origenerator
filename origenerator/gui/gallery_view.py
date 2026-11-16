@@ -41,6 +41,7 @@ from origenerator.config import (
     OUTPUT_PLACES,
     THUMB_DIR,
     TRASH_DIR,
+    VIDEO_RECORDS_DIR,
 )
 from origenerator.db import Database, NewRequest
 from origenerator.db_generations import ENHANCE_WHEN_FINISHED, TRASH_WHEN_FINISHED
@@ -332,6 +333,7 @@ class GalleryView(QWidget):
                 genau=Genau.in_folder(GENAU_DIR),
                 bring_in=partial(outside_videos.bring_in_one, db),
                 delete_for_good=delete_through_evolver,
+                video_records=VIDEO_RECORDS_DIR,
 
             ),
 
@@ -2120,6 +2122,7 @@ class GalleryView(QWidget):
     def set_items_favorite(self, prompt_ids, favorite: bool):
         for pid in prompt_ids:
             self._db.set_generation_favorite(pid, favorite)
+        self._edits.tell_fun_time_of_favorites(prompt_ids, favorite)
         ids = set(prompt_ids)
         if self._generating_tile is not None and self._generating_tile.prompt_id in ids:
             self._generating_tile.set_favorite(favorite)

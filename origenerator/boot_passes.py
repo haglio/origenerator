@@ -150,6 +150,12 @@ def _publish_actions(library: Library):
     return publish(library.db)
 
 
+def _take_up_the_non_ai_records(library: Library):
+    from origenerator import non_ai_videos
+
+    return non_ai_videos.take_up_what_the_records_say(library.db, non_ai_videos.places_here())
+
+
 def _reconcile_favorites(library: Library):
     from origenerator.favorite_reconcile import reconcile_favorites
 
@@ -216,6 +222,9 @@ MAINTENANCE = (
     BootPass(None, _publish_actions,
              counted="Published the actions of %d video(s)",
              failure="Publishing the actions of videos failed: %s"),
+    BootPass(None, _take_up_the_non_ai_records,
+             counted="Took up the name or the favorite of %d Non-AI video(s) from their records",
+             failure="Reading the Non-AI videos' records failed: %s"),
     BootPass("Restoring folder bookmarks...", _reconcile_favorites,
              failure="Folder bookmark reconcile failed: %s"),
 )

@@ -357,6 +357,7 @@ def _never_take_a_video_out_of_the_real_kino(monkeypatch, _this_tests_own_folder
     monkeypatch.setattr(gallery_view, "KINO_UPSCALES_DIR", kino / "2D" / "AI")
     monkeypatch.setattr(gallery_view, "KINO_TRASH_DIR", kino / "trash")
     monkeypatch.setattr(gallery_view, "VIDEO_RECORDS_DIR", kino / "metadata")
+    monkeypatch.setattr(gallery_view, "NON_AI_DIR", kino / "2D" / "non_AI")
 
 
 @pytest.fixture(autouse=True)

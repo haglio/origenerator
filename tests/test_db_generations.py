@@ -99,3 +99,17 @@ def test_a_row_read_out_of_the_gallery_is_a_copy_so_changing_it_writes_nothing(t
     db.list_generations()[0]["status"] = "completed"
 
     assert db.get_generation("vid-001")["status"] == "pending"
+
+
+def test_a_file_is_traced_to_its_generation_and_a_generation_made_since_is_found_too(tmp_path):
+    db = _video(tmp_path)
+    db.update_generation("vid-001", output_files='[{"filename": "wan22_i2v_00001_.mp4"}]')
+    first = db.generation_of_file("C:/library/videos/wan22_i2v_00001__topaz.mp4")
+    db.insert_generation(NewGeneration(
+        prompt_id="vid-002", workflow_name="wan22_i2v", workflow_version="v1",
+        params_json="{}", workflow_json="{}"))
+    db.update_generation("vid-002", output_files='[{"filename": "wan22_i2v_00002_.mp4"}]')
+
+    assert (first, db.generation_of_file("C:/library/videos/wan22_i2v_00002_.mp4"),
+            db.generation_of_file("C:/library/videos/no_such_00009_.mp4")) == (
+        "vid-001", "vid-002", None)

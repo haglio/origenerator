@@ -2251,7 +2251,7 @@ class GalleryView(QWidget):
         self._go_to_generation(prompt_id)
 
     def go_to_file(self, path: str):
-        prompt_id = gallery.generation_of_file(path, self._db.list_generations())
+        prompt_id = self._db.generation_of_file(path)
         if prompt_id is not None:
             self.show_generation(prompt_id)
 

@@ -10,6 +10,7 @@ from app_support.watch_weights import COUNT_FIELDS
 from origenerator.box_breaks import unboxed
 from origenerator.db_connection import SqliteFile, Store
 from origenerator.db_schema import GENERATION_COLUMNS, as_read, as_stored
+from origenerator.gallery.output import FilesMade
 from origenerator.generation_state import (
     MADE_ELSEWHERE,
     UNLISTED,
@@ -81,6 +82,8 @@ class GenerationStore(Store):
         self._file = file
         self._own_changes = file.log_own_changes("generations", "prompt_id")
         self._listed: list[dict] | None = None
+        self._listed_ids: frozenset[str] = frozenset()
+        self._files_made = FilesMade()
         self._listing = threading.Lock()
 
     def _set(self, prompt_id: str, column: str, value):
@@ -330,15 +333,31 @@ class GenerationStore(Store):
 
     def list_generations(self) -> list[dict]:
         with self._listing:
-            changed = self._own_changes.changed_since_last_asked()
-            if self._listed is None or changed is None:
-                self._listed = self._read_listed("", ())
-            elif changed:
-                self._listed = sorted(
-                    [row for row in self._listed if row["prompt_id"] not in changed]
-                    + self._read_listed_among(sorted(changed)),
-                    key=lambda row: row["id"], reverse=True)
-            return [dict(r) for r in self._listed]
+            return [dict(r) for r in self._brought_up_to_date()]
+
+    def generation_of_file(self, path) -> str | None:
+        with self._listing:
+            listed = self._brought_up_to_date()
+            found = self._files_made.generation_of(path)
+            if found is None or found in self._listed_ids:
+                return found
+            return FilesMade.of(listed).generation_of(path)
+
+    def _brought_up_to_date(self) -> list[dict]:
+        changed = self._own_changes.changed_since_last_asked()
+        if self._listed is None or changed is None:
+            self._listed = self._read_listed("", ())
+            self._files_made = FilesMade.of(self._listed)
+        elif changed:
+            read_again = self._read_listed_among(sorted(changed))
+            self._listed = sorted(
+                [row for row in self._listed if row["prompt_id"] not in changed] + read_again,
+                key=lambda row: row["id"], reverse=True)
+            self._files_made.add(read_again)
+        else:
+            return self._listed
+        self._listed_ids = frozenset(row["prompt_id"] for row in self._listed)
+        return self._listed
 
     def _read_listed_among(self, prompt_ids: list[str]) -> list[dict]:
         return [row for start in range(0, len(prompt_ids), _IDS_PER_QUERY)

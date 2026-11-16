@@ -10,7 +10,6 @@ from app_support.video_names import stem_of_either_copy
 from origenerator import trash_collection
 from origenerator.db_generations import library_paths_in
 from origenerator.gallery import (
-    generation_of_file,
     output_disk_files,
     remove_enhance_versions,
     resolve_preview,
@@ -70,7 +69,7 @@ class GalleryEdits:
         self.trash(row, pressed=pressed)
 
     def _entry_of(self, video: Path) -> dict | None:
-        prompt_id = generation_of_file(video, self._db.list_generations())
+        prompt_id = self._db.generation_of_file(video)
         return self._db.get_generation(prompt_id) if prompt_id is not None else None
 
     def _entry_brought_in(self, video: Path) -> dict | None:

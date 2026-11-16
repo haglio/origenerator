@@ -443,22 +443,36 @@ Origenerator's gallery is to hold every Haglio video and image, the ones no
 model made included (his decision, 2026-11-15, which replaced his July rule that
 Origenerator never reaches into Evolver). The first step is in:
 `non_ai_videos.scan` writes an item for each video under the library's
-`videosideosD
-on_AI` (`config.NON_AI_DIR`), which is the folder Kino plays
+`videos\videos\2D\non_AI` (`config.NON_AI_DIR`), which is the folder Kino plays
 them from, and moves no file. The item's source is `non_ai`
 (`GenerationSource.NON_AI`), which app_support's `made_here` answers no for, and
 its workflow is `non-ai:` and the first two folders it sits under
 (`workflows/non_ai.py`), so the TOC shows one folder per pair, marked N where a
-workflow's is marked W and a site's S. A Non-AI folder holds its leaf folders
-directly, with no Model or LoRA folder between, one leaf per folder on disk, and
-a Non-AI video's one setting is that folder. The command Evolver runs for a
-Site's videos (`outside_video_entries`) brings these in too.
+workflow's is marked W and a site's S, the N folders first (`folder_kind`). A
+Non-AI folder holds its leaf folders directly, with no Model or LoRA folder
+between, one leaf per folder on disk, labeled with that folder's path past the
+two parts that name the N folder. The command Evolver runs for a Site's videos
+(`outside_video_entries`) brings these in too.
 
-A copy of this app older than that step never sees these items: every listing
-asks only for sources it knows. Deleting one here takes its item and thumbnail
-and leaves the video where Kino plays it; one Trash for both is a later step, as
-are its favorite, its links to the videos cut from it, and playing it on the Main
-Funestra from a Fun Time session.
+What a Non-AI video is called, whether it is a favorite and which full video a
+clip was cut from are kept in the video's record under the library's
+`videos\metadata` (`config.VIDEO_RECORDS_DIR`), where Fun Time reads them, and
+the gallery follows the record: `take_up_what_the_records_say` runs with every
+scan and at every start of the app, names the item as the Main Funestra names
+the playing video (app_support's `title_while_playing`), sets its star to the
+record's favorite, and links a clip to its full video as a trim is linked. A
+star set here is written back to the record (`tell_fun_time_of_favorites`).
+Renaming one here is not built: he is to say where the name is edited, and the
+new name belongs in the record.
+
+A Non-AI video's tab has no settings to show, only a line saying so, and its
+Action row has no image actions. Deleting one sends the video itself to Kino's
+Trash and Restore puts it back (`Kino.non_ai`). In a Fun Time session a
+double-click on one asks Fun Time to play it on the Main Funestra
+(`ask_the_main_funestra_to_play`); Standalone, it starts a slideshow on it.
+
+A copy of this app older than the first step never sees these items: every
+listing asks only for sources it knows.
 
 ## A video's filename is not the video
 

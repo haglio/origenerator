@@ -11,6 +11,7 @@ from origenerator.gallery import enhancement_versions, is_enhanced_row
 from origenerator.gallery_edits import GalleryEdits, GalleryEnvironment
 from origenerator.output_places import OutputPlaces
 from origenerator.trash import Kino, Trash
+from origenerator.workflows.non_ai import non_ai_workflow
 
 
 def _completed_row(db, output_dir, pid, file, *, thumb_dir=None):
@@ -791,6 +792,29 @@ def test_sending_a_site_video_to_trash_takes_it_out_of_kino(tmp_path):
 
     assert not video.exists()
     assert (kino_trash / "video one.mp4").read_bytes() == b"site video"
+
+
+def test_a_non_ai_video_sent_to_trash_leaves_the_folder_kino_plays_it_from_until_it_is_put_back(
+        tmp_path):
+    db = Database(tmp_path / "test.db")
+    kino = Kino(library=tmp_path / "upscaled", trash=tmp_path / "kino trash",
+                own_source="origenerator", non_ai=tmp_path / "non_AI")
+    actions = GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "output"),
+                           Trash(tmp_path / "trash"), environment=GalleryEnvironment(kino=kino))
+    video = kino.non_ai / "sample" / "full" / "video one.mp4"
+    video.parent.mkdir(parents=True)
+    video.write_bytes(b"non-ai video")
+    db.insert_generation(NewGeneration(
+        prompt_id="n1", workflow_name=non_ai_workflow("sample full"), workflow_version="non_ai",
+        params_json="{}", workflow_json="{}"))
+    db.update_generation("n1", status="completed", output_files=json.dumps(
+        [{"filename": video.name, "library_path": str(video)}]))
+
+    actions.delete_rows([db.get_generation("n1")])
+    in_the_trash = (video.exists(), (kino.trash / "video one.mp4").read_bytes())
+    actions.undo()
+
+    assert (in_the_trash, video.read_bytes()) == ((False, b"non-ai video"), b"non-ai video")
 
 
 def test_undoing_a_site_videos_trash_puts_it_back_in_kino(tmp_path):

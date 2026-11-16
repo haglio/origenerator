@@ -44,7 +44,8 @@ def test_the_command_evolver_runs_writes_an_entry_for_a_video_evolver_filed_and_
 
 
 def test_the_command_evolver_runs_brings_in_the_non_ai_videos_too(tmp_path, capsys):
-    non_ai = NonAiPlaces(videos=tmp_path / "non_AI", thumb_dir=tmp_path / "thumbs")
+    non_ai = NonAiPlaces(videos=tmp_path / "non_AI", thumb_dir=tmp_path / "thumbs",
+                         records=tmp_path / "metadata")
     write_mp4(non_ai.videos / "sample" / "full" / "video one.mp4")
 
     assert _the_command(tmp_path, None, non_ai=non_ai) == 0

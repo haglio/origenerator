@@ -35,6 +35,7 @@ from origenerator.gallery.labels import (
     workflow_label,
 )
 from origenerator.gallery.moments import BEFORE_EVERY_RECORD, moment_of
+from origenerator.gallery.non_ai import leaf_folder_label
 from origenerator.gallery.output import (
     is_in_progress,
     media_type_of_row,
@@ -358,6 +359,12 @@ class _Tier:
         return (self.image_index,) if made_from_an_image(self.workflow_name) else ()
 
 
+def _leaf_label(workflow_name: str, key: str, rows: list[dict]) -> str:
+    if non_ai_folder(workflow_name) is None:
+        return folder_id(key)
+    return leaf_folder_label(rows[0])
+
+
 def _build_settings_groups(tier: _Tier, rows: list[dict]) -> list[SettingsGroup]:
     grouped = _group_by_creation(
         rows, lambda r: folder_signature(tier.workflow_name, r.get("params_json"),
@@ -367,7 +374,8 @@ def _build_settings_groups(tier: _Tier, rows: list[dict]) -> list[SettingsGroup]
     groups = []
     for sig, sig_rows in grouped:
         key = settings_key(tier.media_type, tier.workflow_name, sig)
-        label, favorite = _overlay(folder_id(key), key, tier.folder_meta)
+        label, favorite = _overlay(_leaf_label(tier.workflow_name, key, sig_rows), key,
+                                   tier.folder_meta)
         groups.append(tier.kept_folder(key, sig_rows, SettingsGroup, key, label, sig_rows, favorite))
     return groups
 

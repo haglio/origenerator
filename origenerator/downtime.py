@@ -109,10 +109,11 @@ def _comfyui_busy(client) -> bool:
 
 def _handed_over(db, client, queue: Callable[[object], int]) -> int:
     from PySide6.QtCore import QCoreApplication  # noqa: PLC0415
+    from shared_ui.gui_thread_collection import the_application  # noqa: PLC0415
 
     from origenerator.gui.job_queue import JobQueue  # noqa: PLC0415
 
-    _app = QCoreApplication.instance() or QCoreApplication([])
+    _app = the_application(QCoreApplication, [])
     jobs = JobQueue(db, client)
     jobs.close()
     queued = queue(jobs)

@@ -5,6 +5,7 @@ from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QGuiApplication, QImage, QPainter, QPainterPath
 from shared_ui.app_icon import CANVAS, GRID, INSET, UNIT
 from shared_ui.colors import MAGENTA
+from shared_ui.gui_thread_collection import the_application
 
 from origenerator.config import PROJECT_DIR
 
@@ -52,7 +53,7 @@ def save_ico(path) -> None:
 
 
 def main() -> int:
-    QGuiApplication([])
+    the_application(QGuiApplication, [])
     save_ico(PROJECT_DIR / "icon.ico")
     return 0
 

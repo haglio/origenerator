@@ -58,7 +58,6 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 
 logger = logging.getLogger(__name__)
 
-_WANTS_ANIMATING = "an animation"
 
 _ENHANCED_SAID = {AppCommand.ENHANCED_ON: True, AppCommand.ENHANCED_OFF: False}
 

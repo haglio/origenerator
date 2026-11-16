@@ -45,7 +45,6 @@ from origenerator.gallery.shapes import BOTH, SEPARATE
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import core, toasts, two_screens
 from origenerator.gui.core import SESSION_UI_STATE, Core, Launch, OwnedBy
-from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.headset_window import CAP_PX
 from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP
 from origenerator.gui.panes import PaneSplitter

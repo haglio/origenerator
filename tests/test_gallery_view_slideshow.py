@@ -1606,8 +1606,8 @@ def test_closing_the_gallery_closes_the_slideshow_up(qtbot, monkeypatch):
 def test_once_core_is_up_on_two_monitors_the_folder_it_shows_plays_full_screen_on_the_other(
         qtbot, monkeypatch):
     monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)
-    _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    keep_rows_on_disk(monkeypatch)
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
@@ -1626,8 +1626,8 @@ def test_enter_in_a_slideshow_on_its_own_monitor_picks_its_item_in_core_and_play
         qtbot, monkeypatch):
     monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)
     monkeypatch.setattr(slideshow_director, "bring_to_front", lambda window: None)
-    _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    keep_rows_on_disk(monkeypatch)
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
@@ -1644,8 +1644,8 @@ def test_enter_in_a_slideshow_on_its_own_monitor_picks_its_item_in_core_and_play
 
 def _core_beside_its_slideshow(qtbot, monkeypatch):
     monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)
-    _resolve_by_id(monkeypatch)
-    view = GalleryView(FakeDB([_image(f"i{n}", "a cat", 50, n) for n in (1, 2, 3)]))
+    keep_rows_on_disk(monkeypatch)
+    view = GalleryView(database_of([_image(f"i{n}", "a cat", 50, n) for n in (1, 2, 3)]))
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
@@ -1653,7 +1653,7 @@ def _core_beside_its_slideshow(qtbot, monkeypatch):
     view._two_screens.core_is_up.emit()
     slideshow = view._slideshows.showing
     qtbot.addWidget(slideshow.shown)
-    monkeypatch.setattr(view, "_other_window_owns_keys", lambda: False)
+    monkeypatch.setattr(view.keys, "other_window_owns_keys", lambda: False)
     steps = []
     monkeypatch.setattr(slideshow, "slideshow_step", steps.append)
     return view, slideshow, steps

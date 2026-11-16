@@ -164,7 +164,7 @@ SWITCHES: dict[AppCommand, tuple[str, bool | None, str]] = {
     AppCommand.MIC_OFF: (MIC_SWITCH, False, "the mic"),
 }
 SWITCHES_A_HOST_HOLDS = (RADIO_SWITCH, DRIVE_SWITCH, MIC_SWITCH)
-_STANDALONES_ALONE = frozenset({AppCommand.EXPERIMENTS, AppCommand.SWITCH})
+_STANDALONES_ALONE = frozenset({AppCommand.SWITCH})
 
 _BARS = ("speed", "amp", "center")
 _TENS: dict[str, int] = {

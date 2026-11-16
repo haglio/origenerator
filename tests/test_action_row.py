@@ -31,6 +31,7 @@ from origenerator.gui.pills import Pill, pill_look
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.item_actions import ItemActions, stored
 from origenerator.media import MediaType
+from origenerator.workflows.non_ai import non_ai_workflow
 from tests.alert_windows import messages
 
 _BOXES = {MediaType.IMAGE: ("first box", "second box"), MediaType.VIDEO: ("third box",)}
@@ -191,6 +192,14 @@ def test_an_image_shows_no_video_part(action):
     action.show_row(_row())
 
     assert _setter(action, MediaType.VIDEO).parentWidget().isHidden()
+
+
+def test_a_non_ai_video_shows_no_image_part_since_it_started_from_no_image(action):
+    action.show_row(dict(_video(), workflow_name=non_ai_workflow("sample full"),
+                         source=GenerationSource.NON_AI))
+
+    assert (_setter(action, MediaType.IMAGE).parentWidget().isHidden(),
+            _setter(action, MediaType.VIDEO).parentWidget().isHidden()) == (True, False)
 
 
 def test_the_button_opens_the_setter_tool_on_the_item_on_the_tab(action, opened):

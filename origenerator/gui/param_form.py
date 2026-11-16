@@ -34,7 +34,7 @@ from origenerator.gui.eliding import ElidingButton, ElidingLabel
 from origenerator.gui.file_pick import pick_a_file
 from origenerator.gui.label_cells import LabelCell, LabelColumn
 from origenerator.gui.no_wheel import NoWheelSpinBox
-from origenerator.gui.one_notice_per_fill import OneNoticePerFill
+from origenerator.gui.one_change_per_fill import OneChangePerFill
 from origenerator.gui.param_fields import (
     NO_HELPERS,
     NO_TRAITS,
@@ -186,14 +186,14 @@ class ParamForm(QWidget):
         self._param_defs = [pd for pd in param_defs if pd.key not in self._hidden_keys]
         self._defs = {pd.key: pd for pd in self._param_defs}
         scenes_def = next((pd for pd in self._param_defs if pd.type == ParamType.SCENES), None)
-        self._notices = OneNoticePerFill(self.changed.emit)
+        self._changes = OneChangePerFill(self.changed.emit)
         self._scenes: ScenesEditor | None = None
         self._scenes_row = scenes_def.key if scenes_def is not None else None
         if scenes_def is not None:
             self._scenes = ScenesEditor(
                 scenes_def, lambda w, pd=scenes_def: grey_out_of_reach(pd, w), self._shut_down,
                 lines=any(pd.key == "scene_lines" for pd in self._param_defs))
-            self._scenes.changed.connect(self._notices.changed)
+            self._scenes.changed.connect(self._changes.changed)
         self._build()
         self._wire_row_rules()
         for pd in self._seed_defs():
@@ -334,7 +334,7 @@ class ParamForm(QWidget):
             edited = self._kind(pd).change_signal(widget)
             if pd.key == self._size_source_key:
                 edited.connect(self._update_derived_display)
-            edited.connect(self._notices.changed)
+            edited.connect(self._changes.changed)
 
     def _add_row(self, key: str, label: str, field: QWidget, extras: Sequence[QWidget] = ()):
         title = param_sections.section_title(key)
@@ -430,7 +430,7 @@ class ParamForm(QWidget):
             # Qt: a plain QCheckBox's own dark-style tick draws as a bare down-caret.
             cb = TickControl("Random")
             cb.setChecked(True)
-            cb.toggled.connect(self._notices.changed)
+            cb.toggled.connect(self._changes.changed)
             cb.clicked.connect(lambda checked, pd=pd: self._on_random_clicked(pd, checked))
             self._widgets[pd.key].activated.connect(lambda _row, cb=cb: cb.setChecked(False))
             self._randomize_checks[pd.key] = cb
@@ -620,7 +620,7 @@ class ParamForm(QWidget):
             spinner.setMaximum(_DIMENSION_MAX)
             spinner.setSingleStep(_DIMENSION_STEP)
             spinner.setSpecialValueText(NOT_KNOWN)
-            spinner.valueChanged.connect(self._notices.changed)
+            spinner.valueChanged.connect(self._changes.changed)
             self._widgets[key] = spinner
             value_label = QLabel(NOT_KNOWN)
             value_label.setObjectName("readonlyParamValue")
@@ -675,7 +675,7 @@ class ParamForm(QWidget):
         if not unlocked:
             self._update_derived_display()
         self._position_unlock_button()
-        self._notices.changed()
+        self._changes.changed()
 
     def _update_derived_display(self):
         if self._size_deriver is None or self._dimensions_unlocked():
@@ -875,7 +875,7 @@ class ParamForm(QWidget):
         self.set_values({**{pd.key: pd.default for pd in self._param_defs}, **params})
 
     def set_values(self, params: dict, *, carried: bool = False):
-        with self._notices.filling():
+        with self._changes.filling():
             self._fill(params, carried=carried)
 
     def _fill(self, params: dict, *, carried: bool) -> None:

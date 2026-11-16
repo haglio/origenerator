@@ -4,7 +4,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
 
-class OneNoticePerFill:
+class OneChangePerFill:
     def __init__(self, notify: Callable[[], object]) -> None:
         self._notify = notify
         self._filling = 0

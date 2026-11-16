@@ -225,6 +225,22 @@ def test_canceling_a_reroll_removes_its_running_row(qtbot, tmp_path):
     assert db.get_generation(prompt_id) is None
 
 
+def test_a_rows_cancel_takes_the_row_out_of_the_job_queue_before_the_next_poll(
+        qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    _new_tile(view).add_requested.emit()
+    prompt_id = view._live_jobs[key].prompt_id
+    view.job_queue.update()
+    (row,) = view.job_queue.view.rows()
+
+    row._cancel.click()
+
+    assert view.job_queue.view.keys() == [], f"{prompt_id} is still listed"
+
+
 def test_failed_reroll_marks_its_running_row_error(qtbot, tmp_path):
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())

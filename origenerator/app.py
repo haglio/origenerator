@@ -308,7 +308,8 @@ class Boot:
         from origenerator.gui.behind_the_window import finish_core_behind_the_window
 
         finish_core_behind_the_window(library, self.logger, owner=self.app,
-                                           then=window.core_is_ready)
+                                      tidied=window.restore_what_only_core_shows,
+                                      then=window.core_is_ready)
 
     def say(self, step: str) -> None:
         if self.loading is None:

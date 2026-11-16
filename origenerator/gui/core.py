@@ -120,6 +120,8 @@ _CORE_ON_KEY = "core_on"
 _KEYS_THE_SESSION_OWNS = frozenset(
     {"audio_enabled", "osr2_enabled", "mic_enabled", "max_intensity", "motion", "slideshows"})
 
+_ONLY_CORE_SHOWS = frozenset({"generate_tabs"})
+
 SESSION_PERSIST_INTERVAL_MS = 5_000
 
 _THE_ROOMS_FLAGS = Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint
@@ -191,6 +193,7 @@ class Core(QMainWindow):
         quit_shortcut.activated.connect(self.close)
         self._gallery_view.quit_asked.connect(self._close_if_sure)
 
+        self._still_to_restore = _ONLY_CORE_SHOWS if fun_time is not None else frozenset()
         self._restore_session()
         self._persist_the_session_as_it_changes()
         if not is_branch_session():
@@ -208,10 +211,17 @@ class Core(QMainWindow):
             self._restore_geometry()
         self._fill_its_monitor()
         for key, _getter, setter in SESSION_UI_STATE:
-            setter(self._gallery_view, self._app_state.get(key))
+            if key not in self._still_to_restore:
+                setter(self._gallery_view, self._app_state.get(key))
         self._borders.take(self._app_state.get(_PANE_SIZES_KEY))
         if self._fun_time is None:
             self._borders.put_back()
+
+    def restore_what_only_core_shows(self) -> None:
+        for key, _getter, setter in SESSION_UI_STATE:
+            if key in self._still_to_restore:
+                setter(self._gallery_view, self._app_state.get(key))
+        self._still_to_restore = frozenset()
 
     def _persist_the_session_as_it_changes(self) -> None:
         saver = QTimer(self)
@@ -422,6 +432,8 @@ class Core(QMainWindow):
     def _persist_session(self) -> None:
         for key, getter, _setter in SESSION_UI_STATE:
             if self._fun_time is not None and key in _KEYS_THE_SESSION_OWNS:
+                continue
+            if key in self._still_to_restore:
                 continue
             self._app_state.set(key, getter(self._gallery_view))
         self._app_state.set(_PROMPT_HEIGHTS_KEY, PROMPT_HEIGHTS.snapshot())

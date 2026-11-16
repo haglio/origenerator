@@ -494,6 +494,46 @@ def test_restores_generate_tabs_from_app_state(qtbot, tmp_path):
     assert tabs[1]._workflow_dropdown.currentData() == "wan22_i2v"
 
 
+def _two_saved_generate_tabs(tmp_path) -> AppState:
+    state = AppState(tmp_path / "ui.json")
+    state.set("generate_tabs", {"tabs": [
+        {"config": {"workflow_name": "sdxl_t2i", "params": {}, "seed_is_random": True}},
+        {"config": {"workflow_name": "wan22_i2v", "params": {}, "seed_is_random": True}},
+    ], "current": 2})
+    return state
+
+
+def _workflows_of_its_generate_tabs(win) -> list[str]:
+    return [tab._workflow_dropdown.currentData()
+            for tab in win._gallery_view.generate_pane.generate_tabs()]
+
+
+def test_a_window_fun_time_started_leaves_its_generate_tabs_for_behind_the_window(
+        qtbot, tmp_path):
+    win = _window(qtbot, tmp_path, _two_saved_generate_tabs(tmp_path),
+                  fun_time=_fun_time_session())
+
+    assert "wan22_i2v" not in _workflows_of_its_generate_tabs(win), (
+        "the Satellites wait for this window, and only Core shows the Generate tabs")
+
+    win.restore_what_only_core_shows()
+
+    assert _workflows_of_its_generate_tabs(win) == ["sdxl_t2i", "wan22_i2v"]
+
+
+def test_saving_before_the_generate_tabs_are_back_keeps_the_ones_that_were_saved(
+        qtbot, tmp_path):
+    saved = _two_saved_generate_tabs(tmp_path)
+    saved.save()
+    win = _window(qtbot, tmp_path, saved, fun_time=_fun_time_session())
+
+    win._persist_session()
+
+    kept = AppState(tmp_path / "ui.json").get("generate_tabs")["tabs"]
+    assert [tab["config"]["workflow_name"] for tab in kept] == ["sdxl_t2i", "wan22_i2v"], (
+        "a save in the seconds before Core restores them would lose his tabs for good")
+
+
 @pytest.mark.parametrize("saved", [OSR2_PARKED, OSR2_DRIVING])
 def test_reopens_in_the_osr2_control_state_it_was_left_in(qtbot, tmp_path, saved):
     state = AppState(tmp_path / "ui.json")

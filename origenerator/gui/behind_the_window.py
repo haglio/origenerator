@@ -17,7 +17,8 @@ DID_NOT_COME_UP = ("ComfyUI did not come up behind the window; the runs in fligh
 
 
 def finish_core_behind_the_window(library: Library, logger, *, owner,
-                                       then: Callable[[], None]) -> None:
+                                  tidied: Callable[[], None],
+                                  then: Callable[[], None]) -> None:
     def came_up(up) -> None:
         if not up:
             logger.warning(DID_NOT_COME_UP)
@@ -25,9 +26,14 @@ def finish_core_behind_the_window(library: Library, logger, *, owner,
         run_maintenance(library, asking_comfyui(MAINTENANCE), logger.info, logger)
         then()
 
-    def tidy_the_library_then_bring_comfyui_up() -> bool:
-        run_maintenance(library, without_comfyui(MAINTENANCE), logger.info, logger)
+    def bring_comfyui_up() -> bool:
         bring_up = job_queue.BRING_UP_COMFYUI
         return bring_up is not None and bring_up()
 
-    run_off_thread(tidy_the_library_then_bring_comfyui_up, came_up, owner=owner, waits_long=True)
+    def the_library_is_tidy(_nothing) -> None:
+        tidied()
+        run_off_thread(bring_comfyui_up, came_up, owner=owner, waits_long=True)
+
+    run_off_thread(
+        lambda: run_maintenance(library, without_comfyui(MAINTENANCE), logger.info, logger),
+        the_library_is_tidy, owner=owner, waits_long=True)

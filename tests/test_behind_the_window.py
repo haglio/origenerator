@@ -51,7 +51,8 @@ def test_once_comfyui_answers_the_runs_in_flight_at_launch_are_reconnected_and_n
     monkeypatch.setattr(job_queue, "BRING_UP_COMFYUI", lambda: True)
     owner = QObject()
 
-    finish_core_behind_the_window(library, logger, owner=owner, then=lambda: None)
+    finish_core_behind_the_window(library, logger, owner=owner, tidied=lambda: None,
+                                  then=lambda: None)
 
     qtbot.waitUntil(lambda: "from-before" not in _statuses(db), timeout=5000)
     assert _statuses(db) == {"this-session": "running"}
@@ -74,13 +75,18 @@ def test_the_library_is_tidied_behind_the_window_and_off_its_thread_before_comfy
     monkeypatch.setattr(job_queue, "BRING_UP_COMFYUI",
                         lambda: order.append("ComfyUI came up") or True)
 
-    finish_core_behind_the_window(library, logger, owner=QObject(),
-                                       then=lambda: order.append("Core is ready"))
+    def restore():
+        order.append(("Core restored what only it shows",
+                      threading.current_thread() is threading.main_thread()))
+
+    finish_core_behind_the_window(library, logger, owner=QObject(), tidied=restore,
+                                  then=lambda: order.append("Core is ready"))
 
     qtbot.waitUntil(lambda: "Core is ready" in order, timeout=5000)
     on_the_windows_thread = True
-    assert order == [("tidied the library", not on_the_windows_thread), "ComfyUI came up",
-                     "asked ComfyUI", "Core is ready"]
+    assert order == [("tidied the library", not on_the_windows_thread),
+                     ("Core restored what only it shows", on_the_windows_thread),
+                     "ComfyUI came up", "asked ComfyUI", "Core is ready"]
 
 
 def test_core_is_ready_once_comfyui_answered_and_the_runs_in_flight_were_reconnected(
@@ -90,7 +96,8 @@ def test_core_is_ready_once_comfyui_answered_and_the_runs_in_flight_were_reconne
     seen_when_ready = []
 
     finish_core_behind_the_window(
-        library, logger, owner=QObject(), then=lambda: seen_when_ready.append(_statuses(db)))
+        library, logger, owner=QObject(), tidied=lambda: None,
+        then=lambda: seen_when_ready.append(_statuses(db)))
 
     qtbot.waitUntil(lambda: bool(seen_when_ready), timeout=5000)
     assert seen_when_ready == [{"this-session": "running"}]
@@ -104,7 +111,7 @@ def test_a_comfyui_that_never_comes_up_leaves_every_run_for_the_next_launch_and_
 
     with caplog.at_level(logging.WARNING, logger=logger.name):
         finish_core_behind_the_window(library, logger, owner=QObject(),
-                                           then=lambda: ready.append(True))
+                                      tidied=lambda: None, then=lambda: ready.append(True))
         qtbot.waitUntil(lambda: DID_NOT_COME_UP in caplog.messages, timeout=5000)
 
     assert _statuses(db) == {"from-before": "running", "this-session": "running"}
@@ -122,7 +129,7 @@ def test_a_copy_with_no_way_to_start_comfyui_says_so_once_its_library_is_tidied(
 
     with caplog.at_level(logging.WARNING, logger=logger.name):
         finish_core_behind_the_window(library, logger, owner=QObject(),
-                                           then=lambda: ready.append(True))
+                                      tidied=lambda: None, then=lambda: ready.append(True))
         qtbot.waitUntil(lambda: bool(caplog.messages), timeout=5000)
 
     assert tidied == [True]

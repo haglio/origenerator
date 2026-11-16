@@ -23,6 +23,7 @@ from PySide6.QtCore import QCoreApplication, QEvent, QObject, Qt, Signal, qInsta
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QInputDialog, QMessageBox, QWidget
 from pytestqt.qtbot import QtBot
+from shared_ui.gui_thread_collection import collect_cycles_on_the_gui_thread
 
 from origenerator import (
     card_claim,
@@ -579,6 +580,13 @@ def _no_mouse_button_left_held():
     for button in (Qt.MouseButton.LeftButton, Qt.MouseButton.MiddleButton,
                    Qt.MouseButton.RightButton):
         QTest.mouseRelease(stand_in, button)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _cycles_collected_on_the_gui_thread_as_the_app_collects_them(qapp):
+    collection = collect_cycles_on_the_gui_thread(qapp)
+    yield
+    collection.stop()
 
 
 @pytest.fixture(autouse=True, scope="session")

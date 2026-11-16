@@ -135,6 +135,20 @@ def test_starring_a_non_ai_video_here_changes_the_favorite_fun_time_keeps(db, tm
     assert (starred, kept()) == (True, False)
 
 
+def test_a_clip_is_linked_to_the_full_video_its_record_says_it_was_cut_from(db, tmp_path):
+    places = _library(tmp_path)
+    full = write_mp4(places.videos / "sample" / "full" / "set" / "video one.mp4")
+    clip = write_mp4(places.videos / "sample" / "clips" / "video one" / "first.mp4")
+    _record(places, full, {"id": "the-full-videos-id"})
+    _record(places, clip, {"clip": {"full_video_id": "the-full-videos-id"}})
+
+    scan(db, places)
+
+    rows = {json.loads(row["output_files"])[0]["filename"]: row for row in _videos(db)}
+    assert (rows["first.mp4"]["trimmed_from"], rows["video one.mp4"]["trimmed_from"]) == (
+        rows["video one.mp4"]["prompt_id"], None)
+
+
 def _leaves(db) -> list[list[str]]:
     rows = db.list_generations()
 

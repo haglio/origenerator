@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from app_support import favorites
+from app_support import favorites, video_ids
 from app_support.mirrored_tree import filed_record, record_path
 from app_support.video_names import title_while_playing
 
@@ -32,6 +32,8 @@ from origenerator.workflows.non_ai import (
     NonAiWorkflow,
     non_ai_workflow,
 )
+
+FULL_VIDEO_ID_KEY = "full_video_id"
 
 
 @dataclass(frozen=True)
@@ -64,12 +66,28 @@ def scan(db, places: NonAiPlaces, *, videos_per_write: int = VIDEOS_PER_WRITE) -
 
 
 def take_up_what_the_records_say(db, places: NonAiPlaces) -> int:
-    return sum(_take_up(db, row, Path(video), filed_record(Path(video), places.records))
-               for row in db.list_generations() if row["source"] == GenerationSource.NON_AI
-               for video in library_paths_in(row["output_files"]))
+    recorded = [(row, Path(video), filed_record(Path(video), places.records))
+                for row in db.list_generations() if row["source"] == GenerationSource.NON_AI
+                for video in library_paths_in(row["output_files"])]
+    item_of = {given: row["prompt_id"] for row, _video, record in recorded
+               if (given := video_ids.recorded_id(record)) is not None}
+    return sum(_take_up(db, row, video, record, item_of) for row, video, record in recorded)
 
 
-def _take_up(db, row: dict, video: Path, record: dict) -> bool:
+def _full_video_id(record: dict) -> str | None:
+    clip = record.get("clip")
+    return clip.get(FULL_VIDEO_ID_KEY) if isinstance(clip, dict) else None
+
+
+def _take_up(db, row: dict, video: Path, record: dict, item_of: dict[str, str]) -> bool:
+    cut_from = item_of.get(_full_video_id(record))
+    relinked = row.get("trimmed_from") != cut_from
+    if relinked:
+        db.set_cut_from(row["prompt_id"], cut_from)
+    return _take_up_its_name_and_star(db, row, video, record) or relinked
+
+
+def _take_up_its_name_and_star(db, row: dict, video: Path, record: dict) -> bool:
     params, title = json.loads(row["params_json"]), title_while_playing(record, video)
     renamed = params.get(TITLE_KEY) != title
     if renamed:

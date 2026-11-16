@@ -104,6 +104,17 @@ for one thing cost four. So:
   other repos own, each read under the new word there: Funestra's
   `HOLD_PICTURE`, a verb every running Funestra speaks, and app_support's
   loading screen's `pictures.json`.
+- **An item made better is enhanced on the screen, whoever did it.** An image
+  this app re-samples and a video Evolver ran through Topaz are both enhanced
+  items to the user: the Enhanced folder, the slideshow's Enhanced filter, a
+  tooltip and an empty folder's line say enhance, enhanced or enhancement, and
+  none says upscale. That is the word this code and Evolver's use for Topaz's
+  work (`evolver_upscales`, `upscale_of`, the `evolver_upscale` column), and an
+  agent who read it here put "upscaled videos" in the Enhanced folder's
+  tooltip. The code keeps upscale for Topaz's step and for ComfyUI's (the
+  `upscale_model` an enhancement runs first), and the screen keeps it only
+  where it names that first step of an enhancement: the Upscaler, the Upscale
+  Factor, and the help that says an enhancement is an upscale and a re-sample.
 - **An item's actions are actions, and a site's word is its site action.**
   What an item's image actions, video actions and checkboxes say is its
   actions (`item_actions`, `ItemActions`, `actions_of`), never its labels:

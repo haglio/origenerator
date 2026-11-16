@@ -1110,9 +1110,9 @@ def test_enhanced_with_nothing_enhanced_in_it_says_how_to_enhance_one(qtbot):
 
     assert view.listed_prompt_ids() == []
     assert view._scroll.widget().text() == (
-        "No enhanced images or upscaled videos yet.\n\nEnhance an image from its right-click "
+        "No enhanced items yet.\n\nEnhance an image from its right-click "
         "menu or the plus in its corner to see it here. A video shows here once Evolver has "
-        "upscaled it.")
+        "enhanced it.")
 
 
 def test_enhanced_shows_every_enhanced_image_under_its_folder(qtbot):

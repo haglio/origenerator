@@ -2634,11 +2634,11 @@ def test_going_to_a_runs_folder_is_a_stop_and_a_visit(qtbot, tmp_path):
     key, _job = _running_reroll(view)
     workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow)
-    view._folder_history.clear()
+    view.toc_editing.visits.clear()
 
     view._reveal_reroll(key)
 
-    assert [base_of(visit) for visit in view._folder_history] == [key], (
+    assert [base_of(visit) for visit in view.toc_editing.visits] == [key], (
         "the folder is a stop and a visit all the same, both recorded once the tile is picked")
     view._navigation.go_back()
     assert view._tree.currentItem() is _image_workflow(view._tree)

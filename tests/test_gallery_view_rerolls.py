@@ -468,7 +468,7 @@ def test_populating_in_a_favorite_folder_leaves_it_a_favorite(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    view._toggle_favorite(key)
+    view.toc_editing.toggle_favorite(key)
 
     view._buttons.populate.click()
 

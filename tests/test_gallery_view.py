@@ -572,7 +572,7 @@ def test_the_delete_key_on_images_deletes_nothing(qtbot):
     actions = FakeActions()
     view = _of_both_kinds(qtbot, actions)
     view._tree.setCurrentItem(_alls(view._tree)["Images"])
-    view._confirm = lambda text: True
+    view._confirm = view.toc_editing.confirm = lambda text: True
 
     view._delete_selection()
 
@@ -644,7 +644,7 @@ def test_a_folder_the_user_made_takes_no_favorite(qtbot):
     view, cat, _dog = _two_leaf_view(qtbot)
     made = gallery.custom_collection_key(_make_folder(view, "Mine", [cat]))
 
-    view._toggle_favorite(made)
+    view.toc_editing.toggle_favorite(made)
 
     assert not view.group_for_key(made).favorite
 
@@ -669,11 +669,11 @@ def test_the_star_at_the_top_is_a_switch_lit_while_the_open_folder_is_a_favorite
 
 def test_unfavoriting_a_folder_takes_it_off_the_open_favorites_collection(qtbot):
     view, _cat, dog = _two_leaf_view(qtbot)
-    view._toggle_favorite(dog)
+    view.toc_editing.toggle_favorite(dog)
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
     assert view._gallery_pane._listed_folders == [dog]
 
-    view._toggle_favorite(dog)
+    view.toc_editing.toggle_favorite(dog)
 
     assert view._gallery_pane._listed_folders == []
     assert _shown(_collection(view, FAVORITES_KEY)) == "(1) Favorites", (
@@ -698,7 +698,7 @@ def test_starring_a_folder_marks_its_row_where_it_stands(qtbot):
     scrolled_to = half.verticalScrollBar().value()
     assert scrolled_to > 0
 
-    view._toggle_favorite(key)
+    view.toc_editing.toggle_favorite(key)
 
     assert view.toc.item_for(key) is target, (
         "the gallery used to be read back and redrawn whole for one star, seconds of it on a "
@@ -734,7 +734,7 @@ def test_starring_a_folder_marks_it_on_both_sides_of_the_list(qtbot):
     rows = [view.toc.item_for(tree_key) for tree_key in view.toc.keys_for_folder(key)]
     assert len(rows) == 2
 
-    view._toggle_favorite(key)
+    view.toc_editing.toggle_favorite(key)
 
     assert [row.data(0, _GROUP_ROLE).favorite for row in rows] == [True, True], (
         "each shape draws the folder from a copy of its own, so a star set through one row has "
@@ -746,7 +746,7 @@ def test_a_star_made_after_the_pane_moved_on_marks_what_is_on_screen(qtbot):
     view._tree.setCurrentItem(view.toc.item_for(cat).parent())
     view._tree.setCurrentItem(view.toc.item_for(cat))
 
-    view._toggle_favorite(dog)
+    view.toc_editing.toggle_favorite(dog)
 
     assert view.group_for_key(dog).favorite, (
         "the squares a star marks are the ones on screen now: every pane drawn since deleted "
@@ -755,7 +755,7 @@ def test_a_star_made_after_the_pane_moved_on_marks_what_is_on_screen(qtbot):
 
 def test_the_tick_after_a_star_finds_nothing_to_redraw(qtbot):
     view, _cat, dog = _two_leaf_view(qtbot)
-    view._toggle_favorite(dog)
+    view.toc_editing.toggle_favorite(dog)
     row = view.toc.item_for(dog)
 
     view._poll()
@@ -819,7 +819,7 @@ def test_a_reading_of_the_library_taken_before_a_star_does_not_take_it_back(qtbo
     monkeypatch.setattr(view, "off_thread", lambda work, done: held.append((work(), done)))
     view._finish_poll([], None)
 
-    view._toggle_favorite(dog)
+    view.toc_editing.toggle_favorite(dog)
     row = view.toc.item_for(dog)
     (reading, deliver), = held
     deliver(reading)
@@ -838,7 +838,7 @@ def test_favoriting_a_folder_persists_without_reordering(qtbot):
     lora = _at(_image_workflow(view._tree), 0, 0)
     cat_key = _key(_at(lora, 0))
     dog_key = _key(_at(lora, 1))
-    view._toggle_favorite(dog_key)
+    view.toc_editing.toggle_favorite(dog_key)
 
     assert db.folder_meta_map()[dog_key]["starred"] is True
     lora = _at(_image_workflow(view._tree), 0, 0)
@@ -866,7 +866,7 @@ def test_a_right_click_on_a_folders_caret_leaves_it_open(qtbot, monkeypatch):
 
     qtbot.mouseClick(half.viewport(), Qt.MouseButton.RightButton, pos=caret)
     faking_exec(monkeypatch, QMenu, lambda menu, *a: None)
-    view._on_tree_context_menu(images, caret, LANDSCAPE)
+    view.toc_editing.tree_context_menu(images, caret, LANDSCAPE)
 
     assert _image_workflow(view._tree).isExpanded(), (
         "the menu covers the TOC, so a right-click that shut the folder on the way in is seen only "
@@ -882,7 +882,7 @@ def test_favorite_collection_is_pinned_first_and_collects_favorite_folders(qtbot
 
     lora = _at(_image_workflow(view._tree), 0, 0)
     dog_key = _key(_at(lora, 1))
-    view._toggle_favorite(dog_key)
+    view.toc_editing.toggle_favorite(dog_key)
 
     assert list(_alls(view._tree))[:2] == ["Latest", "Favorites"]
     collection = _alls(view._tree)["Favorites"]
@@ -901,7 +901,7 @@ def test_favorites_leads_with_its_count_and_latest_leaves_its_count_to_all(qtbot
     lora = _at(_image_workflow(view._tree), 0, 0)
     cat = _children_by_prompt(lora)["a cat"]
 
-    view._toggle_favorite(_key(cat))
+    view.toc_editing.toggle_favorite(_key(cat))
 
     alls = _alls(view._tree)
     assert _shown(alls["Favorites"]) == "(2) Favorites", (
@@ -1082,7 +1082,7 @@ def test_clicking_a_favorite_tile_drills_into_the_real_folder(qtbot):
 
     lora = _at(_image_workflow(view._tree), 0, 0)
     dog_key = _key(_at(lora, 1))
-    view._toggle_favorite(dog_key)
+    view.toc_editing.toggle_favorite(dog_key)
 
     collection = _alls(view._tree)["Favorites"]
     view._tree.setCurrentItem(collection)
@@ -1150,7 +1150,7 @@ def test_favorite_collection_shows_both_favorite_items_and_folders(qtbot):
 
     lora = _at(_image_workflow(view._tree), 0, 0)
     dog_key = _key(_at(lora, 1))
-    view._toggle_favorite(dog_key)
+    view.toc_editing.toggle_favorite(dog_key)
 
     collection = _alls(view._tree)["Favorites"]
     view._tree.setCurrentItem(collection)
@@ -2030,8 +2030,8 @@ def test_undo_of_a_folder_delete_returns_to_that_folder(qtbot, tmp_path):
     view._tree.setCurrentItem(view.toc.leaf_by_id["a"])
     _pick_by_clicking(view, "a")
     assert view._selected["prompt_id"] == "a"
-    view._confirm = lambda text: True
-    view._delete_folders(view._current_deletable_folders())
+    view._confirm = view.toc_editing.confirm = lambda text: True
+    view.toc_editing.delete_folders(view.toc_editing.deletable_folders())
     assert db.get_generation("a") is None
     assert view._selected is None
 
@@ -2163,9 +2163,9 @@ def test_deleting_a_folder_returns_to_the_side_of_the_list_last_stood_on(qtbot):
                       item.data(0, _GROUP_ROLE))] == ["i3"])
     for item in (second_side, first_side, doomed):
         view._tree.setCurrentItem(item)
-    view._confirm = lambda text: True
+    view._confirm = view.toc_editing.confirm = lambda text: True
 
-    view._delete_folders([doomed.data(0, _GROUP_ROLE)])
+    view.toc_editing.delete_folders([doomed.data(0, _GROUP_ROLE)])
 
     assert view._tree.currentItem() is first_side, (
         "a folder's place in the TOC is where the user is standing, shape and all, so that and"
@@ -2252,7 +2252,7 @@ def test_back_returns_to_the_favorite_collection_after_drilling_into_a_folder(qt
     qtbot.addWidget(view)
     view.refresh()
     dog_key = _key(_at(_image_workflow(view._tree), 0, 0, 1))
-    view._toggle_favorite(dog_key)
+    view.toc_editing.toggle_favorite(dog_key)
 
     view._tree.setCurrentItem(_alls(view._tree)["Favorites"])
     view._gallery_pane._drill_into(view._gallery_pane._listed_folders[0])
@@ -2938,23 +2938,23 @@ def test_a_folder_drawn_again_where_it_stands_is_one_visit(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
-    visits = list(view._folder_history)
+    visits = list(view.toc_editing.visits)
 
     view.hand_pane_back()
 
-    assert view._folder_history == visits
+    assert view.toc_editing.visits == visits
 
 
 def test_going_back_to_a_folder_is_no_new_visit(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
     view._tree.setCurrentItem(view.toc.item_for(cat))
     view._tree.setCurrentItem(view.toc.item_for(dog))
-    visits = list(view._folder_history)
+    visits = list(view.toc_editing.visits)
 
     view._buttons.back.click()
 
     assert view._tree.currentItem() is view.toc.item_for(cat)
-    assert view._folder_history == visits, (
+    assert view.toc_editing.visits == visits, (
         "skipped while Back or Forward is re-selecting, so it stays a genuine visit trail")
 
 
@@ -3032,7 +3032,7 @@ def test_what_a_delete_takes_off_the_tree_is_a_folders_row_on_each_side_and_unde
     view, key = _a_folder_on_both_sides(qtbot)
     group = view.group_for_key(key)
 
-    keys = view._keys_under(group)
+    keys = view.toc_editing._keys_under(group)
 
     assert {shaped_key(key, LANDSCAPE), shaped_key(key, PORTRAIT)} <= keys
     assert len(keys) > 2

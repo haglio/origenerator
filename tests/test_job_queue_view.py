@@ -9,7 +9,7 @@ from PIL import Image
 from PySide6.QtCore import QBuffer, QCoreApplication, QEvent, QMimeData, QPoint, QPointF, QRect, Qt
 from PySide6.QtGui import QDrag, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QMouseEvent, QPixmap
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QStyle, QStyleOptionButton
 from shared_ui.colors import BLUE, BORDER_SUBTLE
 from shared_ui.spacing import GAP_SMALL
 
@@ -640,6 +640,23 @@ def test_shield_all_wears_the_shield_followed_by_all(queue):
     assert not queue._shield_all.icon().isNull()
     assert queue._shield_all.iconSize() == queue.rows()[0]._shield.iconSize()
     assert queue._cancel_all.text() == "Cancel All"
+
+
+def _room_for_its_word(button) -> int:
+    option = QStyleOptionButton()
+    button.initStyleOption(option)
+    return button.style().subElementRect(
+        QStyle.SubElement.SE_PushButtonContents, option, button).height()
+
+
+def test_shield_all_and_cancel_all_leave_their_words_the_room_the_rows_cancel_does(dressed):
+    dressed.set_items([_item(key="a", cancel=lambda: None, shield=lambda _on: None)])
+    QApplication.processEvents()
+
+    rows_cancel = _room_for_its_word(dressed.rows()[0]._cancel)
+    assert _room_for_its_word(dressed._shield_all) == rows_cancel, (
+        "the user's report: the bottom rows of Cancel All's word were shaved off")
+    assert _room_for_its_word(dressed._cancel_all) == rows_cancel
 
 
 def test_shield_all_puts_the_shield_on_every_job_that_has_none(queue):

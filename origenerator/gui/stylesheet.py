@@ -339,9 +339,13 @@ def build_stylesheet() -> str:
         background-color: {_h(BG_TERTIARY)};
         color: {_h(TEXT_MUTED)};
     }}
-    /* Compact enough to ride inside a queue row, which is barely taller. */
+    QPushButton#queueCancelBtn, QPushButton#queueForAllBtn {{
+        padding-top: 0;
+        padding-bottom: 0;
+    }}
     QPushButton#queueCancelBtn {{
-        padding: 0 {BUTTON_PAD_H_TIGHT}px;
+        padding-left: {BUTTON_PAD_H_TIGHT}px;
+        padding-right: {BUTTON_PAD_H_TIGHT}px;
     }}
     QLabel#combineHeading {{
         color: {_h(TEXT_MUTED)};

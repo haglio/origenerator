@@ -226,6 +226,7 @@ class RunningPreview(OpensAFolder, QWidget):
 
 class QueueRow(OpensAFolder, QWidget):
     HEIGHT = 34
+    BUTTON_HEIGHT = HEIGHT - 12
     THUMB = HEIGHT - 2 * GAP_SMALL
     INSET = GAP_SMALL
 
@@ -247,7 +248,7 @@ class QueueRow(OpensAFolder, QWidget):
         layout.addWidget(self._up)
         self._down = self._arrow(icons.move_down_icon(), MOVE_DOWN_TIP, self._on_down)
         layout.addWidget(self._down)
-        self._shield = fill_square_with_icon(QPushButton(), size=self.HEIGHT - 12)
+        self._shield = fill_square_with_icon(QPushButton(), size=self.BUTTON_HEIGHT)
         self._shield.setProperty(CHOSEN, True)
         self._shield.setCheckable(True)
         self._shield.setIcon(icons.shield_icon())
@@ -256,7 +257,7 @@ class QueueRow(OpensAFolder, QWidget):
         layout.addWidget(self._shield)
         self._cancel = QPushButton(CANCEL_TEXT)
         self._cancel.setObjectName("queueCancelBtn")
-        self._cancel.setFixedHeight(self.HEIGHT - 12)
+        self._cancel.setFixedHeight(self.BUTTON_HEIGHT)
         self._cancel.clicked.connect(self._on_cancel)
         layout.addWidget(self._cancel)
         self._thumbs = QueueThumbs(self.THUMB)
@@ -273,7 +274,7 @@ class QueueRow(OpensAFolder, QWidget):
         self.update_item(item)
 
     def _arrow(self, icon, tooltip: str, pressed) -> QPushButton:
-        arrow = fill_square_with_icon(QPushButton(), size=self.HEIGHT - 12)
+        arrow = fill_square_with_icon(QPushButton(), size=self.BUTTON_HEIGHT)
         arrow.setIcon(icon)
         arrow.setToolTip(tooltip)
         arrow.clicked.connect(pressed)
@@ -428,7 +429,7 @@ class JobQueueView(QWidget):
         stack.addStretch(1)
         self._shield_all = QPushButton(SHIELD_ALL_TEXT)
         self._shield_all.setIcon(icons.shield_icon())
-        mark = QueueRow.HEIGHT - 12 - 2 * BUTTON_ICON_INSET
+        mark = QueueRow.BUTTON_HEIGHT - 2 * BUTTON_ICON_INSET
         self._shield_all.setIconSize(QSize(mark, mark))
         self._shield_all.setToolTip(SHIELD_ALL_TIP)
         self._shield_all.clicked.connect(self._shield_every_job)
@@ -436,7 +437,8 @@ class JobQueueView(QWidget):
         self._cancel_all.setToolTip(CANCEL_ALL_TIP)
         self._cancel_all.clicked.connect(self.cancel_all_requested)
         for button in (self._shield_all, self._cancel_all):
-            button.setFixedHeight(QueueRow.HEIGHT - 12)
+            button.setObjectName("queueForAllBtn")
+            button.setFixedHeight(QueueRow.BUTTON_HEIGHT)
             stack.addWidget(button)
         stack.addStretch(1)
         return column

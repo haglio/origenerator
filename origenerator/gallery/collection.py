@@ -66,13 +66,13 @@ ALL_COLLECTIONS: tuple[Collection, ...] = (
                "or favorite a folder from the list, to collect them here."),
         voice=Voice(("favorites",), said_bare=False), slideshow_filter="favorites"),
     Collection(
-        ENHANCED_KEY, ENHANCED_LABEL, "Your enhanced images and upscaled videos",
+        ENHANCED_KEY, ENHANCED_LABEL, "Your enhanced items",
         Glyph("plus", "YELLOW"),
         rows=lambda library: library.enhanced_rows,
         shown_in=lambda shape: bool(shape.tree_model), marked=True,
-        empty=("No enhanced images or upscaled videos yet.\n\nEnhance an image from its "
+        empty=("No enhanced items yet.\n\nEnhance an image from its "
                "right-click menu or the plus in its corner to see it here. A video shows here "
-               "once Evolver has upscaled it."),
+               "once Evolver has enhanced it."),
         slideshow_filter="enhanced"),
     Collection(
         EXPERIMENTS_KEY, EXPERIMENTS_LABEL, "Background experiments awaiting your review",

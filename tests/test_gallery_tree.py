@@ -221,7 +221,7 @@ def test_enhanced_wears_the_plus_an_enhanced_image_wears_and_says_what_it_holds(
     size = QSize(48, 48)
 
     assert enhanced.icon(0).pixmap(size).toImage() == icons.enhance_icon().pixmap(size).toImage()
-    assert enhanced.toolTip(0) == "Your enhanced images and upscaled videos"
+    assert enhanced.toolTip(0) == "Your enhanced items"
 
 
 def test_every_folder_of_folders_leads_with_an_enhanced_whether_it_holds_images_or_videos(qtbot):

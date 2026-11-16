@@ -34,3 +34,8 @@ def test_each_send_button_says_it_sends_to_its_app_in_plain_words():
     assert (lane.tooltip.startswith("Send this flick to Genau:"),
             KINO.tooltip.startswith("Send this video to Kino:"),
             [words for words in said if "lane" in words]) == (True, True, [])
+
+
+def test_each_send_button_says_evolver_enhances_what_it_is_sent():
+    assert ("Evolver enhances it on its usual schedule" in GENAU.tooltip,
+            "Evolver sorts and enhances it on its usual schedule" in KINO.tooltip) == (True, True)

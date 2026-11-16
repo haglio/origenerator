@@ -129,6 +129,11 @@ def jobs_to_cancel(items) -> list:
     return [item for item in items if item.cancel is not None]
 
 
+def jobs_below(items, key: str) -> list:
+    keys = [item.key for item in items]
+    return jobs_to_cancel(items[keys.index(key) + 1:]) if key in keys else []
+
+
 def shield_every_job(items) -> None:
     for item in jobs_to_shield(items):
         item.shielded = True
@@ -149,6 +154,14 @@ CANCEL_ALL_TIP = "Cancel every job in the Job Queue"
 def cancel_all_question(total: int) -> str:
     return ("Cancel the job in the Job Queue?" if total == 1
             else f"Cancel all {total} jobs in the Job Queue?")
+
+
+CANCEL_ALL_BELOW_TEXT = "Cancel All Below"
+
+
+def cancel_below_question(total: int) -> str:
+    return ("Cancel the job below this one in the Job Queue?" if total == 1
+            else f"Cancel the {total} jobs below this one in the Job Queue?")
 
 
 CANCEL_TEXT = "Cancel"

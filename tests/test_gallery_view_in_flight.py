@@ -13,7 +13,10 @@ from PySide6.QtCore import (
     QPoint,
     Qt,
 )
+from PySide6.QtGui import QContextMenuEvent
 from PySide6.QtWidgets import (
+    QApplication,
+    QMenu,
     QMessageBox,
 )
 
@@ -2507,6 +2510,66 @@ def test_cancel_all_asks_about_the_jobs_it_would_cancel(qtbot, monkeypatch):
 
     assert asked == [("Cancel All", "Cancel all 2 jobs in the Job Queue?"),
                      ("Cancel All", "Cancel the job in the Job Queue?")]
+
+
+def _right_click_row(view, key, monkeypatch, pick="Cancel All Below"):
+    offered = []
+
+    def choose(menu, *_args):
+        offered.extend((action.text(), action.isEnabled()) for action in menu.actions())
+        return next((action for action in menu.actions() if action.text() == pick), None)
+
+    faking_exec(monkeypatch, QMenu, choose)
+    row = next(row for row in view.job_queue.view.rows() if row.key == key)
+    at = row.rect().center()
+    QApplication.sendEvent(row, QContextMenuEvent(QContextMenuEvent.Reason.Mouse, at,
+                                                  row.mapToGlobal(at)))
+    return offered
+
+
+def test_cancel_all_below_cancels_the_jobs_under_the_row_from_the_back_forward(
+        qtbot, monkeypatch):
+    cancelled = []
+    view = _view_holding(qtbot, monkeypatch, [_cancelable(key, cancelled)
+                                              for key in ("a", "b", "c", "d")])
+    _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
+
+    _right_click_row(view, "b", monkeypatch)
+
+    assert cancelled == ["d", "c"], (
+        "the row right-clicked stays, and the line is cut from its back forward as Cancel All "
+        "cuts it")
+
+
+def test_cancel_all_below_asks_about_the_jobs_under_the_row_and_cancels_none_on_no(
+        qtbot, monkeypatch):
+    cancelled = []
+    asked = _questions_asked(monkeypatch)
+    view = _view_holding(qtbot, monkeypatch, [
+        _cancelable("a", cancelled), _cancelable("b", cancelled), _cancelable("c", cancelled),
+        InFlightItem(key="d", caption="Alpha Workflow › a paper kite",
+                     reading=RunReading(status="queued"), reveal=lambda: None)])
+
+    _right_click_row(view, "a", monkeypatch)
+    _right_click_row(view, "b", monkeypatch)
+
+    assert asked == [("Cancel All Below", "Cancel the 2 jobs below this one in the Job Queue?"),
+                     ("Cancel All Below", "Cancel the job below this one in the Job Queue?")]
+    assert cancelled == []
+
+
+def test_cancel_all_below_is_grayed_out_on_a_row_with_nothing_below_it_to_cancel(
+        qtbot, monkeypatch):
+    view = _view_holding(qtbot, monkeypatch, [
+        _cancelable("a", []), _cancelable("b", []),
+        InFlightItem(key="c", caption="Alpha Workflow › a paper kite",
+                     reading=RunReading(status="queued"), reveal=lambda: None)])
+
+    offered = [_right_click_row(view, key, monkeypatch, pick=None) for key in ("a", "b", "c")]
+
+    assert offered == [[("Cancel All Below", True)], [("Cancel All Below", False)],
+                       [("Cancel All Below", False)]], (
+        "grayed where it can do nothing, as Cancel All is")
 
 
 def test_cancel_all_leaves_populate_on_to_start_its_next_seed(

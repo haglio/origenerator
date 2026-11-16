@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QMenu,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -24,6 +25,7 @@ from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.drag_thumbnail import DragOut
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.inflight import (
+    CANCEL_ALL_BELOW_TEXT,
     CANCEL_ALL_TEXT,
     CANCEL_ALL_TIP,
     CANCEL_TEXT,
@@ -41,6 +43,7 @@ from origenerator.gui.inflight import (
     clear_queue_tooltip,
     first_movable,
     foreign_queue_text,
+    jobs_below,
     jobs_to_cancel,
     jobs_to_shield,
     movable,
@@ -225,6 +228,7 @@ class RunningPreview(OpensAFolder, QWidget):
 
 
 class QueueRow(OpensAFolder, QWidget):
+    menu_requested = Signal(str, QPoint)
     HEIGHT = 34
     BUTTON_HEIGHT = HEIGHT - 12
     THUMB = HEIGHT - 2 * GAP_SMALL
@@ -337,6 +341,9 @@ class QueueRow(OpensAFolder, QWidget):
     def folder_of(self, position):
         return self._item.reveal
 
+    def contextMenuEvent(self, event):
+        self.menu_requested.emit(self.key, event.globalPos())
+
     def mouseMoveEvent(self, event):
         if self._press_at is None or not self.movable:
             return
@@ -373,6 +380,7 @@ class JobQueueView(QWidget):
     clear_queue_requested = Signal()
     start_now_requested = Signal()
     cancel_all_requested = Signal()
+    cancel_below_requested = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -483,6 +491,7 @@ class JobQueueView(QWidget):
             row = standing.get(item.key)
             if row is None:
                 row = QueueRow(item)
+                row.menu_requested.connect(self._show_row_menu)
             else:
                 row.update_item(item)
             if self._rows_column.indexOf(row) != index:
@@ -493,6 +502,13 @@ class JobQueueView(QWidget):
         _offer(self._shield_all, bool(jobs_to_shield(items)))
         _offer(self._cancel_all, bool(jobs_to_cancel(items)))
         self._rules.update()
+
+    def _show_row_menu(self, key: str, at: QPoint):
+        menu = QMenu(self)
+        cancel_below = menu.addAction(CANCEL_ALL_BELOW_TEXT)
+        cancel_below.setEnabled(bool(jobs_below(self._items, key)))
+        if menu.exec(at) is cancel_below:
+            self.cancel_below_requested.emit(key)
 
     def head_rule(self) -> list[QPoint]:
         rows = self.rows()

@@ -14,6 +14,10 @@ def leaf_folder_label(row: dict) -> str:
     return "/".join(parts[FOLDER_PARTS_IN_A_NAME:] or parts[-1:])
 
 
+def started_from_no_image(row: dict) -> bool:
+    return non_ai_folder(row.get("workflow_name")) is not None
+
+
 def recorded_title(row: dict) -> str | None:
     if non_ai_folder(row.get("workflow_name")) is None:
         return None

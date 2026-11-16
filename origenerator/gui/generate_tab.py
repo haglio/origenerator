@@ -395,6 +395,11 @@ class GenerateTab(DropZones):
         self._workflow_dropdown.currentIndexChanged.connect(self._note_user_edit)
         self._workflow_warning = WarningMark()
         self._workflow_warning.pressed.connect(self._resolve_every_warning)
+        self._no_settings_note = QLabel()
+        self._no_settings_note.setObjectName("mutedLabel")
+        self._no_settings_note.setWordWrap(True)
+        self._no_settings_note.hide()
+        body.addWidget(self._no_settings_note)
         self._form_host = QWidget()
         self._form_host_column = QVBoxLayout(self._form_host)
         self._form_host_column.setContentsMargins(0, 0, 0, 0)
@@ -611,6 +616,7 @@ class GenerateTab(DropZones):
             self.lora_offers.offer()
         else:
             self._clear_form()
+        self._say_why_there_are_no_settings(wf.why_it_has_no_settings if wf is not None else None)
         self._show_advice()
         self._refresh_estimate()
         self.refresh_generate_caption()
@@ -632,6 +638,11 @@ class GenerateTab(DropZones):
             FormHelpers(heights=self._heights,
                         seed_history=SeedHistory(self._seed_uses, self._looping_preview),
                         items=self._zone_items()))
+
+    def _say_why_there_are_no_settings(self, why: str | None) -> None:
+        self._no_settings_note.setText(why or "")
+        self._no_settings_note.setVisible(why is not None)
+        self._form_host.setVisible(why is None)
 
     def _edited_form_values(self) -> dict:
         prior = workflow_named(self._form_workflow_key)

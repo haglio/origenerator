@@ -8,6 +8,7 @@ from shared_ui.tick_control import TickControl
 from origenerator.action_setter_tool import the_setter_tool
 from origenerator.action_vocabulary import vocabulary
 from origenerator.gallery import media_type_of_row
+from origenerator.gallery.non_ai import started_from_no_image
 from origenerator.gallery.source_image import image_actions_row, inherits_image_actions
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.label_cells import LabelCell, LabelForm
@@ -158,7 +159,7 @@ class ActionRow(QWidget):
             form.setRowVisible(shown, False)
 
     def show_row(self, row: dict, start_image: dict | None = None) -> None:
-        if media_type_of_row(row) != MediaType.VIDEO:
+        if media_type_of_row(row) != MediaType.VIDEO or started_from_no_image(row):
             self.show_folder([row])
             return
         holder = image_actions_row(row, start_image)

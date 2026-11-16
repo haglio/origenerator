@@ -32,6 +32,7 @@ def folder_kind(workflow_name: str | None) -> str:
 class NonAiWorkflow(MadeElsewhereWorkflow):
     version = "non_ai"
     why_it_cannot_be_made_again = "A Non-AI video wasn't generated, so it can't be made again"
+    why_it_has_no_settings = "This video wasn't generated, so it has no generation settings."
     output_type = MediaType.VIDEO
 
     def __init__(self, folder: str):

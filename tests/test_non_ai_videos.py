@@ -151,7 +151,7 @@ def test_a_non_ai_folder_holds_its_leaf_folders_with_no_model_or_lora_between(tm
     assert folder_chain(row) == (ALL_KEY, videos.key, folder.key, leaf.key)
 
 
-def test_a_non_ai_videos_tab_shows_its_folder_and_cannot_generate(qtbot, tmp_path):
+def test_a_non_ai_videos_tab_says_it_has_no_settings_and_cannot_generate(qtbot, tmp_path):
     db, places = Database(tmp_path / "test.db"), _library(tmp_path)
     write_mp4(places.videos / "sample" / "full" / "video one.mp4")
     scan(db, places)
@@ -161,7 +161,8 @@ def test_a_non_ai_videos_tab_shows_its_folder_and_cannot_generate(qtbot, tmp_pat
 
     tab.show_saved_generation(_videos(db)[0], [])
 
-    assert tab._workflow_dropdown.currentText() == "sample full"
-    assert tab._param_form.get_values()["folder"] == "sample/full"
+    assert (tab._form_host.isHidden(), tab._no_settings_note.isHidden(),
+            tab._no_settings_note.text()) == (
+        True, False, "This video wasn't generated, so it has no generation settings.")
     assert not tab._generate_pair.isEnabled()
     assert tab._generate_btn.toolTip() == NonAiWorkflow.why_it_cannot_be_made_again

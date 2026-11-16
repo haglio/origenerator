@@ -54,6 +54,9 @@ class Database:
         return self.generations.set_settings_source(
             prompt_id, category=category, video_prompt_id=video_prompt_id)
 
+    def set_cut_from(self, prompt_id: str, source_prompt_id: str | None):
+        return self.generations.set_cut_from(prompt_id, source_prompt_id)
+
     def set_enhance_target(self, prompt_id: str, source_prompt_id: str | None):
         return self.generations.set_enhance_target(prompt_id, source_prompt_id)
 

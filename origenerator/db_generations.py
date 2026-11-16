@@ -165,6 +165,9 @@ class GenerationStore(Store):
                 (category or None, video_prompt_id or None, prompt_id),
             )
 
+    def set_cut_from(self, prompt_id: str, source_prompt_id: str | None):
+        self._set(prompt_id, "trimmed_from", source_prompt_id or None)
+
     def set_enhance_target(self, prompt_id: str, source_prompt_id: str | None):
         with self._connect() as conn:
             conn.execute(

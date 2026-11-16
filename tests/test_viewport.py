@@ -571,6 +571,18 @@ def test_the_timeline_takes_the_videos_length_from_the_player(qtbot, tmp_path):
     assert w._scrubber._duration == 4000
 
 
+def test_the_timeline_keeps_the_length_of_a_video_shown_again_which_the_player_says_only_once(
+        qtbot, tmp_path):
+    w = _scrubber_preview(qtbot)
+    video = _scripted_video(tmp_path)
+    w.show_video(video)
+    w._player.durationChanged.connect.call_args.args[0](4000)
+
+    w.show_video(video)
+
+    assert w._scrubber._duration == 4000
+
+
 def test_a_click_on_the_timeline_jumps_the_video_to_that_moment(qtbot, tmp_path):
     w = _scrubber_preview(qtbot)
     w.resize(320, 480)

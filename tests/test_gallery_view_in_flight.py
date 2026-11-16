@@ -2422,9 +2422,8 @@ def test_the_prompt_says_how_many_jobs_go(qtbot):
 
 def _questions_asked(monkeypatch):
     asked = []
-    monkeypatch.setattr(QMessageBox, "question", staticmethod(
-        lambda _parent, title, text, *_a, **_kw: asked.append((title, text))
-        or QMessageBox.StandardButton.No))
+    faking_exec(monkeypatch, QMessageBox, lambda box, *_a: asked.append(
+        (box.windowTitle(), box.text())) or QMessageBox.StandardButton.No)
     return asked
 
 

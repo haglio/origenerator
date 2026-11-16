@@ -4,10 +4,12 @@ import logging
 from collections.abc import Callable
 from dataclasses import replace
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, QPoint, Signal
+from PySide6.QtGui import QCursor
 from PySide6.QtWidgets import QMessageBox, QWidget
 
 from origenerator.comfyui_api import ForeignQueue
+from origenerator.gui.asked_at_the_cursor import asked_at
 from origenerator.gui.inflight import (
     CANCEL_ALL_TEXT,
     cancel_all_question,
@@ -33,7 +35,8 @@ class ShownJobQueue(QObject):
     changed = Signal(object, int)
 
     def __init__(self, jobs, client, *, starting, in_flight: Callable[..., list],
-                 listed: Callable[[], tuple[list, list]], asks_over: QWidget) -> None:
+                 listed: Callable[[], tuple[list, list]], asks_over: QWidget,
+                 cursor: Callable[[], QPoint] = QCursor.pos) -> None:
         super().__init__(asks_over)
         self._jobs = jobs
         self._client = client
@@ -41,6 +44,7 @@ class ShownJobQueue(QObject):
         self._in_flight = in_flight
         self._listed = listed
         self._asks_over = asks_over
+        self._cursor = cursor
         self._foreign = ForeignQueue(running=[], pending=[])
         self.view = JobQueueView()
         self.view.move_requested.connect(jobs.move)
@@ -115,8 +119,4 @@ class ShownJobQueue(QObject):
             " one of theirs already running is interrupted.")
 
     def _confirmed(self, title: str, question: str) -> bool:
-        reply = QMessageBox.question(
-            self._asks_over, title, question,
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        return reply == QMessageBox.StandardButton.Yes
+        return asked_at(self._cursor(), self._asks_over, title, question)

@@ -381,6 +381,7 @@ def _answer_menu(monkeypatch, label):
 
 def _answer_confirmation(monkeypatch, button):
     monkeypatch.setattr(QMessageBox, "question", staticmethod(lambda *a, **kw: button))
+    faking_exec(monkeypatch, QMessageBox, lambda _box, *a: button)
 
 
 def _menu_labels(monkeypatch, labels):

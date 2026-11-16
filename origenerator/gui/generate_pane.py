@@ -326,11 +326,17 @@ class GeneratePane(QTabWidget):
                           params: dict, thumbnails: list) -> GenerateTab | None:
         if self._client is None:
             return None
-        tab = self._landing_tab()
-        tab.open_modify_batch(folder_key, label, workflow_name, params, thumbnails)
-        self._pin_tab(tab)
+        tab = self._tab_modifying_the_batch_of(folder_key)
+        if tab is None:
+            tab = self._landing_tab()
+            tab.open_modify_batch(folder_key, label, workflow_name, params, thumbnails)
+            self._pin_tab(tab)
         self.setCurrentWidget(tab)
         return tab
+
+    def _tab_modifying_the_batch_of(self, folder_key: str) -> GenerateTab | None:
+        return next((tab for tab in self.generate_tabs()
+                     if tab.modify_batch_folder() == folder_key), None)
 
     def tab_showing(self, prompt_id: str, *, besides: GenerateTab | None = None,
                     ) -> GenerateTab | None:

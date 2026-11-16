@@ -283,6 +283,29 @@ def test_modify_batch_opens_while_another_tab_shows_the_folders_newest_item(tabs
     assert opened.title() == "Modify batch AB12CD34"
 
 
+def test_a_second_modify_batch_of_one_folder_goes_back_to_its_tab(tabs):
+    params = _sdxl_full(positive_prompt="a wizard", seed=1)
+    first = tabs.open_modify_batch("folder one", "AB12CD34", "sdxl_t2i", params, [None])
+    tabs._add_subtab()
+    count = tabs.count()
+
+    again = tabs.open_modify_batch("folder one", "AB12CD34", "sdxl_t2i", params, [None])
+
+    assert again is first
+    assert tabs.count() == count
+    assert tabs.current_generate_tab() is first
+
+
+def test_a_modify_batch_of_another_folder_opens_a_tab_of_its_own(tabs):
+    params = _sdxl_full(positive_prompt="a wizard", seed=1)
+    first = tabs.open_modify_batch("folder one", "AB12CD34", "sdxl_t2i", params, [None])
+
+    other = tabs.open_modify_batch("folder two", "EF56GH78", "sdxl_t2i", params, [None])
+
+    assert other is not first
+    assert other.title() == "Modify batch EF56GH78"
+
+
 def test_go_to_folder_asks_for_the_tab_it_was_raised_over(tabs):
     tab = _loaded_tab(tabs)
     tabs._add_subtab()

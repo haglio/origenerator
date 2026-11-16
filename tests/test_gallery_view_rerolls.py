@@ -414,7 +414,7 @@ def test_the_new_folder_lists_its_images_in_the_order_the_old_one_reads(qtbot, t
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    was = [row["seed"] for row in view._tree_item_for(key).data(0, _GROUP_ROLE).rows]
+    was = [row["seed"] for row in view.toc.item_for(key).data(0, _GROUP_ROLE).rows]
 
     _rewritten(view, key)
 
@@ -929,12 +929,12 @@ def test_generate_navigates_to_a_brand_new_folder_immediately(qtbot, tmp_path):
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    before = {base_of(key) for key in view._item_by_key}
+    before = {base_of(key) for key in view.toc.item_by_key}
 
     folder = _generate_in_current_tab(view, positive_prompt="a totally new prompt", seed=5)
 
     assert folder not in before
-    assert view._tree_item_for(folder) is not None
+    assert view.toc.item_for(folder) is not None
     assert folder in view._live_jobs
     assert _selected_folder(view) == folder
 

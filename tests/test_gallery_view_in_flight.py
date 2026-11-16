@@ -866,7 +866,7 @@ def _seeded_i2v_db(tmp_path):
 
 
 def _select_leaf_of(view, prompt_id):
-    item = view._leaf_by_id[prompt_id]
+    item = view.toc.leaf_by_id[prompt_id]
     view._tree.setCurrentItem(item)
     return item.data(0, _GROUP_ROLE).key
 
@@ -1259,7 +1259,7 @@ def test_open_folder_omits_a_running_row_from_the_static_grid(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
 
     assert "run1" in view._gallery_pane._inflight_tiles
     assert view.listed_prompt_ids() == ["i1"]
@@ -1794,7 +1794,7 @@ def test_reroll_inflight_tile_persists_across_navigation_and_polls(qtbot, tmp_pa
     gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
     assert rr_pid in gv._gallery_pane._inflight_tiles
 
-    gv._tree.setCurrentItem(gv._tree_item_for(folder_key))
+    gv._tree.setCurrentItem(gv.toc.item_for(folder_key))
     gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
     assert rr_pid in gv._gallery_pane._inflight_tiles, "re-roll card vanished after navigation"
 
@@ -1822,7 +1822,7 @@ def test_i2v_reroll_inflight_tile_follows_the_image_to_video_handoff(qtbot, tmp_
     view._poll()
     assert vid_job.prompt_id in view._gallery_pane._inflight_tiles, "video-stage card missing after handoff"
 
-    view._tree.setCurrentItem(view._tree_item_for(key))
+    view._tree.setCurrentItem(view.toc.item_for(key))
     view._tree.setCurrentItem(_collection(view, LATEST_KEY))
     assert vid_job.prompt_id in view._gallery_pane._inflight_tiles, "video-stage card missing after navigation"
 

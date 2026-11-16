@@ -832,7 +832,7 @@ def test_combine_existing_folder_is_opened_with_the_live_tile(qtbot, tmp_path):
 
     view._combine._generate_combination("img", "vid")
 
-    expected = view._leaf_by_id["vsib"].data(0, _GROUP_ROLE).key
+    expected = view.toc.leaf_by_id["vsib"].data(0, _GROUP_ROLE).key
     assert not view._gallery_pane.showing_latest()
     assert _selected_folder(view) == expected
     assert view._selected_reroll_key == expected

@@ -157,7 +157,7 @@ def test_a_rebuilds_reselection_leaves_the_active_tab_alone(qtbot):
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     editing = view._generate_pane._add_subtab()
     editing._viewport.show_media = MagicMock()
     count = view._generate_pane.count()
@@ -204,7 +204,7 @@ def test_a_rebuilds_reselection_does_not_reload_the_form(qtbot, tmp_path):
     view = GalleryView(db, client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["g1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["g1"])
     view._on_thumbnail_clicked("g1")
     _current_form(view).set_values({"positive_prompt": "my edit"})
 
@@ -244,7 +244,7 @@ def test_a_restored_selection_leaves_the_resting_tab_empty(qtbot, monkeypatch):
     probe = GalleryView(db)
     qtbot.addWidget(probe)
     probe.refresh()
-    probe._tree.setCurrentItem(probe._leaf_by_id["i1"])
+    probe._tree.setCurrentItem(probe.toc.leaf_by_id["i1"])
     folder_key = probe.selected_folder()
 
     view = GalleryView(db)

@@ -59,9 +59,6 @@ from origenerator.gallery.collection import (
 )
 from origenerator.gallery.collection import FolderCollection, collection, folder_collection
 from origenerator.gallery.shapes import (
-    LANDSCAPE as _LANDSCAPE,
-)
-from origenerator.gallery.shapes import (
     SEPARATE as _SEPARATE,
 )
 from origenerator.gallery.shapes import (
@@ -387,6 +384,7 @@ class GalleryView(QWidget):
         return self._library.held_rows
 
     def _build_the_panes(self, db, client):
+        self._build_the_toc()
         self._search = GallerySearchController(self, parent=self)
         self._selected_row: dict | None = None
         self._item_names = ItemNames(db)
@@ -403,7 +401,7 @@ class GalleryView(QWidget):
                 item_name=self._item_names.of,
                 tree=TreeNavigation(
                     selected_folder_key=self.selected_folder_key,
-                    folder_context=self._folder_context,
+                    folder_context=self.toc.folder_context,
                     group_for_key=self.group_for_key,
                 ),
             ),
@@ -502,12 +500,14 @@ class GalleryView(QWidget):
                          else self._arrangement.standalone(), 1)
         hold_the_borders_still(self, self._fun_time is not None)
 
-    def _build_toc_pane(self):
+    def _build_the_toc(self):
         self._tree = SplitFolderTree(_GROUP_ROLE, takes_item=self._custom_collection_takes,
                                      takes_folder=self._collecting_row_takes_folder)
         self._tree.offer_separate_and_together(self._fun_time is None)
+        self.toc = GalleryTree(self._tree)
+
+    def _build_toc_pane(self):
         self._tree.shapes_changed.connect(self._on_shapes_changed)
-        self._tree_view = GalleryTree(self._tree)
         self._tree.context_menu_requested.connect(self._on_tree_context_menu)
         self._tree.currentItemChanged.connect(self._on_folder_selected)
         # Qt emits itemSelectionChanged after currentItemChanged, so the selection has the last word on what the panes show.
@@ -705,8 +705,7 @@ class GalleryView(QWidget):
         return self._generate_pane.current_generate_tab()
 
     def group_for_key(self, key: str):
-        item = self._tree_item_for(key)
-        return item.data(0, _GROUP_ROLE) if item is not None else None
+        return self.toc.group_for_key(key)
 
     def _on_front_tab_changed(self, _index):
         self.osr2.reconcile()
@@ -877,12 +876,12 @@ class GalleryView(QWidget):
     def _stand_on_the_run_in(self, key: str, *, rebuild: bool = False) -> bool:
         if rebuild:
             self.refresh()
-        item = self._tree_item_for(key)
+        item = self.toc.item_for(key)
         if item is None:
             return False
         with self._navigation.off_the_record():
             self._tree.setCurrentItem(item)
-        self._note_folder_visit(self._tree_view.selected_folder_key())
+        self._note_folder_visit(self.toc.selected_folder_key())
         self._select_reroll(key)
         self._navigation.record()
         return True
@@ -979,7 +978,7 @@ class GalleryView(QWidget):
     def _rebuild(self, rows, meta):
         self._folder_meta = meta
         self._drawn_version += 1
-        standing = self._tree_view.selected_folder_key()
+        standing = self.toc.selected_folder_key()
         place = self._gallery_pane.place()
         selected_key = standing or self._pending_key
         multi_keys = self._tree.selected_folder_keys()
@@ -1003,7 +1002,7 @@ class GalleryView(QWidget):
             self._custom_collections), item_name=self._item_names.of)
         requests = self._listed_requests = self._db.list_requests()
         self._gallery_pane.set_model(library)
-        self._tree_view.populate(
+        self.toc.populate(
             self._build_sides(trees), folder_meta=meta,
             recently_worked=gallery.recently_worked_folders(trees, rows, bumped=library.recency),
         )
@@ -1012,8 +1011,8 @@ class GalleryView(QWidget):
         self._generate_pane.reconcile_previews(self._live_ids)
         self._generate_pane.reread_names()
         self._combine.reread_names()
-        target = (self._tree_item_for(selected_key) if selected_key
-                  else None) or self._tree_view.default_item()
+        target = (self.toc.item_for(selected_key) if selected_key
+                  else None) or self.toc.default_item()
         with self._navigation.off_the_record():
             if target is not None:
                 self._tree.setCurrentItem(target)
@@ -1027,7 +1026,7 @@ class GalleryView(QWidget):
         self._navigation.seed()
         if self._search.query:
             self._search.run()
-        if standing is not None and self._tree_view.selected_folder_key() == standing:
+        if standing is not None and self.toc.selected_folder_key() == standing:
             self._gallery_pane.return_to(place)
         self.job_queue.update(self.job_queue.items(rows=rows, requests=requests))
         self._reconcile_generating()
@@ -1060,11 +1059,11 @@ class GalleryView(QWidget):
         ) for shape in self._tree.shapes]
 
     def open_folders(self) -> list[str]:
-        return sorted(self._tree_view.folders_left_open())
+        return sorted(self.toc.folders_left_open())
 
     def set_open_folders(self, saved) -> None:
         if isinstance(saved, list):
-            self._tree_view.leave_folders_open(key for key in saved if isinstance(key, str))
+            self.toc.leave_folders_open(key for key in saved if isinstance(key, str))
 
     def toc_shapes(self) -> list[str]:
         return list(self._tree.chosen_sides)
@@ -1073,7 +1072,7 @@ class GalleryView(QWidget):
         self._tree.choose_shapes(_TOGETHER if saved == list(_TOGETHER) else _SEPARATE)
 
     def _on_shapes_changed(self):
-        if not self._tree_view.built:
+        if not self.toc.built:
             return
         with working():
             self.refresh()
@@ -1131,7 +1130,7 @@ class GalleryView(QWidget):
         return prompt_id in self._gallery_pane.listed_prompt_ids()
 
     def show_folder(self, key: str) -> bool:
-        row = self._tree_item_for(key)
+        row = self.toc.item_for(key)
         if row is None:
             return False
         if self._tree.currentItem() is row:
@@ -1162,12 +1161,12 @@ class GalleryView(QWidget):
         item = self._tree.currentItem()
         if self._current_collection_key() is not None:
             rows = self._gallery_pane.selected_collection_rows() or []
-            return _SearchScope(tuple(self._tree_view.path_steps(item)),
+            return _SearchScope(tuple(self.toc.path_steps(item)),
                                 {row["prompt_id"] for row in rows})
         group = item.data(0, _GROUP_ROLE) if item is not None else None
         if group is None:
             return self.everything_scope()
-        return _SearchScope(tuple(self._tree_view.path_steps(item)),
+        return _SearchScope(tuple(self.toc.path_steps(item)),
                             {row["prompt_id"] for row in gallery.rows_under(group)})
 
     def everything_scope(self) -> _SearchScope:
@@ -1219,7 +1218,7 @@ class GalleryView(QWidget):
             self._search.run()
             return
         self._re_aim_every_button()
-        base, shape = _split_collection_key(self._tree_view.selected_folder_key())
+        base, shape = _split_collection_key(self.toc.selected_folder_key())
         collection = folder_collection(base)
         self._experiments_bar.setVisible(collection is not None
                                          and collection.which == _EXPERIMENTS_KEY)
@@ -1234,9 +1233,9 @@ class GalleryView(QWidget):
             self._open_collection(collection, shape, current)
             return
         group = current.data(0, _GROUP_ROLE)
-        here = self._tree_view.selected_folder_key()
+        here = self.toc.selected_folder_key()
         self._note_folder_visit(here if group is not None else None)
-        self._folder_path.show_folder(self._tree_view.path_steps(current))
+        self._folder_path.show_folder(self.toc.path_steps(current))
         self._update_folder_average(group)
         self._show_group_contents(group, current)
         landed = self._land_on_the_first_item()
@@ -1256,7 +1255,7 @@ class GalleryView(QWidget):
     def _open_collection(self, collection: FolderCollection, shape: str | None, item):
         if collection.which == _EXPERIMENTS_KEY:
             self._sync_experiments_bar()
-        self._folder_path.show_folder(self._tree_view.path_steps(item),
+        self._folder_path.show_folder(self.toc.path_steps(item),
                                       mark=collection_mark(collection.which))
         self._folder_actions.show_folder(None)
         self._avg_label.setText("")
@@ -1272,10 +1271,10 @@ class GalleryView(QWidget):
             self._gallery_pane.show_custom_collection(group)
         else:
             self._gallery_pane.show_folder_tiles(gallery.child_groups(group),
-                                            collections=self._tree_view.collections_in(item))
+                                            collections=self.toc.collections_in(item))
 
     def _go_to_folder(self, key: str):
-        item = _row_under(self._tree.currentItem(), key) or self._tree_item_for(key)
+        item = _row_under(self._tree.currentItem(), key) or self.toc.item_for(key)
         if item is not None:
             self._search.leave()
             self._tree.setCurrentItem(item)
@@ -1307,7 +1306,7 @@ class GalleryView(QWidget):
         self._re_aim_every_button()
 
     def _restore_multi_selection(self, keys: list[str]):
-        items = [item for key in keys if (item := self._item_by_key.get(key)) is not None]
+        items = [item for key in keys if (item := self.toc.item_by_key.get(key)) is not None]
         if len(items) <= 1:
             return
         self._tree.blockSignals(True)
@@ -1331,7 +1330,7 @@ class GalleryView(QWidget):
         if not ok or not name.strip():
             return
         folder_id = self._edits.custom_collections.create(
-            name.strip(), [self._folder_identity(f) for f in folders], self.shape_in_view()
+            name.strip(), [self._folder_identity(f) for f in folders], self.toc.shape_in_view()
         )
         self._open_custom_collection(folder_id)
 
@@ -1345,7 +1344,7 @@ class GalleryView(QWidget):
         self._selection_group = None
         self.refresh()
         self._re_aim_every_button()
-        item = self._tree_item_for(gallery.custom_collection_key(folder_id))
+        item = self.toc.item_for(gallery.custom_collection_key(folder_id))
         if item is not None:
             self._tree.setCurrentItem(item)
 
@@ -1367,7 +1366,7 @@ class GalleryView(QWidget):
 
     def _custom_collection_takes(self, row_key: str, prompt_id: str) -> bool:
         folder = self.group_for_key(row_key)
-        leaf = self._leaf_by_id.get(prompt_id)
+        leaf = self.toc.leaf_by_id.get(prompt_id)
         return (isinstance(folder, gallery.CustomCollection) and leaf is not None
                 and _shape_of(leaf.data(0, _TREE_KEY_ROLE)) == _shape_of(row_key))
 
@@ -1436,43 +1435,8 @@ class GalleryView(QWidget):
     def _selected(self) -> dict | None:
         return self._selected_row
 
-    @property
-    def _item_by_key(self) -> dict:
-        return self._tree_view.item_by_key
-
-    @property
-    def _leaf_by_id(self) -> dict:
-        return self._tree_view.leaf_by_id
-
     def selected_folder_key(self) -> str | None:
-        return self._tree_view.selected_folder_key()
-
-    def shape_in_view(self) -> str:
-        return (_shape_of(self.selected_folder_key())
-                or _shape_holding(_LANDSCAPE, self._tree.shapes))
-
-    def _tree_item_for(self, key: str):
-        item = self._item_by_key.get(key)
-        if item is not None:
-            return item
-        folder = _base_of(key)
-        drawn = self._tree_view.keys_for_folder(folder)
-        if _shape_of(key) in self._tree.shapes:
-            return next((self._item_by_key[row] for row in drawn
-                         if _shape_of(row) == _shape_of(key)), None)
-        if not drawn:
-            return None
-        here = shaped_key(folder, self.shape_in_view())
-        return self._item_by_key[here if here in drawn else drawn[0]]
-
-    def _collection_item(self, collection_key: str, shape: str | None = None):
-        return self._tree_view.collection_item(collection_key, shape or self.shape_in_view())
-
-    def _folder_context(self, key: str) -> str:
-        item = self._tree_item_for(key)
-        if item is None or item.parent() is None:
-            return ""
-        return self._tree_view.folder_path(item.parent())
+        return self.toc.selected_folder_key()
 
     def current_group(self):
         if self._selection_group is not None:
@@ -1552,7 +1516,7 @@ class GalleryView(QWidget):
 
     def _on_modify_batch_requested(self, folder_key: str, workflow_name: str, params: dict):
         wf = WORKFLOW_REGISTRY.get(workflow_name)
-        item = self._tree_item_for(folder_key)
+        item = self.toc.item_for(folder_key)
         group = item.data(0, _GROUP_ROLE) if item is not None else None
         rows = self._modify_batch_rows(group) if group is not None else []
         if self._client is None or wf is None or not rows:
@@ -1687,7 +1651,7 @@ class GalleryView(QWidget):
         return collection(key).label
 
     def stand_in_collection(self, key: str, shape: str | None) -> bool:
-        item = self._tree_item_for(shaped_key(key, shape) if shape else key)
+        item = self.toc.item_for(shaped_key(key, shape) if shape else key)
         if item is None:
             return False
         self._tree.setCurrentItem(item)
@@ -1719,14 +1683,14 @@ class GalleryView(QWidget):
         return Listing(location=self.slideshow_location(), rows=tuple(self.rows_to_play()),
                        shown=tuple(self.listed_prompt_ids()),
                        picked=tuple(self.selected_prompt_ids()),
-                       subject=self.slideshow_subject(), shape=self.shape_in_view(),
+                       subject=self.slideshow_subject(), shape=self.toc.shape_in_view(),
                        latest=pane.showing_latest() and not pane.showing_search())
 
     def slideshow_subject(self) -> str:
         if self._showing_search():
             return "these results"
         if self._current_collection_key() is not None:
-            return self._tree_view.folder_path(self._tree.currentItem())
+            return self.toc.folder_path(self._tree.currentItem())
         return "this folder"
 
     def _re_aim_every_button(self) -> None:
@@ -2014,14 +1978,14 @@ class GalleryView(QWidget):
     def reveal_launch(self, key: str):
         if self._stand_on_the_run_in(key):
             return
-        if (latest := self._collection_item(_LATEST_KEY, self._launched_side(key))) is not None:
+        if (latest := self.toc.collection_item(_LATEST_KEY, self._launched_side(key))) is not None:
             self._pending_combine_key = key
             self._tree.setCurrentItem(latest)
 
     def _launched_side(self, key: str) -> str:
         job = self._jobs.job_for(key)
         asked = requested_shape(job.params) if job is not None else None
-        return _shape_holding(asked, self._tree.shapes) or self.shape_in_view()
+        return _shape_holding(asked, self._tree.shapes) or self.toc.shape_in_view()
 
     def _reveal_reroll(self, key: str):
         self._search.leave()
@@ -2152,7 +2116,7 @@ class GalleryView(QWidget):
         self._show_landed_to_watchers(key, finished_row, launcher)
         if key == self._pending_combine_key:
             self._pending_combine_key = None
-            item = self._tree_item_for(key)
+            item = self.toc.item_for(key)
             if item is not None:
                 self._tree.setCurrentItem(item)
         self._reconcile_generating()
@@ -2194,7 +2158,7 @@ class GalleryView(QWidget):
         self._slideshows.note_in_flight(items)
 
     def selected_folder(self) -> str | None:
-        return self._tree_view.selected_folder_key() or self._pending_key
+        return self.toc.selected_folder_key() or self._pending_key
 
     def select_folder(self, key: str | None):
         self._pending_key = key or None
@@ -2273,7 +2237,7 @@ class GalleryView(QWidget):
     def _can_open_containing_folder(self, row: dict) -> bool:
         if row.get("deleted_at") is not None:
             return False
-        leaf = self._leaf_by_id.get(row.get("prompt_id"))
+        leaf = self.toc.leaf_by_id.get(row.get("prompt_id"))
         return leaf is not None and leaf is not self._tree.currentItem()
 
     def run_item_action(self, prompt_id: str, action: str):
@@ -2302,7 +2266,7 @@ class GalleryView(QWidget):
 
     def _recount_the_collections(self) -> None:
         for shape in self._tree.shapes:
-            self._tree_view.set_collection_counts(shape, self._gallery_pane.collection_counts(shape))
+            self.toc.set_collection_counts(shape, self._gallery_pane.collection_counts(shape))
 
     def _redrew_the_favorites_collection(self) -> bool:
         self._recount_the_collections()
@@ -2424,16 +2388,16 @@ class GalleryView(QWidget):
     def _post_delete_target(self, groups):
         doomed = set().union(*(self._keys_under(group) for group in groups))
         for key in reversed(self._folder_history):
-            if key not in doomed and (item := self._item_by_key.get(key)) is not None:
+            if key not in doomed and (item := self.toc.item_by_key.get(key)) is not None:
                 return item
-        item = self._tree_item_for(groups[0].key)
+        item = self.toc.item_for(groups[0].key)
         while item is not None and item.data(0, _TREE_KEY_ROLE) in doomed:
             item = item.parent()
         return item
 
     def _keys_under(self, group) -> set[str]:
-        keys, stack = set(), [self._item_by_key[key] for key
-                              in self._tree_view.keys_for_folder(group.key)]
+        keys, stack = set(), [self.toc.item_by_key[key] for key
+                              in self.toc.keys_for_folder(group.key)]
         while stack:
             node = stack.pop()
             if node.data(0, _GROUP_ROLE) is not None:
@@ -2544,7 +2508,7 @@ class GalleryView(QWidget):
             collapse_and_expand[chosen]()
 
     def _add_to_folder_menu(self, menu: QMenu, key: str) -> dict:
-        shape = _shape_of(key) or self.shape_in_view()
+        shape = _shape_of(key) or self.toc.shape_in_view()
         targets = [f for f in self._custom_collections_by_shape.get(shape, ())
                    if not any(m.key == _base_of(key) for m in gallery.child_groups(f))]
         if not targets:
@@ -2575,7 +2539,7 @@ class GalleryView(QWidget):
     def _set_folder_favorite(self, key: str, favorite: bool):
         if not self._folder_switches.set_favorite(key, favorite):
             return
-        self._tree_view.mark_favorite(key, favorite)
+        self.toc.mark_favorite(key, favorite)
         self._fingerprint = (self._fingerprint[0],
                              _folder_meta_fingerprint(self._folder_meta))
         self._drawn_version += 1
@@ -2649,15 +2613,15 @@ class GalleryView(QWidget):
                     len(self._gallery_pane.listed_prompt_ids()), revealed)
 
     def _folder_row_for(self, prompt_id: str):
-        leaf = self._leaf_by_id.get(prompt_id)
+        leaf = self.toc.leaf_by_id.get(prompt_id)
         if leaf is not None:
             return leaf
         row = self._db.get_generation(prompt_id)
         if row is None:
             held = self.row_for(prompt_id)
-            return self._tree_item_for(shaped_key(_TRASH_KEY, row_shape(held))) if held else None
+            return self.toc.item_for(shaped_key(_TRASH_KEY, row_shape(held))) if held else None
         key = self.folder_key_of(row)
-        return self._tree_item_for(key) if key else None
+        return self.toc.item_for(key) if key else None
 
     def _current_collection_key(self) -> str | None:
         key = self.selected_folder_key()

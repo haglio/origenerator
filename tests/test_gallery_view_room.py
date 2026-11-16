@@ -436,9 +436,9 @@ def test_a_double_click_on_an_image_from_another_folder_opens_that_folder(
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["b1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["b1"])
     folder_b = view.listed_prompt_ids()
-    view._tree.setCurrentItem(view._leaf_by_id["a1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["a1"])
 
     slideshow = view._slideshows.open_in_its_folder(("b1.png", "image"), "b1")
     qtbot.addWidget(slideshow.shown)

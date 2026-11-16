@@ -204,7 +204,7 @@ def _selected_folder(view):
 
 
 def _collection(view, key, shape=UNMEASURABLE_SHAPE):
-    return view._tree_item_for(shaped_key(key, shape))
+    return view.toc.item_for(shaped_key(key, shape))
 
 
 def _shape_rows(view, shape):
@@ -309,7 +309,7 @@ def _tab_with_prompts(view, key="sdxl_t2i"):
 
 def _click_beside_the_mark_of(qtbot, view, key, *, which):
     _on_screen(qtbot, view, 1200, 800)
-    row = view._tree_item_for(key)
+    row = view.toc.item_for(key)
     tree = row.treeWidget()
     tree.scrollToItem(row)
     gestures.click(tree.viewport(), _action_rects(tree.visualItemRect(row))[which].center())
@@ -854,7 +854,7 @@ def _two_leaf_view(qtbot, extra=(), actions=None):
 
 
 def _pick(view, *keys):
-    items = [view._tree_item_for(key) for key in keys]
+    items = [view.toc.item_for(key) for key in keys]
     view._tree.setCurrentItem(items[0])
     for item in items[1:]:
         item.setSelected(True)
@@ -892,7 +892,7 @@ def _tree_menu(view, key=None, shape=UNMEASURABLE_SHAPE):
         tree = view._tree._trees[shape]
         at = _below_the_last_row(tree)
     else:
-        row = view._tree_item_for(key)
+        row = view.toc.item_for(key)
         tree = row.treeWidget()
         tree.scrollToItem(row)
         at = tree.visualItemRect(row).center()

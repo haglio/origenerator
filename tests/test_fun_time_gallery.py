@@ -1220,7 +1220,7 @@ def test_omnipause_leaves_nothing_moving_anywhere_in_the_window(qtbot, tmp_path)
     view = _a_gallery_showing(webp)(database_of(rows), fun_time=_session())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._tree_view.leaf_by_id["v-1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["v-1"])
     assert _moving_thumbnails(view), "nothing was moving, so the sweep would prove nothing"
 
     view.set_room_paused(True)
@@ -1526,7 +1526,7 @@ def test_a_gallery_handed_back_from_a_frozen_session_lets_its_thumbnails_move_ag
     view = _a_gallery_showing(webp)(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._tree_view.leaf_by_id["v-1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["v-1"])
     view.become_hosted(_session())
     view.set_room_paused(True)
 

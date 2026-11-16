@@ -415,7 +415,7 @@ def test_opening_a_folder_lands_on_its_first_item(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
 
     assert view.listed_prompt_ids()[0] == "i1"
     assert view.selected_generation() == "i1"
@@ -631,7 +631,7 @@ def _square_texts(view, key) -> list[str]:
 
 def test_clicking_the_star_beside_a_folder_stars_its_square_in_the_pane_beside_it(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
-    view._tree.setCurrentItem(view._tree_item_for(cat).parent())
+    view._tree.setCurrentItem(view.toc.item_for(cat).parent())
 
     _click_beside_the_mark_of(qtbot, view, dog, which=0)
 
@@ -700,7 +700,7 @@ def test_starring_a_folder_marks_its_row_where_it_stands(qtbot):
 
     view._toggle_favorite(key)
 
-    assert view._tree_item_for(key) is target, (
+    assert view.toc.item_for(key) is target, (
         "the gallery used to be read back and redrawn whole for one star, seconds of it on a "
         "real library")
     assert target.data(0, _GROUP_ROLE).favorite
@@ -718,8 +718,8 @@ def _a_folder_drawn_on_both_sides(qtbot, *, also=None, actions=None):
     qtbot.addWidget(view)
     view.refresh()
     key = _key(_image_workflow(view._tree))
-    rows = [view._tree_item_for(tree_key)
-            for tree_key in view._tree_view.keys_for_folder(key)]
+    rows = [view.toc.item_for(tree_key)
+            for tree_key in view.toc.keys_for_folder(key)]
     assert len(rows) == 2
     return view, key, rows
 
@@ -731,7 +731,7 @@ def test_starring_a_folder_marks_it_on_both_sides_of_the_list(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     key = _key(_at(_image_workflow(view._tree, LANDSCAPE), 0, 0, 0))
-    rows = [view._tree_item_for(tree_key) for tree_key in view._tree_view.keys_for_folder(key)]
+    rows = [view.toc.item_for(tree_key) for tree_key in view.toc.keys_for_folder(key)]
     assert len(rows) == 2
 
     view._toggle_favorite(key)
@@ -743,8 +743,8 @@ def test_starring_a_folder_marks_it_on_both_sides_of_the_list(qtbot):
 
 def test_a_star_made_after_the_pane_moved_on_marks_what_is_on_screen(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
-    view._tree.setCurrentItem(view._tree_item_for(cat).parent())
-    view._tree.setCurrentItem(view._tree_item_for(cat))
+    view._tree.setCurrentItem(view.toc.item_for(cat).parent())
+    view._tree.setCurrentItem(view.toc.item_for(cat))
 
     view._toggle_favorite(dog)
 
@@ -756,11 +756,11 @@ def test_a_star_made_after_the_pane_moved_on_marks_what_is_on_screen(qtbot):
 def test_the_tick_after_a_star_finds_nothing_to_redraw(qtbot):
     view, _cat, dog = _two_leaf_view(qtbot)
     view._toggle_favorite(dog)
-    row = view._tree_item_for(dog)
+    row = view.toc.item_for(dog)
 
     view._poll()
 
-    assert view._tree_item_for(dog) is row
+    assert view.toc.item_for(dog) is row
 
 
 def test_each_tick_puts_what_a_slideshow_is_locked_on_first(qtbot, monkeypatch):
@@ -820,11 +820,11 @@ def test_a_reading_of_the_library_taken_before_a_star_does_not_take_it_back(qtbo
     view._finish_poll([], None)
 
     view._toggle_favorite(dog)
-    row = view._tree_item_for(dog)
+    row = view.toc.item_for(dog)
     (reading, deliver), = held
     deliver(reading)
 
-    assert view._tree_item_for(dog) is row
+    assert view.toc.item_for(dog) is row
     assert row.data(0, _GROUP_ROLE).favorite
 
 
@@ -1773,7 +1773,7 @@ def test_clicking_a_step_of_the_path_goes_to_that_folder(qtbot):
     _click_path_step(view, workflow.text(0))
 
     assert view._tree.currentItem() is workflow
-    assert view._folder_path.display_text() == view._tree_view.folder_path(workflow)
+    assert view._folder_path.display_text() == view.toc.folder_path(workflow)
 
 
 def test_clicking_a_step_of_the_path_puts_a_running_search_away(qtbot):
@@ -1798,7 +1798,7 @@ def test_the_path_links_every_folder_above_the_one_open_and_not_its_side(qtbot):
     here = _first_leaf(view)
     view._tree.setCurrentItem(here)
 
-    _shape, *above, _here = view._tree_view.path_steps(here)
+    _shape, *above, _here = view.toc.path_steps(here)
 
     assert list(_path_links(view)) == [step.name for step in above]
 
@@ -1929,7 +1929,7 @@ def test_going_to_a_failed_generation_opens_the_folder_its_settings_name(qtbot):
     view = GalleryView(database_of([done, failed]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
-    assert "x1" not in view._leaf_by_id
+    assert "x1" not in view.toc.leaf_by_id
 
     view._go_to_generation("x1")
 
@@ -1948,7 +1948,7 @@ def test_following_a_link_lands_in_one_tab(qtbot):
     view.refresh()
     for tab in view._generate_pane.generate_tabs():
         tab._viewport.show_media = MagicMock()
-    view._tree.setCurrentItem(view._leaf_by_id["vid1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["vid1"])
     _pick_by_clicking(view, "vid1")
     tabs = view._generate_pane.count()
 
@@ -1985,7 +1985,7 @@ def test_back_returns_from_a_followed_input_image_link_to_the_video(qtbot):
     view = GalleryView(database_of([video, image]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["vid1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["vid1"])
     _pick_by_clicking(view, "vid1")
     view.follow_link("img1")
 
@@ -2027,7 +2027,7 @@ def test_undo_of_a_folder_delete_returns_to_that_folder(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(view._leaf_by_id["a"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["a"])
     _pick_by_clicking(view, "a")
     assert view._selected["prompt_id"] == "a"
     view._confirm = lambda text: True
@@ -2049,7 +2049,7 @@ def test_back_after_following_a_link_returns_to_the_viewed_generation(qtbot):
     view = GalleryView(database_of([video, image]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["vid1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["vid1"])
     _pick_by_clicking(view, "vid1")
     assert view._selected["prompt_id"] == "vid1"
 
@@ -2067,7 +2067,7 @@ def _linked_view(qtbot, source="i7", count=12):
                  "wan22_i2v_00001_.mp4")
     view = GalleryView(database_of([video, *images]))
     _on_screen(qtbot, view, 1100, 1500)
-    view._tree.setCurrentItem(view._leaf_by_id["vid1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["vid1"])
     _pick_by_clicking(view, "vid1")
     return view
 
@@ -2115,7 +2115,7 @@ def test_moving_on_after_a_followed_link_leaves_the_folder_chosen_instead(qtbot)
     view = _linked_view(qtbot)
 
     view.follow_link("i7")
-    view._tree.setCurrentItem(view._leaf_by_id["vid1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["vid1"])
     qtbot.wait(1)
 
     assert view.listed_prompt_ids() == ["vid1"]
@@ -2128,17 +2128,17 @@ def test_history_spans_folder_navigation(qtbot):
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["v1"])
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["v1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     _pick_by_clicking(view, "i2")
     assert view._selected["prompt_id"] == "i2"
 
     view._navigation.go_back()
-    assert view._tree.currentItem() is view._leaf_by_id["i1"]
+    assert view._tree.currentItem() is view.toc.leaf_by_id["i1"]
     assert view._selected["prompt_id"] == "i1"
 
     view._navigation.go_back()
-    assert view._tree.currentItem() is view._leaf_by_id["v1"]
+    assert view._tree.currentItem() is view.toc.leaf_by_id["v1"]
     assert view._selected["prompt_id"] == "v1"
 
 
@@ -2157,7 +2157,7 @@ def test_back_returns_to_the_side_of_the_list_the_folder_was_opened_on(qtbot):
 def test_deleting_a_folder_returns_to_the_side_of_the_list_last_stood_on(qtbot):
     view, _key_of_both, (first_side, second_side) = _a_folder_drawn_on_both_sides(
         qtbot, also={"i3": (1280, 720, 20)}, actions=FakeActions())
-    doomed = next(item for item in view._item_by_key.values()
+    doomed = next(item for item in view.toc.item_by_key.values()
                   if isinstance(item.data(0, _GROUP_ROLE), gallery.SettingsGroup)
                   and [row["prompt_id"] for row in gallery.rows_under(
                       item.data(0, _GROUP_ROLE))] == ["i3"])
@@ -2323,7 +2323,7 @@ def test_back_to_a_folder_item_re_highlights_its_tile(qtbot):
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     _pick_by_clicking(view, "i1")
     _pick_by_clicking(view, "i2")
 
@@ -2357,7 +2357,7 @@ def test_back_onto_a_folder_of_sub_folders_drops_the_pick(qtbot):
     view.refresh()
     lora = _at(_image_workflow(view._tree), 0, 0)
     view._tree.setCurrentItem(lora)
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
 
     view._navigation.go_back()
 
@@ -2373,7 +2373,7 @@ def test_an_item_looked_at_on_a_collection_goes_back_to_that_collection(qtbot):
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     _pick_by_clicking(view, "i1")
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
 
     view._navigation.go_back()
 
@@ -2514,7 +2514,7 @@ def test_selected_generation_tracks_thumbnail_click(qtbot):
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     view._on_thumbnail_clicked("i2")
     assert view.selected_generation() == "i2"
 
@@ -2525,7 +2525,7 @@ def test_select_generation_restored_with_folder_after_refresh(qtbot):
     probe = GalleryView(db)
     qtbot.addWidget(probe)
     probe.refresh()
-    probe._tree.setCurrentItem(probe._leaf_by_id["i1"])
+    probe._tree.setCurrentItem(probe.toc.leaf_by_id["i1"])
     folder_key = probe.selected_folder()
 
     fresh = GalleryView(db)
@@ -2543,7 +2543,7 @@ def test_selected_generation_survives_a_rebuild(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     view._on_thumbnail_clicked("i2")
 
     put_rows(db, [_image("i3", "a dog", 50, 9)])
@@ -2715,7 +2715,7 @@ def test_an_i2v_tiles_video_seed_corner_starts_that_folders_reroll(
     view = GalleryView(_single_i2v_db(tmp_path, "handpicked.png"), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    leaf = view._leaf_by_id["vid"]
+    leaf = view.toc.leaf_by_id["vid"]
     view._tree.setCurrentItem(leaf)
 
     view._gallery_pane._thumb_widgets["vid"].corner_button_triggered.emit("vid", "video")
@@ -2905,7 +2905,7 @@ def test_the_experiments_switch_is_up_only_in_the_experiments_collection(qtbot):
     view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
     assert not view._experiments_bar.isHidden()
 
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     assert view._experiments_bar.isHidden()
 
 
@@ -2915,7 +2915,7 @@ def test_back_returns_to_where_the_gallery_first_landed(qtbot):
     view.refresh()
     landed = view._tree.currentItem()
 
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     view._navigation.go_back()
 
     assert view._tree.currentItem() is landed
@@ -2937,7 +2937,7 @@ def test_a_folder_drawn_again_where_it_stands_is_one_visit(qtbot):
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     visits = list(view._folder_history)
 
     view.hand_pane_back()
@@ -2947,13 +2947,13 @@ def test_a_folder_drawn_again_where_it_stands_is_one_visit(qtbot):
 
 def test_going_back_to_a_folder_is_no_new_visit(qtbot):
     view, cat, dog = _two_leaf_view(qtbot)
-    view._tree.setCurrentItem(view._tree_item_for(cat))
-    view._tree.setCurrentItem(view._tree_item_for(dog))
+    view._tree.setCurrentItem(view.toc.item_for(cat))
+    view._tree.setCurrentItem(view.toc.item_for(dog))
     visits = list(view._folder_history)
 
     view._buttons.back.click()
 
-    assert view._tree.currentItem() is view._tree_item_for(cat)
+    assert view._tree.currentItem() is view.toc.item_for(cat)
     assert view._folder_history == visits, (
         "skipped while Back or Forward is re-selecting, so it stays a genuine visit trail")
 
@@ -2962,7 +2962,7 @@ def test_with_nothing_selected_the_shape_in_view_is_the_one_holding_landscape(qt
     view = GalleryView(database_of([]))
     qtbot.addWidget(view)
 
-    assert view.shape_in_view() == row_shape({"prompt_id": "of no known shape"}) == LANDSCAPE, (
+    assert view.toc.shape_in_view() == row_shape({"prompt_id": "of no known shape"}) == LANDSCAPE, (
         "with nothing selected the gallery stands on the shape an item nobody could measure "
         "files under everywhere else")
 
@@ -2971,10 +2971,10 @@ def test_a_key_naming_a_drawn_shape_is_answered_by_that_shape_alone(qtbot):
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    key = _key(view._leaf_by_id["i1"])
+    key = _key(view.toc.leaf_by_id["i1"])
 
-    assert view._tree_item_for(shaped_key(key, LANDSCAPE)) is view._leaf_by_id["i1"]
-    assert view._tree_item_for(shaped_key(key, PORTRAIT)) is None
+    assert view.toc.item_for(shaped_key(key, LANDSCAPE)) is view.toc.leaf_by_id["i1"]
+    assert view.toc.item_for(shaped_key(key, PORTRAIT)) is None
 
 
 def _a_folder_on_both_sides(qtbot):
@@ -2992,9 +2992,9 @@ def test_a_folders_own_key_stays_on_the_shape_being_browsed(qtbot):
     view, key = _a_folder_on_both_sides(qtbot)
 
     for shape in (LANDSCAPE, PORTRAIT):
-        row = view._tree_item_for(shaped_key(key, shape))
+        row = view.toc.item_for(shaped_key(key, shape))
         view._tree.setCurrentItem(row)
-        assert view._tree_item_for(key) is row
+        assert view.toc.item_for(key) is row
 
 
 def test_a_folder_saved_under_its_own_key_alone_is_still_the_one_a_rebuild_reopens(qtbot):
@@ -3002,7 +3002,7 @@ def test_a_folder_saved_under_its_own_key_alone_is_still_the_one_a_rebuild_reope
     before = GalleryView(db)
     qtbot.addWidget(before)
     before.refresh()
-    saved = _key(before._leaf_by_id["i2"])
+    saved = _key(before.toc.leaf_by_id["i2"])
     view = GalleryView(db)
     qtbot.addWidget(view)
 
@@ -3023,7 +3023,7 @@ def test_a_session_saved_on_a_collection_reopens_on_that_collection(qtbot, saved
     view.select_folder(shaped_key(saved, LANDSCAPE))
     view.refresh()
 
-    assert view._tree_view.selected_folder_key() == shaped_key(saved, LANDSCAPE), (
+    assert view.toc.selected_folder_key() == shaped_key(saved, LANDSCAPE), (
         "a collection's key never changes, even when its label is renamed, because saved "
         "sessions name the folder they reopen on by it")
 
@@ -3043,8 +3043,8 @@ def test_a_folder_at_the_top_of_the_list_and_one_it_has_not_got_have_no_place_to
     qtbot.addWidget(view)
     view.refresh()
 
-    assert view._folder_context(view.selected_folder_key()) == ""
-    assert view._folder_context("image/no-such-folder") == ""
+    assert view.toc.folder_context(view.selected_folder_key()) == ""
+    assert view.toc.folder_context("image/no-such-folder") == ""
 
 
 def test_following_a_link_stops_nowhere_on_its_way_through_a_folder(qtbot):
@@ -3052,7 +3052,7 @@ def test_following_a_link_stops_nowhere_on_its_way_through_a_folder(qtbot):
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     (first, other) = [view.row_for(pid)["prompt_id"] for pid in ("d1", "d2")]
 
     view.follow_link(other)
@@ -3074,7 +3074,7 @@ def test_a_rebuild_puts_no_stop_on_the_way_back(qtbot):
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     _pick_by_clicking(view, "i2")
     stops = list(view._navigation._history._stack)
     assert len(stops) > 1
@@ -3095,7 +3095,7 @@ def test_a_leaf_folder_shows_its_actions_to_the_right_of_the_buttons_and_no_othe
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     in_a_leaf = not _the_folders_actions(view).isHidden()
     view._tree.setCurrentItem(_image_workflow(view._tree))
 
@@ -3110,7 +3110,7 @@ def test_actions_set_for_a_folder_reach_every_item_in_it_and_the_tab_showing_one
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(view._leaf_by_id["i1"])
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     name = vocabulary(MediaType.IMAGE).checkboxes[0]
 
     _the_folders_actions(view).findChild(TickControl, action_checkbox(MediaType.IMAGE, name)).click()

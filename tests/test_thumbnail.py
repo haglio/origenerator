@@ -7,6 +7,9 @@ from PIL import Image
 
 from origenerator import thumbnail
 from origenerator.thumbnail import (
+    FRAME_MS,
+    LONG_VIDEO_S,
+    frame_ms_of,
     frame_thumbnail,
     generate_animated_thumbnail,
     generate_thumbnail,
@@ -60,6 +63,19 @@ def test_animated_thumbnail_writes_a_looping_multiframe_webp(tmp_path, monkeypat
     assert result.suffix == ".webp"
     anim = Image.open(result)
     assert getattr(anim, "n_frames", 1) == 3
+
+
+def _held_for(tmp_path, monkeypatch, *, seconds: float) -> int:
+    frames = [Image.new("RGB", (64, 48), color) for color in ((255, 0, 0), (0, 255, 0))]
+    monkeypatch.setattr(thumbnail, "_sample_video_frames", lambda path, count, size: frames)
+    monkeypatch.setattr(thumbnail, "video_duration_seconds", lambda path: seconds)
+    made = generate_animated_thumbnail(tmp_path / "v.mp4", tmp_path / f"thumbs {seconds}", name="v")
+    return frame_ms_of(made)
+
+
+def test_a_long_videos_thumbnail_holds_each_frame_five_times_as_long(tmp_path, monkeypatch):
+    assert (_held_for(tmp_path, monkeypatch, seconds=LONG_VIDEO_S - 1),
+            _held_for(tmp_path, monkeypatch, seconds=LONG_VIDEO_S + 1)) == (FRAME_MS, 5 * FRAME_MS)
 
 
 def test_animated_thumbnail_is_cached_and_not_regenerated(tmp_path, monkeypatch):

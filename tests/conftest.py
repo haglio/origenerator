@@ -38,6 +38,7 @@ from origenerator.gui import (
     gallery_view,
     generation_job,
     job_queue,
+    looping_preview,
     off_the_machine,
     omnipause,
     viewport,
@@ -566,6 +567,11 @@ def _off_thread_work_runs_inline(request, monkeypatch):
                             lambda work, done, *, owner: done(work()))
     monkeypatch.setattr(CombineController, "_after_painting",
                         lambda self, work: work())
+
+
+@pytest.fixture(autouse=True)
+def _thumbnails_start_at_once(monkeypatch):
+    monkeypatch.setattr(looping_preview, "STAGGER_SPAN_MS", 0)
 
 
 @pytest.fixture(autouse=True)

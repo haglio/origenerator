@@ -185,13 +185,15 @@ class ParamForm(QWidget):
         self._param_defs = [pd for pd in param_defs if pd.key not in self._hidden_keys]
         self._defs = {pd.key: pd for pd in self._param_defs}
         scenes_def = next((pd for pd in self._param_defs if pd.type == ParamType.SCENES), None)
+        self._filling = 0
+        self._a_change_held = False
         self._scenes: ScenesEditor | None = None
         self._scenes_row = scenes_def.key if scenes_def is not None else None
         if scenes_def is not None:
             self._scenes = ScenesEditor(
                 scenes_def, lambda w, pd=scenes_def: grey_out_of_reach(pd, w), self._shut_down,
                 lines=any(pd.key == "scene_lines" for pd in self._param_defs))
-            self._scenes.changed.connect(self.changed)
+            self._scenes.changed.connect(self._a_field_changed)
         self._build()
         self._wire_row_rules()
         for pd in self._seed_defs():
@@ -333,7 +335,7 @@ class ParamForm(QWidget):
             edited = self._kind(pd).change_signal(widget)
             if pd.key == self._size_source_key:
                 edited.connect(self._update_derived_display)
-            edited.connect(self.changed)
+            edited.connect(self._a_field_changed)
 
     def _add_row(self, key: str, label: str, field: QWidget, extras: Sequence[QWidget] = ()):
         title = param_sections.section_title(key)
@@ -429,7 +431,7 @@ class ParamForm(QWidget):
             # Qt: a plain QCheckBox's own dark-style tick draws as a bare down-caret.
             cb = TickControl("Random")
             cb.setChecked(True)
-            cb.toggled.connect(self.changed)
+            cb.toggled.connect(self._a_field_changed)
             cb.clicked.connect(lambda checked, pd=pd: self._on_random_clicked(pd, checked))
             self._widgets[pd.key].activated.connect(lambda _row, cb=cb: cb.setChecked(False))
             self._randomize_checks[pd.key] = cb
@@ -619,7 +621,7 @@ class ParamForm(QWidget):
             spinner.setMaximum(_DIMENSION_MAX)
             spinner.setSingleStep(_DIMENSION_STEP)
             spinner.setSpecialValueText(NOT_KNOWN)
-            spinner.valueChanged.connect(self.changed)
+            spinner.valueChanged.connect(self._a_field_changed)
             self._widgets[key] = spinner
             value_label = QLabel(NOT_KNOWN)
             value_label.setObjectName("readonlyParamValue")
@@ -674,7 +676,7 @@ class ParamForm(QWidget):
         if not unlocked:
             self._update_derived_display()
         self._position_unlock_button()
-        self.changed.emit()
+        self._a_field_changed()
 
     def _update_derived_display(self):
         if self._size_deriver is None or self._dimensions_unlocked():
@@ -873,7 +875,23 @@ class ParamForm(QWidget):
     def replace_values(self, params: dict):
         self.set_values({**{pd.key: pd.default for pd in self._param_defs}, **params})
 
+    def _a_field_changed(self, *_said) -> None:
+        if self._filling:
+            self._a_change_held = True
+            return
+        self.changed.emit()
+
     def set_values(self, params: dict, *, carried: bool = False):
+        self._filling += 1
+        try:
+            self._fill(params, carried=carried)
+        finally:
+            self._filling -= 1
+        if not self._filling and self._a_change_held:
+            self._a_change_held = False
+            self.changed.emit()
+
+    def _fill(self, params: dict, *, carried: bool) -> None:
         self._passthrough = {
             k: v for k, v in params.items()
             if k not in self._widgets and k not in self._hidden_keys

@@ -2967,3 +2967,17 @@ def test_the_swap_button_sits_between_the_rows_when_size_is_opened_after_the_for
     height = form._widgets["height"].geometry()
     assert width.center().y() < btn.center().y() < height.center().y()
     assert btn.right() <= width.left()
+
+
+def test_filling_the_form_tells_whoever_listens_once_with_every_value_in_place(qtbot):
+    form = ParamForm([ParamDef("enhance", "Enhance", "bool", True),
+                      ParamDef("steps", "Steps", "int", 20),
+                      ParamDef("positive_prompt", "Prompt", "str", "")])
+    qtbot.addWidget(form)
+    told = []
+    form.changed.connect(lambda: told.append(form.get_values()))
+
+    form.set_values({"enhance": False, "steps": 30, "positive_prompt": "made up words"})
+
+    assert [(seen["enhance"], seen["steps"], seen["positive_prompt"]) for seen in told] == [
+        (False, 30, "made up words")]

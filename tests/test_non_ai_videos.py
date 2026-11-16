@@ -4,7 +4,9 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from app_support import favorites
 from app_support.gallery_rows import made_here
+from app_support.mirrored_tree import filed_record
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
@@ -16,6 +18,7 @@ from origenerator.gallery import (
 )
 from origenerator.gallery.non_ai import recorded_title
 from origenerator.gallery.tree import ALL_KEY, folder_chain
+from origenerator.gallery_edits import GalleryEdits, GalleryEnvironment
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.generate_tab import GenerateTab
 from origenerator.item_names import ItemNames
@@ -23,6 +26,7 @@ from origenerator.media import MediaType
 from origenerator.non_ai_videos import NonAiPlaces, scan
 from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import animated_thumbnail_path
+from origenerator.trash import Trash
 from origenerator.workflows import workflow_named
 from origenerator.workflows.non_ai import NonAiWorkflow, non_ai_folder, non_ai_workflow
 from tests.comfyui_folders import SUITE_FOLDERS
@@ -98,6 +102,37 @@ def test_a_scan_takes_up_the_name_a_held_video_has_been_given_since(db, tmp_path
     [row] = _videos(db)
     assert recorded_title(row) == "Jane Doe - Alpha Study"
     assert json.loads(row["params_json"])["folder"] == "sample/full/set"
+
+
+def test_a_non_ai_videos_star_is_the_favorite_fun_time_keeps_in_its_record(db, tmp_path):
+    places = _library(tmp_path)
+    video = write_mp4(places.videos / "sample" / "full" / "set" / "video one.mp4")
+    _record(places, video, {"favorite": True})
+    scan(db, places)
+    starred_when_brought_in = _videos(db)[0]["starred"]
+
+    _record(places, video, {})
+    scan(db, places)
+
+    assert (starred_when_brought_in, _videos(db)[0]["starred"]) == (1, 0)
+
+
+def test_starring_a_non_ai_video_here_changes_the_favorite_fun_time_keeps(db, tmp_path):
+    places = _library(tmp_path)
+    video = write_mp4(places.videos / "sample" / "full" / "set" / "video one.mp4")
+    scan(db, places)
+    edits = GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "out"), Trash(tmp_path / "trash"),
+                         environment=GalleryEnvironment(video_records=places.records))
+    [prompt_id] = [row["prompt_id"] for row in _videos(db)]
+
+    def kept() -> bool:
+        return favorites.is_favorite(filed_record(video, places.records))
+
+    edits.tell_fun_time_of_favorites([prompt_id], True)
+    starred = kept()
+    edits.tell_fun_time_of_favorites([prompt_id], False)
+
+    assert (starred, kept()) == (True, False)
 
 
 def _leaves(db) -> list[list[str]]:

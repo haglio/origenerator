@@ -87,6 +87,7 @@ class FakeActions:
         self.places = places
         self.thumb_dir = thumb_dir
         self.deleted = []
+        self.told_fun_time = []
         self.rejected = []
         self.trashed_files = []
         self.restored = []
@@ -95,6 +96,9 @@ class FakeActions:
         self.redo_count = 0
         self._label = None
         self._redo_label = None
+
+    def tell_fun_time_of_favorites(self, prompt_ids, favorite):
+        self.told_fun_time.append((list(prompt_ids), favorite))
 
     def delete_rows(self, rows, *, pressed=None):
         self.deleted.append(list(rows))

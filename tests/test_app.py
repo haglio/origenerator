@@ -1220,6 +1220,7 @@ _MAINTENANCE_PASSES = (
     ("origenerator.item_shape", "record_shapes"),
     ("origenerator.former_actions", "fill_in_actions"),
     ("origenerator.published_actions", "publish"),
+    ("origenerator.non_ai_videos", "take_up_what_the_records_say"),
     ("origenerator.favorite_reconcile", "reconcile_favorites"),
 )
 

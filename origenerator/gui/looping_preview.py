@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QObject, QSize, Qt
+import zlib
+
+from PySide6.QtCore import QObject, QSize, Qt, QTimer
 from PySide6.QtGui import QImageReader, QMovie
 
 from origenerator.gui import omnipause
 from origenerator.gui.grayscale import play_grayscale
+from origenerator.thumbnail import LONG_VIDEO_S, frame_ms_for
 
 
 def fit_size(path: str, size: QSize) -> QSize | None:
@@ -47,18 +50,38 @@ def set_in_sight(label, in_sight: bool) -> None:
         gate.set_in_sight(in_sight)
 
 
+STAGGER_SPAN_MS = frame_ms_for(LONG_VIDEO_S + 1)
+
+
+def stagger_ms(path: str) -> int:
+    return zlib.crc32(str(path).encode()) % STAGGER_SPAN_MS if STAGGER_SPAN_MS else 0
+
+
 class _Gate(QObject):
-    def __init__(self, movie: QMovie):
+    def __init__(self, movie: QMovie, *, starts_in_ms: int):
         super().__init__(movie)
         self._movie, self._frozen, self._in_sight = movie, False, True
+        if starts_in_ms:
+            movie.jumpToFrame(0)
+            QTimer.singleShot(starts_in_ms, self, self._start)
+        else:
+            self._start()
+
+    def _start(self) -> None:
+        self._movie.start()
+        self._hold_or_run()
 
     def set_frozen(self, frozen: bool) -> None:
         self._frozen = frozen
-        self._movie.setPaused(frozen or not self._in_sight)
+        self._hold_or_run()
 
     def set_in_sight(self, in_sight: bool) -> None:
         self._in_sight = in_sight
-        self._movie.setPaused(self._frozen or not in_sight)
+        self._hold_or_run()
+
+    def _hold_or_run(self) -> None:
+        if self._movie.state() != QMovie.MovieState.NotRunning:
+            self._movie.setPaused(self._frozen or not self._in_sight)
 
 
 def stop_what_plays_in(label) -> None:
@@ -81,7 +104,6 @@ def _fitted(path: str, size: QSize, parent) -> QMovie:
 
 
 def _running(movie: QMovie) -> QMovie:
-    movie.start()
-    omnipause.holds(_Gate(movie))
+    omnipause.holds(_Gate(movie, starts_in_ms=stagger_ms(movie.fileName())))
     return movie
 

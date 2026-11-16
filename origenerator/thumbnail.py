@@ -7,7 +7,7 @@ from pathlib import Path
 from PIL import Image
 from shared_ui.palette import BG_BUTTON
 
-from origenerator.media import MediaType, media_type_from_filename
+from origenerator.media import MediaType, media_type_from_filename, video_header
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +52,43 @@ def first_frame_of(path: Path) -> Image.Image | None:
     return Image.fromarray(frame_rgb)
 
 
+FRAME_MS = 140
+LONG_VIDEO_S = 60
+_TIMES_AS_LONG_ON_A_LONG_VIDEO = 5
+
+
+def video_duration_seconds(path: Path) -> float | None:
+    header = video_header(path)
+    return header.seconds if header else None
+
+
+def frame_ms_for(seconds: float | None) -> int:
+    return FRAME_MS * (_TIMES_AS_LONG_ON_A_LONG_VIDEO if seconds and seconds > LONG_VIDEO_S else 1)
+
+
+def frame_ms_of(animated_thumbnail: Path) -> int | None:
+    try:
+        with Image.open(animated_thumbnail) as made:
+            if getattr(made, "n_frames", 1) < 2:
+                return None
+            return min(_held_ms(made, frame) for frame in range(made.n_frames))
+    except OSError:
+        return None
+
+
+def _held_ms(made: Image.Image, frame: int) -> int:
+    made.seek(frame)
+    made.load()
+    return made.info.get("duration", 0)
+
+
+def at_its_videos_pace(animated_thumbnail: Path, video: Path) -> bool:
+    held = frame_ms_of(animated_thumbnail)
+    return held is None or held == frame_ms_for(video_duration_seconds(video))
+
+
 def generate_animated_thumbnail(
-    source_path: Path, thumb_dir: Path, *, name: str, frames: int = 8, duration_ms: int = 140
+    source_path: Path, thumb_dir: Path, *, name: str, frames: int = 8
 ) -> Path | None:
     dest = animated_thumbnail_path(thumb_dir, name)
     if dest.exists():
@@ -66,7 +101,7 @@ def generate_animated_thumbnail(
             return None
         images[0].save(
             being_written, format="WEBP", save_all=True, append_images=images[1:],
-            duration=duration_ms, loop=0,
+            duration=frame_ms_for(video_duration_seconds(source_path)), loop=0,
         )
         being_written.replace(dest)
     except Exception as e:

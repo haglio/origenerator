@@ -6,14 +6,17 @@ from PySide6.QtCore import QSize
 from PySide6.QtGui import QMovie
 from PySide6.QtWidgets import QLabel
 
-from origenerator.gui import omnipause
+from origenerator.gui import looping_preview, omnipause
 from origenerator.gui.looping_preview import (
     fit_size,
     looping_movie,
     play_gray_in,
     play_in,
     set_in_sight,
+    stagger_ms,
 )
+from origenerator.thumbnail import FRAME_MS
+from tests.children import HANG_AFTER_S
 
 
 def _loop(path, color="gray"):
@@ -125,3 +128,41 @@ def test_a_clip_for_a_caller_who_paints_it_is_parented_to_the_one_it_is_given(la
 def test_a_clip_whose_size_cannot_be_read_is_left_at_its_own_scale(tmp_path):
     assert fit_size(str(tmp_path / "missing.webp"), QSize(40, 30)) is None
 
+
+
+def _changing_loop(path):
+    frames = [Image.new("RGB", (40, 30), color) for color in ("gray", "white")]
+    frames[0].save(path, save_all=True, append_images=frames[1:], loop=0, duration=80)
+    return str(path)
+
+
+@pytest.fixture
+def staggered(monkeypatch):
+    monkeypatch.setattr(looping_preview, "STAGGER_SPAN_MS", 5 * FRAME_MS)
+
+
+def test_thumbnails_start_at_moments_of_their_own_within_one_slow_frame(staggered, tmp_path):
+    waits = {stagger_ms(str(tmp_path / f"{name}.webp")) for name in "abcdefgh"}
+
+    assert len(waits) > 4
+    assert all(0 <= wait < 5 * FRAME_MS for wait in waits)
+
+
+def test_a_thumbnail_shows_its_first_frame_until_its_moment_then_runs(staggered, label, tmp_path,
+                                                                      qtbot):
+    path = _changing_loop(tmp_path / "one.webp")
+    assert stagger_ms(path) > 0
+
+    movie = play_in(label, path, QSize(40, 30))
+
+    assert (movie.state(), movie.currentFrameNumber()) == (QMovie.MovieState.NotRunning, 0)
+    qtbot.waitUntil(lambda: movie.state() == QMovie.MovieState.Running, timeout=HANG_AFTER_S * 1000)
+
+
+def test_a_thumbnail_whose_moment_comes_while_the_room_is_stopped_is_held_still(
+        staggered, label, tmp_path, qtbot):
+    movie = play_in(label, _changing_loop(tmp_path / "one.webp"), QSize(40, 30))
+
+    omnipause.freeze(True)
+
+    qtbot.waitUntil(lambda: movie.state() == QMovie.MovieState.Paused, timeout=HANG_AFTER_S * 1000)

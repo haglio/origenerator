@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 
+from PIL import Image
+
+from origenerator import thumbnail
 from origenerator.db import Database, NewGeneration
 from origenerator.output_places import OutputPlaces
-from origenerator.thumbnail import animated_thumbnail_path
+from origenerator.thumbnail import FRAME_MS, LONG_VIDEO_S, animated_thumbnail_path, frame_ms_of
 from tests.media_files import write_mp4
 from tools.backfill_animated_thumbnails import main
 
@@ -41,3 +44,32 @@ def test_apply_makes_it_and_a_second_run_finds_nothing_left(tmp_path, capsys):
     capsys.readouterr()
     main([], **library)
     assert "0 video(s) with no animated thumbnail" in capsys.readouterr().out
+
+
+def test_a_thumbnail_made_before_its_long_video_slowed_is_counted_and_made_again(
+        tmp_path, capsys, monkeypatch):
+    library = _library(tmp_path)
+    frames = [Image.new("RGB", (64, 48), color) for color in ((255, 0, 0), (0, 255, 0))]
+    monkeypatch.setattr(thumbnail, "_sample_video_frames", lambda path, count, size: frames)
+    main(["--apply"], **library)
+    monkeypatch.setattr(thumbnail, "video_duration_seconds", lambda path: LONG_VIDEO_S + 1)
+    capsys.readouterr()
+
+    main([], **library)
+    assert "1 video(s) whose animated thumbnail changes at the wrong pace" in capsys.readouterr().out
+
+    main(["--apply"], **library)
+    assert frame_ms_of(animated_thumbnail_path(library["thumb_dir"], "v1")) == 5 * FRAME_MS
+    capsys.readouterr()
+    main([], **library)
+    assert "0 video(s) whose animated thumbnail changes at the wrong pace" in capsys.readouterr().out
+
+
+def test_a_thumbnail_whose_video_never_changes_has_no_pace_to_be_wrong(tmp_path, capsys):
+    library = _library(tmp_path)
+    main(["--apply"], **library)
+    capsys.readouterr()
+
+    main([], **library)
+
+    assert "0 video(s) whose animated thumbnail changes at the wrong pace" in capsys.readouterr().out

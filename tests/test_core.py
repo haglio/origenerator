@@ -1598,6 +1598,10 @@ def _frame_published(frames_file) -> tuple[int, int]:
     return width, height
 
 
+def _headset_tick(win) -> None:
+    win.hands_its_window_over._tick()
+
+
 def test_a_crossing_leaves_the_panes_side_by_side(qtbot, tmp_path):
     win = _window(qtbot, tmp_path, fun_time=_hosted_with_a_channel(tmp_path))
     assert win._gallery_view._arrangement.stack is not None, "it did not open folded"
@@ -1614,12 +1618,12 @@ def test_a_crossing_takes_the_presses_the_room_writes(qtbot, tmp_path):
 
     _say(win, tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{presses}")
     assert win.hands_its_window_over is not None
-    qtbot.waitUntil(lambda: _frame_published(tmp_path / "frame.bin") != (0, 0),
-                    timeout=3000)
+    _headset_tick(win)
+    assert _frame_published(tmp_path / "frame.bin") != (0, 0)
     append_command(presses, "hover 10 10")
 
-    qtbot.waitUntil(lambda: not presses.exists() or not presses.read_text(
-        encoding="utf-8").strip(), timeout=3000)
+    _headset_tick(win)
+    assert not presses.exists() or not presses.read_text(encoding="utf-8").strip()
 
 
 def test_a_window_parked_on_the_monitors_is_up_again_once_it_crosses(qtbot, tmp_path):
@@ -1631,7 +1635,8 @@ def test_a_window_parked_on_the_monitors_is_up_again_once_it_crosses(qtbot, tmp_
     assert win.hands_its_window_over is not None
 
     assert not win.isMinimized(), "the room was handed a window Windows had unmapped"
-    qtbot.waitUntil(lambda: _frame_published(frames) != (0, 0), timeout=3000)
+    _headset_tick(win)
+    assert _frame_published(frames) != (0, 0)
 
 
 def test_a_window_launched_hosted_on_the_monitors_still_crosses_into_the_headset(

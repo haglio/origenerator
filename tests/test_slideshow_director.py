@@ -466,6 +466,7 @@ class FakeHost:
         self.cleared_queue = 0
         self.started_now = 0
         self.cancelled_all = 0
+        self.cancelled_below = []
         self.queue = ([], 0)
         self.core = object()
         self.visible = [row["prompt_id"] for row in self.rows]
@@ -501,6 +502,9 @@ class FakeHost:
 
     def cancel_all(self):
         self.cancelled_all += 1
+
+    def cancel_below(self, key):
+        self.cancelled_below.append(key)
 
     def follow_link(self, prompt_id):
         self.followed.append(prompt_id)

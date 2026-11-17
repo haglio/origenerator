@@ -14,6 +14,7 @@ from funestra.playlist import PlaylistItem, read_playlist
 from funestra.radio import radio_file_for, read_radio
 from funestra.satellite_hud import parse_hud
 from PIL import Image
+from PySide6.QtWidgets import QMenu, QMessageBox
 from shared_ui.message_shape import HEARD_MARK, mark_of_a_message_said_now
 
 from origenerator import fun_time_mode as contract
@@ -28,12 +29,13 @@ from origenerator.gallery.collection import FAVORITES_KEY
 from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
 from origenerator.gui import omnipause, slideshow_director
 from origenerator.gui.gallery_view import GalleryView
-from origenerator.gui.hud_queue import CANCEL
+from origenerator.gui.hud_queue import CANCEL, OPEN
 from origenerator.gui.slideshow_pace import DEFAULT_S
 from origenerator.slideshow_buttons import answer
 from tests.closed_windows import is_closed
 from tests.gallery_view_support import (
     FakeActions,
+    _answer_confirmation,
     _comfyui_finishes,
     _generating_tile,
     _image,
@@ -45,6 +47,7 @@ from tests.gallery_view_support import (
     _viewport_of,
     _will_move_on,
 )
+from tests.qt_exec import faking_exec
 from tests.real_db import database_of, keep_on_disk
 from tests.slideshow_hud_support import funestra_of
 from tests.test_slideshow_hud import _inflight
@@ -749,6 +752,40 @@ def test_a_press_on_the_job_queue_a_funestra_draws_reaches_that_job(
     _press(bridge, tmp_path, f"portrait_foot_press|{x + width // 2}|{y + height // 2}")
 
     assert stopped == ["j1"]
+
+
+def test_the_document_names_a_right_click_on_the_job_queue_a_funestra_draws():
+    lines = contract.declaration()["command_lines"]
+
+    assert {"portrait_foot_menu|{x}|{y}", "landscape_foot_menu|{x}|{y}"} <= set(lines)
+
+
+def test_cancel_all_below_on_the_job_queue_a_funestra_draws_cancels_the_jobs_under_the_row(
+        qtbot, tmp_path, monkeypatch):
+    view = GalleryView(database_of([]), fun_time=_funestras_session(tmp_path))
+    qtbot.addWidget(view)
+    monkeypatch.setattr(view, "window", _MinimizedCore)
+    bridge = FunTimeBridge(view._fun_time, view, parent=view)
+    tall = tmp_path / "tall.png"
+    Image.new("RGB", (100, 200)).save(tall)
+    monkeypatch.setattr(view._slideshows, "rows_at", lambda key: [_row_of(
+        (str(tall), "image", "id-tall", str(tall)))] if key == "__all__::portrait" else [])
+    monkeypatch.setattr(view._slideshows, "items_of", _items_of)
+    _press(bridge, tmp_path, "portrait_open_slideshow")
+    shown = view.region_slideshow("portrait").shown
+    stopped = []
+    jobs = [_inflight(key, cancel=lambda key=key: stopped.append(key), typical_seconds=30)
+            for key in ("j1", "j2", "j3")]
+    monkeypatch.setattr(view.job_queue, "items", lambda rows=None, requests=None: jobs)
+    shown.set_queue(jobs)
+    faking_exec(monkeypatch, QMenu, lambda menu, *_a: next(
+        action for action in menu.actions() if action.text() == "Cancel All Below"))
+    _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
+    x, y, width, height = shown.queue_foot.pointer.where(f"{OPEN}|j1")
+
+    _press(bridge, tmp_path, f"portrait_foot_menu|{x + width // 2}|{y + height // 2}")
+
+    assert stopped == ["j3", "j2"]
 
 
 def _stills(tmp_path, prefix, count, size):

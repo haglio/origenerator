@@ -496,6 +496,7 @@ class SlideshowDirector:
             clear_queue=self._job_queue.clear_foreign,
             start_now=self._job_queue.start_now,
             cancel_all=self._job_queue.cancel_all,
+            cancel_below=self._job_queue.cancel_below,
             core_window=self._host.window,
             leave_for_core=self._leave_for_core,
             drive_toggle=self._osr2.toggle,

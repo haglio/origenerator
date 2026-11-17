@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import threading
 from unittest.mock import MagicMock
 
 from PIL import Image
 from PySide6.QtCore import (
+    QObject,
     Qt,
+    Signal,
+    Slot,
 )
 
 from origenerator import (
@@ -492,8 +496,34 @@ def test_populate_relaunches_when_a_variation_finishes(qtbot, tmp_path):
     assert key in view._live_jobs
 
 
+class _WindowTurn(QObject):
+    asked = Signal()
+
+    def __init__(self):
+        super().__init__()
+        self.taken = threading.Event()
+        self.asked.connect(self._take)
+
+    @Slot()
+    def _take(self):
+        self.taken.set()
+
+
+def _accepted_only_after_the_window_has_had_a_turn(client):
+    turn = _WindowTurn()
+
+    def submit(*_args, **_kwargs):
+        turn.taken.clear()
+        turn.asked.emit()
+        turn.taken.wait()
+        return "comfy-X"
+
+    client.submit_job.side_effect = submit
+
+
 def test_turning_populate_on_in_a_second_folder_ends_it_in_the_first(qtbot, tmp_path):
     client = _reroll_client()
+    _accepted_only_after_the_window_has_had_a_turn(client)
     db = _seeded_db(tmp_path)
     db.insert_generation(NewGeneration(
         prompt_id="other", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
@@ -508,13 +538,12 @@ def test_turning_populate_on_in_a_second_folder_ends_it_in_the_first(qtbot, tmp_
     qtbot.addWidget(view)
     view.refresh()
     settings = _at(_image_workflow(view._tree), 0, 0)
-    first = _at(settings, 0).data(0, _GROUP_ROLE).key
-    view._tree.setCurrentItem(_at(settings, 0))
+    first, second = (_at(settings, index).data(0, _GROUP_ROLE).key for index in (0, 1))
+    view._tree.setCurrentItem(view.toc.item_for(first))
     view._toggle_populate(True)
 
-    view._tree.setCurrentItem(_at(settings, 1))
+    view._tree.setCurrentItem(view.toc.item_for(second))
     view._toggle_populate(True)
-    second = _selected_folder(view)
 
     assert view._populate.is_active(second)
     assert not view._populate.is_active(first), (

@@ -45,6 +45,7 @@ from origenerator.gallery.enhance_fold import (
     enhancements_of_images_gone,
     fold_completed_enhancements,
     fold_enhancement,
+    forget_fixes_of_enhancements_gone,
 )
 from origenerator.gallery.enhance_settings import (
     ENHANCE_SETTING_KEYS,
@@ -226,6 +227,7 @@ __all__ = [
     "folder_key_for",
     "folder_level",
     "folder_signature",
+    "forget_fixes_of_enhancements_gone",
     "full_settings",
     "generate_tab_title",
     "generation_seed",

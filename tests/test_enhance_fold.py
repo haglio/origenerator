@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import NamedTuple
 
 from origenerator import gallery
@@ -8,6 +9,7 @@ from origenerator.db import Database, NewGeneration
 from origenerator.gallery import (
     fold_completed_enhancements,
     fold_enhancement,
+    forget_fixes_of_enhancements_gone,
     is_enhanced_row,
 )
 from origenerator.generation_metadata import file_item, metadata_facts
@@ -545,3 +547,54 @@ def test_a_folded_images_plain_version_is_superseded_by_its_enhancement(tmp_path
     assert gallery.enhanced_version_of("image/image_enhance_00001_.png [output]",
                                        enhanced) is None
     assert gallery.enhanced_version_of("image/sdxl_t2i_src.png [output]", plain) is None
+
+
+def _keep_for(root, name, *, days_old):
+    folder = root / name
+    folder.mkdir(parents=True)
+    made = 1_000_000 - days_old * 86_400
+    os.utime(folder, (made, made))
+
+
+def test_what_was_kept_from_fixes_is_forgotten_once_no_item_lists_its_enhancement(tmp_path):
+    db = Database(tmp_path / "gallery.db")
+    _add_source(db)
+    db.update_generation("src", output_files=json.dumps(
+        [{"filename": "enhanced.png", "subfolder": "image", "fixes_kept": "listed",
+          "fixes": [{"part": "faces", "box": [1, 1, 2, 2], "over": []}]}]))
+    root = tmp_path / "kept from fixes"
+    for name in ("listed", "gone"):
+        _keep_for(root, name, days_old=2)
+    _keep_for(root, "still landing", days_old=0)
+
+    forgotten = forget_fixes_of_enhancements_gone(db, root, now=1_000_000)
+
+    assert forgotten == 1
+    assert sorted(folder.name for folder in root.iterdir()) == ["listed", "still landing"]
+
+
+def test_what_was_kept_for_an_item_in_the_trash_stays_for_when_it_comes_back(tmp_path):
+    db = Database(tmp_path / "gallery.db")
+    _add_source(db)
+    db.update_generation("src", output_files=json.dumps(
+        [{"filename": "enhanced.png", "subfolder": "image", "fixes_kept": "trashed"}]))
+    db.record_trashed("src", db.get_generation("src"), {})
+    db.delete_generation("src")
+    root = tmp_path / "kept from fixes"
+    _keep_for(root, "trashed", days_old=2)
+
+    assert forget_fixes_of_enhancements_gone(db, root, now=1_000_000) == 0
+
+
+def test_a_folded_enhancement_still_lists_its_fixes_on_the_image_it_was_made_from(tmp_path):
+    db = Database(tmp_path / "gallery.db")
+    _add_source(db)
+    _add_enhance(db, "enh", "sdxl_t2i_src.png", "image_enhance_00001_.png")
+    db.update_generation("enh", output_files=json.dumps(
+        [{"filename": "image_enhance_00001_.png", "subfolder": "image", "type": "output",
+          "fixes_kept": "enh", "fixes": [{"part": "faces", "box": [1, 1, 2, 2], "over": []}]}]))
+
+    fold_enhancement(db, db.get_generation("enh"))
+
+    newest = gallery.enhancement_versions(db.get_generation("src"))[0]
+    assert [(switch.part, switch.on) for switch in newest.fixes] == [("faces", True)]

@@ -219,7 +219,7 @@ _INSTALLED_OUTLINE_DETECTORS = ("skin_detector.pt", "hair_detector.pt")
 
 GRAPH_FINGERPRINTS = {
     ("flux_t2i_upscaled", "v002"): "95c66b9bc4ef0407",
-    ("image_enhance", "v005"): "8d74869dce5e3d09",
+    ("image_enhance", "v006"): "c0615a81049da016",
     ("krea2_t2i", "v002"): "d864b9064cf7267b",
     ("minimax_h3_i2v", "v001"): "3dadea242d43f242",
     ("wan22_t2v", "v001"): "1a0247fc18bcac2f",

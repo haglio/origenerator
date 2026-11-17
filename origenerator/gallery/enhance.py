@@ -10,6 +10,7 @@ from pathlib import Path
 
 from app_support.comfy_file_refs import frame_name
 
+from origenerator.fix_switches import FixSwitch, switches_of
 from origenerator.gallery.enhance_graph import graph_version_params
 from origenerator.gallery.enhance_settings import (
     ENHANCE_SETTING_KEYS,
@@ -60,6 +61,10 @@ class EnhanceVersion:
     @property
     def is_original(self) -> bool:
         return self.index == 0
+
+    @property
+    def fixes(self) -> list[FixSwitch]:
+        return switches_of(self.file)
 
 
 def original_files_of(row: dict) -> list[dict]:

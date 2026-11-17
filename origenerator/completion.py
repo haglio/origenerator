@@ -5,7 +5,9 @@ import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
+from origenerator import fixes_kept
 from origenerator.config import OUTPUT_PLACES
+from origenerator.fix_switches import FIXES_KEY, KEPT_KEY
 from origenerator.gallery.output import output_file_path
 from origenerator.generation_state import GenerationStatus
 from origenerator.item_shape import shape_its_files_say
@@ -14,13 +16,16 @@ from origenerator.output_places import OutputFolders, OutputPlaces
 from origenerator.thumbnail import animate_if_video, generate_thumbnail
 from origenerator.timing import execution_duration_seconds
 from origenerator.video_lengths import as_recorded, video_length_of
+from origenerator.workflows.fix_finding import parts_found_by, saved_before_each_fix
 
 logger = logging.getLogger(__name__)
 
 
 def extract_completion(workflow, history_data, folders: OutputFolders, prompt_id):
     places, thumb_dir = folders
-    files = file_into_library(workflow.extract_output_info(history_data), places, prompt_id)
+    made = _with_what_each_fix_redrew(workflow.extract_output_info(history_data), history_data,
+                                      places, fixes_kept.folder_beside(thumb_dir), prompt_id)
+    files = file_into_library(made, places, prompt_id)
     thumb = _make_thumbnail(workflow, files, places, thumb_dir, prompt_id)
     source = _first_output_file(files, places)
     if source is not None:
@@ -31,6 +36,31 @@ def extract_completion(workflow, history_data, folders: OutputFolders, prompt_id
         logger.warning("Duration parse failed for %s: %s", prompt_id, e)
         duration = None
     return files, thumb, duration
+
+
+def _with_what_each_fix_redrew(made: list[dict], history_data: dict, places: OutputPlaces,
+                               kept_root: Path, prompt_id) -> list[dict]:
+    befores = [_as_comfyui_saved(record, places) for record in saved_before_each_fix(history_data)]
+    try:
+        parts = parts_found_by(history_data)
+        if not befores or not made or sorted(parts) != list(range(len(befores))):
+            return made
+        fixes = fixes_kept.keep(
+            [*befores, _as_comfyui_saved(made[0], places)],
+            [parts[at].name for at in range(len(befores))], kept_root / prompt_id)
+    except (OSError, ValueError) as e:
+        logger.warning("Keeping what each fix redrew failed for %s: %s", prompt_id, e)
+        return made
+    finally:
+        for before in befores:
+            before.unlink(missing_ok=True)
+    if not fixes:
+        return made
+    return [{**made[0], FIXES_KEY: fixes, KEPT_KEY: prompt_id}, *made[1:]]
+
+
+def _as_comfyui_saved(record: dict, places: OutputPlaces) -> Path:
+    return places.comfyui / (record.get("subfolder") or "") / record["filename"]
 
 
 def _first_output_file(files, places: OutputPlaces) -> Path | None:
@@ -56,7 +86,7 @@ def animate_before_filing(workflow, history_data, places: OutputPlaces, thumb_di
                          prompt_id) -> None:
     files = workflow.extract_output_info(history_data)
     if files:
-        saved = places.comfyui / (files[0].get("subfolder") or "") / files[0]["filename"]
+        saved = _as_comfyui_saved(files[0], places)
         animate_if_video(saved, thumb_dir, name=prompt_id)
 
 

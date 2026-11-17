@@ -1219,6 +1219,7 @@ _MAINTENANCE_PASSES = (
     ("origenerator.gallery", "fold_completed_enhancements"),
     ("origenerator.gallery", "enhancements_of_images_gone"),
     ("origenerator.gallery", "disown_foreign_runs"),
+    ("origenerator.gallery", "forget_fixes_of_enhancements_gone"),
     ("origenerator.importer", "backfill_shared_thumbnails"),
     ("origenerator.log_backfill", "backfill_durations_from_logs"),
     ("origenerator.provenance", "stamp_unstamped"),

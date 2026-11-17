@@ -4,7 +4,9 @@ import json
 import logging
 from pathlib import Path
 
+from origenerator import fixes_kept
 from origenerator.file_refs import reference_path
+from origenerator.fix_switches import KEPT_KEY
 from origenerator.gallery.enhance import (
     enhance_target_id,
     enhance_version_params,
@@ -120,3 +122,13 @@ def disown_foreign_runs(db) -> int:
     if repaired:
         logger.info("Disowned a foreign run id on %d enhanced images", repaired)
     return repaired
+
+
+_LONG_ENOUGH_TO_HAVE_LANDED = 24 * 60 * 60
+
+
+def forget_fixes_of_enhancements_gone(db, kept_root: Path, *, now: float) -> int:
+    rows = [*db.list_generations(), *(trashed["row"] for trashed in db.list_trashed())]
+    listed = {entry.get(KEPT_KEY) for row in rows for entry in row_output_files(row)}
+    return fixes_kept.forget_all_but(kept_root, listed,
+                                     settled_before=now - _LONG_ENOUGH_TO_HAVE_LANDED)

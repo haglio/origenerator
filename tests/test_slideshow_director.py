@@ -589,7 +589,7 @@ def slideshows(monkeypatch):
             playing.items, actions=playing.actions, hud=playing.hud, versions=playing.versions,
             opening=playing.opening, start=playing.start, shuffle=playing.shuffle,
             shape=seat.shape, channel=seat.channel, frames=seat.frames,
-            pace=hosting.pace, say=hosting.say)
+            pace=hosting.pace, messages=hosting.messages)
 
     monkeypatch.setattr(module, "SlideshowView", build_window)
     monkeypatch.setattr(module, "FunestraSlideshow", build_funestra_slideshow)

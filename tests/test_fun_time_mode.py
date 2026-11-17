@@ -71,6 +71,16 @@ def test_a_session_hands_over_each_funestras_own_channel():
     assert portrait.status_file == Path("st/portrait_status.txt")
     assert portrait.hud_file == Path("st/origenerator_portrait_hud.json")
     assert args.fun_time.funestra("landscape").playlist == Path("st/landscape.tsv")
+    assert portrait.message_file is None
+
+
+def test_a_session_may_name_where_a_funestras_slideshow_says_its_messages():
+    args = parse_app_args([*hosted_launch(funestras=True),
+                           "--portrait-message-file", "st/origenerator_portrait_messages.txt"])
+
+    assert args.fun_time.funestra("portrait").message_file == Path(
+        "st/origenerator_portrait_messages.txt")
+    assert args.fun_time.funestra("landscape").message_file is None
 
 
 def test_a_session_in_a_headset_names_where_to_hand_its_window_over():

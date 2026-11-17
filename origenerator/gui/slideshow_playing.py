@@ -27,7 +27,7 @@ class Seat:
 @dataclass(frozen=True)
 class Hosting:
     pace: object = None
-    say: object = None
+    messages: object = None
     shown: object = None
     clock: object = None
 

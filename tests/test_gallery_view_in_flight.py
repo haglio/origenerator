@@ -2558,8 +2558,7 @@ def test_cancel_all_below_asks_about_the_jobs_under_the_row_and_cancels_none_on_
     assert cancelled == []
 
 
-def test_cancel_all_below_is_grayed_out_on_a_row_with_nothing_below_it_to_cancel(
-        qtbot, monkeypatch):
+def test_a_row_with_nothing_below_it_to_cancel_opens_no_menu(qtbot, monkeypatch):
     view = _view_holding(qtbot, monkeypatch, [
         _cancelable("a", []), _cancelable("b", []),
         InFlightItem(key="c", caption="Alpha Workflow › a paper kite",
@@ -2567,9 +2566,8 @@ def test_cancel_all_below_is_grayed_out_on_a_row_with_nothing_below_it_to_cancel
 
     offered = [_right_click_row(view, key, monkeypatch, pick=None) for key in ("a", "b", "c")]
 
-    assert offered == [[("Cancel All Below", True)], [("Cancel All Below", False)],
-                       [("Cancel All Below", False)]], (
-        "grayed where it can do nothing, as Cancel All is")
+    assert offered == [[("Cancel All Below", True)], [], []], (
+        "the user's call: Cancel All Below is left off where it can do nothing, not grayed")
 
 
 def test_cancel_all_leaves_populate_on_to_start_its_next_seed(

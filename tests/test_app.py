@@ -1307,6 +1307,31 @@ def test_a_hosted_boot_builds_its_window_before_it_tidies_its_library_or_comfyui
         "the Satellites wait for the window, and only Core needs a tidied library")
 
 
+def _a_boot_logged(argv) -> list[str]:
+    logger = MagicMock()
+    starting = _ComfyUIStillStarting()
+    try:
+        with _a_faked_boot([], **{
+                "origenerator.gui.job_queue.BRING_UP_COMFYUI": starting,
+                "origenerator.app._configure_logging": MagicMock(return_value=logger)}):
+            assert main(argv) == 0
+    finally:
+        starting.answer.set()
+    return [said.args[0] % said.args[1:] for said in logger.info.call_args_list]
+
+
+def test_a_hosted_boot_logs_where_its_thread_stood_while_the_window_was_built(qapp):
+    built = [line for line in _a_boot_logged(hosted_launch())
+             if line.startswith("Boot: the window is built; ")]
+
+    assert len(built) == 1
+    assert " looks at the thread, and how many found it inside each function: " in built[0]
+
+
+def test_a_boot_outside_fun_time_takes_no_looks_at_its_thread(qapp):
+    assert not [line for line in _a_boot_logged([]) if "looks at the thread" in line]
+
+
 def test_a_hosted_boot_says_core_is_ready_only_once_comfyui_answered_and_the_late_passes_ran(
         qapp, qtbot):
     ran = []

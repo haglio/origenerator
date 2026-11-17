@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import os
 import sys
+import threading
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -175,9 +176,18 @@ def _open_the_loading(fun_time, app, logger, preview, taskbar):
 def _build_window(client, library, app_state, boot, next_launch):
     from origenerator.gui.core import Core, Launch
 
-    window = Core(client, library.db, app_state, fun_time=boot.fun_time,
-                  launch=Launch(boot.preview, boot.taskbar, next_launch), inbox=library.inbox)
-    if boot.fun_time is not None and not boot.fun_time.in_a_headset:
+    def build():
+        return Core(client, library.db, app_state, fun_time=boot.fun_time,
+                    launch=Launch(boot.preview, boot.taskbar, next_launch), inbox=library.inbox)
+
+    if boot.fun_time is None:
+        return build()
+    from origenerator.where_the_time_went import LooksAtAThread
+
+    with LooksAtAThread(threading.get_ident()) as looks:
+        window = build()
+    boot.logger.info("Boot: the window is built; %s", looks.said_in_one_line())
+    if not boot.fun_time.in_a_headset:
         window.showMinimized()
     return window
 

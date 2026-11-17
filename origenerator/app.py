@@ -183,12 +183,18 @@ def _build_window(client, library, app_state, boot, next_launch):
 
     if boot.fun_time is None:
         return build()
-    from origenerator.where_the_time_went import LooksAtAThread
+    from origenerator.where_the_time_went import LooksAtAThread, read_seconds, spent_between
 
+    began = read_seconds()
     with LooksAtAThread(threading.get_ident()) as looks:
         window = build()
-    boot.logger.info("Boot: the window is built; %s", looks.said_in_one_line())
+    built = read_seconds()
+    boot.logger.info("Boot: the window is built; %s; %s",
+                     spent_between(began, built), looks.said_in_one_line())
     window.serve_the_satellites_first()
+    window.once_the_satellites_are_served(lambda: boot.logger.info(
+        "Boot: the Satellites have their lists; since the window was built %s",
+        spent_between(built, read_seconds())))
     if not boot.fun_time.in_a_headset:
         window.showMinimized()
     return window

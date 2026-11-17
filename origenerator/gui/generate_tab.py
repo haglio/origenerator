@@ -75,6 +75,7 @@ from origenerator.gui.enhance_versions import (
     RunningEnhancement,
 )
 from origenerator.gui.flow_layout import FlowLayout
+from origenerator.gui.forms_ahead import FormsAhead
 from origenerator.gui.generate_button import (
     DEFAULT_CAPTION,
     RANDOM_SEED_CAPTION,
@@ -267,6 +268,8 @@ class GenerateTab(DropZones):
                                       lambda: workflow_named(self._form_workflow_key),
                                       train=self.train_requested.emit,
                                       trash=self.trash_requested.emit)
+        self._forms_ahead = FormsAhead(
+            self, self._fresh_form_of, lambda key: workflow_named(key).param_definitions())
         self._caption_timer = QTimer(self)
         self._caption_timer.setSingleShot(True)
         self._caption_timer.setInterval(_CAPTION_DELAY_MS)
@@ -578,18 +581,7 @@ class GenerateTab(DropZones):
         if wf is not None:
             self._offer_workflows(makes=wf.output_type, holding=key)
             edited = self._edited_form_values()
-            deriver = wf.derived_display_size if wf.derives_size_from_input else None
-            self._install_form(ParamForm(
-                wf.param_definitions(),
-                WorkflowTraits(size_deriver=deriver,
-                               size_source=wf.derived_size_source,
-                               hidden_keys=wf.enhance_keys(),
-                               pins_reused_seed=wf.pins_reused_seed(),
-                               lora_keys=wf.lora_keys,
-                               generates_here=wf.generates_here),
-                FormHelpers(heights=self._heights,
-                            seed_history=SeedHistory(self._seed_uses, self._looping_preview),
-                            items=self._zone_items())))
+            self._install_form(self._forms_ahead.take(key) or self._fresh_form_of(key))
             self._form_workflow_key = key
             defaults = wf.default_params()
             carried_over = {
@@ -613,6 +605,21 @@ class GenerateTab(DropZones):
         self._sync_generate()
         self._emit_title()
         self.show_recent_preview()
+
+    def _fresh_form_of(self, key: str) -> ParamForm:
+        wf = workflow_named(key)
+        deriver = wf.derived_display_size if wf.derives_size_from_input else None
+        return ParamForm(
+            wf.param_definitions(),
+            WorkflowTraits(size_deriver=deriver,
+                           size_source=wf.derived_size_source,
+                           hidden_keys=wf.enhance_keys(),
+                           pins_reused_seed=wf.pins_reused_seed(),
+                           lora_keys=wf.lora_keys,
+                           generates_here=wf.generates_here),
+            FormHelpers(heights=self._heights,
+                        seed_history=SeedHistory(self._seed_uses, self._looping_preview),
+                        items=self._zone_items()))
 
     def _edited_form_values(self) -> dict:
         prior = workflow_named(self._form_workflow_key)

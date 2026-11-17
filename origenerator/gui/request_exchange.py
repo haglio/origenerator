@@ -4,7 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from math import ceil
 
-from PySide6.QtCore import QEvent, QPoint, QSize, Qt, Signal
+from PySide6.QtCore import QEvent, QPoint, QPointF, QSize, Qt, Signal
 from PySide6.QtGui import (
     QTextBlockFormat,
     QTextCharFormat,
@@ -109,6 +109,7 @@ class _Made:
 
 class _Conversation(QTextEdit):
     generate_asked = Signal(int)
+    item_activated = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -124,6 +125,8 @@ class _Conversation(QTextEdit):
         self.verticalScrollBar().valueChanged.connect(lambda _value: self._place())
         self._tips: list[str] = []
         self._placed: list[tuple[QWidget, int]] = []
+        self._items: dict[int, str] = {}
+        self.viewport().setMouseTracking(True)
         self.hide()
 
     def show_entries(self, entries: list[_Entry], made: list[_Made]) -> None:
@@ -131,6 +134,7 @@ class _Conversation(QTextEdit):
             widget.hide()
             widget.deleteLater()
         self._placed = []
+        self._items = {}
         self.clear()
         cursor = self.textCursor()
         self._tips = []
@@ -157,6 +161,7 @@ class _Conversation(QTextEdit):
                 _block(cursor, indent=MARGIN_STANDARD, above=GAP_SMALL)
                 cursor.insertImage(image_format)
                 self._tips.append(entry.tip)
+                self._items[cursor.blockNumber()] = entry.made
         elif made.generate:
             button = GenerateButton(self.viewport())
             button.clicked.connect(lambda _checked=False, at=index: self.generate_asked.emit(at))
@@ -195,6 +200,27 @@ class _Conversation(QTextEdit):
         bar.setValue(bar.maximum())
         self._place()
 
+    def _item_at(self, place: QPoint) -> str | None:
+        on_the_page = QPointF(place.x(), place.y() + self.verticalScrollBar().value())
+        position = self.document().documentLayout().hitTest(
+            on_the_page, Qt.HitTestAccuracy.ExactHit)
+        if position < 0:
+            return None
+        return self._items.get(self.document().findBlock(position).blockNumber())
+
+    def mousePressEvent(self, event) -> None:
+        item = self._item_at(event.position().toPoint())
+        if event.button() == Qt.MouseButton.LeftButton and item is not None:
+            self.item_activated.emit(item)
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:
+        super().mouseMoveEvent(event)
+        over_an_item = self._item_at(event.position().toPoint()) is not None
+        self.viewport().setCursor(Qt.CursorShape.PointingHandCursor if over_an_item
+                                  else Qt.CursorShape.IBeamCursor)
+
     def tip_at(self, place: QPoint) -> str:
         block = self.cursorForPosition(place).blockNumber()
         return self._tips[block] if block < len(self._tips) else ""
@@ -213,6 +239,7 @@ class _Conversation(QTextEdit):
 class RequestExchange(QWidget):
     asked = Signal(str)
     generate_asked = Signal(int)
+    item_activated = Signal(str)
     auto_generate_chosen = Signal(bool)
 
     def __init__(self, parent=None):
@@ -221,6 +248,7 @@ class RequestExchange(QWidget):
         column.setSpacing(GAP_SMALL)
         self._conversation = _Conversation()
         self._conversation.generate_asked.connect(self.generate_asked)
+        self._conversation.item_activated.connect(self.item_activated)
         self._in_flight: dict[str, RunReading] = {}
         self._held: list[_Entry] = []
         self._started_on: str | None = None

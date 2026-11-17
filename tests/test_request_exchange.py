@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, QPoint, Qt
-from PySide6.QtGui import QColor, QHelpEvent, QImage, QTextCursor, QTextDocument
+from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
+from PySide6.QtGui import QColor, QHelpEvent, QImage, QMouseEvent, QTextCursor, QTextDocument
 from PySide6.QtWidgets import QApplication, QToolTip
 from shared_ui.colors import BG_TERTIARY, BLUE_LIGHT, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.spacing import MARGIN_STANDARD
@@ -12,6 +12,7 @@ from origenerator.gui.generate_button import GenerateButton
 from origenerator.gui.inflight import RunReading
 from origenerator.gui.progress_bar import ProgressBar
 from origenerator.gui.request_exchange import RequestExchange
+from origenerator.gui.source_tile import SourceTile
 
 EXCHANGE = [("a hat", "Gave her a straw hat."), ("make it red", "The hat is red now.")]
 
@@ -435,6 +436,53 @@ def test_a_turn_an_item_was_made_from_shows_its_thumbnail_where_generate_would_b
     assert len(_placed(exchange, GenerateButton)) == 1
     html = exchange._conversation.document().toHtml()
     assert paths["first"] in html
+
+
+def _thumbnail_place(exchange) -> QPoint:
+    conversation = exchange._conversation
+    block = conversation.document().findBlockByNumber(2)
+    corner = conversation.document().documentLayout().blockBoundingRect(block).topLeft()
+    return QPoint(round(corner.x()) + MARGIN_STANDARD + 4,
+                  round(corner.y() + block.blockFormat().topMargin()) + 4)
+
+
+def _shown_with_a_thumbnail(qtbot, tmp_path):
+    paths = _thumbnails(tmp_path, "first")
+    exchange = _shown_at(qtbot, 400)
+    exchange.set_thumbnail_of(paths.get)
+    exchange.show_exchange([_changed("a cap", made="first")])
+    return exchange
+
+
+def test_clicking_a_turns_thumbnail_opens_the_item_it_made_as_a_link_tile_does(qtbot, tmp_path):
+    exchange = _shown_with_a_thumbnail(qtbot, tmp_path)
+    opened = []
+    exchange.item_activated.connect(appending_to(opened))
+
+    qtbot.mouseClick(exchange._conversation.viewport(), Qt.MouseButton.LeftButton,
+                     pos=_thumbnail_place(exchange))
+    qtbot.mouseClick(exchange._conversation.viewport(), Qt.MouseButton.LeftButton,
+                     pos=QPoint(2, 2))
+
+    assert opened == ["first"]
+
+
+def _move_to(viewport, place: QPoint) -> None:
+    QApplication.sendEvent(viewport, QMouseEvent(
+        QEvent.Type.MouseMove, QPointF(place), QPointF(viewport.mapToGlobal(place)),
+        Qt.MouseButton.NoButton, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier))
+
+
+def test_the_pointer_over_a_turns_thumbnail_is_the_hand_a_link_tile_shows(qtbot, tmp_path):
+    exchange = _shown_with_a_thumbnail(qtbot, tmp_path)
+    viewport = exchange._conversation.viewport()
+
+    _move_to(viewport, _thumbnail_place(exchange))
+    over = viewport.cursor().shape()
+    _move_to(viewport, QPoint(2, 2))
+
+    assert (over, viewport.cursor().shape()) == (SourceTile().cursor().shape(),
+                                                 Qt.CursorShape.IBeamCursor)
 
 
 def test_a_turn_whose_item_is_being_made_shows_its_progress_until_the_thumbnail_comes(

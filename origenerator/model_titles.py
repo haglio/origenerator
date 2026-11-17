@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePosixPath
@@ -24,6 +25,7 @@ _FOLDERS_SHOWN_BY_TITLE = ("diffusion_models", "checkpoints", "loras")
 _NOTES = re.compile(r"\s*\((?P<notes>[^()]*)\)$")
 _PASSES = ("high", "low")
 _read: dict[str, tuple[tuple[int, int], object]] = {}
+_TITLES_OF_THE_PASS_UNDER_WAY: list[dict[str, str]] = []
 
 
 @dataclass(frozen=True, order=True)
@@ -54,7 +56,27 @@ def option_title(option) -> str:
     return model_title(option) if str(option).lower().endswith(MODEL_EXTENSIONS) else str(option)
 
 
+@contextmanager
+def each_title_worked_out_once():
+    under_way = _TITLES_OF_THE_PASS_UNDER_WAY
+    under_way.append(under_way[-1] if under_way else {})
+    try:
+        yield
+    finally:
+        under_way.pop()
+
+
 def model_title(value) -> str:
+    if not _TITLES_OF_THE_PASS_UNDER_WAY:
+        return _title_of(value)
+    titles = _TITLES_OF_THE_PASS_UNDER_WAY[-1]
+    key = str(value)
+    if key not in titles:
+        titles[key] = _title_of(value)
+    return titles[key]
+
+
+def _title_of(value) -> str:
     title, size = _title_and_size(value)
     return title if size is None else precision.in_plain_words(title, size)
 

@@ -846,23 +846,25 @@ class GalleryView(QWidget):
 
     def _on_generate_requested(self, workflow_name: str, batch: list[dict]):
         launching = self.generate_pane.current_generate_tab()
-        launch = self._launch(workflow_name, batch, launching,
-                              launching.asked() if launching is not None else None)
+        self._generate_from(launching, workflow_name, batch,
+                            launching.asked() if launching is not None else None)
+
+    def _on_turn_generate_requested(self, tab, workflow_name: str, params: dict, asked: dict):
+        launched = self._generate_from(tab, workflow_name, [params], asked)
+        if launched:
+            tab.note_turn_made(launched[0])
+
+    def _generate_from(self, launching, workflow_name: str, batch: list[dict],
+                       asked: dict | None) -> list[str]:
+        launch = self._launch(workflow_name, batch, launching, asked)
         if launch is None:
-            return
+            return []
         key, launched = launch
         if launching is not None:
             for prompt_id in launched:
                 launching.note_launched(prompt_id, made_of=batch[0])
         self._stand_on_the_run_in(key, rebuild=True)
-
-    def _on_turn_generate_requested(self, tab, workflow_name: str, params: dict, asked: dict):
-        launch = self._launch(workflow_name, [params], tab, asked)
-        if launch is None:
-            return
-        _key, (prompt_id, *_more) = launch
-        tab.note_turn_made(prompt_id)
-        self.refresh()
+        return launched
 
     def _launch(self, workflow_name: str, batch: list[dict], launching,
                 asked: dict | None) -> tuple[str, list[str]] | None:
@@ -1926,8 +1928,7 @@ class GalleryView(QWidget):
     def _on_reroll_finished(self, key: str, prompt_id: str, origin: str = ""):
         run = origin or prompt_id
         launcher = (None if run in self._populate_origins
-                    else self.generate_pane.tab_that_launched(run)
-                    or self.generate_pane.tab_whose_request_made(prompt_id))
+                    else self.generate_pane.tab_that_launched(run))
         self._populate_origins.discard(run)
         finished_row = self._db.get_generation(prompt_id)
         if finished_row is None or finished_row.get("source") in (GenerationSource.EXPERIMENT,

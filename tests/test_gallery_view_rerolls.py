@@ -1183,11 +1183,9 @@ def _asking_for_two_cats(qtbot, tmp_path, answer_once=None, *, unanswered=False,
     return view, exchange
 
 
-def test_generate_under_a_turn_runs_it_records_its_request_and_keeps_the_tab_on_its_image_meanwhile(
-        qtbot, tmp_path):
+def test_generate_under_a_turn_runs_it_and_records_its_request(qtbot, tmp_path):
     view = _tab_asked_for_two_cats(qtbot, tmp_path)
-    tab = view._generate_pane.current_generate_tab()
-    exchange = tab._param_form.request_exchange()
+    exchange = view._generate_pane.current_generate_tab()._param_form.request_exchange()
 
     exchange.generate_asked.emit(0)
 
@@ -1195,9 +1193,28 @@ def test_generate_under_a_turn_runs_it_records_its_request_and_keeps_the_tab_on_
     record = view._db.get_request(job.prompt_id)
     assert (record["asked"], record["source_prompt_id"], record["new_positive"]) == (
         "two cats", "orig", "two cats")
-    assert tab.displayed_row()["prompt_id"] == "orig"
     assert [entry.made for entry in exchange._entries()] == [job.prompt_id]
-    assert list(exchange._in_flight) == [job.prompt_id]
+
+
+def _generating_state(tab) -> tuple:
+    return (tab.displayed_row(), tab.watched_key() is not None, tab._cancel_btn.isVisibleTo(tab),
+            tab.launched_runs(),
+            _struck_and_lit(tab._param_form._widgets["positive_prompt"].boxes()[0]))
+
+
+def test_generate_under_a_turn_shows_the_tab_generating_as_the_tabs_own_generate_does(
+        qtbot, tmp_path):
+    by_the_turn = _tab_asked_for_two_cats(qtbot, tmp_path / "turn")
+    by_the_tab = _tab_asked_for_two_cats(qtbot, tmp_path / "tab")
+    turns_tab = by_the_turn._generate_pane.current_generate_tab()
+    tabs_tab = by_the_tab._generate_pane.current_generate_tab()
+
+    turns_tab._param_form.request_exchange().generate_asked.emit(0)
+    qtbot.mouseClick(tabs_tab._generate_btn, Qt.MouseButton.LeftButton)
+
+    (job,) = by_the_turn._live_jobs.values()
+    assert _generating_state(turns_tab) == (None, True, True, [job.prompt_id], ("", ""))
+    assert _generating_state(tabs_tab)[1:3] == (True, True)
 
 
 def _shown_by_the_tab(view) -> tuple[str, list, tuple[str, str]]:
@@ -1239,8 +1256,10 @@ def test_a_turns_image_that_fails_leaves_the_tab_on_the_image_asked_of(qtbot, tm
     assert _shown_by_the_tab(view)[:2] == ("orig", [("two cats", _TWO_CATS_SAID)])
 
 
-def _ask_for_a_hat(qtbot, view):
+def _ask_for_a_hat(qtbot, view, answer_once=None):
     def a_hat(positive, negative, words, **_):
+        if answer_once is not None:
+            answer_once.wait(5)
         return work_out(positive, negative, words, ask=lambda p, n, r, known: {"changes": [
             {"prompt": "positive", "replace": "two cats", "with": "two cats, a hat",
              "for": "a hat"}]})
@@ -1249,18 +1268,22 @@ def _ask_for_a_hat(qtbot, view):
     exchange = view._generate_pane.current_generate_tab()._param_form.request_exchange()
     qtbot.keyClicks(exchange._line, "a hat")
     qtbot.keyClick(exchange._line, Qt.Key.Key_Return)
-    qtbot.waitUntil(lambda: exchange.turns()[-1][1] != "", timeout=5000)
+    if answer_once is None:
+        qtbot.waitUntil(lambda: exchange.turns()[-1][1] != "", timeout=5000)
 
 
 def test_a_request_answered_while_the_last_ones_image_is_made_comes_along_to_that_image(
         qtbot, tmp_path):
-    view = _tab_asked_for_two_cats(qtbot, tmp_path, auto_generate=True)
-    view._generate_pane.current_generate_tab()._param_form.request_exchange().set_auto_generate(
-        False)
+    view = _tab_asked_for_two_cats(qtbot, tmp_path)
+    tab = view._generate_pane.current_generate_tab()
+    answer_now = threading.Event()
+    _ask_for_a_hat(qtbot, view, answer_once=answer_now)
+    tab._param_form.request_exchange().generate_asked.emit(0)
     (job,) = view._live_jobs.values()
     qtbot.waitUntil(lambda: _every_job_is_with_comfyui(view), timeout=5000)
-    _ask_for_a_hat(qtbot, view)
 
+    answer_now.set()
+    qtbot.waitUntil(lambda: tab._request_aim.turns[-1].answered != "", timeout=5000)
     _finish_reroll(view, job)
 
     shown, turns, (_struck, lit) = _shown_by_the_tab(view)
@@ -1268,23 +1291,34 @@ def test_a_request_answered_while_the_last_ones_image_is_made_comes_along_to_tha
         job.prompt_id, ["two cats", "a hat"], ", a hat")
 
 
-def test_the_tab_ends_on_the_latest_image_its_conversation_made_and_never_goes_back(
-        qtbot, tmp_path):
+def _land_the_running_job(qtbot, view):
+    qtbot.waitUntil(lambda: any(view._db.get_generation(job.prompt_id)["status"] == "running"
+                                for job in view._live_jobs.values()), timeout=5000)
+    job = next(job for job in view._live_jobs.values()
+               if view._db.get_generation(job.prompt_id)["status"] == "running")
+    _finish_reroll(view, job)
+    return job
+
+
+def test_two_requests_generated_one_after_another_each_become_the_tab_in_turn(qtbot, tmp_path):
     view = _tab_asked_for_two_cats(qtbot, tmp_path, auto_generate=True)
-    (first,) = view._live_jobs.values()
+    first = _land_the_running_job(qtbot, view)
     _ask_for_a_hat(qtbot, view)
-    second = next(job for job in view._live_jobs.values() if job is not first)
+    second = _land_the_running_job(qtbot, view)
 
-    for _landing in range(2):
-        qtbot.waitUntil(lambda: any(view._db.get_generation(job.prompt_id)["status"] == "running"
-                                    for job in view._live_jobs.values()), timeout=5000)
-        _finish_reroll(view, next(job for job in view._live_jobs.values()
-                                  if view._db.get_generation(job.prompt_id)["status"] == "running"))
-
-    tab = view._generate_pane.current_generate_tab()
     shown, turns, _marks = _shown_by_the_tab(view)
     assert (shown, [said for said, _answer in turns]) == (second.prompt_id, ["two cats", "a hat"])
-    assert not tab.follows_its_request_to(first.prompt_id)
+    assert view._db.get_request(second.prompt_id)["source_prompt_id"] == first.prompt_id
+
+
+def test_a_requests_image_landing_after_the_tab_moved_on_leaves_the_tab_where_it_is(
+        qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path, auto_generate=True)
+    view._on_thumbnail_clicked("orig")
+
+    _land_the_running_job(qtbot, view)
+
+    assert _shown_by_the_tab(view)[0] == "orig"
 
 
 def test_a_thumbnail_in_the_request_conversation_opens_its_item_as_a_link_tile_does(

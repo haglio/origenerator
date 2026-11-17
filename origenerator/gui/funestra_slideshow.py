@@ -57,6 +57,7 @@ from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
 logger = logging.getLogger(__name__)
 
 _POLL_MS = round(STATUS_INTERVAL_S * 1000)
+_NOT_HEARD_YET = object()
 
 
 @dataclass(frozen=True)
@@ -96,6 +97,7 @@ class FunestraSlideshow(QObject):
         self._take_set(playing)
         self._open = True
         self._on_funestra = OnTheFunestra()
+        self._asked_load_heard: object = _NOT_HEARD_YET
         def at_defaults() -> bool:
             at_base = self._actions.at_base
             return (not self.locked and self._set.filters == SlideshowFilters()
@@ -239,6 +241,9 @@ class FunestraSlideshow(QObject):
         status = parse_status(fields)
         self.transport.heard(status, fields)
         self._funestra_locked = status.locked
+        asked_for = self._a_step_was_asked_for(fields)
+        if asked_for and fields.get("asked_load") == fields.get("loads"):
+            self._on_screen.a_change_was_asked_for()
         self._on_screen.observe(
             status.video, now=self._clock(),
             playing_for=None if status.image else status.position_ms / 1000)
@@ -250,6 +255,8 @@ class FunestraSlideshow(QObject):
             self._hold_what_is_being_made_for_half()
             self._frame_on_funestra = None
             self._show_what_is_being_made()
+        if asked_for:
+            self._mind_a_step(asked_for)
         self._step_past_a_file_that_would_not_open(fields, status)
         self._tell_the_keep()
         self._give_the_lock_its_gesture()
@@ -386,11 +393,21 @@ class FunestraSlideshow(QObject):
 
     def slideshow_step(self, delta: int, *, verb: str | None = None) -> None:
         self._on_screen.a_change_was_asked_for()
+        self._mind_a_step(delta)
+        self._send(verb or (NEXT if delta > 0 else PREV))
+
+    def _a_step_was_asked_for(self, fields: dict) -> int:
+        asked = fields.get("asked_load")
+        heard_before, self._asked_load_heard = self._asked_load_heard, asked
+        if heard_before is _NOT_HEARD_YET or asked in (None, heard_before):
+            return 0
+        return int(fields.get("asked_step") or 0)
+
+    def _mind_a_step(self, delta: int) -> None:
         self._unlock()
         if delta > 0:
             self._set.end_a_loop_of_one()
         self._leave_the_versions()
-        self._send(verb or (NEXT if delta > 0 else PREV))
 
     def slideshow_toggle_lock(self) -> None:
         self.set_locked(not self.locked)

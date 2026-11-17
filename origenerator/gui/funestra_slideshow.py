@@ -170,11 +170,18 @@ class FunestraSlideshow(QObject):
     def _funestra_pace(self) -> int:
         return 0 if self._comparing else self._pace.seconds
 
-    def _tell_the_keep(self) -> None:
+    def _tell_the_keep(self, *, on_the_slide_he_locked: bool = False) -> None:
         keeps = self._keeps()
         if keeps != self._keep_told:
             self._keep_told = keeps
-            self._send(LOCK_ON if keeps else LOCK_OFF)
+            self._send(LOCK_OFF if not keeps else
+                       self._lock_on_the_current() if on_the_slide_he_locked else LOCK_ON)
+
+    def _lock_on_the_current(self) -> str:
+        current = self._set.playlist.current()
+        if current is None or current.is_live:
+            return LOCK_ON
+        return f"{LOCK_ON} {self._file_of(current)}"
 
     def _keeps(self) -> bool:
         return self._locked or self._request_holds_it or self._on_the_run()
@@ -388,7 +395,7 @@ class FunestraSlideshow(QObject):
     def set_locked(self, locked: bool) -> bool:
         if locked == self.locked:
             return False
-        self._lock(locked)
+        self._lock(locked, by_him=True)
         if locked:
             self._gesture_owed = True
             self._give_the_lock_its_gesture()
@@ -404,11 +411,11 @@ class FunestraSlideshow(QObject):
         if self._actions.lock is not None and prompt_id is not None:
             self._actions.lock(prompt_id)
 
-    def _lock(self, on: bool) -> None:
+    def _lock(self, on: bool, *, by_him: bool = False) -> None:
         self._locked = on
         if not on:
             self._gesture_owed = False
-        self._tell_the_keep()
+        self._tell_the_keep(on_the_slide_he_locked=by_him)
         self._publish()
 
     def _unlock(self) -> None:
@@ -425,7 +432,7 @@ class FunestraSlideshow(QObject):
             self._flash("Unfavorited")
             self._send(NEXT)
             return
-        self._send(TRASH)
+        self._send(f"{TRASH} {self._file_of(item)}")
         self._on_funestra = OnTheFunestra()
         self._set.forget(item)
         self._set.playlist.remove_current()

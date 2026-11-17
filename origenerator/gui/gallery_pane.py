@@ -59,7 +59,7 @@ from origenerator.gui.pane_place import (
     show_the_tiles_qt_queued_to_show,
     stand_at,
 )
-from origenerator.gui.picking import Picking
+from origenerator.gui.picking import Picking, Picks
 from origenerator.item_shape import base_of, filter_rows, key_holds, split_key
 from origenerator.library_views import LibrarySnapshot
 from origenerator.media import MediaType
@@ -948,6 +948,13 @@ class GalleryPane(QObject):
     @property
     def selected_ids(self) -> set:
         return self._selection.picked
+
+    def picks(self) -> Picks:
+        return self._selection.picks()
+
+    def pick_again(self, picks: Picks) -> None:
+        self._selection.pick_again(picks)
+        self._refresh_selection_highlights()
 
     def selected_prompt_ids(self) -> list[str]:
         return self._selection.in_shown_order()

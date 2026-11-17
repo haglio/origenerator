@@ -236,8 +236,16 @@ class _SaidOverShow:
     def set_locked(self, locked):
         self.done.append(("locked", locked))
 
+    def slideshow_more_seeds(self):
+        self.done.append(("more seeds",))
 
-@pytest.mark.parametrize(("said", "done"), [("trash", "trash"), ("wrong_action", "wrong action")])
+    def slideshow_step_version(self, step):
+        self.done.append(("version", step))
+
+
+@pytest.mark.parametrize(("said", "done"), [
+    ("trash", ("trash",)), ("wrong_action", ("wrong action",)), ("more_seeds", ("more seeds",)),
+    ("cycle_version", ("version", -1)), ("cycle_version_back", ("version", 1))])
 def test_a_word_about_the_slide_goes_back_to_the_slide_it_was_said_over_first(
         qtbot, tmp_path, monkeypatch, said, done):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
@@ -249,7 +257,7 @@ def test_a_word_about_the_slide_goes_back_to_the_slide_it_was_said_over_first(
         f"portrait_{said} @{five_seconds_ago:.3f}\n", encoding="utf-8")
     bridge._tick()
 
-    assert show.done == [("back to", pytest.approx(on_this_clock, abs=0.1)), (done,)]
+    assert show.done == [("back to", pytest.approx(on_this_clock, abs=0.1)), done]
 
 
 def test_a_lock_the_session_sends_is_taken_on_the_slide_it_brought_back(qtbot, tmp_path,

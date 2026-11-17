@@ -14,6 +14,7 @@ from origenerator.gallery.voice_commands import said_in
 from origenerator.gui import voice_router as module
 from origenerator.gui.gallery_pane_buttons import GROUP_TIP
 from origenerator.gui.message import ERROR, INFO, WARNING
+from origenerator.gui.picking import Picks
 from origenerator.gui.starting_rows import StartingRows
 from origenerator.gui.voice_router import VoiceRouter, VoiceSources, VoiceSwitches
 from origenerator.setter_voice import setter_phrases
@@ -223,6 +224,7 @@ class FakeHost:
     def __init__(self, *, collections=("__recents__",), selected=None):
         self.collections = set(collections)
         self.selected = selected
+        self.picked = Picks()
         self.stood_in = []
         self.enhanced = []
         self.fixed = []
@@ -238,6 +240,12 @@ class FakeHost:
 
     def selected_generation(self):
         return self.selected
+
+    def picks(self):
+        return self.picked
+
+    def pick_again(self, picks):
+        self.picked = picks
 
     def enhance_it(self, prompt_id):
         self.enhanced.append(prompt_id)
@@ -644,6 +652,46 @@ def test_a_word_about_the_slide_goes_with_when_it_was_said(router):
     voice.on_command(AppCommand.LOCK, said_at=7.5)
 
     assert slideshows.slide_words == [(AppCommand.LOCK, 7.5)]
+
+
+@pytest.mark.parametrize("command", [AppCommand.CULL, AppCommand.FAVORITE])
+def test_a_word_said_over_one_tile_picks_it_again_before_the_gallery_acts_on_it(router, command):
+    host, acted_on = FakeHost(), []
+    voice, _host, _slideshows = router(host, buttons={"actions": {
+        command: (FakeButton(tip="Trash"), lambda: acted_on.append(host.picked))}})
+    said_over, picked_since = Picks(frozenset({"g1", "g3"}), "g1"), Picks(frozenset({"g2"}), "g2")
+    voice.note_picks(said_over, now=10.0)
+    voice.note_picks(picked_since, now=12.0)
+    host.picked = picked_since
+
+    voice.on_command(command, said_at=11.0)
+
+    assert acted_on == [said_over]
+
+
+def test_a_word_said_with_no_tiles_picked_leaves_the_tiles_picked_since_alone(router):
+    host = FakeHost()
+    voice, _host, _slideshows = router(host, buttons={"actions": {
+        AppCommand.CULL: (FakeButton(tip="Trash"), lambda: None)}})
+    voice.note_picks(Picks(), now=10.0)
+    picked_since = Picks(frozenset({"g2"}), "g2")
+    voice.note_picks(picked_since, now=12.0)
+    host.picked = picked_since
+
+    voice.on_command(AppCommand.CULL, said_at=11.0)
+
+    assert host.picked == picked_since
+
+
+def test_a_word_said_with_the_same_tiles_picked_leaves_the_picks_alone(router):
+    host = FakeHost()
+    voice, _host, _slideshows = router(host, buttons={"actions": {
+        AppCommand.CULL: (FakeButton(tip="Trash"), lambda: None)}})
+    picked = Picks(frozenset({"g1"}), "g1")
+    voice.note_picks(picked, now=10.0)
+    host.picked, host.pick_again = picked, None
+
+    voice.on_command(AppCommand.CULL, said_at=11.0)
 
 
 def test_undo_stays_the_gallerys_even_under_a_slideshow(router):

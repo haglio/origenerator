@@ -10,6 +10,7 @@ from funestra.main_hud import (
 from PySide6.QtCore import (
     QPoint,
     QRect,
+    Qt,
 )
 
 from origenerator import (
@@ -1371,3 +1372,27 @@ def test_a_sentence_holding_a_command_word_is_no_command(qtbot, tmp_path):
     assert view._voice.listener.speak("a lock of hair over her eye") is None
     assert surface.said is None
     assert surface.steps == []
+
+
+def test_the_tiles_picked_are_told_to_the_voice_and_can_be_picked_again(qtbot, tmp_path,
+                                                                       monkeypatch):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    told = []
+
+    def note_picks(picks, *, now):
+        told.append(picks)
+
+    monkeypatch.setattr(view._voice, "note_picks", note_picks)
+    [tile] = view._gallery_pane._thumb_widgets
+
+    view._gallery_pane.apply_selection(tile, Qt.KeyboardModifier.NoModifier)
+    picked = view.picks()
+    view._gallery_pane.clear_thumbnail_selection()
+    view.pick_again(picked)
+
+    assert told[0] == picked
+    assert told[-1] == picked
+    assert view._gallery_pane.selected_prompt_ids() == [tile]

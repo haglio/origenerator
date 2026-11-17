@@ -389,7 +389,7 @@ def test_the_padlock_is_the_slideshows_own_lock_whatever_the_funestra_says(qtbot
     _says(slideshow, video="one.png", locked=True)
     slideshow.tick()
 
-    assert (told, still_locked, slideshow.locked) == (["LOCK_ON"], True, False)
+    assert (told, still_locked, slideshow.locked) == (["LOCK_ON one.png"], True, False)
 
 
 def test_stepping_lets_go_of_a_locked_slide_first(qtbot, tmp_path):
@@ -501,7 +501,7 @@ def test_a_lock_let_go_of_and_pressed_again_gets_the_whole_lock_again(qtbot, tmp
     _says(slideshow, video="one.png", locked=True)
     slideshow.tick()
 
-    assert (asked_again, sent) == (True, ["LOCK_ON"])
+    assert (asked_again, sent) == (True, ["LOCK_ON one.png"])
     assert asked == _the_whole_lock_on("id-1") * 2
 
 
@@ -552,11 +552,21 @@ def test_culling_tells_the_funestra_to_drop_it_before_deleting_it(qtbot, tmp_pat
     slideshow.slideshow_cull()
 
     assert deleted == ["id-1"]
-    assert queued_at_delete[:1] == ["TRASH"], (
+    assert queued_at_delete[:1] == ["TRASH one.png"], (
         "the Funestra is playing the condemned file and holds it open, so it is told to drop"
         " it before the generation is deleted")
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
     assert played == ["two.png", "three.png"]
+
+
+def test_a_lock_names_the_slide_it_was_pressed_on_so_the_funestra_locks_that_one(
+        qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path)
+    _sent(slideshow)
+
+    slideshow.slideshow_toggle_lock()
+
+    assert "LOCK_ON one.png" in _sent(slideshow)
 
 
 def test_the_delete_a_cull_starts_does_not_skip_a_second_item(qtbot, tmp_path):
@@ -812,7 +822,7 @@ def test_a_double_click_on_the_map_gives_that_item_the_lock_buttons_whole_lock(q
     _says(slideshow, video="three.png", locked=True)
     slideshow.tick()
 
-    assert sent == ["PLAY_FILE three.png", "LOCK_ON"]
+    assert sent == ["PLAY_FILE three.png", "LOCK_ON three.png"]
     assert asked == _the_whole_lock_on("id-3")
 
 
@@ -830,7 +840,7 @@ def test_a_double_click_on_the_map_moves_a_lock_held_on_another_item_onto_that_o
     _says(slideshow, video="three.png", locked=True)
     slideshow.tick()
 
-    assert sent == ["LOCK_OFF", "PLAY_FILE three.png", "LOCK_ON"]
+    assert sent == ["LOCK_OFF", "PLAY_FILE three.png", "LOCK_ON three.png"]
     assert asked == _the_whole_lock_on("id-1") + _the_whole_lock_on("id-3")
 
 
@@ -842,7 +852,7 @@ def test_a_slide_shown_locked_plays_and_locks_and_neither_stars_nor_enhances(qtb
 
     slideshow.show_locked("three.png")
 
-    assert _sent(slideshow) == ["PLAY_FILE three.png", "LOCK_ON"]
+    assert _sent(slideshow) == ["PLAY_FILE three.png", "LOCK_ON three.png"]
     assert (favorited, asked) == ([], [])
 
 
@@ -1255,7 +1265,7 @@ class TestVersions:
     @pytest.mark.parametrize(("move", "verb"), [
         (lambda slideshow: slideshow.slideshow_step(1), "NEXT"),
         (lambda slideshow: slideshow.slideshow_step(-1), "PREV"),
-        (lambda slideshow: slideshow.slideshow_cull(), "TRASH"),
+        (lambda slideshow: slideshow.slideshow_cull(), "TRASH one.png"),
         (lambda slideshow: slideshow.show_item("three.png"), "PLAY_FILE three.png"),
         (lambda slideshow: slideshow.reorder([("five.png", "image", "id-5")], latest=True),
          "PLAY_FILE five.png"),
@@ -1763,7 +1773,7 @@ def test_a_loop_button_for_a_row_of_one_image_locks_it_instead(qtbot, tmp_path):
 
     slideshow.slideshow_loop("seed")
 
-    assert (_sent(slideshow), said) == (["LOCK_ON"], ["Locked"]), (
+    assert (_sent(slideshow), said) == (["LOCK_ON one.png"], ["Locked"]), (
         "a row holding only the image on screen cannot be looped and the press still means this "
         "one, so it locks the image rather than refusing, the way a Satellite's loop button "
         "locks a video whose group holds only it")
@@ -1787,7 +1797,7 @@ def test_the_loop_keys_first_press_locks_the_item_on_screen(qtbot, tmp_path):
 
     slideshow.slideshow_loop_cycle()
 
-    assert [verb for verb in _sent(slideshow) if verb.startswith("LOCK")] == ["LOCK_ON"]
+    assert [verb for verb in _sent(slideshow) if verb.startswith("LOCK")] == ["LOCK_ON one.png"]
     assert (slideshow.locked, slideshow.hud_map().loop, said) == (True, "", ["Locked"])
 
 
@@ -1813,7 +1823,7 @@ def test_the_loop_key_is_the_lock_where_there_is_nothing_to_loop(qtbot, tmp_path
     slideshow.slideshow_loop_cycle()
     slideshow.slideshow_loop_cycle()
 
-    assert [verb for verb in _sent(slideshow) if verb.startswith("LOCK")] == ["LOCK_ON", "LOCK_OFF"]
+    assert [verb for verb in _sent(slideshow) if verb.startswith("LOCK")] == ["LOCK_ON one.png", "LOCK_OFF"]
     assert said == ["Locked", "Unlocked"]
 
 

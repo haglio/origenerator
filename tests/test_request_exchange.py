@@ -455,6 +455,24 @@ def test_a_turn_an_item_was_made_from_shows_its_thumbnail_where_generate_would_b
     assert paths["first"] in html
 
 
+def test_a_turn_whose_generate_would_only_remake_an_item_shows_that_items_thumbnail(
+        qtbot, tmp_path):
+    paths = _thumbnails(tmp_path, "already")
+    exchange = _shown_at(qtbot, 400)
+    exchange.set_thumbnail_of(paths.get)
+    exchange.set_generate_offered(lambda _index: False)
+    exchange.set_remade_by({0: "already"}.get)
+    opened = []
+    exchange.item_activated.connect(appending_to(opened))
+
+    exchange.show_exchange([_changed("a cap")])
+    qtbot.mouseClick(exchange._conversation.viewport(), Qt.MouseButton.LeftButton,
+                     pos=_thumbnail_place(exchange))
+
+    assert paths["already"] in exchange._conversation.document().toHtml()
+    assert opened == ["already"]
+
+
 def _thumbnail_place(exchange) -> QPoint:
     conversation = exchange._conversation
     block = conversation.document().findBlockByNumber(2)

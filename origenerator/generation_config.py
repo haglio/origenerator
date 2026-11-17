@@ -111,9 +111,19 @@ def would_reproduce_a_completed_run(rows, workflow, params: dict, *,
     return find_duplicate_generation(rows, snapshot) is not None
 
 
+def _what_a_request_runs(workflow, params: dict, asked_of: dict | None) -> dict:
+    return {**workflow.default_params(), **params, **seeds_of(asked_of, workflow)}
+
+
+def item_a_request_remakes(rows, workflow, params: dict, asked_of: dict | None) -> dict | None:
+    return find_duplicate_generation(
+        rows, ConfigSnapshot(workflow.name, _what_a_request_runs(workflow, params, asked_of), False))
+
+
 def what_a_request_makes(rows, workflow, params: dict, asked_of: dict | None) -> dict | None:
-    made = {**workflow.default_params(), **params, **seeds_of(asked_of, workflow)}
-    return None if would_reproduce_a_completed_run(rows, workflow, made) else made
+    if item_a_request_remakes(rows, workflow, params, asked_of) is not None:
+        return None
+    return _what_a_request_runs(workflow, params, asked_of)
 
 
 def seeds_of(row: dict | None, workflow) -> dict:

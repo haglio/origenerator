@@ -1410,7 +1410,8 @@ def _generate_offered(exchange) -> bool:
                for button in exchange._conversation.viewport().findChildren(GenerateButton))
 
 
-def test_a_turn_whose_change_would_make_an_image_already_made_offers_no_generate(qtbot, tmp_path):
+def test_a_turn_whose_change_would_make_an_image_already_made_shows_that_image_for_generate(
+        qtbot, tmp_path):
     answer = threading.Event()
     view, exchange = _asking_for_two_cats(qtbot, tmp_path, answer_once=answer)
     _completed_image(view._db, "already", "two cats", 7)
@@ -1418,7 +1419,7 @@ def test_a_turn_whose_change_would_make_an_image_already_made_offers_no_generate
 
     qtbot.waitUntil(lambda: exchange.turns() == [("two cats", _TWO_CATS_SAID)], timeout=5000)
 
-    assert not _generate_offered(exchange)
+    assert (_generate_offered(exchange), exchange._made_of(0).item) == (False, "already")
 
 
 def test_a_turn_whose_change_would_make_a_new_image_offers_generate(qtbot, tmp_path):

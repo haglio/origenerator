@@ -101,6 +101,7 @@ def _paragraph(cursor: QTextCursor, words: str, color, *, indent: int = 0, above
 
 @dataclass(frozen=True)
 class _Made:
+    item: str = ""
     thumbnail: str | None = None
     reading: RunReading | None = None
     generate: bool = False
@@ -156,13 +157,13 @@ class _Conversation(QTextEdit):
             bar.setFixedHeight(BAR_HEIGHT)
             bar.show_progress(made.reading.caption(), *made.reading.bars())
             self._reserve(cursor, bar, entry)
-        elif entry.made:
+        elif made.item:
             image_format = fitted(made.thumbnail, self._thumbnail_box())
             if image_format is not None:
                 _block(cursor, indent=MARGIN_STANDARD, above=GAP_SMALL)
                 cursor.insertImage(image_format)
                 self._tips.append(entry.tip)
-                self._items[cursor.blockNumber()] = entry.made
+                self._items[cursor.blockNumber()] = made.item
         elif made.generate:
             button = GenerateButton(self.viewport())
             button.clicked.connect(lambda _checked=False, at=index: self.generate_asked.emit(at))
@@ -262,6 +263,7 @@ class RequestExchange(QWidget):
         self._showing: str | None = None
         self._thumbnail_of: Callable[[str], str | None] | None = None
         self._generate_offered: Callable[[int], bool] = lambda _index: True
+        self._remade_by: Callable[[int], str | None] = lambda _index: None
         column.addWidget(self._conversation)
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
@@ -302,6 +304,9 @@ class RequestExchange(QWidget):
     def set_generate_offered(self, offered: Callable[[int], bool]) -> None:
         self._generate_offered = offered
 
+    def set_remade_by(self, remade_by: Callable[[int], str | None]) -> None:
+        self._remade_by = remade_by
+
     def _offers_generate(self, index: int) -> bool:
         entry = self._held[index]
         return not entry.made and entry.changed_anything() and self._generate_offered(index)
@@ -317,10 +322,11 @@ class RequestExchange(QWidget):
 
     def _made_of(self, index: int) -> _Made:
         entry = self._held[index]
-        if not entry.made:
+        item = entry.made or (self._remade_by(index) if entry.changed_anything() else None)
+        if not item:
             return _Made(generate=self._offers_generate(index))
-        return _Made(thumbnail=self._thumbnail_of(entry.made) if self._thumbnail_of else None,
-                     reading=self._in_flight.get(entry.made))
+        return _Made(item=item, thumbnail=self._thumbnail_of(item) if self._thumbnail_of else None,
+                     reading=self._in_flight.get(item))
 
     def mark_made(self, index: int, prompt_id: str) -> None:
         self._held[index].made = prompt_id

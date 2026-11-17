@@ -57,26 +57,31 @@ def main(argv: list[str] | None = None, *, db_path: Path | None = None,
     db = Database(config.DB_PATH if db_path is None else db_path)
     if args.verb == "record":
         found = [take_record(db, args.video, read_json(args.record), places=places(), grab=grab)]
-    elif args.verb == "watched":
-        found = [_on_its_row(db, Path(video), "set_watch_counts", counts)
-                 for video, counts in read_json(args.totals).items()]
-    elif args.verb == "favorite":
-        found = [_on_its_row(db, args.video, "set_generation_favorite", args.starred)]
-    elif args.verb == "flipped":
-        found = [_on_its_row(db, args.video, "set_library_record", genau_flipped=int(args.flipped))]
     else:
-        found = [_on_its_row(db, args.video, "set_library_record",
-                             upscale_provenance=json.dumps(read_json(args.provenance)))]
+        found = _written_on_their_rows(db, args)
     phone_records(db).write()
     print(json.dumps({"done": sum(found), "no_row": len(found) - sum(found)}))
     return 0
 
 
-def _on_its_row(db, video: Path, write: str, *args, **kwargs) -> bool:
-    prompt_id = VideoRows(db.list_generations())(video)
-    if prompt_id is not None:
-        getattr(db, write)(prompt_id, *args, **kwargs)
-    return prompt_id is not None
+def _written_on_their_rows(db, args) -> list[bool]:
+    row_of = VideoRows(db.list_generations())
+
+    def on_its_row(video: Path, write: str, *values, **fields) -> bool:
+        prompt_id = row_of(video)
+        if prompt_id is not None:
+            getattr(db, write)(prompt_id, *values, **fields)
+        return prompt_id is not None
+
+    if args.verb == "watched":
+        return [on_its_row(Path(video), "set_watch_counts", counts)
+                for video, counts in read_json(args.totals).items()]
+    if args.verb == "favorite":
+        return [on_its_row(args.video, "set_generation_favorite", args.starred)]
+    if args.verb == "flipped":
+        return [on_its_row(args.video, "set_library_record", genau_flipped=int(args.flipped))]
+    return [on_its_row(args.video, "set_library_record",
+                       upscale_provenance=json.dumps(read_json(args.provenance)))]
 
 
 if __name__ == "__main__":

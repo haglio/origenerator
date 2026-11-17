@@ -96,6 +96,6 @@ def test_it_goes_on_looking_until_the_work_it_watches_is_over():
         return ""
 
     with LooksAtAThread(_WATCHED, stacks=stacks, every_s=0.001) as looks:
-        assert looked_twice.wait(10)
+        assert looked_twice.wait()
 
     assert looks.said_in_one_line().startswith(f"{len(seen)} looks at the thread")

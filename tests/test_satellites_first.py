@@ -1,55 +1,72 @@
 from __future__ import annotations
 
+from app_support.threading_utils import wait_until
 from PySide6.QtCore import QObject
+from PySide6.QtWidgets import QApplication
 
-from origenerator.gui.satellites_first import SatellitesFirst
-
-_NEVER_MS = 600_000
+from origenerator.gui.satellites_first import LONGEST_WAIT_S, SatellitesFirst
 
 
-def _waiting(qtbot, served, *, wait_ms=_NEVER_MS):
+class _Clock:
+    def __init__(self) -> None:
+        self.at = 0.0
+
+    def __call__(self) -> float:
+        return self.at
+
+
+def _waiting(served, clock=None):
     owner = QObject()
-    first = SatellitesFirst(owner, served=served, wait_ms=wait_ms)
+    first = SatellitesFirst(owner, served=served, now=clock or _Clock())
     first.owner = owner
     return first
+
+
+def _until(condition):
+    wait_until(condition, pump=QApplication.processEvents)
 
 
 def test_what_waits_runs_once_the_satellites_have_their_lists(qtbot):
     have = []
     ran = []
-    first = _waiting(qtbot, lambda: bool(have))
+    first = _waiting(lambda: bool(have))
     first.then(lambda: ran.append("drawn"))
-    qtbot.wait(150)
+    first.look()
     assert ran == []
 
     have.append("lists")
 
-    qtbot.waitUntil(lambda: ran == ["drawn"])
+    _until(lambda: ran == ["drawn"])
 
 
 def test_what_waits_runs_when_the_wait_is_over_though_a_satellite_never_took_a_list(qtbot):
     ran = []
-    first = _waiting(qtbot, lambda: False, wait_ms=50)
+    clock = _Clock()
+    first = _waiting(lambda: False, clock)
     first.then(lambda: ran.append("drawn"))
+    first.look()
+    assert ran == []
 
-    qtbot.waitUntil(lambda: ran == ["drawn"])
+    clock.at = LONGEST_WAIT_S
+
+    _until(lambda: ran == ["drawn"])
 
 
 def test_what_waits_runs_in_the_order_it_was_asked_and_only_once(qtbot):
     ran = []
-    first = _waiting(qtbot, lambda: True)
+    first = _waiting(lambda: True)
     first.then(lambda: ran.append("the window's own draw"))
     first.then(lambda: ran.append("the library's tidying"))
 
-    qtbot.waitUntil(lambda: len(ran) == 2)
-    qtbot.wait(250)
+    _until(lambda: len(ran) == 2)
+    first.look()
 
     assert ran == ["the window's own draw", "the library's tidying"]
 
 
 def test_what_is_asked_after_the_satellites_were_served_runs_at_once(qtbot):
-    first = _waiting(qtbot, lambda: True)
-    qtbot.waitUntil(lambda: first.over)
+    first = _waiting(lambda: True)
+    _until(lambda: first.over)
     ran = []
 
     first.then(lambda: ran.append("late"))

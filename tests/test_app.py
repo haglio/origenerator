@@ -27,10 +27,11 @@ from app_support.testing import (
     pinned_shortcuts_stamped,
     window_dressed,
 )
+from app_support.threading_utils import wait_until
 from app_support.win32 import TaskbarApp
 from PIL import Image
 from PySide6.QtGui import QColor, QPalette
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QApplication, QWidget
 from shared_ui.alert import Level
 from shared_ui.colors import BLUE
 from shared_ui.preview import Preview
@@ -1303,7 +1304,7 @@ def test_a_hosted_boot_tidies_its_library_only_once_the_satellites_are_served(qa
         (served,), _ = window.once_the_satellites_are_served.call_args
         served()
 
-        qtbot.waitUntil(lambda: "reconcile_in_flight" in ran, timeout=5000)
+        wait_until(lambda: "reconcile_in_flight" in ran, pump=QApplication.processEvents)
 
 
 def test_a_boot_outside_fun_time_serves_no_satellites_first(qapp):
@@ -1339,7 +1340,7 @@ def test_a_hosted_boot_builds_its_window_before_it_tidies_its_library_or_comfyui
                                    "origenerator.gui.job_queue.BRING_UP_COMFYUI": starting}) as _, \
              patch("origenerator.comfyui_launcher.ensure_comfyui_server") as ensure:
             assert main(hosted_launch()) == 0
-            qtbot.waitUntil(starting.asked.is_set, timeout=5000)
+            wait_until(starting.asked.is_set, pump=QApplication.processEvents)
     finally:
         starting.answer.set()
 
@@ -1385,10 +1386,10 @@ def test_a_hosted_boot_says_core_is_ready_only_once_comfyui_answered_and_the_lat
         with _a_faked_boot(ran, **{"origenerator.gui.core.Core": MagicMock(return_value=window),
                                    "origenerator.gui.job_queue.BRING_UP_COMFYUI": starting}):
             assert main(hosted_launch()) == 0
-            qtbot.waitUntil(starting.asked.is_set, timeout=5000)
+            wait_until(starting.asked.is_set, pump=QApplication.processEvents)
             assert "core is ready" not in ran
             starting.answer.set()
-            qtbot.waitUntil(lambda: "core is ready" in ran, timeout=5000)
+            wait_until(lambda: "core is ready" in ran, pump=QApplication.processEvents)
     finally:
         starting.answer.set()
 

@@ -231,6 +231,7 @@ class GenerateTab(DropZones):
     displayed_changed = Signal()
     enhance_requested = Signal(str)
     versions_delete_requested = Signal(str, list)
+    fix_switch_requested = Signal(str, str, str, bool)
     train_requested = Signal(str)
     trash_requested = Signal(str)
     actions_saved = Signal(str, object)
@@ -407,6 +408,7 @@ class GenerateTab(DropZones):
         self._versions.version_selected.connect(self._show_version)
         self._versions.enhance_requested.connect(self._on_enhance_requested)
         self._versions.delete_requested.connect(self._on_versions_delete_requested)
+        self._versions.fix_switch_requested.connect(self._on_fix_switch_requested)
         body.addWidget(self._versions)
 
     def _build_settings_pane(self) -> QWidget:
@@ -1208,11 +1210,14 @@ class GenerateTab(DropZones):
             return
         self._display_result(row, image_rows, made_with=merge_denormalized(row))
 
-    def refresh_displayed(self, row: dict, image_rows: list[dict]):
+    def refresh_displayed(self, row: dict, image_rows: list[dict], version: str | None = None):
         shown = self._displayed_row
         if shown is None or shown.get("prompt_id") != row.get("prompt_id"):
             return
         self._display_result(row, image_rows)
+        listed = [listed.file.get("filename") for listed in self._listed_versions]
+        if version in listed:
+            self._versions.pick_and_show(listed.index(version))
 
     def show_finished_media(self, row: dict):
         if resolve_preview(row, OUTPUT_PLACES) is not None:
@@ -1652,6 +1657,12 @@ class GenerateTab(DropZones):
                  if 0 <= p < len(versions)]
         if names:
             self.versions_delete_requested.emit(row["prompt_id"], names)
+
+    def _on_fix_switch_requested(self, position: int, part: str, on: bool):
+        row = self._displayed_row
+        if row is not None and 0 <= position < len(self._listed_versions):
+            self.fix_switch_requested.emit(
+                row["prompt_id"], self._listed_versions[position].file.get("filename"), part, on)
 
     def _refresh_versions(self):
         row = self._displayed_row

@@ -439,9 +439,9 @@ class GeneratePane(QTabWidget):
         for tab in self.generate_tabs():
             tab.hear_actions(side, actions_by_id)
 
-    def refresh_displayed(self, row: dict, image_rows: list[dict]):
+    def refresh_displayed(self, row: dict, image_rows: list[dict], version: str | None = None):
         for tab in self.generate_tabs():
-            tab.refresh_displayed(row, image_rows)
+            tab.refresh_displayed(row, image_rows, version)
 
     def reread_names(self):
         for tab in self.generate_tabs():

@@ -32,6 +32,7 @@ from shared_ui.colors import BG_PRIMARY, BLUE, BORDER_SUBTLE, TEXT_MUTED, TEXT_P
 from shared_ui.icons import CANVAS
 from shared_ui.spacing import BUTTON_SIZE_HUD
 from shared_ui.testing import appending_to
+from shared_ui.tick_control import TickControl
 from shared_ui.toggle_switch import ToggleSwitch
 
 import origenerator.gui.enhance_pane as enhance_pane_module
@@ -2702,3 +2703,86 @@ def test_the_versions_list_shows_its_rows_before_their_files_are_decoded(qtbot, 
     for work, done in held:
         done(work())
     assert all(not row._thumbnail.pixmap().isNull() for row in _rows(versions))
+
+
+A_PLACE = [100, 100, 300, 300]
+
+
+def _fix(part: str, *over: str, box=A_PLACE) -> dict:
+    return {"part": part, "box": box, "over": list(over)}
+
+
+def _enhancement_with_fixes(*fixes, off=()):
+    file = {"filename": "img.png", "fixes_kept": "run-1", "fixes": list(fixes)}
+    if off:
+        file["fixes_off"] = list(off)
+    return EnhanceVersion(1, "Enhancement 1/1", file, {"enhance_scale": 2.0})
+
+
+def _fix_boxes(versions) -> dict:
+    (row,) = _rows(versions)
+    return {box.text(): box for box in row.findChildren(TickControl)}
+
+
+def _showing(qtbot, version) -> EnhanceVersions:
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_versions(_items([version]))
+    return versions
+
+
+def test_an_enhancements_row_lists_its_fixes_each_with_a_checkbox_in_the_order_they_were_drawn(qtbot):
+    versions = _showing(qtbot, _enhancement_with_fixes(
+        _fix("faces"), _fix("hands"), off=["hands"]))
+
+    boxes = _fix_boxes(versions)
+
+    assert [(name, box.isChecked(), box.isEnabled()) for name, box in boxes.items()] == [
+        ("Faces", True, True), ("Hands", False, True)]
+
+
+def test_an_enhancement_made_before_fixes_were_kept_shows_no_fix_checkboxes(qtbot):
+    versions = _showing(qtbot, EnhanceVersion(
+        1, "Enhancement 1/1", {"filename": "img.png"},
+        {"enhance_scale": 2.0, "enhance_detail_fixes": {"faces": 0.4}}))
+
+    assert _fix_boxes(versions) == {}
+
+
+def test_unchecking_a_fix_asks_for_it_to_be_switched_off_on_that_enhancement(qtbot):
+    versions = _showing(qtbot, _enhancement_with_fixes(_fix("faces")))
+    asked = []
+    versions.fix_switch_requested.connect(lambda *told: asked.append(told))
+
+    _fix_boxes(versions)["Faces"].click()
+
+    assert asked == [(0, "faces", False)]
+
+
+def test_a_fix_with_another_drawn_over_it_is_grayed_and_says_which_to_turn_off_first(qtbot):
+    versions = _showing(qtbot, _enhancement_with_fixes(
+        _fix("faces"), _fix("eyes", "faces")))
+
+    faces = _fix_boxes(versions)["Faces"]
+
+    assert (faces.isChecked(), faces.isEnabled()) == (True, False)
+    assert faces.toolTip() == "Eyes was drawn over part of this fix. Turn off Eyes first."
+
+
+def test_an_off_fix_drawn_over_another_off_fix_is_grayed_and_says_which_to_turn_on_first(qtbot):
+    versions = _showing(qtbot, _enhancement_with_fixes(
+        _fix("faces"), _fix("eyes", "faces"), off=["eyes", "faces"]))
+
+    eyes = _fix_boxes(versions)["Eyes"]
+
+    assert (eyes.isChecked(), eyes.isEnabled()) == (False, False)
+    assert eyes.toolTip() == "This fix was drawn over part of Faces. Turn on Faces first."
+
+
+def test_a_fix_that_found_nothing_is_grayed_and_says_so(qtbot):
+    versions = _showing(qtbot, _enhancement_with_fixes(_fix("teeth", box=None)))
+
+    teeth = _fix_boxes(versions)["Teeth"]
+
+    assert not teeth.isEnabled()
+    assert teeth.toolTip() == "This fix found nothing to redraw in this image"

@@ -723,7 +723,11 @@ class GalleryView(QWidget):
         tab.displayed_changed.connect(self.enhance.reconcile)
         tab.displayed_changed.connect(self._reconcile_generating)
         tab.enhance_requested.connect(lambda pid: self.enhance.enhance_items([pid]))
-        tab.versions_delete_requested.connect(self.delete_enhance_versions)
+        tab.versions_delete_requested.connect(lambda prompt_id, filenames: self.edit_versions(
+            prompt_id, lambda row: self._edits.delete_enhance_versions(row, filenames)))
+        tab.fix_switch_requested.connect(lambda prompt_id, filename, part, on: self.edit_versions(
+            prompt_id, lambda row: self._edits.switch_fix(row, filename, part, on=on),
+            then_show=filename))
         tab.set_enhance_settings(self.enhance.settings)
         tab.set_fullscreen_factory(self.slideshows.open_on_preview)
         tab.set_setter_host(self._setter_host)
@@ -1759,14 +1763,15 @@ class GalleryView(QWidget):
         self.refresh()
         return "Request submitted", INFO
 
-    def delete_enhance_versions(self, prompt_id: str, filenames: list):
+    def edit_versions(self, prompt_id: str, edit, then_show: str | None = None):
         row = self._db.get_generation(prompt_id)
-        if row is None or not self._edits.delete_enhance_versions(row, filenames):
+        if row is None or not edit(row):
             return
         self.refresh()
         updated = self._db.get_generation(prompt_id)
         if updated is not None:
-            self.generate_pane.refresh_displayed(updated, self.library.reading.image_rows)
+            self.generate_pane.refresh_displayed(updated, self.library.reading.image_rows,
+                                                  then_show)
             self.slideshows.note_versions_deleted(updated)
 
     def slideshow_location(self):

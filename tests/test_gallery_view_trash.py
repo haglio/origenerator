@@ -1444,7 +1444,7 @@ def test_deleting_an_items_enhancement_versions_puts_the_delete_on_the_undo_butt
     view.refresh()
     assert not view._buttons.undo.isEnabled()
 
-    view.delete_enhance_versions("i1", ["enhanced.png"])
+    view.generate_pane.current_generate_tab().versions_delete_requested.emit("i1", ["enhanced.png"])
 
     assert view._buttons.undo.isEnabled()
     assert "Delete 1 version" in view._buttons.undo.toolTip()

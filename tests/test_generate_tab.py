@@ -5148,3 +5148,48 @@ def test_a_run_from_a_lone_image_shows_it_where_and_as_big_as_the_frames_that_fo
     assert (viewport._stack.currentWidget(), viewport._live) == (viewport._image_label, True), (
         "drawn in the pair's smaller square, the image shrank the moment Generate was pressed "
         "and grew back when the first frame came")
+
+
+def _forms_built(monkeypatch) -> list:
+    built = []
+
+    class CountedForm(ParamForm):
+        def __init__(self, definitions, *args, **kwargs):
+            built.append(len(definitions))
+            super().__init__(definitions, *args, **kwargs)
+
+    monkeypatch.setattr(generate_tab_module, "ParamForm", CountedForm)
+    return built
+
+
+def test_coming_back_to_a_workflow_shows_a_form_made_ahead_of_time(blank_panel, monkeypatch):
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "flux_t2i_upscaled"))
+    QApplication.processEvents()
+    built = _forms_built(monkeypatch)
+
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
+
+    assert built == [], "the form for a workflow shown before is made while nothing else is asked"
+    defaults = WORKFLOW_REGISTRY["sdxl_t2i"].default_params()
+    shown = blank_panel._param_form.get_values()
+    assert {key: shown[key] for key in ("steps", "cfg")} == {
+        key: defaults[key] for key in ("steps", "cfg")}
+    assert blank_panel._workflow_dropdown.parent() is not None
+    assert blank_panel._param_form.isAncestorOf(blank_panel._workflow_dropdown)
+
+
+def test_a_form_made_ahead_is_left_unused_once_its_workflow_offers_something_else(
+        blank_panel, monkeypatch):
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "flux_t2i_upscaled"))
+    QApplication.processEvents()
+    sdxl = WORKFLOW_REGISTRY["sdxl_t2i"]
+    offered = sdxl.param_definitions()
+    steps = next(definition for definition in offered if definition.key == "steps")
+    steps.default += 1
+    monkeypatch.setattr(sdxl, "param_definitions", lambda: offered)
+
+    blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
+
+    assert blank_panel._param_form.get_values()["steps"] == steps.default

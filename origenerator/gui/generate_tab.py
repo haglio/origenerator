@@ -1322,7 +1322,7 @@ class GenerateTab(DropZones):
             self._item_config(made_with) if self._displayed_row is not None else None
         )
         if self._param_form is not None:
-            self._aim_the_request(self._displayed_row or being_made)
+            self._aim_the_request(self._displayed_row, being_made=being_made)
             self._mark_prompts()
         self.refresh_modified_message()
 
@@ -1346,13 +1346,16 @@ class GenerateTab(DropZones):
     def _settings_shown(self) -> ConfigSnapshot:
         return self._displayed_config or self._item_config()
 
-    def _aim_the_request(self, row: dict | None) -> None:
+    def _aim_the_request(self, row: dict | None, *, being_made: dict | None = None) -> None:
         exchange = self._param_form.request_exchange()
         if exchange is None:
             self._request_aim = None
             return
         offered = row is not None and self._displayed_config is not None
         self._param_form.request_section().setVisible(offered)
+        if row is None and being_made is not None and self._launched_runs:
+            return
+        row = row or being_made
         if row is None:
             self._request_aim = None
             return
@@ -1386,12 +1389,6 @@ class GenerateTab(DropZones):
         was.carried_onto(prompt_id, shown, len(self._db.requests.turns_of(prompt_id))
                          if made_by_a_turn is None else made_by_a_turn)
         return was
-
-    def follows_its_request_to(self, prompt_id: str) -> bool:
-        aim = self._request_aim
-        made = [turn.made for turn in aim.every_turn()] if aim is not None else []
-        return prompt_id in made and (aim.prompt_id not in made
-                                      or made.index(prompt_id) > made.index(aim.prompt_id))
 
     def _thumbnail_of(self, prompt_id: str) -> str | None:
         return (self._db.get_generation(prompt_id) or {}).get("thumbnail_path")

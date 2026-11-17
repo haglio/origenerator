@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -7,7 +8,7 @@ from pathlib import Path
 
 from app_support.video_names import stem_of_either_copy
 
-from origenerator import non_ai_videos, trash_collection
+from origenerator import fix_switches, fixes_kept, non_ai_videos, trash_collection
 from origenerator.gallery import (
     counted,
     output_disk_files,
@@ -15,7 +16,12 @@ from origenerator.gallery import (
     resolve_preview,
     unreviewed_experiments,
 )
-from origenerator.gallery.output import stems_made_as, with_files_renamed
+from origenerator.gallery.output import (
+    output_file_path,
+    row_output_files,
+    stems_made_as,
+    with_files_renamed,
+)
 from origenerator.one_look import looking_once
 from origenerator.output_files import library_paths_in
 from origenerator.output_places import OutputPlaces
@@ -139,6 +145,31 @@ class GalleryEdits:
 
         self._history.push(UndoEntry(_version_label(len(filenames)), undo, batch.purge,
                               redo=lambda: self.delete_enhance_versions(row, filenames)))
+        return True
+
+    def switch_fix(self, row: dict, filename: str, part: str, *, on: bool) -> bool:
+        thumb_dir = self._environment.thumb_dir
+        files = row_output_files(row)
+        at = next((at for at, entry in enumerate(files) if entry.get("filename") == filename), None)
+        if thumb_dir is None or at is None:
+            return False
+        switched = fix_switches.switched(files[at], part, on)
+        drawn = fix_switches.drawn_as(files[at], part)
+        if switched is None or drawn is None:
+            return False
+        image = output_file_path(files[at], self._places)
+        if self._environment.release_files is not None:
+            self._environment.release_files([image], the_item_stays=True)
+        kept = fixes_kept.folder_beside(Path(thumb_dir)) / files[at][fix_switches.KEPT_KEY]
+        try:
+            if not fixes_kept.switch(image, kept, *drawn, on=on):
+                return False
+        except OSError:
+            logger.exception("Could not switch a fix of %s", row["prompt_id"])
+            return False
+        files[at] = switched
+        self._db.update_generation(row["prompt_id"], output_files=json.dumps(files))
+        self._redraw_thumbnail(row["prompt_id"])
         return True
 
     def _redraw_thumbnail(self, prompt_id: str) -> None:

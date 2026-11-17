@@ -228,7 +228,7 @@ def test_binning_a_version_reaches_a_tab_on_that_image_that_is_not_in_front(qtbo
     db.update_generation("g0", output_files=json.dumps(
         [{"filename": "sdxl_t2i_g0.png", "subfolder": "image", "type": "output"}]))
 
-    view.delete_enhance_versions("g0", ["image_enhance_00001_.png"])
+    first_tab.versions_delete_requested.emit("g0", ["image_enhance_00001_.png"])
 
     assert len(first_tab._versions._host.findChildren(_VersionRow)) == 1
 
@@ -245,9 +245,31 @@ def test_binning_a_version_tells_the_slideshows_what_the_image_has_left(qtbot, t
     told = []
     view.slideshows.note_versions_deleted = told.append
 
-    view.delete_enhance_versions("g0", ["image_enhance_00001_.png"])
+    view.generate_pane.current_generate_tab().versions_delete_requested.emit("g0", ["image_enhance_00001_.png"])
 
     assert [row["prompt_id"] for row in told] == ["g0"]
+
+
+def test_a_fix_checkbox_pressed_on_an_enhancements_row_switches_that_fix_and_keeps_showing_that_enhancement(
+        qtbot, tmp_path):
+    client = _reroll_client()
+    db = _enhanceable_db(tmp_path, count=1)
+    actions = FakeActions()
+    view = GalleryView(db, client=client, actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._on_thumbnail_clicked("g0")
+    tab = view.generate_pane.current_generate_tab()
+    view.enhance_items(["g0"])
+    (job,) = view._jobs.all_jobs
+    client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
+    shown = []
+    tab._versions.version_selected.connect(shown.append)
+
+    tab._versions.fix_switch_requested.emit(0, "faces", False)
+
+    assert actions.fixes_switched == [("g0", "image_enhance_00001_.png", "faces", False)]
+    assert shown == [0]
 
 
 def test_enhance_items_queues_the_picked_images(qtbot, tmp_path):

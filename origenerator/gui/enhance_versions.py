@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 from shared_ui.colors import BG_PRIMARY, TEXT_PRIMARY, YELLOW
 from shared_ui.icons import icon_pixmap
 from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, GAP_SMALL
+from shared_ui.tick_control import TickControl
 
 from origenerator.generation_metadata import UNDATED, Dating, MetadataItem, created_item, file_item
 from origenerator.gui import icons, palette
@@ -38,7 +39,9 @@ _PLUS = THUMBNAIL_BOX.width() * 2 // 3
 _PENDING_BORDER = f"2px solid {palette.IN_FLIGHT_BORDER}"
 _MATCH_BORDER = f"2px solid {palette.MATCH_BORDER}"
 _VALUE_COLUMN = 1
-_FACT_KEYS = ("Enhancement", "File", "Created")
+_FIXES = "Fixes"
+_FACT_KEYS = ("Enhancement", _FIXES, "File", "Created")
+_FOUND_NOTHING = "This fix found nothing to redraw in this image"
 # The app's global QWidget background paints every label opaque over the row's fill.
 _ROW_CSS = "#versionRow QLabel { background-color: transparent; }"
 _SELECTED_ROW_CSS = (
@@ -73,6 +76,22 @@ def _pass_mouse_through(widget) -> None:
     # Qt gives selectable text its own Copy / Select All menu, which would sit over the row's Delete.
     widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
     widget.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
+
+
+def _named(parts) -> str:
+    return " and ".join(part.capitalize() for part in parts)
+
+
+def _fix_tooltip(switch) -> str:
+    if not switch.redrew_something:
+        return _FOUND_NOTHING
+    held_by = _named(switch.held_by)
+    if held_by and switch.on:
+        return f"{held_by} was drawn over part of this fix. Turn off {held_by} first."
+    if held_by:
+        return f"This fix was drawn over part of {held_by}. Turn on {held_by} first."
+    return ("Uncheck to take this fix off the image" if switch.on
+            else "Check to put this fix back on the image")
 
 
 class RunningEnhancement(NamedTuple):
@@ -239,6 +258,7 @@ class _VersionRow(_Row):
     clicked = Signal(int, Qt.KeyboardModifier)
     context_requested = Signal(int, QPoint)
     delete_pressed = Signal(int)
+    fix_switched = Signal(int, str, bool)
 
     def __init__(self, version, position: int, thumbnails=_STILL_COMING,
                  dating: Dating = UNDATED, deletable: bool = False):
@@ -260,6 +280,7 @@ class _VersionRow(_Row):
             trash.clicked.connect(
                 lambda _checked=False: self.delete_pressed.emit(self._position))
         self._show_facts(items, beside_copy=trash)
+        self._show_fixes(version.fixes, line=len(items) + 1)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -282,6 +303,26 @@ class _VersionRow(_Row):
         else:
             self._thumbnail.setText(NOT_KNOWN)
             self._thumbnail.setToolTip("This version's file is no longer on disk")
+
+    def _show_fixes(self, switches, line: int) -> None:
+        if not switches:
+            return
+        key_width = label_column_width([MetadataItem(key, "") for key in _FACT_KEYS])
+        label = metadata_cells(MetadataItem(_FIXES, ""), key_width)[0]
+        _pass_mouse_through(label)
+        self._facts.addWidget(label, line, 0, Qt.AlignmentFlag.AlignTop)
+        listed = QVBoxLayout()
+        listed.setContentsMargins(0, 0, 0, 0)
+        listed.setSpacing(GAP_SMALL)
+        for switch in switches:
+            box = TickControl(switch.part.capitalize())
+            box.setChecked(switch.on)
+            box.setEnabled(switch.can_be_switched)
+            box.setToolTip(_fix_tooltip(switch))
+            box.clicked.connect(lambda on, part=switch.part:
+                                self.fix_switched.emit(self._position, part, on))
+            listed.addWidget(box, 0, Qt.AlignmentFlag.AlignLeft)
+        self._facts.addLayout(listed, line, _VALUE_COLUMN)
 
     def set_highlighted(self, on: bool) -> None:
         self._thumbnail.setStyleSheet(
@@ -373,6 +414,7 @@ class EnhanceVersions(QWidget):
     version_selected = Signal(int)
     enhance_requested = Signal()
     delete_requested = Signal(list)
+    fix_switch_requested = Signal(int, str, bool)
 
     def __init__(self, parent=None, *, read=QImage):
         super().__init__(parent)
@@ -436,6 +478,7 @@ class EnhanceVersions(QWidget):
             row.clicked.connect(self._on_row_clicked)
             row.context_requested.connect(self._on_row_menu)
             row.delete_pressed.connect(lambda at: self.delete_requested.emit([at]))
+            row.fix_switched.connect(self.fix_switch_requested)
             self._rows.append(row)
             self._picking.note_shown(position)
             column.addWidget(row)
@@ -469,7 +512,7 @@ class EnhanceVersions(QWidget):
         self._picking.apply(position)
         self._show_picks()
 
-    def _pick_and_show(self, position: int) -> None:
+    def pick_and_show(self, position: int) -> None:
         self._pick_only(position)
         self.version_selected.emit(position)
 
@@ -482,7 +525,7 @@ class EnhanceVersions(QWidget):
         if position == _ENHANCE_ROW:
             self._pick_only(position)
         else:
-            self._pick_and_show(position)
+            self.pick_and_show(position)
 
     def _on_row_menu(self, position: int, global_pos: QPoint):
         if position in self._originals:

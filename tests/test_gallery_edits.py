@@ -1048,3 +1048,83 @@ def test_deleting_many_items_and_undoing_it_each_tell_the_gallery_once(tmp_path)
 
     assert (deleted, len(told)) == (1, 2)
     assert [db.get_generation(f"p{n}") is not None for n in range(3)] == [True] * 3
+
+
+UNDER_THE_FIX, FIXED = (10, 10, 10), (200, 0, 0)
+FIX_BOX = [10, 10, 40, 40]
+
+
+def _row_enhanced_with_a_fix(db, output_dir, thumb_dir, pid="p1"):
+    _completed_row(db, output_dir, pid, "image/base.png")
+    enhanced = Image.new("RGB", (100, 100), UNDER_THE_FIX)
+    enhanced.paste(FIXED, tuple(FIX_BOX))
+    enhanced.save(output_dir / "image" / "enhanced.png")
+    kept = thumb_dir.parent / "kept from fixes" / "run-1"
+    kept.mkdir(parents=True)
+    Image.new("RGB", (30, 30), UNDER_THE_FIX).save(kept / "0_before.png")
+    Image.new("RGB", (30, 30), FIXED).save(kept / "0_after.png")
+    Image.new("L", (30, 30), 255).save(kept / "0_changed.png")
+    db.update_generation(
+        pid,
+        output_files=json.dumps([
+            {"filename": "enhanced.png", "subfolder": "image", "fixes_kept": "run-1",
+             "fixes": [{"part": "faces", "box": FIX_BOX, "over": []}]},
+            {"filename": "base.png", "subfolder": "image"},
+        ]),
+        original_files=json.dumps([{"filename": "base.png", "subfolder": "image"}]),
+    )
+    return db.get_generation(pid)
+
+
+def _color_in_the_fix(output_dir):
+    with Image.open(output_dir / "image" / "enhanced.png") as image:
+        return image.getpixel((20, 20))
+
+
+def test_switching_a_fix_off_redraws_the_enhancement_without_it_and_writes_it_down(tmp_path):
+    thumb_dir = tmp_path / "thumbnails"
+    actions, db, output_dir = _actions(tmp_path, thumb_dir=thumb_dir)
+    row = _row_enhanced_with_a_fix(db, output_dir, thumb_dir)
+
+    assert actions.switch_fix(row, "enhanced.png", "faces", on=False) is True
+
+    assert _color_in_the_fix(output_dir) == UNDER_THE_FIX
+    listed = json.loads(db.get_generation("p1")["output_files"])
+    assert listed[0]["fixes_off"] == ["faces"]
+    assert Path(db.get_generation("p1")["thumbnail_path"]).is_file()
+
+
+def test_switching_a_fix_back_on_draws_it_again(tmp_path):
+    thumb_dir = tmp_path / "thumbnails"
+    actions, db, output_dir = _actions(tmp_path, thumb_dir=thumb_dir)
+    actions.switch_fix(_row_enhanced_with_a_fix(db, output_dir, thumb_dir),
+                       "enhanced.png", "faces", on=False)
+
+    assert actions.switch_fix(db.get_generation("p1"), "enhanced.png", "faces", on=True) is True
+
+    assert _color_in_the_fix(output_dir) == FIXED
+    assert "fixes_off" not in json.loads(db.get_generation("p1")["output_files"])[0]
+
+
+def test_a_switch_lets_go_of_the_image_before_redrawing_it(tmp_path):
+    thumb_dir = tmp_path / "thumbnails"
+    seen = []
+    actions, db, output_dir = _actions(
+        tmp_path, thumb_dir=thumb_dir,
+        release_files=lambda paths, **told: seen.append((list(paths), told)))
+
+    actions.switch_fix(_row_enhanced_with_a_fix(db, output_dir, thumb_dir),
+                       "enhanced.png", "faces", on=False)
+
+    assert seen == [([output_dir / "image" / "enhanced.png"], {"the_item_stays": True})]
+
+
+def test_a_fix_whose_kept_places_are_gone_stays_as_it_is(tmp_path):
+    thumb_dir = tmp_path / "thumbnails"
+    actions, db, output_dir = _actions(tmp_path, thumb_dir=thumb_dir)
+    row = _row_enhanced_with_a_fix(db, output_dir, thumb_dir)
+    (thumb_dir.parent / "kept from fixes" / "run-1" / "0_before.png").unlink()
+
+    assert actions.switch_fix(row, "enhanced.png", "faces", on=False) is False
+
+    assert db.get_generation("p1")["output_files"] == row["output_files"]

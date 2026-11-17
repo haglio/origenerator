@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import contextlib
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from operator import attrgetter
 
@@ -36,6 +37,7 @@ from origenerator.gui.headset_window import CAP_PX, HeadsetWindow
 from origenerator.gui.osr2_driving import Osr2Driving
 from origenerator.gui.panes import RememberedBorders
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
+from origenerator.gui.satellites_first import LONGEST_WAIT_MS, SatellitesFirst
 from origenerator.gui.slideshow_director import SlideshowDirector
 from origenerator.gui.taskbar_identity import TaskbarIdentity
 from origenerator.gui.toasts import Toasts
@@ -160,6 +162,7 @@ class Core(QMainWindow):
         self.setWindowTitle(WINDOW_TITLE if fun_time else window_title(WINDOW_TITLE, preview))
         self.setMinimumSize(600, 400)
         self._device_rect = None
+        self._satellites_first: SatellitesFirst | None = None
         if fun_time is not None:
             self._wear_the_session(fun_time)
 
@@ -216,6 +219,15 @@ class Core(QMainWindow):
         self._borders.take(self._app_state.get(_PANE_SIZES_KEY))
         if self._fun_time is None:
             self._borders.put_back()
+
+    def serve_the_satellites_first(self, *, wait_ms: int = LONGEST_WAIT_MS) -> None:
+        self._satellites_first = self._gallery_view.serve_the_satellites_first(wait_ms=wait_ms)
+
+    def once_the_satellites_are_served(self, run: Callable[[], None]) -> None:
+        if self._satellites_first is None:
+            run()
+        else:
+            self._satellites_first.then(run)
 
     def restore_what_only_core_shows(self) -> None:
         for key, _getter, setter in SESSION_UI_STATE:

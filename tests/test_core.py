@@ -41,7 +41,7 @@ from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
 from origenerator.fun_time_bridge import FunTimeBridge
-from origenerator.fun_time_mode import CORE_READY, FunTimeSession, Rect
+from origenerator.fun_time_mode import CORE_READY, FunestraChannel, FunTimeSession, Rect
 from origenerator.gallery.collection import LATEST_KEY, FolderCollection
 from origenerator.gallery.shapes import BOTH, SEPARATE
 from origenerator.generation_state import GenerationSource
@@ -2563,3 +2563,82 @@ def test_core_taken_into_a_session_takes_its_name_off(qtbot, tmp_path, his_two_m
     win.become_hosted(_fun_time_session())
 
     assert win._title.isHidden()
+
+
+
+
+def _indexed_for_search(win) -> list[str]:
+    return list(win._gallery_view.search.index._entries)
+
+
+def _read_for_the_satellites(win) -> list[str]:
+    return [row["prompt_id"] for row in win._gallery_view.library.reading.rows]
+
+
+def _hosted_with_two_satellites(tmp_path):
+    def channel(shape):
+        return FunestraChannel(*(tmp_path / f"{shape}_{part}" for part in
+                                 ("playlist.tsv", "cmd.txt", "status.txt", "hud.json")))
+    return replace(_fun_time_session(), portrait_funestra=channel("portrait"),
+                   landscape_funestra=channel("landscape"))
+
+
+def test_a_window_serving_the_satellites_first_reads_the_library_and_leaves_its_own_draw(
+        qtbot, tmp_path):
+    win = _window(qtbot, tmp_path, fun_time=_hosted_with_two_satellites(tmp_path))
+    _completed_image(win._gallery_view._db)
+    win.serve_the_satellites_first()
+
+    win.show()
+    qtbot.wait(300)
+
+    assert _read_for_the_satellites(win) == ["g-1"]
+    assert _indexed_for_search(win) == [], (
+        "the window's own draw took the seconds the Satellites spent waiting for their lists")
+
+
+def test_a_window_serving_the_satellites_first_draws_itself_once_they_have_their_lists(
+        qtbot, tmp_path, monkeypatch):
+    win = _window(qtbot, tmp_path, fun_time=_hosted_with_two_satellites(tmp_path))
+    _completed_image(win._gallery_view._db)
+    win.serve_the_satellites_first()
+    win.show()
+
+    with monkeypatch.context() as while_both_play:
+        while_both_play.setattr(win._gallery_view.slideshows, "region_slideshow",
+                                lambda shape: object())
+
+        qtbot.waitUntil(lambda: _indexed_for_search(win) == ["g-1"])
+
+
+def test_a_window_serving_the_satellites_first_draws_itself_when_the_wait_is_over(
+        qtbot, tmp_path):
+    win = _window(qtbot, tmp_path, fun_time=_hosted_with_two_satellites(tmp_path))
+    _completed_image(win._gallery_view._db)
+    win.serve_the_satellites_first(wait_ms=50)
+
+    win.show()
+
+    qtbot.waitUntil(lambda: _indexed_for_search(win) == ["g-1"])
+
+
+def test_what_waits_for_the_satellites_runs_after_the_windows_own_draw(qtbot, tmp_path):
+    win = _window(qtbot, tmp_path, fun_time=_fun_time_session())
+    _completed_image(win._gallery_view._db)
+    win.serve_the_satellites_first()
+    win.show()
+    found = []
+
+    win.once_the_satellites_are_served(lambda: found.append(_indexed_for_search(win)))
+
+    qtbot.waitUntil(lambda: found == [["g-1"]])
+
+
+def test_a_window_never_told_to_serve_the_satellites_first_runs_what_waits_at_once(
+        qtbot, tmp_path):
+    win = _window(qtbot, tmp_path)
+    ran = []
+
+    win.once_the_satellites_are_served(lambda: ran.append("ran"))
+
+    assert ran == ["ran"]

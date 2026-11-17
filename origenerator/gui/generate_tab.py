@@ -1375,11 +1375,21 @@ class GenerateTab(DropZones):
 
     def _aim_carried_onto(self, prompt_id: str, shown: tuple[str, str]) -> RequestAim | None:
         was = self._request_aim
-        if was is None or prompt_id not in self._launched_runs or not (was.turns or was.asking):
+        if was is None or not (was.turns or was.asking):
+            return None
+        made_by_a_turn = was.turns_up_to(prompt_id)
+        if made_by_a_turn is None and prompt_id not in self._launched_runs:
             return None
         self._request_aims.forget(was.prompt_id)
-        was.carried_onto(prompt_id, shown, len(self._db.requests.turns_of(prompt_id)))
+        was.carried_onto(prompt_id, shown, len(self._db.requests.turns_of(prompt_id))
+                         if made_by_a_turn is None else made_by_a_turn)
         return was
+
+    def follows_its_request_to(self, prompt_id: str) -> bool:
+        aim = self._request_aim
+        made = [turn.made for turn in aim.every_turn()] if aim is not None else []
+        return prompt_id in made and (aim.prompt_id not in made
+                                      or made.index(prompt_id) > made.index(aim.prompt_id))
 
     def _thumbnail_of(self, prompt_id: str) -> str | None:
         return (self._db.get_generation(prompt_id) or {}).get("thumbnail_path")

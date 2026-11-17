@@ -1926,7 +1926,8 @@ class GalleryView(QWidget):
     def _on_reroll_finished(self, key: str, prompt_id: str, origin: str = ""):
         run = origin or prompt_id
         launcher = (None if run in self._populate_origins
-                    else self.generate_pane.tab_that_launched(run))
+                    else self.generate_pane.tab_that_launched(run)
+                    or self.generate_pane.tab_whose_request_made(prompt_id))
         self._populate_origins.discard(run)
         finished_row = self._db.get_generation(prompt_id)
         if finished_row is None or finished_row.get("source") in (GenerationSource.EXPERIMENT,

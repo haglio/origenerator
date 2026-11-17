@@ -34,6 +34,10 @@ class RequestAim:
             at = index - len(self.earlier)
             self.turns[at] = self.turns[at]._replace(made=prompt_id)
 
+    def turns_up_to(self, prompt_id: str) -> int | None:
+        made = [turn.made for turn in self.turns]
+        return made.index(prompt_id) + 1 if prompt_id in made else None
+
     def answered(self, turn, values: dict) -> None:
         self.turns.append(turn)
         self.values.append(values)

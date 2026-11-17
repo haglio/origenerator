@@ -39,6 +39,7 @@ from tests.gallery_view_support import (
     _alls,
     _at,
     _completed_image,
+    _every_job_is_with_comfyui,
     _finish_reroll,
     _frame_shown,
     _front_panel,
@@ -58,6 +59,7 @@ from tests.gallery_view_support import (
     _seeded_db,
     _select_first_leaf,
     _selected_folder,
+    _struck_and_lit,
     _tile_kinds_in_order,
 )
 from tests.real_db import database_of, kept_on_disk
@@ -1181,7 +1183,7 @@ def _asking_for_two_cats(qtbot, tmp_path, answer_once=None, *, unanswered=False,
     return view, exchange
 
 
-def test_generate_under_a_turn_runs_it_records_its_request_and_leaves_the_tab_on_its_image(
+def test_generate_under_a_turn_runs_it_records_its_request_and_keeps_the_tab_on_its_image_meanwhile(
         qtbot, tmp_path):
     view = _tab_asked_for_two_cats(qtbot, tmp_path)
     tab = view._generate_pane.current_generate_tab()
@@ -1196,6 +1198,24 @@ def test_generate_under_a_turn_runs_it_records_its_request_and_leaves_the_tab_on
     assert tab.displayed_row()["prompt_id"] == "orig"
     assert [entry.made for entry in exchange._entries()] == [job.prompt_id]
     assert list(exchange._in_flight) == [job.prompt_id]
+
+
+def _shown_by_the_tab(view) -> tuple[str, list, tuple[str, str]]:
+    tab = view._generate_pane.current_generate_tab()
+    return (tab.displayed_row()["prompt_id"], tab._param_form.request_exchange().turns(),
+            _struck_and_lit(tab._param_form._widgets["positive_prompt"].boxes()[0]))
+
+
+def test_the_image_a_turns_generate_made_becomes_the_tab_when_it_lands_with_nothing_marked(
+        qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path)
+    view._generate_pane.current_generate_tab()._param_form.request_exchange().generate_asked.emit(0)
+    (job,) = view._live_jobs.values()
+    qtbot.waitUntil(lambda: _every_job_is_with_comfyui(view), timeout=5000)
+
+    _finish_reroll(view, job)
+
+    assert _shown_by_the_tab(view) == (job.prompt_id, [("two cats", _TWO_CATS_SAID)], ("", ""))
 
 
 def test_generate_under_a_turn_that_would_make_an_image_already_made_makes_no_second_copy(

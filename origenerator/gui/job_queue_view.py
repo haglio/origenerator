@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QMenu,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -25,7 +24,6 @@ from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.drag_thumbnail import DragOut
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.inflight import (
-    CANCEL_ALL_BELOW_TEXT,
     CANCEL_ALL_TEXT,
     CANCEL_ALL_TIP,
     CANCEL_TEXT,
@@ -43,7 +41,6 @@ from origenerator.gui.inflight import (
     clear_queue_tooltip,
     first_movable,
     foreign_queue_text,
-    jobs_below,
     jobs_to_cancel,
     jobs_to_shield,
     movable,
@@ -55,6 +52,7 @@ from origenerator.gui.inflight import (
     starting_row_text,
 )
 from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
+from origenerator.gui.queue_row_menu import picks_cancel_below
 from origenerator.gui.queue_thumbs import QueueThumbs
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.gui.widget_size import QWIDGETSIZE_MAX
@@ -504,10 +502,7 @@ class JobQueueView(QWidget):
         self._rules.update()
 
     def _show_row_menu(self, key: str, at: QPoint):
-        menu = QMenu(self)
-        cancel_below = menu.addAction(CANCEL_ALL_BELOW_TEXT)
-        cancel_below.setEnabled(bool(jobs_below(self._items, key)))
-        if menu.exec(at) is cancel_below:
+        if picks_cancel_below(self, self._items, key, at):
             self.cancel_below_requested.emit(key)
 
     def head_rule(self) -> list[QPoint]:

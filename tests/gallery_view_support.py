@@ -951,6 +951,11 @@ def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
     return view
 
 
+def _every_job_is_with_comfyui(view) -> bool:
+    return all(view._db.get_generation(job.prompt_id)["status"] != "pending"
+               for job in view._live_jobs.values())
+
+
 def _finish_reroll(view, job):
     view._client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
     view.refresh()

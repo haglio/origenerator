@@ -411,6 +411,10 @@ class GeneratePane(QTabWidget):
         return next((tab for tab in self.generate_tabs()
                      if origin in tab.launched_runs()), None)
 
+    def tab_whose_request_made(self, prompt_id: str):
+        return next((tab for tab in self.generate_tabs()
+                     if tab.follows_its_request_to(prompt_id)), None)
+
     def watchers_of(self, key: str) -> list[GenerateTab]:
         return [tab for tab in self.generate_tabs()
                 if tab.watched_key() == key]

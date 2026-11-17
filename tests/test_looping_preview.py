@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import pytest
+from app_support.threading_utils import wait_until
 from PIL import Image
 from PySide6.QtCore import QSize
 from PySide6.QtGui import QMovie
-from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QApplication, QLabel
 
 from origenerator.gui import looping_preview, omnipause
 from origenerator.gui.looping_preview import (
@@ -16,7 +17,6 @@ from origenerator.gui.looping_preview import (
     stagger_ms,
 )
 from origenerator.thumbnail import FRAME_MS
-from tests.children import HANG_AFTER_S
 
 
 def _loop(path, color="gray"):
@@ -148,21 +148,20 @@ def test_thumbnails_start_at_moments_of_their_own_within_one_slow_frame(staggere
     assert all(0 <= wait < 5 * FRAME_MS for wait in waits)
 
 
-def test_a_thumbnail_shows_its_first_frame_until_its_moment_then_runs(staggered, label, tmp_path,
-                                                                      qtbot):
+def test_a_thumbnail_shows_its_first_frame_until_its_moment_then_runs(staggered, label, tmp_path):
     path = _changing_loop(tmp_path / "one.webp")
     assert stagger_ms(path) > 0
 
     movie = play_in(label, path, QSize(40, 30))
 
     assert (movie.state(), movie.currentFrameNumber()) == (QMovie.MovieState.NotRunning, 0)
-    qtbot.waitUntil(lambda: movie.state() == QMovie.MovieState.Running, timeout=HANG_AFTER_S * 1000)
+    wait_until(lambda: movie.state() == QMovie.MovieState.Running, pump=QApplication.processEvents)
 
 
 def test_a_thumbnail_whose_moment_comes_while_the_room_is_stopped_is_held_still(
-        staggered, label, tmp_path, qtbot):
+        staggered, label, tmp_path):
     movie = play_in(label, _changing_loop(tmp_path / "one.webp"), QSize(40, 30))
 
     omnipause.freeze(True)
 
-    qtbot.waitUntil(lambda: movie.state() == QMovie.MovieState.Paused, timeout=HANG_AFTER_S * 1000)
+    wait_until(lambda: movie.state() == QMovie.MovieState.Paused, pump=QApplication.processEvents)

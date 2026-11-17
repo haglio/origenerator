@@ -43,6 +43,14 @@
       "--landscape-hud-file"
     ]
   },
+  "message_flags": {
+    "portrait": [
+      "--portrait-message-file"
+    ],
+    "landscape": [
+      "--landscape-message-file"
+    ]
+  },
   "headset_flags": [
     "--frames-file",
     "--input-file"

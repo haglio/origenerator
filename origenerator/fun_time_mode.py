@@ -40,6 +40,7 @@ SESSION_FILES = ("command-file", "paused-file", "status-file", "dashboard-cmd-fi
 
 SHAPES = ("portrait", "landscape")
 FUNESTRA_FILES = ("playlist", "cmd-file", "status-file", "hud-file")
+FUNESTRA_MESSAGE_FILE = "message-file"
 
 HEADSET_FILES = ("frames-file", "input-file")
 
@@ -105,6 +106,10 @@ def funestra_flags(shape: str) -> tuple[str, ...]:
     return tuple(f"--{shape}-{name}" for name in FUNESTRA_FILES)
 
 
+def message_flags(shape: str) -> tuple[str, ...]:
+    return (f"--{shape}-{FUNESTRA_MESSAGE_FILE}",)
+
+
 def headset_flags() -> tuple[str, ...]:
     return tuple(f"--{name}" for name in HEADSET_FILES)
 
@@ -155,6 +160,7 @@ def declaration() -> dict:
         "required_flags": list(required_flags()),
         "region_flags": {shape: list(region_flags(shape)) for shape in SHAPES},
         "player_flags": {shape: list(funestra_flags(shape)) for shape in SHAPES},
+        "message_flags": {shape: list(message_flags(shape)) for shape in SHAPES},
         "headset_flags": list(headset_flags()),
         "headset_words": list(HEADSET_WORDS),
         "command_case_blind": True,
@@ -198,6 +204,7 @@ class FunestraChannel:
     command_file: Path
     status_file: Path
     hud_file: Path
+    message_file: Path | None = None
 
     def write_playlist(self, items) -> None:
         write_playlist(self.playlist, items)
@@ -263,7 +270,7 @@ def build_parser() -> argparse.ArgumentParser:
     for name in (*SESSION_FILES, *HEADSET_FILES):
         parser.add_argument(f"--{name}", type=Path, default=None)
     for shape in SHAPES:
-        for name in FUNESTRA_FILES:
+        for name in (*FUNESTRA_FILES, FUNESTRA_MESSAGE_FILE):
             parser.add_argument(f"--{shape}-{name}", type=Path, default=None)
     parser.add_argument(TASKBAR_IDENTITY_FLAG, default=None)
     parser.add_argument(CHECK_LAUNCH_FLAG, action="store_true")
@@ -329,7 +336,8 @@ def majority_shape(shapes) -> str:
 def _funestra(args: argparse.Namespace, shape: str) -> FunestraChannel | None:
     files = [getattr(args, flag.removeprefix("--").replace("-", "_"))
              for flag in funestra_flags(shape)]
-    return FunestraChannel(*files) if all(files) else None
+    messages = getattr(args, f"{shape}_{FUNESTRA_MESSAGE_FILE}".replace("-", "_"))
+    return FunestraChannel(*files, message_file=messages) if all(files) else None
 
 
 def _session_of(args: argparse.Namespace) -> FunTimeSession | None:

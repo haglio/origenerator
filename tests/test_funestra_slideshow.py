@@ -10,6 +10,7 @@ import pytest
 from funestra.file_channel import consume_command_file
 from funestra.funestra_verbs import play_file, set_speed
 from funestra.hud_title import LATEST_LABEL
+from funestra.modes import MessageLevel
 from funestra.playback_rate import NORMAL_RATE
 from funestra.playlist import PlaylistItem, read_playlist
 from funestra.satellite_hud import parse_hud
@@ -24,7 +25,7 @@ from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow, Hosting, Playing, Seat
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.hud_queue import OPEN
-from origenerator.gui.message import HEARD_MARK
+from origenerator.gui.message import WARNING
 from origenerator.gui.region_openings import RegionOpening
 from origenerator.gui.slideshow_pace import DEFAULT_S, SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
@@ -45,16 +46,17 @@ DRIVERS = ("origenerator/gui/slideshow_hud.py", "origenerator/fun_time_bridge.py
            "origenerator/gui/osr2_controls_state.py")
 
 
+class _Messages:
+    def __init__(self, said: list) -> None:
+        self._said = said
+
+    def say(self, message, *, level):
+        assert isinstance(level, MessageLevel)
+        self._said.append(message)
+
+
 def _into(said: list):
-    def say(message, *, mark):
-        assert isinstance(mark, str)
-        said.append(message)
-
-    return say
-
-
-def _marked_into(said: list):
-    return lambda message, *, mark: said.append((mark, message))
+    return _Messages(said)
 
 
 def _channel(tmp_path: Path) -> FunestraChannel:
@@ -76,7 +78,7 @@ _NO_HOSTING = Hosting()
 def _slideshow(qtbot, tmp_path, items=_ITEMS, *, say=None, hosting=_NO_HOSTING,
                **playing) -> FunestraSlideshow:
     slideshow = FunestraSlideshow(Playing(items, shuffle=in_order, **playing), _seat(tmp_path),
-                                  replace(hosting, say=say or hosting.say))
+                                  replace(hosting, messages=say or hosting.messages))
     stop_the_poll_to_tick_by_hand(slideshow)
     return slideshow
 
@@ -623,6 +625,31 @@ def test_the_delete_a_cull_starts_does_not_skip_a_second_item(qtbot, tmp_path):
     assert "NEXT" not in released
 
 
+def test_a_slideshow_on_a_sessions_funestra_writes_what_it_says_where_fun_time_shows_it(
+        qtbot, tmp_path):
+    messages = tmp_path / "origenerator_portrait_messages.txt"
+    seat = Seat("portrait", replace(_channel(tmp_path), message_file=messages),
+                FrameFiles(tmp_path / "frames"))
+    slideshow = FunestraSlideshow(Playing(_ITEMS, shuffle=in_order), seat, _NO_HOSTING)
+    stop_the_poll_to_tick_by_hand(slideshow)
+
+    slideshow.shown.flash("F-mode on")
+    said = dict(line.split("=", 1) for line in messages.read_text(encoding="utf-8").splitlines())
+    assert (said["message"], said["level"]) == ("F-mode on", MessageLevel.NORMAL)
+
+    slideshow.shown.flash("nothing here is enhanced", kind=WARNING)
+    assert f"level={MessageLevel.WARNING}" in messages.read_text(encoding="utf-8").splitlines()
+
+
+def test_a_session_that_hands_over_no_message_file_is_told_nothing_and_nothing_fails(
+        qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path)
+
+    slideshow.shown.flash("F-mode on")
+
+    assert [path.name for path in tmp_path.glob("*message*")] == []
+
+
 def test_a_file_the_funestra_will_not_let_go_of_is_said_rather_than_raised(qtbot, tmp_path):
     said = []
 
@@ -630,13 +657,11 @@ def test_a_file_the_funestra_will_not_let_go_of_is_said_rather_than_raised(qtbot
         raise PermissionError("the file is in use")
 
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(delete=delete),
-                           say=_marked_into(said), items=_ITEMS[:1])
+                           say=_into(said), items=_ITEMS[:1])
 
     slideshow.slideshow_cull()
 
-    mark, line = said[-1]
-    assert mark == "trash"
-    assert "couldn't delete" in line
+    assert "couldn't delete" in said[-1]
 
 
 def test_narrowing_hands_the_funestra_what_is_left(qtbot, tmp_path):
@@ -1800,15 +1825,15 @@ def test_the_loop_key_is_the_lock_where_there_is_nothing_to_loop(qtbot, tmp_path
     assert said == ["Locked", "Unlocked"]
 
 
-def test_a_press_is_answered_plain_and_a_spoken_word_after_the_mic(qtbot, tmp_path):
+def test_a_press_and_a_spoken_word_are_both_answered_on_a_sessions_funestra(qtbot, tmp_path):
     said = []
-    slideshow = _slideshow(qtbot, tmp_path, say=_marked_into(said))
+    slideshow = _slideshow(qtbot, tmp_path, say=_into(said))
     _sent(slideshow)
 
     slideshow.slideshow_loop("seed")
     slideshow.note_voice_command("favorited")
 
-    assert said == [("", "Locked"), (HEARD_MARK, "favorited")]
+    assert said == ["Locked", "favorited"]
 
 
 def test_more_seeds_hands_the_funestra_the_wider_row(qtbot, tmp_path):
@@ -2537,10 +2562,10 @@ def test_a_ready_opening_leads_with_the_slide_whose_map_it_already_has(qtbot, tm
     assert read_playlist(slideshow.channel.playlist)[0].path.name == "two.png"
 
 
-def test_on_a_sessions_funestra_a_request_and_what_is_being_dictated_are_said_in_the_gallerys_caption(
+def test_on_a_sessions_funestra_a_request_and_what_is_being_dictated_are_said_where_fun_time_shows_them(
         qtbot, tmp_path):
     said = []
-    slideshow = _slideshow(qtbot, tmp_path, say=lambda text, mark: said.append(text))
+    slideshow = _slideshow(qtbot, tmp_path, say=_into(said))
 
     slideshow.shown.request_line("a request")
     slideshow.shown.dictating("some words")

@@ -1,25 +1,29 @@
 from __future__ import annotations
 
 from funestra.file_channel import publish_whole
+from funestra.messages import MessageWriter
+from funestra.modes import MessageLevel
 from funestra.satellite_hud import hud_text
 
 from origenerator.gui.hud_queue import JobQueueFile, QueueFoot
-from origenerator.gui.message import HEARD_MARK, INFO
+from origenerator.gui.message import ERROR, FAVORITE, INFO, WARNING
 from origenerator.gui.slideshow_hud import HudPlacement, slideshow_hud_model
 
 READER_HOLD_BUDGET_S = 1.0
 _RETRY_SPACING_S = 0.005
+_LEVELS = {INFO: MessageLevel.NORMAL, WARNING: MessageLevel.WARNING,
+           ERROR: MessageLevel.WARNING, FAVORITE: MessageLevel.HIGHLIGHT}
 
 
 class OnASessionsFunestra:
 
     player = None
 
-    def __init__(self, slideshow, shape: str, channel, say=None, *, actions) -> None:
+    def __init__(self, slideshow, shape: str, channel, messages=None, *, actions) -> None:
         self._slideshow = slideshow
         self._side = shape
         self._hud_file = channel.hud_file
-        self._say = say
+        self._messages = messages if messages is not None else MessageWriter(channel.message_file)
         self._published = ""
         foot = QueueFoot(actions)
         self.queue_foot = foot
@@ -38,16 +42,15 @@ class OnASessionsFunestra:
             self._published = text
 
     def flash(self, text: str, *, kind: str = INFO, ms: int = 0, mark: str = "") -> None:
-        if self._say is not None:
-            self._say(text, mark=mark)
+        self._messages.say(text, level=_LEVELS[kind])
 
     def request_line(self, message: str, request=None, *, working: bool = False,
                      kind: str = INFO) -> None:
-        self.flash(message, kind=kind, mark=HEARD_MARK)
+        self.flash(message, kind=kind)
 
     def dictating(self, note: str) -> None:
         if note:
-            self.flash(note, mark=HEARD_MARK)
+            self.flash(note)
 
     def room_paused(self, paused: bool) -> None:
         pass

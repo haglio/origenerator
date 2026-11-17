@@ -240,7 +240,9 @@ class FunestraSlideshow(QObject):
         status = parse_status(fields)
         self.transport.heard(status, fields)
         self._funestra_locked = status.locked
-        self._on_screen.observe(status.video, now=self._clock())
+        self._on_screen.observe(
+            status.video, now=self._clock(),
+            playing_for=None if status.image else status.position_ms / 1000)
         moved = status.video and status.video != self._on_funestra.item
         self._on_funestra = _heard(fields)
         if moved:
@@ -384,6 +386,7 @@ class FunestraSlideshow(QObject):
         return self._set.current_prompt_id() if self.locked else None
 
     def slideshow_step(self, delta: int, *, verb: str | None = None) -> None:
+        self._on_screen.a_change_was_asked_for()
         self._unlock()
         if delta > 0:
             self._set.end_a_loop_of_one()
@@ -694,6 +697,10 @@ class FunestraSlideshow(QObject):
         if said_over is not self._set.playlist.current():
             self._jump_to(said_over)
         return said_over.prompt_id
+
+    def moved_on_by_itself_since(self, said_at: float) -> bool:
+        said_over = self._on_screen.path_at(said_at)
+        return bool(said_over) and said_over != self._on_screen.path_at(float("inf"))
 
     def _said_over(self, said_at: float | None):
         showing = (self._item_showing(self._on_screen.path_at(said_at))

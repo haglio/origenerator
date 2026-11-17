@@ -272,6 +272,9 @@ class FakeSlideshow:
     def back_to_what_was_said_over(self, said_at):
         self.done.append(("back to", said_at))
 
+    def moved_on_by_itself_since(self, said_at):
+        return getattr(self, "moved_on_by_itself", False)
+
     def show_locked(self, path):
         self.shown_locked.append(path)
 
@@ -1964,6 +1967,18 @@ def test_the_transport_words_step_the_slide_and_say_which_way(slideshows):
     assert made[0].done == []
     assert made[0].said == ["next", "back"]
     assert made[0].said_kinds == [INFO, INFO]
+
+
+def test_a_step_said_over_a_slide_the_show_has_since_left_by_itself_is_already_done(slideshows):
+    director, _host, made = slideshows()
+    director.open([("a.png", "image", "g1", None)])
+    made[0].moved_on_by_itself = True
+
+    director.run_on_slide(AppCommand.FORWARD, said_at=7.5)
+    director.run_on_slide(AppCommand.BACK, said_at=7.5)
+
+    assert made[0].steps == []
+    assert made[0].said == ["next", "back"]
 
 
 def test_a_lock_said_over_a_slide_since_left_puts_that_slide_back_and_locks_it(slideshows):

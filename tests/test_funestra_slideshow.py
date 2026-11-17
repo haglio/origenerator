@@ -376,6 +376,32 @@ def test_a_word_said_over_a_slide_since_left_puts_that_slide_back_on_screen(qtbo
     assert _sent(slideshow) == []
 
 
+def _a_slideshow_that_moved_from_one_to_two(qtbot, tmp_path, *, he_stepped: bool = False):
+    now = [10.0]
+    slideshow = _slideshow(qtbot, tmp_path, hosting=Hosting(clock=lambda: now[0]))
+    _says(slideshow, video="one.png")
+    slideshow.tick()
+    if he_stepped:
+        slideshow.slideshow_step(1)
+    now[0] = 12.0
+    _says(slideshow, video="two.png")
+    slideshow.tick()
+    return slideshow
+
+
+def test_a_slide_left_by_itself_since_a_moment_says_it_moved_on(qtbot, tmp_path):
+    slideshow = _a_slideshow_that_moved_from_one_to_two(qtbot, tmp_path)
+
+    assert slideshow.moved_on_by_itself_since(10.5) is True
+    assert slideshow.moved_on_by_itself_since(12.5) is False
+
+
+def test_a_slide_he_stepped_off_did_not_move_on_by_itself(qtbot, tmp_path):
+    slideshow = _a_slideshow_that_moved_from_one_to_two(qtbot, tmp_path, he_stepped=True)
+
+    assert slideshow.moved_on_by_itself_since(10.5) is False
+
+
 def test_the_padlock_is_the_slideshows_own_lock_whatever_the_funestra_says(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path)
     _sent(slideshow)

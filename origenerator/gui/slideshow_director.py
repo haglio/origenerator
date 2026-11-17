@@ -1218,11 +1218,14 @@ class SlideshowDirector:
         if command in _ABOUT_THE_SLIDE_SAID_OVER:
             slideshow.back_to_what_was_said_over(said_at)
         kind = INFO
+        already_done = said_at is not None and slideshow.moved_on_by_itself_since(said_at)
         if command is AppCommand.BACK:
-            slideshow.slideshow_step(-1)
+            if not already_done:
+                slideshow.slideshow_step(-1)
             said = "back"
         elif command is AppCommand.FORWARD:
-            slideshow.slideshow_step(1)
+            if not already_done:
+                slideshow.slideshow_step(1)
             said = "next"
         elif command is AppCommand.CULL:
             slideshow.cull()

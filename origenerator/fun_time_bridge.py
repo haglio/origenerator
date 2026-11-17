@@ -34,7 +34,7 @@ from origenerator.fun_time_mode import (
 )
 from origenerator.osr2_controls_commands import shape_press, shape_spoken_to, spelled_for
 from origenerator.radio import deal_to_the_funestras
-from origenerator.slideshow_buttons import HUD_FACTS, PRESSES_ABOUT_THE_SLIDE, answer
+from origenerator.slideshow_buttons import HUD_FACTS, PRESSES_ABOUT_THE_SLIDE, STEPS, answer
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +232,11 @@ class FunTimeBridge(QObject):
                     said_at: float | None) -> None:
         slideshow = self._gallery.region_slideshow(shape)
         if slideshow is None:
+            return
+        if (action in STEPS and said_at is not None
+                and slideshow.moved_on_by_itself_since(said_at)):
+            logger.info("%s was pressed on a slide the %s slideshow has since left; "
+                        "the step it asked for has happened", action, shape)
             return
         if action in PRESSES_ABOUT_THE_SLIDE:
             slideshow.back_to_what_was_said_over(said_at)

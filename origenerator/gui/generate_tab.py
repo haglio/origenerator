@@ -1369,7 +1369,8 @@ class GenerateTab(DropZones):
         self._turn_being_made = None
         exchange.set_thumbnail_of(self._thumbnail_of)
         exchange.set_generate_offered(self._turn_makes_a_new_image)
-        exchange.show_exchange(aim.every_turn(), started_on=aim.started_on, asking=aim.asking)
+        exchange.show_exchange(aim.every_turn(), started_on=aim.started_on, asking=aim.asking,
+                               showing=prompt_id)
         if aim.turns:
             self._param_form.set_prompts(aim.turns[-1].new_positive, aim.turns[-1].new_negative,
                                          typed=True)

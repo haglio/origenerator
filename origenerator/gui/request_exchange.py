@@ -125,10 +125,12 @@ class _Conversation(QTextEdit):
         self._tips: list[str] = []
         self._placed: list[tuple[QWidget, int]] = []
         self._items: dict[int, str] = {}
+        self._showing: str | None = None
         self.viewport().setMouseTracking(True)
         self.hide()
 
-    def show_entries(self, entries: list[_Entry], made: list[_Made]) -> None:
+    def show_entries(self, entries: list[_Entry], made: list[_Made], showing: str | None) -> None:
+        self._showing = showing
         for widget, _block_number in self._placed:
             widget.hide()
             widget.deleteLater()
@@ -207,17 +209,23 @@ class _Conversation(QTextEdit):
             return None
         return self._items.get(self.document().findBlock(position).blockNumber())
 
+    def _link_at(self, place: QPoint) -> str | None:
+        item = self._item_at(place)
+        return None if item == self._showing else item
+
     def mousePressEvent(self, event) -> None:
-        item = self._item_at(event.position().toPoint())
-        if event.button() == Qt.MouseButton.LeftButton and item is not None:
-            self.item_activated.emit(item)
+        place = event.position().toPoint()
+        if event.button() == Qt.MouseButton.LeftButton and self._item_at(place) is not None:
+            self.clearFocus()
+            if (link := self._link_at(place)) is not None:
+                self.item_activated.emit(link)
             return
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event) -> None:
         super().mouseMoveEvent(event)
-        over_an_item = self._item_at(event.position().toPoint()) is not None
-        self.viewport().setCursor(Qt.CursorShape.PointingHandCursor if over_an_item
+        over_a_link = self._link_at(event.position().toPoint()) is not None
+        self.viewport().setCursor(Qt.CursorShape.PointingHandCursor if over_a_link
                                   else Qt.CursorShape.IBeamCursor)
 
     def tip_at(self, place: QPoint) -> str:
@@ -251,6 +259,7 @@ class RequestExchange(QWidget):
         self._in_flight: dict[str, RunReading] = {}
         self._held: list[_Entry] = []
         self._started_on: str | None = None
+        self._showing: str | None = None
         self._thumbnail_of: Callable[[str], str | None] | None = None
         self._generate_offered: Callable[[int], bool] = lambda _index: True
         column.addWidget(self._conversation)
@@ -303,7 +312,8 @@ class RequestExchange(QWidget):
             entry.compare(before, self._thumbnail_of)
             before = entry.made
         self._conversation.show_entries(
-            self._held, [self._made_of(index) for index in range(len(self._held))])
+            self._held, [self._made_of(index) for index in range(len(self._held))],
+            self._showing)
 
     def _made_of(self, index: int) -> _Made:
         entry = self._held[index]
@@ -333,11 +343,12 @@ class RequestExchange(QWidget):
         self._working.setVisible(waiting)
 
     def show_exchange(self, turns, *, started_on: str | None = None,
-                      asking: str | None = None) -> None:
+                      asking: str | None = None, showing: str | None = None) -> None:
         self._held = [_Entry(turn) for turn in turns]
         if asking:
             self._held.append(_Entry((asking, ""), waiting=True))
         self._started_on = started_on
+        self._showing = showing
         self._draw()
         self._settle()
 

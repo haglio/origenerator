@@ -1299,6 +1299,22 @@ def test_a_thumbnail_in_the_request_conversation_opens_its_item_as_a_link_tile_d
     assert view._generate_pane.current_generate_tab().displayed_row()["prompt_id"] == "child"
 
 
+def test_the_conversation_knows_which_item_the_tab_shows_so_its_thumbnail_links_nowhere(
+        qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path)
+    _completed_image(view._db, "child", "a cat, a hat", 8)
+    view._db.record_request(NewRequest(
+        prompt_id="child", source_prompt_id="orig", heard="", asked="a hat",
+        old_positive="a cat", new_positive="a cat, a hat",
+        turns=(Turn("a hat", "Added a hat.", "a cat", "", "a cat, a hat", ""),)))
+    view.refresh()
+
+    view.follow_link("child")
+
+    exchange = view._generate_pane.current_generate_tab()._param_form.request_exchange()
+    assert exchange._conversation._showing == "child"
+
+
 def test_generate_under_a_turn_that_would_make_an_image_already_made_makes_no_second_copy(
         qtbot, tmp_path):
     view = _tab_asked_for_two_cats(qtbot, tmp_path)

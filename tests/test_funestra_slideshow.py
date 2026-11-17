@@ -103,8 +103,10 @@ def _says(slideshow: FunestraSlideshow, **fields) -> None:
 
 
 def _funestra_says(channel: FunestraChannel, *, loads: int = 1, idle: bool = False,
-                   has_funscript: bool = False, showing: str | None = None, **fields) -> None:
+                   has_funscript: bool = False, showing: str | None = None,
+                   asked: tuple[int, int] = (0, 0), **fields) -> None:
     lines = {**status_fields(FunestraStatus(**fields)), "loads": str(loads),
+             "asked_load": str(asked[0]), "asked_step": str(asked[1]),
              "idle": "1" if idle else "0", "has_funscript": "1" if has_funscript else "0",
              "showing": fields.get("video", "") if showing is None else showing}
     channel.status_file.write_text(
@@ -413,6 +415,42 @@ def test_a_slide_he_stepped_off_did_not_move_on_by_itself(qtbot, tmp_path):
     slideshow = _a_slideshow_that_moved_from_one_to_two(qtbot, tmp_path, he_stepped=True)
 
     assert slideshow.moved_on_by_itself_since(10.5) is False
+
+
+def test_a_step_the_funestra_was_asked_for_by_someone_else_did_not_move_on_by_itself(
+        qtbot, tmp_path):
+    now = [10.0]
+    slideshow = _slideshow(qtbot, tmp_path, hosting=Hosting(clock=lambda: now[0]))
+    _says(slideshow, video="one.png")
+    slideshow.tick()
+    now[0] = 12.0
+    _says(slideshow, video="two.png", loads=2, asked=(2, 1))
+    slideshow.tick()
+
+    assert slideshow.moved_on_by_itself_since(10.5) is False
+
+
+def test_a_step_someone_else_asked_the_funestra_for_lets_go_of_the_lock_without_a_second_step(
+        qtbot, tmp_path):
+    slideshow = _slideshow_locked_on(qtbot, tmp_path, "one.png")
+    _says(slideshow, video="one.png", locked=True)
+    slideshow.tick()
+    _sent(slideshow)
+
+    _says(slideshow, video="two.png", locked=True, loads=2, asked=(2, 1))
+    slideshow.tick()
+
+    assert (slideshow.locked, _sent(slideshow)) == (False, ["LOCK_OFF"])
+
+
+def test_a_step_the_funestra_took_before_the_slideshow_first_heard_it_changes_nothing(
+        qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path)
+    slideshow.set_locked(True)
+    _says(slideshow, video="one.png", locked=True, loads=3, asked=(3, 1))
+    slideshow.tick()
+
+    assert slideshow.locked is True
 
 
 def test_the_padlock_is_the_slideshows_own_lock_whatever_the_funestra_says(qtbot, tmp_path):

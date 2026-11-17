@@ -58,7 +58,6 @@ from origenerator.gui.inflight import (
     CANCEL_ALL_TIP,
     CANCEL_TEXT,
     CLEAR_TEXT,
-    EMPTY_QUEUE_TEXT,
     FOLDER_CELLS,
     MOVE_DOWN_TIP,
     MOVE_UP_TIP,
@@ -201,10 +200,6 @@ class QueueSection:
         return foreign_queue_text(self.foreign) or ""
 
     @property
-    def empty_note(self) -> str:
-        return "" if self.lines else EMPTY_QUEUE_TEXT
-
-    @property
     def drawn(self) -> tuple[JobLine, ...]:
         return self.lines[self.first:self.first + ROWS]
 
@@ -228,22 +223,16 @@ class QueueSection:
                              dim=not self.any_to_cancel))
 
     def _paint_whats_in_flight(self, canvas, x, y, width) -> None:
-        image, draw = canvas.image, canvas.draw
+        image = canvas.image
         if self.leader is not None or self.foreign:
             self._paint_head(canvas, x, y, width)
         rows = y + _FRAME + BLOCK_GAP
         if not self.lines:
-            self._paint_empty_note(draw, x, rows if self.foreign else y, width, y + _HEIGHT)
             return
         self._paint_mark(image, x, rows, width, self.first > 0)
         self._paint_rows(canvas, x, rows + _MARK_H, width)
         self._paint_mark(image, x, rows + _MARK_H + ROWS * _ROW_H, width,
                          self.first + ROWS < len(self.lines))
-
-    def _paint_empty_note(self, draw, x, top, width, bottom) -> None:
-        draw.text((x + width / 2, (top + bottom) / 2),
-                  fit_text(_tiny(), self.empty_note, width), font=_tiny(), anchor="mm",
-                  fill=(*TEXT_MUTED, 255))
 
     def _paint_head(self, canvas, x, y, width) -> None:
         draw = canvas.draw
@@ -519,7 +508,7 @@ class QueueFoot:
 
     def section(self) -> QueueSection | None:
         core = self._actions.core_window() if self._actions.core_window is not None else None
-        if core_shows_the_queue(core, beside=self._beside()):
+        if core_shows_the_queue(core, beside=self._beside()) or not (self._items or self._foreign):
             return None
         return queue_section(self._items, self._foreign, first=self.pointer.first,
                              drop_at=self.pointer.drop, pointer=self.pointer)

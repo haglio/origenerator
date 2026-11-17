@@ -11,6 +11,7 @@ from shared_ui.type_scale import SIZE_TINY
 
 from origenerator.gui import hud_queue
 from origenerator.gui.hud_queue import (
+    _FRAME,
     CANCEL,
     CANCEL_ALL,
     CLEAR,
@@ -25,7 +26,7 @@ from origenerator.gui.hud_queue import (
     QueuePointer,
     queue_section,
 )
-from origenerator.gui.inflight import EMPTY_QUEUE_TEXT, InFlightItem, RunReading
+from origenerator.gui.inflight import InFlightItem, RunReading
 
 
 def _item(key="j1", caption="Alpha Workflow \u203a a paper kite", status="queued", **kw):
@@ -40,16 +41,12 @@ def _item(key="j1", caption="Alpha Workflow \u203a a paper kite", status="queued
                         reveal=kw.pop("reveal", lambda: None), **kw)
 
 
-def test_an_idle_job_queue_says_what_cores_does_when_nothing_is_queued():
-    section = queue_section([], 0)
+def test_another_apps_backlog_alone_draws_its_head_and_no_empty_line_under_it():
+    image, _targets = _painted(queue_section([], 3))
 
-    assert section.empty_note == EMPTY_QUEUE_TEXT
-    assert _inked(_painted(section)[0])
-
-
-def test_a_job_queue_with_anything_in_it_says_nothing_of_being_empty():
-    assert queue_section([_item("waiting-one")], 0).empty_note == ""
-    assert queue_section([], 3).empty_note == EMPTY_QUEUE_TEXT
+    assert _inked(image.crop((0, 0, image.width, _FRAME)))
+    assert not _inked(image.crop((0, _FRAME, image.width, image.height))), (
+        "he wants no \"(queued jobs show up here)\" on a HUD (2026-11-17)")
 
 
 def test_the_job_queue_keeps_one_size_whatever_is_in_flight():

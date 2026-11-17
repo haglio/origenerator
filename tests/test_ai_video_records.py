@@ -127,6 +127,19 @@ def test_watch_totals_land_on_each_videos_row_and_a_video_with_none_is_counted(t
     assert (row["watch_completions"], row["watch_skips"], row["watch_locks"]) == (3, 1, 2)
 
 
+def test_watch_totals_for_many_videos_read_the_gallery_once(tmp_path, capsys, monkeypatch):
+    _the_gallery(tmp_path)
+    reads = []
+    listed = Database.list_generations
+    monkeypatch.setattr(Database, "list_generations",
+                        lambda self: reads.append(1) or listed(self))
+    totals = {str(tmp_path / f"v{n}.mp4"): {"completions": 1} for n in range(3)}
+
+    _run(tmp_path, capsys, "watched", "--totals", _json_file(tmp_path, "totals.json", totals))
+
+    assert len(reads) == 1
+
+
 def test_the_phones_star_goes_on_and_comes_off(tmp_path, capsys):
     db = _the_gallery(tmp_path)
     video = _filed(_places(tmp_path))

@@ -62,6 +62,7 @@ from origenerator.generation_config import (
     what_a_request_makes,
     would_reproduce_a_completed_run,
 )
+from origenerator.generation_state import GenerationStatus
 from origenerator.gui.action_button import ActionButton
 from origenerator.gui.action_row import ActionRow
 from origenerator.gui.collapsible_section import line_up_the_labels
@@ -1367,6 +1368,7 @@ class GenerateTab(DropZones):
         aim.earlier = list(self._db.requests.exchange_of(prompt_id))
         aim.asked_into = self._db.requests.items_asked_into(prompt_id)
         aim.started_on = self._db.requests.started_on(prompt_id) if aim.earlier else prompt_id
+        aim.forget_what_never_came(self._still_there)
         self._request_aims.keep(aim)
         self._request_aim = aim
         self._turn_being_made = None
@@ -1441,6 +1443,10 @@ class GenerateTab(DropZones):
             return
         self._turn_being_made = index
         self.turn_generate_requested.emit(*launch)
+
+    def _still_there(self, prompt_id: str) -> bool:
+        row = self._db.get_generation(prompt_id)
+        return row is not None and row.get("status") != GenerationStatus.ERROR
 
     def note_in_flight(self, readings: dict) -> None:
         exchange = self._param_form.request_exchange() if self._param_form else None

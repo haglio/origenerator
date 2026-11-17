@@ -1256,6 +1256,49 @@ def test_a_turns_image_that_fails_leaves_the_tab_on_the_image_asked_of(qtbot, tm
     assert _shown_by_the_tab(view)[:2] == ("orig", [("two cats", _TWO_CATS_SAID)])
 
 
+def _generate_under_the_turn_then(qtbot, view, end):
+    exchange = view._generate_pane.current_generate_tab()._param_form.request_exchange()
+    exchange.generate_asked.emit(0)
+    (job,) = view._live_jobs.values()
+    qtbot.waitUntil(lambda: _every_job_is_with_comfyui(view), timeout=5000)
+    end(job)
+    view.refresh()
+    return exchange
+
+
+def test_a_turns_image_canceled_in_the_job_queue_offers_generate_under_the_turn_again(
+        qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path)
+
+    exchange = _generate_under_the_turn_then(
+        qtbot, view, lambda job: view._gallery_pane.cancel_requested.emit(job.prompt_id))
+
+    assert _shown_by_the_tab(view)[:2] == ("orig", [("two cats", _TWO_CATS_SAID)])
+    assert _generate_offered(exchange)
+
+
+def test_a_turns_image_that_fails_offers_generate_under_the_turn_again(qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path)
+
+    exchange = _generate_under_the_turn_then(
+        qtbot, view, lambda job: view._client.job_error.emit(job.prompt_id, "boom"))
+
+    assert _generate_offered(exchange)
+
+
+def test_a_turns_image_canceled_while_the_tab_shows_its_image_again_offers_generate_again(
+        qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path)
+
+    def back_on_the_image_then_cancel(job):
+        view._on_thumbnail_clicked("orig")
+        view._gallery_pane.cancel_requested.emit(job.prompt_id)
+
+    exchange = _generate_under_the_turn_then(qtbot, view, back_on_the_image_then_cancel)
+
+    assert _generate_offered(exchange)
+
+
 def _ask_for_a_hat(qtbot, view, answer_once=None):
     def a_hat(positive, negative, words, **_):
         if answer_once is not None:

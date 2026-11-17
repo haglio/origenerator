@@ -1165,3 +1165,11 @@ def test_a_lock_the_session_could_not_be_told_of_is_said_to_be_untold(tmp_path):
     assert tell_of_a_lock(tmp_path / "dashboard_cmd.txt", "portrait", "scene one.mp4") is True
     assert tell_of_a_lock(in_the_way / "dashboard_cmd.txt", "portrait", "scene one.mp4") is False
     assert tell_of_a_lock(None, "portrait", "scene one.mp4") is False
+
+
+def test_what_fun_time_asks_is_looked_for_many_times_within_a_tenth_of_a_second(qtbot, tmp_path):
+    _view, bridge = _view_with_bridge(qtbot, tmp_path)
+
+    assert bridge._timer.interval() <= 30, (
+        "a press in Fun Time waits for this look before the hosted app hears of it, so a look "
+        "every 150 ms was up to 150 ms nothing could take back")

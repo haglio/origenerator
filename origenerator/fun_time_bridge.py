@@ -38,7 +38,7 @@ from origenerator.slideshow_buttons import HUD_FACTS, PRESSES_ABOUT_THE_SLIDE, a
 
 logger = logging.getLogger(__name__)
 
-_POLL_MS = 150
+_POLL_MS = 30
 
 ORIGENERATOR_MODE = "origenerator_activate"
 

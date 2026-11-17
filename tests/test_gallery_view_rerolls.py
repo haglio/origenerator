@@ -1126,13 +1126,34 @@ def test_generate_under_a_turn_asked_with_random_ticked_keeps_the_seed_of_the_it
     assert tab._param_form.seed_is_random()
 
 
-def _tab_asked_for_two_cats(qtbot, tmp_path, *, random_seed=False):
-    view, exchange = _asking_for_two_cats(qtbot, tmp_path, random_seed=random_seed)
+def test_the_tabs_own_generate_pressed_with_random_ticked_runs_a_request_on_the_asked_seed(
+        qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path, random_seed=True)
+    tab = view._generate_pane.current_generate_tab()
+
+    qtbot.mouseClick(tab._generate_btn, Qt.MouseButton.LeftButton)
+
+    (job,) = view._live_jobs.values()
+    assert (job.params["seed"], tab._param_form.seed_is_random()) == (7, True)
+
+
+def test_auto_generate_with_random_ticked_runs_a_request_on_the_asked_seed(qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path, random_seed=True, auto_generate=True)
+    tab = view._generate_pane.current_generate_tab()
+
+    (job,) = view._live_jobs.values()
+    assert (job.params["seed"], tab._param_form.seed_is_random()) == (7, True)
+
+
+def _tab_asked_for_two_cats(qtbot, tmp_path, *, random_seed=False, auto_generate=False):
+    view, exchange = _asking_for_two_cats(qtbot, tmp_path, random_seed=random_seed,
+                                          auto_generate=auto_generate)
     qtbot.waitUntil(lambda: exchange.turns() == [("two cats", _TWO_CATS_SAID)], timeout=5000)
     return view
 
 
-def _asking_for_two_cats(qtbot, tmp_path, answer_once=None, *, unanswered=False, random_seed=False):
+def _asking_for_two_cats(qtbot, tmp_path, answer_once=None, *, unanswered=False, random_seed=False,
+                         auto_generate=False):
     db = _seeded_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
@@ -1153,6 +1174,8 @@ def _asking_for_two_cats(qtbot, tmp_path, answer_once=None, *, unanswered=False,
     if random_seed:
         tab._param_form._randomize_checks["seed"].click()
     exchange = tab._param_form.request_exchange()
+    if auto_generate:
+        exchange._auto_generate.click()
     qtbot.keyClicks(exchange._line, "two cats")
     qtbot.keyClick(exchange._line, Qt.Key.Key_Return)
     return view, exchange

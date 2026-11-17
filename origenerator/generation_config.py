@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 import random
 from dataclasses import dataclass
+from functools import lru_cache
 
 from app_support.gallery_rows import source_of
 
 from origenerator.generation_state import GenerationSource, GenerationStatus
-from origenerator.output_files import produced_output
+from origenerator.output_files import READINGS_KEPT, produced_output
 
 _DENORMALIZED_COLUMNS = ("positive_prompt", "negative_prompt", "seed")
 
@@ -51,18 +52,25 @@ def _values_equal(a, b) -> bool:
 
 
 def merge_denormalized(row: dict) -> dict:
-    raw = row.get("params_json")
+    return _with_what_only_its_columns_hold(row, _recorded)
+
+
+def _recorded(raw: str | None) -> dict:
     try:
         params = json.loads(raw) if raw else {}
     except (json.JSONDecodeError, TypeError):
         params = {}
-    if not isinstance(params, dict):
-        params = {}
-    for key in _DENORMALIZED_COLUMNS:
-        val = row.get(key)
-        if val is not None and key not in params:
-            params[key] = val
-    return params
+    return params if isinstance(params, dict) else {}
+
+
+_recorded_as_read_before = lru_cache(maxsize=READINGS_KEPT)(_recorded)
+
+
+def _with_what_only_its_columns_hold(row: dict, recorded) -> dict:
+    params = recorded(row.get("params_json"))
+    only_in_columns = {key: row[key] for key in _DENORMALIZED_COLUMNS
+                       if row.get(key) is not None and key not in params}
+    return {**params, **only_in_columns} if only_in_columns else params
 
 
 def _params_identical(a: dict, b: dict) -> bool:
@@ -83,7 +91,8 @@ def find_duplicate_generation(rows, snapshot: ConfigSnapshot) -> dict | None:
             continue
         if row.get("workflow_name", "") != snapshot.workflow_name:
             continue
-        if _params_identical(snapshot.params, merge_denormalized(row)):
+        if _params_identical(snapshot.params, _with_what_only_its_columns_hold(
+                row, _recorded_as_read_before)):
             return row
     return None
 

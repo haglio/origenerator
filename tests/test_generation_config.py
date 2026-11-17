@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from origenerator import generation_config
 from origenerator.generation_config import (
     ConfigSnapshot,
     configs_match,
@@ -259,3 +260,16 @@ def test_filled_params_takes_the_enhance_layer_from_the_workflows_defaults_not_t
 
     assert params["enhance"] == wf.default_params()["enhance"]
     assert params["enhance"] is not True
+
+
+def test_looking_for_a_duplicate_again_reads_no_runs_settings_a_second_time(monkeypatch):
+    rows = [_row(params={"steps": 20, "seed": seed}) for seed in (701, 702, 703)]
+    snap = _snapshot(params={"steps": 20, "seed": 704})
+    assert find_duplicate_generation(rows, snap) is None
+    read = []
+    loads = json.loads
+    monkeypatch.setattr(generation_config.json, "loads",
+                        lambda raw: read.append(raw) or loads(raw))
+
+    assert find_duplicate_generation(rows, snap) is None
+    assert read == []

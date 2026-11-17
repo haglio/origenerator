@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import ctypes
 import faulthandler
 import re
 import tempfile
 import threading
+import time
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
+from typing import NamedTuple
 
 PACKAGE_DIR = str(Path(__file__).resolve().parent)
 LOOK_EVERY_S = 0.1
@@ -72,3 +75,34 @@ class LooksAtAThread:
     def _keep_looking(self) -> None:
         while not self._done.wait(self._every_s):
             self.look()
+
+
+class Seconds(NamedTuple):
+    wall: float
+    this_program: float
+    computer_busy: float
+    computer_all: float
+
+
+_FILETIME_TICKS_A_SECOND = 10_000_000
+
+
+def _seconds_of(filetime: ctypes.c_uint64) -> float:
+    return filetime.value / _FILETIME_TICKS_A_SECOND
+
+
+def read_seconds() -> Seconds:
+    idle, kernel_with_idle_in_it, user = ctypes.c_uint64(), ctypes.c_uint64(), ctypes.c_uint64()
+    ctypes.windll.kernel32.GetSystemTimes(
+        ctypes.byref(idle), ctypes.byref(kernel_with_idle_in_it), ctypes.byref(user))
+    computer_all = _seconds_of(kernel_with_idle_in_it) + _seconds_of(user)
+    return Seconds(wall=time.perf_counter(), this_program=time.process_time(),
+                   computer_busy=computer_all - _seconds_of(idle), computer_all=computer_all)
+
+
+def spent_between(before: Seconds, after: Seconds) -> str:
+    computer_all = after.computer_all - before.computer_all
+    busy = (after.computer_busy - before.computer_busy) / computer_all if computer_all else 0.0
+    return (f"{after.wall - before.wall:.1f} s passed, this program had a processor for "
+            f"{after.this_program - before.this_program:.1f} s of them, "
+            f"and the computer's processors were {busy:.0%} busy")

@@ -6,9 +6,12 @@ from collections import Counter
 from origenerator.where_the_time_went import (
     PACKAGE_DIR,
     LooksAtAThread,
+    Seconds,
     every_threads_stack,
     functions_stood_in,
+    read_seconds,
     said_in_one_line,
+    spent_between,
 )
 
 _WATCHED = 0x1D34
@@ -99,3 +102,26 @@ def test_it_goes_on_looking_until_the_work_it_watches_is_over():
         assert looked_twice.wait()
 
     assert looks.said_in_one_line().startswith(f"{len(seen)} looks at the thread")
+
+
+def test_the_seconds_spent_say_how_long_the_program_had_a_processor_and_how_busy_the_computer_was():
+    before = Seconds(wall=100.0, this_program=2.0, computer_busy=1000.0, computer_all=4000.0)
+    after = Seconds(wall=108.0, this_program=3.5, computer_busy=1120.0, computer_all=4128.0)
+
+    assert spent_between(before, after) == (
+        "8.0 s passed, this program had a processor for 1.5 s of them, "
+        "and the computer's processors were 94% busy")
+
+
+def test_no_time_on_the_computers_clocks_reads_as_no_share_rather_than_dividing_by_nothing():
+    at_once = Seconds(wall=1.0, this_program=1.0, computer_busy=5.0, computer_all=9.0)
+
+    assert spent_between(at_once, at_once).endswith("were 0% busy")
+
+
+def test_the_computers_clocks_never_run_backwards_and_busy_is_part_of_all():
+    first, second = read_seconds(), read_seconds()
+
+    assert second.wall >= first.wall
+    assert second.computer_all >= first.computer_all
+    assert 0 <= second.computer_busy <= second.computer_all

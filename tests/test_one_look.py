@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 
 from origenerator import one_look
-from origenerator.one_look import is_file, looking_once
+from origenerator.one_look import is_file, looking_once, once_a_look
 
 
 def _write(path):
@@ -62,3 +62,28 @@ def test_a_look_taken_inside_another_lists_nothing_again(tmp_path, monkeypatch):
         assert asked_again()
 
     assert listed == [str(tmp_path)]
+
+
+def test_within_one_look_an_answer_asked_for_again_is_not_worked_out_again():
+    worked_out = []
+
+    @once_a_look
+    def doubled(number):
+        worked_out.append(number)
+        return number * 2
+
+    with one_look.one_look():
+        answers = [doubled(2), doubled(2), doubled(3)]
+
+    assert (answers, worked_out) == ([4, 4, 6], [2, 3])
+
+
+def test_outside_a_look_every_answer_is_worked_out_afresh():
+    worked_out = []
+
+    @once_a_look
+    def doubled(number):
+        worked_out.append(number)
+        return number * 2
+
+    assert (doubled(2), doubled(2), worked_out) == (4, 4, [2, 2])

@@ -67,6 +67,7 @@ from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView, Shared
 from origenerator.item_actions import actions_of
 from origenerator.item_shape import row_shape, shaped_key
 from origenerator.media import MediaType
+from origenerator.one_look import once_a_look
 from origenerator.output_places import OutputPlaces
 from origenerator.trash import Trash
 from tests import gestures
@@ -1936,6 +1937,19 @@ def test_going_to_a_failed_generation_opens_the_folder_its_settings_name(qtbot):
 
     assert "i1" in view.listed_prompt_ids()
     assert view._selected["prompt_id"] == "x1"
+
+
+def test_following_a_link_is_one_look_at_the_disk(qtbot):
+    view = GalleryView(database_of([_image("img1", "a cat", 50, 1)]),
+                       client=ComfyUIClient(folders=SUITE_FOLDERS))
+    qtbot.addWidget(view)
+    looked = []
+    look = once_a_look(lambda: looked.append("looked"))
+    view._go_to_generation = lambda prompt_id: (look(), look())
+
+    view.follow_link("img1")
+
+    assert looked == ["looked"]
 
 
 def test_following_a_link_lands_in_one_tab(qtbot):

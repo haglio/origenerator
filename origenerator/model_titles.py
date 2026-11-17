@@ -9,6 +9,7 @@ from pathlib import Path, PurePosixPath
 from app_support.comfy_file_refs import reference_basename
 
 from origenerator import config, precision, title_words
+from origenerator.one_look import once_a_look
 from origenerator.precision import Precision
 from origenerator.what_from_what import kind_first
 from origenerator.workflows.model_arch import describe, safetensors_metadata
@@ -68,6 +69,7 @@ def model_help(value) -> str:
         size and installed and precision.file_size_sentence(installed.stat().st_size))))
 
 
+@once_a_look
 def _title_and_size(value) -> tuple[str, Precision | None]:
     title = _kept_title(value)
     installed = _installed(value)

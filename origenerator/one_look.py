@@ -7,17 +7,16 @@ from contextvars import ContextVar
 from functools import wraps
 from pathlib import Path
 
-_LISTINGS: ContextVar[dict[Path, dict[str, os.DirEntry]] | None] = ContextVar(
-    "listings", default=None)
+_ANSWERS: ContextVar[dict | None] = ContextVar("answers", default=None)
 
 
 @contextmanager
 def one_look() -> Iterator[None]:
-    token = _LISTINGS.set(_LISTINGS.get() if _LISTINGS.get() is not None else {})
+    token = _ANSWERS.set(_ANSWERS.get() if _ANSWERS.get() is not None else {})
     try:
         yield
     finally:
-        _LISTINGS.reset(token)
+        _ANSWERS.reset(token)
 
 
 def looking_once(asked):
@@ -28,24 +27,31 @@ def looking_once(asked):
     return answered
 
 
+def once_a_look(asked):
+    @wraps(asked)
+    def answered(*args):
+        answers = _ANSWERS.get()
+        if answers is None:
+            return asked(*args)
+        if (asked, args) not in answers:
+            answers[asked, args] = asked(*args)
+        return answers[asked, args]
+    return answered
+
+
 def is_file(path) -> bool:
     path = Path(path)
-    if _LISTINGS.get() is None:
+    if _ANSWERS.get() is None:
         return path.is_file()
     entry = entries_in(path.parent).get(os.path.normcase(path.name))
     return entry is not None and entry.is_file()
 
 
 def entries_in(folder) -> dict[str, os.DirEntry]:
-    listings = _LISTINGS.get()
-    folder = Path(folder)
-    if listings is None:
-        return _listing(folder)
-    if folder not in listings:
-        listings[folder] = _listing(folder)
-    return listings[folder]
+    return _listing(Path(folder))
 
 
+@once_a_look
 def _listing(folder: Path) -> dict[str, os.DirEntry]:
     try:
         with os.scandir(folder) as entries:

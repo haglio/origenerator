@@ -9,6 +9,7 @@ from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
 logger = logging.getLogger(__name__)
 
 _in_flight = set()
+LONG_WAIT_THREAD = "off-thread wait"
 
 
 class _Result(QObject):
@@ -48,6 +49,6 @@ def run_off_thread(work, done, *, owner: QObject, waits_long: bool = False) -> N
     result.ready.connect(deliver)
     task = _Task(work, result)
     if waits_long:
-        threading.Thread(target=task.run, name="off-thread wait", daemon=True).start()
+        threading.Thread(target=task.run, name=LONG_WAIT_THREAD, daemon=True).start()
     else:
         QThreadPool.globalInstance().start(task)

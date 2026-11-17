@@ -220,9 +220,16 @@ def test_a_spoken_phrase_goes_with_when_the_session_heard_it_said(qtbot, tmp_pat
 
 
 class _SaidOverShow:
-    def __init__(self):
+    def __init__(self, *, moved_on_by_itself=False):
         self.done = []
         self.action_presses = self
+        self.moved_on_by_itself = moved_on_by_itself
+
+    def moved_on_by_itself_since(self, said_at):
+        return self.moved_on_by_itself
+
+    def slideshow_step(self, delta, *, verb=None):
+        self.done.append(("step", delta))
 
     def back_to_what_was_said_over(self, said_at):
         self.done.append(("back to", said_at))
@@ -258,6 +265,21 @@ def test_a_word_about_the_slide_goes_back_to_the_slide_it_was_said_over_first(
     bridge._tick()
 
     assert show.done == [("back to", pytest.approx(on_this_clock, abs=0.1)), done]
+
+
+@pytest.mark.parametrize(("pressed", "delta"), [("next", 1), ("prev", -1)])
+@pytest.mark.parametrize("moved_on_by_itself", [False, True])
+def test_a_step_pressed_on_a_slide_the_show_has_since_left_by_itself_is_already_done(
+        qtbot, tmp_path, monkeypatch, pressed, delta, moved_on_by_itself):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    show = _SaidOverShow(moved_on_by_itself=moved_on_by_itself)
+    monkeypatch.setattr(view, "region_slideshow", lambda shape: show)
+
+    (tmp_path / "origenerator_cmd.txt").write_text(
+        f"portrait_{pressed} @100.000" + chr(10), encoding="utf-8")
+    bridge._tick()
+
+    assert show.done == ([] if moved_on_by_itself else [("step", delta)])
 
 
 def test_a_lock_the_session_sends_is_taken_on_the_slide_it_brought_back(qtbot, tmp_path,

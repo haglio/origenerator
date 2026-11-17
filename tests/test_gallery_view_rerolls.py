@@ -1218,6 +1218,75 @@ def test_the_image_a_turns_generate_made_becomes_the_tab_when_it_lands_with_noth
     assert _shown_by_the_tab(view) == (job.prompt_id, [("two cats", _TWO_CATS_SAID)], ("", ""))
 
 
+def test_the_image_auto_generate_made_becomes_the_tab_when_it_lands(qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path, auto_generate=True)
+    (job,) = view._live_jobs.values()
+    qtbot.waitUntil(lambda: _every_job_is_with_comfyui(view), timeout=5000)
+
+    _finish_reroll(view, job)
+
+    assert _shown_by_the_tab(view) == (job.prompt_id, [("two cats", _TWO_CATS_SAID)], ("", ""))
+
+
+def test_a_turns_image_that_fails_leaves_the_tab_on_the_image_asked_of(qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path, auto_generate=True)
+    (job,) = view._live_jobs.values()
+    qtbot.waitUntil(lambda: _every_job_is_with_comfyui(view), timeout=5000)
+
+    view._client.job_error.emit(job.prompt_id, "boom")
+    view.refresh()
+
+    assert _shown_by_the_tab(view)[:2] == ("orig", [("two cats", _TWO_CATS_SAID)])
+
+
+def _ask_for_a_hat(qtbot, view):
+    def a_hat(positive, negative, words, **_):
+        return work_out(positive, negative, words, ask=lambda p, n, r, known: {"changes": [
+            {"prompt": "positive", "replace": "two cats", "with": "two cats, a hat",
+             "for": "a hat"}]})
+
+    view._voice.requests._work_out = a_hat
+    exchange = view._generate_pane.current_generate_tab()._param_form.request_exchange()
+    qtbot.keyClicks(exchange._line, "a hat")
+    qtbot.keyClick(exchange._line, Qt.Key.Key_Return)
+    qtbot.waitUntil(lambda: exchange.turns()[-1][1] != "", timeout=5000)
+
+
+def test_a_request_answered_while_the_last_ones_image_is_made_comes_along_to_that_image(
+        qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path, auto_generate=True)
+    view._generate_pane.current_generate_tab()._param_form.request_exchange().set_auto_generate(
+        False)
+    (job,) = view._live_jobs.values()
+    qtbot.waitUntil(lambda: _every_job_is_with_comfyui(view), timeout=5000)
+    _ask_for_a_hat(qtbot, view)
+
+    _finish_reroll(view, job)
+
+    shown, turns, (_struck, lit) = _shown_by_the_tab(view)
+    assert (shown, [said for said, _answer in turns], lit) == (
+        job.prompt_id, ["two cats", "a hat"], ", a hat")
+
+
+def test_the_tab_ends_on_the_latest_image_its_conversation_made_and_never_goes_back(
+        qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path, auto_generate=True)
+    (first,) = view._live_jobs.values()
+    _ask_for_a_hat(qtbot, view)
+    second = next(job for job in view._live_jobs.values() if job is not first)
+
+    for _landing in range(2):
+        qtbot.waitUntil(lambda: any(view._db.get_generation(job.prompt_id)["status"] == "running"
+                                    for job in view._live_jobs.values()), timeout=5000)
+        _finish_reroll(view, next(job for job in view._live_jobs.values()
+                                  if view._db.get_generation(job.prompt_id)["status"] == "running"))
+
+    tab = view._generate_pane.current_generate_tab()
+    shown, turns, _marks = _shown_by_the_tab(view)
+    assert (shown, [said for said, _answer in turns]) == (second.prompt_id, ["two cats", "a hat"])
+    assert not tab.follows_its_request_to(first.prompt_id)
+
+
 def test_generate_under_a_turn_that_would_make_an_image_already_made_makes_no_second_copy(
         qtbot, tmp_path):
     view = _tab_asked_for_two_cats(qtbot, tmp_path)

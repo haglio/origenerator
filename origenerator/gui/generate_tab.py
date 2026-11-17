@@ -58,6 +58,7 @@ from origenerator.gallery.source_image import start_images_among
 from origenerator.generation_config import (
     ConfigSnapshot,
     configs_match,
+    item_a_request_remakes,
     merge_denormalized,
     what_a_request_makes,
     would_reproduce_a_completed_run,
@@ -1374,6 +1375,7 @@ class GenerateTab(DropZones):
         self._turn_being_made = None
         exchange.set_thumbnail_of(self._thumbnail_of)
         exchange.set_generate_offered(self._turn_makes_a_new_image)
+        exchange.set_remade_by(self._item_a_turn_remakes)
         exchange.show_exchange(aim.every_turn(), started_on=aim.started_on, asking=aim.asking,
                                showing=prompt_id)
         if aim.turns:
@@ -1430,12 +1432,22 @@ class GenerateTab(DropZones):
         return workflow, {**params, "positive_prompt": turn.new_positive,
                           "negative_prompt": turn.new_negative}, asked
 
-    def _turn_makes_a_new_image(self, index: int) -> bool:
+    def _turn_request(self, index: int) -> tuple | None:
         launch = self._turn_launch(index)
         workflow = workflow_named(launch[0]) if launch is not None else None
-        return workflow is not None and what_a_request_makes(
-            self._library.now().rows, workflow, launch[1],
-            self._db.get_generation(launch[2]["source_prompt_id"])) is not None
+        if workflow is None:
+            return None
+        return (self._library.now().rows, workflow, launch[1],
+                self._db.get_generation(launch[2]["source_prompt_id"]))
+
+    def _turn_makes_a_new_image(self, index: int) -> bool:
+        request = self._turn_request(index)
+        return request is not None and what_a_request_makes(*request) is not None
+
+    def _item_a_turn_remakes(self, index: int) -> str | None:
+        request = self._turn_request(index)
+        remade = item_a_request_remakes(*request) if request is not None else None
+        return remade["prompt_id"] if remade is not None else None
 
     def _generate_from_turn(self, index: int) -> None:
         launch = self._turn_launch(index)

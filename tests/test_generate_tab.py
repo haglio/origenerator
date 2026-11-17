@@ -3809,7 +3809,7 @@ def test_a_request_still_being_worked_out_keeps_the_line_waiting_when_the_item_i
     tab.refresh_displayed(image, [image])
 
     assert not exchange._line.isEnabled()
-    assert exchange._status.text() == "updating…"
+    assert not exchange._working.isHidden()
     assert exchange.turns() == [("a hat", "")]
 
 
@@ -3822,7 +3822,7 @@ def test_the_line_waits_while_the_model_works_out_a_request(saved_panel, qtbot):
     exchange = _ask(tab, qtbot, "a hat")
 
     assert not exchange._line.isEnabled()
-    assert exchange._status.text() == "updating…"
+    assert not exchange._working.isHidden()
     assert tab.asked() is None
 
 

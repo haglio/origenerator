@@ -90,6 +90,20 @@ def test_two_callers_are_not_handed_the_same_dictionary(tmp_path):
     assert first is not second
 
 
+def test_the_disk_is_asked_once_which_overlay_answers_however_many_items_want_it(tmp_path, monkeypatch):
+    example = tmp_path / "content.example.json"
+    example.write_text(json.dumps({"library_root": "C:/example"}), encoding="utf-8")
+    local = tmp_path / "content.local.json"
+    asked = []
+    is_there = Path.exists
+    monkeypatch.setattr(Path, "exists", lambda path: asked.append(path) or is_there(path))
+
+    for _item in range(5):
+        content.load_content(local, example)
+
+    assert asked == [local]
+
+
 def test_the_overlay_is_read_once_however_many_modules_want_it():
     seen = _import_in_a_fresh_interpreter(
         "origenerator.config", "origenerator.search",

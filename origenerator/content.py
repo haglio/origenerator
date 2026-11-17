@@ -36,12 +36,15 @@ def _text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+_which_answers = cache(_overlay.overlay_path)
+
+
 def overlay_path(
     local_path: Path | None = None,
     example_path: Path | None = None,
 ) -> Path:
-    return _overlay.overlay_path(LOCAL_CONTENT if local_path is None else local_path,
-                                 EXAMPLE_CONTENT if example_path is None else example_path)
+    return _which_answers(LOCAL_CONTENT if local_path is None else local_path,
+                          EXAMPLE_CONTENT if example_path is None else example_path)
 
 
 _RENAMED_KEYS = {"combine_recipes": "pinned_kino_settings",
@@ -61,8 +64,6 @@ def load_content(
 ) -> dict[str, Any]:
     return _current(json.loads(_text(overlay_path(local_path, example_path))))
 
-
-load_content.cache_clear = _text.cache_clear
 
 
 def missing_overlay_keys(

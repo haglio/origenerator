@@ -82,7 +82,6 @@ from origenerator.gallery.labels import (
 )
 from origenerator.gallery.output import (
     animated_preview_if_made,
-    generation_of_file,
     input_image_reference,
     is_in_progress,
     make_animated_preview,
@@ -221,7 +220,6 @@ __all__ = [
     "folder_signature",
     "full_settings",
     "generate_tab_title",
-    "generation_of_file",
     "generation_seed",
     "group_level",
     "holds",

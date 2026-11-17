@@ -88,10 +88,6 @@ def generations_by_stem(rows: list[dict]) -> dict[str, str]:
     return {stem: prompt_id for stem, (_rank, prompt_id) in FilesMade.of(rows).by_stem.items()}
 
 
-def generation_of_file(path, rows: list[dict]) -> str | None:
-    return FilesMade.of(rows).generation_of(path)
-
-
 class FilesMade:
     def __init__(self) -> None:
         self.kept_at: dict[Path, tuple[int, str]] = {}

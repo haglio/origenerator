@@ -531,3 +531,20 @@ def test_a_video_with_no_file_yet_is_not_enhanced(tmp_path, monkeypatch):
     being_made = {**upscaled, "status": "running", "output_files": None}
 
     assert LibrarySnapshot([being_made]).enhanced_ids_of([being_made]) == set()
+
+
+def test_the_videos_files_are_indexed_once_for_every_file_asked_after(monkeypatch):
+    video = {"id": 2, "prompt_id": "vid-1", "workflow_name": "wan22_i2v", "status": "completed",
+             "output_files": json.dumps([{"filename": "made_here_00001_.mp4"}])}
+    image = {"id": 1, "prompt_id": "pic-1", "workflow_name": "sdxl_t2i", "status": "completed",
+             "output_files": json.dumps([{"filename": "made_here_00001_.png"}])}
+    library = LibrarySnapshot([video, image])
+    indexed = []
+    index_of = library_views.FilesMade.of
+    monkeypatch.setattr(library_views.FilesMade, "of",
+                        lambda rows: indexed.append(len(rows)) or index_of(rows))
+
+    found = [library.videos_made.generation_of(f"C:/library/{name}")
+             for name in ("made_here_00001_.mp4", "made_here_00001__topaz.mp4", "other.mp4")]
+
+    assert (found, indexed) == (["vid-1", "vid-1", None], [1])

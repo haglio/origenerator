@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from origenerator.db_connection import Store
+from origenerator.folder_switch_fields import SWITCH_KEYS
 
-_SWITCHES = "favorite_after_id, enhance_after_id"
+_SWITCHES = ", ".join(SWITCH_KEYS)
 
 
 def _switches(r) -> dict:
-    return {"favorite_after_id": r["favorite_after_id"],
-            "enhance_after_id": r["enhance_after_id"]}
+    return {key: r[key] for key in SWITCH_KEYS}
 
 
 class FolderMetaStore(Store):
@@ -37,14 +37,16 @@ class FolderMetaStore(Store):
                 (folder_key, 1 if favorite else 0, after_id if favorite else None),
             )
 
-    def set_folder_enhance(self, folder_key: str, *, after_id: int | None):
+    def set_folder_enhance(self, folder_key: str, *, after_id: int | None,
+                           settings: str | None = None):
         with self._connect() as conn:
             conn.execute(
-                """INSERT INTO folder_meta (folder_key, enhance_after_id)
-                   VALUES (?, ?)
+                """INSERT INTO folder_meta (folder_key, enhance_after_id, enhance_settings)
+                   VALUES (?, ?, ?)
                    ON CONFLICT(folder_key)
-                   DO UPDATE SET enhance_after_id = excluded.enhance_after_id""",
-                (folder_key, after_id),
+                   DO UPDATE SET enhance_after_id = excluded.enhance_after_id,
+                                 enhance_settings = excluded.enhance_settings""",
+                (folder_key, after_id, settings),
             )
 
     def move_folder_arrivals_on(self, folder_key: str, *, favorite_after_id: int | None,
@@ -77,21 +79,23 @@ class FolderMetaStore(Store):
     def upsert_folder_meta(self, folder_key: str, *, custom_name: str | None,
                            favorite: bool, level: str | None, ref_prompt_id: str | None,
                            favorite_after_id: int | None = None,
-                           enhance_after_id: int | None = None):
+                           enhance_after_id: int | None = None,
+                           enhance_settings: str | None = None):
         with self._connect() as conn:
             conn.execute(
                 f"""INSERT INTO folder_meta
                        (folder_key, custom_name, starred, level, ref_prompt_id, {_SWITCHES})
-                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(folder_key) DO UPDATE SET
                        custom_name = excluded.custom_name,
                        starred = excluded.starred,
                        level = excluded.level,
                        ref_prompt_id = excluded.ref_prompt_id,
                        favorite_after_id = excluded.favorite_after_id,
-                       enhance_after_id = excluded.enhance_after_id""",
+                       enhance_after_id = excluded.enhance_after_id,
+                       enhance_settings = excluded.enhance_settings""",
                 (folder_key, custom_name, 1 if favorite else 0, level, ref_prompt_id,
-                 favorite_after_id, enhance_after_id),
+                 favorite_after_id, enhance_after_id, enhance_settings),
             )
 
     def delete_folder_meta(self, folder_key: str):

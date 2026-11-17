@@ -34,6 +34,13 @@ _SETTLING_ROUNDS = 4
 FOLDER_KEYS_MIME = "application/x-origenerator-folder-keys"
 
 
+def folder_keys_in(mime) -> list[str]:
+    data = mime.data(FOLDER_KEYS_MIME)
+    if data.isEmpty():
+        return []
+    return [key for key in bytes(data).decode("utf-8").split("\n") if key]
+
+
 def _action_rects(content: QRect):
     y = content.y() + (content.height() - _ICON) // 2
     star = QRect(content.left() - _PAD - _ICON, y, _ICON, _ICON)
@@ -470,10 +477,7 @@ class FolderTree(QTreeWidget):
     def _dragged_keys(self, mime, source) -> list[str]:
         if isinstance(source, FolderTree) and source is not self:
             return []
-        data = mime.data(FOLDER_KEYS_MIME)
-        if data.isEmpty():
-            return []
-        return [key for key in bytes(data).decode("utf-8").split("\n") if key]
+        return folder_keys_in(mime)
 
     def dragEnterEvent(self, event):
         # Qt: a drag refused on entry is sent no moves, so it would never be offered a row to land on.

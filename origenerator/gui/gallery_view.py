@@ -412,6 +412,10 @@ class GalleryView(QWidget):
                 slideshows=self.slideshows, info_tabs_of=lambda: self.generate_pane),
             db=db, library=self.library)
         self._folder_switches = FolderSwitches(self, db, self.enhance, library=self.library)
+        self.enhance.pane.take_folders_settings_from(
+            self._folder_switches.enhance_params_of_the_one_enhancing)
+        self.enhance.after_restoring(
+            self._folder_switches.keep_the_settings_of_folders_switched_on_before_settings_were_kept)
         self._jobs.changed.connect(self.enhance.reconcile)
         self._jobs.enhance_images_with(self.enhance.enhance_a_videos_start_image)
         self._look_training = LookTrainingController(

@@ -17,7 +17,7 @@ def _enhancing_from(mark: int | None) -> dict:
     return {"starred": False, "favorite_after_id": None, "enhance_after_id": mark}
 
 
-def _every_one(row) -> bool:
+def _every_one(_key, _row) -> bool:
     return True
 
 
@@ -61,26 +61,26 @@ def test_a_finished_image_that_arrives_where_enhance_is_on_is_enhanced():
     found = arrivals_in({"leaf": [_item(3), _item(5)]}, {"leaf": _enhancing_from(4)},
                         would_enhance=_every_one)
 
-    assert [row["prompt_id"] for row in found.to_enhance] == ["p5"]
+    assert [row["prompt_id"] for row in found.to_enhance["leaf"]] == ["p5"]
     assert found.marks == {"leaf": (None, 5)}
 
 
 def test_enhance_passes_over_what_it_would_not_enhance():
     found = arrivals_in({"leaf": [_item(5)]}, {"leaf": _enhancing_from(4)},
-                        would_enhance=lambda row: False)
+                        would_enhance=lambda _key, _row: False)
 
-    assert (found.to_enhance, found.marks) == ([], {"leaf": (None, 5)})
+    assert (found.to_enhance, found.marks) == ({}, {"leaf": (None, 5)})
 
 
 def test_enhance_waits_on_an_item_still_being_made_and_comes_back_to_it():
     leaves = {"leaf": [_item(5, status="pending"), _item(6)]}
 
     found = arrivals_in(leaves, {"leaf": _enhancing_from(4)}, would_enhance=_every_one)
-    assert ([row["prompt_id"] for row in found.to_enhance], found.marks) == (["p6"], {})
+    assert ([row["prompt_id"] for row in found.to_enhance["leaf"]], found.marks) == (["p6"], {})
 
     leaves["leaf"][0] = _item(5)
     found = arrivals_in(leaves, {"leaf": _enhancing_from(4)}, would_enhance=_every_one)
-    assert [row["prompt_id"] for row in found.to_enhance] == ["p5", "p6"]
+    assert [row["prompt_id"] for row in found.to_enhance["leaf"]] == ["p5", "p6"]
     assert found.marks == {"leaf": (None, 6)}
 
 

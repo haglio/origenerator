@@ -331,6 +331,7 @@ ADDED_COLUMNS = {
         "ref_prompt_id": "TEXT",
         "favorite_after_id": "INTEGER",
         "enhance_after_id": "INTEGER",
+        "enhance_settings": "TEXT",
     },
     "custom_folders": {
         "side": "TEXT",

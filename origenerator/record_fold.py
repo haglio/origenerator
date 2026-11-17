@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from origenerator.folder_switch_fields import switches_of
 from origenerator.gallery_contract import LANES
 
 
@@ -43,8 +44,7 @@ def _repoint_at_the_record_that_stays(db, rows, folded: dict, keeper: dict) -> N
                                   custom_name=folder_meta.get("custom_name"),
                                   favorite=bool(folder_meta.get("starred")),
                                   level=folder_meta.get("level"), ref_prompt_id=stays,
-                                  favorite_after_id=folder_meta.get("favorite_after_id"),
-                                  enhance_after_id=folder_meta.get("enhance_after_id"))
+                                  **switches_of(folder_meta))
     db.repoint_item_in_custom_collections(gone, stays)
     for held in db.folders_in_custom_collections():
         if held.get("ref_prompt_id") == gone:

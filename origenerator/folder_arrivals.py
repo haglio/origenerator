@@ -8,7 +8,7 @@ from origenerator.gallery.output import is_in_progress
 
 class Arrivals(NamedTuple):
     to_star: list[str]
-    to_enhance: list[dict]
+    to_enhance: dict[str, list[dict]]
     marks: dict[str, tuple[int | None, int | None]]
 
 
@@ -17,9 +17,9 @@ def _highest_id(rows: list[dict]) -> int:
 
 
 def arrivals_in(leaves: dict[str, list[dict]], meta: dict[str, dict], *,
-                would_enhance: Callable[[dict], bool], older_stars: bool = False) -> Arrivals:
+                would_enhance: Callable[[str, dict], bool], older_stars: bool = False) -> Arrivals:
     to_star: list[str] = []
-    to_enhance: list[dict] = []
+    to_enhance: dict[str, list[dict]] = {}
     marks: dict[str, tuple[int | None, int | None]] = {}
     for key, rows in leaves.items():
         held = meta.get(key) or {}
@@ -34,8 +34,10 @@ def arrivals_in(leaves: dict[str, list[dict]], meta: dict[str, dict], *,
         if enhancing_from is not None:
             arrived = [row for row in rows if row["id"] > enhancing_from]
             waiting = [row["id"] for row in arrived if is_in_progress(row)]
-            to_enhance += [row for row in arrived
-                           if not is_in_progress(row) and would_enhance(row)]
+            ready = [row for row in arrived
+                     if not is_in_progress(row) and would_enhance(key, row)]
+            if ready:
+                to_enhance[key] = ready
             enhance_mark = (min(waiting) - 1 if waiting
                             else max(enhancing_from, _highest_id(arrived)))
         if (favorite_mark, enhance_mark) != (starred_from, enhancing_from):

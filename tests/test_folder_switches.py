@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from origenerator import gallery
 from origenerator.gui.folder_switches import FolderSwitches
 from tests.real_db import database_of
 
@@ -26,8 +27,14 @@ class _Library:
         return {"leaf": [{"prompt_id": "a"}, {"prompt_id": "b", "starred": 1}]}
 
 
+_KEPT = gallery.EnhanceSettings(params={**gallery.EnhanceSettings().params,
+                                          "enhance_steps": 11}).to_json()
+
+
 class _Enhance:
-    def enhance_what_awaits(self, rows):
+    settings = gallery.EnhanceSettings.parse(_KEPT)
+
+    def enhance_what_awaits(self, rows, settings):
         pass
 
 
@@ -42,7 +49,8 @@ def test_favoriting_a_folder_saves_it_and_writes_its_record_from_the_newest_item
     assert switches.set_favorite("leaf", True) is True
 
     assert db.folder_meta_map()["leaf"] == {"custom_name": None, "starred": True,
-                                            "favorite_after_id": 41, "enhance_after_id": None}
+                                            "favorite_after_id": 41, "enhance_after_id": None,
+                                            "enhance_settings": None}
     assert library.folder_meta["leaf"] == {"custom_name": None, "starred": True, "favorite_after_id": 41}
 
 
@@ -63,6 +71,8 @@ def test_unfavoriting_keeps_the_rest_of_the_folders_record():
     switches.set_favorite("leaf", False)
 
     assert library.folder_meta["leaf"] == {"custom_name": None, "starred": False,
-                                 "enhance_after_id": 41, "favorite_after_id": None}
+                                 "enhance_after_id": 41, "enhance_settings": _KEPT,
+                                 "favorite_after_id": None}
     assert db.folder_meta_map()["leaf"] == {"custom_name": None, "starred": False,
-                                            "favorite_after_id": None, "enhance_after_id": 41}
+                                            "favorite_after_id": None, "enhance_after_id": 41,
+                                            "enhance_settings": _KEPT}

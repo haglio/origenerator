@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from functools import cached_property
 
 from origenerator import gallery
+from origenerator.folder_switch_fields import SWITCH_KEYS, switches_of
 from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
 from origenerator.item_shape import row_shape
 from origenerator.media import MediaType
@@ -62,7 +63,7 @@ def reconcile_folder_meta(db, folders: Folders | None = None) -> dict:
         held = meta_by_key[row["folder_key"]]
         db.upsert_folder_meta(row["folder_key"], custom_name=held["custom_name"],
                               favorite=held["starred"], level=level, ref_prompt_id=ref,
-                              **_switches_of(held))
+                              **switches_of(held))
         held["level"], held["ref_prompt_id"] = level, ref
 
     def repoint(row, target, identity):
@@ -165,18 +166,13 @@ def _repoint_target(row, folders: Folders):
     return folders.legacy_keys.get(row["folder_key"])
 
 
-def _switches_of(meta: dict) -> dict:
-    return {"favorite_after_id": meta.get("favorite_after_id"),
-            "enhance_after_id": meta.get("enhance_after_id")}
-
-
 def _move_favorite(db, row, target, identity, meta_by_key):
     level, ref = identity
     existing = meta_by_key.get(target)
     name = (existing["custom_name"] if existing else None) or row["custom_name"]
     favorite = bool((existing["starred"] if existing else False) or row["starred"])
     switches = {switch: (existing or {}).get(switch) or row.get(switch)
-                for switch in _switches_of(row)}
+                for switch in SWITCH_KEYS}
     db.upsert_folder_meta(target, custom_name=name, favorite=favorite,
                           level=level, ref_prompt_id=ref, **switches)
     db.delete_folder_meta(row["folder_key"])

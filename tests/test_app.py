@@ -66,6 +66,7 @@ from origenerator.db import Database, NewGeneration
 from origenerator.evolver_export import EvolverInbox
 from origenerator.export_lane import GENAU
 from origenerator.fun_time_mode import TASKBAR_IDENTITY_FLAG
+from origenerator.gui import off_thread
 from origenerator.gui.loading_screen import loading_screen
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.window_monitor import the_window_on
@@ -1237,6 +1238,11 @@ def _the_application_keeps_nothing_a_launch_hung_on_it(qapp):
             left.deleteLater()
 
 
+def _nothing_runs_behind_the_window() -> bool:
+    QApplication.processEvents()
+    return not any(thread.name == off_thread.LONG_WAIT_THREAD for thread in threading.enumerate())
+
+
 @contextmanager
 def _a_faked_boot(record, *, passes=None, **patches):
     targets = {
@@ -1263,7 +1269,10 @@ def _a_faked_boot(record, *, passes=None, **patches):
                     side_effect=lambda *a, _n=name, **k: record.append(_n) or []))))
         for target, value in patches.items():
             stack.enter_context(patch(target, value))
-        yield
+        try:
+            yield
+        finally:
+            wait_until(_nothing_runs_behind_the_window)
 
 
 def test_main_runs_every_maintenance_pass_in_the_documented_order(qapp):
@@ -1324,7 +1333,7 @@ class _ComfyUIStillStarting:
 
     def __call__(self):
         self.asked.set()
-        self.answer.wait(5)
+        self.answer.wait()
         return self.comes_up
 
 
@@ -1335,17 +1344,18 @@ def test_a_hosted_boot_builds_its_window_before_it_tidies_its_library_or_comfyui
     core = MagicMock(
         side_effect=lambda *a, **k: ran.append("Core") or _a_window_whose_satellites_are_served())
 
-    try:
-        with _a_faked_boot(ran, **{"origenerator.gui.core.Core": core,
-                                   "origenerator.gui.job_queue.BRING_UP_COMFYUI": starting}) as _, \
-             patch("origenerator.comfyui_launcher.ensure_comfyui_server") as ensure:
+    with _a_faked_boot(ran, **{"origenerator.gui.core.Core": core,
+                               "origenerator.gui.job_queue.BRING_UP_COMFYUI": starting}) as _, \
+         patch("origenerator.comfyui_launcher.ensure_comfyui_server") as ensure:
+        try:
             assert main(hosted_launch()) == 0
             wait_until(starting.asked.is_set, pump=QApplication.processEvents)
-    finally:
-        starting.answer.set()
+            ran_before_comfyui_answered = list(ran)
+        finally:
+            starting.answer.set()
 
     ensure.assert_not_called()
-    assert ran == ["Core"] + [name for _, name in _MAINTENANCE_PASSES
+    assert ran_before_comfyui_answered == ["Core"] + [name for _, name in _MAINTENANCE_PASSES
                               if name != "reconcile_in_flight"], (
         "the Satellites wait for the window, and only Core needs a tidied library")
 
@@ -1353,13 +1363,13 @@ def test_a_hosted_boot_builds_its_window_before_it_tidies_its_library_or_comfyui
 def _a_boot_logged(argv) -> list[str]:
     logger = MagicMock()
     starting = _ComfyUIStillStarting()
-    try:
-        with _a_faked_boot([], **{
-                "origenerator.gui.job_queue.BRING_UP_COMFYUI": starting,
-                "origenerator.app._configure_logging": MagicMock(return_value=logger)}):
+    with _a_faked_boot([], **{
+            "origenerator.gui.job_queue.BRING_UP_COMFYUI": starting,
+            "origenerator.app._configure_logging": MagicMock(return_value=logger)}):
+        try:
             assert main(argv) == 0
-    finally:
-        starting.answer.set()
+        finally:
+            starting.answer.set()
     return [said.args[0] % said.args[1:] for said in logger.info.call_args_list]
 
 

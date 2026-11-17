@@ -31,7 +31,6 @@ from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
 
 _ASK = "What to change, e.g. two women"
 _REQUEST = "Request"
-_UPDATING = "updating…"
 _FAILED = "couldn't work that into the prompts"
 _LINES_AT_MOST = 20
 _THUMBNAIL_LINES = 2
@@ -272,6 +271,9 @@ class RequestExchange(QWidget):
         self._request = GenerateButton()
         self._request.set_caption(_REQUEST)
         self._request.clicked.connect(self._ask)
+        self._working = ProgressBar()
+        self._working.hide()
+        row.addWidget(self._working)
         row.addWidget(self._request)
         column.addLayout(row)
 
@@ -324,9 +326,13 @@ class RequestExchange(QWidget):
 
     def _settle(self, status: str = "") -> None:
         waiting = bool(self._held) and self._held[-1].waiting
-        _say(self._status, status or (_UPDATING if waiting else ""))
-        for asks in (self._line, self._request):
-            asks.setEnabled(not waiting)
+        _say(self._status, status)
+        self._line.setEnabled(not waiting)
+        if waiting:
+            self._working.setFixedSize(self._request.size())
+            self._working.show_progress(_REQUEST, None)
+        self._request.setHidden(waiting)
+        self._working.setVisible(waiting)
 
     def show_exchange(self, turns, *, started_on: str | None = None,
                       asking: str | None = None) -> None:

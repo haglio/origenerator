@@ -70,16 +70,6 @@ def test_the_request_button_at_the_end_of_the_line_asks_for_the_words_and_clears
     assert row.layout().itemAt(row.layout().count() - 1).widget() is _request_button(exchange)
 
 
-def test_the_request_button_waits_with_the_line_while_a_request_is_worked_out(qtbot):
-    exchange = _exchange(qtbot)
-    exchange.add_turn("brighter")
-    waiting = _request_button(exchange).isEnabled()
-
-    exchange.answered(("brighter", "Brighter now."))
-
-    assert (waiting, _request_button(exchange).isEnabled()) == (False, True)
-
-
 def test_enter_on_an_empty_line_asks_nothing(qtbot):
     exchange = _exchange(qtbot)
     asked = _asked(qtbot, exchange)
@@ -133,22 +123,41 @@ def test_with_no_exchange_only_the_line_shows(qtbot):
     assert exchange.turns() == []
 
 
-def test_a_request_just_asked_shows_as_a_turn_updating_until_its_answer_comes(qtbot):
+def test_a_request_just_asked_shows_as_a_turn_until_its_answer_comes(qtbot):
     exchange = _exchange(qtbot)
     exchange.show_exchange(EXCHANGE)
 
     exchange.add_turn("brighter")
 
     assert exchange.turns()[-1] == ("brighter", "")
-    assert exchange._status.text() == "updating…"
-    assert not exchange._status.isHidden()
+    assert exchange._status.isHidden()
     assert not exchange._line.isEnabled()
 
     exchange.answered(("brighter", "Brighter now."))
 
     assert exchange.turns()[-1] == ("brighter", "Brighter now.")
-    assert exchange._status.isHidden()
     assert exchange._line.isEnabled()
+
+
+def _sweeping_bars(exchange) -> list[str]:
+    return [bar.caption() for bar in exchange.findChildren(ProgressBar)
+            if not bar.isHidden() and bar.maximum() == 0]
+
+
+def test_the_request_button_is_a_sweeping_bar_of_its_own_size_while_a_request_is_worked_out(
+        qtbot):
+    exchange = _exchange(qtbot)
+    button = _request_button(exchange)
+    size = button.size()
+
+    exchange.add_turn("brighter")
+    (bar,) = [bar for bar in exchange.findChildren(ProgressBar) if not bar.isHidden()]
+
+    assert (_sweeping_bars(exchange), button.isHidden(), bar.size()) == (["Request"], True, size)
+
+    exchange.answered(("brighter", "Brighter now."))
+
+    assert (_sweeping_bars(exchange), button.isHidden()) == ([], False)
 
 
 def test_an_exchange_shown_with_a_request_still_being_worked_out_waits_on_it(qtbot):
@@ -157,7 +166,7 @@ def test_an_exchange_shown_with_a_request_still_being_worked_out_waits_on_it(qtb
     exchange.show_exchange(EXCHANGE, asking="brighter")
 
     assert exchange.turns()[-1] == ("brighter", "")
-    assert exchange._status.text() == "updating…"
+    assert _sweeping_bars(exchange) == ["Request"]
     assert not exchange._line.isEnabled()
 
     exchange.answered(("brighter", "Brighter now."))

@@ -30,7 +30,6 @@ from origenerator.gallery import (
     folder_key_at_level,
     folder_level,
     generate_tab_title,
-    generation_of_file,
     group_level,
     is_enhanced_row,
     job_kind_label,
@@ -2138,7 +2137,7 @@ def test_a_copy_the_library_renamed_is_traced_back_to_the_generation_it_copies()
                                               "subfolder": "video"}]))
     delivered = "C:/library/videos/genau/clips/wan22_i2v_00007_ (2)_topaz (3).mp4"
 
-    assert generation_of_file(delivered, [neighbor, loop]) == "vid-7"
+    assert gallery_output.FilesMade.of([neighbor, loop]).generation_of(delivered) == "vid-7"
 
 
 def test_a_lone_scene_groups_with_the_clip_length_it_runs_for():
@@ -2214,7 +2213,7 @@ def test_a_video_another_site_made_is_found_by_where_it_is_kept(tmp_path):
         [{"filename": kept.name, "library_path": str(kept)}])}
     ours = {"prompt_id": "v1", "output_files": json.dumps([{"filename": "scene one.mp4"}])}
 
-    assert generation_of_file(str(kept), [ours, theirs]) == "o1"
+    assert gallery_output.FilesMade.of([ours, theirs]).generation_of(str(kept)) == "o1"
 
 
 def test_the_stems_a_row_was_made_as_are_read_from_its_files_once(monkeypatch):

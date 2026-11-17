@@ -99,7 +99,7 @@ class ZoneItems(FilesOnly):
             prompt_id = gallery.source_image_id_of(held, library.image_config_index)
         else:
             path = self.path_of(held) if kind is not None else None
-            prompt_id = gallery.generation_of_file(path, library.rows_of(kind)) if path else None
+            prompt_id = library.videos_made.generation_of(path) if path else None
         return self._db.get_generation(prompt_id) if prompt_id else None
 
     def _still_of(self, path: Path) -> str | None:

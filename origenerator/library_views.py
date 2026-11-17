@@ -14,6 +14,7 @@ from origenerator.evolver_upscales import EvolverUpscales, original_stem
 from origenerator.gallery.collection import collection, folder_collection
 from origenerator.gallery.custom import index_folders
 from origenerator.gallery.enhance import EnhanceVersion, file_at, upscale_and_original
+from origenerator.gallery.output import FilesMade
 from origenerator.gallery.placement import Placement
 from origenerator.gallery.shapes import LANDSCAPE, shape_covers
 from origenerator.gallery.tree import KeptFolders, all_the_same
@@ -128,6 +129,10 @@ class LibrarySnapshot:
     @cached_property
     def video_rows(self) -> list[dict]:
         return self._of_kind(MediaType.VIDEO)
+
+    @cached_property
+    def videos_made(self) -> FilesMade:
+        return FilesMade.of(self.video_rows)
 
     @cached_property
     def recency(self) -> dict:
@@ -285,9 +290,6 @@ class LibrarySnapshot:
     @cached_property
     def image_config_index(self) -> dict:
         return gallery.build_image_config_index(self.image_rows)
-
-    def rows_of(self, kind: MediaType) -> list[dict]:
-        return self.image_rows if kind == MediaType.IMAGE else self.video_rows
 
     def in_settings(self, key: tuple[str, str] | None) -> list[dict]:
         if key is None:

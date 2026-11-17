@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from pathlib import Path
 
 from app_support.gallery_rows import source_of
@@ -9,6 +10,7 @@ from origenerator.db_connection import Store
 from origenerator.db_generations import library_paths_in
 from origenerator.db_schema import as_read
 from origenerator.generation_state import GenerationSource
+from origenerator.output_files import READINGS_KEPT
 from origenerator.trash import TrashedBatch
 
 
@@ -69,9 +71,15 @@ def _of_a_known_source(trashed: dict) -> bool:
 
 
 def _trashed_record(record) -> dict:
+    return _as_read_before(record["prompt_id"], record["row_json"], record["batch_json"],
+                           record["deleted_at"])
+
+
+@lru_cache(maxsize=READINGS_KEPT)
+def _as_read_before(prompt_id: str, row_json: str, batch_json: str, deleted_at) -> dict:
     return {
-        "prompt_id": record["prompt_id"],
-        "row": as_read(json.loads(record["row_json"])),
-        "batch": json.loads(record["batch_json"]),
-        "deleted_at": record["deleted_at"],
+        "prompt_id": prompt_id,
+        "row": as_read(json.loads(row_json)),
+        "batch": json.loads(batch_json),
+        "deleted_at": deleted_at,
     }

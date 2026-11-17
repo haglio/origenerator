@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from origenerator import db_trash
 from origenerator.box_breaks import BOX_BREAK
 from origenerator.db import Database, NewGeneration, NewRequest
 from origenerator.db_requests import Turn
@@ -1197,3 +1198,16 @@ def test_a_turn_outlives_the_item_it_led_to(tmp_path):
     db.delete_generation("gen-1")
 
     assert db.requests.exchange_of("gen-1") == [Turn("a hat", "Gave her a hat.", made="gen-1")]
+
+
+def test_listing_the_trash_again_reads_no_record_it_has_read(tmp_path, monkeypatch):
+    db = Database(tmp_path / "test.db")
+    for prompt_id in ("d-1", "d-2"):
+        db.record_trashed(prompt_id, {"prompt_id": prompt_id}, {"moves": []})
+    listed = db.list_trashed()
+    read = []
+    loads = json.loads
+    monkeypatch.setattr(db_trash.json, "loads", lambda raw: read.append(raw) or loads(raw))
+
+    assert db.list_trashed() == listed
+    assert read == []

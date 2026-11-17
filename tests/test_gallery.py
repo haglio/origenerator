@@ -2215,3 +2215,15 @@ def test_a_video_another_site_made_is_found_by_where_it_is_kept(tmp_path):
     ours = {"prompt_id": "v1", "output_files": json.dumps([{"filename": "scene one.mp4"}])}
 
     assert generation_of_file(str(kept), [ours, theirs]) == "o1"
+
+
+def test_the_stems_a_row_was_made_as_are_read_from_its_files_once(monkeypatch):
+    row = _row(prompt_id="v1", workflow_name="wan22_i2v",
+               output_files=json.dumps([{"filename": "made_once_00001_.mp4"}]))
+    first = gallery_output.stems_made_as(row)
+    read = []
+    monkeypatch.setattr(gallery_output, "parse_file_list",
+                        lambda raw: read.append(raw) or [])
+
+    assert gallery_output.stems_made_as(dict(row)) == first == frozenset({"made_once_00001_"})
+    assert read == []

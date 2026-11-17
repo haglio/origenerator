@@ -74,7 +74,13 @@ def place_of_its_own(file: dict) -> str | None:
 
 
 def stems_made_as(row: dict) -> frozenset[str]:
-    return frozenset(stem_of_either_copy(name) for file in row_output_files(row) if isinstance(file, dict)
+    return _stems_in(row.get("output_files"))
+
+
+@lru_cache(maxsize=READINGS_KEPT)
+def _stems_in(output_files: str | None) -> frozenset[str]:
+    return frozenset(stem_of_either_copy(name)
+                     for file in parse_file_list(output_files) if isinstance(file, dict)
                      for name in (file.get("filename"), file.get("library_path")) if name)
 
 

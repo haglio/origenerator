@@ -15,6 +15,7 @@ import shiboken6
 from app_support import loading_screen as launchers_screen
 from app_support.file_channel import read_key_values
 from app_support.frame_channel import _HEADER
+from app_support.threading_utils import wait_until
 from funestra.file_channel import append_command
 from funestra.hud_placement import HudCorner
 from funestra.main_hud import OSR2_DRIVING, OSR2_PARKED
@@ -51,6 +52,7 @@ from origenerator.gui.headset_window import CAP_PX
 from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP
 from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
+from origenerator.gui.satellites_first import LONGEST_WAIT_S
 from origenerator.gui.taskbar_identity import TaskbarIdentity
 from origenerator.gui.window_monitor import the_window_on
 from origenerator.item_shape import shaped_key
@@ -2583,6 +2585,10 @@ def _hosted_with_two_satellites(tmp_path):
                    landscape_funestra=channel("landscape"))
 
 
+def _until(condition):
+    wait_until(condition, pump=QApplication.processEvents)
+
+
 def test_a_window_serving_the_satellites_first_reads_the_library_and_leaves_its_own_draw(
         qtbot, tmp_path):
     win = _window(qtbot, tmp_path, fun_time=_hosted_with_two_satellites(tmp_path))
@@ -2590,7 +2596,7 @@ def test_a_window_serving_the_satellites_first_reads_the_library_and_leaves_its_
     win.serve_the_satellites_first()
 
     win.show()
-    qtbot.wait(300)
+    QApplication.processEvents()
 
     assert _read_for_the_satellites(win) == ["g-1"]
     assert _indexed_for_search(win) == [], (
@@ -2608,18 +2614,20 @@ def test_a_window_serving_the_satellites_first_draws_itself_once_they_have_their
         while_both_play.setattr(win._gallery_view.slideshows, "region_slideshow",
                                 lambda shape: object())
 
-        qtbot.waitUntil(lambda: _indexed_for_search(win) == ["g-1"])
+        _until(lambda: _indexed_for_search(win) == ["g-1"])
 
 
 def test_a_window_serving_the_satellites_first_draws_itself_when_the_wait_is_over(
         qtbot, tmp_path):
     win = _window(qtbot, tmp_path, fun_time=_hosted_with_two_satellites(tmp_path))
     _completed_image(win._gallery_view._db)
-    win.serve_the_satellites_first(wait_ms=50)
-
+    at = [0.0]
+    win.serve_the_satellites_first(now=lambda: at[0])
     win.show()
 
-    qtbot.waitUntil(lambda: _indexed_for_search(win) == ["g-1"])
+    at[0] = LONGEST_WAIT_S
+
+    _until(lambda: _indexed_for_search(win) == ["g-1"])
 
 
 def test_what_waits_for_the_satellites_runs_after_the_windows_own_draw(qtbot, tmp_path):
@@ -2631,7 +2639,7 @@ def test_what_waits_for_the_satellites_runs_after_the_windows_own_draw(qtbot, tm
 
     win.once_the_satellites_are_served(lambda: found.append(_indexed_for_search(win)))
 
-    qtbot.waitUntil(lambda: found == [["g-1"]])
+    _until(lambda: found == [["g-1"]])
 
 
 def test_a_window_never_told_to_serve_the_satellites_first_runs_what_waits_at_once(

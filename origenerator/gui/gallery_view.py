@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from functools import partial
 from typing import NamedTuple
 
@@ -154,7 +155,7 @@ from origenerator.gui.panes import (
 )
 from origenerator.gui.populate_controller import PopulateController
 from origenerator.gui.prompt_reveal import reveal_prompt
-from origenerator.gui.satellites_first import LONGEST_WAIT_MS, SatellitesFirst
+from origenerator.gui.satellites_first import SatellitesFirst
 from origenerator.gui.shown_job_queue import ShownJobQueue, read_foreign_queue
 from origenerator.gui.slideshow_director import (
     DirectorSources,
@@ -869,9 +870,9 @@ class GalleryView(QWidget):
             self.slideshows.library_moved()
         self.slideshows.fill_the_wanted_regions()
 
-    def serve_the_satellites_first(self, *, wait_ms: int = LONGEST_WAIT_MS) -> SatellitesFirst:
+    def serve_the_satellites_first(self, *, now: Callable[[], float] = time.monotonic) -> SatellitesFirst:
         self._satellites_first = SatellitesFirst(
-            self, served=self._every_satellite_has_its_list, wait_ms=wait_ms)
+            self, served=self._every_satellite_has_its_list, now=now)
         return self._satellites_first
 
     def _the_satellites_are_still_to_serve(self) -> bool:

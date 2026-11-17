@@ -17,7 +17,7 @@ from origenerator.workflows.derived_size import (
     override_size,
 )
 from origenerator.workflows.detail_parts import detail_fix_passes, fix_prompts
-from origenerator.workflows.fix_finding import finding_nodes, parts_found_by
+from origenerator.workflows.fix_finding import before_save_node, finding_nodes, parts_found_by
 from origenerator.workflows.frame_rate import NATIVE_FPS, rate_multiplier, rate_options
 from origenerator.workflows.parts import NodeRefs, Segment
 
@@ -513,6 +513,7 @@ class WorkflowTemplate(ABC):
         for index, fix in enumerate(detail_fix_passes(params)):
             found, segs_ref = finding_nodes(index, fix, redrawn_so_far, original)
             nodes.update(found)
+            nodes.update(before_save_node(index, redrawn_so_far))
             detailer_id = f"fix{index}_detailer"
             own = prompts[fix.part.name]
             fixed = WorkflowTemplate.lora_chain(

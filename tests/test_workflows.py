@@ -36,6 +36,7 @@ from origenerator.workflows.base import (
 )
 from origenerator.workflows.derived_size import scale_to_total_pixels
 from origenerator.workflows.duration import seconds_for_frames
+from origenerator.workflows.fix_finding import saved_before_each_fix
 from origenerator.workflows.flux_t2i_upscaled import FluxT2iUpscaledWorkflow
 from origenerator.workflows.frame_rate import (
     MAX_PLAYBACK_FPS,
@@ -679,7 +680,7 @@ def test_each_part_asked_for_is_re_sampled_in_place_at_its_own_denoise():
                  if n["inputs"]["image"] == [decode_id, 0])
     second = next(nid for nid in detailers if nid != first)
     assert detailers[second]["inputs"]["image"] == [first, 0]
-    assert payload[_node_id(payload, "SaveImage")]["inputs"]["images"] == [second, 0], (
+    assert payload[ImageEnhanceWorkflow.output_node_id]["inputs"]["images"] == [second, 0], (
         "saved off the tail's decode, every pass would run and be thrown away")
 
 
@@ -702,6 +703,24 @@ def test_each_pass_reports_the_regions_its_detector_found_then_the_whole_image()
         tuple(detailer["inputs"]["segs"]) for detailer in _nodes_of(payload, "DetailerForEach")}
     assert {_linked(payload, concat["inputs"]["segs2"])["class_type"] for concat in joined} == {"MaskToSEGS"}
     assert _find_node(payload, "GetImageSize")["inputs"]["image"] == [_node_id(payload, "VAEDecode"), 0]
+
+
+def test_each_fix_saves_the_image_as_it_stood_before_that_fix_drew_on_it():
+    payload = _enhance_payload(enhance_detail_fixes={"faces": 0.45, "hands": 0.6})
+
+    assert payload["fix0_before"]["inputs"] == {
+        "images": [_node_id(payload, "VAEDecode"), 0], "filename_prefix": "before fixes/fix0"}
+    assert payload["fix1_before"]["inputs"]["images"] == ["fix0_detailer", 0]
+    assert payload["12"]["inputs"]["images"] == ["fix1_detailer", 0]
+
+
+def test_the_images_saved_before_each_fix_are_read_back_in_the_order_the_fixes_ran():
+    history = {"outputs": {"12": {"images": [ENHANCED]},
+                           "fix1_before": {"images": [{"filename": "fix1_00001_.png"}]},
+                           "fix0_before": {"images": [{"filename": "fix0_00001_.png"}]}}}
+
+    assert [saved["filename"] for saved in saved_before_each_fix(history)] == [
+        "fix0_00001_.png", "fix1_00001_.png"]
 
 
 def _region(*edges) -> str:
@@ -802,7 +821,7 @@ def test_a_detector_comfyui_hasnt_got_drops_its_part_rather_than_failing_the_sub
     assert provider["inputs"]["model_name"] == "bbox/face_finder.pt"
     (detailer,) = _nodes_of(payload, "DetailerForEach")
     assert detailer["inputs"]["image"] == [_node_id(payload, "VAEDecode"), 0]
-    save = payload[_node_id(payload, "SaveImage")]
+    save = payload[ImageEnhanceWorkflow.output_node_id]
     assert save["inputs"]["images"] == [_node_id(payload, "DetailerForEach"), 0]
 
 

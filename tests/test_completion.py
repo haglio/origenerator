@@ -174,3 +174,57 @@ def test_a_finished_run_is_filed_in_the_library_before_its_thumbnail_is_drawn(tm
     assert (places.images / "sdxl_t2i_00001_.png").is_file()
     assert thumb is not None
     assert Path(thumb).is_file()
+
+
+ENHANCE = WORKFLOW_REGISTRY["image_enhance"]
+BEFORE_THE_FIX, FIXED = (10, 10, 10), (200, 0, 0)
+
+
+def _an_enhance_run_with_one_fix(tmp_path, *, graph=True):
+    library = tmp_path / "library"
+    places = OutputPlaces(comfyui=tmp_path / "comfyui saves", images=library / "images",
+                          videos=library / "videos", scripts=library / "scripts",
+                          audio=library / "sounds")
+    saved, before = places.run("n1") / "image", places.run("n1") / "before fixes"
+    saved.mkdir(parents=True)
+    before.mkdir()
+    Image.new("RGB", (100, 100), BEFORE_THE_FIX).save(before / "fix0_00001_.png")
+    enhanced = Image.new("RGB", (100, 100), BEFORE_THE_FIX)
+    enhanced.paste(FIXED, (10, 10, 40, 40))
+    enhanced.save(saved / "image_enhance_00001_.png")
+    history = {"outputs": {
+        "12": {"images": [{"filename": "image_enhance_00001_.png",
+                           "subfolder": "origenerator/n1/image", "type": "output"}]},
+        "fix0_before": {"images": [{"filename": "fix0_00001_.png",
+                                    "subfolder": "origenerator/n1/before fixes", "type": "output"}]},
+        "fix0_points": {"text": ["[10, 10, 40, 40]", "[0, 0, 100, 100]"]}}}
+    if graph:
+        history["prompt"] = [1, "n1", {"fix0_detector": {
+            "class_type": "UltralyticsDetectorProvider",
+            "inputs": {"model_name": "bbox/face_finder.pt"}}}, {}, []]
+    return places, history
+
+
+def test_a_finished_enhancement_keeps_what_each_fix_redrew_and_none_of_the_whole_images(tmp_path):
+    places, history = _an_enhance_run_with_one_fix(tmp_path)
+
+    files, _thumb, _duration = completion.extract_completion(
+        ENHANCE, history, OutputFolders(places, tmp_path / "thumbnails"), "n1")
+
+    assert files[0]["fixes"] == [{"part": "faces", "box": [10, 10, 40, 40], "over": []}]
+    kept = tmp_path / "kept from fixes" / files[0]["fixes_kept"]
+    with Image.open(kept / "0_before.png") as under_the_fix:
+        assert under_the_fix.size == (30, 30)
+        assert under_the_fix.getpixel((0, 0)) == BEFORE_THE_FIX
+    assert not places.run("n1").exists()
+
+
+def test_an_enhancement_whose_fixes_cannot_be_named_keeps_nothing_and_leaves_no_whole_image(tmp_path):
+    places, history = _an_enhance_run_with_one_fix(tmp_path, graph=False)
+
+    files, _thumb, _duration = completion.extract_completion(
+        ENHANCE, history, OutputFolders(places, tmp_path / "thumbnails"), "n1")
+
+    assert "fixes" not in files[0]
+    assert not (tmp_path / "kept from fixes").exists()
+    assert not places.run("n1").exists()

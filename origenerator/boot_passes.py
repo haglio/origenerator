@@ -2,6 +2,7 @@
 # Imports below are late on purpose: origenerator.app imports this file before QT_SCALE_FACTOR is set and before the voice runtimes load.
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -107,6 +108,14 @@ def _disown_foreign_runs(library: Library):
     return disown_foreign_runs(library.db)
 
 
+def _forget_fixes_of_enhancements_gone(library: Library):
+    from origenerator import fixes_kept
+    from origenerator.gallery import forget_fixes_of_enhancements_gone
+
+    return forget_fixes_of_enhancements_gone(
+        library.db, fixes_kept.folder_beside(library.thumb_dir), now=time.time())
+
+
 def _repair_thumbnails(library: Library):
     from origenerator.importer import backfill_shared_thumbnails
 
@@ -201,6 +210,9 @@ MAINTENANCE = (
     BootPass(None, _disown_foreign_runs,
              counted="Disowned a preview's run id on %d enhanced image(s)",
              failure="Disowning foreign enhancement runs failed: %s"),
+    BootPass(None, _forget_fixes_of_enhancements_gone,
+             counted="Forgot what the fixes of %d enhancement(s) no longer listed had kept",
+             failure="Forgetting what gone enhancements' fixes kept failed: %s"),
     BootPass("Repairing thumbnails...", _repair_thumbnails,
              counted="Repaired %d colliding thumbnails",
              failure="Thumbnail repair failed: %s"),

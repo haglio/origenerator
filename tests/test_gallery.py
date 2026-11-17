@@ -914,25 +914,24 @@ def test_a_seed_a_workflow_declares_splits_no_folders(monkeypatch):
         "seed cannot start splitting folders by it")
 
 
-def test_a_start_frame_many_videos_share_is_looked_for_once(monkeypatch):
-    looked_for = []
-    find = source_image_module._image_named
+def test_the_images_are_gone_through_once_however_many_videos_ask_for_their_start():
+    gone_through = []
 
-    def counted(name, image_rows):
-        looked_for.append(name)
-        return find(name, image_rows)
+    class CountedImages(list):
+        def __iter__(self):
+            gone_through.append("once")
+            return super().__iter__()
 
-    monkeypatch.setattr(source_image_module, "_image_named", counted)
     image = _row(prompt_id="img", workflow_name="sdxl_t2i",
                  output_files=json.dumps([{"filename": "start.png"}]))
     videos = [_row(prompt_id=f"v{n}", workflow_name="wan22_i2v",
-                   params_json=json.dumps({"input_image": "start.png"})) for n in range(3)]
+                   params_json=json.dumps({"input_image": f"start{'' if n else '_other'}.png"}))
+              for n in range(3)]
 
-    start_image = source_image_module.start_images_among([image])
+    start_image = source_image_module.start_images_among(CountedImages([image]))
 
-    assert [start_image(video)["prompt_id"] for video in videos] == ["img", "img", "img"]
-    assert looked_for == ["start.png"], (
-        "each start frame is looked for once however many rows share it")
+    assert [(start_image(video) or {}).get("prompt_id") for video in videos] == [None, "img", "img"]
+    assert gone_through == ["once"]
 
 
 def test_output_reference_round_trips_back_to_its_source_image():

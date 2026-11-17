@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from functools import cache, partial
 
 from app_support.comfy_file_refs import frame_name
 from app_support.gallery_rows import made_here, source_of
@@ -46,8 +45,11 @@ def source_image_of(row: dict, image_rows: list[dict]) -> dict | None:
 
 
 def start_images_among(image_rows: list[dict]) -> Callable[[dict], dict | None]:
-    named = cache(partial(_image_named, image_rows=image_rows))
-    return lambda row: named(_start_frame_of(row))
+    by_frame: dict[str, dict] = {}
+    for image in image_rows:
+        for name in frame_names_of(image.get("output_files")):
+            by_frame.setdefault(name, image)
+    return lambda row: by_frame.get(frame_name(_start_frame_of(row)))
 
 
 def rebuildable_source_image(row: dict, image_rows: list[dict]) -> dict | None:
@@ -119,11 +121,12 @@ def build_image_config_index(image_rows: list[dict]) -> dict[str, _ImageConfig]:
 
 
 def videos_from_source_image(image_row: dict, video_rows: list[dict]) -> list[dict]:
-    image_id = image_row.get("prompt_id")
-    if image_id is None:
+    if image_row.get("prompt_id") is None:
         return []
-    return [v for v in video_rows if find_source_image_id(v, [image_row]) == image_id
-            and was_made_from(v, image_row)]
+    frames = frame_names_of(image_row.get("output_files"))
+    return [video for video in video_rows
+            if frame_name(_start_frame_of(video)) in frames
+            and was_made_from(video, image_row)]
 
 
 def was_made_from(video: dict, image: dict) -> bool:

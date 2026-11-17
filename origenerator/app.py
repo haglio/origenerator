@@ -8,6 +8,7 @@ import sys
 import threading
 import uuid
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 
 from app_support import origenerator_handoff
@@ -187,6 +188,7 @@ def _build_window(client, library, app_state, boot, next_launch):
     with LooksAtAThread(threading.get_ident()) as looks:
         window = build()
     boot.logger.info("Boot: the window is built; %s", looks.said_in_one_line())
+    window.serve_the_satellites_first()
     if not boot.fun_time.in_a_headset:
         window.showMinimized()
     return window
@@ -317,9 +319,9 @@ class Boot:
             return
         from origenerator.gui.behind_the_window import finish_core_behind_the_window
 
-        finish_core_behind_the_window(library, self.logger, owner=self.app,
-                                      tidied=window.restore_what_only_core_shows,
-                                      then=window.core_is_ready)
+        window.once_the_satellites_are_served(partial(
+            finish_core_behind_the_window, library, self.logger, owner=self.app,
+            tidied=window.restore_what_only_core_shows, then=window.core_is_ready))
 
     def say(self, step: str) -> None:
         if self.loading is None:

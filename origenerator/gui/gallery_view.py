@@ -154,6 +154,7 @@ from origenerator.gui.panes import (
 )
 from origenerator.gui.populate_controller import PopulateController
 from origenerator.gui.prompt_reveal import reveal_prompt
+from origenerator.gui.satellites_first import LONGEST_WAIT_MS, SatellitesFirst
 from origenerator.gui.shown_job_queue import ShownJobQueue, read_foreign_queue
 from origenerator.gui.slideshow_director import (
     DirectorSources,
@@ -201,6 +202,7 @@ logger = logging.getLogger(__name__)
 
 
 _POLL_INTERVAL_MS = 1500
+_SATELLITE_SHAPES = ("portrait", "landscape")
 
 
 def _row_under(row, folder_key: str):
@@ -249,6 +251,8 @@ class GalleryView(QWidget):
         self._app_title = shared.app_title
         self._client = client
         self._fun_time = fun_time
+        self._satellites_first: SatellitesFirst | None = None
+        self._own_draw_waits = False
         self._radio = shared.radio if shared.radio is not None else OrigeneratorRadio()
         omnipause.holds(self._radio)
         self.osr2 = Osr2Driving(
@@ -858,9 +862,31 @@ class GalleryView(QWidget):
     def refresh(self, *, only_if_moved: bool = False):
         rows, meta = self.library.read()
         if self.library.moved_to(rows, meta) or not only_if_moved:
-            self._rebuild(rows, meta)
+            if self._the_satellites_are_still_to_serve():
+                self._read_only_what_the_satellites_play(rows, meta)
+            else:
+                self._rebuild(rows, meta)
             self.slideshows.library_moved()
         self.slideshows.fill_the_wanted_regions()
+
+    def serve_the_satellites_first(self, *, wait_ms: int = LONGEST_WAIT_MS) -> SatellitesFirst:
+        self._satellites_first = SatellitesFirst(
+            self, served=self._every_satellite_has_its_list, wait_ms=wait_ms)
+        return self._satellites_first
+
+    def _the_satellites_are_still_to_serve(self) -> bool:
+        return self._satellites_first is not None and not self._satellites_first.over
+
+    def _every_satellite_has_its_list(self) -> bool:
+        return all(self.slideshows.region_slideshow(shape) is not None
+                   for shape in _SATELLITE_SHAPES
+                   if self._fun_time is not None and self._fun_time.funestra(shape) is not None)
+
+    def _read_only_what_the_satellites_play(self, rows, meta) -> None:
+        self.library.take(rows, meta, self._tree.shapes)
+        if not self._own_draw_waits:
+            self._own_draw_waits = True
+            self._satellites_first.then(self.refresh)
 
     def _poll(self):
         if self._poll_inflight or (self.window().isMinimized()

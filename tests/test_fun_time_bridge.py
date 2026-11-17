@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import time
 from unittest.mock import MagicMock
@@ -515,6 +516,23 @@ def test_core_ready_goes_out_once_core_is_ready(qtbot, tmp_path):
     bridge._tick()
 
     assert _published_status(tmp_path) == {contract.UP: "1", contract.CORE_READY: "1"}
+
+
+def test_the_log_says_when_fun_time_was_told_each_thing_once(qtbot, tmp_path, caplog):
+    view = GalleryView(database_of([]), fun_time=_session(tmp_path))
+    qtbot.addWidget(view)
+    bridge = FunTimeBridge(view._fun_time, view, parent=view, core_ready=False)
+
+    with caplog.at_level(logging.INFO, logger="origenerator.fun_time_bridge"):
+        bridge._tick()
+        bridge._tick()
+        bridge.core_is_ready()
+        bridge._tick()
+
+    assert [record.getMessage() for record in caplog.records
+            if record.getMessage().startswith("Told Fun Time: ")] == [
+        f"Told Fun Time: {contract.UP}=1 {contract.CORE_READY}=0",
+        f"Told Fun Time: {contract.UP}=1 {contract.CORE_READY}=1"]
 
 
 def test_a_slideshow_opened_mid_pause_opens_frozen(qtbot, tmp_path, monkeypatch):

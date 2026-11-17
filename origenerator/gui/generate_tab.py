@@ -589,8 +589,7 @@ class GenerateTab(DropZones):
                                generates_here=wf.generates_here),
                 FormHelpers(heights=self._heights,
                             seed_history=SeedHistory(self._seed_uses, self._looping_preview),
-                            items=self._zone_items()),
-                workflow_row=self._workflow_row()))
+                            items=self._zone_items())))
             self._form_workflow_key = key
             defaults = wf.default_params()
             carried_over = {
@@ -694,7 +693,8 @@ class GenerateTab(DropZones):
     def _clear_form(self):
         had_form = self._param_form is not None
         if self._bare_form is None:
-            self._bare_form = ParamForm([], workflow_row=self._workflow_row())
+            self._bare_form = ParamForm([])
+            self._bare_form.host_the_workflow_row(self._workflow_row())
             self._form_host_column.addWidget(self._bare_form)
         self._detach_form()
         self._form_workflow_key = None
@@ -705,6 +705,7 @@ class GenerateTab(DropZones):
         self._detach_form()
         self._drop_bare_form()
         self._param_form = form
+        self._param_form.host_the_workflow_row(self._workflow_row())
         self._param_form.changed.connect(self.form_edited)
         self._param_form.text_fields_changed.connect(self.prompt_fields_changed)
         self._param_form.changed.connect(self._note_user_edit)

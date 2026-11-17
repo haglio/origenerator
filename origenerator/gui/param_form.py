@@ -143,11 +143,9 @@ class ParamForm(QWidget):
         traits: WorkflowTraits = NO_TRAITS,
         helpers: FormHelpers = NO_HELPERS,
         parent=None,
-        *,
-        workflow_row: WorkflowRow | None = None,
     ):
         super().__init__(parent)
-        self._workflow_row = workflow_row
+        self._workflow_row: WorkflowRow | None = None
         self._lora_keys = tuple(traits.lora_keys)
         self.training = TrainingRows()
         self._heights = helpers.heights
@@ -269,11 +267,6 @@ class ParamForm(QWidget):
                     pd.key == "positive_prompt" for pd in self._param_defs):
                 outer.addWidget(self._build_request_section())
         outer.addStretch(1)
-        if self._workflow_row is not None:
-            form = self._sections[param_sections.WORKFLOW_TITLE].content_form()
-            form.insertRow(0, LabelCell(self._workflow_row.warning, ElidingLabel("Workflow"),
-                                        form.label_column),
-                           self._workflow_row.field)
 
         for pd in sorted(self._param_defs, key=lambda d: param_sections.key_rank(d.key)):
             widget = self._make_widget(pd)
@@ -398,6 +391,14 @@ class ParamForm(QWidget):
     def _insert_index(present: list[str], key: str) -> int:
         rank = param_sections.key_rank(key)
         return sum(1 for k in present if param_sections.key_rank(k) < rank)
+
+    def host_the_workflow_row(self, workflow_row: WorkflowRow) -> None:
+        self._workflow_row = workflow_row
+        form = self._sections[param_sections.WORKFLOW_TITLE].content_form()
+        form.insertRow(0, LabelCell(workflow_row.warning, ElidingLabel("Workflow"),
+                                    form.label_column),
+                       workflow_row.field)
+        self._refresh_section_visibility()
 
     def _rows_above_keys(self, title: str) -> int:
         return int(self._workflow_row is not None and title == param_sections.WORKFLOW_TITLE)

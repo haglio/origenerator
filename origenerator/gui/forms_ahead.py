@@ -6,6 +6,7 @@ from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QWidget
 
 from origenerator.gui.param_form import ParamForm
+from origenerator.one_look import looking_once
 
 WORKFLOWS_KEPT_AHEAD = 3
 
@@ -40,6 +41,7 @@ class FormsAhead(QWidget):
                 self._made.pop(forgotten)[1].deleteLater()
         self._shown_lately = self._shown_lately[-WORKFLOWS_KEPT_AHEAD:]
 
+    @looking_once
     def _make_one(self) -> None:
         owed = [key for key in self._shown_lately[:-1] if key not in self._made]
         if not owed:

@@ -30,6 +30,7 @@ from origenerator.gui.inflight import RunReading
 from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
 
 _ASK = "What to change, e.g. two women"
+_REQUEST = "Request"
 _UPDATING = "updating…"
 _FAILED = "couldn't work that into the prompts"
 _LINES_AT_MOST = 20
@@ -240,6 +241,10 @@ class RequestExchange(QWidget):
         self._auto_generate.setToolTip(_AUTO_GENERATE_TIP)
         self._auto_generate.clicked.connect(self.auto_generate_chosen)
         row.addWidget(self._auto_generate)
+        self._request = GenerateButton()
+        self._request.set_caption(_REQUEST)
+        self._request.clicked.connect(self._ask)
+        row.addWidget(self._request)
         column.addLayout(row)
 
     def _ask(self) -> None:
@@ -292,7 +297,8 @@ class RequestExchange(QWidget):
     def _settle(self, status: str = "") -> None:
         waiting = bool(self._held) and self._held[-1].waiting
         _say(self._status, status or (_UPDATING if waiting else ""))
-        self._line.setEnabled(not waiting)
+        for asks in (self._line, self._request):
+            asks.setEnabled(not waiting)
 
     def show_exchange(self, turns, *, started_on: str | None = None,
                       asking: str | None = None) -> None:

@@ -1287,6 +1287,18 @@ def test_the_tab_ends_on_the_latest_image_its_conversation_made_and_never_goes_b
     assert not tab.follows_its_request_to(first.prompt_id)
 
 
+def test_a_thumbnail_in_the_request_conversation_opens_its_item_as_a_link_tile_does(
+        qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path)
+    _completed_image(view._db, "child", "two cats", 8)
+    view.refresh()
+    exchange = view._generate_pane.current_generate_tab()._param_form.request_exchange()
+
+    exchange.item_activated.emit("child")
+
+    assert view._generate_pane.current_generate_tab().displayed_row()["prompt_id"] == "child"
+
+
 def test_generate_under_a_turn_that_would_make_an_image_already_made_makes_no_second_copy(
         qtbot, tmp_path):
     view = _tab_asked_for_two_cats(qtbot, tmp_path)

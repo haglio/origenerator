@@ -740,6 +740,7 @@ class GenerateTab(DropZones):
         if form.request_exchange() is not None:
             form.request_exchange().asked.connect(self._on_request_asked)
             form.request_exchange().generate_asked.connect(self._generate_from_turn)
+            form.request_exchange().item_activated.connect(self.link_clicked)
             form.request_exchange().set_auto_generate(self._request_auto_generate)
             form.request_exchange().auto_generate_chosen.connect(
                 self.request_auto_generate_chosen)

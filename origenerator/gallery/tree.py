@@ -427,11 +427,15 @@ def placeable_rows(rows: list[dict]) -> list[dict]:
     return [row for row in rows_with_a_folder(rows) if in_sight(row)]
 
 
+def is_an_enhance_being_made(row: dict) -> bool:
+    return row.get("workflow_name") == ENHANCE_WORKFLOW and is_in_progress(row)
+
+
 def rows_with_a_folder(rows: list[dict]) -> list[dict]:
     return [
         row for row in rows
         if (produced_output(row) or is_in_progress(row))
-        and not (row.get("workflow_name") == ENHANCE_WORKFLOW and is_in_progress(row))
+        and not is_an_enhance_being_made(row)
         and row.get("source") != GenerationSource.BASE_RENDER
     ]
 

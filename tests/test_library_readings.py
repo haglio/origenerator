@@ -4,7 +4,7 @@ import json
 
 from origenerator.item_names import ItemNames
 from origenerator.library_readings import LibraryReadings, read_whole
-from tests.real_db import database_in
+from tests.real_db import database_in, put_rows
 
 _SHAPES = ("landscape", "portrait")
 
@@ -79,3 +79,26 @@ def test_a_row_is_found_among_the_listed_and_then_among_those_held_in_trash(tmp_
 
     assert readings.row_for("a")["prompt_id"] == "a"
     assert readings.row_for("nobody") is None
+
+
+def _an_enhance(prompt_id: str, status: str) -> dict:
+    return {"prompt_id": prompt_id, "status": status, "workflow_name": "image_enhance",
+            "params_json": json.dumps({"input_image": "a.png", "seed": 2}),
+            "output_files": json.dumps(
+                [{"filename": f"{prompt_id}.png"}] if status == "completed" else [])}
+
+
+def test_an_enhance_still_being_made_is_no_news_and_the_finished_one_is(tmp_path):
+    readings, db, _published = _readings(tmp_path, _image("a"))
+    readings.moved_to(*readings.read())
+    put_rows(db, [_an_enhance("e1", "pending")])
+    waiting = read_whole(db)
+    db.update_generation("e1", status="running")
+    running = read_whole(db)
+    db.update_generation("e1", status="completed",
+                         output_files=json.dumps([{"filename": "e1.png"}]))
+    finished = read_whole(db)
+
+    assert [readings.is_news(read, readings.drawn_version)
+            for read in (waiting, running, finished)] == [False, False, True], (
+        "an Enhance being made has no place in the gallery, so nothing is drawn again for it")

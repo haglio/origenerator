@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import NamedTuple
 
 from origenerator import trash_collection
+from origenerator.gallery.tree import is_an_enhance_being_made
 from origenerator.library_views import LibrarySnapshot
 
 
@@ -104,7 +105,7 @@ def _rows_fingerprint(rows) -> int:
         (r.get("prompt_id"), r.get("status"), r.get("thumbnail_path"),
          r.get("workflow_name"), r.get("params_json"), r.get("output_files"),
          r.get("evolver_upscale"), r.get("evolver_upscaled_at"))
-        for r in rows
+        for r in rows if not is_an_enhance_being_made(r)
     ))
 
 

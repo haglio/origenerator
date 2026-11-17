@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, Signal
 from PySide6.QtWidgets import (
     QDialog,
@@ -54,6 +56,7 @@ from origenerator.gui.fix_prompts_parts import (
     window_column,
 )
 from origenerator.gui.flow_layout import FieldGrid, FlowLayout
+from origenerator.gui.folder_tree import folder_keys_in
 from origenerator.gui.lora_offers import trashed
 from origenerator.gui.no_wheel import (
     NoWheelDoubleSpinBox,
@@ -166,11 +169,6 @@ def _enhancer_param_defs() -> dict:
     }
 
 
-def _settings_dragged(mime, _source) -> tuple[dict] | None:
-    params = params_from_mime(mime)
-    return None if params is None else (params,)
-
-
 def _set_of_check_and_number(check, label, number) -> QFrame:
     column = QFrame()
     grid = QGridLayout(column)
@@ -226,6 +224,7 @@ class EnhancePane(QWidget):
         self._source_models: frozenset[str] | object | None = _NOT_READ
         self._loading = False
         self._widgets: dict = {}
+        self._folders_settings: Callable[[list[str]], dict | None] = lambda _keys: None
         self._defs = _enhancer_param_defs()
         self.setObjectName("enhancePane")
         self.setStyleSheet(_DISABLED_CSS + _FIX_FIELD_CSS + _ENHANCE_BUTTON_CSS)
@@ -265,7 +264,16 @@ class EnhancePane(QWidget):
         action_row.addWidget(self._preset_button)
         action_row.addWidget(self._enhance_button)
         column.addLayout(action_row)
-        DropTarget(self, _settings_dragged, self._take_settings)
+        DropTarget(self, self._settings_dragged, self._take_settings)
+
+    def take_folders_settings_from(self, folders_settings) -> None:
+        self._folders_settings = folders_settings
+
+    def _settings_dragged(self, mime, _source) -> tuple[dict] | None:
+        params = params_from_mime(mime)
+        if params is None:
+            params = self._folders_settings(folder_keys_in(mime))
+        return None if params is None else (params,)
 
     def _build_the_settings(self) -> QWidget:
         settings = QWidget()

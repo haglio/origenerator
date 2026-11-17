@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import json
 
+from PySide6.QtCore import QMimeData
+
 from origenerator import branch_session, gallery
 from origenerator.db import NewGeneration
 from origenerator.gallery.collection import FAVORITES_KEY
+from origenerator.gui.folder_tree import FOLDER_KEYS_MIME
 from origenerator.gui.gallery_view import GalleryView
+from tests.drops import dropped_on
 from tests.gallery_view_support import (
     _at,
     _children_by_prompt,
@@ -92,7 +96,10 @@ def test_a_folder_with_folders_inside_takes_no_favorite(qtbot):
 
 
 def _enhancing_view(qtbot, tmp_path, count=1):
-    db = _enhanceable_db(tmp_path, count=count)
+    return _enhancing_view_of(qtbot, _enhanceable_db(tmp_path, count=count))
+
+
+def _enhancing_view_of(qtbot, db):
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -125,6 +132,115 @@ def test_enhance_switched_on_enhances_each_image_that_arrives_after(qtbot, tmp_p
 
     assert _enhancing(view) == ["image/sdxl_t2i_g0.png [output]",
                                 "image/sdxl_t2i_g9.png [output]"]
+
+
+def _steps_of_each_enhance(view) -> list[int]:
+    return sorted(job.params["enhance_steps"] for job in view._jobs.all_jobs)
+
+
+def _pane_set_to(view, steps: int, *, auto=False):
+    held = gallery.EnhanceSettings()
+    _set_enhance(view, auto=auto, params={**held.params, "enhance_steps": steps})
+
+
+def test_a_folder_enhances_its_arrivals_with_the_settings_it_was_switched_on_with(
+        qtbot, tmp_path):
+    view, db, _leaf = _enhancing_view(qtbot, tmp_path)
+    _pane_set_to(view, 11)
+    view._buttons.enhance.click()
+
+    _pane_set_to(view, 23)
+    _an_image_arrives(db, "g9", 9)
+    view.refresh()
+
+    assert _steps_of_each_enhance(view) == [11, 11]
+
+
+def test_an_arrival_gets_the_auto_ticks_enhance_and_its_folders_when_they_differ(
+        qtbot, tmp_path):
+    view, db, _leaf = _enhancing_view(qtbot, tmp_path)
+    _pane_set_to(view, 11)
+    view._buttons.enhance.click()
+
+    _pane_set_to(view, 23, auto=True)
+    _an_image_arrives(db, "g9", 9)
+    view.enhance.enhance_when_wanted(db.get_generation("g9"))
+    view.refresh()
+
+    assert _steps_of_each_enhance(view) == [11, 11, 23]
+
+
+def test_an_arrival_gets_one_enhance_when_the_auto_ticks_and_its_folders_are_the_same(
+        qtbot, tmp_path):
+    view, db, _leaf = _enhancing_view(qtbot, tmp_path)
+    _pane_set_to(view, 11, auto=True)
+    view._buttons.enhance.click()
+
+    _an_image_arrives(db, "g9", 9)
+    view.enhance.enhance_when_wanted(db.get_generation("g9"))
+    view.refresh()
+
+    assert _steps_of_each_enhance(view) == [11, 11]
+
+
+def test_the_enhance_buttons_tooltip_says_which_settings_its_folder_enhances_with(
+        qtbot, tmp_path):
+    view, _db, _leaf = _enhancing_view(qtbot, tmp_path)
+    _pane_set_to(view, 11)
+    view._buttons.enhance.click()
+    _pane_set_to(view, 23)
+
+    tip = view._buttons.enhance.toolTip()
+
+    assert tip.startswith("Stop enhancing new images in")
+    assert tip.endswith("\nEnhancing at " + gallery.describe_enhance_params(
+        {**gallery.EnhanceSettings().params, "enhance_steps": 11}))
+
+
+def _folder_rows_mime(*keys):
+    mime = QMimeData()
+    mime.setData(FOLDER_KEYS_MIME, "\n".join(keys).encode("utf-8"))
+    return mime
+
+
+def test_a_folders_row_dropped_on_the_enhance_pane_brings_its_settings(qtbot, tmp_path):
+    view, _db, leaf = _enhancing_view(qtbot, tmp_path)
+    _pane_set_to(view, 11)
+    view._buttons.enhance.click()
+    _pane_set_to(view, 23)
+    mime = _folder_rows_mime(leaf)
+
+    dropped_on(view.enhance.pane, mime)
+
+    assert view.enhance.settings.params["enhance_steps"] == 11
+
+
+def test_a_folder_not_enhancing_carries_no_settings_to_the_enhance_pane(qtbot, tmp_path):
+    view, _db, leaf = _enhancing_view(qtbot, tmp_path)
+    _pane_set_to(view, 23)
+    mime = _folder_rows_mime(leaf)
+
+    dropped_on(view.enhance.pane, mime)
+
+    assert view.enhance.settings.params["enhance_steps"] == 23
+
+
+def test_a_folder_switched_on_before_it_kept_settings_keeps_the_ones_held_now(qtbot, tmp_path):
+    db = _enhanceable_db(tmp_path, count=1)
+    first = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(first)
+    first.refresh()
+    db.set_folder_enhance(_select_first_leaf(first), after_id=1)
+    view = GalleryView(db, client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _pane_set_to(view, 11)
+
+    _pane_set_to(view, 23)
+    _an_image_arrives(db, "g9", 9)
+    view.refresh()
+
+    assert _steps_of_each_enhance(view) == [11]
 
 
 def test_enhance_switched_off_enhances_nothing_more_and_keeps_what_it_started(qtbot, tmp_path):

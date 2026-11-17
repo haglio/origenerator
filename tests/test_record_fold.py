@@ -105,9 +105,10 @@ def test_a_folder_keyed_from_the_folded_record_keeps_its_new_arrival_switches(tm
     db = _two_records(tmp_path)
     db.upsert_folder_meta("sdxl_t2i/sample/abc123", custom_name=None, favorite=False,
                           level="settings", ref_prompt_id="repeat",
-                          favorite_after_id=7, enhance_after_id=9)
+                          favorite_after_id=7, enhance_after_id=9, enhance_settings="kept")
 
     _fold_repeat_into_first(db)
 
     (folder_meta,) = db.folder_meta_full()
-    assert (folder_meta["favorite_after_id"], folder_meta["enhance_after_id"]) == (7, 9)
+    assert (folder_meta["favorite_after_id"], folder_meta["enhance_after_id"],
+            folder_meta["enhance_settings"]) == (7, 9, "kept")

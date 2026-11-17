@@ -200,12 +200,13 @@ def test_a_repointed_favorite_keeps_starring_and_enhancing_what_arrives(tmp_path
                          filename="sdxl_t2i_p1.png")
     legacy_key = gallery.legacy_settings_folder_key(row)
     db.set_folder_favorite(legacy_key, True, after_id=5)
-    db.set_folder_enhance(legacy_key, after_id=4)
+    db.set_folder_enhance(legacy_key, after_id=4, settings="kept")
 
     reconcile_folder_meta(db)
 
     meta = db.folder_meta_map()[gallery.settings_folder_key(row)]
-    assert (meta["favorite_after_id"], meta["enhance_after_id"]) == (5, 4)
+    assert (meta["favorite_after_id"], meta["enhance_after_id"],
+            meta["enhance_settings"]) == (5, 4, "kept")
 
 
 def test_a_refreshed_favorite_keeps_starring_and_enhancing_what_arrives(tmp_path):
@@ -214,12 +215,13 @@ def test_a_refreshed_favorite_keeps_starring_and_enhancing_what_arrives(tmp_path
                          filename="sdxl_t2i_p1.png")
     key = gallery.settings_folder_key(row)
     db.set_folder_favorite(key, True, after_id=5)
-    db.set_folder_enhance(key, after_id=4)
+    db.set_folder_enhance(key, after_id=4, settings="kept")
 
     reconcile_folder_meta(db)
 
     meta = db.folder_meta_map()[key]
-    assert (meta["favorite_after_id"], meta["enhance_after_id"]) == (5, 4)
+    assert (meta["favorite_after_id"], meta["enhance_after_id"],
+            meta["enhance_settings"]) == (5, 4, "kept")
 
 
 def test_a_launch_whose_favorites_all_still_match_works_out_no_old_keys(tmp_path, monkeypatch):

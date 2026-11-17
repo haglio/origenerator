@@ -109,6 +109,7 @@ class EnhanceController:
         self.pane.preset_renamed.connect(lambda index, name: self.pane.show_presets(
             enhance_presets.rename(index, name)))
         self._training: TrainingRun | None = None
+        self._after_restoring: list = []
 
     def _train_fix(self, name: str) -> None:
         if self._training is not None:
@@ -169,6 +170,11 @@ class EnhanceController:
         self._settings = gallery.EnhanceSettings.parse(raw)
         self.pane.show_settings(self._settings)
         self._push_settings()
+        for restored in self._after_restoring:
+            restored()
+
+    def after_restoring(self, callback) -> None:
+        self._after_restoring.append(callback)
 
     def _push_settings(self) -> None:
         for pane in self._generate_pane_of().generate_tabs():
@@ -225,9 +231,9 @@ class EnhanceController:
     def enhanceable_selection(self) -> list[str]:
         return self._enhanceable_among(self._picked_rows())
 
-    def would_enhance(self, row: dict) -> bool:
+    def would_enhance(self, row: dict, settings: gallery.EnhanceSettings | None = None) -> bool:
         return (gallery.is_enhanceable_row(row)
-                and gallery.version_matching_settings(row, self._settings) is None)
+                and gallery.version_matching_settings(row, settings or self._settings) is None)
 
     def enhance_the_selection(self) -> None:
         if self._gallery_pane.selected_ids:
@@ -243,13 +249,18 @@ class EnhanceController:
         if isinstance(group, gallery.SettingsGroup):
             self.enhance_what_awaits(group.rows)
 
-    def enhance_what_awaits(self, rows: list[dict]) -> None:
-        self._enqueue(self._awaiting(rows), self._settings)
+    def enhance_what_awaits(self, rows: list[dict],
+                            settings: gallery.EnhanceSettings | None = None) -> None:
+        self._enqueue(self._awaiting(rows), settings or self._settings)
         self._host.enhance_offer_changed()
 
     def enhance_items(self, prompt_ids: list[str]) -> None:
         found = self._db.get_generations(prompt_ids)
-        self._enqueue([found[pid] for pid in prompt_ids if pid in found], self._settings)
+        self.enhance_rows([found[pid] for pid in prompt_ids if pid in found])
+
+    def enhance_rows(self, rows: list[dict],
+                     settings: gallery.EnhanceSettings | None = None) -> None:
+        self._enqueue(rows, settings or self._settings)
 
     def enhance_a_videos_start_image(self, row: dict) -> None:
         self._enqueue([row], basic_enhance_settings())

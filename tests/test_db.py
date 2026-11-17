@@ -298,7 +298,7 @@ def test_an_early_database_gains_every_generations_column(tmp_path, column):
 
 
 @pytest.mark.parametrize("column", ["level", "ref_prompt_id", "favorite_after_id",
-                                    "enhance_after_id"])
+                                    "enhance_after_id", "enhance_settings"])
 def test_an_early_database_gains_every_folder_meta_column(tmp_path, column):
     Database(_database_as_first_written(tmp_path / "old.db"))
 
@@ -595,6 +595,16 @@ def test_a_folders_enhance_is_on_from_an_item_until_it_is_turned_off(tmp_path):
     assert db.folder_meta_map()["k"]["starred"] is True
 
 
+def test_a_folders_enhance_keeps_the_settings_it_was_turned_on_with_until_turned_off(tmp_path):
+    db = Database(tmp_path / "test.db")
+
+    db.set_folder_enhance("k", after_id=7, settings='{"params": {"enhance_steps": 11}}')
+    assert db.folder_meta_map()["k"]["enhance_settings"] == '{"params": {"enhance_steps": 11}}'
+
+    db.set_folder_enhance("k", after_id=None)
+    assert db.folder_meta_map()["k"]["enhance_settings"] is None
+
+
 def test_a_folders_arrivals_move_on_without_touching_its_switches(tmp_path):
     db = Database(tmp_path / "test.db")
     db.set_folder_favorite("k", True, after_id=3)
@@ -613,7 +623,7 @@ def test_folder_meta_full_reports_identity_columns(tmp_path):
     assert db.folder_meta_full() == [{
         "folder_key": "image/sdxl_t2i/abc123", "custom_name": "Cats",
         "starred": True, "level": "settings", "ref_prompt_id": "p1",
-        "favorite_after_id": None, "enhance_after_id": None,
+        "favorite_after_id": None, "enhance_after_id": None, "enhance_settings": None,
     }]
 
 

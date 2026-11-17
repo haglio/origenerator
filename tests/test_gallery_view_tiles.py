@@ -50,6 +50,7 @@ from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.workflows import detail_parts
 from tests import gestures
 from tests.comfyui_folders import SUITE_FOLDERS
+from tests.drops import dropped_on
 from tests.gallery_view_support import (
     _CTRL,
     _ENHANCE_HISTORY,
@@ -88,7 +89,6 @@ from tests.gallery_view_support import (
 from tests.qt_exec import faking_exec
 from tests.real_db import database_of, put_rows
 from tests.related_links import source_tile
-from tests.test_enhance_pane import _dropped_on
 from tests.test_folder_tree import _shown
 
 
@@ -842,7 +842,7 @@ def test_a_version_dragged_onto_the_enhance_pane_grays_the_enhance_that_would_re
     version = next(row for row in versions._host.findChildren(_VersionRow) if row._params)
     mime = enhance_version_mime(version._params)
 
-    _dropped_on(view.enhance.pane, mime)
+    dropped_on(view.enhance.pane, mime)
 
     assert not view.enhance.pane._enhance_button.isEnabled()
     (tile,) = versions._host.findChildren(_AddRow)

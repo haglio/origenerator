@@ -9,10 +9,7 @@ from app_support.local_time import when_words
 from PIL import Image
 from PySide6.QtCore import QEvent, QMimeData, QPoint, QPointF, QRect, QSize, Qt
 from PySide6.QtGui import (
-    QDragEnterEvent,
     QDragLeaveEvent,
-    QDragMoveEvent,
-    QDropEvent,
     QEnterEvent,
     QFocusEvent,
     QPixmap,
@@ -76,6 +73,7 @@ from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE, part_table
 from origenerator.workflows.model_files import NO_LORA
 from tests import gestures
 from tests.drop_style_seen import worn
+from tests.drops import brought_over, dropped_on
 from tests.qt_exec import faking_exec
 from tests.text_readers import clip_reader
 
@@ -1793,23 +1791,6 @@ def test_a_new_frame_updates_the_tile_without_a_rebuild(qtbot):
         "caller is told rather than left with a stale strip")
 
 
-def _held(mime) -> tuple:
-    return (Qt.DropAction.CopyAction, mime, Qt.MouseButton.LeftButton,
-            Qt.KeyboardModifier.NoModifier)
-
-
-def _brought_over(pane, mime):
-    """A drag of ``mime`` brought over ``pane`` and held there. Qt hands a
-    drag's later events to the widget that took its first."""
-    QApplication.sendEvent(pane, QDragEnterEvent(QPointF(5, 5), *_held(mime)))
-    QApplication.sendEvent(pane, QDragMoveEvent(QPointF(5, 5), *_held(mime)))
-
-
-def _dropped_on(pane, mime):
-    _brought_over(pane, mime)
-    QApplication.sendEvent(pane, QDropEvent(QPointF(5, 5), *_held(mime)))
-
-
 def test_dropping_a_version_absorbs_its_settings(qtbot):
     pane, edits = _panel(qtbot)
     pane._auto.setChecked(True)
@@ -1818,7 +1799,7 @@ def test_dropping_a_version_absorbs_its_settings(qtbot):
     mime = enhance_version_mime({"enhance_scale": 3.0, "enhance_steps": 40,
                                "enhance_denoise": 0.35})
 
-    _dropped_on(pane, mime)
+    dropped_on(pane, mime)
 
     settings = pane.settings()
     assert settings.params["enhance_scale"] == 3.0
@@ -1838,7 +1819,7 @@ def test_a_dropped_version_leaves_the_panel_at_exactly_what_that_version_ran_wit
     ran = {"enhance_scale": 2.0, "enhance_detail_fixes": {"hands": 0.45}}
     mime = enhance_version_mime(ran)
 
-    _dropped_on(pane, mime)
+    dropped_on(pane, mime)
 
     assert full_settings(pane.settings().params) == full_settings(ran)
 
@@ -1879,7 +1860,7 @@ def test_the_panel_under_the_drag_lights_one_step_lighter(qtbot):
     mime = enhance_version_mime({"enhance_scale": 3.0})
     under_way.started.emit(mime, None)
 
-    _brought_over(pane, mime)
+    brought_over(pane, mime)
 
     assert _drop_styles_worn(pane) == {AIMED}
     QApplication.sendEvent(pane, QDragLeaveEvent())

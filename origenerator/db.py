@@ -234,8 +234,10 @@ class Database:
                             after_id: int | None = None):
         return self.folder_meta.set_folder_favorite(folder_key, favorite, after_id=after_id)
 
-    def set_folder_enhance(self, folder_key: str, *, after_id: int | None):
-        return self.folder_meta.set_folder_enhance(folder_key, after_id=after_id)
+    def set_folder_enhance(self, folder_key: str, *, after_id: int | None,
+                           settings: str | None = None):
+        return self.folder_meta.set_folder_enhance(folder_key, after_id=after_id,
+                                                   settings=settings)
 
     def move_folder_arrivals_on(self, folder_key: str, *, favorite_after_id: int | None,
                                 enhance_after_id: int | None):
@@ -247,12 +249,10 @@ class Database:
 
     def upsert_folder_meta(self, folder_key: str, *, custom_name: str | None,
                            favorite: bool, level: str | None, ref_prompt_id: str | None,
-                           favorite_after_id: int | None = None,
-                           enhance_after_id: int | None = None):
+                           **switches):
         return self.folder_meta.upsert_folder_meta(
             folder_key, custom_name=custom_name, favorite=favorite,
-            level=level, ref_prompt_id=ref_prompt_id,
-            favorite_after_id=favorite_after_id, enhance_after_id=enhance_after_id)
+            level=level, ref_prompt_id=ref_prompt_id, **switches)
 
     def delete_folder_meta(self, folder_key: str):
         return self.folder_meta.delete_folder_meta(folder_key)

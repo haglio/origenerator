@@ -44,8 +44,10 @@ class FolderSwitches:
         if all_video(leaf.rows):
             return Button(enabled=False, tip=NO_VIDEO_ENHANCER, checked=False)
         if self.enhancing(leaf.key):
+            held = self.enhance_settings_of(leaf.key)
             return Button(tip=f"Stop enhancing new images in “{leaf.label}” "
-                              "(enhancements stay)", checked=True)
+                              "(enhancements stay)\nEnhancing at "
+                              f"{gallery.describe_enhance_params(held.params)}", checked=True)
         return Button(tip=f"Enhance every image in “{leaf.label}”, and each new one that arrives",
                       checked=False)
 
@@ -69,11 +71,35 @@ class FolderSwitches:
 
     def set_enhancing(self, key: str, on: bool) -> None:
         after_id = self._library.reading.highest_id if on else None
-        self._db.set_folder_enhance(key, after_id=after_id)
-        self._library.folder_meta.setdefault(key, dict(_NEVER_SWITCHED))[
-            "enhance_after_id"] = after_id
+        self._keep_enhance(key, after_id, self._enhance.settings if on else None)
         if on:
-            self._enhance.enhance_what_awaits(self._library.leaf_folders().get(key, []))
+            self._enhance.enhance_what_awaits(self._library.leaf_folders().get(key, []),
+                                              self._enhance.settings)
+
+    def _keep_enhance(self, key: str, after_id: int | None,
+                      settings: gallery.EnhanceSettings | None) -> None:
+        kept = None if settings is None else gallery.EnhanceSettings(
+            params=settings.params).to_json()
+        self._db.set_folder_enhance(key, after_id=after_id, settings=kept)
+        self._library.folder_meta.setdefault(key, dict(_NEVER_SWITCHED)).update(
+            enhance_after_id=after_id, enhance_settings=kept)
+
+    def enhance_settings_of(self, key: str) -> gallery.EnhanceSettings | None:
+        held = self._library.folder_meta.get(key) or {}
+        if held.get("enhance_after_id") is None:
+            return None
+        kept = held.get("enhance_settings")
+        return gallery.EnhanceSettings.parse(kept) if kept else self._enhance.settings
+
+    def enhance_params_of_the_one_enhancing(self, keys: list[str]) -> dict | None:
+        held = [settings for key in keys if (settings := self.enhance_settings_of(key))]
+        return held[0].params if len(held) == 1 else None
+
+    def keep_the_settings_of_folders_switched_on_before_settings_were_kept(self) -> None:
+        meta = self._library.folder_meta
+        for key, held in meta.items():
+            if held.get("enhance_after_id") is not None and not held.get("enhance_settings"):
+                self._keep_enhance(key, held["enhance_after_id"], self._enhance.settings)
 
     def take_in_the_arrivals(self) -> None:
         meta = self._library.folder_meta
@@ -85,8 +111,10 @@ class FolderSwitches:
             return
         leaves = {key: rows for key, rows in self._library.leaf_folders().items()
                   if key in switched_on}
-        found = arrivals_in(leaves, meta, would_enhance=self._enhance.would_enhance,
-                            older_stars=self._takes_up_older_stars)
+        found = arrivals_in(
+            leaves, meta, older_stars=self._takes_up_older_stars,
+            would_enhance=lambda key, row: self._enhance.would_enhance(
+                row, self.enhance_settings_of(key)))
         for key, (favorite_after_id, enhance_after_id) in found.marks.items():
             self._db.move_folder_arrivals_on(key, favorite_after_id=favorite_after_id,
                                              enhance_after_id=enhance_after_id)
@@ -94,5 +122,5 @@ class FolderSwitches:
                              enhance_after_id=enhance_after_id)
         if found.to_star:
             self._host.set_items_favorite(found.to_star, True)
-        if found.to_enhance:
-            self._enhance.enhance_items([row["prompt_id"] for row in found.to_enhance])
+        for key, rows in found.to_enhance.items():
+            self._enhance.enhance_rows(rows, self.enhance_settings_of(key))

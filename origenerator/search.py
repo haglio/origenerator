@@ -13,6 +13,7 @@ from origenerator.gallery.item_numbers import name_starts_in, without_name_start
 from origenerator.gallery.output import stems_made_as
 from origenerator.gallery.signatures import READINGS_KEPT
 from origenerator.generation_state import in_sight
+from origenerator.model_titles import each_title_worked_out_once
 
 logger = logging.getLogger(__name__)
 
@@ -315,6 +316,10 @@ class GallerySearch:
         self._synonyms = _SYNONYMS if synonyms is None else synonyms
 
     def update(self, rows, folders=(), item_name=None) -> None:
+        with each_title_worked_out_once():
+            self._take(rows, folders, item_name)
+
+    def _take(self, rows, folders, item_name) -> None:
         entries: dict[str, _Entry] = {}
         order: list[str] = []
         folder_names: dict[str, list[str]] = {}

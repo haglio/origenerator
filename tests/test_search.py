@@ -4,7 +4,8 @@ import json
 
 import pytest
 
-from origenerator import gallery, local_llm, search
+from origenerator import gallery, local_llm, model_titles, search
+from origenerator.gallery.signatures import workflow_model_keys
 from origenerator.generation_state import GenerationSource
 
 
@@ -627,3 +628,16 @@ def test_combinations_of_equal_size_are_ordered_alphabetically():
     sections = search.group_by_model_lora(_index(rows).search("street").results)
     headings = [heading for heading, _ in sections]
     assert headings == sorted(headings)
+
+
+def test_a_model_several_generations_share_is_looked_for_on_the_disk_once(monkeypatch):
+    looked_for = []
+    installed = model_titles._installed
+    monkeypatch.setattr(model_titles, "_installed",
+                        lambda value: looked_for.append(value) or installed(value))
+    key = workflow_model_keys("sdxl_t2i")[0]
+    _index([_row(f"g{n}", f"a vermilion kite {n}", params={key: "example_model.safetensors"})
+            for n in range(3)])
+    assert looked_for.count("example_model.safetensors") <= 1, (
+        "a library's first draw looked for each row's model file on the disk again, "
+        "which was most of the seconds a hosted window took to show")

@@ -89,8 +89,7 @@ def test_words_are_taken_out_of_a_prompt_and_the_commas_close_over_them():
 
     assert (outcome.positive, outcome.negative) == ("a woman", "")
     assert outcome.line == (
-        'Removed "on a couch" from the Positive Prompt. Removed "blurry" from the Negative Prompt. '
-        'Nothing in the Negative Prompt works against "grain".')
+        'Removed "on a couch" from the Positive Prompt. Removed "blurry" from the Negative Prompt.')
 
 
 def test_a_prompt_change_answering_nothing_he_asked_for_is_left_out_and_says_so():
@@ -442,14 +441,56 @@ def test_leaving_out_something_the_positive_prompt_names_says_only_what_changed(
         'Removed "a straw hat" from the Positive Prompt. Added "hats" to the Negative Prompt.')
 
 
-def test_looking_in_the_negative_prompt_for_something_wanted_that_is_not_there_says_so_once():
+def test_looking_in_the_negative_prompt_for_something_wanted_that_is_not_there_says_nothing():
     outcome = _applied([{"prompt": "positive", "add": "freckles", "for": "freckles"},
                         {"prompt": "negative", "remove": "freckles", "for": "freckles"},
                         {"prompt": "negative", "replace": "freckles", "with": "", "for": "freckles"}],
                        asked=("freckles",))
 
-    assert outcome.line == ('Added "freckles" to the Positive Prompt. '
-                            'Nothing in the Negative Prompt works against "freckles".')
+    assert outcome.line == 'Added "freckles" to the Positive Prompt.'
+
+
+@pytest.mark.parametrize(("change", "made", "said"), [
+    ({"prompt": "positive", "replace": "kneeling", "with": "lying prone",
+      "for": "lying instead of kneeling"},
+     "a woman lying on a rug", 'Replaced "kneeling" with "lying" in the Positive Prompt.'),
+    ({"prompt": "positive", "replace": "kneeling on a rug", "with": "lying on her back on a rug",
+      "for": "lying instead of kneeling"},
+     "a woman lying on a rug", 'Replaced "kneeling on a rug" with "lying on a rug" in the Positive Prompt.'),
+    ({"prompt": "positive", "replace": "kneeling", "with": "lying, face down, relaxed",
+      "for": "lying instead of kneeling"},
+     "a woman lying, relaxed on a rug", 'Replaced "kneeling" with "lying" in the Positive Prompt. '
+     'Added "relaxed" to the Positive Prompt.')])
+def test_which_way_a_body_lies_stays_open_when_he_did_not_say(change, made, said):
+    outcome = _applied([change], pair=("a woman kneeling on a rug", "blurry"),
+                       asked=("lying instead of kneeling",))
+
+    assert (outcome.positive, outcome.line) == (made, said)
+
+
+def test_which_way_a_body_lies_is_written_when_he_says_it():
+    outcome = _applied([{"prompt": "positive", "replace": "kneeling", "with": "lying prone",
+                         "for": "lying prone instead of kneeling"}],
+                       pair=("a woman kneeling on a rug", "blurry"),
+                       asked=("lying prone instead of kneeling",))
+
+    assert outcome.positive == "a woman lying prone on a rug"
+
+
+def test_which_way_a_body_lies_stays_as_the_prompt_already_has_it():
+    outcome = _applied([{"prompt": "positive", "replace": "kneeling face down", "with": "lying face down",
+                         "for": "lying instead of kneeling"}],
+                       pair=("a woman kneeling face down on a rug", "blurry"),
+                       asked=("lying instead of kneeling",))
+
+    assert outcome.positive == "a woman lying face down on a rug"
+
+
+def test_an_added_thing_takes_no_way_of_lying_he_did_not_say():
+    outcome = _applied([{"prompt": "positive", "add": "a man lying supine", "for": "add a man lying"}],
+                       pair=("a woman on a rug", "blurry"), asked=("add a man lying",))
+
+    assert outcome.positive == "a woman on a rug, a man lying"
 
 
 def test_prompts_that_take_no_weights_get_none_from_a_request():

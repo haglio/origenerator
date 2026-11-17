@@ -107,6 +107,18 @@ def _as_written(text: str, words: str) -> str:
     return there.group(0) if there else words
 
 
+_WHICH_WAY_A_BODY_LIES = re.compile(
+    r"\s*\b(?:prone|supine|face[- ]?(?:down|up)"
+    r"|on (?:her|his|their|its|the) (?:back|side|stomach|belly|front))\b", re.IGNORECASE)
+
+
+def _leaving_open_what_he_did(new: str, said_already: str) -> str:
+    def stays(way: re.Match) -> str:
+        return way.group(0) if _whole(said_already, way.group(0).strip()) else ""
+    parts = [_WHICH_WAY_A_BODY_LIES.sub(stays, part).strip() for part in _parts(new)]
+    return ", ".join(part for part in parts if part)
+
+
 def _whole(text: str, words: str) -> bool:
     spaced = _spaced(words)
     return bool(spaced) and re.search(rf"(?<!\w){spaced}(?!\w)", text, re.IGNORECASE) is not None
@@ -397,7 +409,8 @@ class _Applying:
 
     def _replace(self, which: str, change: dict) -> list[str]:
         old = _as_written(getattr(self, which), str(change["replace"]))
-        new = self._as_these_prompts_take(str(change.get("with") or ""))
+        new = self._what_he_left_open_stays_open(
+            self._as_these_prompts_take(str(change.get("with") or "")), old)
         if not new.strip() or self._only_takes_out_what_he_quoted(old, new):
             return self._remove(which, {"remove": old})
         found = (_found(getattr(self, which), old)
@@ -438,6 +451,9 @@ class _Applying:
         return (", ".join(part for part in _parts(new) if not left_out.get(part)),
                 [words for words in left_out.values() if words])
 
+    def _what_he_left_open_stays_open(self, new: str, old: str = "") -> str:
+        return _leaving_open_what_he_did(new, " ".join([old, *self.asked]))
+
     def _as_these_prompts_take(self, words: str) -> str:
         return words if self.take_weights else without_weights(words)
 
@@ -472,7 +488,8 @@ class _Applying:
 
     def _add(self, which: str, change: dict) -> list[str]:
         words, left_out = self._without_what_it_leaves_out(
-            which, "", tidy(self._as_these_prompts_take(str(change["add"]))))
+            which, "", tidy(self._what_he_left_open_stays_open(
+                self._as_these_prompts_take(str(change["add"])))))
         if left_out:
             said = [line for unwanted in left_out for line in self._add("negative", {"add": unwanted})]
             return said + (self._add(which, {**change, "add": words}) if words else [])
@@ -515,7 +532,7 @@ class _Applying:
         if len(parts) > 1:
             parts = [part for part in parts if self._names_what_he_asked(part)]
         if which == "negative" and asked and not parts:
-            return [f"Nothing in the Negative Prompt works against {_quoted(part)}." for part in asked]
+            return []
         if not parts:
             self._nothing_taken_out(text, asked)
             return []

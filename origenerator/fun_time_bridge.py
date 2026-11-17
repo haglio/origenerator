@@ -281,4 +281,6 @@ class FunTimeBridge(QObject):
         if self._published == status and self._session.status_file.exists():
             return
         if publish_whole(self._session.status_file, status):
+            if self._published != status:
+                logger.info("Told Fun Time: %s", " ".join(status.split()))
             self._published = status

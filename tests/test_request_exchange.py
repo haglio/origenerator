@@ -58,7 +58,7 @@ def _request_button(exchange) -> GenerateButton:
     return button
 
 
-def test_the_request_button_at_the_end_of_the_line_asks_for_the_words_and_clears_the_line(qtbot):
+def test_the_request_button_asks_for_the_words_and_clears_the_line(qtbot):
     exchange = _exchange(qtbot)
     asked = _asked(qtbot, exchange)
     qtbot.keyClicks(exchange._line, "two women")
@@ -66,8 +66,16 @@ def test_the_request_button_at_the_end_of_the_line_asks_for_the_words_and_clears
     qtbot.mouseClick(_request_button(exchange), Qt.MouseButton.LeftButton)
 
     assert (asked, exchange._line.text()) == (["two women"], "")
-    row = exchange._line.parentWidget().layout().itemAt(1)
-    assert row.layout().itemAt(row.layout().count() - 1).widget() is _request_button(exchange)
+
+
+def test_the_request_button_and_its_bar_sit_right_after_the_line_before_auto_generate(qtbot):
+    exchange = _exchange(qtbot)
+
+    row = exchange._line.parentWidget().layout().itemAt(1).layout()
+
+    assert [row.itemAt(at).widget() for at in range(row.count())] == [
+        exchange._line, _request_button(exchange), exchange._working, exchange._status,
+        exchange._auto_generate]
 
 
 def test_enter_on_an_empty_line_asks_nothing(qtbot):

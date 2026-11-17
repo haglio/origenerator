@@ -5250,6 +5250,7 @@ def test_generate_under_a_later_turn_of_an_earlier_exchange_marks_that_turn(save
     db.record_request(NewRequest(prompt_id="img1", source_prompt_id="src", heard="", asked="red"))
     db.requests.record_turns("img1", [Turn(said, "Done.", "a", "", f"a {said}", "")
                                       for said in ("one", "two", "three", "red")])
+    _image_row(db, "made-1", prompt="a two")
     db.requests.mark_made("img1", 1, "made-1")
     tab.show_saved_generation(image, [image])
     asked_for = _turn_runs(tab)

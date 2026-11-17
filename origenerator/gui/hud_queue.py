@@ -19,7 +19,7 @@ from funestra.hud import (
 )
 from funestra.hud_button import Button
 from funestra.hud_icons import shared_icon
-from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
+from funestra.hud_overlay import FOOT_DRAG, FOOT_MENU, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
 from funestra.satellite_hud import (
     BLOCK_GAP,
     CTRL_BTN,
@@ -30,6 +30,7 @@ from funestra.satellite_hud import (
     map_block_width,
 )
 from PIL import Image, ImageDraw
+from PySide6.QtGui import QCursor
 from shared_ui.icons_pil import paste_icon
 from shared_ui.lettering import fit_text
 from shared_ui.palette import (
@@ -80,6 +81,7 @@ from origenerator.gui.inflight import (
     shield_every_job,
     starting_row_text,
 )
+from origenerator.gui.queue_row_menu import picks_cancel_below
 from origenerator.workflows.derived_size import resolve_input_image_path
 
 UP = "queue_up"
@@ -518,7 +520,8 @@ class QueueFoot:
     def press(self, verb: str, payload: str) -> None:
         numbers = [int(part) for part in payload.split("|")]
         {FOOT_WHEEL: self.pointer.wheel, FOOT_PRESS: self.pointer.press,
-         FOOT_DRAG: self.pointer.drag, FOOT_RELEASE: self.pointer.release}[verb](*numbers)
+         FOOT_DRAG: self.pointer.drag, FOOT_RELEASE: self.pointer.release,
+         FOOT_MENU: self.pointer.menu}[verb](*numbers)
 
     def move(self, key: str, before: str | None) -> None:
         if self._actions.move is not None:
@@ -535,6 +538,11 @@ class QueueFoot:
     def cancel_all(self) -> None:
         if self._actions.cancel_all is not None:
             self._actions.cancel_all()
+
+    def menu_for(self, key: str) -> None:
+        if (self._actions.cancel_below is not None
+                and picks_cancel_below(None, self._items, key, QCursor.pos())):
+            self._actions.cancel_below(key)
 
 
 class JobQueueFile:
@@ -655,6 +663,12 @@ class QueuePointer:
             return
         lines = len(self._host.hud_queue[0])
         self.first = max(0, min(self.first - steps, max(0, lines - ROWS)))
+
+    def menu(self, px: int, py: int) -> None:
+        key = next((key for (_x, y, _width, height), key in self._rows()
+                    if y <= py < y + height), None)
+        if key is not None:
+            self._host.menu_for(key)
 
     def _command_at(self, px: int, py: int) -> str:
         return next((posted for rect, posted in self._buttons if _on(rect, (px, py))), "")

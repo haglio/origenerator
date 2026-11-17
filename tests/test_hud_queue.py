@@ -426,6 +426,7 @@ class _Host:
         self.cleared = 0
         self.started_now = 0
         self.cancelled_all = 0
+        self.menus = []
 
     def move(self, key, before):
         self.moved.append((key, before))
@@ -438,6 +439,9 @@ class _Host:
 
     def cancel_all(self):
         self.cancelled_all += 1
+
+    def menu_for(self, key):
+        self.menus.append(key)
 
 
 def _pointer_over(items, foreign=0):
@@ -506,6 +510,16 @@ class TestThePointerOnTheBlock:
         pointer.press(*_middle_of(pointer, CANCEL_ALL))
 
         assert host.cancelled_all == 1
+
+    def test_a_right_click_anywhere_along_a_row_asks_for_that_rows_menu(self):
+        pointer, host = _pointer_over([_item("j1", cancel=lambda: None, typical_seconds=30),
+                                       _item("j2", cancel=lambda: None)])
+
+        pointer.menu(*_middle_of(pointer, f"{OPEN}|j2"))
+        pointer.menu(*_middle_of(pointer, f"{CANCEL}|j1"))
+        pointer.menu(*_middle_of(pointer, CANCEL_ALL))
+
+        assert host.menus == ["j2", "j1"]
 
     def test_a_press_on_a_rows_shield_puts_it_on_and_lights_it_at_once(self):
         asked = []

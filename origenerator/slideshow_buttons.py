@@ -4,7 +4,7 @@ from collections.abc import Callable
 from typing import Any
 
 from funestra.funestra_verbs import NEXT_FUNSCRIPTED
-from funestra.hud_overlay import FOOT_DRAG, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
+from funestra.hud_overlay import FOOT_DRAG, FOOT_MENU, FOOT_PRESS, FOOT_RELEASE, FOOT_WHEEL
 from funestra.inclusion_pair import Included, InclusionPair, media_pair
 from funestra.loop_cycle import ACTION, SEED
 
@@ -84,7 +84,7 @@ PRESSES_ABOUT_THE_SLIDE = frozenset({"trash", "lock_action", "wrong_action", "se
 PRESSES_ABOUT_A_FILE = tuple(_PRESSES_ABOUT_A_FILE)
 STEPS = frozenset({"next", "prev"})
 PRESSES_ON_THE_QUEUE = {FOOT_PRESS: "{x}|{y}", FOOT_DRAG: "{x}|{y}", FOOT_RELEASE: "{x}|{y}",
-                        FOOT_WHEEL: "{steps}|{x}|{y}"}
+                        FOOT_WHEEL: "{steps}|{x}|{y}", FOOT_MENU: "{x}|{y}"}
 
 
 def answer(host, action: str, argument: str = "") -> bool:

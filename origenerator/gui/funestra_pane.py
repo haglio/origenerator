@@ -235,6 +235,11 @@ class FunestraPane(QWidget):
             self._funestra.wheel(*self._device_point(position), steps,
                                  viewport=self._device_size())
 
+    def right_press(self, position) -> None:
+        if self._funestra is not None:
+            self._funestra.right_press(*self._device_point(position),
+                                       viewport=self._device_size())
+
     def pointer_left(self) -> None:
         if self._funestra is not None:
             self._funestra.leave()
@@ -256,6 +261,8 @@ class _FunestraWindow(QWidget):
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
             self._pane.press(event.position())
+        elif event.button() == Qt.MouseButton.RightButton:
+            self._pane.right_press(event.position())
 
     def mouseReleaseEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:

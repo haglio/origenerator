@@ -26,6 +26,7 @@ class SlideshowActions:
     clear_queue: Callable[[], None] | None = None
     start_now: Callable[[], None] | None = None
     cancel_all: Callable[[], None] | None = None
+    cancel_below: Callable[[str], None] | None = None
     core_window: Callable[[], object] | None = None
     leave_for_core: Callable[[str | None], bool] | None = None
     drive_toggle: Callable[[], None] | None = None

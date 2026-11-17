@@ -15,6 +15,7 @@ from funestra.testing import FakeEngine, engine_will_not_open
 from funestra.volume import VolumeHud
 from PySide6.QtCore import QPoint, QPointF, Qt
 from PySide6.QtGui import QWheelEvent
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from origenerator import running_ahead
@@ -260,6 +261,24 @@ def test_the_pointer_reaches_the_funestra_in_the_windows_own_pixels(qtbot, tmp_p
     pane.wheel(QPointF(12, 22), -3)
 
     assert reached == [(20, 40), (22, 42, True), (24, 44, -3)]
+
+
+def test_a_right_click_reaches_the_funestra_as_one_in_the_windows_own_pixels(
+        qtbot, tmp_path, monkeypatch):
+    pane, _engine, running = _pane(qtbot)
+    _hand_over(pane, _items(tmp_path, "one"))
+    monkeypatch.setattr(type(pane._window), "devicePixelRatioF", lambda self: 2.0)
+    reached = []
+    monkeypatch.setattr(pane._funestra, "right_press",
+                        lambda x, y, *, viewport: reached.append((x, y)))
+
+    QTest.mousePress(pane._window, Qt.MouseButton.RightButton,
+                     Qt.KeyboardModifier.NoModifier, QPoint(10, 20))
+    QTest.mouseRelease(pane._window, Qt.MouseButton.RightButton,
+                       Qt.KeyboardModifier.NoModifier, QPoint(10, 20))
+
+    assert reached == [(20, 40)]
+    assert running[0].commands == [], "a right-click never pauses the room as a press does"
 
 
 def test_the_wheel_is_counted_in_notches(qtbot, tmp_path, monkeypatch):

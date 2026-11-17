@@ -175,6 +175,21 @@ def test_a_plain_click_picks_one_tile_and_ctrl_toggles_another(qtbot, db):
     assert pane.selected_prompt_ids() == ["g3"]
 
 
+def test_tiles_picked_before_can_be_picked_again_and_say_so(qtbot, db):
+    rows = [_row("g1", 1), _row("g2", 2), _row("g3", 3)]
+    pane, _scroll = _pane(qtbot, db, rows)
+    _open_latest(pane, rows)
+    pane.apply_selection("g1", _NO_MOD)
+    pane.apply_selection("g3", _CTRL)
+    before = pane.picks()
+    pane.apply_selection("g2", _NO_MOD)
+
+    with qtbot.waitSignal(pane.selection_changed):
+        pane.pick_again(before)
+
+    assert pane.selected_prompt_ids() == ["g1", "g3"]
+
+
 def test_a_tile_click_picks_by_the_keys_held_during_that_click(qtbot, db):
     rows = [_row("g1", 1), _row("g2", 2)]
     pane, _scroll = _pane(qtbot, db, rows)

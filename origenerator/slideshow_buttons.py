@@ -73,8 +73,9 @@ HUD_FACTS: dict[str, str] = {HUD_CORNER: "{corner}", HUD_MINIMIZED: "{on}", HAS_
 
 PRESSES = tuple(_PRESSES)
 PRESSES_ABOUT_THE_SLIDE = frozenset({"trash", "lock_action", "wrong_action", "seed_loop",
-                                     "action_loop", "loop",
-                                     "cycle_seed", "cycle_action"})
+                                     "action_loop", "loop", "more_seeds",
+                                     "cycle_seed", "cycle_action",
+                                     "cycle_version", "cycle_version_back"})
 PRESSES_ABOUT_A_FILE = tuple(_PRESSES_ABOUT_A_FILE)
 PRESSES_ON_THE_QUEUE = {FOOT_PRESS: "{x}|{y}", FOOT_DRAG: "{x}|{y}", FOOT_RELEASE: "{x}|{y}",
                         FOOT_WHEEL: "{steps}|{x}|{y}"}

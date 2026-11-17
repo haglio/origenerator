@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from functools import partial
 from typing import NamedTuple
 
@@ -150,6 +151,7 @@ from origenerator.gui.panes import (
     pane,
     pane_following,
 )
+from origenerator.gui.picking import Picks
 from origenerator.gui.populate_controller import PopulateController
 from origenerator.gui.prompt_reveal import reveal_prompt
 from origenerator.gui.shown_job_queue import ShownJobQueue, read_foreign_queue
@@ -417,6 +419,8 @@ class GalleryView(QWidget):
             self, VoiceSources(db=db, slideshows=self._slideshows, client=client,
                                starting=self._starting, jobs=self._jobs, setters=open_setters),
             parent=self, motion=self.osr2.motion)
+        self._gallery_pane.selection_changed.connect(
+            lambda: self._voice.note_picks(self._gallery_pane.picks(), now=time.monotonic()))
 
     def _open_the_tabs_slideshow(self) -> None:
         tab = self._generate_pane.current_generate_tab()
@@ -1982,6 +1986,12 @@ class GalleryView(QWidget):
 
     def select_generation(self, prompt_id: str | None):
         self._pending_selection = prompt_id or None
+
+    def picks(self) -> Picks:
+        return self._gallery_pane.picks()
+
+    def pick_again(self, picks: Picks) -> None:
+        self._gallery_pane.pick_again(picks)
 
     def capture_generate_tabs(self) -> dict:
         return self._generate_pane.capture_state()

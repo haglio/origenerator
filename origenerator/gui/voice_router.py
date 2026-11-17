@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Protocol
 
+from funestra.on_screen_history import OnScreenHistory
 from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtWidgets import QLabel, QWidget
 from shared_ui import colors
@@ -23,6 +24,7 @@ from origenerator.gui.message import (
     time_to_read_ms,
 )
 from origenerator.gui.open_setters import ForTheSetter, OpenSetters
+from origenerator.gui.picking import Picks
 from origenerator.gui.request_answering import RequestAnswerer
 from origenerator.gui.request_promise import RequestPromise
 from origenerator.gui.voice_wiring import VoiceSources, VoiceSwitches
@@ -88,6 +90,8 @@ _BUTTON_REFUSALS = {
     AppCommand.GROUP: "pick some folders first",
 }
 
+_ABOUT_THE_PICKED_TILE = frozenset({AppCommand.CULL, AppCommand.FAVORITE})
+
 _ABOUT_THE_SLIDE = frozenset({
     AppCommand.BACK, AppCommand.FORWARD, AppCommand.CULL,
     AppCommand.LOCK, AppCommand.UNLOCK, AppCommand.FAVORITE,
@@ -101,6 +105,10 @@ class VoiceHost(Protocol):
 
     def selected_generation(self) -> str | None: ...
 
+    def picks(self) -> Picks: ...
+
+    def pick_again(self, picks: Picks) -> None: ...
+
     def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str, str]: ...
 
     def fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str, str]: ...
@@ -109,6 +117,10 @@ class VoiceHost(Protocol):
                    asked) -> tuple[str | None, str, str]: ...
 
     def queue_request(self, row, workflow, params, spoken, revision) -> tuple[str, str]: ...
+
+
+def _named(picks: Picks) -> str:
+    return "|".join(sorted(map(str, picks.picked))) + f"#{picks.anchor}"
 
 
 class VoiceRouter(QObject):
@@ -150,6 +162,8 @@ class VoiceRouter(QObject):
         self._caption: str | None = None
         self._switches: dict[str, QWidget | None] = {}
         self._buttons: dict = {}
+        self._picks_over_time = OnScreenHistory()
+        self._picks_named: dict[str, Picks] = {}
         self._enhance = None
         self._hold_the_motion(motion)
 
@@ -302,7 +316,12 @@ class VoiceRouter(QObject):
         elif self._slideshows.showing is not None and command in _ABOUT_THE_SLIDE:
             self._slideshows.run_on_slide(command, said_at)
         else:
-            self._run_in_gallery(command)
+            self._run_in_gallery(command, said_at)
+
+    def note_picks(self, picks: Picks, *, now: float) -> None:
+        name = _named(picks)
+        self._picks_named[name] = picks
+        self._picks_over_time.observe(name, now=now, playing_for=0.0)
 
     def _go_to_collection(self, key: str, shape: str | None = None) -> None:
         label = self._host.collection_label(key)
@@ -343,13 +362,22 @@ class VoiceRouter(QObject):
         set_the_bar(setting.value)
         self._slideshows.answer(self._motion.status_text())
 
-    def _run_in_gallery(self, command: AppCommand) -> None:
+    def _run_in_gallery(self, command: AppCommand, said_at: float | None = None) -> None:
         if command in (AppCommand.LOCK, AppCommand.UNLOCK):
             self._slideshows.answer(f"No slideshow to {command.value}",
                                     kind=WARNING)
             return
+        if command in _ABOUT_THE_PICKED_TILE:
+            self._pick_again_what_was_picked_at(said_at)
         button, press = self._buttons[command]
         self._press_gallery_pane_button(button, press, _BUTTON_REFUSALS[command])
+
+    def _pick_again_what_was_picked_at(self, said_at: float | None) -> None:
+        if said_at is None:
+            return
+        picks = self._picks_named.get(self._picks_over_time.path_at(said_at))
+        if picks is not None and picks.picked and picks != self._host.picks():
+            self._host.pick_again(picks)
 
     def _press_gallery_pane_button(self, button, press, refusal: str | None = None) -> None:
         if button.isHidden() or not button.isEnabled():

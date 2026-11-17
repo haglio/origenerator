@@ -7,6 +7,7 @@ from pathlib import Path
 from origenerator import config
 from origenerator.base_models import made_for_image_to_video, made_for_text_to_video
 from origenerator.model_titles import MODEL_EXTENSIONS, fix_of, is_a_fixs_lora, model_title
+from origenerator.one_look import once_a_look
 from origenerator.workflows import model_arch
 
 # The directory the Impact Subpack's ``UltralyticsDetectorProvider`` scans, where the enhance graph's detail pass
@@ -31,6 +32,7 @@ def _model_paths(directory: Path) -> list[Path]:
 _catalogued: dict[str, tuple[tuple, list[tuple[str, model_arch.ModelFile]]]] = {}
 
 
+@once_a_look
 def _folder_stamp(directory: Path) -> tuple:
     return tuple((root, os.stat(root).st_mtime_ns, len(dirs) + len(files))
                  for root, dirs, files in os.walk(directory))

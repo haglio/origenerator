@@ -7,6 +7,7 @@ import struct
 import pytest
 
 from origenerator import config
+from origenerator.one_look import one_look
 from origenerator.workflows import model_files
 from origenerator.workflows.model_arch import FLUX, SD15, SDXL, WAN, WAN_I2V, WAN_T2V
 from origenerator.workflows.model_files import (
@@ -270,3 +271,17 @@ def test_the_detectors_that_draw_outlines_come_from_the_ultralytics_segm_dir(tmp
     segm.mkdir(parents=True)
     (segm / "skin_finder.pt").touch()
     assert list_outline_detector_files() == ["skin_finder.pt"]
+
+
+def test_within_one_look_a_models_folder_is_asked_what_changed_once(installed_models, monkeypatch):
+    installed_models.add("checkpoints", "a.safetensors", arch=SDXL)
+    asked = []
+    walk = os.walk
+    monkeypatch.setattr(model_files.os, "walk",
+                        lambda directory: asked.append(directory) or walk(directory))
+
+    with one_look():
+        listings = [model_files.list_model_files("checkpoints", [], accepts=SDXL)
+                    for _ in range(3)]
+
+    assert (listings, len(asked)) == ([["a.safetensors"]] * 3, 1)

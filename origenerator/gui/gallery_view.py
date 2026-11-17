@@ -187,6 +187,7 @@ from origenerator.item_shape import (
     split_key as _split_collection_key,
 )
 from origenerator.library_readings import LibraryReadings, arrived, read_whole
+from origenerator.one_look import looking_once
 from origenerator.prompt_tokens import boxed_as_typed
 from origenerator.published_actions import give_the_launch_its_actions
 from origenerator.radio import OrigeneratorRadio
@@ -2246,6 +2247,7 @@ class GalleryView(QWidget):
         return (gallery.animated_preview_if_made(row, self._edits.places, thumb_dir)
                 if thumb_dir is not None else None)
 
+    @looking_once
     def follow_link(self, prompt_id: str):
         self._search.leave()
         self._go_to_generation(prompt_id)

@@ -14,6 +14,7 @@ from origenerator.model_titles import (
     versioned,
     write_title,
 )
+from origenerator.one_look import one_look
 from origenerator.precision import FULL_SIZE, HALF_SIZE, PACKED_HALF_SIZE
 
 
@@ -232,3 +233,15 @@ def test_a_loras_rank_and_the_height_it_was_trained_at_are_explained_like_its_ot
 
 def test_text_to_video_is_explained_as_image_to_video_is():
     assert title_words.explained("Example T2V")[0].startswith("T2V: text to video.")
+
+
+def test_within_one_look_a_models_title_is_worked_out_once(titled_models):
+    titled_models({"example_model": "Example Model v2"})
+
+    with one_look():
+        first = model_title("example_model.safetensors")
+        titled_models({"example_model": "Example Model the third"})
+        again = model_title("example_model.safetensors")
+
+    assert (first, again, model_title("example_model.safetensors")) == (
+        "Example Model v2", "Example Model v2", "Example Model the third")

@@ -16,7 +16,7 @@ from PySide6.QtCore import QEvent, QPoint, QPointF
 from PySide6.QtWidgets import QApplication
 
 from origenerator.gui.hud_queue import CANCEL, OPEN
-from origenerator.gui.inflight import EMPTY_QUEUE_TEXT, InFlightItem, RunReading
+from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.osr2_controls import Osr2Controls
 from origenerator.gui.slideshow_hud import HudPlacement, slideshow_hud_model
 from origenerator.gui.slideshow_pace import MAX_S, MIN_S, STEP_S, SlideshowPace
@@ -551,17 +551,23 @@ class TestTheQueueOnTheOneHud:
 
         assert window._hud_model().foot is None
 
-    def test_a_hud_over_an_idle_job_queue_shows_it_saying_so(self, qtbot):
+    def test_a_hud_over_an_idle_job_queue_leaves_it_off(self, qtbot):
         window = _dressed(qtbot)
         window.set_queue([], 0)
 
-        foot = window._hud_model().foot
-        assert foot.empty_note == EMPTY_QUEUE_TEXT
+        assert window._hud_model().foot is None, (
+            "he wants the Job Queue gone rather than showing its empty line (2026-11-17)")
+
+    def test_another_apps_backlog_alone_still_shows_the_job_queue(self, qtbot):
+        window = _dressed(qtbot)
+        window.set_queue([], 3)
+
+        assert window._hud_model().foot is not None
 
     def test_the_hud_keeps_one_size_as_jobs_come_and_go(self, qtbot):
         covering_core = _core_as(qtbot, over=True)
         sizes = set()
-        for items in ([], [_inflight("j1", job_kind="Image", typical_seconds=30)],
+        for items in ([_inflight("j1", job_kind="Image", typical_seconds=30)],
                       [_inflight(f"j{index}", typical_seconds=30) for index in range(7)]):
             covering_core.set_queue(items, 0)
             sizes.add(_hud(covering_core)[2].shape)

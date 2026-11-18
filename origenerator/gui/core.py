@@ -15,7 +15,7 @@ from shared_ui.foreground import bring_to_front
 from shared_ui.hard_to_miss import sure
 from shared_ui.preview import Preview, window_title
 
-from origenerator import downtime, places_backfill, ui_scale
+from origenerator import downtime, osr2, places_backfill, ui_scale
 from origenerator.app_state import AppState
 from origenerator.base_backfill import cancel_base_renders, fold_completed_base_renders
 from origenerator.branch_session import is_branch_session
@@ -394,6 +394,11 @@ class Core(QMainWindow):
         self._gallery_view.close()
         close_the_windows_it_opened(self)
         super().closeEvent(event)
+        _run_on_its_own(self._remind_to_turn_off_the_osr2)
+
+    def _remind_to_turn_off_the_osr2(self) -> None:
+        if self._fun_time is None:
+            osr2.ask_for_the_turn_off_reminder()
 
     def hand_comfyui_what_runs_while_closed(self) -> None:
         _run_on_its_own(self._gallery_view.flush_queue_to_server)

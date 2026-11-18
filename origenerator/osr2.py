@@ -36,6 +36,12 @@ def press_the_broker(*, state_dir=None, checkout: Path | None = None) -> None:
     broker.press(_state_dir(state_dir), broker.tray_launcher_in(checkout))
 
 
+def ask_for_the_turn_off_reminder(*, state_dir=None, checkout: Path | None = None) -> None:
+    checkout = project_dir("broker") if checkout is None else checkout
+    broker.remind_to_turn_off(_state_dir(state_dir), broker.tray_launcher_in(checkout),
+                              closed="Origenerator")
+
+
 def format_position(pos_0_100: float, interval_ms: float) -> str:
     return format_tcode_command("L0", to_tcode_position(pos_0_100), int(interval_ms))
 

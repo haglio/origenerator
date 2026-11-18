@@ -10,23 +10,34 @@ import pytest
 from funestra.file_channel import consume_command_file
 from funestra.funestra_verbs import play_file, set_speed
 from funestra.hud_title import LATEST_LABEL
+from funestra.messages import SaidMessage, read_message
 from funestra.modes import MessageLevel
 from funestra.playback_rate import NORMAL_RATE
 from funestra.playlist import PlaylistItem, read_playlist
 from funestra.satellite_hud import parse_hud
 from funestra.status import FunestraStatus, status_fields
-from shared_ui.message_shape import WARNING
+from shared_ui.message_shape import ERROR, HEARD_MARK, WARNING
 from shared_ui.testing import appending_to
 
 from origenerator import osr2_driver
 from origenerator.fun_time_mode import FunestraChannel
-from origenerator.funscript import funscript_path_for, synthesize_actions, write_funscript
+from origenerator.funscript import (
+    funscript_path_for,
+    synthesize_actions,
+    write_funscript,
+)
 from origenerator.gui import slideshow_pass
 from origenerator.gui.frame_files import FrameFiles
-from origenerator.gui.funestra_slideshow import FunestraSlideshow, Hosting, Playing, Seat
+from origenerator.gui.funestra_slideshow import (
+    FunestraSlideshow,
+    Hosting,
+    Playing,
+    Seat,
+)
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.hud_queue import OPEN
 from origenerator.gui.region_openings import RegionOpening
+from origenerator.gui.slideshow_hud import slideshow_hud_model
 from origenerator.gui.slideshow_pace import DEFAULT_S, SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
@@ -50,7 +61,7 @@ class _Messages:
     def __init__(self, said: list) -> None:
         self._said = said
 
-    def say(self, message, *, level):
+    def say(self, message, *, level, mark=""):
         assert isinstance(level, MessageLevel)
         self._said.append(message)
 
@@ -639,6 +650,72 @@ def test_a_slideshow_on_a_sessions_funestra_writes_what_it_says_where_fun_time_s
 
     slideshow.shown.flash("nothing here is enhanced", kind=WARNING)
     assert f"level={MessageLevel.WARNING}" in messages.read_text(encoding="utf-8").splitlines()
+
+
+def _on_a_sessions_satellite(tmp_path, items=_ITEMS) -> FunestraSlideshow:
+    seat = Seat("portrait", replace(_channel(tmp_path), message_file=tmp_path / "said.txt"),
+                FrameFiles(tmp_path / "frames"))
+    slideshow = FunestraSlideshow(Playing(items, shuffle=in_order), seat, _NO_HOSTING)
+    stop_the_poll_to_tick_by_hand(slideshow)
+    return slideshow
+
+
+def _what_fun_time_reads(slideshow: FunestraSlideshow) -> SaidMessage:
+    said = read_message(slideshow.channel.message_file)
+    return replace(said, seq=0.0)
+
+
+def test_a_message_that_answers_what_was_said_crosses_to_fun_time_with_the_microphone(
+        qtbot, tmp_path):
+    slideshow = _on_a_sessions_satellite(tmp_path)
+
+    slideshow.note_voice_command("slideshow paused")
+
+    assert _what_fun_time_reads(slideshow) == SaidMessage(
+        0.0, MessageLevel.NORMAL, "slideshow paused", HEARD_MARK)
+
+
+def test_a_messages_own_drawing_crosses_to_fun_time_too(qtbot, tmp_path):
+    slideshow = _on_a_sessions_satellite(tmp_path)
+
+    slideshow.shown.flash("couldn't delete that one", kind=WARNING, mark="trash")
+
+    assert _what_fun_time_reads(slideshow).mark == "trash"
+
+
+def test_an_error_crosses_to_fun_time_as_an_error(qtbot, tmp_path):
+    slideshow = _on_a_sessions_satellite(tmp_path)
+
+    slideshow.shown.flash("the Funestra could not be reached", kind=ERROR)
+
+    assert _what_fun_time_reads(slideshow).level is MessageLevel.ERROR
+
+
+def test_a_request_line_and_a_dictation_cross_to_fun_time_with_the_microphone(qtbot, tmp_path):
+    slideshow = _on_a_sessions_satellite(tmp_path)
+
+    slideshow.note_request("Request submitted")
+    answered = _what_fun_time_reads(slideshow).mark
+    slideshow.shown.dictating("Request: no hat")
+
+    assert (answered, _what_fun_time_reads(slideshow).mark) == (HEARD_MARK, HEARD_MARK)
+
+
+def _the_hud_button(slideshow: FunestraSlideshow, tooltip: str):
+    model = slideshow_hud_model("portrait", slideshow)
+    return next(button for row in model.rows for button in row if button.tooltip == tooltip)
+
+
+def test_a_press_of_the_huds_including_images_says_videos_only_where_fun_time_shows_it(
+        qtbot, tmp_path):
+    slideshow = _on_a_sessions_satellite(
+        tmp_path, [("one.png", "image", "id-1"), ("two.mp4", "video", "id-2")])
+    pressed = _the_hud_button(slideshow, "Including images").command
+
+    answer(slideshow, pressed.removeprefix("portrait_"))
+
+    assert (pressed, _what_fun_time_reads(slideshow)) == (
+        "portrait_media_videos", SaidMessage(0.0, MessageLevel.NORMAL, "Videos only"))
 
 
 def test_a_session_that_hands_over_no_message_file_is_told_nothing_and_nothing_fails(

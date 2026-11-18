@@ -7,6 +7,7 @@ import pytest
 from PySide6.QtCore import (
     QEvent,
     QPoint,
+    QRect,
     QSize,
     Qt,
 )
@@ -996,7 +997,7 @@ def test_the_bank_groups_its_buttons_with_a_space_between(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    groups = [buttons for _gap, buttons in view._buttons._groups]
+    groups = list(view._buttons._groups)
     assert groups[0] == (view._buttons.back, view._buttons.forward), (
         "icon-only buttons lean on their neighbors to be read, so they are laid out in groups "
         "with a space between")
@@ -1015,13 +1016,11 @@ def test_a_group_with_nothing_showing_takes_no_space(qtbot):
     view.show()
     _select_first_leaf(view)
 
-    gaps = {id(gap): gap for gap, _ in view._buttons._groups}
-    leading, group_gap = view._buttons._groups[0][0], view._buttons._groups[2][0]
-    assert not leading.isVisible()
-    assert view._buttons.group.isHidden()
-    assert not group_gap.isVisible()
-    assert view._buttons._groups[3][0].isVisible()
-    assert len(gaps) == len(view._buttons._groups)
+    bank = view._buttons
+    bank.layout().setGeometry(QRect(0, 0, 2000, 200))
+    assert bank.back.x() == 0
+    assert bank.group.isHidden()
+    assert bank.favorite.x() - (bank.redo.x() + bank.redo.width()) == bank.layout().group_spacing()
 
 
 def test_the_bank_wraps_onto_another_row_rather_than_squeezing_its_buttons(qtbot):
@@ -1035,7 +1034,7 @@ def test_the_bank_wraps_onto_another_row_rather_than_squeezing_its_buttons(qtbot
     host.updateGeometry()
     qtbot.wait(10)
 
-    shown = [b for _gap, group in view._buttons._groups for b in group
+    shown = [b for group in view._buttons._groups for b in group
              if not b.isHidden()]
     assert len(shown) > 3
     for button in shown:

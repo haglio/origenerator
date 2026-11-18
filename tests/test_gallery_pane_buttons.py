@@ -181,32 +181,33 @@ def test_the_tip_s_link_leads_wherever_populate_is_now(buttons):
     assert followed == ["populate"]
 
 
+def _laid_out(made: GalleryPaneButtons) -> GalleryPaneButtons:
+    made.layout().setGeometry(QRect(0, 0, 2000, 200))
+    return made
+
+
 def test_a_group_with_nothing_showing_wears_no_gap(buttons):
     made = buttons()
 
-    made.apply(_state(group=Button(visible=False), slideshow=Button(visible=False)))
+    made.apply(_state(group=Button(visible=False)))
+    _laid_out(made)
 
-    gaps = [gap.isVisible() for gap, buttons in made._groups]
-    assert gaps[0] is False
-    assert gaps[2] is False
+    assert made.favorite.x() - (made.redo.x() + made.redo.width()) == made.layout().group_spacing()
 
 
 def test_the_first_group_that_shows_is_the_one_left_unindented(buttons):
     made = buttons()
-    made.show()
 
     made.apply(_state(back=Button(visible=False), forward=Button(visible=False)))
+    _laid_out(made)
 
-    gaps = [gap.isVisible() for gap, buttons in made._groups]
-    assert gaps[0] is False
-    assert gaps[1] is False
-    assert gaps[3] is True
+    assert made.undo.x() == 0
 
 
 def test_the_buttons_stand_in_groups_by_what_they_are_about(buttons):
     made = buttons()
 
-    assert [group for _gap, group in made._groups] == [
+    assert list(made._groups) == [
         (made.back, made.forward),
         (made.undo, made.redo),
         (made.group,),
@@ -221,14 +222,12 @@ def test_the_buttons_stand_in_groups_by_what_they_are_about(buttons):
 
 
 def test_space_alone_sets_the_groups_apart(buttons):
-    made = _every_button_showing_as_the_app_styles_it(buttons)
+    layout = buttons().layout()
 
-    for gap, _group in made._groups[1:]:
-        drawn = gap.grab().toImage()
-        colors = {drawn.pixel(x, y) for x in range(drawn.width()) for y in range(drawn.height())}
-        assert (gap.width() > 0, len(colors)) == (True, 1), (
-            "space alone sets the groups apart: in a row that wraps, a rule would land at the end "
-            "of one row or the start of the next, marking nothing")
+    assert all(isinstance(layout.itemAt(index).widget(), QToolButton)
+               for index in range(layout.count())), (
+        "space alone sets the groups apart: in a row that wraps, a rule would land at the end "
+        "of one row or the start of the next, marking nothing")
 
 
 def test_wrapped_rows_stand_the_familys_wider_gap_apart(buttons):
@@ -308,7 +307,7 @@ def test_a_hosted_banks_buttons_land_on_screen_the_size_a_standalone_rows_do(but
 
 def _gaps(made: GalleryPaneButtons) -> tuple[int, int, int]:
     layout = made.layout()
-    return layout.spacing(), layout.row_spacing(), made._groups[0][0].width()
+    return layout.spacing(), layout.row_spacing(), layout.group_spacing()
 
 
 def test_a_standalone_banks_gaps_land_on_screen_the_size_a_hosted_rows_do(buttons):
@@ -480,3 +479,14 @@ def test_a_bank_handed_back_with_one_monitor_keeps_the_switch_away(buttons):
     taken.become_standalone()
 
     assert taken.switch.isHidden()
+
+
+def test_a_squeezed_bank_wraps_between_groups_never_inside_one(buttons):
+    made = _every_button_showing_as_the_app_styles_it(buttons)
+    widest_group = BUTTON_SIZE_HUD * 5 + BUTTON_GAP * 4
+    for width in range(widest_group, 1200, 7):
+        made.layout().setGeometry(QRect(0, 0, width, made.layout().heightForWidth(width)))
+
+        for group in made._groups:
+            shown = [button for button in group if not button.isHidden()]
+            assert len({button.y() for button in shown}) == 1, (width, [b.toolTip() for b in shown])

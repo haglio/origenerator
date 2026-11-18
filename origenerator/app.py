@@ -175,28 +175,37 @@ def _open_the_loading(fun_time, app, logger, preview, taskbar):
 
 
 def _build_window(client, library, app_state, boot, next_launch):
-    from origenerator.gui.core import Core, Launch
+    from origenerator.gui.core import Core, Launch, SatellitesServedFirst
 
-    def build():
-        return Core(client, library.db, app_state, fun_time=boot.fun_time,
-                    launch=Launch(boot.preview, boot.taskbar, next_launch), inbox=library.inbox)
-
+    launch = Launch(boot.preview, boot.taskbar, next_launch)
     if boot.fun_time is None:
-        return build()
+        return Core(client, library.db, app_state, launch=launch, inbox=library.inbox)
     from origenerator.where_the_time_went import LooksAtAThread, read_seconds, spent_between
 
     began = read_seconds()
-    with LooksAtAThread(threading.get_ident()) as looks:
-        window = build()
-    built = read_seconds()
-    boot.logger.info("Boot: the window is built; %s; %s",
-                     spent_between(began, built), looks.said_in_one_line())
-    window.serve_the_satellites_first()
-    window.once_the_satellites_are_served(lambda: boot.logger.info(
-        "Boot: the Satellites have their lists; since the window was built %s",
-        spent_between(built, read_seconds())))
+    watching_the_build = contextlib.ExitStack()
+    watched = []
+
+    def the_satellites_have_their_lists() -> None:
+        boot.logger.info("Boot: the Satellites have their lists; since what they play was "
+                         "begun %s", spent_between(began, read_seconds()))
+        watched.append((read_seconds(), watching_the_build.enter_context(
+            LooksAtAThread(threading.get_ident()))))
+
+    def the_window_is_built() -> None:
+        watching_the_build.close()
+        for served_at, looks in watched:
+            boot.logger.info("Boot: the window is built; %s; %s",
+                             spent_between(served_at, read_seconds()), looks.said_in_one_line())
+
+    window = Core(client, library.db, app_state, fun_time=boot.fun_time, launch=launch,
+                  inbox=library.inbox,
+                  satellites_first=SatellitesServedFirst(served=the_satellites_have_their_lists))
+    boot.logger.info("Boot: what the Satellites play is built; %s",
+                     spent_between(began, read_seconds()))
+    window.once_the_satellites_are_served(the_window_is_built)
     if not boot.fun_time.in_a_headset:
-        window.showMinimized()
+        window.once_the_satellites_are_served(window.showMinimized)
     return window
 
 

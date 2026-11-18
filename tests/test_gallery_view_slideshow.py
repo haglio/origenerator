@@ -1511,7 +1511,7 @@ def test_a_slideshow_lock_on_a_video_asks_for_nothing(qtbot, tmp_path):
     assert view.enhance.enhance_from_slideshow("g0") is False
 
 
-def test_a_slideshow_is_armed_with_each_images_versions(qtbot, tmp_path):
+def test_a_slideshow_is_armed_with_each_images_versions(qtbot, tmp_path, monkeypatch):
     db = _enhanceable_db(tmp_path, count=1)
     db.update_generation("g0", output_files=json.dumps([
         {"filename": "image_enhance_1.png", "subfolder": "image", "type": "output"},
@@ -1532,7 +1532,11 @@ def test_a_slideshow_is_armed_with_each_images_versions(qtbot, tmp_path):
     assert [version.path.name for version in versions] == \
         ["image_enhance_1.png", "sdxl_t2i_g0.png"]
     assert [version.label for version in versions] == ["Enhancement 1/1", "Original"]
-    assert slideshow._actions.enhance == view.enhance.enhance_from_slideshow
+    pressed = []
+    monkeypatch.setattr(view.enhance, "enhance_from_slideshow",
+                        lambda prompt_id: pressed.append(prompt_id) or True)
+    assert slideshow._actions.enhance("an-invented-id")
+    assert pressed == ["an-invented-id"]
     slideshow.close()
 
 

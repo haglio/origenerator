@@ -469,6 +469,9 @@ class SlideshowDirector:
         self._osr2.reconcile()
         return slideshow
 
+    def _enhance_from_slideshow(self, prompt_id: str) -> bool:
+        return self._enhancing_of().enhance_from_slideshow(prompt_id)
+
     def _slideshow_actions(self, shape: str) -> SlideshowActions:
         def at_its_regions_base(slideshow) -> bool:
             shown_on = self._shape_of(slideshow)
@@ -478,7 +481,7 @@ class SlideshowDirector:
         return SlideshowActions(
             queue_now=self._job_queue.now,
             delete=self._host.trash_generation,
-            enhance=self._enhancing_of().enhance_from_slideshow,
+            enhance=self._enhance_from_slideshow,
             favorite=self._host.favorite_generation,
             is_favorite=self._is_favorite,
             is_enhanced=self._is_enhanced,

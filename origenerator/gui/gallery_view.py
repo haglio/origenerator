@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Callable
 from functools import partial
 from typing import NamedTuple
 
@@ -155,7 +154,6 @@ from origenerator.gui.panes import (
 )
 from origenerator.gui.populate_controller import PopulateController
 from origenerator.gui.prompt_reveal import reveal_prompt
-from origenerator.gui.satellites_first import SatellitesFirst
 from origenerator.gui.shown_job_queue import ShownJobQueue, read_foreign_queue
 from origenerator.gui.slideshow_director import (
     DirectorSources,
@@ -243,7 +241,8 @@ class GalleryView(QWidget):
                  client: ComfyUIClient | None = None,
                  actions: GalleryEdits | None = None,
                  fun_time: FunTimeSession | None = None,
-                 shared: Shared = NO_SHARED):
+                 shared: Shared = NO_SHARED,
+                 the_rest_later: bool = False):
         super().__init__()
         self._db = db
         self._prompt_heights = shared.prompt_heights
@@ -252,8 +251,6 @@ class GalleryView(QWidget):
         self._app_title = shared.app_title
         self._client = client
         self._fun_time = fun_time
-        self._satellites_first: SatellitesFirst | None = None
-        self._own_draw_waits = False
         self._radio = shared.radio if shared.radio is not None else OrigeneratorRadio()
         omnipause.holds(self._radio)
         self.osr2 = Osr2Driving(
@@ -263,8 +260,45 @@ class GalleryView(QWidget):
         self._build_the_queue_of_runs(db, client)
         self._item_names = ItemNames(db)
         self.library = LibraryReadings(db, self._item_names, shared.publish_names)
+        self._build_what_the_satellites_play(db, client)
+        self._edits_given = actions
+        self.rest_built = False
+        if not the_rest_later:
+            self.build_the_rest()
+
+    def _build_what_the_satellites_play(self, db, client):
+        self._build_the_toc()
+        self._gallery_pane: GalleryPane | None = None
+        self._starting = StartingRows(self)
+        self.job_queue = ShownJobQueue(
+            self._jobs, client, starting=self._starting,
+            in_flight=self._in_flight_items,
+            listed=lambda: (self.library.reading.rows, self.library.requests), asks_over=self)
+        self.slideshows = SlideshowDirector(
+            self,
+            DirectorSources.of_this_library(db=db, jobs=self._jobs, names=self._item_names,
+                                            library=lambda: self.library.reading, listing=self.listing),
+            DirectorSurroundings(
+                pace=self._pace, motion=self.osr2.motion, osr2=self.osr2,
+                job_queue=self.job_queue, fun_time=self._fun_time,
+                radio=self._radio, buttons_of=lambda: self._buttons,
+                enhancing_of=lambda: self.enhance,
+                two_screens=self._two_screens))
+
+    def _in_flight_items(self, rows=None, requests=None) -> list:
+        if self._gallery_pane is None:
+            return []
+        return self._gallery_pane.inflight_items(rows=rows, requests=requests)
+
+    def every_satellite_has_its_list(self) -> bool:
+        return all(self.slideshows.region_slideshow(shape) is not None
+                   for shape in _SATELLITE_SHAPES
+                   if self._fun_time is not None and self._fun_time.funestra(shape) is not None)
+
+    def build_the_rest(self) -> None:
+        db, client = self._db, self._client
         self._build_the_panes(db, client)
-        self._edits = actions or GalleryEdits(
+        self._edits = self._edits_given or GalleryEdits(
             db, OUTPUT_PLACES, Trash(TRASH_DIR),
             environment=GalleryEnvironment(
                 release_files=self._release_held_media, thumb_dir=THUMB_DIR,
@@ -329,6 +363,7 @@ class GalleryView(QWidget):
         self._poll_timer.setInterval(_POLL_INTERVAL_MS)
         self._poll_timer.timeout.connect(self._poll)
         self._poll_timer.start()
+        self.rest_built = True
 
     def _build_the_queue_of_runs(self, db, client):
         self._jobs = JobQueue(db, client)
@@ -347,7 +382,6 @@ class GalleryView(QWidget):
         self._generating_tile: GeneratingTile | None = None
 
     def _build_the_panes(self, db, client):
-        self._build_the_toc()
         self._selected_row: dict | None = None
         self._scroll = GalleryPaneScrollArea()
         self._gallery_pane = GalleryPane(
@@ -388,21 +422,6 @@ class GalleryView(QWidget):
         self._navigation = NavigationController(
             self, search=self.search, toc=self.toc, pane=self._gallery_pane)
         self._trail = (False, False)
-        self._starting = StartingRows(self)
-        self.job_queue = ShownJobQueue(
-            self._jobs, client, starting=self._starting,
-            in_flight=self._gallery_pane.inflight_items,
-            listed=lambda: (self.library.reading.rows, self.library.requests), asks_over=self)
-        self.slideshows = SlideshowDirector(
-            self,
-            DirectorSources.of_this_library(db=db, jobs=self._jobs, names=self._item_names,
-                                            library=lambda: self.library.reading, listing=self.listing),
-            DirectorSurroundings(
-                pace=self._pace, motion=self.osr2.motion, osr2=self.osr2,
-                job_queue=self.job_queue, fun_time=self._fun_time,
-                radio=self._radio, buttons_of=lambda: self._buttons,
-                enhancing_of=lambda: self.enhance,
-                two_screens=self._two_screens))
         self._gallery_pane.slideshow_requested.connect(self.slideshows.open_on_tile)
         self.combine = CombineController(
             self,
@@ -863,31 +882,12 @@ class GalleryView(QWidget):
     def refresh(self, *, only_if_moved: bool = False):
         rows, meta = self.library.read()
         if self.library.moved_to(rows, meta) or not only_if_moved:
-            if self._the_satellites_are_still_to_serve():
-                self._read_only_what_the_satellites_play(rows, meta)
-            else:
+            if self.rest_built:
                 self._rebuild(rows, meta)
+            else:
+                self.library.take(rows, meta, self._tree.shapes)
             self.slideshows.library_moved()
         self.slideshows.fill_the_wanted_regions()
-
-    def serve_the_satellites_first(self, *, now: Callable[[], float] = time.monotonic) -> SatellitesFirst:
-        self._satellites_first = SatellitesFirst(
-            self, served=self._every_satellite_has_its_list, now=now)
-        return self._satellites_first
-
-    def _the_satellites_are_still_to_serve(self) -> bool:
-        return self._satellites_first is not None and not self._satellites_first.over
-
-    def _every_satellite_has_its_list(self) -> bool:
-        return all(self.slideshows.region_slideshow(shape) is not None
-                   for shape in _SATELLITE_SHAPES
-                   if self._fun_time is not None and self._fun_time.funestra(shape) is not None)
-
-    def _read_only_what_the_satellites_play(self, rows, meta) -> None:
-        self.library.take(rows, meta, self._tree.shapes)
-        if not self._own_draw_waits:
-            self._own_draw_waits = True
-            self._satellites_first.then(self.refresh)
 
     def _poll(self):
         if self._poll_inflight or (self.window().isMinimized()

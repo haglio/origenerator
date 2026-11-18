@@ -887,7 +887,7 @@ def test_a_hosted_boot_shows_every_window_under_the_sessions_taskbar_button(qapp
 
 
 def test_main_in_fun_time_mode_parks_the_window_and_threads_the_session(qapp):
-    window = MagicMock()
+    window = _a_window_whose_satellites_are_served()
     with patch("origenerator.app._init_windows_taskbar_identity"), \
          patch("origenerator.app._taskbar_identity", return_value=None), \
          patch("origenerator.gui.loading_screen.loading_screen"), \
@@ -1243,6 +1243,9 @@ def _nothing_runs_behind_the_window() -> bool:
     return not any(thread.name == off_thread.LONG_WAIT_THREAD for thread in threading.enumerate())
 
 
+_CORE = "origenerator.gui.core.Core"
+
+
 @contextmanager
 def _a_faked_boot(record, *, passes=None, **patches):
     targets = {
@@ -1250,7 +1253,6 @@ def _a_faked_boot(record, *, passes=None, **patches):
         "origenerator.app._taskbar_identity": None,
         "origenerator.comfyui_launcher.ensure_comfyui_server": DEFAULT,
         "origenerator.gui.loading_screen.loading_screen": DEFAULT,
-        "origenerator.gui.core.Core": _a_window_whose_satellites_are_served(),
         "origenerator.app_state.AppState": DEFAULT,
         "origenerator.db.Database": DEFAULT,
         "origenerator.trash.Trash": DEFAULT,
@@ -1267,7 +1269,7 @@ def _a_faked_boot(record, *, passes=None, **patches):
                 f"{module}.{name}",
                 passes.get(name, MagicMock(
                     side_effect=lambda *a, _n=name, **k: record.append(_n) or []))))
-        for target, value in patches.items():
+        for target, value in {_CORE: _a_core_that_serves_the_satellites_at_once(), **patches}.items():
             stack.enter_context(patch(target, value))
         try:
             yield
@@ -1290,15 +1292,29 @@ def _a_window_whose_satellites_are_served(**given):
     return window
 
 
-def test_a_hosted_boot_has_its_window_serve_the_satellites_before_it_is_shown(qapp):
-    window = _a_window_whose_satellites_are_served()
+def _a_core_that_serves_the_satellites_at_once(window=None):
+    window = window or _a_window_whose_satellites_are_served()
 
-    with _a_faked_boot([], **{"origenerator.gui.core.Core": MagicMock(return_value=window),
+    def built(*_given, satellites_first=None, **_named):
+        if satellites_first is not None:
+            satellites_first.served()
+        return window
+    return MagicMock(side_effect=built)
+
+
+def test_a_hosted_boot_shows_its_window_only_once_the_satellites_are_served(qapp):
+    window = MagicMock()
+    core = MagicMock(return_value=window)
+
+    with _a_faked_boot([], **{_CORE: core,
                               "origenerator.gui.job_queue.BRING_UP_COMFYUI": lambda: True}):
         assert main(hosted_launch()) == 0
 
-    asked = [call[0] for call in window.method_calls]
-    assert asked.index("serve_the_satellites_first") < asked.index("showMinimized")
+        assert core.call_args.kwargs["satellites_first"] is not None
+        window.showMinimized.assert_not_called()
+        for (run,), _named in window.once_the_satellites_are_served.call_args_list:
+            run()
+        window.showMinimized.assert_called_once()
 
 
 def test_a_hosted_boot_tidies_its_library_only_once_the_satellites_are_served(qapp, qtbot):
@@ -1317,12 +1333,12 @@ def test_a_hosted_boot_tidies_its_library_only_once_the_satellites_are_served(qa
 
 
 def test_a_boot_outside_fun_time_serves_no_satellites_first(qapp):
-    window = MagicMock()
+    core = MagicMock()
 
-    with _a_faked_boot([], **{"origenerator.gui.core.Core": MagicMock(return_value=window)}):
+    with _a_faked_boot([], **{_CORE: core}):
         assert main([]) == 0
 
-    window.serve_the_satellites_first.assert_not_called()
+    assert "satellites_first" not in core.call_args.kwargs
 
 
 class _ComfyUIStillStarting:

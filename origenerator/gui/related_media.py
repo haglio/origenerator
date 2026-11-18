@@ -7,6 +7,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 from shared_ui.spacing import GAP_MEDIUM
 
+from origenerator.content import non_ai_clip_heading
 from origenerator.gallery import (
     media_type_of_row,
     start_images_among,
@@ -14,6 +15,7 @@ from origenerator.gallery import (
     was_made_from,
     was_taken_from,
 )
+from origenerator.gallery.non_ai import started_from_no_image
 from origenerator.gui.change_tip import change_tip
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.flow_layout import FlowLayout
@@ -34,6 +36,10 @@ def _change_tip(record: dict, before: dict | None, after: dict | None) -> str:
                           "old_positive", "old_negative", "new_positive", "new_negative")))
 
 
+def _cut_into(row: dict) -> str:
+    return non_ai_clip_heading() if started_from_no_image(row) else TRIMMED_INTO
+
+
 LINKS = "Links"
 ANIMATED_FROM = "Animated from"
 ANIMATED_FROM_STARTING_FRAME_OF = "Animated from starting frame of"
@@ -43,6 +49,7 @@ STARTING_FRAME_ANIMATED_INTO = "Starting frame animated into"
 VIDEO_SETTINGS_USED_FOR_ANIMATION_OF = "Video settings used for animation of"
 TRIMMED_FROM = "Trimmed from"
 TRIMMED_INTO = "Trimmed into"
+FULL_VIDEO = "Full video"
 
 
 class _LinkRow(QWidget):
@@ -141,7 +148,7 @@ class RelatedMedia(QWidget):
             + self._made_with_settings_of(prompt_id, videos),
             self._name_of, self._trashed())
         self._trims.show_links(
-            trimmed_from + [(TRIMMED_INTO, video) for video in videos
+            trimmed_from + [(_cut_into(row), video) for video in videos
                             if prompt_id and video.get("trimmed_from") == prompt_id],
             self._name_of, self._trashed())
         self._follow_the_rows()
@@ -175,7 +182,7 @@ class RelatedMedia(QWidget):
     def _made_from(self, row: dict, start_image_of, videos: list[dict]):
         trimmed = self._trimmed_from(row)
         if trimmed is not None:
-            return [(TRIMMED_FROM, trimmed)], []
+            return [(FULL_VIDEO if started_from_no_image(row) else TRIMMED_FROM, trimmed)], []
         frame = self._source_of(row, start_image_of)
         if frame is None:
             return [], []

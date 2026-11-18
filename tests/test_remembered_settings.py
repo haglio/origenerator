@@ -94,7 +94,8 @@ NO_SETTING = {
 OSR2_CONTROLS_PRESSES_REMEMBERED_AS = {
     "motion": {"robot_hand_speed_up", "robot_hand_speed_down", "robot_hand_amplitude_up",
                "robot_hand_amplitude_down", "robot_hand_center_up", "robot_hand_center_down",
-               "robot_hand_cycle_shape", "robot_hand_toggle_learned", "speed", "amp", "center"},
+               "robot_hand_cycle_shape", "robot_hand_learned_on", "robot_hand_learned_off",
+               "robot_hand_off", "speed", "amp", "center"},
     "osr2_enabled": set(OSR2_CONTROL_BY_COMMAND),
     "max_intensity": {"max_intensity"},
 }

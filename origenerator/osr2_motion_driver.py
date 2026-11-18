@@ -231,6 +231,10 @@ class Osr2MotionDriver(QObject):
             else:
                 motion_engine.disable_learned_motion(self._state)
 
+    def turn_the_robot_hand_off(self) -> None:
+        with self._lock:
+            motion_engine.turn_the_robot_hand_off(self._state)
+
     @property
     def held(self) -> str | None:
         return self._held

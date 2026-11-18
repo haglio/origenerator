@@ -19,6 +19,17 @@ class FakeMotion:
         self.calls.append("learned")
         self.state.learned.active = not self.state.learned.active
 
+    def set_learned(self, on):
+        self.calls.append(("learned", on))
+        if on:
+            motion_engine.enable_learned_motion(self.state)
+        else:
+            motion_engine.disable_learned_motion(self.state)
+
+    def turn_the_robot_hand_off(self):
+        self.calls.append("robot_hand_off")
+        motion_engine.turn_the_robot_hand_off(self.state)
+
     def cycle_shape(self):
         self.calls.append("shape")
         motion_engine.cycle_shape(self.state.state)

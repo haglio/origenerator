@@ -30,6 +30,13 @@ class EvolverUpscales:
         return upscale
 
 
+def original_waiting_for(video, originals_dir, source: str) -> Path | None:
+    video = Path(video)
+    waiting = (Path(originals_dir) / source / shape / video.name for shape in SHAPES)
+    return next((original for original in waiting
+                 if original.is_file() and _predates(video, original)), None)
+
+
 def filed_upscales(upscaled_dir) -> list[tuple[str, Path]]:
     filed = []
     for shape in SHAPES:

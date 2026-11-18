@@ -216,6 +216,16 @@ def test_the_start_of_a_name_finds_the_items_whose_names_start_that_way():
     assert _hits(index, "79bb46f1 0") == ["g1"]
 
 
+def test_any_word_of_a_title_finds_the_video_that_wears_it():
+    rows = [_row("n1", ""), _row("n2", "")]
+    names = {"n1": "Jane Doe - A Day Out", "n2": "Sample Studio - video two"}
+    index = search.GallerySearch()
+    index.update(rows, item_name=names.get)
+
+    assert _hits(index, "day") == ["n1"]
+    assert _hits(index, "studio two") == ["n2"]
+
+
 def test_a_word_under_four_letters_is_never_taken_for_the_start_of_a_name():
     rows = [_row("g1", "a bed by a window"), _row("g2", "a quiet street")]
     names = {"g1": "11111111 000", "g2": "BED00000 000"}

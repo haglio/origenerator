@@ -124,6 +124,7 @@ _KEYS_THE_SESSION_OWNS = frozenset(
     {"audio_enabled", "osr2_enabled", "mic_enabled", "max_intensity", "motion", "slideshows"})
 
 _ONLY_CORE_SHOWS = frozenset({"generate_tabs"})
+_THE_SATELLITES_LISTS_NEED = frozenset({"toc_shapes", "session_slideshows"})
 
 SESSION_PERSIST_INTERVAL_MS = 5_000
 
@@ -144,12 +145,19 @@ class Launch:
     next_launch: MeetingPlace | None = None
 
 
+@dataclass(frozen=True)
+class SatellitesServedFirst:
+    now: Callable[[], float] = time.monotonic
+    served: Callable[[], None] = lambda: None
+
+
 class Core(QMainWindow):
     handed_back = Signal()
 
     def __init__(self, client: ComfyUIClient, db: Database, app_state: AppState,
                  *, fun_time: FunTimeSession | None = None, launch: Launch | None = None,
-                 inbox: EvolverInbox | None = None):
+                 inbox: EvolverInbox | None = None,
+                 satellites_first: SatellitesServedFirst | None = None):
         super().__init__()
         launch = launch or Launch()
         self._app_state = app_state
@@ -176,15 +184,41 @@ class Core(QMainWindow):
                                          shared=Shared(prompt_heights=PROMPT_HEIGHTS, inbox=inbox,
                                                        device_waits_for_the_window=True,
                                                        two_screens=self._sides,
-                                                       app_title=self._title))
+                                                       app_title=self._title),
+                                         the_rest_later=satellites_first is not None)
         self.setCentralWidget(self._gallery_view)
-        self._toasts = Toasts(self.windowIcon(), parent=self, shown_as=preview,
-                                       video_in_front=self._gallery_view.video_in_front)
-        self._gallery_view.run_ended.connect(self._toasts.note)
         self._bridge: FunTimeBridge | None = None
         if fun_time is not None:
             self._bridge = FunTimeBridge(fun_time, self._gallery_view, parent=self,
-                                         core_ready=False)
+                                         core_ready=False, core_built=satellites_first is None)
+        self._still_to_restore = _ONLY_CORE_SHOWS if fun_time is not None else frozenset()
+        self._restored: frozenset[str] = frozenset()
+        self._client, self._db, self._preview = client, db, preview
+        self.rest_built = False
+        if satellites_first is None:
+            self._build_the_rest()
+        else:
+            self._serve_the_satellites_first(satellites_first)
+
+    def _serve_the_satellites_first(self, serving: SatellitesServedFirst) -> None:
+        self._restore(_THE_SATELLITES_LISTS_NEED)
+        self._satellites_first = SatellitesFirst(
+            self, served=self._gallery_view.every_satellite_has_its_list, now=serving.now)
+        self._satellites_first.then(serving.served)
+        self._satellites_first.then(self._build_the_rest)
+        self._satellites_first.then(self._gallery_view.refresh)
+        self._gallery_view.refresh()
+
+    def _build_the_rest(self) -> None:
+        if self.rest_built:
+            return
+        client, db, fun_time = self._client, self._db, self._fun_time
+        if not self._gallery_view.rest_built:
+            self._gallery_view.build_the_rest()
+        self._toasts = Toasts(self.windowIcon(), parent=self, shown_as=self._preview,
+                                       video_in_front=self._gallery_view.video_in_front)
+        self._gallery_view.run_ended.connect(self._toasts.note)
+        if self._bridge is not None:
             self._answer_the_crossings(self._bridge)
         self.hands_its_window_over: HeadsetWindow | None = None
         self._found: tuple[QByteArray, float, bool] | None = None
@@ -197,7 +231,6 @@ class Core(QMainWindow):
         quit_shortcut.activated.connect(self.close)
         self._gallery_view.quit_asked.connect(self._close_if_sure)
 
-        self._still_to_restore = _ONLY_CORE_SHOWS if fun_time is not None else frozenset()
         self._restore_session()
         self._persist_the_session_as_it_changes()
         if not is_branch_session():
@@ -209,20 +242,25 @@ class Core(QMainWindow):
         if not is_branch_session():
             downtime.forget_work_left()
         self._gallery_view.reconnect_running_jobs()
+        self.rest_built = True
+        if self._bridge is not None:
+            self._bridge.core_is_built()
+
+    def _restore(self, keys) -> None:
+        for key, _getter, setter in SESSION_UI_STATE:
+            if key in keys:
+                setter(self._gallery_view, self._app_state.get(key))
+        self._restored |= frozenset(keys)
 
     def _restore_session(self):
         if self._fun_time is None or self._fun_time.in_a_headset:
             self._restore_geometry()
         self._fill_its_monitor()
-        for key, _getter, setter in SESSION_UI_STATE:
-            if key not in self._still_to_restore:
-                setter(self._gallery_view, self._app_state.get(key))
+        self._restore({key for key, _getter, _setter in SESSION_UI_STATE}
+                      - self._still_to_restore - self._restored)
         self._borders.take(self._app_state.get(_PANE_SIZES_KEY))
         if self._fun_time is None:
             self._borders.put_back()
-
-    def serve_the_satellites_first(self, *, now: Callable[[], float] = time.monotonic) -> None:
-        self._satellites_first = self._gallery_view.serve_the_satellites_first(now=now)
 
     def once_the_satellites_are_served(self, run: Callable[[], None]) -> None:
         if self._satellites_first is None:
@@ -410,6 +448,7 @@ class Core(QMainWindow):
         self._device_rect = (rect.x, rect.y, rect.width, rect.height)
 
     def closeEvent(self, event):
+        self._build_the_rest()
         if event.spontaneous() and not self._sure_to_close():
             event.ignore()
             return

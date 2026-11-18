@@ -1470,6 +1470,8 @@ class GalleryView(QWidget):
         return rows if self._showing_search() else what_plays_at(self.slideshow_location(), rows)
 
     def listing(self) -> Listing:
+        if not self.rest_built:
+            return Listing()
         pane = self._gallery_pane
         return Listing(location=self.slideshow_location(), rows=tuple(self.rows_to_play()),
                        shown=tuple(self.listed_prompt_ids()),

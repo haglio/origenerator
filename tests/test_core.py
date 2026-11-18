@@ -20,6 +20,7 @@ from funestra.file_channel import append_command
 from funestra.hud_placement import HudCorner
 from funestra.main_hud import OSR2_DRIVING, OSR2_PARKED
 from funestra.robot_hand import WaveformShape
+from PIL import Image
 from PySide6.QtCore import QEvent, QObject, QPoint, Qt
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import QApplication, QMessageBox, QWidget
@@ -2610,6 +2611,26 @@ def test_a_window_serving_the_satellites_first_reads_what_they_play_before_the_r
     assert _read_for_the_satellites(win) == ["g-1"]
     assert not win.rest_built, (
         "building the window took the seconds the Satellites spent waiting for their lists")
+
+
+def test_each_satellites_list_fills_before_the_rest_of_the_window_is_built(
+        qtbot, tmp_path, monkeypatch):
+    win = _hosted_serving_the_satellites_first(qtbot, tmp_path)
+    still = tmp_path / "made-up.png"
+    Image.new("RGB", (100, 200)).save(still)
+    monkeypatch.setattr(win._gallery_view.slideshows, "items_of",
+                        lambda rows: [(str(still), "image", "g-1", str(still))])
+    assert not win.rest_built
+
+    filled = []
+    for shape in ("portrait", "landscape"):
+        win._gallery_view.fill_the_region(shape)
+        filled.append(win._gallery_view.region_slideshow(shape) is not None)
+
+    assert filled == [True, True], (
+        "a list that cannot be made until the whole window is built leaves the Satellite dark "
+        "and Fun Time waiting two minutes for it")
+    _until(lambda: win.rest_built)
 
 
 def test_a_window_serving_the_satellites_first_builds_the_rest_once_they_have_their_lists(

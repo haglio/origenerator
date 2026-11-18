@@ -5,7 +5,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from app_support import haglio_settings, kino_folder, siblings
+from app_support import flick_folder, haglio_settings, kino_folder, siblings
 from funestra.robot_hand import bpm_for_speed
 
 from origenerator.branch_session import THIS_CHECKOUT, is_branch_session
@@ -29,13 +29,17 @@ PROJECT_ROOTS = haglio_settings.project_roots()
 _RADIO_KEY = "ambient_audio_dir"
 
 
-def radio_dir(settings: dict[str, Any] | None = None) -> Path | None:
+def _folder_the_settings_may_name(key: str, settings: dict[str, Any] | None = None) -> Path | None:
     settings = haglio_settings.load() if settings is None else settings
-    raw = settings.get(_RADIO_KEY)
+    raw = settings.get(key)
     if not raw:
         return None
     path = Path(raw)
     return path if path.is_absolute() else Path(settings["library_root"]) / path
+
+
+def radio_dir(settings: dict[str, Any] | None = None) -> Path | None:
+    return _folder_the_settings_may_name(_RADIO_KEY, settings)
 
 
 RADIO_DIR = radio_dir()
@@ -105,6 +109,10 @@ KINO_UPSCALES_DIR = kino_folder.upscales_in(KINO_DIR)
 KINO_TRASH_DIR = kino_folder.trash_folder_in(KINO_DIR)
 GENAU_SOURCE = haglio_settings.value("genau_source")
 GENAU_DIR = Path(haglio_settings.value("genau_dir"))
+GENAU_FLICKS_NO_MODEL_MADE = tuple(
+    kept_in(flicks) for flicks in [flick_folder.flicks_folder_in(GENAU_DIR)] if flicks is not None
+    for kept_in in (flick_folder.non_ai_flicks_in, flick_folder.vr_flicks_in))
+VR_DIR = _folder_the_settings_may_name("vr_videos_dir")
 
 OUTPUT_PLACES = replace(
     OutputPlaces.from_settings(haglio_settings.load(), comfyui_dir=COMFYUI_DIR, trash=TRASH_DIR,

@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 from shared_ui.spacing import MARGIN_STANDARD
 
+from origenerator import config, display_names
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.gallery import (
@@ -26,7 +27,7 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui.generate_tab import GenerateTab
 from origenerator.item_names import ItemNames
 from origenerator.media import MediaType
-from origenerator.non_ai_videos import NonAiPlaces, scan
+from origenerator.non_ai_videos import Kept, NonAiPlaces, more_places_here, scan
 from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import animated_thumbnail_path
 from origenerator.trash import Trash
@@ -50,6 +51,14 @@ def test_a_non_ai_folder_shows_its_first_folder_capitalized_and_other_as_other_o
     assert [workflow_named(non_ai_workflow(folder)).display_name
             for folder in ("sample full", "other clips", "other", "otherwise full")] == [
         "Sample full", "(other/unknown) clips", "(other/unknown)", "Otherwise full"]
+
+
+def test_the_overlay_can_give_a_non_ai_folder_another_name_to_show(monkeypatch):
+    monkeypatch.setattr(display_names, "load_content", lambda: {"display_names": {
+        non_ai_workflow("sample full"): "Sample films"}})
+
+    assert [workflow_named(non_ai_workflow(folder)).display_name
+            for folder in ("sample full", "sample clips")] == ["Sample films", "Sample clips"]
 
 
 def _library(tmp_path) -> NonAiPlaces:
@@ -245,3 +254,70 @@ def test_the_line_saying_there_are_no_settings_sits_in_the_middle_of_the_empty_t
     assert note.alignment() == Qt.AlignmentFlag.AlignCenter
     assert section.height() > 4 * note.fontMetrics().height()
     assert max(abs(middle.x()), abs(middle.y())) <= MARGIN_STANDARD
+
+
+def _library_with_more(tmp_path) -> tuple[NonAiPlaces, Path, Path]:
+    places = _library(tmp_path)
+    library = places.videos.parent
+    other_drive = tmp_path / "another drive" / "videos"
+    return (NonAiPlaces(
+        videos=places.videos, thumb_dir=places.thumb_dir, records=places.records,
+        more=(Kept(other_drive / "VR" / "finished", named_from=other_drive),
+              Kept(library / "sample app" / "flicks" / "2D" / "non_AI", named_from=library),
+              Kept(library / "sample app" / "flicks" / "VR", named_from=library))),
+        library, other_drive)
+
+
+def test_a_scan_brings_in_the_videos_of_every_place_each_under_its_own_folders(db, tmp_path):
+    places, library, other_drive = _library_with_more(tmp_path)
+    for video in (places.videos / "sample" / "full" / "video one.mp4",
+                  other_drive / "VR" / "finished" / "video two.mp4",
+                  library / "sample app" / "flicks" / "2D" / "non_AI" / "video three.mp4",
+                  library / "sample app" / "flicks" / "VR" / "video four.mp4"):
+        write_mp4(video)
+
+    assert (scan(db, places), scan(db, places)) == (4, 0)
+
+    [videos] = build_gallery_tree(db.list_generations())
+    assert {folder.label: sorted(leaf.label for leaf in child_groups(folder))
+            for folder in child_groups(videos)} == {
+        "Sample full": ["full"], "VR finished": ["finished"],
+        "Sample app flicks": ["2D/non_AI", "VR"]}
+
+
+def test_a_video_kept_on_another_drive_takes_its_name_and_star_from_its_record(db, tmp_path):
+    places, _library_folder, other_drive = _library_with_more(tmp_path)
+    video = write_mp4(other_drive / "VR" / "finished" / "video two.mp4")
+    record = places.records / "VR" / "finished" / "video two.json"
+    record.parent.mkdir(parents=True)
+    record.write_text(json.dumps({"title": "Jane Doe - Beta Study", "favorite": True}),
+                      encoding="utf-8")
+
+    scan(db, places)
+
+    [row] = _videos(db)
+    assert (recorded_title(row), row["starred"], json.loads(row["output_files"])) == (
+        "Jane Doe - Beta Study", 1, [{"filename": "video two.mp4", "library_path": str(video)}])
+
+
+def test_a_place_that_is_not_there_brings_nothing_in_and_stops_no_other(db, tmp_path):
+    places, _library_folder, _other_drive = _library_with_more(tmp_path)
+    write_mp4(places.videos / "sample" / "full" / "video one.mp4")
+
+    assert scan(db, places) == 1
+
+
+def test_the_places_beyond_the_non_ai_folder_are_the_vr_folder_and_genaus_flicks_no_model_made(
+        tmp_path, monkeypatch):
+    drive, genau = tmp_path / "another drive" / "videos", tmp_path / "videos" / "sample app"
+    flicks = (genau / "flicks" / "2D" / "non_AI", genau / "flicks" / "VR")
+    monkeypatch.setattr(config, "GENAU_DIR", genau)
+    monkeypatch.setattr(config, "GENAU_FLICKS_NO_MODEL_MADE", flicks)
+    monkeypatch.setattr(config, "VR_DIR", drive / "VR" / "finished")
+    with_vr = more_places_here()
+    monkeypatch.setattr(config, "VR_DIR", None)
+
+    assert (with_vr, more_places_here()) == (
+        (Kept(drive / "VR" / "finished", named_from=drive),
+         *(Kept(folder, named_from=tmp_path / "videos") for folder in flicks)),
+        tuple(Kept(folder, named_from=tmp_path / "videos") for folder in flicks))

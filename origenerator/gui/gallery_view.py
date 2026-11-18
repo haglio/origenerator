@@ -25,6 +25,7 @@ from origenerator import (
     alert,
     evolver_export,
     gallery,
+    non_ai_videos,
     outside_videos,
     timing,
     trash_collection,
@@ -43,6 +44,7 @@ from origenerator.config import (
     THUMB_DIR,
     TRASH_DIR,
     VIDEO_RECORDS_DIR,
+    VR_DIR,
 )
 from origenerator.db import Database, NewRequest
 from origenerator.db_generations import ENHANCE_WHEN_FINISHED, TRASH_WHEN_FINISHED
@@ -200,7 +202,7 @@ from origenerator.prompt_tokens import boxed_as_typed
 from origenerator.published_actions import give_the_launch_its_actions
 from origenerator.radio import OrigeneratorRadio
 from origenerator.setting_advice import files_not_installed, made_with_files_not_installed
-from origenerator.trash import Genau, Kino, Trash
+from origenerator.trash import Genau, KeptBesideItsTrash, Kino, Trash
 from origenerator.voice.app_commands import AppCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import resolve_input_image_path
@@ -332,9 +334,11 @@ class GalleryView(QWidget):
                 cancel_enhancements=self.enhance.cancel_for_delete,
                 kino=Kino(KINO_UPSCALES_DIR, KINO_TRASH_DIR, EVOLVER_SOURCE, non_ai=NON_AI_DIR),
                 genau=Genau.in_folder(GENAU_DIR),
+                vr=KeptBesideItsTrash(VR_DIR) if VR_DIR is not None else None,
                 bring_in=partial(outside_videos.bring_in_one, db),
                 delete_for_good=delete_through_evolver,
                 video_records=VIDEO_RECORDS_DIR,
+                libraries_elsewhere=non_ai_videos.places_here().libraries_elsewhere,
 
             ),
 

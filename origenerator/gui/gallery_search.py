@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 from shared_ui.spacing import GAP_SMALL
 
 from origenerator import gallery, search
+from origenerator.gallery.non_ai import started_from_no_image
 from origenerator.gui.gallery_pane import SEARCH_DRAW_LIMIT
 from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.scope_search_edit import ScopeSearchEdit
@@ -263,7 +264,8 @@ class GallerySearchController(QObject):
             by_folder.setdefault(key, []).append(result.row)
         tiles = []
         for key, rows in by_folder.items():
-            group = self._host.group_for_key(key) if len(rows) > 1 else None
+            near_copies = len(rows) > 1 and not started_from_no_image(rows[0])
+            group = self._host.group_for_key(key) if near_copies else None
             if group is not None:
                 tiles.append(search.SearchTile(row=rows[0], group=group, rows=list(rows)))
             else:

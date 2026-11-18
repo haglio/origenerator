@@ -4,6 +4,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
+from app_support.threading_utils import wait_until
 from PySide6.QtCore import (
     QEvent,
     Qt,
@@ -1699,7 +1700,7 @@ def test_an_arrow_pressed_in_a_text_field_of_cores_stays_in_the_field(qtbot, mon
     view, slideshow, steps = _core_beside_its_slideshow(qtbot, monkeypatch)
     view.activateWindow()
     view._search.field.setFocus()
-    qtbot.waitUntil(lambda: QApplication.focusWidget() is view._search.field)
+    wait_until(lambda: QApplication.focusWidget() is view._search.field, pump=QApplication.processEvents)
 
     taken = _arrow_pressed_in_core(view)
 

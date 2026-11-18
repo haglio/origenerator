@@ -30,6 +30,7 @@ from origenerator.gallery.collection import (
 )
 from origenerator.gallery.shapes import LANDSCAPE, SHAPE_LABELS
 from origenerator.gui.gallery_view import GalleryView
+from origenerator.workflows.non_ai import non_ai_workflow
 from tests.gallery_view_support import (
     _NO_MOD,
     FakeActions,
@@ -756,6 +757,24 @@ def test_a_folders_lone_hit_stays_the_item_itself(qtbot):
     assert view.listed_prompt_ids() == ["i1"], (
         "a folder that answered once has nothing to collapse, and a folder tile there would hide "
         "the image under a name")
+    assert view._gallery_pane._listed_folders == []
+
+
+def test_several_non_ai_videos_found_in_one_folder_come_back_as_the_videos(qtbot):
+    rows = [{**_row(prompt_id, non_ai_workflow("sample clips"),
+                    {"folder": "sample/clips/sorted", "title": title}, f"{prompt_id}.mp4"),
+             "source": "non_ai", "workflow_version": "non_ai"}
+            for prompt_id, title in (("n1", "Jane Doe - video one"), ("n2", "Jane Doe - video two"),
+                                     ("n3", "Sample Studio - video three"))]
+    view = GalleryView(database_of(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    _search_for(view, "Jane")
+
+    assert sorted(view.listed_prompt_ids()) == ["n1", "n2"], (
+        "a folder of Non-AI videos is a folder on disk, whose videos have nothing in common but "
+        "where they are kept, so each one found is an answer of its own")
     assert view._gallery_pane._listed_folders == []
 
 

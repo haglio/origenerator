@@ -174,6 +174,7 @@ class _Entry:
     seeds: frozenset[str]
     folders: frozenset[str] = frozenset()
     name: str = ""
+    title: frozenset[str] = frozenset()
     tags: tuple[tuple[str, ...], ...] = ()
     folder_tags: tuple[tuple[str, ...], ...] = ()
     files: frozenset[str] = frozenset()
@@ -235,6 +236,7 @@ def _term_score(term: QueryTerm, entry: _Entry) -> float:
     if term.stem in entry.seeds or _starts_the_name(term.stem, entry.name):
         return _EXACT
     return max(
+        _field_score(term, entry.title),
         _field_score(term, entry.positive) * _POSITIVE_WEIGHT,
         _field_score(term, entry.folders) * _FOLDER_WEIGHT,
         _field_score(term, entry.made_with) * _MADE_WITH_WEIGHT,
@@ -266,6 +268,10 @@ def _as_it_was(entry: _Entry | None, row: dict, named: tuple[str, ...], name: st
 
 def _folder_stems(names) -> frozenset[str]:
     return frozenset().union(*(_stems(name) for name in names))
+
+
+def _title_stems(name: str) -> frozenset[str]:
+    return frozenset() if name_starts_in(name) else _stems(name)
 
 
 def _says(entry: _Entry, words: tuple[str, ...]) -> bool:
@@ -332,7 +338,8 @@ class GallerySearch:
             known = self._entries.get(prompt_id)
             entries[prompt_id] = (known if _as_it_was(known, row, named, name) else replace(
                 known if known is not None else _build_entry(row),
-                row=row, folders=_folder_stems(named), name=name, folder_names=named,
+                row=row, folders=_folder_stems(named), name=name, title=_title_stems(name),
+                folder_names=named,
                 folder_tags=tuple(tag for folder in named for tag in _tags(folder)),
             ))
             order.append(prompt_id)

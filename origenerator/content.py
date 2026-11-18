@@ -78,3 +78,10 @@ def missing_overlay_keys(
 
 def genau_flick_word() -> str:
     return haglio_settings.value("genau_flick_words", "one")
+
+
+def non_ai_clip_heading() -> str:
+    try:
+        return haglio_settings.value("non_ai_clip_heading")
+    except haglio_settings.MissingSetting:
+        return "Clip"

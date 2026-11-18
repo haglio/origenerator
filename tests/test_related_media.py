@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+
 import pytest
+from app_support import haglio_settings
 from PIL import Image
 from PySide6.QtCore import QEvent, QPoint, Qt
 from PySide6.QtGui import QColor, QHelpEvent, QImage, QMouseEvent
@@ -18,6 +21,7 @@ from origenerator.gui.related_media import (
 )
 from origenerator.gui.source_tile import SourceTile
 from origenerator.gui.trash_box import TrashBox
+from origenerator.workflows.non_ai import non_ai_workflow
 from tests.related_links import (
     POINTING_BACK,
     no_sources,
@@ -625,6 +629,43 @@ def test_a_clip_points_at_each_cut_out_of_it_under_trims(make_related):
 
     section = related._trims
     assert _links(section) == [("Trimmed into", "cut1"), ("Trimmed into", "cut2")]
+
+
+def _non_ai_row(prompt_id, cut_from=None):
+    return {"prompt_id": prompt_id, "workflow_name": non_ai_workflow("sample full"),
+            "created_at": "2026-01-02 03:05:06", "params_json": '{"folder": "sample/full"}',
+            "output_files": f'[{{"filename": "{prompt_id}.mp4"}}]',
+            "thumbnail_path": f"{prompt_id}_thumb.jpg", "trimmed_from": cut_from}
+
+
+def test_a_non_ai_clip_points_back_at_its_full_video_under_full_video(make_related):
+    related = make_related(_non_ai_row("full1"))
+
+    related.show_row(_non_ai_row("cut1", cut_from="full1"), [])
+
+    assert _links(related._trims) == [("Full video", "full1")]
+
+
+def test_a_non_ai_full_video_points_at_each_clip_under_the_words_the_shared_settings_give(
+        make_related, monkeypatch, tmp_path):
+    settings = tmp_path / "settings.json"
+    settings.write_text(json.dumps({**haglio_settings.EXAMPLE, "non_ai_clip_heading": "Sample cut"}),
+                        encoding="utf-8")
+    monkeypatch.setenv(haglio_settings.SETTINGS_ENV, str(settings))
+    related = make_related(_non_ai_row("cut1", cut_from="full1"),
+                           _non_ai_row("cut2", cut_from="full1"))
+
+    related.show_row(_non_ai_row("full1"), [])
+
+    assert _links(related._trims) == [("Sample cut", "cut1"), ("Sample cut", "cut2")]
+
+
+def test_where_the_shared_settings_give_no_words_a_non_ai_clip_is_headed_clip(make_related):
+    related = make_related(_non_ai_row("cut1", cut_from="full1"))
+
+    related.show_row(_non_ai_row("full1"), [])
+
+    assert _links(related._trims) == [("Clip", "cut1")]
 
 
 def test_a_cut_does_not_point_past_its_clip_at_that_clip_s_start_frame(make_related):

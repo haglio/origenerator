@@ -202,8 +202,25 @@
         "CLIP_WORDS",
         "CLIP = \"clip\"",
         "(\"text_encoders\", \"clip\")",
-        "clip_tokenizer"
+        "clip_tokenizer",
+        "non_ai_clip_heading",
+        "\"Clip\""
       ]
+    },
+    {
+      "id": "non_ai_clip",
+      "thing": "a short Non-AI video cut from a full video, which its tab's Links name under the words the shared settings give",
+      "screen": [
+        "Clip",
+        "Full video"
+      ],
+      "his_word": "clip, 2026-11-17",
+      "code_today": [
+        "non ai clip heading"
+      ],
+      "code_word": null,
+      "status": "his_word",
+      "ruled": "2026-11-17: the heading over such a video in Links is the shared settings' non_ai_clip_heading; the code's own word for one waits for him"
     },
     {
       "id": "image",

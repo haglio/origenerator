@@ -18,7 +18,7 @@ from funestra.main_hud import (
 from funestra.main_hud_painter import hud_xy
 from funestra.modes import MainMode, Osr2State
 from funestra.osr2_part_painter import Osr2PartPainter
-from funestra.osr2_visualizer import DRIVEN_BY_NOTHING, DRIVEN_BY_ROBOT_HAND
+from funestra.osr2_visualizer import DRIVEN_BY_NOTHING, DRIVEN_BY_PARKED, DRIVEN_BY_ROBOT_HAND
 from funestra.robot_hand import POSITION_MAX
 from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, Qt, Signal
 from PySide6.QtGui import QMouseEvent
@@ -94,7 +94,7 @@ def test_cores_osr2_controls_are_the_consoles_osr2_section_alone(qtbot):
                  "portrait_clip_seconds_down", "portrait_clip_seconds_up",
                  "landscape_clip_seconds_down", "landscape_clip_seconds_up"):
         assert gone not in actions, gone
-    for kept in ("robot_hand_toggle_learned",
+    for kept in ("robot_hand_learned_on", "robot_hand_off",
                  "robot_hand_cycle_shape", "robot_hand_release",
                  "robot_hand_speed_up", "robot_hand_amplitude_up", "robot_hand_center_up"):
         assert kept in actions, kept
@@ -107,7 +107,7 @@ def test_the_osr2_controls_declare_the_buttons_this_app_answers(qtbot):
 
     assert hud.main_hud_model.rows == ()
     assert [[b.command for b in row if b.command] for row in hud.main_hud_model.osr2_rows] == [
-        ["robot_hand_park", "robot_hand_toggle_learned", "robot_hand_cycle_shape"],
+        ["robot_hand_park", "robot_hand_learned_on", "robot_hand_cycle_shape", "robot_hand_off"],
     ]
     assert [b.command for b in hud.main_hud_model.osr2_controls] == [BROKER_PRESS]
 
@@ -189,10 +189,21 @@ def test_the_motion_buttons_reach_the_driver(qtbot):
     motion.state.state.amplitude = 40
     controls.drawing()
     for action in ("robot_hand_speed_up", "robot_hand_amplitude_down", "robot_hand_center_up",
-                   "robot_hand_toggle_learned", "robot_hand_cycle_shape"):
+                   "robot_hand_learned_on", "robot_hand_cycle_shape", "robot_hand_off"):
         _press(controls, action)
     assert motion.calls == [("speed", 5), ("amp", -10), ("center", 5),
-                            "learned", "shape"]
+                            ("learned", True), "shape", "robot_hand_off"]
+
+
+def test_the_x_lights_once_the_robot_hand_is_off_and_waveform_takes_the_motion_back(qtbot):
+    controls, motion = _controls(qtbot)
+    controls.drawing()
+    _press(controls, "robot_hand_off")
+    controls.drawing()
+
+    assert next(b for _r, b in controls._painter.buttons if b.command == "robot_hand_off").lit
+    _press(controls, "robot_hand_learned_off")
+    assert motion.calls[-1] == ("learned", False)
 
 
 def test_each_press_on_the_waveform_button_changes_the_face_it_wears(qtbot):
@@ -421,6 +432,16 @@ def test_the_readout_is_the_motion_only_while_it_runs(qtbot):
     motion = FakeMotion()
     assert drive_hud(motion.state, False).driven == DRIVEN_BY_NOTHING
     assert drive_hud(motion.state, True).driven == DRIVEN_BY_ROBOT_HAND
+
+
+def test_a_running_motion_with_the_robot_hand_off_reads_as_parked_at_home(qtbot):
+    motion = FakeMotion()
+    motion.turn_the_robot_hand_off()
+
+    drive = drive_hud(motion.state, True)
+
+    assert drive.driven == DRIVEN_BY_PARKED
+    assert set(drive.waveform) == {0.0}
 
 
 def test_off_is_said_only_of_a_device_that_is_switched_off(qtbot):

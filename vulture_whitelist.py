@@ -37,10 +37,6 @@ _.top_block
 _.set_showing
 _.own_frame
 
-# --- vulture: reached by name, from the table a spoken word is dispatched through ---
-# `voice_router._MOTION` maps the spoken on and off words for human inspired to
-# "set_learned", which `_hold_the_motion` hands to getattr.
-_.set_learned
 
 # --- sqlite3 reads this off the connection it was set on ---
 _.row_factory

@@ -257,6 +257,22 @@ def test_the_learned_motion_takes_the_motion_over_and_it_is_what_is_streamed(qtb
     assert not driver.state.learned.times
 
 
+def test_with_the_robot_hand_off_the_osr2_is_streamed_home_until_a_motion_is_chosen(qtbot):
+    driver, broker, clock = _driver(qtbot)
+    driver.set_learned(True)
+    driver.start()
+
+    driver.turn_the_robot_hand_off()
+    for _ in range(20):
+        clock.t += 0.025
+        driver.poll()
+
+    assert not driver.state.learned.active
+    assert {pos for pos, _interval in broker.positions[-5:]} == {0.0}
+    driver.set_learned(False)
+    assert not driver.state.state.off
+
+
 def test_a_hold_leaves_amp_speed_and_center_where_they_were(qtbot):
     driver, _broker, _clock = _driver(qtbot)
     driver.set_amplitude(60)
@@ -500,6 +516,16 @@ def test_a_motion_stopped_in_a_frozen_room_parks_now_and_stays_stopped(qtbot):
 
     assert broker.parked == 1
     assert len(broker.positions) == sent
+
+
+def test_the_robot_hand_left_off_comes_back_off():
+    left = motion_engine.Motion()
+    motion_engine.turn_the_robot_hand_off(left)
+    reopened = motion_engine.Motion()
+
+    motion_engine.take_settings(reopened, motion_engine.settings_of(left))
+
+    assert reopened.state.off
 
 
 @pytest.mark.parametrize("saved", [

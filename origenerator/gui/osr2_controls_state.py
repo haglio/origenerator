@@ -7,10 +7,14 @@ from app_support.osr2_device import Osr2Mode, Osr2Trouble
 from funestra import drive_layout
 from funestra.main_hud import (
     BROKER_PRESS,
+    HUMAN_INSPIRED_ON,
+    NEXT_WAVEFORM,
     OSR2_CONTROL_BUTTONS,
     OSR2_CONTROL_UNANSWERED,
     OSR2_DRIVING,
     OSR2_PARKED,
+    ROBOT_HAND_OFF,
+    WAVEFORM_ON,
     MainHudModel,
     aim_row,
     osr2_controls,
@@ -21,8 +25,8 @@ from funestra.osr2_part_painter import Osr2PartPainter
 from funestra.osr2_visualizer import (
     DRIVEN_BY_FUNSCRIPT,
     DRIVEN_BY_NOTHING,
-    DRIVEN_BY_ROBOT_HAND,
     DriveHud,
+    driven_by_the_robot_hand,
 )
 from funestra.robot_hand import POSITION_MAX, control_limits
 
@@ -40,7 +44,7 @@ def drive_hud(state, active: bool) -> DriveHud:
     return DriveHud(
         **_bars_drawn(state.state),
         position=round(POSITION_MAX * motion_engine.position(state) / 100),
-        driven=DRIVEN_BY_ROBOT_HAND if active else DRIVEN_BY_NOTHING,
+        driven=driven_by_the_robot_hand(state.state) if active else DRIVEN_BY_NOTHING,
         trace_seconds=_TRACE_SECONDS,
         waveform=tuple(heights[:drive_layout.TRACE_SAMPLES]),
         slide=slide,
@@ -105,7 +109,8 @@ def osr2_controls_state(motion, situation: Osr2Situation = USUAL_SITUATION) -> O
     driving = motion.active and on and not scripted
     return Osr2ControlsState(
         osr2_rows=(aim_row(learned=motion.state.learned.active,
-                           shape=motion.state.state.shape.value, control=control),),
+                           shape=motion.state.state.shape.value, control=control,
+                           off=motion.state.state.off),),
         osr2_controls=osr2_controls(broker_running=broker_running),
         osr2=Osr2State.of(device, funscript_driving=scripted, trouble=trouble),
         drive=(script_hud(script, motion.state) if scripted
@@ -147,9 +152,13 @@ def post_device_action(action: str, *, motion, control=None) -> bool:
         _ask_for_control(OSR2_CONTROL_BY_COMMAND[action], motion, control)
     elif action == BROKER_PRESS:
         osr2.press_the_broker()
-    elif action == "robot_hand_toggle_learned":
-        motion.toggle_learned()
-    elif action == "robot_hand_cycle_shape":
+    elif action == HUMAN_INSPIRED_ON:
+        motion.set_learned(True)
+    elif action == WAVEFORM_ON:
+        motion.set_learned(False)
+    elif action == ROBOT_HAND_OFF:
+        motion.turn_the_robot_hand_off()
+    elif action == NEXT_WAVEFORM:
         motion.cycle_shape()
     else:
         return False

@@ -32,6 +32,7 @@ from origenerator.gui import omnipause, slideshow_director
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.hud_queue import CANCEL, OPEN
 from origenerator.gui.slideshow_pace import DEFAULT_S
+from origenerator.osr2_controls_commands import spelled_for
 from origenerator.slideshow_buttons import answer
 from tests.closed_windows import is_closed
 from tests.gallery_view_support import (
@@ -1267,3 +1268,55 @@ def test_what_fun_time_asks_is_looked_for_many_times_within_a_tenth_of_a_second(
     assert bridge._timer.interval() <= 30, (
         "a press in Fun Time waits for this look before the hosted app hears of it, so a look "
         "every 150 ms was up to 150 ms nothing could take back")
+
+
+class _GalleryAsked:
+    def __init__(self) -> None:
+        self.asked: list[tuple[str, str]] = []
+
+    def fill_the_region(self, shape: str) -> None:
+        self.asked.append(("fill", shape))
+
+    def run_spoken_command(self, text: str, said_at) -> None:
+        self.asked.append(("say", text))
+
+    def taking_a_request(self) -> bool:
+        return False
+
+    def region_slideshow(self, shape: str):
+        return None
+
+    def set_room_paused(self, paused: bool) -> None:
+        self.asked.append(("paused", str(paused)))
+
+
+def _fill(shape: str) -> str:
+    return spelled_for(shape, contract.OPEN_SLIDESHOW)
+
+
+def test_before_core_is_built_a_satellite_gets_its_list_and_what_needs_core_waits_in_order(
+        qtbot, tmp_path):
+    gallery = _GalleryAsked()
+    bridge = FunTimeBridge(_session(tmp_path), gallery, core_built=False)
+    (tmp_path / "origenerator_cmd.txt").write_text(
+        f"{_fill('portrait')}\nLANDSCAPE_SAY:favorites\n{_fill('landscape')}\n", encoding="utf-8")
+
+    bridge._tick()
+
+    assert gallery.asked == [("fill", "portrait")], (
+        "a word for Core met a window that was not built, or ran ahead of what was asked before it")
+
+    bridge.core_is_built()
+
+    assert gallery.asked == [("fill", "portrait"), ("say", "landscape favorites"),
+                             ("fill", "landscape")]
+
+
+def test_a_bridge_whose_core_is_built_holds_nothing_back(qtbot, tmp_path):
+    gallery = _GalleryAsked()
+    bridge = FunTimeBridge(_session(tmp_path), gallery)
+    (tmp_path / "origenerator_cmd.txt").write_text("LANDSCAPE_SAY:favorites\n", encoding="utf-8")
+
+    bridge._tick()
+
+    assert gallery.asked == [("say", "landscape favorites")]

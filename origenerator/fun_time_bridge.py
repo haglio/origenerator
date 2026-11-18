@@ -84,13 +84,24 @@ def _the_last_line_of(error: Exception) -> str:
     return f"{type(error).__name__}: {said}" if said else type(error).__name__
 
 
+def _read(line: str) -> tuple[str, str, str, float | None, bool]:
+    keyword, marker, argument = _split_argument(line)
+    said_at, heard = None, False
+    if marker == ":":
+        argument, said_at = _without_when_said(argument)
+    elif not marker:
+        heard = keyword.endswith(HEARD)
+        keyword, said_at = _without_when_said(keyword.removesuffix(HEARD))
+    return keyword.upper(), marker, argument, said_at, heard
+
+
 class FunTimeBridge(QObject):
     released = Signal()
     hand_over_asked = Signal(Path, Path)
     take_back_asked = Signal()
 
     def __init__(self, session: FunTimeSession, gallery, parent=None, *, radio_dir=RADIO_DIR,
-                 core_ready: bool = True):
+                 core_ready: bool = True, core_built: bool = True):
         super().__init__(parent)
         self._session = session
         self._radio_dir = radio_dir
@@ -99,6 +110,7 @@ class FunTimeBridge(QObject):
         self._paused = False
         self._core_ready = core_ready
         self._start_failed: str | None = None
+        self._waiting_for_core: list[str] | None = None if core_built else []
         self._published: str | None = None
         self._session_verbs = {
             CLOSE_SLIDESHOWS: self._close_the_slideshows,
@@ -153,15 +165,14 @@ class FunTimeBridge(QObject):
     def _apply(self, line: str) -> None:
         if not line:
             return
-        keyword, marker, argument = _split_argument(line)
-        said_at, heard = None, False
-        if marker == ":":
-            argument, said_at = _without_when_said(argument)
-        elif not marker:
-            heard = keyword.endswith(HEARD)
-            keyword, said_at = _without_when_said(keyword.removesuffix(HEARD))
+        keyword, marker, argument, said_at, heard = _read(line)
+        if self._waiting_for_core is not None and (
+                self._waiting_for_core
+                or not self._the_satellites_answer_alone(keyword, marker, argument)):
+            self._waiting_for_core.append(line)
+            return
         with answering_what_he_said() if heard else nullcontext():
-            self._answer(line, keyword.upper(), marker, argument, said_at)
+            self._answer(line, keyword, marker, argument, said_at)
 
     def _answer(self, line: str, keyword: str, marker: str, argument: str,
                 said_at: float | None) -> None:
@@ -184,6 +195,22 @@ class FunTimeBridge(QObject):
             return
 
         self._apply_to_a_shape(line, keyword, marker, argument, said_at)
+
+    def _the_satellites_answer_alone(self, keyword: str, marker: str, argument: str) -> bool:
+        shape = shape_spoken_to(keyword, SHAPES)
+        if shape is None:
+            return False
+        action, _argument = shape_press(shape, keyword.lower(), argument)
+        return (not marker and action in self._shape_verbs) or action in HUD_FACTS or action in STEPS
+
+    def core_is_built(self) -> None:
+        if self._waiting_for_core is None:
+            return
+        waited, self._waiting_for_core = self._waiting_for_core, None
+        for line in waited:
+            if self._released:
+                return
+            self._apply(line)
 
     def _apply_to_a_shape(self, line: str, keyword: str, marker: str, argument: str, said_at: float | None) -> None:
         shape = shape_spoken_to(keyword, SHAPES)

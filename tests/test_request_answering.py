@@ -13,6 +13,7 @@ from origenerator.db_requests import Turn
 from origenerator.gui.request_answering import RequestAnswerer, leave_the_graphics_card
 from origenerator.prompt_edit import NO_GRAPHICS_CARD
 from origenerator.queue_line import ModelHold
+from tests.waiting import until
 
 
 class _Jobs:
@@ -59,7 +60,7 @@ def test_the_model_is_asked_off_the_ui_thread_with_the_items_exchange_and_the_no
     answerer.ask("g1", ("a woman, a hat", "blurry"), "no hat", owner=parent, then=answers.append)
 
     assert jobs.model_hold
-    qtbot.waitUntil(lambda: answers == ["the revision"], timeout=5000)
+    until(lambda: answers == ["the revision"])
     assert seen["asked"] == ("a woman, a hat", "blurry", "no hat")
     assert [(turn.said, turn.answered) for turn in seen["exchange"]] == [("a hat", "Gave her a hat.")]
     assert seen["notes"].patterns == "the patterns"
@@ -85,7 +86,7 @@ def test_what_was_asked_since_the_item_was_shown_follows_its_saved_exchange(qtbo
     answerer.ask("g1", ("a woman, a hat, a scarf", "blurry"), "no scarf",
                  since=[Turn("a scarf", "Gave her a scarf.")], owner=parent, then=answers.append)
 
-    qtbot.waitUntil(lambda: answers == ["the revision"], timeout=5000)
+    until(lambda: answers == ["the revision"])
     assert [(turn.said, turn.answered) for turn in seen["exchange"]] == [
         ("a hat", "Gave her a hat."), ("a scarf", "Gave her a scarf.")]
 
@@ -102,7 +103,7 @@ def test_an_item_nothing_was_asked_of_starts_with_no_exchange(qtbot, tmp_path):
 
     answerer.ask("fresh", ("a woman", ""), "a hat", owner=parent, then=answers.append)
 
-    qtbot.waitUntil(lambda: answers == ["the revision"], timeout=5000)
+    until(lambda: answers == ["the revision"])
     assert seen == {"exchange": [], "notes": None, "examples": []}
 
 
@@ -125,7 +126,7 @@ def test_his_own_prompts_that_touch_the_request_are_gathered_newest_first_for_th
 
     answerer.ask("fresh", ("a woman", ""), "add a dog", owner=parent, then=answers.append)
 
-    qtbot.waitUntil(lambda: answers == ["the revision"], timeout=5000)
+    until(lambda: answers == ["the revision"])
     assert seen["examples"] == [("two dogs chasing a stick, wagging tails", ""),
                                 ("a dog on a park bench, wagging tail", "blurry, cats")]
 
@@ -172,7 +173,7 @@ def test_with_no_comfyui_the_card_is_not_waited_for(qtbot, tmp_path):
 
     answerer.ask("g1", ("a woman", ""), "a hat", owner=parent, then=answers.append)
 
-    qtbot.waitUntil(lambda: answers == ["the revision"], timeout=5000)
+    until(lambda: answers == ["the revision"])
 
 
 def test_a_failure_answers_with_nothing_and_logs_only_its_kind(qtbot, tmp_path, caplog):
@@ -233,7 +234,7 @@ def test_the_settings_he_may_change_ride_along_to_the_model(qtbot, tmp_path):
     answerer.ask(None, ("a woman", ""), "fewer steps", settings=("told",), owner=parent,
                  then=answers.append)
 
-    qtbot.waitUntil(lambda: answers == ["the revision"], timeout=5000)
+    until(lambda: answers == ["the revision"])
     assert seen["settings"] == ("told",)
 
 
@@ -249,14 +250,14 @@ def test_a_request_about_a_story_is_worked_out_scene_by_scene(qtbot, tmp_path):
 
     answerer.ask(None, ("a dog", ""), "a hat", in_scenes=True, owner=parent, then=answers.append)
 
-    qtbot.waitUntil(lambda: answers == ["the revision"], timeout=5000)
+    until(lambda: answers == ["the revision"])
     assert told["in_scenes"] is True
 
 
 def _answered(qtbot, answerer, parent, words="a hat"):
     answers = []
     answerer.ask("g1", ("a woman", ""), words, owner=parent, then=answers.append)
-    qtbot.waitUntil(lambda: len(answers) == 1, timeout=5000)
+    until(lambda: len(answers) == 1)
     return answers[0]
 
 

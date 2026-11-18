@@ -112,6 +112,7 @@ from tests.real_db import database_in, kept_on_disk
 from tests.related_links import settings_tile, source_tile
 from tests.text_readers import clap_reader, clip_reader, word_reader, word_reading
 from tests.thumbnail_rows import looping_video, painted_row, where_the_thumbnail_is
+from tests.waiting import until
 
 
 @pytest.fixture
@@ -3478,7 +3479,7 @@ def test_a_request_asked_of_the_image_on_display_shows_that_image_before_it(
     tab.show_saved_generation(db.get_generation("img1"), [image])
 
     exchange = _ask(tab, qtbot, "two women")
-    qtbot.waitUntil(lambda: exchange.turns() == [("two women", _TWO_WOMEN_SAID)], timeout=5000)
+    until(lambda: exchange.turns() == [("two women", _TWO_WOMEN_SAID)])
 
     (entry,) = exchange._entries()
     assert shown in entry.tip
@@ -3569,7 +3570,7 @@ def test_asking_rewrites_the_prompts_of_the_image_on_display_and_shows_what_chan
 
     exchange = _ask(tab, qtbot, "two women")
 
-    qtbot.waitUntil(lambda: _positive(tab) == "two women on a couch", timeout=5000)
+    until(lambda: _positive(tab) == "two women on a couch")
     assert [(positive, words) for positive, _negative, words in calls] == [
         ("a woman on a couch", "two women")]
     assert exchange.turns() == [("two women", _TWO_WOMEN_SAID)]
@@ -3629,7 +3630,7 @@ def test_a_request_for_the_newer_lora_picks_it_on_the_form_and_swaps_its_trigger
 
     exchange = _ask(tab, qtbot, "use the newer version of the LoRA")
 
-    qtbot.waitUntil(lambda: bool(exchange.turns()) and bool(exchange.turns()[-1][1]), timeout=5000)
+    until(lambda: bool(exchange.turns()) and bool(exchange.turns()[-1][1]))
     assert exchange.turns()[-1][1].endswith(
         "to Example Style 1.1 (was Example Style 1.0), and swapped its trigger word exmplstyle "
         "for exmplnew in the Positive Prompt.")
@@ -3646,11 +3647,11 @@ def test_a_second_request_builds_on_the_first_and_generate_records_every_turn(
     image = _image_row(db, "img1", prompt="a woman on a couch")
     tab.show_saved_generation(image, [image])
     _ask(tab, qtbot, "two women")
-    qtbot.waitUntil(lambda: _positive(tab) == "two women on a couch", timeout=5000)
+    until(lambda: _positive(tab) == "two women on a couch")
 
     _ask(tab, qtbot, "on a beach")
 
-    qtbot.waitUntil(lambda: _positive(tab) == "two women on a beach", timeout=5000)
+    until(lambda: _positive(tab) == "two women on a beach")
     assert [(positive, words) for positive, _negative, words in calls] == [
         ("a woman on a couch", "two women"), ("two women on a couch", "on a beach")]
     asked = tab.asked()
@@ -3671,11 +3672,11 @@ def test_a_second_request_typed_before_generating_is_worked_out_knowing_the_firs
     image = _image_row(db, "img1", prompt="a woman on a couch")
     tab.show_saved_generation(image, [image])
     _ask(tab, qtbot, "a red scarf")
-    qtbot.waitUntil(lambda: _positive(tab) == "a woman on a couch, a red scarf", timeout=5000)
+    until(lambda: _positive(tab) == "a woman on a couch, a red scarf")
 
     exchange = _ask(tab, qtbot, "that is the wrong place for it, please fix")
 
-    qtbot.waitUntil(lambda: _positive(tab) == "a woman on a couch", timeout=5000)
+    until(lambda: _positive(tab) == "a woman on a couch")
     assert exchange.turns()[-1][1] == 'Removed "a red scarf" from the Positive Prompt.'
 
 
@@ -3691,7 +3692,7 @@ def test_a_typed_request_tells_the_model_whether_the_tabs_prompts_take_weights(
 
     _ask(tab, qtbot, "freckles")
 
-    qtbot.waitUntil(lambda: told == [False], timeout=5000)
+    until(lambda: told == [False])
 
 
 class _HoldsAnswers:
@@ -3719,11 +3720,11 @@ def test_a_request_typed_while_generating_follows_the_result_that_lands_with_its
     image = _image_row(db, "img1", prompt="a woman on a couch")
     tab.show_saved_generation(image, [image])
     _ask(tab, qtbot, "two women")
-    qtbot.waitUntil(lambda: _positive(tab) == "two women on a couch", timeout=5000)
+    until(lambda: _positive(tab) == "two women on a couch")
     landing = _landed(db, "img2", "two women on a couch", asked=tab.asked())
     tab.note_launched("img2", made_of={"positive_prompt": "two women on a couch"})
     _ask(tab, qtbot, "on a beach")
-    qtbot.waitUntil(lambda: _positive(tab) == "two women on a beach", timeout=5000)
+    until(lambda: _positive(tab) == "two women on a beach")
 
     tab.show_completed_result(landing, [landing])
 
@@ -3768,7 +3769,7 @@ def test_an_item_shown_again_keeps_what_was_asked_of_it_meanwhile(saved_panel, q
     other = _image_row(db, "img2", prompt="a cat", filename="sdxl_img2.png")
     tab.show_saved_generation(image, [image])
     _ask(tab, qtbot, "two women")
-    qtbot.waitUntil(lambda: _positive(tab) == "two women on a couch", timeout=5000)
+    until(lambda: _positive(tab) == "two women on a couch")
 
     tab.show_saved_generation(other, [other])
     assert tab._param_form.request_exchange().turns() == []

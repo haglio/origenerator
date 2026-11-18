@@ -63,6 +63,7 @@ from tests.gallery_view_support import (
     _tile_kinds_in_order,
 )
 from tests.real_db import database_of, kept_on_disk
+from tests.waiting import until
 
 
 def test_leaf_shows_add_tile_when_client_present(qtbot):
@@ -1083,7 +1084,7 @@ def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbo
     exchange = tab._param_form.request_exchange()
     qtbot.keyClicks(exchange._line, "two cats")
     qtbot.keyClick(exchange._line, Qt.Key.Key_Return)
-    qtbot.waitUntil(lambda: exchange.turns() == [("two cats", _TWO_CATS_SAID)], timeout=5000)
+    until(lambda: exchange.turns() == [("two cats", _TWO_CATS_SAID)])
 
     view._on_generate_requested("sdxl_t2i", [{"seed": 9, "positive_prompt": "two cats"}])
 
@@ -1150,7 +1151,7 @@ def test_auto_generate_with_random_ticked_runs_a_request_on_the_asked_seed(qtbot
 def _tab_asked_for_two_cats(qtbot, tmp_path, *, random_seed=False, auto_generate=False):
     view, exchange = _asking_for_two_cats(qtbot, tmp_path, random_seed=random_seed,
                                           auto_generate=auto_generate)
-    qtbot.waitUntil(lambda: exchange.turns() == [("two cats", _TWO_CATS_SAID)], timeout=5000)
+    until(lambda: exchange.turns() == [("two cats", _TWO_CATS_SAID)])
     return view
 
 
@@ -1166,7 +1167,7 @@ def _asking_for_two_cats(qtbot, tmp_path, answer_once=None, *, unanswered=False,
 
     def two_cats(positive, negative, words, **_):
         if answer_once is not None:
-            answer_once.wait(5)
+            answer_once.wait()
         if unanswered:
             raise TimeoutError("the model gave no answer")
         return work_out(positive, negative, words, ask=lambda p, n, r, known: {"changes": [
@@ -1228,7 +1229,7 @@ def test_the_image_a_turns_generate_made_becomes_the_tab_when_it_lands_with_noth
     view = _tab_asked_for_two_cats(qtbot, tmp_path)
     view._generate_pane.current_generate_tab()._param_form.request_exchange().generate_asked.emit(0)
     (job,) = view._live_jobs.values()
-    qtbot.waitUntil(lambda: _every_job_is_with_comfyui(view), timeout=5000)
+    until(lambda: _every_job_is_with_comfyui(view))
 
     _finish_reroll(view, job)
 
@@ -1238,7 +1239,7 @@ def test_the_image_a_turns_generate_made_becomes_the_tab_when_it_lands_with_noth
 def test_the_image_auto_generate_made_becomes_the_tab_when_it_lands(qtbot, tmp_path):
     view = _tab_asked_for_two_cats(qtbot, tmp_path, auto_generate=True)
     (job,) = view._live_jobs.values()
-    qtbot.waitUntil(lambda: _every_job_is_with_comfyui(view), timeout=5000)
+    until(lambda: _every_job_is_with_comfyui(view))
 
     _finish_reroll(view, job)
 
@@ -1248,7 +1249,7 @@ def test_the_image_auto_generate_made_becomes_the_tab_when_it_lands(qtbot, tmp_p
 def test_a_turns_image_that_fails_leaves_the_tab_on_the_image_asked_of(qtbot, tmp_path):
     view = _tab_asked_for_two_cats(qtbot, tmp_path, auto_generate=True)
     (job,) = view._live_jobs.values()
-    qtbot.waitUntil(lambda: _every_job_is_with_comfyui(view), timeout=5000)
+    until(lambda: _every_job_is_with_comfyui(view))
 
     view._client.job_error.emit(job.prompt_id, "boom")
     view.refresh()
@@ -1260,7 +1261,7 @@ def _generate_under_the_turn_then(qtbot, view, end):
     exchange = view._generate_pane.current_generate_tab()._param_form.request_exchange()
     exchange.generate_asked.emit(0)
     (job,) = view._live_jobs.values()
-    qtbot.waitUntil(lambda: _every_job_is_with_comfyui(view), timeout=5000)
+    until(lambda: _every_job_is_with_comfyui(view))
     end(job)
     view.refresh()
     return exchange
@@ -1302,7 +1303,7 @@ def test_a_turns_image_canceled_while_the_tab_shows_its_image_again_offers_gener
 def _ask_for_a_hat(qtbot, view, answer_once=None):
     def a_hat(positive, negative, words, **_):
         if answer_once is not None:
-            answer_once.wait(5)
+            answer_once.wait()
         return work_out(positive, negative, words, ask=lambda p, n, r, known: {"changes": [
             {"prompt": "positive", "replace": "two cats", "with": "two cats, a hat",
              "for": "a hat"}]})
@@ -1312,7 +1313,7 @@ def _ask_for_a_hat(qtbot, view, answer_once=None):
     qtbot.keyClicks(exchange._line, "a hat")
     qtbot.keyClick(exchange._line, Qt.Key.Key_Return)
     if answer_once is None:
-        qtbot.waitUntil(lambda: exchange.turns()[-1][1] != "", timeout=5000)
+        until(lambda: exchange.turns()[-1][1] != "")
 
 
 def test_a_request_answered_while_the_last_ones_image_is_made_comes_along_to_that_image(
@@ -1323,10 +1324,10 @@ def test_a_request_answered_while_the_last_ones_image_is_made_comes_along_to_tha
     _ask_for_a_hat(qtbot, view, answer_once=answer_now)
     tab._param_form.request_exchange().generate_asked.emit(0)
     (job,) = view._live_jobs.values()
-    qtbot.waitUntil(lambda: _every_job_is_with_comfyui(view), timeout=5000)
 
     answer_now.set()
-    qtbot.waitUntil(lambda: tab._request_aim.turns[-1].answered != "", timeout=5000)
+    until(lambda: tab._request_aim.turns[-1].answered != "")
+    until(lambda: _every_job_is_with_comfyui(view))
     _finish_reroll(view, job)
 
     shown, turns, (_struck, lit) = _shown_by_the_tab(view)
@@ -1335,8 +1336,8 @@ def test_a_request_answered_while_the_last_ones_image_is_made_comes_along_to_tha
 
 
 def _land_the_running_job(qtbot, view):
-    qtbot.waitUntil(lambda: any(view._db.get_generation(job.prompt_id)["status"] == "running"
-                                for job in view._live_jobs.values()), timeout=5000)
+    until(lambda: any(view._db.get_generation(job.prompt_id)["status"] == "running"
+                                for job in view._live_jobs.values()))
     job = next(job for job in view._live_jobs.values()
                if view._db.get_generation(job.prompt_id)["status"] == "running")
     _finish_reroll(view, job)
@@ -1417,7 +1418,7 @@ def test_a_turn_whose_change_would_make_an_image_already_made_shows_that_image_f
     _completed_image(view._db, "already", "two cats", 7)
     answer.set()
 
-    qtbot.waitUntil(lambda: exchange.turns() == [("two cats", _TWO_CATS_SAID)], timeout=5000)
+    until(lambda: exchange.turns() == [("two cats", _TWO_CATS_SAID)])
 
     assert (_generate_offered(exchange), exchange._made_of(0).item) == (False, "already")
 
@@ -1468,7 +1469,7 @@ def test_a_requests_answer_reaches_its_image_after_the_tab_that_asked_is_closed(
     aims = pane.current_generate_tab()._request_aims
 
     answer_now.set()
-    qtbot.waitUntil(lambda: bool(aims.of("orig").turns), timeout=5000)
+    until(lambda: bool(aims.of("orig").turns))
     view._on_thumbnail_clicked("orig")
 
     assert _request_turns_shown(view) == ([("two cats", _TWO_CATS_SAID)], "two cats")
@@ -1491,7 +1492,7 @@ def test_a_requests_answer_reaches_the_tab_that_reopened_its_image_while_it_was_
     view, exchange = _reopened_while_asking(qtbot, tmp_path, answer_now)
 
     answer_now.set()
-    qtbot.waitUntil(exchange._line.isEnabled, timeout=5000)
+    until(exchange._line.isEnabled)
 
     assert _request_turns_shown(view) == ([("two cats", _TWO_CATS_SAID)], "two cats")
 
@@ -1502,7 +1503,7 @@ def test_a_request_left_unanswered_frees_the_tab_that_reopened_its_image_while_i
     view, exchange = _reopened_while_asking(qtbot, tmp_path, answer_now, unanswered=True)
 
     answer_now.set()
-    qtbot.waitUntil(exchange._line.isEnabled, timeout=5000)
+    until(exchange._line.isEnabled)
 
     assert _request_turns_shown(view) == ([], "a cat")
     assert exchange._status.text() == "couldn't work that into the prompts"

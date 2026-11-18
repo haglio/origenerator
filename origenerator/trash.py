@@ -12,7 +12,7 @@ from app_support.file_channel import retried_while_held
 from app_support.flick_folder import flicks_folder_in, trash_folder_beside
 from app_support.trash_names import spot_in_trash
 
-from origenerator.evolver_upscales import EvolverUpscales
+from origenerator.evolver_upscales import EvolverUpscales, original_waiting_for
 from origenerator.file_numbers import NUMBERED, next_number, numbered
 from origenerator.one_look import is_file
 
@@ -139,10 +139,16 @@ class Kino:
     trash: Path
     own_source: str
     non_ai: Path | None = None
+    originals: Path | None = None
 
     def holds(self, video: Path) -> bool:
-        return video.is_relative_to(self.library) or (
-            self.non_ai is not None and video.is_relative_to(self.non_ai))
+        return any(video.is_relative_to(folder)
+                   for folder in (self.library, self.non_ai, self.originals) if folder is not None)
+
+    def original_waiting_for(self, video: Path) -> Path | None:
+        if self.originals is None:
+            return None
+        return original_waiting_for(video, self.originals, self.own_source)
 
     def plays(self, video: Path) -> bool:
         return self.holds(video) and is_file(video)

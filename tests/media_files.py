@@ -7,13 +7,17 @@ _FPS = 16
 
 
 def write_mp4(path: Path, *, seconds: float = 0.25, width: int = 16, height: int = 16) -> Path:
+    return write_mp4_of_shades(path, [0] * max(1, round(seconds * _FPS)), width=width, height=height)
+
+
+def write_mp4_of_shades(path: Path, shades: list[int], *, width: int = 16, height: int = 16) -> Path:
     import cv2  # noqa: PLC0415 (heavy; only a test that needs a real video writes one)
     import numpy  # noqa: PLC0415
 
     path.parent.mkdir(parents=True, exist_ok=True)
     writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), _FPS, (width, height))
-    for _ in range(max(1, round(seconds * _FPS))):
-        writer.write(numpy.zeros((height, width, 3), dtype=numpy.uint8))
+    for shade in shades:
+        writer.write(numpy.full((height, width, 3), shade, dtype=numpy.uint8))
     writer.release()
     return path
 

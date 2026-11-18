@@ -11,10 +11,13 @@ from origenerator.thumbnail import (
     LONG_VIDEO_S,
     frame_ms_of,
     frame_thumbnail,
+    frames_showing_something,
     generate_animated_thumbnail,
     generate_thumbnail,
+    is_black,
+    shows_black_among_other_frames,
 )
-from tests.media_files import write_mp4
+from tests.media_files import write_mp4, write_mp4_of_shades
 
 
 def test_generate_thumbnail_from_image(tmp_path):
@@ -118,3 +121,48 @@ def test_an_animated_thumbnail_that_cannot_be_written_leaves_the_still_to_show(t
     a_file_in_the_way.write_bytes(b"not a folder")
 
     assert generate_animated_thumbnail(video, a_file_in_the_way, name="v1") is None
+
+
+def _shade(shade: int) -> Image.Image:
+    return Image.new("RGB", (4, 4), (shade, shade, shade))
+
+
+def _shades_chosen(shades: list[int], count: int) -> list[int]:
+    chosen = frames_showing_something(lambda at: _shade(shades[at]), len(shades), count)
+    return [frame.getpixel((0, 0))[0] for frame in chosen]
+
+
+def test_a_black_frame_gives_way_to_the_next_one_of_its_stretch_that_shows_something():
+    fades_in_and_out = [0, 0, 0, 103, 104, 105, 106, 107, 108, 109, 110, 111, 0, 0, 0, 0]
+
+    assert _shades_chosen(fades_in_and_out, 4) == [103, 104, 108]
+
+
+def test_a_video_that_is_black_throughout_keeps_its_black_frames():
+    assert _shades_chosen([0] * 16, 4) == [0, 0, 0, 0]
+
+
+def test_a_frame_that_shows_something_is_taken_where_it_always_was():
+    assert _shades_chosen(list(range(100, 116)), 4) == [100, 104, 108, 112]
+
+
+def test_a_video_that_fades_in_gets_thumbnails_with_no_black_frame(tmp_path):
+    video = write_mp4_of_shades(tmp_path / "fades in.mp4", [0] * 8 + [200] * 24)
+
+    animated = generate_animated_thumbnail(video, tmp_path / "thumbs", name="v")
+    still = generate_thumbnail(video, "video", tmp_path / "thumbs", name="v")
+
+    assert not shows_black_among_other_frames(animated)
+    assert not is_black(Image.open(animated))
+    assert not is_black(Image.open(still))
+
+
+def test_a_thumbnail_showing_black_beside_other_frames_is_told_from_one_black_throughout(tmp_path):
+    def saved(name: str, shades: list[int]):
+        frames = [_shade(shade) for shade in shades]
+        frames[0].save(tmp_path / name, format="WEBP", save_all=True, append_images=frames[1:],
+                       duration=FRAME_MS, loop=0, lossless=True)
+        return tmp_path / name
+
+    assert [shows_black_among_other_frames(saved(f"{at}.webp", shades))
+            for at, shades in enumerate(([0, 200], [0, 0], [200, 180]))] == [True, False, False]

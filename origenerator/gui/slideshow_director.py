@@ -363,6 +363,8 @@ class SlideshowDirector:
 
     @looking_once
     def open_on_preview(self, media, generation):
+        if media is not None and self._plays_on_the_main_funestra(self._row_for(generation)):
+            return None
         hud = HudFacts(order_label=LATEST_LABEL)
         if media is None:
             location = self._location_of(self._row_for(generation)) if generation else None
@@ -385,13 +387,18 @@ class SlideshowDirector:
     @looking_once
     def open_on_tile(self, generation):
         row = self._row_for(generation)
-        kinos = video_kino_plays(row) if row is not None else None
-        if kinos is not None and ask_the_main_funestra_to_play(self._session_channel, kinos):
+        if self._plays_on_the_main_funestra(row):
             return None
         items = self.items_of([row]) if row is not None else []
         if not items:
             return None
         return self.open_in_its_folder(items[0][:2], generation)
+
+    def _plays_on_the_main_funestra(self, row: dict | None) -> bool:
+        kinos = video_kino_plays(row) if row is not None else None
+        return kinos is not None and (
+            ask_the_main_funestra_to_play(self._session_channel, kinos)
+            or self._fun_time is not None)
 
     @looking_once
     def open_in_its_folder(self, media, generation):
@@ -428,7 +435,7 @@ class SlideshowDirector:
 
     def _listed_rows(self) -> list[dict]:
         rows = map(self._row_for, self._listing().shown)
-        return [row for row in rows if row is not None]
+        return self._what_a_slideshow_may_hold(row for row in rows if row is not None)
 
     def _row_for(self, prompt_id: str) -> dict | None:
         return self._library().row_for(prompt_id) or self._db.get_generation(prompt_id)
@@ -738,7 +745,13 @@ class SlideshowDirector:
         if not location:
             return []
         return self._one_per_run_where_the_order_is_newest_first(
-            location, what_plays_at(location, self._library().rows_at(location)))
+            location, self._what_a_slideshow_may_hold(
+                what_plays_at(location, self._library().rows_at(location))))
+
+    def _what_a_slideshow_may_hold(self, rows) -> list[dict]:
+        if self._fun_time is None:
+            return list(rows)
+        return [row for row in rows if video_kino_plays(row) is None]
 
     def _one_per_run_where_the_order_is_newest_first(self, location, rows) -> list[dict]:
         if not _plays_latest(location):
@@ -864,7 +877,8 @@ class SlideshowDirector:
 
     def _rows_of(self, slides) -> list[dict]:
         ids = (slide.prompt_id for slide in slides if slide.prompt_id is not None)
-        return [row for row in map(self._row_for, ids) if row is not None]
+        return self._what_a_slideshow_may_hold(
+            row for row in map(self._row_for, ids) if row is not None)
 
     def put_back(self, held: HeldSlideshow):
         return self.open(list(held.items), rows=self._rows_of(held.items),

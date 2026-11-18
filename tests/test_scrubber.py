@@ -169,3 +169,16 @@ def _drag_to(scrubber, pos: QPoint) -> None:
                         Qt.MouseButton.NoButton, Qt.MouseButton.LeftButton,
                         Qt.KeyboardModifier.NoModifier)
     QApplication.sendEvent(scrubber, event)
+
+
+def test_the_video_is_held_from_the_press_until_the_button_is_let_go(qtbot):
+    scrubber, _heard = _timed_scrubber(qtbot)
+    holds = []
+    scrubber.held.connect(holds.append)
+    y = scrubber.height() // 2
+
+    qtbot.mousePress(scrubber, Qt.MouseButton.LeftButton, pos=QPoint(BAR_INSET_Y + 10, y))
+    _drag_to(scrubber, QPoint(BAR_INSET_Y + 40, y))
+    qtbot.mouseRelease(scrubber, Qt.MouseButton.LeftButton, pos=QPoint(BAR_INSET_Y + 40, y))
+
+    assert holds == [True, False]

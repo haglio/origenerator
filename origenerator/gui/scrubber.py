@@ -1,43 +1,32 @@
 from __future__ import annotations
 
+from funestra.scrub import Scrub
 from funestra.scrubber_bar import (
-    BAR_BORDER,
-    BAR_EDGE,
-    BAR_FILL,
     BAR_INSET_Y,
-    BORDER_W,
-    CURSOR,
-    CURSOR_W,
     SCRUBBER_HEIGHT,
-    bar_x,
+    TrackMarks,
+    progress_bar_bgra,
     time_at_x,
 )
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QColor, QPainter
+from PySide6.QtGui import QImage, QPainter
 from PySide6.QtWidgets import QWidget
 
 from origenerator.funscript import heatmap_colors
 
-
-def _at_full_strength(funestra_color) -> QColor:
-    return QColor(*funestra_color[:3])
-
-
-_FILL = _at_full_strength(BAR_FILL)
-_BORDER = _at_full_strength(BAR_BORDER)
-_EDGE = _at_full_strength(BAR_EDGE)
-_CURSOR = _at_full_strength(CURSOR)
 _FLOAT_OFF_EVERY_EDGE = BAR_INSET_Y
 
 
 class Scrubber(QWidget):
     scrubbed = Signal(int)
+    held = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._actions: list[dict] = []
         self._position: int | None = None
         self._duration = 0
+        self._scrub = Scrub(seek=self._go_to, hold=self.held.emit)
         self.setFixedHeight(SCRUBBER_HEIGHT)
 
     def set_actions(self, actions) -> None:
@@ -54,19 +43,24 @@ class Scrubber(QWidget):
         self.update()
 
     def mousePressEvent(self, event) -> None:
-        if event.button() != Qt.MouseButton.LeftButton:
+        if event.button() != Qt.MouseButton.LeftButton or self._duration <= 0:
             super().mousePressEvent(event)
             return
-        self._scrub_to(event.position().x())
+        self._scrub.press(self._time_at(event.position().x()))
 
     def mouseMoveEvent(self, event) -> None:
         if event.buttons() & Qt.MouseButton.LeftButton:
-            self._scrub_to(event.position().x())
+            self._scrub.drag(self._time_at(event.position().x()))
 
-    def _scrub_to(self, x: float) -> None:
-        if self._duration <= 0:
-            return
-        moment = round(time_at_x(x, self._duration, *self._track_x()))
+    def mouseReleaseEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._scrub.release()
+
+    def _time_at(self, x: float) -> float:
+        return time_at_x(x, self._duration, *self._track_x())
+
+    def _go_to(self, ms: float) -> None:
+        moment = round(ms)
         self.set_position(moment)
         self.scrubbed.emit(moment)
 
@@ -78,41 +72,12 @@ class Scrubber(QWidget):
 
     def paintEvent(self, event) -> None:
         x0, x1 = self._track_x()
-        y0, y1 = _FLOAT_OFF_EVERY_EDGE, self.height() - _FLOAT_OFF_EVERY_EDGE
-        if _too_narrow_for_a_track(x1 - x0, y1 - y0):
+        if x1 - x0 < 2 * _FLOAT_OFF_EVERY_EDGE:
             return
-        painter = QPainter(self)
-        self._paint_fill(painter, x0, x1, y0, y1)
-        self._paint_frame(painter, x0, x1, y0, y1)
-        self._paint_cursor(painter, x0, x1, y0, y1)
-
-    def _paint_fill(self, painter, x0, x1, y0, y1) -> None:
-        motion = heatmap_colors(self._actions, buckets=x1 - x0)
-        if not motion:
-            painter.fillRect(x0, y0, x1 - x0, y1 - y0, _FILL)
-            return
-        for column, (red, green, blue) in enumerate(motion):
-            painter.fillRect(x0 + column, y0, 1, y1 - y0, QColor(red, green, blue))
-
-    def _paint_frame(self, painter, x0, x1, y0, y1) -> None:
-        _ring(painter, (x0, x1, y0, y1), 1, _EDGE)
-        _ring(painter, (x0 + 1, x1 - 1, y0 + 1, y1 - 1), BORDER_W - 1, _BORDER)
-
-    def _paint_cursor(self, painter, x0, x1, y0, y1) -> None:
-        if self._position is None or self._duration <= 0:
-            return
-        center = bar_x(min(self._position, self._duration), self._duration, x0, x1)
-        left = min(max(x0, center - CURSOR_W // 2), x1 - CURSOR_W)
-        painter.fillRect(left, y0, CURSOR_W, y1 - y0, _CURSOR)
-
-
-def _too_narrow_for_a_track(width, height) -> bool:
-    return width < 2 * BORDER_W or height < 2 * BORDER_W
-
-
-def _ring(painter, box: tuple[int, int, int, int], thickness, color) -> None:
-    x0, x1, y0, y1 = box
-    painter.fillRect(x0, y0, x1 - x0, thickness, color)
-    painter.fillRect(x0, y1 - thickness, x1 - x0, thickness, color)
-    painter.fillRect(x0, y0, thickness, y1 - y0, color)
-    painter.fillRect(x1 - thickness, y0, thickness, y1 - y0, color)
+        position = None if self._duration <= 0 or self._position is None else min(
+            self._position, self._duration)
+        bar = progress_bar_bgra(TrackMarks(position, self._duration), self.width(), self.height(),
+                                heatmap=heatmap_colors(self._actions, buckets=x1 - x0) or None,
+                                track=(x0, x1), opaque=True)
+        image = QImage(bar.data, bar.shape[1], bar.shape[0], bar.strides[0], QImage.Format.Format_ARGB32)
+        QPainter(self).drawImage(0, 0, image)

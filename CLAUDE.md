@@ -437,39 +437,62 @@ folder of those names that a save created would read to its startup repair as
 every image having vanished from a folder that still holds files. Removing
 them is safe only once no checkout that old can be started.
 
-## The gallery holds the Non-AI videos too, where they are kept
+## The gallery holds the videos no model made, where they are kept
 
 Origenerator's gallery is to hold every Haglio video and image, the ones no
 model made included (his decision, 2026-11-15, which replaced his July rule that
-Origenerator never reaches into Evolver). The first step is in:
-`non_ai_videos.scan` writes an item for each video under the library's
-`videos\videos\2D\non_AI` (`config.NON_AI_DIR`), which is the folder Kino plays
-them from, and moves no file. The item's source is `non_ai`
+Origenerator never reaches into Evolver; "everything goes in there", 2026-11-17).
+`non_ai_videos.scan` writes an item for each video in each place such videos
+are kept (`non_ai_videos.places_here`), and moves no file: the library's
+`videos\videos\2D\non_AI` (`config.NON_AI_DIR`), which Kino plays from; the VR
+videos' folder, which the settings all of Haglio share name as `vr_videos_dir`
+(`config.VR_DIR`; it is on the pCloud drive alone, so a copy of the app
+without the setting or the drive holds none of them); and Genau's flicks no
+model made, the `2D\non_AI` and `VR` folders of its flicks folder under
+`genau_dir` (`config.GENAU_FLICKS_NO_MODEL_MADE`). The item's source is `non_ai`
 (`GenerationSource.NON_AI`), which app_support's `made_here` answers no for, and
-its workflow is `non-ai:` and the first two folders it sits under
-(`workflows/non_ai.py`), so the TOC shows one folder per pair, marked N where a
-workflow's is marked W and a site's S, the N folders first (`folder_kind`). A
-Non-AI folder holds its leaf folders directly, with no Model or LoRA folder
-between, one leaf per folder on disk, labeled with that folder's path past the
-two parts that name the N folder. The command Evolver runs for a Site's videos
-(`outside_video_entries`) brings these in too.
+its workflow is `non-ai:` and the first two folders it sits under, counted
+from where its place is named from (`Kept.named_from`: the Non-AI folder
+itself, and the library's videos folder for the others), so the TOC shows one
+folder per pair, marked N where a workflow's is marked W and a site's S, the N
+folders first (`folder_kind`). The folder's name shows with its first letter
+capitalized, a first folder called other shows as (other/unknown), and the
+overlay's `display_names` can give any of them another name
+(`workflows/non_ai.py`). A Non-AI folder holds its leaf folders directly, with
+no Model or LoRA folder between, one leaf per folder on disk, labeled with that
+folder's path past the two parts that name the N folder. The command Evolver
+runs for a Site's videos (`outside_video_entries`) brings these in too.
 
-What a Non-AI video is called, whether it is a favorite and which full video a
+What such a video is called, whether it is a favorite and which full video a
 clip was cut from are kept in the video's record under the library's
 `videos\metadata` (`config.VIDEO_RECORDS_DIR`), where Fun Time reads them, and
-the gallery follows the record: `take_up_what_the_records_say` runs with every
-scan and at every start of the app, names the item as the Main Funestra names
-the playing video (app_support's `title_while_playing`), sets its star to the
-record's favorite, and links a clip to its full video as a trim is linked. A
-star set here is written back to the record (`tell_fun_time_of_favorites`).
-Renaming one here is not built: he is to say where the name is edited, and the
-new name belongs in the record.
+the gallery follows the record (`NonAiPlaces.record_of`, which finds the record
+of a video kept on another drive too): `take_up_what_the_records_say` runs with
+every scan and at every start of the app, names the item as the Main Funestra
+names the playing video (app_support's `title_while_playing`), sets its star to
+the record's favorite, and links a clip to its full video. Under Links the
+clip's tab heads that tile "Full video", and the full video's tab heads each
+clip's tile with the words the shared settings give as `non_ai_clip_heading`,
+which this repo cannot carry. A star set here is written back to the record
+(`tell_fun_time_of_favorites`). Renaming one here is not built: he is to say
+where the name is edited, and the new name belongs in the record.
 
-A Non-AI video's tab has no settings to show, only a line saying so, and its
-Action row has no image actions. Deleting one sends the video itself to Kino's
-Trash and Restore puts it back (`Kino.non_ai`). In a Fun Time session a
-double-click on one asks Fun Time to play it on the Main Funestra
-(`ask_the_main_funestra_to_play`); Standalone, it starts a slideshow on it.
+Such a video's tab has no settings to show, only a line saying so in the
+middle of the space they would fill, and its Action row has no image actions.
+Deleting one moves the video itself and Restore puts it back: a Non-AI video
+to Kino's Trash (`Kino.non_ai`), a flick to Genau's, and a VR video to the
+trash folder beside its own (`KeptBesideItsTrash`), which stays on its drive.
+In a Fun Time session a double-click on one, on its tile or on its tab's
+Preview, asks Fun Time to play it on the Main Funestra
+(`ask_the_main_funestra_to_play`), and no slideshow of the session takes one,
+since a session's slideshows play on the Satellites; Standalone, slideshows
+hold them like any video.
+
+A video's thumbnails leave out black frames: a long video fades in and out, so
+each stretch of it gives the first of a few looks along it that shows
+something (`thumbnail.frames_showing_something`), and
+`tools/backfill_animated_thumbnails.py` counts and remakes the thumbnails made
+before that.
 
 A copy of this app older than the first step never sees these items: every
 listing asks only for sources it knows.

@@ -30,6 +30,7 @@ from origenerator.gui.pane_arrangement import TOC_OPENING_WIDTH
 from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.slideshow_hud import slideshow_hud_model
 from origenerator.gui.slideshow_pace import STEP_S as PACE_STEP_S
+from origenerator.trash import Genau
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.commands import CollectionCommand, SurfaceCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -595,6 +596,21 @@ def test_a_double_click_on_a_non_ai_videos_preview_in_a_session_plays_it_on_the_
     assert (tmp_path / "dashboard_cmd.txt").read_text(encoding="utf-8").splitlines() == [
         f"kino_play|{video}"]
     assert not any(view._slideshows._region_slideshows.values())
+
+
+def test_a_double_click_on_one_of_genaus_videos_in_a_session_plays_it_in_genau(qtbot, tmp_path):
+    genau = Genau(tmp_path / "genau" / "kept")
+    video = genau.flicks / "2D" / "non_AI" / "video one.mp4"
+    view = GalleryView(database_of([_non_ai_row("n1", video)]),
+                       fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._slideshows._genau = genau
+
+    view._gallery_pane.slideshow_requested.emit("n1")
+
+    assert (tmp_path / "dashboard_cmd.txt").read_text(encoding="utf-8").splitlines() == [
+        f"genau_play|{video}"]
 
 
 def _fox_library(tmp_path):

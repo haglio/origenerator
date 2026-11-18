@@ -409,7 +409,7 @@ class GalleryView(QWidget):
                 pace=self._pace, motion=self.osr2.motion, osr2=self.osr2,
                 job_queue=self.job_queue, fun_time=self._fun_time,
                 radio=self._radio, buttons_of=lambda: self._buttons,
-                two_screens=self._two_screens))
+                two_screens=self._two_screens, genau=Genau.in_folder(GENAU_DIR)))
         self._gallery_pane.slideshow_requested.connect(self._slideshows.open_on_tile)
         self._combine = CombineController(
             self,

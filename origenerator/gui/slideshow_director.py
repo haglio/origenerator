@@ -4,6 +4,7 @@ import logging
 import time
 from dataclasses import asdict, dataclass, replace
 from functools import partial
+from pathlib import Path
 from random import randrange
 from typing import Protocol
 
@@ -201,6 +202,7 @@ class SlideshowDirector:
                  surroundings: DirectorSurroundings):
         self._host = host
         self._radio = surroundings.radio
+        self._genau = surroundings.genau
         self._buttons_of = surroundings.buttons_of
         self._volume_left_at: VolumeHud | None = None
         self._db = sources.db
@@ -376,7 +378,9 @@ class SlideshowDirector:
     def _plays_on_the_main_funestra(self, row: dict | None) -> bool:
         kinos = video_kino_plays(row) if row is not None else None
         return kinos is not None and (
-            ask_the_main_funestra_to_play(self._session_channel, kinos)
+            ask_the_main_funestra_to_play(
+                self._session_channel, kinos,
+                in_genau=self._genau is not None and self._genau.holds(Path(kinos)))
             or self._fun_time is not None)
 
     @looking_once

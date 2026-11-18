@@ -120,12 +120,7 @@ class Viewport(QWidget):
         self._controls = CornerButtons(self)
         self._controls.triggered.connect(self._on_control)
 
-        self._scrubber = Scrubber() if show_scrubber else None
-        if self._scrubber is not None:
-            outer.addWidget(self._scrubber)
-            self._scrubber.hide()
-            self._player.durationChanged.connect(self._scrubber.set_duration)
-            self._player.positionChanged.connect(self._scrubber.set_position)
+        self._scrubber = self._scrubber_under(outer) if show_scrubber else None
 
         # Windows Media Foundation can deadlock at shutdown if a player is still active
         app = QApplication.instance()
@@ -133,6 +128,15 @@ class Viewport(QWidget):
             app.aboutToQuit.connect(self.release_player)
 
         omnipause.holds(self)
+
+    def _scrubber_under(self, outer: QVBoxLayout) -> Scrubber:
+        scrubber = Scrubber()
+        outer.addWidget(scrubber)
+        scrubber.hide()
+        self._player.durationChanged.connect(scrubber.set_duration)
+        self._player.positionChanged.connect(scrubber.set_position)
+        scrubber.scrubbed.connect(self._player.setPosition)
+        return scrubber
 
     def _take_the_pane(self, media, *, generation: str | None = None,
                        stop_player: bool = True, enhancing: bool = False,

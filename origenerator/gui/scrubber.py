@@ -10,8 +10,9 @@ from funestra.scrubber_bar import (
     CURSOR_W,
     SCRUBBER_HEIGHT,
     bar_x,
+    time_at_x,
 )
-from PySide6.QtCore import QSize
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import QWidget
 
@@ -30,6 +31,8 @@ _FLOAT_OFF_EVERY_EDGE = BAR_INSET_Y
 
 
 class Scrubber(QWidget):
+    scrubbed = Signal(int)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._actions: list[dict] = []
@@ -51,11 +54,31 @@ class Scrubber(QWidget):
         self._position = position_ms
         self.update()
 
+    def mousePressEvent(self, event) -> None:
+        if event.button() != Qt.MouseButton.LeftButton:
+            super().mousePressEvent(event)
+            return
+        self._scrub_to(event.position().x())
+
+    def mouseMoveEvent(self, event) -> None:
+        if event.buttons() & Qt.MouseButton.LeftButton:
+            self._scrub_to(event.position().x())
+
+    def _scrub_to(self, x: float) -> None:
+        if self._duration <= 0:
+            return
+        moment = round(time_at_x(x, self._duration, *self._track_x()))
+        self.set_position(moment)
+        self.scrubbed.emit(moment)
+
+    def _track_x(self) -> tuple[int, int]:
+        return _FLOAT_OFF_EVERY_EDGE, self.width() - _FLOAT_OFF_EVERY_EDGE
+
     def sizeHint(self) -> QSize:
         return QSize(0, SCRUBBER_HEIGHT)
 
     def paintEvent(self, event) -> None:
-        x0, x1 = _FLOAT_OFF_EVERY_EDGE, self.width() - _FLOAT_OFF_EVERY_EDGE
+        x0, x1 = self._track_x()
         y0, y1 = _FLOAT_OFF_EVERY_EDGE, self.height() - _FLOAT_OFF_EVERY_EDGE
         if _too_narrow_for_a_track(x1 - x0, y1 - y0):
             return

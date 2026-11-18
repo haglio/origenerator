@@ -10,7 +10,7 @@ from origenerator.db import Database, NewGeneration
 from origenerator.gallery import enhancement_versions, is_enhanced_row
 from origenerator.gallery_edits import GalleryEdits, GalleryEnvironment
 from origenerator.output_places import OutputPlaces
-from origenerator.trash import Kino, Trash
+from origenerator.trash import Genau, KeptBesideItsTrash, Kino, Trash
 from origenerator.workflows.non_ai import non_ai_workflow
 
 
@@ -815,6 +815,50 @@ def test_a_non_ai_video_sent_to_trash_leaves_the_folder_kino_plays_it_from_until
     actions.undo()
 
     assert (in_the_trash, video.read_bytes()) == ((False, b"non-ai video"), b"non-ai video")
+
+
+def _non_ai_item(db, video) -> None:
+    video.parent.mkdir(parents=True)
+    video.write_bytes(b"non-ai video")
+    db.insert_generation(NewGeneration(
+        prompt_id="n1", workflow_name=non_ai_workflow("sample full"), workflow_version="non_ai",
+        params_json="{}", workflow_json="{}"))
+    db.update_generation("n1", status="completed", output_files=json.dumps(
+        [{"filename": video.name, "library_path": str(video)}]))
+
+
+def _deleted_then_put_back(actions, db, video, waits_at) -> tuple:
+    actions.delete_rows([db.get_generation("n1")])
+    in_the_trash = (video.exists(), waits_at.read_bytes())
+    actions.undo()
+    return in_the_trash, video.read_bytes(), waits_at.exists()
+
+
+def test_a_flick_no_model_made_sent_to_trash_goes_to_genaus_trash_until_it_is_put_back(tmp_path):
+    db = Database(tmp_path / "test.db")
+    genau = Genau(tmp_path / "genau" / "flicks")
+    actions = GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "output"),
+                           Trash(tmp_path / "trash"), environment=GalleryEnvironment(genau=genau))
+    video = genau.flicks / "2D" / "non_AI" / "video one.mp4"
+    _non_ai_item(db, video)
+
+    assert _deleted_then_put_back(
+        actions, db, video, tmp_path / "genau" / "trash" / "2D" / "non_AI" / "video one.mp4") == (
+        (False, b"non-ai video"), b"non-ai video", False)
+
+
+def test_a_vr_video_sent_to_trash_goes_to_the_trash_beside_its_folder_until_it_is_put_back(
+        tmp_path):
+    db = Database(tmp_path / "test.db")
+    vr = KeptBesideItsTrash(tmp_path / "another drive" / "VR" / "finished")
+    actions = GalleryEdits(db, OutputPlaces.in_one_folder(tmp_path / "output"),
+                           Trash(tmp_path / "trash"), environment=GalleryEnvironment(vr=vr))
+    video = vr.folder / "video one.mp4"
+    _non_ai_item(db, video)
+
+    assert _deleted_then_put_back(
+        actions, db, video, tmp_path / "another drive" / "VR" / "trash" / "video one.mp4") == (
+        (False, b"non-ai video"), b"non-ai video", False)
 
 
 def test_undoing_a_site_videos_trash_puts_it_back_in_kino(tmp_path):

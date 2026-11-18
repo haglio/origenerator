@@ -181,7 +181,23 @@ class Genau:
 
 
 
-def take_out_of_play(place: Kino | Genau, video: Path) -> tuple[Path, Path] | None:
+@dataclass(frozen=True)
+class KeptBesideItsTrash:
+    folder: Path
+
+    @property
+    def trash(self) -> Path:
+        return self.folder.parent / "trash"
+
+    def plays(self, video: Path) -> bool:
+        return video.is_relative_to(self.folder) and video.is_file()
+
+    def waits_at(self, video: Path) -> Path:
+        return self.trash / video.relative_to(self.folder)
+
+
+def take_out_of_play(place: Kino | Genau | KeptBesideItsTrash,
+                     video: Path) -> tuple[Path, Path] | None:
     waits = place.waits_at(video)
     held = spot_in_trash(waits.parent, waits.name)
     try:

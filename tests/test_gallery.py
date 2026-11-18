@@ -747,8 +747,8 @@ def test_model_label_joins_multiple_model_keys():
 
 
 def test_model_label_falls_back_when_model_is_unknown():
-    assert model_label("sdxl_t2i", {}) == "(unknown model)"
-    assert model_label("nope", {"checkpoint": "x.safetensors"}) == "(unknown model)"
+    assert model_label("sdxl_t2i", {}) == "(other/unknown model)"
+    assert model_label("nope", {"checkpoint": "x.safetensors"}) == "(other/unknown model)"
 
 
 def test_lora_label_joins_cleaned_lora_filenames():
@@ -1161,7 +1161,7 @@ def test_a_workflow_or_site_the_overlay_names_shows_the_overlays_name(monkeypatc
 def test_items_no_workflow_is_known_for_are_under_unknown_workflow_in_parentheses():
     unrecorded = dict(_LOOP_VIDEO, prompt_id="found", workflow_name="unknown")
 
-    assert _workflow_labels([unrecorded]) == {"video/unknown": "(unknown workflow)"}
+    assert _workflow_labels([unrecorded]) == {"video/unknown": "(other/unknown workflow)"}
 
 
 def test_a_workflow_that_made_both_kinds_has_a_folder_of_each_by_the_workflows_own_name():
@@ -1569,7 +1569,7 @@ def test_a_workflow_folder_named_in_parentheses_comes_last():
         output_files=json.dumps([{"filename": "found.png"}]))]
 
     assert [w.label for w in build_gallery_tree(newest_first)[0].children] \
-        == ["T2I SDXL", "(unknown workflow)"]
+        == ["T2I SDXL", "(other/unknown workflow)"]
 
 
 def test_a_workflows_model_folders_are_in_alphabetical_order_with_the_unknown_model_last():
@@ -1581,7 +1581,7 @@ def test_a_workflows_model_folders_are_in_alphabetical_order_with_the_unknown_mo
     ]
 
     models = _workflows(build_gallery_tree(newest_first))[0].children
-    assert [m.label for m in models] == ["alpha_model", "zeta_model", "(unknown model)"]
+    assert [m.label for m in models] == ["alpha_model", "zeta_model", "(other/unknown model)"]
 
 
 def test_a_models_lora_folders_are_in_alphabetical_order_with_no_lora_last():
@@ -1605,7 +1605,7 @@ def test_non_ai_folders_come_first_then_sites_then_workflows_each_in_alphabetica
     videos = build_gallery_tree(rows)[0]
 
     assert [w.label for w in videos.children] == [
-        "alpha folder", "zeta folder", "alpha-site", "zeta-site",
+        "Alpha folder", "Zeta folder", "alpha-site", "zeta-site",
         workflow_label("wan22_i2v"), workflow_label("wan22_flf2v_loop")]
 
 

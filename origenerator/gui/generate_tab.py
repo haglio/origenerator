@@ -394,8 +394,10 @@ class GenerateTab(DropZones):
         self._no_settings_note = QLabel()
         self._no_settings_note.setObjectName("mutedLabel")
         self._no_settings_note.setWordWrap(True)
+        self._no_settings_note.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._no_settings_note.hide()
-        body.addWidget(self._no_settings_note)
+        body.addWidget(self._no_settings_note, 1)
+        self._settings_column = body
         self._form_host = QWidget()
         self._form_host_column = QVBoxLayout(self._form_host)
         self._form_host_column.setContentsMargins(0, 0, 0, 0)
@@ -643,6 +645,8 @@ class GenerateTab(DropZones):
         self._no_settings_note.setText(why or "")
         self._no_settings_note.setVisible(why is not None)
         self._form_host.setVisible(why is None)
+        space_under_the_form = self._settings_column.count() - 1
+        self._settings_column.setStretch(space_under_the_form, int(why is None))
 
     def _edited_form_values(self) -> dict:
         prior = workflow_named(self._form_workflow_key)

@@ -7,6 +7,9 @@ from unittest.mock import MagicMock
 from app_support import favorites
 from app_support.gallery_rows import made_here
 from app_support.mirrored_tree import filed_record
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication
+from shared_ui.spacing import MARGIN_STANDARD
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
@@ -222,3 +225,23 @@ def test_a_non_ai_videos_tab_says_it_has_no_settings_and_cannot_generate(qtbot, 
     assert not tab._generate_pair.isEnabled()
     assert tab._generate_btn.toolTip() == NonAiWorkflow.why_it_cannot_be_made_again
 
+
+def test_the_line_saying_there_are_no_settings_sits_in_the_middle_of_the_empty_top_section(
+        qtbot, tmp_path):
+    db, places = Database(tmp_path / "test.db"), _library(tmp_path)
+    write_mp4(places.videos / "sample" / "full" / "video one.mp4")
+    scan(db, places)
+    tab = GenerateTab(ComfyUIClient(folders=SUITE_FOLDERS), db)
+    qtbot.addWidget(tab)
+    tab._viewport.show_media = MagicMock()
+    tab.resize(700, 1000)
+    tab.show()
+
+    tab.show_saved_generation(_videos(db)[0], [])
+    QApplication.processEvents()
+
+    section, note = tab._settings_scroll.viewport(), tab._no_settings_note
+    middle = note.mapTo(section, note.rect().center()) - section.rect().center()
+    assert note.alignment() == Qt.AlignmentFlag.AlignCenter
+    assert section.height() > 4 * note.fontMetrics().height()
+    assert max(abs(middle.x()), abs(middle.y())) <= MARGIN_STANDARD

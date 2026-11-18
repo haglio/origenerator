@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from funestra.scrubber_bar import BAR_BORDER, BAR_INSET_Y, BORDER_W, CURSOR_W
-from PySide6.QtGui import QColor
+from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
+from PySide6.QtGui import QColor, QMouseEvent
+from PySide6.QtWidgets import QApplication
 
 from origenerator.funscript import synthesize_actions
 from origenerator.gui.scrubber import Scrubber
@@ -111,3 +113,59 @@ def test_a_pane_with_no_room_for_a_track_draws_nothing(qtbot):
     bare.resize(narrow, bare.height())
 
     assert scrubber.grab().toImage() == bare.grab().toImage()
+
+
+def _timed_scrubber(qtbot, *, duration_ms=10_000):
+    scrubber = Scrubber()
+    qtbot.addWidget(scrubber)
+    scrubber.resize(100 + 2 * BAR_INSET_Y, scrubber.height())
+    scrubber.set_duration(duration_ms)
+    scrubber.set_position(0)
+    heard = []
+    scrubber.scrubbed.connect(heard.append)
+    return scrubber, heard
+
+
+def test_a_click_on_the_track_asks_for_the_moment_under_it(qtbot):
+    scrubber, heard = _timed_scrubber(qtbot)
+
+    qtbot.mousePress(scrubber, Qt.MouseButton.LeftButton,
+                     pos=QPoint(BAR_INSET_Y + 50, scrubber.height() // 2))
+
+    assert heard == [5000]
+
+
+def test_a_drag_along_the_track_asks_for_each_moment_it_passes_and_the_cursor_follows(qtbot):
+    scrubber, heard = _timed_scrubber(qtbot)
+    y = scrubber.height() // 2
+
+    qtbot.mousePress(scrubber, Qt.MouseButton.LeftButton, pos=QPoint(BAR_INSET_Y + 10, y))
+    _drag_to(scrubber, QPoint(BAR_INSET_Y + 80, y))
+    _drag_to(scrubber, QPoint(500, y))
+
+    assert heard == [1000, 8000, 10_000]
+    assert abs(_cursor_x(scrubber) - (scrubber.width() - BAR_INSET_Y)) <= CURSOR_W
+
+
+def test_moving_over_the_track_without_holding_the_button_asks_for_nothing(qtbot):
+    scrubber, heard = _timed_scrubber(qtbot)
+
+    qtbot.mouseMove(scrubber, QPoint(BAR_INSET_Y + 50, scrubber.height() // 2))
+
+    assert heard == []
+
+
+def test_a_click_before_the_video_has_a_length_asks_for_nothing(qtbot):
+    scrubber, heard = _timed_scrubber(qtbot, duration_ms=0)
+
+    qtbot.mousePress(scrubber, Qt.MouseButton.LeftButton,
+                     pos=QPoint(BAR_INSET_Y + 50, scrubber.height() // 2))
+
+    assert heard == []
+
+
+def _drag_to(scrubber, pos: QPoint) -> None:
+    event = QMouseEvent(QEvent.Type.MouseMove, QPointF(pos), QPointF(scrubber.mapToGlobal(pos)),
+                        Qt.MouseButton.NoButton, Qt.MouseButton.LeftButton,
+                        Qt.KeyboardModifier.NoModifier)
+    QApplication.sendEvent(scrubber, event)

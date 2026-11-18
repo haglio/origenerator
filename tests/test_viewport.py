@@ -506,7 +506,9 @@ def test_a_pane_whose_item_went_to_a_sessions_funestra_goes_on_taking_runs_and_f
 
 
 def _scrubber_preview(qtbot):
-    w = Viewport(player=MagicMock(), show_scrubber=True)
+    player = MagicMock()
+    player.position.return_value = 0
+    w = Viewport(player=player, show_scrubber=True)
     qtbot.addWidget(w)
     return w
 
@@ -559,8 +561,9 @@ def test_the_cursor_follows_playback_position(qtbot, tmp_path):
     follow = w._player.positionChanged.connect.call_args.args[0]
     follow(1500)
     assert w._scrubber._position == 1500
+    w._player.position.return_value = 0
     w.show_video(_scripted_video(tmp_path, name="next.mp4"))
-    assert w._scrubber._position is None
+    assert w._scrubber._position == 0
 
 
 def test_the_timeline_takes_the_videos_length_from_the_player(qtbot, tmp_path):
@@ -583,6 +586,19 @@ def test_the_timeline_keeps_the_length_of_a_video_shown_again_which_the_player_s
     assert w._scrubber._duration == 4000
 
 
+def test_the_cursor_stays_where_a_paused_video_is_when_the_tab_shows_it_again(qtbot, tmp_path):
+    w = _scrubber_preview(qtbot)
+    video = _scripted_video(tmp_path)
+    w.show_video(video)
+    w._player.durationChanged.connect.call_args.args[0](4000)
+    w._player.positionChanged.connect.call_args.args[0](1500)
+    w._player.position.return_value = 1500
+
+    w.show_video(video)
+
+    assert (w._scrubber._duration, w._scrubber._position) == (4000, 1500)
+
+
 def test_a_click_on_the_timeline_jumps_the_video_to_that_moment(qtbot, tmp_path):
     w = _scrubber_preview(qtbot)
     w.resize(320, 480)
@@ -596,6 +612,26 @@ def test_a_click_on_the_timeline_jumps_the_video_to_that_moment(qtbot, tmp_path)
                      pos=QPoint(scrubber.width() // 2, scrubber.height() // 2))
 
     assert w._player.setPosition.call_args_list == [call(2000)]
+
+
+@pytest.mark.parametrize("playing", [True, False])
+def test_a_drag_on_the_timeline_holds_the_video_and_letting_go_puts_it_back_as_it_was(
+        qtbot, tmp_path, playing):
+    w = _scrubber_preview(qtbot)
+    w.show_video(_scripted_video(tmp_path))
+    w._player.isPlaying.return_value = playing
+    w._player.reset_mock(return_value=False)
+
+    w._scrubber.held.emit(True)
+    held = _pauses_and_plays(w._player)
+    w._scrubber.held.emit(False)
+
+    assert held == [call.pause()]
+    assert _pauses_and_plays(w._player) == [call.pause()] + ([call.play()] if playing else [])
+
+
+def _pauses_and_plays(player):
+    return [made for made in player.method_calls if made in (call.pause(), call.play())]
 
 
 def test_the_corners_follow_the_item_when_the_timeline_takes_its_room(qtbot, tmp_path):

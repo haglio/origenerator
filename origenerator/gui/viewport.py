@@ -76,6 +76,7 @@ class Viewport(QWidget):
         self._fullscreen = self._open_fullscreen_view = None
         self._generation = self._actions_id = None
         self.drag_out = DragOut()
+        self._playing_before_the_scrub = False
 
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -136,7 +137,15 @@ class Viewport(QWidget):
         self._player.durationChanged.connect(scrubber.set_duration)
         self._player.positionChanged.connect(scrubber.set_position)
         scrubber.scrubbed.connect(self._player.setPosition)
+        scrubber.held.connect(self._hold_for_a_scrub)
         return scrubber
+
+    def _hold_for_a_scrub(self, held: bool) -> None:
+        if held:
+            self._playing_before_the_scrub = self._player.isPlaying()
+            self._player.pause()
+        elif self._playing_before_the_scrub:
+            self._player.play()
 
     def _take_the_pane(self, media, *, generation: str | None = None,
                        stop_player: bool = True, enhancing: bool = False,
@@ -339,6 +348,7 @@ class Viewport(QWidget):
         actions = (read_actions(funscript_of(video_path, places=OUTPUT_PLACES))
                    if video_path else [])
         self._scrubber.set_actions(actions)
+        self._scrubber.set_position(self._player.position())
         self._scrubber.setVisible(bool(video_path))
 
     def _hide_scrubber(self) -> None:

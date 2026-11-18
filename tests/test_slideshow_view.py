@@ -14,7 +14,14 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QWidget
 from shared_ui.colors import GREEN, RED, TEXT_PRIMARY, YELLOW
 from shared_ui.icons import icon_then_text
-from shared_ui.message_shape import MESSAGE_TOP_MARGIN
+from shared_ui.message_shape import (
+    ERROR,
+    FAVORITE,
+    HEARD_MARK,
+    MESSAGE_TOP_MARGIN,
+    WARNING,
+    time_to_read_ms,
+)
 from shared_ui.testing import appending_to
 
 from origenerator.funscript import (
@@ -24,7 +31,7 @@ from origenerator.funscript import (
 from origenerator.gui.funestra_slideshow import Playing
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.inflight import InFlightItem, RunReading
-from origenerator.gui.message import ERROR, FAVORITE, HEARD_MARK, WARNING, Message
+from origenerator.gui.message import Message
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView, ViewShow, ViewWiring
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
@@ -34,7 +41,11 @@ from tests import gestures
 from tests.closed_windows import is_closed
 from tests.marked_words import words
 from tests.motion_doubles import FakeMotion
-from tests.slideshow_hud_support import button_on_screen, speaker_on_screen, thumbnail_on_screen
+from tests.slideshow_hud_support import (
+    button_on_screen,
+    speaker_on_screen,
+    thumbnail_on_screen,
+)
 from tests.slideshow_support import ahead, slides_named, stop_the_poll_to_tick_by_hand
 
 _ITEMS = [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")]
@@ -2971,3 +2982,15 @@ def test_a_requests_line_stays_up_long_enough_to_be_read(qtbot):
     view.request_line("Moved her to a tropical beach at golden hour, the way your beach "
                       "prompts usually have it, and kept the pose and the lighting as they were.")
     assert view._note_timer.interval() > 3000
+
+
+@pytest.mark.parametrize("said", ["Locked", "Including no other items, so this one stays up a "
+                                            "while longer than a word or two would"])
+def test_every_message_stays_up_as_long_as_its_words_take_to_read(qtbot, said):
+    view = _view(qtbot)
+
+    view.flash(said)
+
+    assert view._note_timer.interval() == time_to_read_ms(said), (
+        "a press's message, a spoken command's and a request's all stay up for the reading "
+        "time of their words, the same rule a Fun Time session's messages follow")

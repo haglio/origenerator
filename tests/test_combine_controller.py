@@ -6,6 +6,7 @@ import urllib.request
 import pytest
 from PIL import Image
 from PySide6.QtWidgets import QWidget
+from shared_ui.message_shape import ERROR, INFO, WARNING
 
 from origenerator import (
     action_settings,
@@ -24,14 +25,22 @@ from origenerator.gui import combine_controller as module
 from origenerator.gui import file_pick
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine import CombineRequest
-from origenerator.gui.combine_controller import ALREADY_GENAUD, CombineController, CombineParts
-from origenerator.gui.message import ERROR, INFO, WARNING
+from origenerator.gui.combine_controller import (
+    ALREADY_GENAUD,
+    CombineController,
+    CombineParts,
+)
 from origenerator.gui.recent_videos import RecentVideo
 from origenerator.gui.starting_rows import StartingRows
 from origenerator.item_actions import ItemActions
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
-from origenerator.outside_videos import FrameFolders, OutsideVideo, Record, rows_bringing_in
+from origenerator.outside_videos import (
+    FrameFolders,
+    OutsideVideo,
+    Record,
+    rows_bringing_in,
+)
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.real_db import database_in, put_rows
 from tests.thumbnail_rows import square

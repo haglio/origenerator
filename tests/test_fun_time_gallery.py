@@ -13,6 +13,7 @@ from PIL import Image
 from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
 from PySide6.QtGui import QKeyEvent, QMovie, QPixmap
 from PySide6.QtWidgets import QLabel, QSplitter, QWidget
+from shared_ui.message_shape import INFO, WARNING
 from shared_ui.testing import icons_drawn
 
 from origenerator import gallery
@@ -25,7 +26,6 @@ from origenerator.gui.collapsible_section import FoldHeader
 from origenerator.gui.gallery_view import GalleryView, Shared
 from origenerator.gui.generate_pane import GeneratePane
 from origenerator.gui.generate_tab import GenerateTab
-from origenerator.gui.message import INFO, WARNING
 from origenerator.gui.pane_arrangement import TOC_OPENING_WIDTH
 from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.slideshow_hud import slideshow_hud_model

@@ -10,6 +10,7 @@ from funestra.main_hud import (
 from PySide6.QtCore import (
     Qt,
 )
+from shared_ui.message_shape import INFO, WARNING
 
 from origenerator import (
     action_settings,
@@ -36,7 +37,6 @@ from origenerator.gui import (
     voice_router,
 )
 from origenerator.gui.gallery_view import GalleryView
-from origenerator.gui.message import INFO, WARNING
 from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.slideshow_pace import DEFAULT_S
 from origenerator.gui.source_tile import SourceTile

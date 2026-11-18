@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from shared_ui.message_shape import ERROR, INFO, WARNING
 
 from origenerator import config, gallery
 from origenerator.db import Database
@@ -18,7 +19,6 @@ from origenerator.gui.enhance_controller import (
     EnhanceParts,
     Offer,
 )
-from origenerator.gui.message import ERROR, INFO, WARNING
 from origenerator.workflows import detail_parts
 from origenerator.workflows.detail_parts import DetailPart
 from tests.real_db import database_in, put_rows

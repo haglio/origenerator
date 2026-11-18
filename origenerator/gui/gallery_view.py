@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from shared_ui.find_bar import FindBar
+from shared_ui.message_shape import ERROR, INFO
 from shared_ui.spacing import GAP_MEDIUM
 from shared_ui.tick_control import TickControl
 
@@ -57,7 +58,11 @@ from origenerator.gallery.collection import (
 from origenerator.gallery.collection import (
     TRASH_KEY as _TRASH_KEY,
 )
-from origenerator.gallery.collection import FolderCollection, collection, folder_collection
+from origenerator.gallery.collection import (
+    FolderCollection,
+    collection,
+    folder_collection,
+)
 from origenerator.gallery.shapes import (
     SEPARATE as _SEPARATE,
 )
@@ -136,7 +141,6 @@ from origenerator.gui.inflight import (
 )
 from origenerator.gui.job_queue import JobQueue
 from origenerator.gui.look_training_controller import LookTrainingController
-from origenerator.gui.message import ERROR, INFO
 from origenerator.gui.modify_batch_tile import ModifyBatchTile
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.new_tile import NewTile

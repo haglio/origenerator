@@ -6,13 +6,13 @@ from typing import Protocol
 from funestra.on_screen_history import OnScreenHistory
 from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QWidget
+from shared_ui.message_shape import ERROR, INFO, WARNING
 
 from origenerator import gallery, request_settings
 from origenerator.animate_command import AnimateRequest
 from origenerator.gallery.voice_commands import said_in
 from origenerator.generation_config import filled_params
 from origenerator.gui.inflight_items import requested_of
-from origenerator.gui.message import ERROR, INFO, WARNING
 from origenerator.gui.open_setters import ForTheSetter, OpenSetters
 from origenerator.gui.picking import Picks
 from origenerator.gui.request_answering import RequestAnswerer

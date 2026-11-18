@@ -14,6 +14,7 @@ from funestra.hud_placement import HudCorner
 from funestra.hud_title import LATEST_LABEL
 from PIL import Image
 from PySide6.QtCore import QRect, Qt
+from shared_ui.message_shape import FAVORITE, INFO, WARNING
 
 from origenerator import gallery, library_views
 from origenerator.db import Database
@@ -28,7 +29,6 @@ from origenerator.gallery.shapes import BOTH
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import slideshow_director as module
 from origenerator.gui import two_screens
-from origenerator.gui.message import FAVORITE, INFO, WARNING
 from origenerator.gui.slideshow_director import (
     Carrying,
     DirectorSources,

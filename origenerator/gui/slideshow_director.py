@@ -14,6 +14,7 @@ from funestra.volume import VolumeHud
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QWidget
 from shared_ui.foreground import bring_to_front
+from shared_ui.message_shape import FAVORITE, INFO, WARNING
 
 from origenerator import gallery
 from origenerator.config import FRAMES_BEING_MADE_DIR, OUTPUT_PLACES
@@ -38,7 +39,12 @@ from origenerator.gallery.shapes import shape_holds, the_one_shape_on, the_shape
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.action_presses import striking
 from origenerator.gui.frame_files import FrameFiles
-from origenerator.gui.funestra_slideshow import FunestraSlideshow, Hosting, Playing, Seat
+from origenerator.gui.funestra_slideshow import (
+    FunestraSlideshow,
+    Hosting,
+    Playing,
+    Seat,
+)
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.hud_places import (
     HudPlaces,
@@ -51,7 +57,6 @@ from origenerator.gui.hud_places import (
     restore,
     told,
 )
-from origenerator.gui.message import FAVORITE, INFO, WARNING
 from origenerator.gui.region_openings import RegionOpening, RegionOpenings
 from origenerator.gui.regions_left import RegionLeft, restored_regions, saved_regions
 from origenerator.gui.slideshow_lock import LockedOn, lock_held

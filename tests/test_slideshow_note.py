@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from funestra.testing import FakeEngine
 from shared_ui.colors import RED, TEXT_PRIMARY, YELLOW
+from shared_ui.message_shape import ERROR, WARNING
 
-from origenerator.gui.message import ERROR, WARNING
 from origenerator.gui.slideshow_view import SlideshowView, ViewShow, ViewWiring
 from tests.gallery_view_support import _requesting_view
 from tests.marked_words import words_shown

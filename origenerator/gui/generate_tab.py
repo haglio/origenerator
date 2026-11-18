@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 from shared_ui.colors import TEXT_PRIMARY, YELLOW
 from shared_ui.icons import icon_then_text, qt_icon
+from shared_ui.message_label import set_marked_text
 from shared_ui.orientation import orientation_of_size as shape_of_size
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, GAP_MEDIUM, MARGIN_STANDARD
 
@@ -83,15 +84,23 @@ from origenerator.gui.generate_button import (
     refused_over_prompts,
 )
 from origenerator.gui.how_many import GenerateWithHowMany, HowManyDropdown
-from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP, CANCEL_TEXT, cancel_tooltip
+from origenerator.gui.inflight import (
+    ALREADY_MAKING_ONE_TIP,
+    CANCEL_TEXT,
+    cancel_tooltip,
+)
 from origenerator.gui.item_area import ItemArea
 from origenerator.gui.lora_offers import LoraOffers
-from origenerator.gui.message import set_marked_text
 from origenerator.gui.metadata_section import MetadataSection, wrappable
 from origenerator.gui.modify_batch import ModifyBatch
 from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.panes import PaneSplitter, pane
-from origenerator.gui.param_form import FormHelpers, ParamForm, WorkflowRow, WorkflowTraits
+from origenerator.gui.param_form import (
+    FormHelpers,
+    ParamForm,
+    WorkflowRow,
+    WorkflowTraits,
+)
 from origenerator.gui.related_media import RelatedLookups, RelatedMedia
 from origenerator.gui.request_answering import RequestAnswerer
 from origenerator.gui.viewport import Viewport
@@ -122,7 +131,11 @@ from origenerator.setting_advice import (
     trigger_word_advice,
 )
 from origenerator.timing import estimate_label
-from origenerator.workflows import RETIRED_WORKFLOW_NAMES, offered_workflows, workflow_named
+from origenerator.workflows import (
+    RETIRED_WORKFLOW_NAMES,
+    offered_workflows,
+    workflow_named,
+)
 
 logger = logging.getLogger(__name__)
 

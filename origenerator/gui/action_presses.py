@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from funestra.loop_cycle import SEED
+from shared_ui.message_shape import INFO, WARNING
 
-from origenerator.gui.message import INFO, WARNING
 from origenerator.gui.slideshow_set import (
     SlideshowSet,
     narrow_to_actions,

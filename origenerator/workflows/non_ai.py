@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from origenerator.display_names import in_parentheses
 from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.outside import MadeElsewhereWorkflow, outside_source
@@ -8,6 +9,7 @@ _PREFIX = "non-ai:"
 FOLDER_KEY = "folder"
 TITLE_KEY = "title"
 FOLDER_PARTS_IN_A_NAME = 2
+OTHER = "other"
 
 
 def non_ai_workflow(folder: str) -> str:
@@ -18,6 +20,12 @@ def non_ai_folder(workflow_name: str | None) -> str | None:
     if workflow_name and workflow_name.startswith(_PREFIX):
         return workflow_name.removeprefix(_PREFIX)
     return None
+
+
+def shown_folder(folder: str) -> str:
+    first, _space, rest = folder.partition(" ")
+    shown = in_parentheses() if first == OTHER else first[:1].upper() + first[1:]
+    return f"{shown} {rest}".rstrip()
 
 
 FOLDER_KINDS = ("non_ai", "site", "workflow")
@@ -37,7 +45,7 @@ class NonAiWorkflow(MadeElsewhereWorkflow):
 
     def __init__(self, folder: str):
         self.name = non_ai_workflow(folder)
-        self.display_name = folder
+        self.display_name = shown_folder(folder)
 
     def param_definitions(self) -> list[ParamDef]:
         return [ParamDef(FOLDER_KEY, "Folder", ParamType.STR, "")]

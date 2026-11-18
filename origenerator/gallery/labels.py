@@ -5,7 +5,7 @@ from enum import StrEnum
 
 from app_support.comfy_file_refs import frame_name, reference_basename, unannotated
 
-from origenerator.display_names import shown_name
+from origenerator.display_names import in_parentheses, shown_name
 from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.gallery.keys import folder_id, settings_key
 from origenerator.gallery.signatures import (
@@ -27,7 +27,7 @@ def workflow_label(workflow_name: str | None) -> str:
     if wf:
         return wf.display_name
     if workflow_name in (None, "", "unknown"):
-        return "(unknown workflow)"
+        return in_parentheses("workflow")
     return RETIRED_WORKFLOW_NAMES.get(workflow_name) or shown_name(workflow_name)
 
 
@@ -37,7 +37,7 @@ def _joined_file_label(keys: tuple[str, ...], params: dict, fallback: str) -> st
 
 
 def model_label(workflow_name: str | None, params: dict) -> str:
-    return _joined_file_label(workflow_model_keys(workflow_name), params, "(unknown model)")
+    return _joined_file_label(workflow_model_keys(workflow_name), params, in_parentheses("model"))
 
 
 def lora_label(workflow_name: str | None, params: dict) -> str:

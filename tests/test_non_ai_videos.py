@@ -43,6 +43,12 @@ def test_a_non_ai_folder_is_a_workflow_named_for_it_that_nothing_generates():
     assert non_ai_folder("wan22_i2v") is None
 
 
+def test_a_non_ai_folder_shows_its_first_folder_capitalized_and_other_as_other_or_unknown():
+    assert [workflow_named(non_ai_workflow(folder)).display_name
+            for folder in ("sample full", "other clips", "other", "otherwise full")] == [
+        "Sample full", "(other/unknown) clips", "(other/unknown)", "Otherwise full"]
+
+
 def _library(tmp_path) -> NonAiPlaces:
     library = tmp_path / "library"
     return NonAiPlaces(videos=library / "videos" / "non_AI", thumb_dir=tmp_path / "thumbs",
@@ -68,7 +74,7 @@ def test_a_scan_brings_each_non_ai_video_in_once_from_where_it_is_kept(tmp_path)
     [row] = _videos(db)
     assert json.loads(row["output_files"]) == [{"filename": "video one.mp4",
                                                 "library_path": str(kept)}]
-    assert workflow_named(row["workflow_name"]).display_name == "sample full"
+    assert workflow_named(row["workflow_name"]).display_name == "Sample full"
     assert resolve_preview(row, OutputPlaces.in_one_folder(tmp_path / "out")) == (
         kept, MediaType.VIDEO)
     assert Path(row["thumbnail_path"]).exists()
@@ -183,7 +189,7 @@ def test_a_non_ai_leaf_folder_is_named_for_its_folder_on_disk(db, tmp_path):
 
     assert {folder.label: sorted(leaf.label for leaf in child_groups(folder))
             for folder in child_groups(videos)} == {
-        "sample clips": ["clips"], "sample full": ["set one", "set two/extra"]}
+        "Sample clips": ["clips"], "Sample full": ["set one", "set two/extra"]}
 
 
 def test_a_non_ai_folder_holds_its_leaf_folders_with_no_model_or_lora_between(tmp_path):
@@ -196,7 +202,7 @@ def test_a_non_ai_folder_holds_its_leaf_folders_with_no_model_or_lora_between(tm
     [folder] = child_groups(videos)
     [leaf] = child_groups(folder)
 
-    assert (folder.label, type(leaf)) == ("sample full", SettingsGroup)
+    assert (folder.label, type(leaf)) == ("Sample full", SettingsGroup)
     assert folder_chain(row) == (ALL_KEY, videos.key, folder.key, leaf.key)
 
 
@@ -215,3 +221,4 @@ def test_a_non_ai_videos_tab_says_it_has_no_settings_and_cannot_generate(qtbot, 
         True, False, "This video wasn't generated, so it has no generation settings.")
     assert not tab._generate_pair.isEnabled()
     assert tab._generate_btn.toolTip() == NonAiWorkflow.why_it_cannot_be_made_again
+

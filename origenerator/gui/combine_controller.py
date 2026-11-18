@@ -5,6 +5,7 @@ import logging
 from typing import Protocol
 
 from PySide6.QtCore import QObject
+from shared_ui.message_shape import ERROR, INFO, WARNING
 
 from origenerator import (
     action_settings,
@@ -12,17 +13,23 @@ from origenerator import (
     gallery,
 )
 from origenerator.animate_command import what_to_animate
-from origenerator.animation_names import Animation, image_button_of, item_actions_named, named
+from origenerator.animation_names import (
+    Animation,
+    image_button_of,
+    item_actions_named,
+    named,
+)
 from origenerator.combine_runs import CombineRun
 from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES
-from origenerator.default_animation_settings import the_default_animation_settings_window
+from origenerator.default_animation_settings import (
+    the_default_animation_settings_window,
+)
 from origenerator.export_lane import GENAU as GENAU_LANE
 from origenerator.gallery.combine import cycle_names
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine import Combine, CombineParts, ZoneLookups
 from origenerator.gui.deferred import defer
 from origenerator.gui.file_pick import FILE_FILTERS, pick_a_file
-from origenerator.gui.message import ERROR, INFO, WARNING
 from origenerator.gui.recent_videos import RecentVideo
 from origenerator.gui.zone_items import FilesOnly
 from origenerator.item_actions import actions_of
@@ -88,7 +95,10 @@ class CombineController(QObject):
             self.widget.hide()
 
     def _on_animation_settings(self) -> None:
-        from origenerator.own_window import show_or_say, still_open  # noqa: PLC0415 -- Qt only
+        from origenerator.own_window import (  # noqa: PLC0415 -- Qt only
+            show_or_say,
+            still_open,
+        )
 
         if still_open(self._animation_settings):
             self._animation_settings.raise_()

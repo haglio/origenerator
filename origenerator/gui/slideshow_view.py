@@ -14,14 +14,20 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QPalette
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 from shared_ui.colors import BLACK
+from shared_ui.message_shape import HEARD_MARK, INFO, time_to_read_ms
 
 from origenerator.config import FRAMES_BEING_MADE_DIR
 from origenerator.gui.deferred import defer
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_pane import FunestraPane, PaneAudio, PaneChannel
-from origenerator.gui.funestra_slideshow import FunestraSlideshow, Hosting, Playing, Seat
+from origenerator.gui.funestra_slideshow import (
+    FunestraSlideshow,
+    Hosting,
+    Playing,
+    Seat,
+)
 from origenerator.gui.hud_queue import QueueFoot
-from origenerator.gui.message import HEARD_MARK, INFO, Message, time_to_read_ms
+from origenerator.gui.message import Message
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.request_promise import RequestPromise
 from origenerator.gui.slideshow_hud import (
@@ -281,9 +287,9 @@ class SlideshowView(QWidget):
         else:
             self.room_paused(not self._paused)
 
-    def flash(self, text: str, *, kind: str = INFO, ms: int = 1500, mark: str = "") -> None:
+    def flash(self, text: str, *, kind: str = INFO, mark: str = "") -> None:
         self._note.say(text, kind=kind, mark=mark)
-        self._note_timer.start(ms)
+        self._note_timer.start(time_to_read_ms(text))
 
     def dictating(self, note: str) -> None:
         if note:
@@ -299,7 +305,7 @@ class SlideshowView(QWidget):
             self._refresh_note()
             return
         self._promise.keep(request)
-        self.flash(message, ms=time_to_read_ms(message), kind=kind, mark=HEARD_MARK)
+        self.flash(message, kind=kind, mark=HEARD_MARK)
 
     def _refresh_note(self):
         if self._request_note:

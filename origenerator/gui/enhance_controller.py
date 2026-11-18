@@ -7,6 +7,7 @@ from typing import NamedTuple, Protocol
 
 from app_support.comfy_file_refs import frame_name
 from PySide6.QtWidgets import QMessageBox
+from shared_ui.message_shape import ERROR, INFO, WARNING
 
 from origenerator import config, enhance_presets, fix_training, gallery, lora_training
 from origenerator.gallery.enhance_settings import basic_enhance_settings
@@ -16,7 +17,6 @@ from origenerator.gui.enhance_pane import EnhancePane
 from origenerator.gui.enhance_versions import RunningEnhancement
 from origenerator.gui.generation_job import display_status
 from origenerator.gui.inflight import RunReading
-from origenerator.gui.message import ERROR, INFO, WARNING
 from origenerator.gui.training_run import TrainingRun
 from origenerator.media import MediaType
 from origenerator.workflows import WORKFLOW_REGISTRY

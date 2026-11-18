@@ -1,78 +1,26 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QLabel, QWidget
-from shared_ui.colors import BG_SECONDARY, GREEN, RED, TEXT_PRIMARY, YELLOW
-from shared_ui.fonts import FONT_UI, make_font
-from shared_ui.icons import icon_then_text
-from shared_ui.message_shape import (
-    MESSAGE_PAD_H,
-    MESSAGE_PAD_V,
-    MESSAGE_RADIUS,
-    MESSAGE_TOP_MARGIN,
-    MESSAGE_TYPE_SIZE,
-)
+from PySide6.QtWidgets import QWidget
+from shared_ui.message_label import MessageLabel
+from shared_ui.message_shape import INFO, MESSAGE_TOP_MARGIN
 
 from origenerator.gui.media_overlay import float_over_media, raise_over_media
 
-INFO = "info"
-WARNING = "warning"
-ERROR = "error"
-FAVORITE = "favorite"
-_INK = {INFO: TEXT_PRIMARY, WARNING: YELLOW, ERROR: RED, FAVORITE: GREEN}
 
-HEARD_MARK = "mic"
-
-
-def set_marked_text(label: QLabel, text: str, *, mark: str, color) -> None:
-    if not mark:
-        label.setTextFormat(Qt.TextFormat.PlainText)
-        label.setText(text)
-        return
-    label.setTextFormat(Qt.TextFormat.RichText)
-    label.setText(icon_then_text(mark, text, color=color, size=label.fontMetrics().height()))
-
-
-def time_to_read_ms(text: str) -> int:
-    return max(3000, 1500 + 250 * len(text.split()))
-
-
-class Message(QLabel):
+class Message(MessageLabel):
     def __init__(self, host: QWidget):
         super().__init__(host)
-        self.setFont(make_font(FONT_UI, MESSAGE_TYPE_SIZE, bold=True))
-        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         float_over_media(self)
-        self._said = ("", "", _INK[INFO])
         self.hide()
 
     def say(self, text: str, *, kind: str = INFO, mark: str = "") -> None:
-        ink = _INK[kind].name()
-        self.setStyleSheet(
-            f"background-color: {BG_SECONDARY.name()};"
-            f" color: {ink}; border: 1px solid {ink};"
-            f" padding: {MESSAGE_PAD_V}px {MESSAGE_PAD_H}px; border-radius: {MESSAGE_RADIUS}px;"
-        )
-        self._said = (text, mark, _INK[kind])
+        super().say(text, kind=kind, mark=mark)
         self.show()
         self.reposition()
 
     def reposition(self) -> None:
         host = self.parentWidget()
-        self._fit_into(host.width() - 2 * MESSAGE_TOP_MARGIN)
+        self.fit_into(host.width() - 2 * MESSAGE_TOP_MARGIN)
         x = (host.width() - self.width()) // 2
         self.move(max(0, x), MESSAGE_TOP_MARGIN)
         raise_over_media(self)
-
-    def _fit_into(self, room: int) -> None:
-        text, mark, ink = self._said
-        set_marked_text(self, text, mark=mark, color=ink)
-        self.adjustSize()
-        overhang = self.width() - room
-        if overhang <= 0:
-            return
-        metrics = self.fontMetrics()
-        fitted = metrics.elidedText(text, Qt.TextElideMode.ElideRight,
-                                    max(0, metrics.horizontalAdvance(text) - overhang - 1))
-        set_marked_text(self, fitted, mark=mark, color=ink)
-        self.adjustSize()

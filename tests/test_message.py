@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 from PySide6.QtWidgets import QWidget
-from shared_ui.message_shape import MESSAGE_TOP_MARGIN
+from shared_ui.message_shape import HEARD_MARK, MESSAGE_TOP_MARGIN, time_to_read_ms
 
 from origenerator.gui import media_overlay
-from origenerator.gui.message import HEARD_MARK, Message, time_to_read_ms
+from origenerator.gui.message import Message
 
 
 def _a_message_over_a_surface(qtbot) -> tuple[QWidget, Message]:

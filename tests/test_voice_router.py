@@ -4,6 +4,7 @@ import logging
 
 import pytest
 from PySide6.QtWidgets import QWidget
+from shared_ui.message_shape import ERROR, INFO, WARNING
 
 from origenerator import gallery
 from origenerator.action_settings import GENAU, VIDEO
@@ -12,7 +13,6 @@ from origenerator.gallery.collection import LATEST_KEY
 from origenerator.gallery.voice_commands import said_in
 from origenerator.gui import voice_router as module
 from origenerator.gui.gallery_pane_buttons import GROUP_TIP
-from origenerator.gui.message import ERROR, INFO, WARNING
 from origenerator.gui.picking import Picks
 from origenerator.gui.starting_rows import StartingRows
 from origenerator.gui.voice_router import VoiceRouter, VoiceSources, VoiceSwitches

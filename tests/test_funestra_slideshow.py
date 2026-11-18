@@ -15,6 +15,7 @@ from funestra.playback_rate import NORMAL_RATE
 from funestra.playlist import PlaylistItem, read_playlist
 from funestra.satellite_hud import parse_hud
 from funestra.status import FunestraStatus, status_fields
+from shared_ui.message_shape import WARNING
 from shared_ui.testing import appending_to
 
 from origenerator import osr2_driver
@@ -25,7 +26,6 @@ from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow, Hosting, Playing, Seat
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.hud_queue import OPEN
-from origenerator.gui.message import WARNING
 from origenerator.gui.region_openings import RegionOpening
 from origenerator.gui.slideshow_pace import DEFAULT_S, SlideshowPace
 from origenerator.gui.slideshow_view import SlideshowView

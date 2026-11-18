@@ -33,10 +33,10 @@ from funestra.on_screen_history import OnScreenHistory
 from funestra.playlist import PlaylistItem
 from funestra.status import STATUS_INTERVAL_S, parse_status
 from PySide6.QtCore import QObject, QTimer, Signal
+from shared_ui.message_shape import HEARD_MARK, INFO, WARNING
 
 from origenerator.gui.action_presses import ActionPresses
 from origenerator.gui.funestra_transport import FunestraTransport
-from origenerator.gui.message import HEARD_MARK, INFO, WARNING
 from origenerator.gui.on_a_sessions_funestra import OnASessionsFunestra
 from origenerator.gui.slideshow_pace import STEP_S as PACE_STEP_S
 from origenerator.gui.slideshow_pace import SlideshowPace
@@ -814,7 +814,7 @@ class FunestraSlideshow(QObject):
         self.shown.request_line(message, request, working=working, kind=kind)
 
     def note_voice_command(self, message: str, *, kind: str = INFO) -> None:
-        self.shown.flash(message, kind=kind, ms=2500, mark=HEARD_MARK)
+        self.shown.flash(message, kind=kind, mark=HEARD_MARK)
 
     def note_voice_run(self, prompt_id, message: str, *, kind: str = INFO) -> None:
         if prompt_id is not None:

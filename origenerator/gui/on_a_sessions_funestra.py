@@ -4,9 +4,9 @@ from funestra.file_channel import publish_whole
 from funestra.messages import MessageWriter
 from funestra.modes import MessageLevel
 from funestra.satellite_hud import hud_text
+from shared_ui.message_shape import ERROR, FAVORITE, INFO, WARNING
 
 from origenerator.gui.hud_queue import JobQueueFile, QueueFoot
-from origenerator.gui.message import ERROR, FAVORITE, INFO, WARNING
 from origenerator.gui.slideshow_hud import HudPlacement, slideshow_hud_model
 
 READER_HOLD_BUDGET_S = 1.0

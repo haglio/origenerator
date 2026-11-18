@@ -20,7 +20,7 @@ from origenerator.one_look import looking_once
 from origenerator.output_files import library_paths_in
 from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import generate_thumbnail
-from origenerator.trash import Genau, Kino, TrashedBatch, take_out_of_play
+from origenerator.trash import Genau, KeptBesideItsTrash, Kino, TrashedBatch, take_out_of_play
 from origenerator.undo_stack import UndoEntry, UndoStack
 
 logger = logging.getLogger(__name__)
@@ -33,9 +33,11 @@ class GalleryEnvironment:
     thumb_dir: Path | None = None
     kino: Kino | None = None
     genau: Genau | None = None
+    vr: KeptBesideItsTrash | None = None
     bring_in: Callable[[Path], bool] | None = None
     delete_for_good: Callable[[list[Path]], None] | None = None
     video_records: Path | None = None
+    libraries_elsewhere: tuple[Path, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -66,7 +68,8 @@ class GalleryEdits:
         if self._environment.video_records is not None:
             non_ai_videos.tell_fun_time_of_favorites(
                 filter(None, map(self._db.get_generation, prompt_ids)), favorite,
-                self._environment.video_records)
+                self._environment.video_records,
+                libraries_elsewhere=self._environment.libraries_elsewhere)
 
     def trash_file(self, path, already_at=None) -> None:
         pressed = Pressed(Path(path), Path(already_at) if already_at else None)
@@ -181,7 +184,8 @@ class GalleryEdits:
         genau_videos = genau.videos() if genau is not None else []
         pressed_now = [pressed.video] if pressed is not None and pressed.already_at is None else []
         return [[*self._in_kino(row, upscales, pressed_now),
-                 *_in_genau(genau, row, genau_videos, pressed_now)]
+                 *_in_genau(genau, row, genau_videos, pressed_now),
+                 *_kept_by(self._environment.vr, row)]
                 for row in rows]
 
     def _in_kino(self, row: dict, upscales, pressed_now: list[Path]) -> list[tuple]:
@@ -373,7 +377,15 @@ def _in_genau(genau: Genau | None, row: dict, genau_videos: list[Path],
     if genau is None:
         return []
     return [(genau, video) for video in dict.fromkeys(
-        [*_copies_of(row, genau_videos), *filter(genau.plays, pressed_now)])]
+        [*_copies_of(row, genau_videos), *filter(genau.plays, pressed_now),
+         *(video for _genau, video in _kept_by(genau, row))])]
+
+
+def _kept_by(place, row: dict) -> list[tuple]:
+    if place is None:
+        return []
+    return [(place, video) for video in map(Path, library_paths_in(row.get("output_files")))
+            if place.plays(video)]
 
 
 def _copies_of(row: dict, genau_videos: list[Path]) -> list[Path]:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from origenerator.display_names import in_parentheses
+from origenerator.display_names import in_parentheses, shown_name
 from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.outside import MadeElsewhereWorkflow, outside_source
@@ -45,7 +45,11 @@ class NonAiWorkflow(MadeElsewhereWorkflow):
 
     def __init__(self, folder: str):
         self.name = non_ai_workflow(folder)
-        self.display_name = shown_folder(folder)
+        self._folder = folder
+
+    @property
+    def display_name(self) -> str:
+        return shown_name(self.name, otherwise=shown_folder(self._folder))
 
     def param_definitions(self) -> list[ParamDef]:
         return [ParamDef(FOLDER_KEY, "Folder", ParamType.STR, "")]

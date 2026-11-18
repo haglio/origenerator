@@ -47,7 +47,7 @@ from tests.gallery_view_support import (
     _will_move_on,
 )
 from tests.marked_words import words
-from tests.real_db import database_of
+from tests.real_db import database_of, keep_rows_on_disk
 from tests.slideshow_hud_support import (
     engine_of,
     funestra_of,
@@ -543,6 +543,55 @@ def test_a_double_click_on_a_non_ai_video_in_a_session_plays_it_on_the_main_fune
 
     view._gallery_pane.slideshow_requested.emit("n1")
 
+    assert (tmp_path / "dashboard_cmd.txt").read_text(encoding="utf-8").splitlines() == [
+        f"kino_play|{video}"]
+    assert not any(view._slideshows._region_slideshows.values())
+
+
+def _non_ai_row(prompt_id: str, video) -> dict:
+    return {**_image(prompt_id, "", 50, 1), "workflow_name": non_ai_workflow("sample full"),
+            "source": "non_ai", "workflow_version": "non_ai",
+            "params_json": json.dumps({"folder": "sample/full"}),
+            "output_files": json.dumps([{"filename": video.name, "library_path": str(video)}])}
+
+
+def _ids_a_slideshow_takes_from_the_folder_of(view, prompt_id: str) -> list[str]:
+    director = view._slideshows
+    folder = director._location_of(director._row_for(prompt_id))
+    return [row["prompt_id"] for row in director.rows_at(folder)]
+
+
+def test_in_a_session_no_slideshow_takes_a_non_ai_video_and_standalone_they_do(
+        qtbot, tmp_path, monkeypatch):
+    keep_rows_on_disk(monkeypatch)
+    rows = [_image("i1", "a cat", 50, 1),
+            _non_ai_row("n1", tmp_path / "non_AI" / "sample" / "full" / "video one.mp4")]
+    hosted = GalleryView(database_of(rows), fun_time=_session_with_dashboard(tmp_path))
+    standalone = GalleryView(database_of(rows))
+    for view in (hosted, standalone):
+        qtbot.addWidget(view)
+        view.refresh()
+        monkeypatch.setattr(view._slideshows, "_listing",
+                            lambda: SimpleNamespace(shown=["i1", "n1"]))
+
+    assert (_ids_a_slideshow_takes_from_the_folder_of(hosted, "n1"),
+            _ids_a_slideshow_takes_from_the_folder_of(standalone, "n1")) == ([], ["n1"])
+    assert ([row["prompt_id"] for row in hosted._slideshows._listed_rows()],
+            [row["prompt_id"] for row in standalone._slideshows._listed_rows()]) == (
+        ["i1"], ["i1", "n1"])
+
+
+def test_a_double_click_on_a_non_ai_videos_preview_in_a_session_plays_it_on_the_main_funestra(
+        qtbot, tmp_path):
+    video = tmp_path / "non_AI" / "sample" / "full" / "video one.mp4"
+    view = GalleryView(database_of([_non_ai_row("n1", video)]),
+                       fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    opened = view._slideshows.open_on_preview((video, "video"), "n1")
+
+    assert opened is None
     assert (tmp_path / "dashboard_cmd.txt").read_text(encoding="utf-8").splitlines() == [
         f"kino_play|{video}"]
     assert not any(view._slideshows._region_slideshows.values())

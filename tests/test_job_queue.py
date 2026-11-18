@@ -29,6 +29,7 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.never_answered import NeverAnswered
 from tests.story_voices import voices_asked_for
+from tests.waiting import until
 
 _I2V = WORKFLOW_REGISTRY["wan22_i2v"]
 _IMAGE_WF = "flux_t2i_upscaled"
@@ -2582,7 +2583,7 @@ def test_a_model_left_loaded_is_sent_away_before_comfyui_is_handed_a_job(qtbot, 
 
     job = _launch_video(queue, "v1", seed=1)
 
-    qtbot.waitUntil(lambda: client.submit_job.call_count == 1, timeout=5000)
+    until(lambda: client.submit_job.call_count == 1)
     assert handed_when_it_left == [0]
     assert [call.args[1] for call in client.submit_job.call_args_list] == [job.prompt_id]
 
@@ -2598,8 +2599,8 @@ def test_a_model_left_loaded_leaves_after_the_minutes_it_may_stay_with_no_reques
 
     queue._model_stays.timeout.emit()
 
-    qtbot.waitUntil(lambda: handed_when_it_left == [0], timeout=5000)
-    qtbot.waitUntil(lambda: not queue.model_hold, timeout=5000)
+    until(lambda: handed_when_it_left == [0])
+    until(lambda: not queue.model_hold)
     assert not queue._model_stays.isActive()
 
 

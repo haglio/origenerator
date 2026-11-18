@@ -16,12 +16,20 @@ class _Trailing(QWidgetItem):
     pass
 
 
+class _Grouped(QWidgetItem):
+    def __init__(self, widget, group: int):
+        super().__init__(widget)
+        self.group = group
+
+
 class FlowLayout(QLayout):
     def __init__(self, parent=None, *, margin=0, spacing=6, row_spacing=None,
-                 align_right=False):
+                 group_spacing=None, align_right=False):
         super().__init__(parent)
         self._items = []
+        self._groups_added = 0
         self._row_spacing = spacing if row_spacing is None else row_spacing
+        self._group_spacing = spacing if group_spacing is None else group_spacing
         self._align_right = align_right
         self.setContentsMargins(margin, margin, margin, margin)
         self.setSpacing(spacing)
@@ -35,6 +43,19 @@ class FlowLayout(QLayout):
 
     def addItem(self, item):
         self._items.append(item)
+
+    def group_spacing(self) -> int:
+        return self._group_spacing
+
+    def set_group_spacing(self, spacing: int) -> None:
+        self._group_spacing = spacing
+        self.invalidate()
+
+    def add_group(self, widgets):
+        self._groups_added += 1
+        for widget in widgets:
+            self.addChildWidget(widget)
+            self.addItem(_Grouped(widget, self._groups_added))
 
     def add_full_row(self, widget):
         self.addChildWidget(widget)
@@ -84,44 +105,67 @@ class FlowLayout(QLayout):
     def _do_layout(self, rect, place):
         area = rect.marginsRemoved(self.contentsMargins())
         margin_height = rect.height() - area.height()
-        spacing = self.spacing()
-        rows, row, x = [], [], area.x()
-        for item in self._items:
-            if item.isEmpty():
-                continue
-            if isinstance(item, _FullRow):
-                if row:
-                    rows.append(row)
-                rows.append([(item, QSize(area.width(), item.sizeHint().height()))])
-                row, x = [], area.x()
-                continue
-            hint = _hint_within(item, area.width())
-            if row and x + hint.width() > area.x() + area.width():
-                rows.append(row)
-                row, x = [], area.x()
-            row.append((item, hint))
-            x += hint.width() + spacing
-        if row:
-            rows.append(row)
-
+        rows = self._rows(area)
         y = area.y()
         for placed in rows:
-            leading = [(item, hint) for item, hint in placed if not isinstance(item, _Trailing)]
-            trailing = [(item, hint) for item, hint in placed if isinstance(item, _Trailing)]
+            leading = _closed_up([entry for entry in placed if not isinstance(entry[0], _Trailing)])
+            trailing = _closed_up([entry for entry in placed if isinstance(entry[0], _Trailing)])
             x = area.x()
             if self._align_right:
-                x += max(0, area.width() - _span_of(placed, spacing))
+                x += max(0, area.width() - _width_of(placed))
             for run, run_x in ((leading, x),
-                               (trailing, area.x() + max(0, area.width() - _span_of(trailing, spacing)))):
+                               (trailing, area.x() + max(0, area.width() - _width_of(trailing)))):
                 start = run_x
-                for item, hint in run:
+                for item, hint, before in run:
+                    start += before
                     if place:
                         item.setGeometry(QRect(QPoint(start, y), hint))
-                    start += hint.width() + spacing
-            y += max(hint.height() for _item, hint in placed) + self._row_spacing
+                    start += hint.width()
+            y += max(hint.height() for _item, hint, _gap in placed) + self._row_spacing
         if not rows:
             return margin_height
         return y - self._row_spacing - area.y() + margin_height
+
+    def _rows(self, area):
+        right = area.x() + area.width()
+        rows, row, x = [], [], area.x()
+        for unit, gap in self._units(area.width()):
+            if isinstance(unit[0][0], _FullRow):
+                if row:
+                    rows.append(row)
+                item = unit[0][0]
+                rows.append([(item, QSize(area.width(), item.sizeHint().height()), 0)])
+                row, x = [], area.x()
+                continue
+            width = _span_of(unit, self.spacing())
+            if row and x + gap + width > right:
+                rows.append(row)
+                row, x = [], area.x()
+            for index, (item, hint) in enumerate(unit):
+                before = (gap if index == 0 else self.spacing()) if row else 0
+                if row and x + before + hint.width() > right:
+                    rows.append(row)
+                    row, x, before = [], area.x(), 0
+                row.append((item, hint, before))
+                x += before + hint.width()
+        if row:
+            rows.append(row)
+        return rows
+
+    def _units(self, width: int):
+        units, previous_group = [], None
+        for item in self._items:
+            if item.isEmpty():
+                continue
+            group = item.group if isinstance(item, _Grouped) else None
+            entry = (item, _hint_within(item, width))
+            if group is not None and group == previous_group:
+                units[-1][0].append(entry)
+            else:
+                between_groups = group is not None and previous_group is not None
+                units.append(([entry], self._group_spacing if between_groups else self.spacing()))
+            previous_group = group
+        return units
 
 
 def _hint_within(item, width: int) -> QSize:
@@ -132,8 +176,16 @@ def _hint_within(item, width: int) -> QSize:
     return hint
 
 
-def _span_of(placed, spacing) -> int:
-    return sum(hint.width() for _item, hint in placed) + spacing * max(0, len(placed) - 1)
+def _span_of(unit, spacing) -> int:
+    return sum(hint.width() for _item, hint in unit) + spacing * max(0, len(unit) - 1)
+
+
+def _closed_up(run):
+    return [(item, hint, before if index else 0) for index, (item, hint, before) in enumerate(run)]
+
+
+def _width_of(placed) -> int:
+    return sum(hint.width() + before for _item, hint, before in _closed_up(placed))
 
 
 def _narrowest(widget: QWidget) -> int:

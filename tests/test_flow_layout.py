@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from PySide6.QtCore import QRect
 from PySide6.QtWidgets import QLabel, QPushButton, QWidget
 
 from origenerator.gui.flow_layout import FlowLayout
@@ -187,3 +188,68 @@ def test_a_full_row_never_holds_the_layout_wider_than_its_tiles(qtbot):
     layout.add_full_row(QLabel("a heading a good deal wider than the one tile under it"))
 
     assert layout.minimumSize().width() == 40
+
+
+def _squares(count: int) -> list[QWidget]:
+    made = []
+    for _ in range(count):
+        square = QWidget()
+        square.setFixedSize(40, 40)
+        made.append(square)
+    return made
+
+
+def test_a_group_that_does_not_fit_the_row_moves_to_the_next_row_whole(qtbot):
+    host = QWidget()
+    qtbot.addWidget(host)
+    flow = FlowLayout(host, spacing=4, group_spacing=16)
+    first, second = _squares(2), _squares(3)
+    flow.add_group(first)
+    flow.add_group(second)
+
+    flow.setGeometry(QRect(0, 0, 40 + 4 + 40 + 16 + 40 + 4 + 40, 200))
+
+    assert [square.y() for square in first + second] == [0, 0, 44, 44, 44], (
+        "a group of buttons wraps as one: room for two of the second group's three is no "
+        "reason to leave its third alone on the row below")
+    assert [square.x() for square in second] == [0, 44, 88], (
+        "a group that starts a row starts at the row's edge, with no gap in front of it")
+
+
+def test_groups_on_one_row_stand_the_wider_gap_apart(qtbot):
+    host = QWidget()
+    qtbot.addWidget(host)
+    flow = FlowLayout(host, spacing=4, group_spacing=16)
+    first, second = _squares(2), _squares(1)
+    flow.add_group(first)
+    flow.add_group(second)
+
+    flow.setGeometry(QRect(0, 0, 400, 200))
+
+    assert [square.x() for square in first + second] == [0, 44, 44 + 40 + 16]
+
+
+def test_a_group_with_nothing_showing_leaves_no_gap(qtbot):
+    host = QWidget()
+    qtbot.addWidget(host)
+    flow = FlowLayout(host, spacing=4, group_spacing=16)
+    first, hidden, last = _squares(1), _squares(1), _squares(1)
+    for group in (first, hidden, last):
+        flow.add_group(group)
+    hidden[0].hide()
+
+    flow.setGeometry(QRect(0, 0, 400, 200))
+
+    assert last[0].x() == 40 + 16
+
+
+def test_a_group_wider_than_the_whole_row_wraps_inside_itself(qtbot):
+    host = QWidget()
+    qtbot.addWidget(host)
+    flow = FlowLayout(host, spacing=4, group_spacing=16)
+    group = _squares(3)
+    flow.add_group(group)
+
+    flow.setGeometry(QRect(0, 0, 90, 200))
+
+    assert [(square.x(), square.y()) for square in group] == [(0, 0), (44, 0), (0, 44)]

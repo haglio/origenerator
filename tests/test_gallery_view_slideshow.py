@@ -34,7 +34,6 @@ from origenerator.gui.slideshow_hud import HudPlacement, slideshow_hud_model
 from origenerator.item_shape import key_holds, shaped_key
 from origenerator.slideshow import LIVE
 from origenerator.voice.app_commands import AppCommand
-from tests import gestures
 from tests.gallery_view_support import (
     _CTRL,
     _NO_MOD,
@@ -241,7 +240,7 @@ def test_starting_a_slideshow_while_the_last_one_sits_minimized_puts_it_back_on_
     _minimized_from_the_taskbar(slideshow)
     assert slideshow.shown.isMinimized()
 
-    gestures.click(view._buttons.slideshow, view._buttons.slideshow.rect().center())
+    view._buttons.slideshow.click()
 
     assert view._slideshows.showing is slideshow
     assert not slideshow.shown.isMinimized()

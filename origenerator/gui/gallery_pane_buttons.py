@@ -138,10 +138,6 @@ def _reference_button() -> QToolButton:
     return button
 
 
-def _group_gap() -> QWidget:
-    return QWidget()
-
-
 class GalleryPaneButtons(QWidget):
     def __init__(self, handlers: ButtonHandlers, *, hosted: bool,
                  two_screens: TwoScreens | None = None):
@@ -203,7 +199,7 @@ class GalleryPaneButtons(QWidget):
             )
             self.switch = self._switch_between_the_monitors()
         layout = FlowLayout(self)
-        self._groups: list[tuple[QWidget, tuple[QToolButton, ...]]] = []
+        self._groups: list[tuple[QToolButton, ...]] = []
         for listed in (
             (self.back, self.forward),
             (self.undo, self.redo),
@@ -213,11 +209,8 @@ class GalleryPaneButtons(QWidget):
             (self.power, self.play_pause, self.reference, self.mic, self.switch),
         ):
             buttons = tuple(b for b in listed if b is not None)
-            gap = _group_gap()
-            layout.addWidget(gap)
-            for button in buttons:
-                layout.addWidget(button)
-            self._groups.append((gap, buttons))
+            layout.add_group(buttons)
+            self._groups.append(buttons)
         self._point_the_switch_where_core_would_move()
         self._draw_at_the_huds_scale(hosted=hosted)
 
@@ -225,9 +218,9 @@ class GalleryPaneButtons(QWidget):
         layout = self.layout()
         layout.setSpacing(_landing_at_the_huds_scale(BUTTON_GAP, hosted=hosted))
         layout.set_row_spacing(_landing_at_the_huds_scale(BUTTON_ROW_GAP, hosted=hosted))
+        layout.set_group_spacing(_landing_at_the_huds_scale(BUTTON_GROUP_GAP, hosted=hosted))
         square = _landing_at_the_huds_scale(BUTTON_SIZE, hosted=hosted)
-        for gap, buttons in self._groups:
-            gap.setFixedSize(_landing_at_the_huds_scale(BUTTON_GROUP_GAP, hosted=hosted), 1)
+        for buttons in self._groups:
             for button in buttons:
                 fill_square_with_icon(button, size=square)
 
@@ -256,7 +249,6 @@ class GalleryPaneButtons(QWidget):
         if self.switch is not None:
             self.switch.setVisible(direction is not None)
             self.switch.setIcon(icons.switch_icon(direction or LEFT))
-        self._show_the_gaps()
 
     def turn_the_radio_on(self) -> None:
         if self.radio is not None:
@@ -266,7 +258,6 @@ class GalleryPaneButtons(QWidget):
         for switch in self._room_switches:
             if switch is not None:
                 switch.setVisible(shown)
-        self._show_the_gaps()
 
     def apply(self, state: ButtonStates) -> None:
         for button, stands in (
@@ -289,11 +280,3 @@ class GalleryPaneButtons(QWidget):
                 button.setChecked(stands.checked)
                 button.blockSignals(False)
         self.populate_tip.set_html(state.populate_tip)
-        self._show_the_gaps()
-
-    def _show_the_gaps(self) -> None:
-        leading = True
-        for gap, buttons in self._groups:
-            showing = any(not button.isHidden() for button in buttons)
-            gap.setVisible(showing and not leading)
-            leading = leading and not showing

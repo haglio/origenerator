@@ -56,12 +56,13 @@ def ask_for_origenerator_mode(dashboard_cmd_file) -> None:
         append_command(dashboard_cmd_file, ORIGENERATOR_MODE)
 
 
-PLAY_ON_THE_MAIN_FUNESTRA = "kino_play"
+PLAY_IN_KINO = "kino_play"
+PLAY_IN_GENAU = "genau_play"
 
 
-def ask_the_main_funestra_to_play(dashboard_cmd_file, video) -> bool:
+def ask_the_main_funestra_to_play(dashboard_cmd_file, video, *, in_genau: bool) -> bool:
     return dashboard_cmd_file is not None and append_command(
-        dashboard_cmd_file, f"{PLAY_ON_THE_MAIN_FUNESTRA}|{video}")
+        dashboard_cmd_file, f"{PLAY_IN_GENAU if in_genau else PLAY_IN_KINO}|{video}")
 
 
 def tell_of_a_lock(dashboard_cmd_file, shape: str, file) -> bool:

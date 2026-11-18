@@ -484,7 +484,8 @@ to Kino's Trash (`Kino.non_ai`), a flick to Genau's, and a VR video to the
 trash folder beside its own (`KeptBesideItsTrash`), which stays on its drive.
 In a Fun Time session a double-click on one, on its tile or on its tab's
 Preview, asks Fun Time to play it on the Main Funestra
-(`ask_the_main_funestra_to_play`), and no slideshow of the session takes one,
+(`ask_the_main_funestra_to_play`), in Genau when Genau keeps it and in Kino
+otherwise, and no slideshow of the session takes one,
 since a session's slideshows play on the Satellites; Standalone, slideshows
 hold them like any video.
 

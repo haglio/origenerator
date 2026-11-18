@@ -313,7 +313,7 @@ class GalleryView(QWidget):
                 job_queue=self.job_queue, fun_time=self._fun_time,
                 radio=self._radio, buttons_of=lambda: self._buttons,
                 enhancing_of=lambda: self.enhance,
-                two_screens=self._two_screens))
+                two_screens=self._two_screens, genau=Genau.in_folder(GENAU_DIR)))
 
     def _in_flight_items(self, rows=None, requests=None) -> list:
         if self._gallery_pane is None:

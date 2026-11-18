@@ -119,6 +119,7 @@ class DirectorSurroundings:
     buttons_of: Callable | None = None
     two_screens: object = None
     own_funestras: object = None
+    genau: object = None
 
 
 @dataclass(frozen=True)

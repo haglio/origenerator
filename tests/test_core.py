@@ -31,6 +31,7 @@ from origenerator import (
     downtime,
     flick_finales,
     gallery,
+    osr2,
     toast_raising,
     ui_scale,
 )
@@ -384,6 +385,56 @@ def test_a_window_a_session_handed_back_asks_again(qtbot, tmp_path, monkeypatch)
     _close_from_the_title_bar(win)
 
     assert len(asked) == 1
+
+
+@pytest.fixture
+def reminders(monkeypatch):
+    asked = []
+    monkeypatch.setattr(osr2, "ask_for_the_turn_off_reminder", lambda: asked.append(True))
+    return asked
+
+
+def test_closing_it_on_its_own_asks_the_broker_to_remind_him_to_turn_the_osr2_off(
+        qtbot, tmp_path, monkeypatch, reminders):
+    _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.Yes)
+    win = _window(qtbot, tmp_path)
+    win.show()
+
+    _close_from_the_title_bar(win)
+
+    assert reminders == [True]
+
+
+def test_a_close_he_calls_off_asks_for_no_reminder(qtbot, tmp_path, monkeypatch, reminders):
+    _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.No)
+    win = _window(qtbot, tmp_path)
+    win.show()
+
+    _close_from_the_title_bar(win)
+
+    assert reminders == []
+
+
+def test_a_window_fun_time_closes_leaves_the_reminder_to_fun_time(qtbot, tmp_path, reminders):
+    win = _window(qtbot, tmp_path, fun_time=_fun_time_session())
+    win.show()
+
+    _close_from_the_title_bar(win)
+
+    assert reminders == []
+
+
+def test_a_window_a_session_handed_back_asks_for_the_reminder_when_it_closes(
+        qtbot, tmp_path, monkeypatch, reminders):
+    _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.Yes)
+    win = _window(qtbot, tmp_path)
+    win.show()
+    win.become_hosted(_fun_time_session())
+    win.become_standalone()
+
+    _close_from_the_title_bar(win)
+
+    assert reminders == [True]
 
 
 def test_opening_a_config_fills_the_resting_tab(qtbot, tmp_path):

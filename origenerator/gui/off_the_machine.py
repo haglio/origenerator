@@ -64,6 +64,7 @@ def keep_off_the_device(setattr) -> None:
     setattr(osr2_controls.osr2, "device_trouble", lambda **_kw: None)
     setattr(osr2_controls.osr2, "broker_running", lambda **_kw: True)
     setattr(osr2_controls.osr2, "press_the_broker", lambda **_kw: None)
+    setattr(osr2_controls.osr2, "ask_for_the_turn_off_reminder", lambda **_kw: None)
 
 
 def keep_out_of_windows(setattr) -> None:

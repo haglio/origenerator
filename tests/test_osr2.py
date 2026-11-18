@@ -24,6 +24,7 @@ from funestra.testing import broker_pressed
 
 from origenerator.osr2 import (
     Osr2Broker,
+    ask_for_the_turn_off_reminder,
     broker_running,
     device_mode,
     device_trouble,
@@ -128,6 +129,21 @@ def test_the_broker_is_running_while_its_heartbeat_in_the_shared_directory_is_fr
     (tmp_path / BROKER_HEARTBEAT).write_text("999.0", encoding="utf-8")
 
     assert broker_running(now=1000.0, state_dir=tmp_path)
+
+
+def test_closing_asks_the_broker_its_checkout_names_to_remind_him_to_turn_the_osr2_off(
+        tmp_path):
+    checkout = tmp_path / "relay"
+    checkout.mkdir()
+    (checkout / CONTRACT_FILE).write_text(json.dumps({
+        "app_name": "Relay", "package_dir": "relay_pkg", "broker_module": "relay_pkg.app",
+        "tray_module": "relay_pkg.tray", "tray_launcher": "launch_relay_tray.vbs",
+        "turn_off_reminder_request": "relay_reminder.txt",
+    }), encoding="utf-8")
+
+    ask_for_the_turn_off_reminder(state_dir=tmp_path, checkout=checkout)
+
+    assert (tmp_path / "relay_reminder.txt").read_text(encoding="utf-8") == "Origenerator"
 
 
 def test_a_press_on_the_broker_goes_through_the_launcher_its_checkout_names(

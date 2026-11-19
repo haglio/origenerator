@@ -6,6 +6,7 @@ from origenerator.workflows.non_ai import (
     FOLDER_KEY,
     FOLDER_PARTS_IN_A_NAME,
     TITLE_KEY,
+    VERSION_GROUP_KEY,
     non_ai_folder,
 )
 
@@ -23,6 +24,21 @@ def video_kino_plays(row: dict) -> str | None:
     if not started_from_no_image(row):
         return None
     return next(iter(sorted(library_paths_in(row.get("output_files")))), None)
+
+
+def alternate_versions(row: dict, videos) -> list[dict]:
+    group = _version_group(row)
+    if group is None:
+        return []
+    return [other for other in videos
+            if other.get("workflow_name") == row["workflow_name"]
+            and other["prompt_id"] != row["prompt_id"] and _version_group(other) == group]
+
+
+def _version_group(row: dict) -> str | None:
+    if non_ai_folder(row.get("workflow_name")) is None:
+        return None
+    return parse_params(row.get("params_json")).get(VERSION_GROUP_KEY) or None
 
 
 def recorded_title(row: dict) -> str | None:

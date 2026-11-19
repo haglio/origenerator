@@ -4,6 +4,7 @@ import json
 import threading
 from unittest.mock import ANY, MagicMock
 
+import pytest
 from app_support.threading_utils import wait_until
 from PIL import Image
 from PySide6.QtCore import (
@@ -1234,6 +1235,36 @@ def test_the_image_a_turns_generate_made_becomes_the_tab_when_it_lands_with_noth
     _finish_reroll(view, job)
 
     assert _shown_by_the_tab(view) == (job.prompt_id, [("two cats", _TWO_CATS_SAID)], ("", ""))
+
+
+def _press_generate_under_the_turn(qtbot, tab) -> None:
+    tab._param_form.request_exchange().generate_asked.emit(0)
+
+
+def _press_the_tabs_own_generate(qtbot, tab) -> None:
+    qtbot.mouseClick(tab._generate_btn, Qt.MouseButton.LeftButton)
+
+
+@pytest.mark.parametrize(("auto_generate", "press"), [
+    (False, _press_generate_under_the_turn),
+    (False, _press_the_tabs_own_generate),
+    (True, None),
+])
+def test_the_conversation_shows_on_the_tab_the_moment_its_image_lands(
+        qtbot, tmp_path, auto_generate, press):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path, auto_generate=auto_generate)
+    tab = view._generate_pane.current_generate_tab()
+    if press is not None:
+        press(qtbot, tab)
+    (job,) = view._live_jobs.values()
+    until(lambda: _every_job_is_with_comfyui(view))
+
+    _finish_reroll(view, job)
+
+    exchange = tab._param_form.request_exchange()
+    assert (tab._param_form.request_section().isVisibleTo(tab),
+            exchange._conversation.isVisibleTo(tab), exchange.turns()) == (
+        True, True, [("two cats", _TWO_CATS_SAID)])
 
 
 def test_the_image_auto_generate_made_becomes_the_tab_when_it_lands(qtbot, tmp_path):

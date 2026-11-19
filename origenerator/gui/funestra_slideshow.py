@@ -720,6 +720,7 @@ class FunestraSlideshow(QObject):
                 self._set.playlist.add(slide)
                 or self._set.playlist.replace_file(prompt_id, slide.path, slide.media_type,
                                                    slide.still)):
+            self._set.a_row_played_whole_is_its_loop()
             self._hand_over()
 
     def note_enhanced(self, prompt_id: str, path, media_type: str = MediaType.IMAGE,

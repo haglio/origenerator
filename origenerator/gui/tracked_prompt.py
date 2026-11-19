@@ -12,6 +12,9 @@ from origenerator.prompt_diff import ADDED, REMOVED, SAME, diff_spans
 
 SETTLE_MS = 150
 
+_TYPED = "typed"
+_LETTER_OF = {SAME: "s", ADDED: "a", REMOVED: "r", _TYPED: "t"}
+
 _BACK = (QTextCursor.MoveOperation.PreviousCharacter, QTextCursor.MoveOperation.PreviousWord)
 _ON = (QTextCursor.MoveOperation.NextCharacter, QTextCursor.MoveOperation.NextWord)
 _MOVES = {Qt.Key.Key_Left: _BACK, Qt.Key.Key_Right: _ON}
@@ -39,7 +42,24 @@ def _spliced(layout: list, position: int, removed: int, inserted: str) -> list:
         before.append((kind, text[:max(0, position - doc)]))
         after.append((kind, text[max(0, position + removed - doc):]))
         doc += len(text)
-    return [(kind, text) for kind, text in [*before, (ADDED, inserted), *after] if text]
+    return [(kind, text) for kind, text in [*before, (_TYPED, inserted), *after] if text]
+
+
+def _letters(layout: list) -> str:
+    return "".join(_LETTER_OF[kind] * len(text) for kind, text in layout)
+
+
+def _runs_to_relight(lit: list, wanted: list) -> list[tuple[int, int, bool]]:
+    runs: list[tuple[int, int, bool]] = []
+    for at, (before, after) in enumerate(zip(_letters(lit), _letters(wanted), strict=True)):
+        if before == after and before != "t":
+            continue
+        added = after == "a"
+        if runs and runs[-1][1] == at and runs[-1][2] == added:
+            runs[-1] = (runs[-1][0], at + 1, added)
+        else:
+            runs.append((at, at + 1, added))
+    return runs
 
 
 class UndoHistory(QObject):
@@ -212,10 +232,25 @@ class _Tracker(QObject):
     def _show_prompt_only(self) -> None:
         spans = [span for span in diff_spans(self._baseline, self._value)
                  if span[0] != REMOVED]
-        if self._edit.toPlainText() == self._value:
-            self._light(spans)
-        else:
+        if self._edit.toPlainText() != self._value:
             self._paint(spans, self._prompt_caret)
+        elif len(_letters(self._layout)) == len(self._value):
+            self._relight(spans)
+        else:
+            self._light(spans)
+
+    def _relight(self, spans: list) -> None:
+        runs = _runs_to_relight(self._layout, spans)
+        self._layout = spans
+        with self._own_write():
+            cursor = QTextCursor(self._edit.document())
+            for start, end, added in runs:
+                cursor.setPosition(start)
+                cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
+                cursor.mergeCharFormat(_plain_format())
+                if added:
+                    cursor.mergeCharFormat(diff_text.format_for(ADDED))
+            diff_text.hold_value(self._edit, None)
 
     def _on_contents_change(self, position: int, removed: int, added: int) -> None:
         # Qt: a struck-through line break does not report itself as struck.

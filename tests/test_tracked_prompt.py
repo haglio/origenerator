@@ -558,3 +558,33 @@ def test_the_up_arrow_gets_past_struck_lines(pair, qtbot):
         qtbot.keyClick(pair.edit, Qt.Key.Key_Up)
 
     assert pair.edit.textCursor().block().text() == "one"
+
+
+def _typed_at(edit, position: int, text: str) -> None:
+    cursor = edit.textCursor()
+    cursor.setPosition(position)
+    edit.setTextCursor(cursor)
+    for letter in text:
+        edit.insertPlainText(letter)
+        _drawn(edit)
+
+
+def test_a_key_relights_only_what_it_changed_never_the_whole_prompt(pair, monkeypatch):
+    tracked_prompt.track(pair.edit, "a cat on a couch")
+    pair.edit.setFocus()
+    unmarked = []
+    monkeypatch.setattr(tracked_prompt, "_unmark", unmarked.append)
+
+    _typed_at(pair.edit, len("a cat on a "), "red ")
+
+    assert unmarked == [], "each key reset the format of every letter of the prompt"
+    assert _marked(pair.edit, "lit") == "red"
+
+
+def test_a_letter_that_turns_a_kept_word_into_a_new_one_lights_the_whole_word(pair):
+    tracked_prompt.track(pair.edit, "a cat on a couch")
+    pair.edit.setFocus()
+
+    _typed_at(pair.edit, len("a cat"), "s")
+
+    assert _marks(pair.edit) == [("a ", "plain"), ("cats", "lit"), (" on a couch", "plain")]

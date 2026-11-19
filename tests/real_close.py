@@ -3,7 +3,6 @@ from __future__ import annotations
 import collections
 import gc
 import json
-import socket
 import sys
 import weakref
 from pathlib import Path
@@ -16,7 +15,8 @@ import shiboken6
 from PySide6.QtCore import QCoreApplication, QObject, QThread, QTimer
 from PySide6.QtWidgets import QApplication
 
-from origenerator import app, config, landed_while_away
+from origenerator import app, landed_while_away
+from origenerator.gui.off_the_machine import EVERYTHING_OFF_THE_MACHINE
 
 
 class _Watched:
@@ -24,15 +24,7 @@ class _Watched:
 
 
 def _leave_no_watcher_behind(setattr) -> None:
-    """A close with runs in flight starts a process to wait them out, and one
-    started from here would ask the ComfyUI on this machine about them for hours."""
     setattr(landed_while_away, "_start_a_watcher", lambda _identity: None)
-
-
-def _a_port_nothing_answers_on() -> int:
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", 0))
-        return probe.getsockname()[1]
 
 
 def _owned_by_python() -> dict[str, int]:
@@ -65,11 +57,9 @@ def _close_once_its_loop_runs(window) -> None:
 
 def open_and_close(built) -> int:
     say_where_it_hangs()
-    config.COMFYUI_PORT = _a_port_nothing_answers_on()
-    for keep_off in (suite.keep_the_microphone_shut, suite.refuse_the_comfyui_on_this_machine,
-                     suite.start_no_comfyui_on_this_machine,
-                     suite.keep_off_the_device, suite.keep_out_of_windows, suite.keep_silent,
-                     suite.refuse_the_dialogs_nobody_can_answer, _leave_no_watcher_behind):
+    for keep_off in (*EVERYTHING_OFF_THE_MACHINE, suite.keep_the_microphone_shut,
+                     suite.keep_off_the_device, suite.keep_the_run_at_its_own_priority,
+                     _leave_no_watcher_behind):
         keep_off(setattr)
     build = app._build_window
 

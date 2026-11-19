@@ -48,6 +48,7 @@ def test_the_parser_accepts_exactly_the_flags_the_document_names():
           for side in document[group] for flag in document[group][side]),
         *document["headset_flags"],
         document["check_launch_flag"],
+        document["hosted_rehearsal_flag"],
     }
 
     assert flags_the_parser_accepts() == declared, (

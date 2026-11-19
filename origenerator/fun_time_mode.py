@@ -77,6 +77,8 @@ TASKBAR_IDENTITY_FLAG = "--taskbar-identity"
 
 CHECK_LAUNCH_FLAG = "--check-launch"
 
+REHEARSE_FLAG = "--rehearse-hosted-start"
+
 SPOKEN_PHRASES_MODULE = "origenerator.voice.hosted"
 
 WINDOW_TITLE = "Origenerator"
@@ -157,6 +159,7 @@ def declaration() -> dict:
         "module": MODULE,
         "window_title": WINDOW_TITLE,
         "check_launch_flag": CHECK_LAUNCH_FLAG,
+        "hosted_rehearsal_flag": REHEARSE_FLAG,
         "spoken_phrases_module": SPOKEN_PHRASES_MODULE,
         "required_flags": list(required_flags()),
         "region_flags": {shape: list(region_flags(shape)) for shape in SHAPES},
@@ -250,6 +253,7 @@ class FunTimeSession:
 class AppArgs:
     fun_time: FunTimeSession | None
     check_launch: bool = False
+    rehearse: bool = False
 
 
 def _add_rect_arguments(parser: argparse.ArgumentParser, prefix: str) -> None:
@@ -275,6 +279,7 @@ def build_parser() -> argparse.ArgumentParser:
             parser.add_argument(f"--{shape}-{name}", type=Path, default=None)
     parser.add_argument(TASKBAR_IDENTITY_FLAG, default=None)
     parser.add_argument(CHECK_LAUNCH_FLAG, action="store_true")
+    parser.add_argument(REHEARSE_FLAG, action="store_true")
     return parser
 
 
@@ -371,7 +376,8 @@ def parse_app_args(argv: list[str]) -> AppArgs:
     if args.fun_time and (missing := _missing_required(argv)):
         parser.error(f"{MODE_FLAG} without {', '.join(missing)}; the launch "
                      f"contract is {CONTRACT_FILE}")
-    return AppArgs(fun_time=_session_of(args), check_launch=args.check_launch)
+    return AppArgs(fun_time=_session_of(args), check_launch=args.check_launch,
+                   rehearse=args.rehearse_hosted_start)
 
 
 def _stayed_standalone(why: str) -> None:

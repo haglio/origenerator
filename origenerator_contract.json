@@ -2,6 +2,7 @@
   "module": "origenerator",
   "window_title": "Origenerator",
   "check_launch_flag": "--check-launch",
+  "hosted_rehearsal_flag": "--rehearse-hosted-start",
   "spoken_phrases_module": "origenerator.voice.hosted",
   "required_flags": [
     "--fun-time",

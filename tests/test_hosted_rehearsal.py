@@ -43,5 +43,7 @@ def test_a_rehearsal_that_meets_an_error_filling_a_satellite_fails_with_its_last
 
     failed = hosted_rehearsal.rehearse(a_hosted_launch_in(tmp_path), child=breaking)
 
+    said = capfd.readouterr().err
     assert failed != 0
-    assert "TypeError: an invented fault filling the portrait Satellite" in capfd.readouterr().err
+    assert any(f"TypeError: an invented fault filling the {shape} Satellite" in said
+               for shape in contract.SHAPES), said

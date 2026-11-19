@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+from collections import OrderedDict
 from dataclasses import dataclass
 
 from PySide6.QtCore import QPoint, QSize, Qt, Signal
@@ -21,11 +22,28 @@ from shared_ui.spacing import BUTTON_ICON, BUTTON_RADIUS, GAP_SMALL, HAIRLINE
 
 from origenerator.gui import palette, tile_shape
 from origenerator.gui.text_color import color_text
+from origenerator.one_look import written_at
 
 _CELL_GAP = HAIRLINE
 _CELL_SIZE = ((tile_shape.THUMBNAIL_SIZE[0] - _CELL_GAP) // 2,
               (tile_shape.THUMBNAIL_SIZE[1] - _CELL_GAP) // 2)
 _INNER_WIDTH = tile_shape.TILE_WIDTH - 2 * tile_shape.TILE_MARGIN
+_FITTED_CELLS: OrderedDict[tuple[str, int | None], QPixmap | None] = OrderedDict()
+_MOST_FITTED_CELLS = 1024
+
+
+def _fitted_cell(path: str) -> QPixmap | None:
+    key = (path, written_at(path))
+    if key in _FITTED_CELLS:
+        _FITTED_CELLS.move_to_end(key)
+        return _FITTED_CELLS[key]
+    decoded = QPixmap(path)
+    _FITTED_CELLS[key] = None if decoded.isNull() else decoded.scaled(
+        *_CELL_SIZE, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+        Qt.TransformationMode.SmoothTransformation)
+    if len(_FITTED_CELLS) > _MOST_FITTED_CELLS:
+        _FITTED_CELLS.popitem(last=False)
+    return _FITTED_CELLS[key]
 
 
 @dataclass(frozen=True)
@@ -146,13 +164,9 @@ class FolderTile(QFrame):
             cell.setStyleSheet(
                 f"background: {palette.EMPTY_PLATE}; border-radius: {BUTTON_RADIUS}px;")
             if idx < len(previews):
-                pm = QPixmap(str(previews[idx]))
-                if not pm.isNull():
-                    cell.setPixmap(pm.scaled(
-                        *_CELL_SIZE,
-                        Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-                        Qt.TransformationMode.SmoothTransformation,
-                    ))
+                fitted = _fitted_cell(str(previews[idx]))
+                if fitted is not None:
+                    cell.setPixmap(fitted)
             grid.addWidget(cell, idx // 2, idx % 2)
         return thumbnails
 

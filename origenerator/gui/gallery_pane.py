@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
-from pathlib import Path
 from typing import NamedTuple
 
 import shiboken6
@@ -63,7 +62,7 @@ from origenerator.gui.picking import Picking, Picks
 from origenerator.item_shape import base_of, filter_rows, key_holds, split_key
 from origenerator.library_views import LibrarySnapshot
 from origenerator.media import MediaType
-from origenerator.one_look import looking_once
+from origenerator.one_look import is_file, looking_once
 
 REROLL_VIDEO = "video"
 REROLL_IMAGE = "image"
@@ -102,11 +101,12 @@ def _search_empty_hint(outcome, query: str, scope: str) -> str:
             "all — try fewer of them.")
 
 
+@looking_once
 def _thumbnails_of(rows) -> list[str]:
     paths = []
     for row in rows:
         thumb = row.get("thumbnail_path")
-        if thumb and Path(thumb).exists():
+        if thumb and is_file(thumb):
             paths.append(thumb)
             if len(paths) >= _PREVIEW_COUNT:
                 break

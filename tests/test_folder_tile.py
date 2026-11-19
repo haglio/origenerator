@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QLabel
 
 from origenerator import gallery
-from origenerator.gui import folder_icons, tile_shape
+from origenerator.gui import folder_icons, folder_tile, tile_shape
 from origenerator.gui.folder_tile import FolderMarks, FolderTile
 
 
@@ -96,3 +97,20 @@ def test_a_folder_square_wears_the_picked_frame_when_it_is_marked(qtbot):
 
     assert not tile._selected
     assert tile_shape.idle_css("folderTile") in tile.styleSheet()
+
+
+def test_a_folder_drawn_again_decodes_none_of_its_pictures_again(qtbot, tmp_path, monkeypatch):
+    previews = []
+    for n in range(4):
+        picture = QPixmap(8, 8)
+        picture.fill()
+        path = tmp_path / f"thumb {n}.png"
+        picture.save(str(path))
+        previews.append(str(path))
+    decoded = []
+    monkeypatch.setattr(folder_tile, "QPixmap", lambda path: decoded.append(path) or QPixmap(path))
+
+    for _ in range(3):
+        qtbot.addWidget(FolderTile("k", "a dog", previews, 4))
+
+    assert sorted(decoded) == sorted(previews)

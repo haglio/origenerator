@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -1081,3 +1082,23 @@ def test_restarring_many_drawn_tiles_reads_their_rows_in_one_query(qtbot, db, mo
     pane.refresh_corners()
 
     assert asked_one_by_one == []
+
+
+def test_a_folder_s_preview_lists_its_thumbnails_folder_rather_than_asking_after_each(
+        tmp_path, monkeypatch):
+    rows = [{"thumbnail_path": str(tmp_path / f"gone {n}.png")} for n in range(6)]
+
+    asked = []
+
+    def asking_through(real):
+        def asking(path, *args, **kwargs):
+            if tmp_path in path.parents:
+                asked.append(path.name)
+            return real(path, *args, **kwargs)
+        return asking
+
+    monkeypatch.setattr(Path, "exists", asking_through(Path.exists))
+    monkeypatch.setattr(Path, "is_file", asking_through(Path.is_file))
+
+    assert gallery_pane._thumbnails_of(rows) == []
+    assert asked == []

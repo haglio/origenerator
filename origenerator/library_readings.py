@@ -13,12 +13,16 @@ class Read(NamedTuple):
     meta: dict
     requests: list[dict]
     fingerprint: tuple[int, int]
+    version: int | None = None
 
 
-def read_whole(db) -> Read:
+def read_whole(db, last: Read | None = None) -> Read:
+    version = db.library_version()
+    if last is not None and last.version == version:
+        return last
     rows = db.list_generations()
     meta = db.folder_meta_map()
-    return Read(rows, meta, db.list_requests(), _fingerprint(rows, meta))
+    return Read(rows, meta, db.list_requests(), _fingerprint(rows, meta), version)
 
 
 class LibraryReadings:

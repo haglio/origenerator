@@ -312,6 +312,7 @@ class GalleryView(QWidget):
         self.keys.intercept(True)
 
         self._poll_inflight = False
+        self._last_poll_read = None
         self._poll_timer = QTimer(self)
         self._poll_timer.setInterval(_POLL_INTERVAL_MS)
         self._poll_timer.timeout.connect(self._poll)
@@ -864,13 +865,15 @@ class GalleryView(QWidget):
             raise
         db = self._db
         read_at = self.library.drawn_version
-        self.off_thread(lambda: read_whole(db),
+        last = self._last_poll_read
+        self.off_thread(lambda: read_whole(db, last),
                         lambda read: self._finish_poll_rebuild(read, read_at))
 
     def _finish_poll_rebuild(self, read, read_at: int):
         try:
             if read is None:
                 return
+            self._last_poll_read = read
             if self.library.is_news(read, read_at):
                 listed_before = self.library.reading.rows
                 self._rebuild(read.rows, read.meta)

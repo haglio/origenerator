@@ -57,7 +57,7 @@ from tests import gestures
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.qt_exec import faking_exec
 from tests.real_db import database_of, keep_on_disk, keep_rows_on_disk
-from tests.slideshow_hud_support import funestra_of
+from tests.slideshow_hud_support import funestra_of, press_key_on
 
 _SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
 
@@ -703,7 +703,6 @@ def _enhanced_in_place(db, pid="g0"):
 def _double_click_slideshow(view, qtbot, *, media=("shown.png", "image"), target=None):
     slideshow = (view.slideshows.open_on_preview(None, None) if media is None
                  else view.slideshows.open_in_its_folder(media, view.selected_prompt_id()))
-    qtbot.addWidget(slideshow.shown)
     if target is not None:
         _aim_slideshow(view, slideshow, target)
     return slideshow
@@ -834,13 +833,12 @@ def _a_slideshow_standing_on_its_own(qtbot, monkeypatch, **gallery):
     _open_leaf(view)
     view.slideshows.start()
     slideshow = view.slideshows.showing
-    qtbot.addWidget(slideshow.shown)
     funestra_of(slideshow.shown)
     return view, slideshow
 
 
 def _press_enter(slideshow):
-    gestures.press_key(slideshow.shown, Qt.Key.Key_Return)
+    press_key_on(slideshow, Qt.Key.Key_Return)
 
 
 def _press_escape(view):
@@ -938,7 +936,6 @@ def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
     view.refresh()
     _select_first_leaf(view)
     view.slideshows.start()
-    qtbot.addWidget(view.slideshows.showing.shown)
     return view
 
 

@@ -67,8 +67,6 @@ from origenerator.media import MediaType
 from origenerator.run_toast import RunOutcome
 from origenerator.slideshow import SlideshowFilters, SlideshowState
 from origenerator.workflows import WORKFLOW_REGISTRY
-from tests import gestures
-from tests.closed_windows import is_closed
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import _collection, _select_first_leaf, _selected_folder
 from tests.his_monitors import (
@@ -279,14 +277,11 @@ def test_ctrl_alt_q_in_a_slideshow_takes_the_slideshow_down_with_the_app(
     _select_first_leaf(win._gallery_view)
     win._gallery_view.slideshows.start()
     slideshow = win._gallery_view.slideshows.showing
-    qtbot.addWidget(slideshow.shown)
-    with qtbot.waitActive(slideshow.shown):
-        slideshow.shown.activateWindow()
 
-    gestures.press_key(slideshow.shown, Qt.Key.Key_Q, _CTRL_ALT)
+    slideshow.shown.asked("key|q|ctrl+alt", 0.0)
 
     assert not win.isVisible()
-    assert is_closed(slideshow.shown)
+    assert not slideshow.is_showing()
 
 
 def test_closing_it_takes_down_the_action_setter_tool_it_opened(qtbot, tmp_path, monkeypatch):
@@ -809,7 +804,6 @@ def test_a_slideshow_started_after_a_relaunch_comes_back_on_enhanced_only(
     first._gallery_view.refresh()
     _select_first_leaf(first._gallery_view)
     first._gallery_view.slideshows.start()
-    qtbot.addWidget(first._gallery_view.slideshows.showing.shown)
     first._gallery_view.slideshows.showing.set_enhanced_filter(True)
 
     first.close()
@@ -818,7 +812,6 @@ def test_a_slideshow_started_after_a_relaunch_comes_back_on_enhanced_only(
     second._gallery_view.slideshows.start()
 
     slideshow = second._gallery_view.slideshows.showing
-    qtbot.addWidget(slideshow.shown)
     assert slideshow.hud_enhanced_filter
 
 
@@ -1609,8 +1602,6 @@ def test_the_videos_recent_lists_come_back_after_close_and_reopen(qtbot, tmp_pat
 def _fun_time_session(main=(10, 20, 800, 600)):
     return FunTimeSession(
         main_rect=Rect(*main),
-        portrait_rect=Rect(2560, 0, 1440, 1870),
-        landscape_rect=Rect(853, 0, 1707, 1400),
         command_file=None, paused_file=None, status_file=None,
         dashboard_cmd_file=None,
     )

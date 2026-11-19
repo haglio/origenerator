@@ -5,13 +5,12 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
-from funestra.testing import FakeEngine
+from funestra.program.asks import FOCUSED
+from funestra.session_quit import SESSION_QUIT
 from funestra.volume import VolumeHud
 from PIL import Image
-from PySide6.QtCore import QPoint, QPointF, Qt
-from PySide6.QtGui import QGuiApplication, QIcon, QKeyEvent
-from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QWidget
+from PySide6.QtCore import QRect, Qt
+from PySide6.QtGui import QGuiApplication, QKeyEvent
 from shared_ui.colors import GREEN, RED, TEXT_PRIMARY, YELLOW
 from shared_ui.icons import icon_then_text
 from shared_ui.message_shape import (
@@ -31,16 +30,13 @@ from origenerator.funscript import (
 from origenerator.gui.funestra_slideshow import Playing
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.inflight import InFlightItem, RunReading
-from origenerator.gui.message import Message
+from origenerator.gui.message_over_a_funestra import MessageOverAFunestra
 from origenerator.gui.slideshow_pace import SlideshowPace
-from origenerator.gui.slideshow_view import SlideshowView, ViewShow, ViewWiring
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
-from origenerator.gui.stylesheet import dress_application
 from origenerator.slideshow import LIVE, Slide, SlideshowFilters, in_order
-from tests import gestures
-from tests.closed_windows import is_closed
 from tests.marked_words import words
 from tests.motion_doubles import FakeMotion
+from tests.own_funestra_support import standalone as _standalone
 from tests.slideshow_hud_support import (
     button_on_screen,
     speaker_on_screen,
@@ -72,11 +68,8 @@ class _Clock:
 
 def _view(qtbot, items=_ITEMS, **kw):
     kw.setdefault("shuffle", lambda order: None)
-    kw = _wired(kw)
-    wiring = {name: kw.pop(name) for name in ("motion", "radio", "volume") if name in kw}
-    view = SlideshowView(items, ViewShow(**kw), ViewWiring(engine=FakeEngine(), clock=_Clock(), **wiring))
-    qtbot.addWidget(view)
-    view.resize(1280, 720)
+    kw.setdefault("clock", _Clock())
+    view = _standalone(items, **_wired(kw))
     stop_the_poll_to_tick_by_hand(view.slideshow)
     return view
 
@@ -87,7 +80,7 @@ def _settle(view):
 
 
 def _engine(view):
-    return view._pane._engine
+    return view.engine if view.funestra is not None else None
 
 
 def _media_on_screen(view) -> str:
@@ -102,8 +95,8 @@ def _video_up(view) -> bool:
 
 
 def _the_slideshow_follows_the_funestra(view):
-    view._pane.tick()
-    view._pane.tick()
+    view.tick_the_funestra()
+    view.tick_the_funestra()
     _settle(view)
 
 
@@ -286,12 +279,23 @@ def test_a_slideshow_following_a_running_generation_has_no_set_to_narrow(qtbot, 
     assert len(view.slideshow._set.playlist) == 1
 
 
+_AS_A_FUNESTRA_NAMES_IT = {
+    Qt.Key.Key_Up: "up", Qt.Key.Key_Down: "down", Qt.Key.Key_Left: "left",
+    Qt.Key.Key_Right: "right", Qt.Key.Key_Escape: "escape", Qt.Key.Key_Return: "return",
+    Qt.Key.Key_Enter: "enter", Qt.Key.Key_Home: "home", Qt.Key.Key_Space: "space",
+    Qt.Key.Key_Semicolon: ";",
+}
+
+
+def _as_a_funestra_names(key) -> str:
+    return _AS_A_FUNESTRA_NAMES_IT.get(key) or chr(int(key)).lower()
+
+
 def _press(view, key, modifiers=Qt.KeyboardModifier.NoModifier):
-    if not view.isActiveWindow():
-        view.show()
-        view.activateWindow()
-        QTest.qWaitForWindowActive(view)
-    gestures.press_key(view, key, modifiers)
+    held = [name for name, modifier in (("shift", Qt.KeyboardModifier.ShiftModifier),
+                                        ("ctrl", Qt.KeyboardModifier.ControlModifier))
+            if modifiers & modifier]
+    view.key(_as_a_funestra_names(key), "+".join(held))
 
 
 def _shift(view, key):
@@ -411,9 +415,8 @@ def test_a_new_set_played_in_drops_the_switches_the_last_one_left_on(qtbot):
 
 def test_culling_releases_the_lock(qtbot):
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
-    view = SlideshowView(items, ViewShow(shuffle=lambda order: None,
-                         actions=SlideshowActions(delete=lambda prompt_id: None)), ViewWiring(engine=FakeEngine()))
-    qtbot.addWidget(view)
+    view = _standalone(items, shuffle=lambda order: None,
+                         actions=SlideshowActions(delete=lambda prompt_id: None))
     _press(view, Qt.Key.Key_Down)
     _press(view, Qt.Key.Key_Up)
     assert not view.slideshow.locked
@@ -422,9 +425,7 @@ def test_culling_releases_the_lock(qtbot):
 
 def test_space_drives_the_shared_motion_not_the_lock(qtbot):
     motion = FakeMotion()
-    view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None), ViewWiring(engine=FakeEngine(),
-                         motion=motion))
-    qtbot.addWidget(view)
+    view = _standalone(_ITEMS, shuffle=lambda order: None, motion=motion)
     _press(view, Qt.Key.Key_Space)
     assert ("toggle", True) in motion.calls
     assert not view.slideshow.locked
@@ -432,19 +433,16 @@ def test_space_drives_the_shared_motion_not_the_lock(qtbot):
 
 def test_esc_leaves_the_slideshow_up(qtbot):
     view = _view(qtbot)
-    view.show()
     _press(view, Qt.Key.Key_Escape)
-    assert view.isVisible()
+    assert view.is_up()
 
 
-def test_closing_the_funestra_closes_nothing_in_the_window(qtbot):
+def test_closing_the_funestras_own_window_ends_the_slideshow(qtbot):
     view = _view(qtbot)
-    view.show()
 
-    view._pane.close_engine()
+    view.asked(SESSION_QUIT, 0.0)
 
-    assert view.isVisible(), (
-        "the window is the slideshow's own, so closing the Funestra closes nothing here")
+    assert not view.is_up()
 
 
 
@@ -453,9 +451,8 @@ def test_up_deletes_the_current_item_and_advances(qtbot, arrows):
     deleted = []
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b"),
              ("c.png", "image", "id-c")]
-    view = SlideshowView(items, ViewShow(shuffle=lambda order: None,
-                         actions=SlideshowActions(delete=deleted.append)), ViewWiring(engine=FakeEngine()))
-    qtbot.addWidget(view)
+    view = _standalone(items, shuffle=lambda order: None,
+                         actions=SlideshowActions(delete=deleted.append))
     assert view.slideshow._set.playlist.current()[2] == "id-a"
 
     _press(view, arrows.up)
@@ -467,56 +464,57 @@ def test_up_deletes_the_current_item_and_advances(qtbot, arrows):
 
 def test_enter_leaves_for_the_shown_items_folder(qtbot):
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
-    view = SlideshowView(items, ViewShow(shuffle=lambda order: None), ViewWiring(engine=FakeEngine()))
-    qtbot.addWidget(view)
-    view.show()
+    view = _standalone(items, shuffle=lambda order: None)
     opened = []
     view.slideshow.open_requested.connect(appending_to(opened))
 
     _press(view, Qt.Key.Key_Return)
 
     assert opened == ["id-a"]
-    assert is_closed(view)
+    assert not view.is_up()
 
 
 def test_a_slideshow_with_a_monitor_of_its_own_stays_up_and_hands_core_its_item(qtbot):
     left_for = []
     view = _view(qtbot, [("a.png", "image", "id-a"), ("b.png", "image", "id-b")],
                  on_leave_for_core=lambda prompt_id: left_for.append(prompt_id) or True)
-    view.show()
     _settle(view)
 
     _press(view, Qt.Key.Key_Return)
 
-    assert (left_for, view.isVisible(), view.slideshow.is_showing()) == (["id-a"], True, True)
+    assert (left_for, view.is_up(), view.slideshow.is_showing()) == (["id-a"], True, True)
 
 
 def test_shift_esc_does_nothing_in_a_slideshow(qtbot):
     left_for = []
     view = _view(qtbot, on_leave_for_core=lambda prompt_id: left_for.append(prompt_id) or True)
-    view.show()
 
     _press(view, Qt.Key.Key_Escape, Qt.KeyboardModifier.ShiftModifier)
 
-    assert (left_for, view.isVisible(), view._paused) == ([], True, False)
+    assert (left_for, view.is_up(), view._paused) == ([], True, False)
 
 
 def test_a_slideshow_core_will_not_take_from_closes_as_it_always_did(qtbot):
     view = _view(qtbot, on_leave_for_core=lambda prompt_id: False)
-    view.show()
 
     _press(view, Qt.Key.Key_Return)
 
-    assert is_closed(view)
+    assert not view.is_up()
 
 
-class _CoreOn:
-    def __init__(self, monitor):
-        self._monitor = monitor
+class _CoreAt:
+    def __init__(self, x: int, y: int):
+        self._area = QRect(x, y, 400, 300)
         self.raised = 0
 
-    def screen(self):
-        return self._monitor
+    def frameGeometry(self):
+        return QRect(self._area)
+
+    def isVisible(self):
+        return True
+
+    def isMinimized(self):
+        return False
 
     def raise_(self):
         self.raised += 1
@@ -526,31 +524,36 @@ def _app_comes_to_the_front():
     QGuiApplication.instance().applicationStateChanged.emit(Qt.ApplicationState.ApplicationActive)
 
 
-def test_coming_back_to_the_app_brings_core_forward_with_the_slideshow_on_the_other_monitor(qtbot):
-    core = _CoreOn(monitor=object())
+def test_coming_back_to_the_app_brings_the_slideshow_forward_on_the_other_monitor_too(qtbot):
+    core = _CoreAt(5000, 100)
     view = _view(qtbot, on_core_window=lambda: core)
-    view.show()
 
     _app_comes_to_the_front()
+
+    assert view.program.window.lifted == 1
+
+
+def test_a_slideshow_sharing_cores_monitor_is_not_lifted_over_core(qtbot):
+    core = _CoreAt(100, 100)
+    view = _view(qtbot, on_core_window=lambda: core)
+
+    _app_comes_to_the_front()
+
+    assert view.program.window.lifted == 0
+
+
+def test_bringing_the_slideshow_forward_brings_core_forward_on_the_other_monitor_too(qtbot):
+    core = _CoreAt(5000, 100)
+    view = _view(qtbot, on_core_window=lambda: core)
+
+    view.asked(FOCUSED, 0.0)
 
     assert core.raised == 1
 
 
-def test_a_slideshow_sharing_cores_monitor_does_not_pull_core_up_over_itself(qtbot):
-    view = _view(qtbot)
-    core = _CoreOn(monitor=view.screen())
-    view._actions = SlideshowActions(core_window=lambda: core)
-    view.show()
-
-    _app_comes_to_the_front()
-
-    assert core.raised == 0
-
-
 def _collection_view(qtbot):
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
-    view = SlideshowView(items, ViewShow(shuffle=lambda order: None), ViewWiring(engine=FakeEngine()))
-    qtbot.addWidget(view)
+    view = _standalone(items, shuffle=lambda order: None)
     _on_screen_wearing_its_hud(qtbot, view)
     opened = []
     view.slideshow.open_requested.connect(appending_to(opened))
@@ -558,8 +561,8 @@ def _collection_view(qtbot):
 
 
 def _leave_by_double_clicking_the_slide(qtbot, view):
-    gestures.double_click(view._pane._window, _on_the_slide_clear_of_the_hud(view))
-    qtbot.waitUntil(lambda: is_closed(view))
+    view.double_click(_on_the_slide_clear_of_the_hud(view))
+    qtbot.waitUntil(lambda: not view.is_up())
 
 
 def test_ending_a_slideshow_on_a_locked_slide_hands_that_slide_over(qtbot):
@@ -605,9 +608,7 @@ def test_closing_a_slideshow_twice_hands_over_once(qtbot):
 
 def test_culling_the_last_slide_hands_nothing_over(qtbot):
     deleted = []
-    view = SlideshowView([("a.png", "image", "id-a")], ViewShow(shuffle=lambda order: None, actions=SlideshowActions(delete=deleted.append)), ViewWiring(engine=FakeEngine()))
-    qtbot.addWidget(view)
-    view.show()
+    view = _standalone([("a.png", "image", "id-a")], shuffle=lambda order: None, actions=SlideshowActions(delete=deleted.append))
     opened = []
     view.slideshow.open_requested.connect(appending_to(opened))
     _press(view, Qt.Key.Key_Down)
@@ -1169,9 +1170,8 @@ def test_what_is_being_made_of_the_slide_is_no_message_across_the_top(qtbot):
 
 
 def test_the_message_wears_the_color_of_what_it_says(qtbot):
-    host = QWidget()
-    qtbot.addWidget(host)
-    message = Message(host)
+    message = MessageOverAFunestra()
+    qtbot.addWidget(message)
 
     message.say("a plain line")
     assert TEXT_PRIMARY.name() in message.styleSheet(), (
@@ -1375,10 +1375,8 @@ def test_stepping_off_a_locked_slide_releases_it(qtbot):
 
 def _on_screen_wearing_its_hud(qtbot, view):
     view.resize(900, 700)
-    with qtbot.waitExposed(view):
-        view.show()
     view.wear_the_hud("portrait")
-    view._pane.tick()
+    view.tick_the_funestra()
     _settle(view)
     return view
 
@@ -1387,14 +1385,14 @@ def test_a_move_of_its_volume_is_told_to_the_gallery(qtbot):
     moved = []
     view = _on_screen_wearing_its_hud(qtbot, _view(qtbot, on_volume_moved=moved.append))
 
-    gestures.click(view._pane._window, speaker_on_screen(view._pane))
+    view.click(speaker_on_screen(view))
+    _settle(view)
 
     assert moved == [VolumeHud(volume=100, muted=True)]
 
 
-def _on_the_slide_clear_of_the_hud(view) -> QPoint:
-    window = view._pane._window
-    return QPoint(window.width() * 3 // 4, window.height() * 3 // 4)
+def _on_the_slide_clear_of_the_hud(view) -> tuple[int, int]:
+    return view.width() * 3 // 4, view.height() * 3 // 4
 
 
 def test_double_clicking_the_slide_leaves_the_slideshow(qtbot):
@@ -1402,9 +1400,9 @@ def test_double_clicking_the_slide_leaves_the_slideshow(qtbot):
     closes = []
     view.slideshow.closed.connect(lambda: closes.append(True))
 
-    gestures.double_click(view._pane._window, _on_the_slide_clear_of_the_hud(view))
+    view.double_click(_on_the_slide_clear_of_the_hud(view))
 
-    qtbot.waitUntil(lambda: is_closed(view))
+    qtbot.waitUntil(lambda: not view.is_up())
     assert closes == [True], "the dismissal reaches the gallery, like Escape's"
 
 
@@ -1415,9 +1413,9 @@ def test_double_clicking_a_thumbnail_on_the_map_gives_it_the_lock_buttons_whole_
         enhance=lambda pid: asked.append(("enhance", pid)) or True,
         lock=lambda pid: asked.append(("lock", pid)))))
 
-    gestures.double_click(view._pane._window, thumbnail_on_screen(view, "b.png"))
+    view.double_click(thumbnail_on_screen(view, "b.png"))
 
-    assert view.isVisible()
+    assert view.is_up()
     assert (_media_on_screen(view), view.slideshow.locked) == ("b.png", True)
     assert asked == [("star", "id-b"), ("enhance", "id-b"), ("lock", "id-b")]
 
@@ -1425,9 +1423,9 @@ def test_double_clicking_a_thumbnail_on_the_map_gives_it_the_lock_buttons_whole_
 def test_two_quick_clicks_on_next_step_on_twice_and_leave_the_slideshow_up(qtbot):
     view = _on_screen_wearing_its_hud(qtbot, _view(qtbot))
 
-    gestures.double_click(view._pane._window, button_on_screen(view, "portrait_next"))
+    view.double_click(button_on_screen(view, "portrait_next"))
 
-    assert view.isVisible()
+    assert view.is_up()
     assert _media_on_screen(view) == "c.png"
 
 
@@ -1619,7 +1617,7 @@ def test_a_request_leaves_a_clip_playing_and_only_stops_the_slideshow_moving_on(
 
 
 def _click(view):
-    view._pane.press(QPointF(view._pane.width() / 2, view._pane.height() / 2))
+    view.click((view.width() // 2, view.height() // 2))
 
 
 def _escape(view):
@@ -2015,19 +2013,7 @@ def test_a_scripted_clip_hands_its_motion_to_the_hud(qtbot, tmp_path):
     write_funscript(vid.with_suffix(".funscript"),
                     synthesize_actions(2.0, hz=1.0))
     view = _view(qtbot, [(str(vid), "video")])
-    assert view._pane.playback.has_funscript
-
-
-def test_a_slideshow_wears_the_apps_icon_in_the_window_switcher(qtbot, qapp):
-    # Windows' task switcher draws a window with no icon of its own as a blank page
-    before = qapp.windowIcon()
-    qapp.setWindowIcon(QIcon())
-    try:
-        dress_application(qapp, None)
-
-        assert not _view(qtbot).windowIcon().isNull()
-    finally:
-        qapp.setWindowIcon(before)
+    assert view.funestra.playback.has_funscript
 
 
 def test_releasing_a_condemned_file_lets_go_of_it(qtbot, tmp_path):
@@ -2055,16 +2041,15 @@ def test_osr2_drive_target_bundles_the_scripted_video(qtbot, tmp_path):
     vid = tmp_path / "c.mp4"
     write_funscript(vid.with_suffix(".funscript"),
                     synthesize_actions(2.0, hz=1.0))
-    view = SlideshowView([(str(vid), "video")], ViewShow(shuffle=lambda order: None), ViewWiring(engine=FakeEngine()))
-    qtbot.addWidget(view)
+    view = _standalone([(str(vid), "video")], shuffle=lambda order: None)
 
     target = view.slideshow.osr2_drive_target()
 
     assert target is not None
     path, tgt_player, actions = target
     assert path == str(vid)
-    assert tgt_player is view._pane, (
-        "the pane is what the drive follows: it is what knows where the video has got to")
+    assert tgt_player is view.player, (
+        "what the drive follows is what knows where the video on the Funestra has got to")
     assert actions
 
 
@@ -2188,7 +2173,7 @@ def test_a_clip_the_backend_cannot_open_does_not_park_the_slideshow(qtbot, tmp_p
     assert view.slideshow._set.playlist.current()[2] == "v-1"
 
     _engine(view).idle = True
-    view._pane.tick()
+    view.tick_the_funestra()
     _settle(view)
 
     assert view.slideshow._set.playlist.current()[2] == "i-1", (
@@ -2207,7 +2192,7 @@ def test_an_unopenable_clip_is_stepped_past_even_while_locked(qtbot, tmp_path):
     _settle(view)
 
     _engine(view).idle = True
-    view._pane.tick()
+    view.tick_the_funestra()
     _settle(view)
 
     assert view.slideshow._set.playlist.current()[2] == "i-1", (
@@ -2547,10 +2532,8 @@ def test_a_configuration_rows_button_puts_it_up_and_loops_its_seeds(qtbot):
 class TestMovingTheSlideshowsHud:
     @staticmethod
     def _slideshow(qtbot, moves):
-        slideshow = SlideshowView([("scene one.png", "image")], ViewShow(shuffle=in_order,
-                                  actions=SlideshowActions(move_hud=moves.append)), ViewWiring(engine=FakeEngine()))
-        qtbot.addWidget(slideshow)
-        return slideshow
+        return _standalone([("scene one.png", "image")], shuffle=in_order,
+                           actions=SlideshowActions(move_hud=moves.append))
 
     @_ARROW_KEYS_OR_WASD
     def test_each_ctrl_arrow_asks_for_that_direction(self, qtbot, arrows):
@@ -2558,8 +2541,8 @@ class TestMovingTheSlideshowsHud:
         slideshow = self._slideshow(qtbot, moves)
 
         for key in (arrows.left, arrows.right, arrows.up, arrows.down):
-            slideshow.keyPressEvent(QKeyEvent(QKeyEvent.Type.KeyPress, key,
-                                              Qt.KeyboardModifier.ControlModifier))
+            slideshow.take_key(QKeyEvent(QKeyEvent.Type.KeyPress, key,
+                                         Qt.KeyboardModifier.ControlModifier))
 
         assert moves == ["left", "right", "up", "down"], (
             "both sets of keys move the HUD, the ones a Fun Time session gives its portrait Funestra and its "
@@ -2570,8 +2553,8 @@ class TestMovingTheSlideshowsHud:
         moves: list[str] = []
         slideshow = self._slideshow(qtbot, moves)
 
-        slideshow.keyPressEvent(QKeyEvent(QKeyEvent.Type.KeyPress, arrows.right,
-                                          Qt.KeyboardModifier.NoModifier))
+        slideshow.take_key(QKeyEvent(QKeyEvent.Type.KeyPress, arrows.right,
+                                     Qt.KeyboardModifier.NoModifier))
 
         assert moves == []
 
@@ -2849,21 +2832,12 @@ def test_a_version_stepped_to_while_the_image_is_enhanced_stays_up(qtbot, tmp_pa
     assert _media_on_screen(view) == a_base
 
 
-def test_a_closing_slideshow_is_off_the_screen_before_its_engine_lets_go(qtbot):
-    seen = {}
-
-    class RecordingEngine(FakeEngine):
-        def close(self) -> None:
-            super().close()
-            seen["slideshow visible"] = view.isVisible()
-
-    view = SlideshowView(_ITEMS, ViewShow(shuffle=in_order), ViewWiring(engine=RecordingEngine()))
-    qtbot.addWidget(view)
-    view.show()
+def test_a_closing_slideshow_ends_its_funestra_so_no_file_is_held_open(qtbot):
+    view = _standalone(_ITEMS, shuffle=in_order)
 
     view.close()
 
-    assert seen == {"slideshow visible": False}
+    assert (view.program.ended, view.engine.closed) == (True, True)
 
 
 def test_a_run_the_slideshow_opened_on_comes_back_finished_after_the_image_on_screen(qtbot):
@@ -2961,16 +2935,10 @@ def test_an_enhancement_landing_on_an_older_version_stepped_to_counts_from_the_n
     assert view.slideshow.hud_item_note == "Enhancement 2/2"
 
 
-def test_a_funestra_that_opens_after_the_pass_is_handed_over_takes_the_pace(qtbot):
-    view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None), ViewWiring(clock=_Clock()))
-    qtbot.addWidget(view)
-    assert _engine(view) is None
-    engine = FakeEngine()
-    view._pane._engine_for = lambda wid: engine
+def test_the_funestra_takes_the_pace_with_the_pass_it_is_handed(qtbot):
+    view = _standalone(_ITEMS, shuffle=lambda order: None)
 
-    view._pane._open_if_ready()
-
-    assert engine.pace_s == 4
+    assert view.engine.pace_s == 4
 
 
 def test_a_name_that_cannot_be_worked_out_leaves_the_item_line_blank(qtbot):
@@ -3008,3 +2976,131 @@ def test_every_message_stays_up_as_long_as_its_words_take_to_read(qtbot, said):
     assert view._note_timer.interval() == time_to_read_ms(said), (
         "a press's message, a spoken command's and a request's all stay up for the reading "
         "time of their words, the same rule a Fun Time session's messages follow")
+
+
+class _HeldRadio:
+    def __init__(self) -> None:
+        self.ticked: tuple | None = None
+        self.closed = False
+
+    def tick(self, *, image, level, paused) -> None:
+        self.ticked = (image, level, paused)
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class _ARadio:
+    def __init__(self) -> None:
+        self.held = _HeldRadio()
+
+    def held_by_a_slideshow(self) -> _HeldRadio:
+        return self.held
+
+
+def test_the_radio_its_slideshow_holds_plays_over_an_image_at_the_funestras_own_volume(qtbot):
+    radio = _ARadio()
+    view = _view(qtbot, _KEYED, radio=radio, volume=VolumeHud(volume=40, muted=False))
+    _engine(view).showing_image = True
+
+    _the_slideshow_follows_the_funestra(view)
+
+    assert radio.held.ticked == (True, 40, False)
+
+
+def test_the_radio_gives_way_to_a_video_and_stops_with_the_pause(qtbot):
+    radio = _ARadio()
+    view = _view(qtbot, [("b.mp4", "video", "id-b")], radio=radio)
+    _the_slideshow_follows_the_funestra(view)
+    assert radio.held.ticked == (False, 100, False)
+
+    view.slideshow.set_paused(True)
+    _the_slideshow_follows_the_funestra(view)
+
+    assert radio.held.ticked == (False, 100, True)
+
+
+def test_a_muted_funestra_plays_no_radio(qtbot):
+    radio = _ARadio()
+    view = _view(qtbot, _KEYED, radio=radio, volume=VolumeHud(volume=40, muted=True))
+
+    _the_slideshow_follows_the_funestra(view)
+
+    assert radio.held.ticked[1] is None
+
+
+def test_a_closing_slideshow_lets_its_hold_on_the_radio_go(qtbot):
+    radio = _ARadio()
+    view = _view(qtbot, _KEYED, radio=radio)
+
+    view.close()
+
+    assert radio.held.closed is True
+
+
+def test_the_funestra_opens_with_its_sound_on(qtbot):
+    view = _view(qtbot, _KEYED)
+
+    assert (_engine(view).volume, _engine(view).muted) == (100, False)
+
+
+def test_the_funestra_opens_at_the_volume_its_slideshow_was_left_at(qtbot):
+    view = _view(qtbot, _KEYED, volume=VolumeHud(volume=40, muted=False))
+
+    assert (_engine(view).volume, _engine(view).muted) == (40, False)
+
+
+def test_the_volume_it_was_opened_at_is_no_move_of_his_to_tell_the_gallery(qtbot):
+    moved = []
+    view = _view(qtbot, _KEYED, volume=VolumeHud(volume=40, muted=False),
+                 on_volume_moved=moved.append)
+
+    _the_slideshow_follows_the_funestra(view)
+    _the_slideshow_follows_the_funestra(view)
+
+    assert moved == []
+
+
+def test_the_drive_is_told_where_the_video_has_got_to_since_the_funestra_last_said(qtbot):
+    clock = _Clock()
+    view = _view(qtbot, [("b.mp4", "video", "id-b")], clock=clock)
+    assert view.player.position() == 0
+    _engine(view).position_ms = 12345.6
+    _settle(view)
+
+    clock.now += 0.1
+
+    assert view.player.position() == 12445
+
+
+def test_a_paused_video_stays_where_the_funestra_last_said(qtbot):
+    clock = _Clock()
+    view = _view(qtbot, [("b.mp4", "video", "id-b")], clock=clock)
+    _engine(view).position_ms = 12345.6
+    view.slideshow.set_paused(True)
+    _settle(view)
+
+    clock.now += 0.1
+
+    assert view.player.position() == 12345
+
+
+def test_a_slideshow_shown_again_where_it_already_is_is_left_alone(qtbot):
+    view = _view(qtbot, _KEYED)
+    shown = len(view.program.shown_on)
+
+    view.resize(1280, 720)
+
+    assert len(view.program.shown_on) == shown, (
+        "showing a window hands it the keyboard, so a slideshow given a new set where it "
+        "already plays must not take the keyboard from Core each time")
+
+
+def test_a_minimized_slideshow_shown_where_it_was_comes_back(qtbot):
+    view = _view(qtbot, _KEYED)
+    view.program.minimize()
+    shown = len(view.program.shown_on)
+
+    view.resize(1280, 720)
+
+    assert (len(view.program.shown_on), view.program.minimized) == (shown + 1, False)

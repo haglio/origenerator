@@ -34,7 +34,6 @@ from origenerator.gui.hud_queue import CANCEL, OPEN
 from origenerator.gui.slideshow_pace import DEFAULT_S
 from origenerator.osr2_controls_commands import spelled_for
 from origenerator.slideshow_buttons import answer
-from tests.closed_windows import is_closed
 from tests.gallery_view_support import (
     FakeActions,
     _answer_confirmation,
@@ -47,19 +46,15 @@ from tests.gallery_view_support import (
     _running_reroll,
     _seeded_db,
     _viewport_of,
-    _will_move_on,
 )
 from tests.qt_exec import faking_exec
 from tests.real_db import database_of, keep_on_disk
-from tests.slideshow_hud_support import funestra_of
 from tests.test_slideshow_hud import _inflight
 
 
 def _session(tmp_path):
     return FunTimeSession(
         main_rect=Rect(0, 206, 853, 1234),
-        portrait_rect=Rect(2560, 0, 1440, 1870),
-        landscape_rect=Rect(853, 0, 1707, 1440),
         command_file=tmp_path / "origenerator_cmd.txt",
         paused_file=tmp_path / "origenerator_paused.txt",
         status_file=tmp_path / "origenerator_status.txt",
@@ -74,7 +69,7 @@ def _as_items(rows):
 
 
 def _view_with_bridge(qtbot, tmp_path, rows=()):
-    view = GalleryView(database_of(list(rows)), fun_time=_session(tmp_path))
+    view = GalleryView(database_of(list(rows)), fun_time=_funestras_session(tmp_path))
     qtbot.addWidget(view)
     bridge = FunTimeBridge(view._fun_time, view, parent=view)
     return view, bridge
@@ -91,22 +86,19 @@ def _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path, count=3):
     monkeypatch.setattr(view.slideshows, "items_of", lambda rows: list(items))
     monkeypatch.setattr(view, "slideshow_subject", lambda: "a folder")
     view.slideshows.start()
-    slideshow = view.region_slideshow("portrait")
-    qtbot.addWidget(slideshow.shown)
-    funestra_of(slideshow.shown)
-    return slideshow
+    view.fill_the_region("portrait")
+    return view.region_slideshow("portrait")
 
 
 def test_side_verbs_drive_the_slideshow_holding_that_region(qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
-    slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
-    before = slideshow._set.playlist.index
+    _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
+    _told(tmp_path, "portrait")
 
     (tmp_path / "origenerator_cmd.txt").write_text("PORTRAIT_NEXT\n", encoding="utf-8")
     bridge._tick()
-    slideshow.tick()
 
-    assert slideshow._set.playlist.index == (before + 1) % 3
+    assert _told(tmp_path, "portrait") == ["NEXT"]
 
 
 def test_a_verb_for_an_empty_region_is_dropped(qtbot, tmp_path):
@@ -419,24 +411,8 @@ def test_close_slideshows_clears_both_regions(qtbot, tmp_path, monkeypatch):
     (tmp_path / "origenerator_cmd.txt").write_text("CLOSE_SLIDESHOWS\n", encoding="utf-8")
     bridge._tick()
 
-    assert is_closed(slideshow.shown)
+    assert not slideshow.is_showing()
     assert view.region_slideshow("portrait") is None
-
-
-
-
-def test_the_paused_flag_freezes_and_resumes_an_open_slideshow(qtbot, tmp_path, monkeypatch):
-    view, bridge = _view_with_bridge(qtbot, tmp_path)
-    slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
-    assert _will_move_on(slideshow)
-
-    (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")
-    bridge._tick()
-    assert not _will_move_on(slideshow)
-
-    (tmp_path / "origenerator_paused.txt").write_text("0", encoding="utf-8")
-    bridge._tick()
-    assert _will_move_on(slideshow)
 
 
 def test_omnipause_stops_the_gallerys_own_moving_thumbnails(qtbot, tmp_path):
@@ -536,31 +512,6 @@ def test_the_log_says_when_fun_time_was_told_each_thing_once(qtbot, tmp_path, ca
         f"Told Fun Time: {contract.UP}=1 {contract.CORE_READY}=1"]
 
 
-def test_a_slideshow_opened_mid_pause_opens_frozen(qtbot, tmp_path, monkeypatch):
-    view, bridge = _view_with_bridge(qtbot, tmp_path)
-    (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")
-    bridge._tick()
-
-    slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
-
-    assert not _will_move_on(slideshow)
-
-
-def test_a_step_while_paused_lands_on_a_slide_that_stays_frozen(qtbot, tmp_path, monkeypatch):
-    view, bridge = _view_with_bridge(qtbot, tmp_path)
-    slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
-    (tmp_path / "origenerator_paused.txt").write_text("1", encoding="utf-8")
-    bridge._tick()
-    before = slideshow._set.playlist.index
-
-    (tmp_path / "origenerator_cmd.txt").write_text("PORTRAIT_NEXT\n", encoding="utf-8")
-    bridge._tick()
-    slideshow.tick()
-
-    assert slideshow._set.playlist.index == (before + 1) % 3
-    assert not _will_move_on(slideshow)
-
-
 def test_a_spoken_request_from_the_session_is_collected_here(qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
@@ -642,8 +593,6 @@ def test_a_request_said_in_one_breath_leaves_the_room_nothing_to_hear(
     assert _the_room_was_told(tmp_path) == []
 
 
-
-
 def _press(bridge, tmp_path, line: str) -> None:
     (tmp_path / "origenerator_cmd.txt").write_text(f"{line}\n", encoding="utf-8")
     bridge._tick()
@@ -703,8 +652,8 @@ def _funestras_session(tmp_path):
         )
     session = _session(tmp_path)
     return FunTimeSession(
-        main_rect=session.main_rect, portrait_rect=session.portrait_rect,
-        landscape_rect=session.landscape_rect, command_file=session.command_file,
+        main_rect=session.main_rect,
+        command_file=session.command_file,
         paused_file=session.paused_file, status_file=session.status_file,
         dashboard_cmd_file=session.dashboard_cmd_file,
         portrait_funestra=channel("portrait"), landscape_funestra=channel("landscape"),
@@ -714,9 +663,9 @@ def _funestras_session(tmp_path):
 def test_a_session_that_hands_over_its_funestras_gets_both_sides_on_them(
         qtbot, tmp_path, monkeypatch):
     def no_window(*args, **kwargs):
-        raise AssertionError("a window of this app's opened over a region")
+        raise AssertionError("a Funestra of this app's own opened over a region")
 
-    monkeypatch.setattr(slideshow_director, "SlideshowView", no_window)
+    monkeypatch.setattr(slideshow_director, "OnItsOwnFunestra", no_window)
     view = GalleryView(database_of([]), fun_time=_funestras_session(tmp_path))
     qtbot.addWidget(view)
     bridge = FunTimeBridge(view._fun_time, view, parent=view)

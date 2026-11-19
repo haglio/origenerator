@@ -11,13 +11,14 @@ from app_support.gallery_rows import source_of
 from funestra.hud_placement import HudCorner
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.volume import VolumeHud
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QWidget
 from shared_ui.foreground import bring_to_front
 from shared_ui.message_shape import FAVORITE, INFO, WARNING
 
 from origenerator import gallery
-from origenerator.config import FRAMES_BEING_MADE_DIR, OUTPUT_PLACES
+from origenerator.config import FRAMES_BEING_MADE_DIR, OUTPUT_PLACES, STATE_DIR
 from origenerator.fun_time_bridge import (
     ask_for_omnipause,
     tell_of_a_lock,
@@ -39,6 +40,8 @@ from origenerator.gallery.shapes import shape_holds, the_one_shape_on, the_shape
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.action_presses import striking
 from origenerator.gui.frame_files import FrameFiles
+from origenerator.gui.funestra_asks import AsksFromTheFunestra
+from origenerator.gui.funestra_program import OwnFunestras
 from origenerator.gui.funestra_slideshow import (
     FunestraSlideshow,
     Hosting,
@@ -57,11 +60,11 @@ from origenerator.gui.hud_places import (
     restore,
     told,
 )
+from origenerator.gui.on_its_own_funestra import HudWear, OnItsOwnFunestra, OwnWiring
 from origenerator.gui.region_openings import RegionOpening, RegionOpenings
 from origenerator.gui.regions_left import RegionLeft, restored_regions, saved_regions
 from origenerator.gui.slideshow_lock import LockedOn, lock_held
 from origenerator.gui.slideshow_pace import SlideshowPace
-from origenerator.gui.slideshow_view import HudWear, SlideshowView, ViewShow, ViewWiring
 from origenerator.gui.slideshow_wiring import (
     NOTHING_CARRIED,
     Carrying,
@@ -100,7 +103,6 @@ from origenerator.slideshow import (
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.dictation import words_of
 from origenerator.voice.slideshow_commands import SlideshowCommand
-from origenerator.win32 import place_window_in_device_pixels
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +110,6 @@ _ABOUT_THE_SLIDE_SAID_OVER = frozenset({AppCommand.CULL, AppCommand.FAVORITE, Ap
 
 _OPENINGS_KEPT_FRESH_MS = 10 * 60 * 1000
 
-_REGION_CAPTIONS = {"portrait": "Origenerator Portrait", "landscape": "Origenerator Landscape"}
 
 
 class SlideshowHost(Protocol):
@@ -213,8 +214,13 @@ class SlideshowDirector:
         self._job_queue = surroundings.job_queue
         fun_time = self._fun_time = surroundings.fun_time
         self.two_screens = surroundings.two_screens or TwoScreens()
+        self._own_funestras = surroundings.own_funestras or OwnFunestras(STATE_DIR / "funestras")
+        application = QGuiApplication.instance()
+        if application is not None:
+            application.aboutToQuit.connect(self._own_funestras.end_the_one_waiting)
         self._asked_for_by_him = True
         self.two_screens.switched.connect(self._keep_the_slideshow_off_cores_monitor)
+        self.two_screens.core_is_up.connect(self._have_a_funestra_waiting)
         self.two_screens.core_is_up.connect(self._keep_a_slideshow_up)
         self._slideshow = None
         self._standalone_shape: str | None = None
@@ -242,6 +248,7 @@ class SlideshowDirector:
         self._taken_into_the_session: dict[str, HeldSlideshow] = {}
         self._regions_left: dict[str, RegionLeft] = {}
         self._giving_them_back = False
+        self._have_a_funestra_waiting()
 
     def become_hosted(self, session) -> None:
         self._taken_into_the_session = self._held_for_the_session()
@@ -437,13 +444,16 @@ class SlideshowDirector:
         keep_the_slide = kwargs.get("start") is not None
         if channel is not None:
             slideshow = self._hand_to_the_funestra(items, where, channel, showing, **kwargs)
+        elif self._fun_time is not None:
+            logger.warning("The session handed this app no %s Funestra, so nothing opens there",
+                           where)
+            return None
         else:
-            shape = (_shape_it_opens_on(where, rows, items,
-                                        _item_opened_on(items, kwargs.get("start"), carrying.resume))
-                     if self._fun_time is None else where)
-            slideshow = self._open_a_window(items, where, showing, window_shape=shape, **kwargs)
-            if self._fun_time is None:
-                self._standalone_showing = _one_shape_of_the_set(rows, items) or shape
+            shape = _shape_it_opens_on(where, rows, items,
+                                       _item_opened_on(items, kwargs.get("start"), carrying.resume))
+            slideshow = self._hand_to_the_apps_own_funestra(
+                items, where, showing, window_shape=shape, **kwargs)
+            self._standalone_showing = _one_shape_of_the_set(rows, items) or shape
         self._slideshow = slideshow
         self._picked_as_the_slideshow_up_opened = self._listing().picked
         already_live = any(live is slideshow for live, _where in self._live_slideshows)
@@ -568,42 +578,48 @@ class SlideshowDirector:
         slideshow.transport.set_has_osr2(has_the_osr2(self._huds, shape))
         return slideshow
 
-    def _open_a_window(self, items, shape: str, showing: Showing, *, window_shape: str,
-                       **kwargs):
-        up = self._window_up() if self._fun_time is None else None
-        view = up.shown if up is not None else None
-        if self._fun_time is None:
-            self._standalone_shape = shape
-            self._standalone_window_shape = window_shape
-        built = view is None
-        if built:
-            view = SlideshowView(
-                items,
-                ViewShow(shape=shape, actions=showing.actions, pace=self._pace_on(shape),
-                         hud=showing.hud, versions=showing.versions, **kwargs),
-                ViewWiring(motion=self._motion, **self._the_audio_standing_on_its_own()))
-        else:
-            view.slideshow.play(
-                Playing(items, actions=showing.actions, hud=showing.hud, versions=showing.versions, **kwargs))
-        if built:
-            self._present_surface(view, shape)
-        else:
-            self._show_on_its_monitor(view, built=False)
-        return view.slideshow
+    def _a_funestra_of_the_apps_own(self, items, shape: str, showing: Showing, **kwargs):
+        program = self._own_funestras.take()
+        asks = AsksFromTheFunestra(program.asks_file)
+        shown = OnItsOwnFunestra(
+            program, shape, showing.actions,
+            OwnWiring(motion=self._motion, **self._the_audio_standing_on_its_own()), asks=asks)
+        slideshow = FunestraSlideshow(
+            Playing(items, actions=showing.actions, hud=showing.hud, versions=showing.versions,
+                    **kwargs),
+            Seat(shape, shown.channel, FrameFiles(FRAMES_BEING_MADE_DIR / "fullscreen")),
+            Hosting(pace=self._pace_on(shape), shown=shown.shown_for))
+        shown.setParent(slideshow)
+        asks.setParent(shown)
+        asks.start()
+        return slideshow
 
-    def _show_on_its_monitor(self, view, *, built: bool) -> None:
+    def _hand_to_the_apps_own_funestra(self, items, shape: str, showing: Showing, *,
+                                       window_shape: str, **kwargs):
+        self._standalone_shape = shape
+        self._standalone_window_shape = window_shape
+        up = self._window_up()
+        if up is not None:
+            up.play(Playing(items, actions=showing.actions, hud=showing.hud,
+                            versions=showing.versions, **kwargs))
+            self._show_on_its_monitor(up.shown)
+            return up
+        slideshow = self._a_funestra_of_the_apps_own(items, shape, showing, **kwargs)
+        self._show_on_its_monitor(slideshow.shown)
+        self._wear_the_hud(slideshow.shown, shape)
+        return slideshow
+
+    def _show_on_its_monitor(self, shown) -> None:
         if self._asked_for_by_him:
             self.two_screens.put_the_slideshow_on(self._standalone_window_shape)
         monitor = (self.two_screens.slideshows_monitor()
-                   or monitor_shaped(self._standalone_window_shape))
-        if monitor is not None and (built or view.screen().geometry() != monitor.geometry()):
-            if view.isFullScreen():
-                view.showNormal()
-            area = monitor.geometry()
-            view.setGeometry(area.x(), area.y(), area.width(), area.height())
-            view.showFullScreen()
-        elif built or view.isMinimized():
-            view.showFullScreen()
+                   or monitor_shaped(self._standalone_window_shape)
+                   or QGuiApplication.primaryScreen())
+        shown.show_on(monitor)
+
+    def _have_a_funestra_waiting(self) -> None:
+        if self._fun_time is None:
+            self._own_funestras.have_one_waiting()
 
     def _has_a_monitor_of_its_own(self) -> bool:
         return self._fun_time is None and self.two_screens.slideshows_monitor() is not None
@@ -620,7 +636,7 @@ class SlideshowDirector:
         up = self._window_up() if self._has_a_monitor_of_its_own() else None
         if up is None:
             return False
-        up.shown.keyPressEvent(event)
+        up.shown.take_key(event)
         return True
 
     def _leave_for_core(self, prompt_id: str | None) -> bool:
@@ -643,7 +659,7 @@ class SlideshowDirector:
         up = self._window_up() if self._fun_time is None else None
         if up is not None:
             self._standalone_window_shape = self.two_screens.slideshow_on()
-            self._show_on_its_monitor(up.shown, built=False)
+            self._show_on_its_monitor(up.shown)
 
     def items_of(self, rows) -> list:
         return self._library().slides_of(rows)
@@ -703,40 +719,6 @@ class SlideshowDirector:
             return rows
         return one_per_stretch(rows, image_index=self._library().image_index)
 
-    def _present_surface(self, view, shape: str):
-        if self._fun_time is None:
-            self._show_on_its_monitor(view, built=True)
-            self._wear_the_hud(view, shape)
-            return
-        occupant = self._region_slideshows.get(shape)
-        if occupant is not None and occupant.is_showing():
-            occupant.close()
-        view.setWindowTitle(_REGION_CAPTIONS[shape])
-        view.setWindowFlags(
-            view.windowFlags()
-            | Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.WindowStaysOnTopHint
-        )
-        view.set_audio_muted(True)
-        rect = self._fun_time.region_rect(shape)
-        # Windows: in a process it does not scale, a window's logical rect is its device rect.
-        view.setGeometry(rect.x, rect.y, rect.width, rect.height)
-        view.show()
-        # Win32: in a scaled process the screens' logical rects overlap, so only device pixels reach a
-        # second monitor's edge; after show(), since an unrealized window has no handle and Qt
-        # gives the window it creates the widget's own geometry.
-        place_window_in_device_pixels(int(view.winId()),
-                                      rect.x, rect.y, rect.width, rect.height)
-        # Windows: activation alone does not lift a window over the topmost Funestras sharing its region.
-        view.raise_()
-        view.activateWindow()
-        self._region_slideshows[shape] = view.slideshow
-        if self._room_paused:
-            view.slideshow.set_paused(True)
-        self._wear_the_hud(view, shape)
-        slideshow = view.slideshow
-        slideshow.transport.set_has_osr2(has_the_osr2(self._huds, shape))
-
     def hud_place(self, shape: str) -> tuple[HudCorner, bool]:
         return place_of(self._huds, shape)
 
@@ -764,10 +746,9 @@ class SlideshowDirector:
         if slideshow is not None:
             slideshow.transport.set_has_osr2(has_the_osr2(self._huds, shape))
 
-    def _wear_the_hud(self, view, shape: str) -> None:
+    def _wear_the_hud(self, shown, shape: str) -> None:
         corner, minimized = self.hud_place(shape)
-        view.wear_the_hud(shape, HudWear(
-            dashboard_cmd_file=self._session_channel,
+        shown.wear_the_hud(shape, HudWear(
             corner=corner, minimized=minimized,
             collapse=partial(self.collapse_the_hud, shape=shape),
             open_in=partial(self.open_the_hud_in, shape=shape)))
@@ -790,6 +771,7 @@ class SlideshowDirector:
         if shape is not None:
             self._region_slideshows[shape] = None
             self._refill_region(shape)
+        self._have_a_funestra_waiting()
 
     def _where_it_stands(self, slideshow) -> SlideshowState:
         return replace(slideshow.state(),

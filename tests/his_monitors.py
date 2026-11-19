@@ -11,7 +11,8 @@ TASKBAR = 48
 
 def _monitor(area: QRect) -> SimpleNamespace:
     return SimpleNamespace(geometry=lambda: area,
-                           availableGeometry=lambda: area.adjusted(0, 0, 0, -TASKBAR))
+                           availableGeometry=lambda: area.adjusted(0, 0, 0, -TASKBAR),
+                           devicePixelRatio=lambda: 1.0)
 
 
 HIS_TWO_MONITORS = [_monitor(LANDSCAPE_MONITOR), _monitor(PORTRAIT_MONITOR)]

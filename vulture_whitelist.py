@@ -31,12 +31,6 @@ _.nextCheckState
 # --- Qt override signatures -- the framework passes the argument, so the parameter has to be there ---
 supported_actions
 
-# --- vulture: funestra's Funestra asks these of what runs on it, through its User protocol ---
-_.apply_command
-_.top_block
-_.set_showing
-_.own_frame
-
 
 # --- sqlite3 reads this off the connection it was set on ---
 _.row_factory

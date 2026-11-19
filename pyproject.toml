@@ -85,7 +85,7 @@ siblings = ["app_support", "funestra", "shared_ui", "voice_core"]
 # A search result's score, which nothing reads back.
 unread-dataclass-fields = ["SearchResult.score"]
 # Test helpers no test calls.
-unread-test-helpers = ["end_outright", "let_go_over", "double_click", "click", "move",
+unread-test-helpers = ["end_outright", "let_go_over", "move",
                        "press", "release", "press_key", "right_click", "_enhance_row",
                        "_as_items"]
 

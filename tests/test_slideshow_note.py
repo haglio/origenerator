@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from funestra.testing import FakeEngine
 from shared_ui.colors import RED, TEXT_PRIMARY, YELLOW
 from shared_ui.message_shape import ERROR, WARNING
 
-from origenerator.gui.slideshow_view import SlideshowView, ViewShow, ViewWiring
 from tests.gallery_view_support import _requesting_view
 from tests.marked_words import words_shown
+from tests.own_funestra_support import standalone
 
 _ITEMS = [("one.png", "image"), ("two.png", "image")]
 
@@ -18,9 +17,7 @@ _ASKED_AGAIN = object()
 
 
 def _view(qtbot):
-    view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None), ViewWiring(engine=FakeEngine()))
-    qtbot.addWidget(view)
-    return view
+    return standalone(_ITEMS, shuffle=lambda order: None)
 
 
 def _mid_request(qtbot, tmp_path, monkeypatch):

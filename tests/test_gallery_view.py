@@ -72,6 +72,7 @@ from origenerator.media import MediaType
 from origenerator.one_look import once_a_look
 from origenerator.output_places import OutputPlaces
 from origenerator.trash import Trash
+from origenerator.workflows.non_ai import non_ai_workflow
 from tests import gestures
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import (
@@ -368,6 +369,18 @@ def test_branch_shows_folder_tiles_and_leaf_shows_thumbnails(qtbot):
 
 def _square_names(view):
     return [tile._text for tile in view._scroll.widget().findChildren(FolderTile)]
+
+
+def test_a_non_ai_folder_has_no_experiments_since_nothing_in_it_was_generated(qtbot):
+    non_ai = {**_row("n1", non_ai_workflow("sample full"), {"folder": "sample/full/sorted"},
+                     "video one.mp4"),
+              "source": "non_ai", "workflow_version": "non_ai"}
+    view = GalleryView(database_of([non_ai]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert _collection_names(_video_workflow(view._tree)) == [
+        name for name in _COLLECTION_NAMES if name != "Experiments"]
 
 
 def test_a_folder_of_folders_shows_its_collections_as_squares_before_its_folders(qtbot):

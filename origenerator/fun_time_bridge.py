@@ -26,6 +26,7 @@ from origenerator.fun_time_mode import (
     SAID_AT,
     SAY,
     SHAPES,
+    START_FAILED,
     TAKE_BACK,
     TRASH_FILE,
     UP,
@@ -75,6 +76,11 @@ def _without_when_said(said: str) -> tuple[str, float | None]:
     return words, time.monotonic() - (time.time() - said_at_epoch_seconds)
 
 
+def _the_last_line_of(error: Exception) -> str:
+    said = " ".join(str(error).split())
+    return f"{type(error).__name__}: {said}" if said else type(error).__name__
+
+
 class FunTimeBridge(QObject):
     released = Signal()
     hand_over_asked = Signal(Path, Path)
@@ -89,6 +95,7 @@ class FunTimeBridge(QObject):
         self._gallery = gallery
         self._paused = False
         self._core_ready = core_ready
+        self._start_failed: str | None = None
         self._published: str | None = None
         self._session_verbs = {
             CLOSE_SLIDESHOWS: self._close_the_slideshows,
@@ -177,7 +184,7 @@ class FunTimeBridge(QObject):
             return
         action, argument = shape_press(shape, keyword.lower(), argument)
         if not marker and action in self._shape_verbs:
-            self._shape_verbs[action](shape)
+            self._answer_the_session(self._shape_verbs[action], shape)
             return
         if action in HUD_FACTS:
             self._gallery.tell_the_hud(shape, action, argument)
@@ -186,6 +193,14 @@ class FunTimeBridge(QObject):
             self._run_what_was_said(shape, argument, said_at)
             return
         self._apply_shape(shape, action, argument, line, said_at)
+
+    def _answer_the_session(self, verb, shape: str) -> None:
+        try:
+            verb(shape)
+        except Exception as error:
+            self._start_failed = _the_last_line_of(error)
+            self._publish_status()
+            raise
 
     def _run_what_was_said(self, shape: str, words: str, said_at: float | None) -> None:
         was_taking_a_request = self._gallery.taking_a_request()
@@ -247,8 +262,9 @@ class FunTimeBridge(QObject):
         self._core_ready = True
 
     def _status(self) -> str:
+        said = ((START_FAILED, self._start_failed),) if self._start_failed else ()
         return "".join(f"{key}={value}\n" for key, value in (
-            (UP, "1"), (CORE_READY, "1" if self._core_ready else "0")))
+            (UP, "1"), (CORE_READY, "1" if self._core_ready else "0"), *said))
 
     def _publish_status(self) -> None:
         if self._session.status_file is None:

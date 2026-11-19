@@ -397,6 +397,28 @@ def test_the_status_file_says_this_app_is_up_and_core_is_ready(qtbot, tmp_path):
     assert _published_status(tmp_path) == {contract.UP: "1", contract.CORE_READY: "1"}
 
 
+def test_a_region_that_cannot_be_filled_tells_the_session_why_in_the_status_file(
+        qtbot, tmp_path, monkeypatch):
+    view = GalleryView(database_of([]), fun_time=_session(tmp_path))
+    qtbot.addWidget(view)
+
+    def it_breaks(_shape):
+        raise TypeError("example_rows() got an unexpected keyword argument 'example'")
+
+    monkeypatch.setattr(view, "fill_the_region", it_breaks)
+    bridge = FunTimeBridge(view._fun_time, view, parent=view)
+    (tmp_path / "origenerator_cmd.txt").write_text(
+        f"{PORTRAIT}_{contract.OPEN_SLIDESHOW}\n", encoding="utf-8")
+
+    with pytest.raises(TypeError):
+        bridge._tick()
+
+    assert _published_status(tmp_path)[contract.START_FAILED] == (
+        "TypeError: example_rows() got an unexpected keyword argument 'example'"), (
+        "Fun Time waits for both Satellites' slideshows; told nothing, it waits out its "
+        "whole budget and cannot say what went wrong")
+
+
 def test_a_status_file_cleared_under_it_is_written_again(qtbot, tmp_path):
     _view, bridge = _view_with_bridge(qtbot, tmp_path)
     bridge._tick()

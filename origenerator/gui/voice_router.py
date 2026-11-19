@@ -6,7 +6,7 @@ from typing import Protocol
 from funestra.on_screen_history import OnScreenHistory
 from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QWidget
-from shared_ui.message_shape import ERROR, INFO, WARNING
+from shared_ui.message_shape import ERROR, INFO, WARNING, answering_what_he_said
 
 from origenerator import gallery, request_settings
 from origenerator.animate_command import AnimateRequest
@@ -186,6 +186,10 @@ class VoiceRouter(QObject):
         return ForTheSetter(text) if self._setters.knows(text) else shaped_app_command(text)
 
     def run_spoken_command(self, text: str, said_at: float | None = None) -> bool:
+        with answering_what_he_said():
+            return self._run_what_he_said(text, said_at)
+
+    def _run_what_he_said(self, text: str, said_at: float | None) -> bool:
         shape, rest = split_shape(text)
         spoken = self.listener.push_dictation(rest, spoken_at=said_at)
         if spoken is not None:
@@ -206,6 +210,10 @@ class VoiceRouter(QObject):
         return True
 
     def on_command(self, matched, said_at: float | None = None) -> None:
+        with answering_what_he_said():
+            self._answer(matched, said_at)
+
+    def _answer(self, matched, said_at: float | None) -> None:
         if isinstance(matched, ForTheSetter):
             self._setters.hear(matched.text)
         elif isinstance(matched, CollectionCommand):

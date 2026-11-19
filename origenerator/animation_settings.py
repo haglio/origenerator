@@ -33,9 +33,17 @@ def _write(held: dict, path: Path | None = None) -> None:
     beside.replace(path)
 
 
+def every_accepted(path: Path | None = None) -> dict:
+    return _read(path)
+
+
 def settings_for(lane: str, action: str, state: str, *, path: Path | None = None
-               ) -> dict | None:
-    held = _read(path).get(lane, {}).get(action, {}).get(state)
+                 ) -> dict | None:
+    return accepted_in(_read(path), lane, action, state)
+
+
+def accepted_in(accepted: dict, lane: str, action: str, state: str) -> dict | None:
+    held = accepted.get(lane, {}).get(action, {}).get(state)
     if not isinstance(held, dict) or not (held.get("workflow") or held.get("params")):
         return None
     return held

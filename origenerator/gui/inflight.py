@@ -156,7 +156,7 @@ def cancel_all_question(total: int) -> str:
             else f"Cancel all {total} jobs in the Job Queue?")
 
 
-CANCEL_ALL_BELOW_TEXT = "Cancel All Below"
+CANCEL_ALL_BELOW_TEXT = "Cancel all below"
 
 
 def cancel_below_question(total: int) -> str:

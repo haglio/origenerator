@@ -24,9 +24,11 @@ from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import FunestraSlideshow, Playing, Seat
 from origenerator.gui.generation_drag import GENERATION_MIME
 from origenerator.gui.viewport import Viewport
+from origenerator.media import MediaType, ShownFile
 from origenerator.output_places import OutputPlaces
 from tests.drawn_on_the_graphics_card import drawn_on_the_graphics_card
 from tests.heard_drags import HeardDrags
+from tests.media_files import write_mp4
 from tests.slideshow_support import stop_the_poll_to_tick_by_hand
 
 
@@ -70,7 +72,7 @@ def _make_animated_gif(path):
 def make_preview(qtbot):
     # The real Qt Multimedia backend deadlocks at session shutdown once a player has started
     def _make(**kwargs):
-        w = Viewport(player=MagicMock(), **kwargs)
+        w = Viewport(player=MagicMock(), make_player=lambda _parent: MagicMock(), **kwargs)
         qtbot.addWidget(w)
         return w
 
@@ -1294,7 +1296,7 @@ def test_showing_a_folder_puts_down_all_the_pane_was_holding(make_preview,
                                                              tmp_path):
     w = _pane_holding_everything(make_preview(), tmp_path)
 
-    w.show_folder([_make_png(tmp_path / "wall.png")])
+    w.show_folder([ShownFile(str(_make_png(tmp_path / "wall.png")), MediaType.IMAGE)])
 
     assert w._player.stop.called
     assert w._message.isHidden()
@@ -1311,7 +1313,7 @@ def test_the_corners_over_a_folder_have_no_generation_to_fire_at(make_preview,
     fired = []
     w.action_triggered.connect(lambda pid, action: fired.append((pid, action)))
 
-    w.show_folder([_make_png(tmp_path / "wall.png")])
+    w.show_folder([ShownFile(str(_make_png(tmp_path / "wall.png")), MediaType.IMAGE)])
     w._on_control("trash")
 
     assert fired == []
@@ -1366,7 +1368,7 @@ def test_releasing_the_player_detaches_it_from_the_pane(make_preview):
 def test_a_folder_shown_fills_the_contact_sheet(make_preview, tmp_path):
     w = make_preview()
 
-    w.show_folder([_make_png(tmp_path / "wall.png")])
+    w.show_folder([ShownFile(str(_make_png(tmp_path / "wall.png")), MediaType.IMAGE)])
 
     assert w._sheet.count() == 1, (
         "the pane is put down before the contact sheet is laid out, because putting it down "
@@ -1493,3 +1495,23 @@ def test_a_hidden_window_holds_its_video_and_plays_it_on_when_shown_again(qtbot,
         "hidden while a Fun Time session shows the Random Faves Browser")
     QApplication.sendEvent(window, QShowEvent())
     assert _told_last(player) == "play"
+
+
+def test_whatever_the_pane_shows_next_lets_go_of_the_videos_of_the_folder_it_showed(
+        make_preview, tmp_path):
+    w = make_preview()
+    w.show_folder([ShownFile(str(write_mp4(tmp_path / "one.mp4")), MediaType.VIDEO)])
+
+    w.show_message("Every video already has its actions.")
+
+    assert w._sheet.count() == 0
+
+
+def test_letting_go_of_the_player_at_quitting_lets_go_of_the_folders_videos_too(
+        make_preview, tmp_path):
+    w = make_preview()
+    w.show_folder([ShownFile(str(write_mp4(tmp_path / "one.mp4")), MediaType.VIDEO)])
+
+    w.release_player()
+
+    assert w._sheet.count() == 0

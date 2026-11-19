@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 from app_support import wrong_actions
+from PIL import Image
 
 from origenerator import gallery
 from origenerator.action_setter_tool import (
@@ -16,9 +18,10 @@ from origenerator.action_setter_tool import (
 from origenerator.db import Database, NewGeneration
 from origenerator.gui.action_setter_window import ask_to_keep_going
 from origenerator.item_actions import ItemActions, actions_of
-from origenerator.media import MediaType
+from origenerator.media import MediaType, ShownFile
 from origenerator.output_places import OutputPlaces
 from origenerator.sent_back import Returned, SentBack
+from tests.media_files import write_mp4
 
 
 def _a_finished_image(db, prompt_id: str, seed: int, prompt: str = "a red kite") -> None:
@@ -28,6 +31,11 @@ def _a_finished_image(db, prompt_id: str, seed: int, prompt: str = "a red kite")
     db.update_generation(prompt_id, status="completed", thumbnail_path=f"{prompt_id}_thumb.jpg",
                          output_files=json.dumps([{"filename": f"{prompt_id}.png",
                                                    "subfolder": ""}]))
+
+
+def _an_image_file(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (8, 6)).save(path)
 
 
 def _waiting(db, tmp_path, side=MediaType.IMAGE, first="", **kwargs):
@@ -58,10 +66,13 @@ def test_a_folder_waits_while_any_of_its_items_has_no_actions_and_shows_them_all
     db.set_actions("gen-two", MediaType.IMAGE, ItemActions(("alpha",)))
     db.set_actions("all set", MediaType.IMAGE, ItemActions(("alpha",)))
 
+    for prompt_id in ("gen-one", "gen-two", "all set"):
+        _an_image_file(tmp_path / f"{prompt_id}.png")
+
     [folder] = _waiting(db, tmp_path)
 
-    assert (sorted(_in_each([folder])[0]), sorted(folder["thumbnails"])) == (
-        ["gen-one", "gen-two"], ["gen-one_thumb.jpg", "gen-two_thumb.jpg"])
+    assert (sorted(_in_each([folder])[0]), sorted(Path(f.path).name for f in folder["shown"])) == (
+        ["gen-one", "gen-two"], ["gen-one.png", "gen-two.png"])
 
 
 def test_the_line_starts_with_the_folder_of_the_item_it_was_opened_on(tmp_path):
@@ -138,10 +149,12 @@ def _a_finished_video(db, prompt_id: str, *, made_from: str | None = None) -> No
 def test_a_video_made_from_no_image_waits_among_the_images_shown_by_its_first_frame(tmp_path):
     db = Database(tmp_path / "gallery.db")
     _a_finished_video(db, "vid")
+    write_mp4(tmp_path / "vid.mp4")
 
     [folder] = _waiting(db, tmp_path)
 
-    assert (_in_each([folder]), folder["thumbnails"]) == ([["vid"]], ["vid_thumb.jpg"])
+    assert (_in_each([folder]), folder["shown"]) == (
+        [["vid"]], [ShownFile("vid_thumb.jpg", MediaType.IMAGE, "vid_thumb.jpg")])
 
 
 def test_opened_on_an_item_it_asks_whether_to_go_on_and_opened_on_its_own_it_never_does():
@@ -219,3 +232,14 @@ def test_while_the_tool_is_open_its_listener_is_the_only_one_on_the_computer_tha
     ON_ITS_OWN.listen(window)
 
     assert [kwargs.get("listens_alone") for kwargs in made] == [True]
+
+
+def test_a_video_waiting_is_shown_by_its_own_file_playing_rather_than_its_thumbnail(tmp_path):
+    db = Database(tmp_path / "gallery.db")
+    _a_finished_video(db, "vid")
+    write_mp4(tmp_path / "vid.mp4")
+
+    [folder] = _waiting(db, tmp_path, MediaType.VIDEO)
+
+    assert folder["shown"] == [
+        ShownFile(str(tmp_path / "vid.mp4"), MediaType.VIDEO, "vid_thumb.jpg")]

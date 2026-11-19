@@ -108,7 +108,7 @@ from origenerator.gui.warning_mark import WarningMark
 from origenerator.gui.zone_items import ZoneFolders, ZoneItems
 from origenerator.item_names import ItemNames
 from origenerator.library_views import NO_VIEWS, LibraryViews, TabViews
-from origenerator.media import MediaType
+from origenerator.media import MediaType, ShownFile
 from origenerator.one_look import one_look
 from origenerator.osr2_driver import drive_target_for
 from origenerator.prompt_tokens import prompt_readings
@@ -1157,7 +1157,7 @@ class GenerateTab(DropZones):
         self._hide_footer()
         self._set_displayed_row(None)
         self._note_displayed_config()
-        self._viewport.show_folder(thumbnails)
+        self._viewport.show_folder([ShownFile(path, MediaType.IMAGE) for path in thumbnails])
         self._reflow_for_the_media()
         self._mark_prompts()
         self._apply_generate_caption()

@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import NamedTuple
 
-from origenerator.media import MediaType
+from origenerator.media import MediaType, ShownFile
 
 TITLE = "Action setter tool"
 LOCKS_FILE = "action_setter_locks.json"
@@ -60,11 +60,22 @@ def waiting_folders(db, places, side: str, first: str = "", *, returned=None) ->
 
     opened_on = _opened_on(first, rows, every)
     every += [entry for entry in opened_on if entry not in every]
-    return [_shown_as_a_folder(entries, side, leaves.get(entries[0].shown["prompt_id"]), names)
+    return [_shown_as_a_folder(entries, side, leaves.get(entries[0].shown["prompt_id"]), names,
+                               places)
             for entries in in_folders([*opened_on, *line], every, folder_of)]
 
 
-def _shown_as_a_folder(entries: list, side: str, leaf, names) -> dict:
+def _shown_file(row: dict, side: str, places) -> ShownFile | None:
+    from origenerator.gallery.output import resolve_preview
+
+    found = resolve_preview(row, places)
+    thumbnail = row.get("thumbnail_path")
+    if found is None or found[1] != side:
+        return ShownFile(thumbnail, MediaType.IMAGE, thumbnail) if thumbnail else None
+    return ShownFile(str(found[0]), found[1], thumbnail)
+
+
+def _shown_as_a_folder(entries: list, side: str, leaf, names, places) -> dict:
     from origenerator.item_actions import actions_if_any
 
     shown = entries[0].shown["prompt_id"]
@@ -73,7 +84,8 @@ def _shown_as_a_folder(entries: list, side: str, leaf, names) -> dict:
     return {"key": leaf.key if leaf is not None else shown,
             "name": leaf.label if leaf is not None else names.of(shown),
             "items": items,
-            "thumbnails": [entry.shown.get("thumbnail_path") for entry in entries],
+            "shown": [shown for entry in entries
+                      if (shown := _shown_file(entry.shown, side, places)) is not None],
             "actions": _shared([item["actions"] for item in items
                                 if item["actions"] is not None])}
 

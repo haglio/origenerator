@@ -16,5 +16,14 @@ def next_number(stem: str, folders: Iterable[Path], held: Iterable[str] = ()) ->
     return max(numbers, default=0) + 1
 
 
+def highest_numbers(names: Iterable[str]) -> dict[str, int]:
+    highest: dict[str, int] = {}
+    for name in names:
+        match = NUMBERED.match(name)
+        if match:
+            highest[match["stem"]] = max(highest.get(match["stem"], 0), int(match["counter"]))
+    return highest
+
+
 def numbered(name: str, stem: str, number: int) -> str:
     return f"{stem}_{number:05}{NUMBERED.match(name)['rest']}"

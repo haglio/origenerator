@@ -334,17 +334,20 @@ def _carried_over_whole(reading, before):
     return before if before is not None and before == reading else reading
 
 
+class KeptUntilTheLibraryChanges:
+    def __init__(self, db, work_out: Callable[[], object]):
+        self._db = db
+        self._work_out = work_out
+        self._kept: tuple[int, object] | None = None
+
+    def __call__(self):
+        version = self._db.library_version()
+        if self._kept is None or self._kept[0] != version:
+            self._kept = (version, self._work_out())
+        return self._kept[1]
+
+
 class LibraryViews:
     def __init__(self, db):
-        self._db = db
-        self._version: int | None = None
-        self._snapshot: LibrarySnapshot | None = None
-
-    def now(self) -> LibrarySnapshot:
-        version = self._db.library_version()
-        if self._snapshot is None or version != self._version:
-            self._version = version
-            self._snapshot = LibrarySnapshot(
-                self._db.list_generations(),
-                trash_collection.trash_items(self._db.list_trashed()))
-        return self._snapshot
+        self.now = KeptUntilTheLibraryChanges(db, lambda: LibrarySnapshot(
+            db.list_generations(), trash_collection.trash_items(db.list_trashed())))

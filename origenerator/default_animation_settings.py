@@ -64,6 +64,7 @@ def the_default_animation_settings_window():
         OUTPUT_PLACES,
         THUMB_DIR,
     )
+    from origenerator.content import load_content
     from origenerator.db import Database
     from origenerator.default_animation_settings_session import DefaultAnimationSettingsSession
     from origenerator.gui.default_animation_settings_window import DefaultAnimationSettingsWindow
@@ -81,10 +82,12 @@ def the_default_animation_settings_window():
         return (str(still[0]) if still and still[1] == MediaType.IMAGE else None,
                 gallery.animated_preview_if_made(sample, OUTPUT_PLACES, THUMB_DIR))
 
+    content = load_content()
+    samples = animation_samples.samples_by_path(rows, content=content)
     return DefaultAnimationSettingsWindow(
         DefaultAnimationSettingsSession(
-            list(animation_samples.paths_in_order(rows)),
-            animation_samples.samples_by_path(rows),
+            list(animation_samples.paths_in_order(samples, content=content)),
+            samples,
             AcceptedSettings(),
             pinned=action_settings.pinned_settings),
         look,

@@ -1336,3 +1336,48 @@ def test_an_imported_performance_gains_the_video_it_performed(tmp_path):
     params = json.loads(db.get_generation("performed")["params_json"])
     assert params["video"] == "C:/library/videos/videos/scene one.mp4"
     assert params["video_start"] == 2.0
+
+
+def _asked_after_one_by_one(monkeypatch, under: Path) -> list[str]:
+    asked = []
+
+    def asking_through(real):
+        def asking(path, *args, **kwargs):
+            if under in path.parents and path.suffix:
+                asked.append(path.name)
+            return real(path, *args, **kwargs)
+        return asking
+
+    monkeypatch.setattr(Path, "exists", asking_through(Path.exists))
+    monkeypatch.setattr(Path, "is_file", asking_through(Path.is_file))
+    return asked
+
+
+def test_a_scan_of_files_already_in_the_gallery_lists_each_folder_rather_than_asking_after_each(
+        tmp_path, monkeypatch):
+    output_dir = tmp_path / "output" / "image"
+    output_dir.mkdir(parents=True)
+    for n in range(4):
+        Image.new("RGB", (8, 8)).save(output_dir / f"image {n}.png")
+    db = Database(tmp_path / "test.db")
+    places = OutputPlaces.in_one_folder(output_dir.parent)
+    assert import_comfyui_output(places, db, tmp_path / "thumbs") == 4
+    asked = _asked_after_one_by_one(monkeypatch, tmp_path / "output")
+
+    assert import_comfyui_output(places, db, tmp_path / "thumbs") == 0
+    assert asked == []
+
+
+def test_the_thumbnail_repair_lists_the_thumbnails_folder_rather_than_asking_after_each(
+        tmp_path, monkeypatch):
+    output_dir = tmp_path / "output" / "image"
+    output_dir.mkdir(parents=True)
+    for n in range(4):
+        Image.new("RGB", (8, 8)).save(output_dir / f"image {n}.png")
+    db = Database(tmp_path / "test.db")
+    places = OutputPlaces.in_one_folder(output_dir.parent)
+    import_comfyui_output(places, db, tmp_path / "thumbs")
+    asked = _asked_after_one_by_one(monkeypatch, tmp_path / "thumbs")
+
+    assert backfill_shared_thumbnails(db, places, tmp_path / "thumbs") == 0
+    assert asked == []

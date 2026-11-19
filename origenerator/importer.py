@@ -41,6 +41,7 @@ from origenerator.gallery import (
 from origenerator.gallery.output import place_of_its_own
 from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
+from origenerator.one_look import is_file, looking_once
 from origenerator.output_places import OutputPlaces
 from origenerator.record_fold import file_key, fold_record_into, lanes_owed
 from origenerator.thumbnail import animate_if_video, generate_thumbnail
@@ -71,6 +72,7 @@ def infer_workflow_name(filename: str) -> str | None:
     return best_name
 
 
+@looking_once
 def import_comfyui_output(places: OutputPlaces, db: Database, thumb_dir: Path) -> int:
     imported = 0
     existing = _get_existing_filenames(db)
@@ -236,6 +238,7 @@ def _fold_silent_copy(db: Database, copy: dict, video: dict, rows: list[dict]) -
     db.delete_generation(copy["prompt_id"])
 
 
+@looking_once
 def backfill_shared_thumbnails(db: Database, places: OutputPlaces, thumb_dir: Path) -> int:
     rows = db.list_generations()
     owners = Counter(r["thumbnail_path"] for r in rows if r.get("thumbnail_path"))
@@ -244,7 +247,7 @@ def backfill_shared_thumbnails(db: Database, places: OutputPlaces, thumb_dir: Pa
         thumb = row.get("thumbnail_path")
         if not thumb:
             continue
-        if owners[thumb] == 1 and Path(thumb).exists():
+        if owners[thumb] == 1 and is_file(thumb):
             continue
         fresh = _render_row_thumbnail(row, places, thumb_dir)
         if fresh is not None:

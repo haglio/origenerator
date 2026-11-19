@@ -1173,7 +1173,7 @@ def test_unfavoriting_an_item_from_the_collection_removes_it(qtbot, monkeypatch)
     collection = _alls(view._tree)["Favorites"]
     view._tree.setCurrentItem(collection)
     assert view.listed_prompt_ids() == ["i1"]
-    _answer_menu(monkeypatch, "Unfavorite 1 item")
+    _answer_menu(monkeypatch, "Unfavorite 1 image")
     _right_click(view, "i1")
 
     assert not db.get_generation("i1")["starred"]

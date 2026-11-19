@@ -225,6 +225,12 @@ def _top_section(folder_path: QWidget, buttons: QWidget, folder_actions: QWidget
     return top
 
 
+def _generate_with_random_seeds_text(rows: list[dict]) -> str:
+    if len(rows) == 1:
+        return "Generate with random seed"
+    return f"Generate {gallery.counted(rows)} with random seeds"
+
+
 class GalleryView(QWidget):
     run_ended = Signal(object)
     quit_asked = Signal()
@@ -1507,8 +1513,8 @@ class GalleryView(QWidget):
         pids = self.selected_prompt_ids() if self._gallery_pane.selected_ids else []
         if pids and not self._in_the_trash():
             favoriting = not self._all_favorites(pids)
-            return Button(tip=f"{'Favorite' if favoriting else 'Unfavorite'} {len(pids)} "
-                              f"item{'s' if len(pids) != 1 else ''}")
+            return Button(tip=f"{'Favorite' if favoriting else 'Unfavorite'} "
+                              f"{self._counted(pids)}")
         group = None if pids else self._favoritable_folder()
         if group is None:
             return Button(enabled=False, tip="Nothing here to favorite")
@@ -1520,14 +1526,14 @@ class GalleryView(QWidget):
         return Button(enabled=offer.available, tip=offer.tip)
 
     def _delete_the_picked_offer(self) -> Button:
-        count = len(self._gallery_pane.selected_ids)
+        picked = list(self._gallery_pane.selected_ids)
         if self._in_the_trash():
             return Button(
-                enabled=bool(count),
-                tip=f"Permanently delete {count} item{'s' if count != 1 else ''}"
-                if count else "Pick an item to delete permanently")
-        if count:
-            return Button(tip=f"Delete {count} item{'s' if count != 1 else ''}")
+                enabled=bool(picked),
+                tip=f"Permanently delete {self._counted(picked)}"
+                if picked else "Pick an item to delete permanently")
+        if picked:
+            return Button(tip=f"Delete {self._counted(picked)}")
         return self._delete_the_folder_offer()
 
     def _delete_the_folder_offer(self) -> Button:
@@ -1671,6 +1677,19 @@ class GalleryView(QWidget):
         else:
             self._jobs.reroll_image_seed(key, row, self.library.reading.image_rows)
         self._select_reroll(key)
+
+    def _counted(self, prompt_ids) -> str:
+        return gallery.counted([self.row_for(pid) or {} for pid in prompt_ids])
+
+    def _generate_with_random_seeds(self, rows: list[dict]):
+        for row in rows:
+            self._jobs.reroll_every_seed(
+                self.library.folder_key_of(row), row, self.library.reading.image_rows)
+
+    def _made_again_from_here(self, rows: list[dict]) -> list[dict]:
+        if self._client is None or isinstance(self.current_group(), gallery.SettingsGroup):
+            return []
+        return [row for row in rows if gallery.rerollable(row)]
 
     def off_thread(self, work, done):
         run_off_thread(work, done, owner=self)
@@ -1886,11 +1905,14 @@ class GalleryView(QWidget):
         if not rows:
             return
         count = len(rows)
-        suffix = f" {count} item{'s' if count != 1 else ''}"
+        suffix = " " + gallery.counted(rows)
         menu = QMenu(self)
         folder_action = None
         if count == 1 and self._can_open_containing_folder(rows[0]):
             folder_action = menu.addAction("Go to folder")
+        to_generate = self._made_again_from_here(rows)
+        generate_action = (menu.addAction(_generate_with_random_seeds_text(to_generate))
+                           if to_generate else None)
         offer_copy_names_above_a_line(
             menu, [self._item_names.of(row["prompt_id"]) for row in rows])
         all_favorites = all(row.get("starred") for row in rows)
@@ -1923,6 +1945,8 @@ class GalleryView(QWidget):
         chosen = menu.exec(global_pos)
         if folder_action is not None and chosen is folder_action:
             self.follow_link(rows[0]["prompt_id"])
+        elif generate_action is not None and chosen is generate_action:
+            self._generate_with_random_seeds(to_generate)
         elif chosen is favorite_action:
             self.set_items_favorite([row["prompt_id"] for row in rows], not all_favorites)
         elif remove_action is not None and chosen is remove_action:
@@ -2013,7 +2037,7 @@ class GalleryView(QWidget):
 
     def _trash_menu(self, global_pos):
         ids = self.selected_prompt_ids()
-        suffix = f" {len(ids)} item{'s' if len(ids) != 1 else ''}"
+        suffix = " " + self._counted(ids)
         menu = QMenu(self)
         offer_copy_names_above_a_line(menu, [self._item_names.of(pid) for pid in ids])
         restore_action = trash_collection.restore_action_on(menu, "Restore" + suffix,
@@ -2055,9 +2079,8 @@ class GalleryView(QWidget):
         if not prompt_ids:
             return
         count = len(prompt_ids)
-        plural = "s" if count != 1 else ""
         if not self._confirm(
-            f"Permanently delete {count} item{plural}? This cannot be undone."
+            f"Permanently delete {self._counted(prompt_ids)}? This cannot be undone."
         ):
             return
         self._edit_then_redraw(

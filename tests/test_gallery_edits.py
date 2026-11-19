@@ -387,7 +387,7 @@ def test_restoring_from_the_trash_is_not_an_undo_step(tmp_path):
 
     actions.restore_deleted(["p1"])
 
-    assert actions.undo_label() == "Delete 1 item", \
+    assert actions.undo_label() == "Delete 1 image", \
         "undoing a restore would only delete the item again, which the user can do directly"
 
 

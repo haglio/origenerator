@@ -99,7 +99,7 @@ def test_delete_takes_every_picked_folder_not_only_the_current_one(qtbot):
     assert view._buttons.delete.toolTip() == "Delete 2 folders"
     view._buttons.delete.click()
 
-    assert asked == ["Delete 2 folders and their 2 items?"]
+    assert asked == ["Delete 2 folders and their 2 images?"]
     assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i2"}
 
 
@@ -478,7 +478,7 @@ def test_removing_a_folder_of_your_own_says_the_items_it_holds_are_kept(qtbot):
     view.toc_editing.remove_collection(view.group_for_key(gallery.custom_collection_key(folder_id)))
 
     assert asked == [("Remove the folder “Keepers”?\n\n"
-                      "The 1 folder and 1 item it holds are kept.")]
+                      "The 1 folder and 1 image it holds are kept.")]
 
 
 def test_a_folder_of_your_own_says_folders_and_items_can_be_dropped_on_it(qtbot):
@@ -1023,7 +1023,7 @@ def test_deleting_the_picked_folders_asks_first_then_takes_them_all(qtbot, monke
 
     _tree_menu(view, dog)
 
-    assert asked == ["Delete 2 folders and their 2 items?"]
+    assert asked == ["Delete 2 folders and their 2 images?"]
     assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i2"}
 
 
@@ -1050,7 +1050,7 @@ def test_the_trash_can_takes_every_folder_picked_by_clicks_after_a_right_click(
     tip = view._buttons.delete.toolTip()
     view._buttons.delete.click()
 
-    assert (tip, asked) == ("Delete 2 folders", ["Delete 2 folders and their 2 items?"] * 2)
+    assert (tip, asked) == ("Delete 2 folders", ["Delete 2 folders and their 2 images?"] * 2)
 
 
 def test_the_trash_can_on_a_picked_row_deletes_every_picked_folder(qtbot):
@@ -1062,7 +1062,7 @@ def test_the_trash_can_on_a_picked_row_deletes_every_picked_folder(qtbot):
 
     _click_beside_the_mark_of(qtbot, view, dog, which=1)
 
-    assert asked == ["Delete 2 folders and their 2 items?"]
+    assert asked == ["Delete 2 folders and their 2 images?"]
     assert {r["prompt_id"] for r in actions.deleted[0]} == {"i1", "i2"}
 
 

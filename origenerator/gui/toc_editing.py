@@ -31,7 +31,7 @@ def _kept_on_removal(custom) -> str:
     folders, items = len(gallery.child_groups(custom)), len(custom.rows)
     if not items:
         return f"The {folders} folder{'s' if folders != 1 else ''} it holds, and their items, are kept."
-    held = f"{items} item{'s' if items != 1 else ''}"
+    held = gallery.counted(custom.rows)
     if folders:
         held = f"{folders} folder{'s' if folders != 1 else ''} and {held}"
     return f"The {held} it holds are kept."
@@ -233,8 +233,8 @@ class TocEditing:
                      for row in gallery.rows_under(group)}.values())
         if not rows:
             return
-        if not self.confirm(deleting_a_folder(groups[0].label, len(rows)) if len(groups) == 1
-                             else deleting_folders(len(groups), len(rows))):
+        if not self.confirm(deleting_a_folder(groups[0].label, gallery.counted(rows)) if len(groups) == 1
+                             else deleting_folders(len(groups), gallery.counted(rows))):
             return
         target = self._post_delete_target(groups)
         if target is not None:

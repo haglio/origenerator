@@ -31,6 +31,7 @@ from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, MARGIN_STANDARD
 from shared_ui.tick_control import TickControl
 
 from origenerator.branch_session import titled
+from origenerator.gallery import counted_of
 from origenerator.gui.deleting import asked_to_delete, deleting_a_folder
 from origenerator.gui.style_property import set_style_property
 from origenerator.gui.text_color import color_text
@@ -382,7 +383,8 @@ class ActionSetterWindow(QWidget):
     def _on_trash(self) -> None:
         folder = self._session.current
         if folder is None or not self._confirm(
-                self, deleting_a_folder(folder.get("name"), len(folder["items"]))):
+                self, deleting_a_folder(folder.get("name"),
+                                        counted_of(len(folder["items"]), self._session.side))):
             return
         self._stage.clear()
         self._session.trash()

@@ -138,10 +138,10 @@ def test_dragging_an_image_out_leaves_the_tab_as_it_was(qtbot, monkeypatch):
     assert view.selected_generation() is None
 
 
-def test_right_clicking_a_recent_item_offers_its_folder_its_name_favorite_enhance_and_delete(
+def test_right_clicking_a_recent_item_offers_its_folder_generate_its_name_favorite_enhance_and_delete(
         qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
-    view = GalleryView(database_of(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions(), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
 
@@ -151,16 +151,69 @@ def test_right_clicking_a_recent_item_offers_its_folder_its_name_favorite_enhanc
 
     _right_click(view, "i2")
 
-    assert labels == ["Go to folder", "Copy name", "", "Favorite 1 item", "Enhance 1 image",
-                      "Delete 1 item"], (
+    assert labels == ["Go to folder", "Generate with random seed", "Copy name", "",
+                      "Favorite 1 image", "Enhance 1 image", "Delete 1 image"], (
         "a collection gathers items from all over, so where this one lives is the question its "
         "menu is most often asked: it leads, above a separator")
     assert view.selected_prompt_ids() == ["i2"]
 
 
-def test_go_to_folder_is_left_off_inside_the_items_own_folder(qtbot, monkeypatch):
+def test_generating_picked_images_with_random_seeds_makes_one_job_each_and_leaves_the_collection_open(
+        qtbot, monkeypatch):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2), _image("i3", "a dog", 50, 3)]
+    view = GalleryView(database_of(rows), actions=FakeActions(), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    latest = _alls(view._tree)["Latest"]
+    view._tree.setCurrentItem(latest)
+    for prompt_id in ("i1", "i2", "i3"):
+        view._gallery_pane.apply_selection(prompt_id, _CTRL)
+    _answer_menu(monkeypatch, "Generate 3 images with random seeds")
+
+    _right_click(view, "i3")
+
+    jobs = [job for jobs in view._jobs.jobs_by_folder.values() for job in jobs]
+    assert sorted(job.params["positive_prompt"] for job in jobs) == ["a cat", "a cat", "a dog"], (
+        "two items of one folder are two jobs, each on its own item's settings")
+    assert not {job.params["seed"] for job in jobs} & {1, 2, 3}
+    assert view._tree.currentItem() is latest
+
+
+def test_generate_with_random_seed_from_a_collections_menu_leaves_the_collection_open(
+        qtbot, monkeypatch):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
+    view = GalleryView(database_of(rows), actions=FakeActions(), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    latest = _alls(view._tree)["Latest"]
+    view._tree.setCurrentItem(latest)
+    _answer_menu(monkeypatch, "Generate with random seed")
+
+    _right_click(view, "i2")
+
+    (job,) = [job for jobs in view._jobs.jobs_by_folder.values() for job in jobs]
+    assert job.params["positive_prompt"] == "a dog"
+    assert view._tree.currentItem() is latest
+
+
+def test_generate_is_left_off_for_an_item_that_cannot_be_made_again(qtbot, monkeypatch):
     rows = [_image("i1", "a cat", 50, 1)]
-    view = GalleryView(database_of(rows), actions=FakeActions())
+    view = GalleryView(database_of(rows), actions=FakeActions(), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    monkeypatch.setattr("origenerator.gui.gallery_view.gallery.rerollable", lambda row: False)
+    labels = []
+    _menu_labels(monkeypatch, labels)
+
+    _right_click(view, "i1")
+
+    assert not [label for label in labels if label.startswith("Generate")]
+
+
+def test_go_to_folder_and_generate_are_left_off_inside_the_items_own_folder(qtbot, monkeypatch):
+    rows = [_image("i1", "a cat", 50, 1)]
+    view = GalleryView(database_of(rows), actions=FakeActions(), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
@@ -169,7 +222,7 @@ def test_go_to_folder_is_left_off_inside_the_items_own_folder(qtbot, monkeypatch
 
     _right_click(view, "i1")
 
-    assert labels == ["Copy name", "", "Favorite 1 item", "Enhance 1 image", "Delete 1 item"]
+    assert labels == ["Copy name", "", "Favorite 1 image", "Enhance 1 image", "Delete 1 image"]
 
 
 def test_enhance_is_grayed_for_an_image_that_already_has_that_enhancement(qtbot, monkeypatch):
@@ -250,7 +303,7 @@ def test_an_item_the_gallery_has_not_named_yet_offers_no_name_to_copy(qtbot, mon
 
     view.generation_menu(["i2"], QPoint(0, 0))
 
-    assert labels == ["Favorite 1 item", "Enhance 1 image", "Delete 1 item"]
+    assert labels == ["Favorite 1 image", "Enhance 1 image", "Delete 1 image"]
 
 
 def _press_ctrl_c(view, monkeypatch):
@@ -426,7 +479,7 @@ def test_right_click_favorite_on_the_latest_collection_favorites_the_item(qtbot,
     view.refresh()
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    _answer_menu(monkeypatch, "Favorite 1 item")
+    _answer_menu(monkeypatch, "Favorite 1 image")
 
     _right_click(view, "i1")
 
@@ -664,7 +717,7 @@ def test_the_enhance_panes_button_takes_the_picked_thumbnails_over_the_folder(qt
     button = view.enhance.pane._enhance_button
 
     _pick_by_clicking(view, "g0")
-    assert button.toolTip().startswith("Enhance 1 item")
+    assert button.toolTip().startswith("Enhance 1 image")
     button.click()
 
     assert queued == [["g0"]]
@@ -1066,7 +1119,7 @@ def test_right_click_favorite_favorites_the_picked_thumbnail(qtbot, monkeypatch)
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    _answer_menu(monkeypatch, "Favorite 1 item")
+    _answer_menu(monkeypatch, "Favorite 1 image")
 
     view._gallery_pane._thumbnail_context_menu("i1", QPoint(0, 0))
 
@@ -1082,7 +1135,7 @@ def test_right_click_unfavorite_clears_a_favorite_thumbnail(qtbot, monkeypatch):
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    _answer_menu(monkeypatch, "Unfavorite 1 item")
+    _answer_menu(monkeypatch, "Unfavorite 1 image")
 
     view._gallery_pane._thumbnail_context_menu("i1", QPoint(0, 0))
 
@@ -1099,7 +1152,7 @@ def test_right_click_favorite_acts_on_the_whole_multi_selection(qtbot, monkeypat
     _open_leaf(view)
     view._gallery_pane.apply_selection("i1", _NO_MOD)
     view._gallery_pane.apply_selection("i3", _CTRL)
-    _answer_menu(monkeypatch, "Favorite 2 items")
+    _answer_menu(monkeypatch, "Favorite 2 images")
 
     view._gallery_pane._thumbnail_context_menu("i3", QPoint(0, 0))
 

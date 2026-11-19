@@ -196,8 +196,7 @@ class EnhanceController:
             picked = self._picked_rows()
             ids = self._enhanceable_among(picked)
             if ids:
-                return Offer(True, f"Enhance {len(ids)} item"
-                                   f"{'s' if len(ids) != 1 else ''} "
+                return Offer(True, f"Enhance {gallery.counted([self._db.get_generation(pid) for pid in ids])} "
                                    f"{_WHAT_AN_ENHANCE_DOES}")
             return Offer(False, NO_VIDEO_ENHANCER if all_video(picked)
                          else ALREADY_AT_THESE_SETTINGS)

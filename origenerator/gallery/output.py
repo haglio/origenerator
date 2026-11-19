@@ -53,6 +53,15 @@ def media_type_of_row(row: dict) -> MediaType:
     return _media_type_of(row.get("output_files"), row.get("workflow_name"))
 
 
+def counted(rows) -> str:
+    kinds = {media_type_of_row(row) for row in rows}
+    return counted_of(len(rows), kinds.pop() if len(kinds) == 1 else None)
+
+
+def counted_of(count: int, kind: MediaType | None) -> str:
+    return f"{count} {kind or 'item'}{'' if count == 1 else 's'}"
+
+
 @lru_cache(maxsize=READINGS_KEPT)
 def _media_type_of(output_files: str | None, workflow_name: str | None) -> MediaType:
     for f in parse_file_list(output_files):

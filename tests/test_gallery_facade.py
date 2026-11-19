@@ -18,7 +18,7 @@ PUBLISHED = {
     "SourceImageGroup", "WorkflowGroup", "all_group", "animated_preview_if_made",
     "build_custom_collections", "build_gallery_tree", "build_image_config_index", "image_config_index_of",
     "child_groups", "combined_params", "command_phrases", "config_folder_key",
-    "config_folder_name",
+    "config_folder_name", "counted", "counted_of",
     "generate_tab_title", "custom_folder_id",
     "custom_collection_key", "default_enhance_params", "describe_enhance_params",
     "disown_foreign_runs",

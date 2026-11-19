@@ -324,7 +324,7 @@ def test_a_pick_of_images_is_what_the_button_aims_at(enhance, monkeypatch, store
     assert offer.available is True, (
         "the Enhance button is aimed the way Delete is: at the picked thumbnails if any are "
         "picked, else at the folder")
-    assert offer.tip == "Enhance 2 items (upscale + light redraw)"
+    assert offer.tip == "Enhance 2 images (upscale + light redraw)"
 
 
 def test_a_picked_clip_is_nothing_to_run_rather_than_a_run_that_fails(enhance, stored):
@@ -623,7 +623,7 @@ def test_a_mixed_folder_keeps_its_settings_live(enhance):
     controller, _host = enhance(FakeHost(rows=rows),
                                 gallery_pane=FakeGalleryPane(["v1", "i1"]))
 
-    controller.sync_pane(Offer(True, "Enhance 1 item"))
+    controller.sync_pane(Offer(True, "Enhance 1 image"))
 
     assert controller.pane.applicable == (True, NO_VIDEO_ENHANCER)
 
@@ -641,7 +641,7 @@ def test_the_panel_hears_which_picked_thumbnails_are_in_front(enhance):
     controller, _host = enhance(FakeHost(rows=rows),
                                 gallery_pane=FakeGalleryPane(["i1", "v1"]))
 
-    controller.sync_pane(Offer(True, "Enhance 1 item"))
+    controller.sync_pane(Offer(True, "Enhance 1 image"))
 
     assert controller.pane.images_in_front == (["i1", "v1"], None)
 

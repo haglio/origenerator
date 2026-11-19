@@ -13,7 +13,7 @@ def _label_texts(tile):
 
 
 def test_folder_tile_shows_its_folder_path_context(qtbot):
-    tile = FolderTile("k", "a dog", [], 3, FolderMarks(context="Images \u203a SDXL"))
+    tile = FolderTile("k", "a dog", [], "3 items", FolderMarks(context="Images \u203a SDXL"))
     qtbot.addWidget(tile)
 
     texts = _label_texts(tile)
@@ -24,7 +24,7 @@ def test_folder_tile_shows_its_folder_path_context(qtbot):
 def test_a_path_too_long_for_the_tile_is_cut_from_the_front(qtbot):
     path = " › ".join(["Images", *(f"a folder with a long name {n}" for n in range(8)),
                             "the folder it sits in"])
-    tile = FolderTile("k", "a dog", [], 3, FolderMarks(context=path))
+    tile = FolderTile("k", "a dog", [], "3 items", FolderMarks(context=path))
     qtbot.addWidget(tile)
 
     shown = next(label.text() for label in tile.findChildren(QLabel) if label.toolTip() == path)
@@ -35,7 +35,7 @@ def test_a_path_too_long_for_the_tile_is_cut_from_the_front(qtbot):
 
 
 def test_folder_tile_without_context_omits_the_folder_path_line(qtbot):
-    tile = FolderTile("k", "a dog", [], 3)
+    tile = FolderTile("k", "a dog", [], "3 items")
     qtbot.addWidget(tile)
 
     texts = _label_texts(tile)
@@ -45,7 +45,7 @@ def test_folder_tile_without_context_omits_the_folder_path_line(qtbot):
 
 
 def test_folder_tile_shows_its_toc_initial(qtbot):
-    tile = FolderTile("k", "wan model", [], 3, FolderMarks(
+    tile = FolderTile("k", "wan model", [], "3 items", FolderMarks(
         kind_icon=folder_icons.folder_kind_icon(gallery.ModelGroup("k", "wan model", []))))
     qtbot.addWidget(tile)
 
@@ -57,14 +57,14 @@ def test_folder_tile_shows_its_toc_initial(qtbot):
 
 
 def test_folder_tile_without_a_level_shows_no_toc_initial(qtbot):
-    tile = FolderTile("k", "a dog", [], 3)
+    tile = FolderTile("k", "a dog", [], "3 items")
     qtbot.addWidget(tile)
 
     assert all(w.toolTip() != "Model" for w in tile.findChildren(QLabel))
 
 
 def test_a_folder_tile_is_the_same_tile_as_the_ones_it_stands_beside(qtbot):
-    tile = FolderTile("k", "a dog", [], 3)
+    tile = FolderTile("k", "a dog", [], "3 items")
     qtbot.addWidget(tile)
 
     assert (tile.width(), tile.height()) == tile_shape.folder_tile_size()
@@ -74,14 +74,14 @@ def test_a_folder_tile_is_the_same_tile_as_the_ones_it_stands_beside(qtbot):
 
 
 def test_the_folder_path_line_is_the_whole_of_what_makes_a_collection_tile_taller(qtbot):
-    tile = FolderTile("k", "a dog", [], 3, FolderMarks(context="Images > SDXL"))
+    tile = FolderTile("k", "a dog", [], "3 items", FolderMarks(context="Images > SDXL"))
     qtbot.addWidget(tile)
 
     assert tile.height() == tile_shape.folder_tile_size(folder_path=True)[1]
 
 
 def test_a_folder_square_wears_the_picked_frame_when_it_is_marked(qtbot):
-    tile = FolderTile("image/sdxl_t2i/abc::landscape", "a folder", [], 3)
+    tile = FolderTile("image/sdxl_t2i/abc::landscape", "a folder", [], "3 items")
     qtbot.addWidget(tile)
     assert not tile._selected
 
@@ -111,6 +111,6 @@ def test_a_folder_drawn_again_decodes_none_of_its_pictures_again(qtbot, tmp_path
     monkeypatch.setattr(folder_tile, "QPixmap", lambda path: decoded.append(path) or QPixmap(path))
 
     for _ in range(3):
-        qtbot.addWidget(FolderTile("k", "a dog", previews, 4))
+        qtbot.addWidget(FolderTile("k", "a dog", previews, "4 items"))
 
     assert sorted(decoded) == sorted(previews)

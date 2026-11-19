@@ -140,6 +140,9 @@ class Database:
     def get_generation(self, prompt_id: str) -> dict | None:
         return self.generations.get_generation(prompt_id)
 
+    def get_generations(self, prompt_ids) -> dict[str, dict]:
+        return self.generations.get_generations(prompt_ids)
+
     def list_generations(self) -> list[dict]:
         return self.generations.list_generations()
 

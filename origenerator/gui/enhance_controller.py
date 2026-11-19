@@ -182,8 +182,10 @@ class EnhanceController:
         self._gallery_pane.refresh_corners()
 
     def sync_pane(self, offer: Offer) -> None:
-        picked = [row for pid in self._gallery_pane.selected_prompt_ids()
-                  if (row := self._library.row_for(pid)) is not None]
+        ids = self._gallery_pane.selected_prompt_ids()
+        found = self._db.get_generations(ids)
+        picked = [row for pid in ids
+                  if (row := found.get(pid) or self._library.row_for(pid)) is not None]
         folder = None if picked or self._gallery_pane.selected_ids else self._host.current_group()
         in_front = picked or list(getattr(folder, "rows", []) or [])
         self.pane.set_applicable(not all_video(in_front), NO_VIDEO_ENHANCER)
@@ -192,12 +194,13 @@ class EnhanceController:
 
     def offer(self) -> Offer:
         if self._gallery_pane.selected_ids:
-            ids = self.enhanceable_selection()
+            picked = self._picked_rows()
+            ids = self._enhanceable_among(picked)
             if ids:
                 return Offer(True, f"Enhance {len(ids)} item"
                                    f"{'s' if len(ids) != 1 else ''} "
                                    f"{_WHAT_AN_ENHANCE_DOES}")
-            return Offer(False, NO_VIDEO_ENHANCER if self._selection_isall_video()
+            return Offer(False, NO_VIDEO_ENHANCER if all_video(picked)
                          else ALREADY_AT_THESE_SETTINGS)
         group = self._host.current_group()
         awaiting = (
@@ -213,18 +216,20 @@ class EnhanceController:
         return gallery.rows_awaiting_enhancement(
             rows, self._db.rows_made_by(gallery.ENHANCE_WORKFLOW))
 
+    def _picked_rows(self) -> list[dict]:
+        ids = self._gallery_pane.selected_prompt_ids()
+        found = self._db.get_generations(ids)
+        return [found[pid] for pid in ids if pid in found]
+
+    def _enhanceable_among(self, rows) -> list[str]:
+        return [row["prompt_id"] for row in rows if self.would_enhance(row)]
+
     def enhanceable_selection(self) -> list[str]:
-        return [prompt_id for prompt_id in self._gallery_pane.selected_prompt_ids()
-                if (row := self._db.get_generation(prompt_id)) is not None
-                and self.would_enhance(row)]
+        return self._enhanceable_among(self._picked_rows())
 
     def would_enhance(self, row: dict) -> bool:
         return (gallery.is_enhanceable_row(row)
                 and gallery.version_matching_settings(row, self._settings) is None)
-
-    def _selection_isall_video(self) -> bool:
-        return all_video(row for pid in self._gallery_pane.selected_prompt_ids()
-                          if (row := self._db.get_generation(pid)) is not None)
 
     def enhance_the_selection(self) -> None:
         if self._gallery_pane.selected_ids:
@@ -245,8 +250,8 @@ class EnhanceController:
         self._host.enhance_offer_changed()
 
     def enhance_items(self, prompt_ids: list[str]) -> None:
-        rows = [self._db.get_generation(pid) for pid in prompt_ids]
-        self._enqueue([r for r in rows if r is not None], self._settings)
+        found = self._db.get_generations(prompt_ids)
+        self._enqueue([found[pid] for pid in prompt_ids if pid in found], self._settings)
 
     def enhance_a_videos_start_image(self, row: dict) -> None:
         self._enqueue([row], basic_enhance_settings())

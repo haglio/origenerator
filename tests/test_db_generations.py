@@ -113,3 +113,9 @@ def test_a_file_is_traced_to_its_generation_and_a_generation_made_since_is_found
     assert (first, db.generation_of_file("C:/library/videos/wan22_i2v_00002_.mp4"),
             db.generation_of_file("C:/library/videos/no_such_00009_.mp4")) == (
         "vid-001", "vid-002", None)
+
+
+def test_rows_read_together_are_the_rows_read_one_by_one(tmp_path):
+    db = _video(tmp_path)
+
+    assert db.get_generations(["vid-001", "never-made"]) == {"vid-001": db.get_generation("vid-001")}

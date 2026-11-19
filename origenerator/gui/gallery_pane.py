@@ -975,8 +975,9 @@ class GalleryPane(QObject):
         return enhance_state(row, self._host.enhancing().settings)
 
     def refresh_corners(self):
+        rows = self._db.get_generations(self._thumb_widgets)
         for prompt_id, tile in self._thumb_widgets.items():
-            row = self._db.get_generation(prompt_id)
+            row = rows.get(prompt_id)
             if row is not None:
                 tile.set_enhance(self._enhance_state(row))
                 tile.set_favorite(bool(row.get("starred")))

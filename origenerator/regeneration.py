@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from origenerator.comfyui_inputs import ComfyFolders, file_named_by
 from origenerator.generation_config import filled_params
+from origenerator.one_look import once_a_look
 from origenerator.setting_advice import named_models, not_installed, spoken_list
 from origenerator.workflows import RETIRED_WORKFLOW_NAMES, workflow_named
 
@@ -16,6 +17,11 @@ def workflow_gone(workflow_name: str) -> str:
 
 def told_why_it_cannot_be_made_again(row: dict | None) -> str | None:
     return (row or {}).get("why_it_cannot_be_made_again") or None
+
+
+@once_a_look
+def _offered_in_this_look(workflow) -> list:
+    return workflow.param_definitions()
 
 
 def why_it_cannot_be_made_again(row: dict, folders: ComfyFolders) -> str | None:
@@ -33,7 +39,7 @@ def why_it_cannot_be_made_again(row: dict, folders: ComfyFolders) -> str | None:
             if file_named_by(str(params.get(key) or "") or None, folders) is None]
     if gone:
         return f"Its {spoken_list(gone, 'and')} can't be found, so it can't be made again"
-    models = list(not_installed(params, workflow.param_definitions(),
+    models = list(not_installed(params, _offered_in_this_look(workflow),
                                 (*workflow.model_keys, *workflow.lora_keys)).values())
     if models:
         verb = "isn't" if len(models) == 1 else "aren't"

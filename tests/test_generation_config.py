@@ -273,3 +273,16 @@ def test_looking_for_a_duplicate_again_reads_no_runs_settings_a_second_time(monk
 
     assert find_duplicate_generation(rows, snap) is None
     assert read == []
+
+
+def test_filling_many_rows_builds_the_workflow_s_form_no_more_often_than_filling_one():
+    workflow = type(WORKFLOW_REGISTRY["sdxl_t2i"])()
+    built = []
+    build = workflow.param_definitions
+    workflow.param_definitions = lambda: built.append(1) or build()
+    rows = [{"workflow_name": "sdxl_t2i", "params_json": json.dumps({"seed": n})} for n in range(10)]
+
+    for row in rows:
+        filled_params(row, workflow)
+
+    assert len(built) <= 2, "once for its seeds and once for its enhance settings"

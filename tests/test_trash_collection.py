@@ -512,3 +512,33 @@ def test_an_item_whose_files_are_all_gone_is_emptied_with_no_thumbnail(tmp_path)
     assert trash_collection.empty_what_has_waited_a_day(db, _places(tmp_path)) == 1
 
     assert trash_collection.trash_items(db.list_trashed())[0]["thumbnail_path"] is None
+
+
+class _Menu:
+    def addAction(self, _label):
+        return _Action()
+
+    def setToolTipsVisible(self, _visible):
+        pass
+
+
+class _Action:
+    def setEnabled(self, _enabled):
+        pass
+
+    def setToolTip(self, _tip):
+        pass
+
+
+def test_the_restore_offer_for_many_emptied_items_lists_the_installed_models_once(monkeypatch):
+    workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
+    built = []
+    build = type(workflow).param_definitions
+    monkeypatch.setattr(type(workflow), "param_definitions",
+                        lambda self: built.append(1) or build(self))
+    items = [{"prompt_id": f"p{n}", "workflow_name": "sdxl_t2i", "emptied": True,
+              "params_json": json.dumps({"seed": n})} for n in range(3)]
+
+    trash_collection.restore_action_on(_Menu(), "Restore", items)
+
+    assert len(built) <= 2

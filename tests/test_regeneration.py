@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from origenerator.comfyui_inputs import ComfyFolders
+from origenerator.one_look import one_look
 from origenerator.output_places import OutputPlaces
 from origenerator.regeneration import MADE_ELSEWHERE_TIP, why_it_cannot_be_made_again
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -77,3 +78,18 @@ def test_an_item_told_why_it_cannot_be_made_again_gives_that_reason_first(tmp_pa
     row = {**_row("sdxl_t2i"), "why_it_cannot_be_made_again": "Its settings were lost"}
 
     assert why_it_cannot_be_made_again(row, _folders(tmp_path)) == "Its settings were lost"
+
+
+def test_asking_of_many_items_lists_the_installed_models_once(tmp_path, monkeypatch):
+    workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
+    built = []
+    build = type(workflow).param_definitions
+    monkeypatch.setattr(type(workflow), "param_definitions",
+                        lambda self: built.append(1) or build(self))
+    rows = [_row("sdxl_t2i", seed=n) for n in range(3)]
+
+    with one_look():
+        for row in rows:
+            why_it_cannot_be_made_again(row, _folders(tmp_path))
+
+    assert len(built) <= 2

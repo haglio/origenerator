@@ -181,6 +181,10 @@ class ParamForm(QWidget):
         self._request_section: CollapsibleSection | None = None
         self._present_keys: dict[str, list[str]] = {}
         self._shut_down: dict[str, str] = {}
+        self._explained: dict[str, tuple] = {}
+        self._warned: dict[str, tuple[str, ...]] = {}
+        self._offered: dict[str, tuple] = {}
+        self._marked_recommended: tuple | None = None
         self._param_defs = [pd for pd in param_defs if pd.key not in self._hidden_keys]
         self._defs = {pd.key: pd for pd in self._param_defs}
         scenes_def = next((pd for pd in self._param_defs if pd.type == ParamType.SCENES), None)
@@ -226,9 +230,7 @@ class ParamForm(QWidget):
                 self._set_row_visible(row, not strength_without_its_lora(row, values))
         for pd in self._param_defs:
             if (pd.key in self._lora_keys and pd.options) or pd.beside_model in values:
-                offer_only(pd, self._widgets[pd.key],
-                           loras_offered_beside(values[pd.beside_model], pd.options)
-                           if pd.beside_model in values else pd.options)
+                self._offer_options(pd, values)
         for row, (in_use, shut_down_help) in _IN_USE_WHILE.items():
             if row not in self._widgets:
                 continue
@@ -240,6 +242,16 @@ class ParamForm(QWidget):
                 self._explain(row)
         if self._scenes is not None:
             self._scenes.reflect_use()
+
+    def _offer_options(self, pd: ParamDef, values: dict) -> None:
+        dropdown = self._widgets[pd.key]
+        beside = values.get(pd.beside_model)
+        asked = (beside, dropdown.currentData(), dropdown.count())
+        if self._offered.get(pd.key) == asked:
+            return
+        offer_only(pd, dropdown, loras_offered_beside(beside, pd.options)
+                   if pd.beside_model in values else pd.options)
+        self._offered[pd.key] = (beside, dropdown.currentData(), dropdown.count())
 
     def _set_row_visible(self, key: str, visible: bool) -> None:
         title = param_sections.section_title(key)
@@ -343,7 +355,15 @@ class ParamForm(QWidget):
         self._explain(key)
 
     def _explain(self, key: str) -> None:
-        help_text, label, widget = self._help(key), self._labels[key], self._widgets.get(key)
+        widget = self._widgets.get(key)
+        said = (tuple(self._recommendations.get(each, "") for each in (key, *self._warned_at(key))),
+                self._shut_down.get(key),
+                self._read_field(self._defs[key])
+                if widget is not None and key in self._lora_keys else None)
+        if self._explained.get(key) == said:
+            return
+        self._explained[key] = said
+        help_text, label = self._help(key), self._labels[key]
         if isinstance(widget, PromptBoxes):
             set_in_use(widget, label, self._shut_down.get(key), help_text)
             return
@@ -368,12 +388,16 @@ class ParamForm(QWidget):
         pd = self._defs.get(key)
         if pd is None:
             return param_help(key)
-        warned_here = [other for other in self._param_defs
-                       if other.key != key and self._row_of(other.key) == key]
         return " ".join(filter(None, [
             definition_help(pd, self._recommendations.get(key, "")),
-            *(advice_help(other, self._recommendations.get(other.key, ""))
-              for other in warned_here)]))
+            *(advice_help(self._defs[other], self._recommendations.get(other, ""))
+              for other in self._warned_at(key))]))
+
+    def _warned_at(self, key: str) -> tuple[str, ...]:
+        if key not in self._warned:
+            self._warned[key] = tuple(other.key for other in self._param_defs
+                                      if other.key != key and self._row_of(other.key) == key)
+        return self._warned[key]
 
     def show_readings(self, readings: dict[str, PromptReading | None]) -> None:
         for key, widget in self._widgets.items():
@@ -473,6 +497,12 @@ class ParamForm(QWidget):
             self._take_advice(key, found.follow_up)
 
     def mark_recommended(self, choices: dict[str, tuple[str, ...]]) -> None:
+        offered = tuple((key, tuple(dropdown.itemText(index) for index in range(dropdown.count())))
+                        for key in choices
+                        if isinstance((dropdown := self._widgets.get(key)), QComboBox))
+        if self._marked_recommended == (choices, offered):
+            return
+        self._marked_recommended = (dict(choices), offered)
         for key, good in choices.items():
             dropdown = self._widgets.get(key)
             if isinstance(dropdown, QComboBox):

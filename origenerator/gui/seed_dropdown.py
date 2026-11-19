@@ -37,9 +37,11 @@ class SeedDropdown(ThumbnailDropdown):
 
     def describe(self, item_seed: int | None, item_thumbnail: str | None,
                  tab_size: tuple[int, int] | None) -> None:
-        self._item = (SeedUse(item_seed, item_thumbnail)
-                      if item_seed is not None and item_thumbnail else None)
-        self._tab_size = tab_size
+        item = (SeedUse(item_seed, item_thumbnail)
+                if item_seed is not None and item_thumbnail else None)
+        if (item, tab_size) == (self._item, self._tab_size):
+            return
+        self._item, self._tab_size = item, tab_size
         self._refresh_thumbnail()
 
     def resizeEvent(self, event):

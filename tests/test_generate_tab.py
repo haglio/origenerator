@@ -50,6 +50,7 @@ from origenerator import (
     look_training,
     osr2_driver,
     prompt_edit,
+    prompt_tokens,
 )
 from origenerator import export_lane as export_lane_module
 from origenerator.action_vocabulary import vocabulary
@@ -70,6 +71,8 @@ from origenerator.generation_config import ConfigSnapshot
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import corner_buttons, diff_text, icons, tracked_prompt
 from origenerator.gui import generate_tab as generate_tab_module
+from origenerator.gui import param_form as param_form_module
+from origenerator.gui import prompt_boxes as prompt_boxes_module
 from origenerator.gui import modify_batch as modify_batch_module
 from origenerator.gui.action_row import SIDE_LABELS, action_checkbox, action_pills
 from origenerator.gui.collapsible_section import CollapsibleSection
@@ -85,6 +88,7 @@ from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.label_cells import LabelCell
 from origenerator.gui.look_training_controller import LookTrainingController
 from origenerator.gui.param_form import STRENGTH_ONE_HELP, ParamForm
+from origenerator.gui.seed_dropdown import SeedDropdown
 from origenerator.gui.pills import Pill
 from origenerator.gui.source_tile import SourceTile
 from origenerator.gui.stylesheet import build_stylesheet
@@ -897,7 +901,7 @@ def prompt_read_as_plain_text(monkeypatch):
     })
 
 
-def test_generate_offers_to_remove_emphasis_when_that_is_the_only_problem(tab, prompt_read_as_plain_text, monkeypatch):
+def test_generate_offers_to_remove_emphasis_when_that_is_the_only_problem(prompt_read_as_plain_text, tab, monkeypatch):
     requested = []
     tab.generate_requested.connect(lambda wf, batch: requested.append(batch))
     asked = _press_in_the_popup(monkeypatch, "Remove emphasis")
@@ -912,7 +916,7 @@ def test_generate_offers_to_remove_emphasis_when_that_is_the_only_problem(tab, p
     assert tab._generate_btn.text() == "Generate"
 
 
-def test_cancel_in_the_emphasis_popup_leaves_the_prompts_as_they_were(tab, prompt_read_as_plain_text, monkeypatch):
+def test_cancel_in_the_emphasis_popup_leaves_the_prompts_as_they_were(prompt_read_as_plain_text, tab, monkeypatch):
     requested = []
     tab.generate_requested.connect(lambda wf, batch: requested.append(batch))
     _press_in_the_popup(monkeypatch, "Cancel")
@@ -924,7 +928,7 @@ def test_cancel_in_the_emphasis_popup_leaves_the_prompts_as_they_were(tab, promp
     assert requested == []
 
 
-def test_generate_goes_ahead_once_the_emphasis_is_removed(tab, prompt_read_as_plain_text, monkeypatch):
+def test_generate_goes_ahead_once_the_emphasis_is_removed(prompt_read_as_plain_text, tab, monkeypatch):
     requested = []
     tab.generate_requested.connect(lambda wf, batch: requested.append(batch))
     _press_in_the_popup(monkeypatch, "Remove emphasis")
@@ -941,7 +945,7 @@ def test_generate_goes_ahead_once_the_emphasis_is_removed(tab, prompt_read_as_pl
     ("(a), b:high)", "Resolve parentheses first"),
     ("(a), b, b", "Resolve unread emphasis first"),
 ])
-def test_emphasis_beside_another_problem_gets_no_popup(tab, prompt_read_as_plain_text, prompt, says):
+def test_emphasis_beside_another_problem_gets_no_popup(prompt_read_as_plain_text, tab, prompt, says):
     tab._param_form.set_values({"positive_prompt": prompt})
 
     tab._generate_btn.click()
@@ -950,7 +954,7 @@ def test_emphasis_beside_another_problem_gets_no_popup(tab, prompt_read_as_plain
     assert tab._generate_btn.text() == says
 
 
-def test_removing_emphasis_leaves_alone_a_prompt_whose_model_reads_it(tab, prompt_read_as_plain_text, monkeypatch):
+def test_removing_emphasis_leaves_alone_a_prompt_whose_model_reads_it(prompt_read_as_plain_text, tab, monkeypatch):
     _press_in_the_popup(monkeypatch, "Remove emphasis")
     tab._param_form.set_values({"positive_prompt": "(a:1.2)", "negative_prompt": "(b:1.2)"})
 
@@ -5193,3 +5197,104 @@ def test_a_form_made_ahead_is_left_unused_once_its_workflow_offers_something_els
     blank_panel._workflow_dropdown.setCurrentIndex(_dropdown_index(blank_panel, "sdxl_t2i"))
 
     assert blank_panel._param_form.get_values()["steps"] == steps.default
+
+
+def _counting(monkeypatch, module, name) -> list:
+    called = []
+    real = getattr(module, name)
+
+    def counted(*args, **kwargs):
+        called.append(args)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(module, name, counted)
+    return called
+
+
+def _typed_into_the_prompt(tab, qtbot, text="abc"):
+    box = tab._param_form.text_fields()[0]
+    qtbot.keyClicks(box, "warm ")
+    return lambda: qtbot.keyClicks(box, text)
+
+
+def test_typing_in_a_prompt_works_out_no_rows_help_again(tab, qtbot, monkeypatch):
+    type_ = _typed_into_the_prompt(tab, qtbot)
+    helped = _counting(monkeypatch, param_form_module, "definition_help")
+    picked = _counting(monkeypatch, param_form_module, "with_the_picked_lora")
+
+    type_()
+
+    assert (helped, picked) == ([], []), (
+        "each row's help, a LoRA's title read off the disk among it, changes only with its "
+        "pick, its recommendation or whether it is in use")
+
+
+def test_typing_in_a_prompt_looks_for_no_tokenizer_again(qtbot, monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "COMFYUI_DIR", tmp_path / "ComfyUI")
+    monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path / "hub"))
+    clip_reader(tmp_path / "ComfyUI")
+    clap_reader(tmp_path / "hub")
+    tab = _panel_on(qtbot, Database(tmp_path / "test.db"))
+    type_ = _typed_into_the_prompt(tab, qtbot)
+    looked = _counting(monkeypatch, prompt_tokens, "_reader_named")
+
+    type_()
+
+    assert looked == [], (
+        "a prompt's tokenizer is found by its workflow and text encoder, and its files "
+        "were read off the disk at every key")
+
+
+def test_typing_in_a_prompt_marks_no_sampler_or_scheduler_option_again(tab, qtbot, monkeypatch):
+    type_ = _typed_into_the_prompt(tab, qtbot)
+    explained = _counting(monkeypatch, param_form_module, "option_help")
+
+    type_()
+
+    assert explained == []
+
+
+def test_typing_in_a_prompt_offers_each_lora_row_its_options_no_more(tab, qtbot, monkeypatch):
+    type_ = _typed_into_the_prompt(tab, qtbot)
+    offered = _counting(monkeypatch, param_form_module, "offer_only")
+
+    type_()
+
+    assert offered == []
+
+
+def test_typing_in_a_prompt_draws_no_seed_thumbnail_again(tab, qtbot, monkeypatch):
+    type_ = _typed_into_the_prompt(tab, qtbot)
+    seeds = [widget for widget in tab._param_form._widgets.values()
+             if isinstance(widget, SeedDropdown)]
+    drawn = []
+    for seed in seeds:
+        monkeypatch.setattr(seed, "_refresh_thumbnail", lambda *_said: drawn.append(seed))
+
+    type_()
+
+    assert seeds and drawn == [], (
+        "a seed's thumbnail is the shown item's, found on the disk, and a prompt's words "
+        "change neither")
+
+
+def test_typing_in_a_prompt_leaves_the_size_headings_mark_alone(tab, qtbot, monkeypatch):
+    type_ = _typed_into_the_prompt(tab, qtbot)
+    heading = tab._param_form._sections["Size"]._header
+    laid_out = []
+    monkeypatch.setattr(heading, "updateGeometry", lambda: laid_out.append(heading))
+
+    type_()
+
+    assert laid_out == []
+
+
+def test_each_key_in_a_prompt_checks_each_prompt_for_problems_once(tab, qtbot, monkeypatch):
+    type_ = _typed_into_the_prompt(tab, qtbot)
+    checked = _counting(monkeypatch, prompt_boxes_module, "mark_problems_in")
+
+    type_()
+
+    assert len(checked) == 3 * 2, (
+        "a key in one prompt changes its own problems and the words the other prompt shares "
+        "with it, and nothing else")

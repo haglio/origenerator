@@ -61,9 +61,10 @@ def _the_verdict_of(ran: subprocess.CompletedProcess) -> str:
 def _away_from_his_machine(folder: Path) -> dict[str, str]:
     env = {name: value for name, value in os.environ.items() if name != _BRANCH_SESSION}
     (folder / "appdata").mkdir()
-    return {**env, _STATE_DIR: str(folder / "state"), "LOCALAPPDATA": str(folder / "appdata"),
-            haglio_settings.SETTINGS_ENV: haglio_settings.THE_EXAMPLE,
+    env |= {_STATE_DIR: str(folder / "state"), "LOCALAPPDATA": str(folder / "appdata"),
             "QT_QPA_PLATFORM": "offscreen"}
+    haglio_settings.run_on(haglio_settings.example_inside(folder), folder, env)
+    return env
 
 
 def away_from_his_library() -> None:

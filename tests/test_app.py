@@ -1939,7 +1939,8 @@ os.environ.pop("ORIGENERATOR_BRANCH_SESSION", None)
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 sys.path.insert(0, {repo!r})
 from app_support import haglio_settings
-os.environ[haglio_settings.SETTINGS_ENV] = haglio_settings.THE_EXAMPLE
+from pathlib import Path
+haglio_settings.run_on(haglio_settings.example_inside(Path({state!r})), Path({state!r}), os.environ)
 from origenerator import content
 content.LOCAL_CONTENT = content.EXAMPLE_CONTENT
 from unittest.mock import MagicMock, patch

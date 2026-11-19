@@ -57,13 +57,15 @@ def _videos_comfyui_reports(names: list[str]) -> list[str]:
 def file_into_library(files: list[dict], places: OutputPlaces, prompt_id: str) -> list[dict]:
     run = _run_subfolder(places, prompt_id)
     held = _names_taken(places)
+    homes = _Homes()
     filed: dict[tuple[str, str], tuple[str, str]] = {}
     for record in files:
         subfolder, name = _key(record)
         if (subfolder, name) in filed or not subfolder.startswith(f"{run}/"):
             continue
         kind = subfolder.removeprefix(f"{run}/")
-        moved = _file_into_its_home(places.comfyui / subfolder, name, places.folder(kind), held)
+        moved = _file_into_its_home(places.comfyui / subfolder, name, places.folder(kind), held,
+                                    homes)
         filed.update({(subfolder, was): (kind, now) for was, now in moved.items()})
     _remove_what_is_left_empty(places.run(prompt_id))
     return [_as_filed(record, filed) for record in files]
@@ -72,8 +74,8 @@ def file_into_library(files: list[dict], places: OutputPlaces, prompt_id: str) -
 def file_what_comfyui_left(places: OutputPlaces) -> int:
     if places.keeps_outputs_in_comfyuis_folder():
         return 0
-    held = _names_taken(places)
-    return sum(_file_everything_under(top, places, held) for top in folders_in(places.comfyui)
+    held, homes = _names_taken(places), _Homes()
+    return sum(_file_everything_under(top, places, held, homes) for top in folders_in(places.comfyui)
                if top != places.working and top.name not in ADD_ON_SCRATCH)
 
 
@@ -90,13 +92,13 @@ def _names_down_the_lanes(places: OutputPlaces) -> set[str]:
             for path in Path(lane).rglob("*")}
 
 
-def _file_everything_under(top: Path, places: OutputPlaces, held: set[str]) -> int:
+def _file_everything_under(top: Path, places: OutputPlaces, held: set[str], homes: _Homes) -> int:
     filed = 0
     for folder, names in files_under(top):
         home = places.folder(folder.relative_to(places.comfyui).as_posix())
         for name in names:
             if (folder / name).is_file():
-                filed += len(_file_into_its_home(folder, name, home, held))
+                filed += len(_file_into_its_home(folder, name, home, held, homes))
     _remove_what_is_left_empty(top)
     return filed
 
@@ -111,21 +113,32 @@ def _run_subfolder(places: OutputPlaces, prompt_id: str) -> str:
     return places.run(prompt_id).relative_to(places.comfyui).as_posix()
 
 
+class _Homes:
+    def __init__(self) -> None:
+        self._names: dict[Path, set[str]] = {}
+
+    def names_in(self, home: Path) -> set[str]:
+        if home not in self._names:
+            self._names[home] = set(os.listdir(home))
+        return self._names[home]
+
+
 def _file_into_its_home(waiting: Path, name: str, home: Path,
-                        held: set[str]) -> dict[str, str]:
+                        held: set[str], homes: _Homes) -> dict[str, str]:
     home.mkdir(parents=True, exist_ok=True)
-    filed_as = _names_in_its_home(waiting, name, home, held)
+    filed_as = _names_in_its_home(waiting, name, home, held, homes)
     for was, now in filed_as.items():
         os.rename(waiting / was, home / now)
+        homes.names_in(home).add(now)
     return filed_as
 
 
 def _names_in_its_home(waiting: Path, name: str, home: Path,
-                       held: set[str]) -> dict[str, str]:
+                       held: set[str], homes: _Homes) -> dict[str, str]:
     match = NUMBERED.match(name)
     if match is None:
         return {} if os.path.lexists(home / name) else {name: name}
-    number = next_number(match["stem"], [home], held)
+    number = next_number(match["stem"], (), held | homes.names_in(home))
     return {sibling: numbered(sibling, match["stem"], number)
             for sibling in os.listdir(waiting)
             if (other := NUMBERED.match(sibling))

@@ -1,4 +1,5 @@
 import _winapi
+import os
 from dataclasses import replace
 from pathlib import Path
 
@@ -308,3 +309,21 @@ def test_a_run_comfyui_reports_with_windows_separators_is_filed_all_the_same(tmp
 
     assert (filed[0]["subfolder"], filed[0]["filename"]) == ("image", "alpha_t2i_00001_.png")
     assert (places.images / "alpha_t2i_00001_.png").is_file()
+
+
+def test_a_run_of_many_images_lists_the_images_folder_once(tmp_path, monkeypatch):
+    places = _places(tmp_path)
+    places.images.mkdir(parents=True)
+    names = [f"alpha_t2i_0000{n}_.png" for n in range(1, 5)]
+    for name in names:
+        _saved_by_comfyui(places, "run-one", "image", name)
+    listed = []
+    listdir = os.listdir
+    monkeypatch.setattr(os, "listdir", lambda folder: (
+        listed.append(folder) if Path(folder) == places.images else None) or listdir(folder))
+
+    filed = file_into_library([_listed("run-one", "image", name) for name in names],
+                              places, "run-one")
+
+    assert [f["filename"] for f in filed] == [f"alpha_t2i_0000{n}_.png" for n in range(1, 5)]
+    assert len(listed) == 1

@@ -10,7 +10,7 @@ from origenerator import branch_session, gallery
 from origenerator.db import NewGeneration
 from origenerator.gallery.collection import FAVORITES_KEY
 from origenerator.gui import enhance_settings_drags
-from origenerator.gui.enhance_versions import enhance_version_mime
+from origenerator.gui.enhance_versions import enhance_version_mime, params_from_mime
 from origenerator.gui.folder_tree import TREE_KEY_ROLE, folder_keys_mime
 from origenerator.gui.gallery_view import GalleryView
 from tests.drops import dropped_on
@@ -253,6 +253,29 @@ def test_an_enhance_button_that_is_off_drags_nothing(qtbot, tmp_path, monkeypatc
 
 def _steps(steps: int) -> dict:
     return {**gallery.EnhanceSettings().params, "enhance_steps": steps}
+
+
+def test_settings_dropped_on_an_unlit_enhance_button_switch_its_folder_on_with_them(
+        qtbot, tmp_path):
+    view, _db, _leaf = _enhancing_view(qtbot, tmp_path)
+    _pane_set_to(view, 23)
+    mime = enhance_version_mime(_steps(30))
+
+    dropped_on(view._buttons.enhance, mime)
+
+    assert view._buttons.enhance.isChecked()
+    assert _steps_of_each_enhance(view) == [30]
+    assert "30 steps" in view._buttons.enhance.toolTip()
+
+
+def test_the_enhance_pane_dragged_from_its_background_carries_its_settings(
+        qtbot, tmp_path, monkeypatch):
+    view, _db, _leaf = _enhancing_view(qtbot, tmp_path)
+    _pane_set_to(view, 23)
+
+    (mime,) = _dragged_from(view.enhance.pane, monkeypatch)
+
+    assert params_from_mime(mime)["enhance_steps"] == 23
 
 
 def test_settings_dropped_on_the_lit_enhance_button_become_its_folders(qtbot, tmp_path):

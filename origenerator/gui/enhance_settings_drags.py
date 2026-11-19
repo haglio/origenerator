@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtGui import QDrag
+from PySide6.QtWidgets import QAbstractButton
 
 from origenerator.gui.drag_thumbnail import DragOut
 from origenerator.gui.drags import carry
@@ -20,13 +21,13 @@ def settings_carried(mime, folders_settings: FoldersSettings) -> dict | None:
 
 
 class EnhanceSettingsDrag(QObject):
-    def __init__(self, button, params_of: Callable[[], dict | None]):
-        super().__init__(button)
-        self._button = button
+    def __init__(self, widget, params_of: Callable[[], dict | None]):
+        super().__init__(widget)
+        self._widget = widget
         self._params_of = params_of
         self._gesture = DragOut()
         self._dragged = False
-        button.installEventFilter(self)
+        widget.installEventFilter(self)
 
     def eventFilter(self, _watched, event):  # noqa: N802 -- Qt's name
         kind = event.type()
@@ -40,17 +41,21 @@ class EnhanceSettingsDrag(QObject):
                 return True
         elif kind == QEvent.Type.MouseButtonRelease and self._dragged:
             self._dragged = False
-            self._button.setDown(False)
+            self._let_go()
             return True
         return False
+
+    def _let_go(self) -> None:
+        if isinstance(self._widget, QAbstractButton):
+            self._widget.setDown(False)
 
     def _carry(self, params: dict) -> None:
         self._dragged = True
         mime = enhance_version_mime(params)
-        drag = QDrag(self._button)
+        drag = QDrag(self._widget)
         drag.setMimeData(mime)
-        carry(drag, mime, self._button, Qt.DropAction.CopyAction)
-        self._button.setDown(False)
+        carry(drag, mime, self._widget, Qt.DropAction.CopyAction)
+        self._let_go()
 
 
 class SettingsDropOnTheButton(QObject):

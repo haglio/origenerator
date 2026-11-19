@@ -188,6 +188,40 @@ def test_right_clicking_a_folder_leaves_its_caret_alone(qtbot):
     assert tree.currentItem() is parent
 
 
+def _label_pos(tree, item) -> QPoint:
+    return tree.visualRect(tree.indexFromItem(item)).center()
+
+
+def test_a_row_opens_when_the_button_comes_back_up_not_when_it_goes_down(qtbot):
+    tree, leaf = _tree_with_an_indented_leaf(qtbot)
+    tree.setCurrentItem(leaf.parent())
+    opened = []
+    tree.currentItemChanged.connect(lambda current, _previous: opened.append(current))
+
+    qtbot.mousePress(tree.viewport(), Qt.MouseButton.LeftButton, pos=_label_pos(tree, leaf))
+    assert (tree.currentItem(), opened) == (leaf.parent(), [])
+
+    qtbot.mouseRelease(tree.viewport(), Qt.MouseButton.LeftButton, pos=_label_pos(tree, leaf))
+    assert (tree.currentItem(), opened) == (leaf, [leaf])
+
+
+def test_a_row_dragged_away_leaves_the_open_folder_open(qtbot, monkeypatch):
+    tree, leaf = _tree_with_an_indented_leaf(qtbot)
+    tree.setCurrentItem(leaf.parent())
+    carried = []
+    monkeypatch.setattr(folder_tree, "carry",
+                        lambda _drag, mime, _source, _action: carried.append(mime))
+    at = _label_pos(tree, leaf)
+
+    qtbot.mousePress(tree.viewport(), Qt.MouseButton.LeftButton, pos=at)
+    qtbot.mouseMove(tree.viewport(), at + QPoint(0, QApplication.startDragDistance() + 8))
+    qtbot.mouseRelease(tree.viewport(), Qt.MouseButton.LeftButton, pos=at)
+
+    assert [folder_tree.folder_keys_in(mime) for mime in carried] == [
+        [shaped_key("m/w/mo/key", LANDSCAPE)]]
+    assert tree.currentItem() is leaf.parent()
+
+
 def test_left_clicking_the_caret_still_collapses_the_folder(qtbot):
     tree, leaf = _tree_with_an_indented_leaf(qtbot)
     parent = leaf.parent()

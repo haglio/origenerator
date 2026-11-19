@@ -11,7 +11,7 @@ from origenerator.db_requests import Turn
 from origenerator.gui.generate_button import GenerateButton
 from origenerator.gui.inflight import RunReading
 from origenerator.gui.progress_bar import ProgressBar
-from origenerator.gui.request_exchange import RequestExchange
+from origenerator.gui.request_exchange import RequestExchange, _Thumbnail
 from origenerator.gui.source_tile import SourceTile
 from tests.waiting import until
 
@@ -443,6 +443,10 @@ def test_generate_sits_under_its_turns_answer_on_a_line_of_its_own(qtbot):
     assert first.geometry().bottom() < conversation.cursorRect(QTextCursor(next_words)).top()
 
 
+def _thumbnails_shown(exchange) -> list[str]:
+    return [thumbnail.item for thumbnail in _placed(exchange, _Thumbnail)]
+
+
 def test_a_turn_an_item_was_made_from_shows_its_thumbnail_where_generate_would_be(
         qtbot, tmp_path):
     paths = _thumbnails(tmp_path, "first")
@@ -451,9 +455,10 @@ def test_a_turn_an_item_was_made_from_shows_its_thumbnail_where_generate_would_b
 
     exchange.show_exchange([_changed("a cap", made="first"), _changed("red")])
 
-    assert len(_placed(exchange, GenerateButton)) == 1
-    html = exchange._conversation.document().toHtml()
-    assert paths["first"] in html
+    (thumbnail,) = _placed(exchange, _Thumbnail)
+    assert (len(_placed(exchange, GenerateButton)), thumbnail.item,
+            thumbnail.pixmap().isNull(), thumbnail.toolTip()) == (
+        1, "first", False, exchange._entries()[0].tip)
 
 
 def test_a_turn_whose_generate_would_only_remake_an_item_shows_that_items_thumbnail(
@@ -467,19 +472,14 @@ def test_a_turn_whose_generate_would_only_remake_an_item_shows_that_items_thumbn
     exchange.item_activated.connect(appending_to(opened))
 
     exchange.show_exchange([_changed("a cap")])
-    qtbot.mouseClick(exchange._conversation.viewport(), Qt.MouseButton.LeftButton,
-                     pos=_thumbnail_place(exchange))
+    qtbot.mouseClick(_the_thumbnail(exchange), Qt.MouseButton.LeftButton)
 
-    assert paths["already"] in exchange._conversation.document().toHtml()
-    assert opened == ["already"]
+    assert (_thumbnails_shown(exchange), opened) == (["already"], ["already"])
 
 
-def _thumbnail_place(exchange) -> QPoint:
-    conversation = exchange._conversation
-    block = conversation.document().findBlockByNumber(2)
-    corner = conversation.document().documentLayout().blockBoundingRect(block).topLeft()
-    return QPoint(round(corner.x()) + MARGIN_STANDARD + 4,
-                  round(corner.y() + block.blockFormat().topMargin()) + 4)
+def _the_thumbnail(exchange) -> _Thumbnail:
+    (thumbnail,) = _placed(exchange, _Thumbnail)
+    return thumbnail
 
 
 def _shown_with_a_thumbnail(qtbot, tmp_path):
@@ -490,71 +490,90 @@ def _shown_with_a_thumbnail(qtbot, tmp_path):
     return exchange
 
 
+def test_selecting_the_whole_conversation_takes_its_words_and_no_thumbnail(qtbot, tmp_path):
+    exchange = _shown_with_a_thumbnail(qtbot, tmp_path)
+    conversation = exchange._conversation
+    conversation.setFocus()
+
+    qtbot.keyClick(conversation, Qt.Key.Key_A, Qt.KeyboardModifier.ControlModifier)
+
+    selected = conversation.textCursor().selection()
+    assert ("<img" in selected.toHtml(), selected.toPlainText().split()) == (
+        False, ["a", "cap", "Changed", "it."])
+
+
+def test_the_conversation_draws_no_text_cursor_when_it_has_the_focus(qtbot):
+    exchange = _shown_at(qtbot, 400)
+    exchange.show_exchange(EXCHANGE)
+    conversation = exchange._conversation
+    exchange.activateWindow()
+    until(exchange.isActiveWindow)
+    unfocused = conversation.viewport().grab().toImage()
+
+    qtbot.mouseClick(conversation.viewport(), Qt.MouseButton.LeftButton,
+                     pos=conversation.cursorRect(QTextCursor(
+                         conversation.document().findBlockByNumber(1))).center())
+
+    assert conversation.hasFocus()
+    assert conversation.viewport().grab().toImage() == unfocused
+
+
 def test_clicking_a_turns_thumbnail_opens_the_item_it_made_as_a_link_tile_does(qtbot, tmp_path):
     exchange = _shown_with_a_thumbnail(qtbot, tmp_path)
     opened = []
     exchange.item_activated.connect(appending_to(opened))
 
-    qtbot.mouseClick(exchange._conversation.viewport(), Qt.MouseButton.LeftButton,
-                     pos=_thumbnail_place(exchange))
+    qtbot.mouseClick(_the_thumbnail(exchange), Qt.MouseButton.LeftButton)
     qtbot.mouseClick(exchange._conversation.viewport(), Qt.MouseButton.LeftButton,
                      pos=QPoint(2, 2))
 
     assert opened == ["first"]
 
 
-def _text_cursor_left_by(qtbot, exchange, click) -> tuple[bool, bool]:
-    exchange.activateWindow()
-    until(exchange.isActiveWindow)
-    click(exchange._conversation.viewport(), Qt.MouseButton.LeftButton,
-          pos=_thumbnail_place(exchange))
-    conversation = exchange._conversation
-    return conversation.hasFocus(), conversation.textCursor().hasSelection()
+def _selection_left_by(exchange, click) -> bool:
+    click(_the_thumbnail(exchange), Qt.MouseButton.LeftButton)
+    return exchange._conversation.textCursor().hasSelection()
 
 
-def test_clicking_a_turns_thumbnail_leaves_no_text_cursor_beside_it(qtbot, tmp_path):
+def test_clicking_or_double_clicking_a_turns_thumbnail_selects_nothing(qtbot, tmp_path):
     exchange = _shown_with_a_thumbnail(qtbot, tmp_path)
 
-    assert _text_cursor_left_by(qtbot, exchange, qtbot.mouseClick) == (False, False)
+    assert (_selection_left_by(exchange, qtbot.mouseClick),
+            _selection_left_by(exchange, qtbot.mouseDClick)) == (False, False)
 
 
-def test_double_clicking_a_turns_thumbnail_leaves_no_text_cursor_beside_it(qtbot, tmp_path):
+def test_dragging_from_a_turns_thumbnail_selects_nothing(qtbot, tmp_path):
     exchange = _shown_with_a_thumbnail(qtbot, tmp_path)
+    thumbnail = _the_thumbnail(exchange)
 
-    assert _text_cursor_left_by(qtbot, exchange, qtbot.mouseDClick) == (False, False)
+    qtbot.mousePress(thumbnail, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
+    QApplication.sendEvent(thumbnail, QMouseEvent(
+        QEvent.Type.MouseMove, QPointF(2, -40), QPointF(thumbnail.mapToGlobal(QPoint(2, -40))),
+        Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier))
+    qtbot.mouseRelease(thumbnail, Qt.MouseButton.LeftButton, pos=QPoint(2, -40))
+
+    assert not exchange._conversation.textCursor().hasSelection()
 
 
-def test_the_thumbnail_of_the_item_on_show_is_no_link_and_takes_no_text_cursor(qtbot, tmp_path):
+def test_the_thumbnail_of_the_item_on_show_is_no_link_and_selects_nothing(qtbot, tmp_path):
     exchange = _shown_with_a_thumbnail(qtbot, tmp_path)
     exchange.show_exchange([_changed("a cap", made="first")], showing="first")
     opened = []
     exchange.item_activated.connect(appending_to(opened))
-    viewport = exchange._conversation.viewport()
-    _move_to(viewport, _thumbnail_place(exchange))
 
-    clicked = _text_cursor_left_by(qtbot, exchange, qtbot.mouseClick)
-    double_clicked = _text_cursor_left_by(qtbot, exchange, qtbot.mouseDClick)
+    clicked = _selection_left_by(exchange, qtbot.mouseClick)
+    double_clicked = _selection_left_by(exchange, qtbot.mouseDClick)
 
-    assert (viewport.cursor().shape(), opened, clicked, double_clicked) == (
-        Qt.CursorShape.IBeamCursor, [], (False, False), (False, False))
-
-
-def _move_to(viewport, place: QPoint) -> None:
-    QApplication.sendEvent(viewport, QMouseEvent(
-        QEvent.Type.MouseMove, QPointF(place), QPointF(viewport.mapToGlobal(place)),
-        Qt.MouseButton.NoButton, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier))
+    assert (_the_thumbnail(exchange).cursor().shape(), opened, clicked, double_clicked) == (
+        Qt.CursorShape.IBeamCursor, [], False, False)
 
 
 def test_the_pointer_over_a_turns_thumbnail_is_the_hand_a_link_tile_shows(qtbot, tmp_path):
     exchange = _shown_with_a_thumbnail(qtbot, tmp_path)
-    viewport = exchange._conversation.viewport()
 
-    _move_to(viewport, _thumbnail_place(exchange))
-    over = viewport.cursor().shape()
-    _move_to(viewport, QPoint(2, 2))
-
-    assert (over, viewport.cursor().shape()) == (SourceTile().cursor().shape(),
-                                                 Qt.CursorShape.IBeamCursor)
+    assert (_the_thumbnail(exchange).cursor().shape(),
+            exchange._conversation.viewport().cursor().shape()) == (
+        SourceTile().cursor().shape(), Qt.CursorShape.IBeamCursor)
 
 
 def test_a_turn_whose_item_is_being_made_shows_its_progress_until_the_thumbnail_comes(
@@ -574,8 +593,7 @@ def test_a_turn_whose_item_is_being_made_shows_its_progress_until_the_thumbnail_
     thumbnails["first"] = paths["first"]
     exchange.note_in_flight({})
 
-    assert _placed(exchange, ProgressBar) == []
-    assert paths["first"] in exchange._conversation.document().toHtml()
+    assert (_placed(exchange, ProgressBar), _thumbnails_shown(exchange)) == ([], ["first"])
 
 
 def test_auto_generate_sits_at_the_end_of_the_line_and_starts_off(qtbot):

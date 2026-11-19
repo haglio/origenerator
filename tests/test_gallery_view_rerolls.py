@@ -1526,7 +1526,7 @@ def test_the_conversation_knows_which_item_the_tab_shows_so_its_thumbnail_links_
     view.follow_link("child")
 
     exchange = view._generate_pane.current_generate_tab()._param_form.request_exchange()
-    assert exchange._conversation._showing == "child"
+    assert exchange._showing == "child"
 
 
 def test_generate_under_a_turn_that_would_make_an_image_already_made_makes_no_second_copy(

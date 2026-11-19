@@ -286,6 +286,10 @@ class WorkflowTemplate(ABC):
         return self.output_type != MediaType.VIDEO
 
     def enhance_keys(self) -> tuple[str, ...]:
+        return self._enhance_keys
+
+    @cached_property
+    def _enhance_keys(self) -> tuple[str, ...]:
         named = tuple(pd.key for pd in self.param_definitions()
                       if pd.key == "enhance" or pd.key.startswith("enhance_"))
         return named + self.extra_enhance_keys

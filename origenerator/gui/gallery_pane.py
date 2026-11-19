@@ -63,6 +63,7 @@ from origenerator.gui.picking import Picking, Picks
 from origenerator.item_shape import base_of, filter_rows, key_holds, split_key
 from origenerator.library_views import LibrarySnapshot
 from origenerator.media import MediaType
+from origenerator.one_look import looking_once
 
 REROLL_VIDEO = "video"
 REROLL_IMAGE = "image"
@@ -146,6 +147,7 @@ class _Pages:
     def more(self) -> bool:
         return self.drawn < len(self._entries)
 
+    @looking_once
     def draw(self, count: int) -> None:
         for entry in self._entries[self.drawn:self.drawn + count]:
             entry.draw()

@@ -20,7 +20,7 @@ from origenerator.gallery.output import (
 from origenerator.gallery.signatures import parse_params
 from origenerator.gallery.tree import settings_folder_key
 from origenerator.generation_state import GenerationStatus
-from origenerator.one_look import is_file
+from origenerator.one_look import is_file, looking_once, one_look
 from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import leave_out_for_good
 from origenerator.regeneration import why_it_cannot_be_made_again
@@ -199,7 +199,8 @@ def why_it_cannot_be_restored(item: dict) -> str | None:
 
 def restore_action_on(menu, label: str, items: list[dict]):
     action = menu.addAction(label)
-    reasons = [why_it_cannot_be_restored(item) for item in items]
+    with one_look():
+        reasons = [why_it_cannot_be_restored(item) for item in items]
     if items and all(reasons):
         menu.setToolTipsVisible(True)
         action.setEnabled(False)
@@ -215,6 +216,7 @@ def restore_from_trash(db, jobs, prompt_ids, restore_with_files, image_index: di
     return _regenerate(db, jobs, emptied, image_index) or restored
 
 
+@looking_once
 def _regenerate(db, jobs, records: list[dict], image_index: dict) -> str | None:
     landing = None
     for record in records:

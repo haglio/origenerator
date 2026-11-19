@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
@@ -33,6 +34,7 @@ from origenerator.gui.gallery_pane import (
 from origenerator.gui.item_tile import ItemTile
 from origenerator.item_shape import shaped_key
 from origenerator.library_views import LibrarySnapshot
+from origenerator.one_look import entries_in
 from tests.real_db import put_rows
 from tests.thumbnail_rows import looping_video
 
@@ -1055,3 +1057,15 @@ def test_search_results_are_listed_in_the_order_their_sections_are_laid_out(qtbo
     assert [row["prompt_id"] for row in pane.collection_rows()] == ["a", "c", "b"], (
         "the shown order, which Shift-select and the slideshow read, is the order the sections "
         "are laid out in rather than the order the search scored them")
+
+
+def test_a_page_of_tiles_lists_each_folder_its_tiles_look_in_once(tmp_path, monkeypatch):
+    listed = []
+    scandir = os.scandir
+    monkeypatch.setattr(os, "scandir", lambda folder: listed.append(folder) or scandir(folder))
+    pages = gallery_pane._Pages(entries=[gallery_pane._Entry(lambda: entries_in(tmp_path))
+                                         for _ in range(3)])
+
+    pages.draw(3)
+
+    assert len(listed) == 1

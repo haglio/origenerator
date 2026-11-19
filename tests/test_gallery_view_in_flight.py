@@ -2577,8 +2577,8 @@ def test_the_huds_cancel_all_below_asks_over_the_slideshow_never_raising_core(
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._slideshows.start()
-    shown = view._slideshows.showing.shown
+    view.slideshows.start()
+    shown = view.slideshows.showing.shown
     qtbot.addWidget(shown)
     jobs = [_cancelable(key, []) for key in ("a", "b", "c")]
     monkeypatch.setattr(view.job_queue, "items", lambda rows=None, requests=None: jobs)

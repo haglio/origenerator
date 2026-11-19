@@ -26,8 +26,6 @@ GROUND_CSS = (
 
 _DELETE_FOR_GOOD_TIP = "Delete permanently — remove it and its files for good"
 _TIPS = {
-    STAR: ("Favorite this item", "Unfavorite this item"),
-    TRASH: ("Delete this item",),
     icons.ENHANCE_OPEN: ("Enhance this image (upscale + re-sample)",),
     icons.ENHANCE_HELD: (("Already enhanced at these settings — "
                           "change one to make a different version"),),
@@ -92,6 +90,7 @@ class CornerButtons(QObject):
         self._available = False
         self._favorite = False
         self._enhance: str | None = None
+        self._kind = "item"
         self._star = _CornerButtonFace(
             host, lambda armed: icons.corner_star_icon(favorite=self._favorite, armed=armed)
             if restore is None
@@ -110,10 +109,11 @@ class CornerButtons(QObject):
     def buttons(self) -> list[QPushButton]:
         return [self._star, self._trash, self._enhance_button]
 
-    def show_for(self, *, favorite: bool, enhance: str | None):
+    def show_for(self, *, favorite: bool, enhance: str | None, kind: str | None = None):
         self._available = True
         self._favorite = favorite
         self._enhance = enhance
+        self._kind = kind or "item"
         self._redraw()
 
     def hide_all(self):
@@ -144,8 +144,10 @@ class CornerButtons(QObject):
         self._sync()
 
     def _retip(self):
-        self._star.setToolTip(self._restore_tip or _TIPS[STAR][1 if self._favorite else 0])
-        self._trash.setToolTip(_DELETE_FOR_GOOD_TIP if self._restore_tip else _TIPS[TRASH][0])
+        favoring = "Unfavorite" if self._favorite else "Favorite"
+        self._star.setToolTip(self._restore_tip or f"{favoring} this {self._kind}")
+        self._trash.setToolTip(_DELETE_FOR_GOOD_TIP if self._restore_tip
+                               else f"Delete this {self._kind}")
         if self._enhance is not None:
             self._enhance_button.setToolTip(_TIPS[self._enhance][0])
 

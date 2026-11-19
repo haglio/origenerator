@@ -1314,6 +1314,7 @@ class GenerateTab(DropZones):
         self._viewport.set_actions(
             row["prompt_id"], favorite=bool(row.get("starred")),
             enhance=enhance_state(row, self._enhance_settings),
+            kind=gallery.media_type_of_row(row),
         )
 
     def reconcile_preview(self, live_ids):

@@ -135,6 +135,7 @@ class ItemTile(QWidget):
         layout.addWidget(self._text_label)
         self._apply_styles()
 
+        self._media_type = appearance.media_type
         self._mark_its_kind(appearance)
 
         layout.activate()  # Qt gives the thumbnail its rectangle only once the layout has run
@@ -199,7 +200,8 @@ class ItemTile(QWidget):
         self._sync_controls()
 
     def _sync_controls(self):
-        self._controls.show_for(favorite=self._favorite, enhance=self._enhance)
+        self._controls.show_for(favorite=self._favorite, enhance=self._enhance,
+                                kind=self._media_type)
 
     def set_enhancing(self, run: RunReading | None):
         self._enhancing = run

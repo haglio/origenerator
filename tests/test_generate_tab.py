@@ -2172,7 +2172,7 @@ def test_a_favorite_preview_stays_favorite_through_an_enhance_setting_change(sav
 
     tab.set_enhance_settings(gallery.EnhanceSettings(auto=True))
 
-    assert tab._viewport._controls.buttons()[0].toolTip() == "Unfavorite this item"
+    assert tab._viewport._controls.buttons()[0].toolTip() == "Unfavorite this image"
 
 
 def test_right_clicking_the_preview_asks_for_the_generations_menu(saved_panel):

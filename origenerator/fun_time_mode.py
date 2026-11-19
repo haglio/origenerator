@@ -145,13 +145,15 @@ def _lines_said_to(shape: str) -> tuple[str, ...]:
 
 
 _CARRIED = re.compile(r"(\{\w+\})")
-_MAYBE_SAID_AT = rf"(?:{re.escape(SAID_AT)}[0-9]+(?:\.[0-9]+)?(?:{re.escape(HEARD)})?)?"
+_MAYBE_SAID_AT = rf"(?:{re.escape(SAID_AT)}[0-9]+(?:\.[0-9]+)?)?"
+_MAYBE_HEARD = rf"(?:{re.escape(HEARD)})?"
 
 
 def command_patterns() -> tuple[str, ...]:
     return tuple("(?i)" + "".join(".+" if _CARRIED.fullmatch(piece) else re.escape(piece)
                                   for piece in _CARRIED.split(line))
                  + ("" if "|" in line else _MAYBE_SAID_AT)
+                 + ("" if "|" in line or ":" in line else _MAYBE_HEARD)
                  for line in command_lines())
 
 

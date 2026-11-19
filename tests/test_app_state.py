@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from origenerator import app_state
 from origenerator.app_state import AppState
 
 
@@ -89,3 +90,19 @@ def test_a_save_cut_off_part_way_leaves_the_last_state_file_whole(tmp_path, monk
         "the state is written to a .tmp file and then put in the real file's place, so a save "
         "cut off part-way leaves the old file whole rather than a cut-off one"
     )
+
+
+def test_saving_a_state_set_again_unchanged_writes_nothing_out(tmp_path, monkeypatch):
+    state = AppState(tmp_path / "ui_state.json")
+    order = tuple(f"id-{n}" for n in range(3000))
+    state.set("slideshows", {"last_show": {"order": order, "current": "id-1"}})
+    state.save()
+    dumped = []
+    dumps = app_state.json.dumps
+    monkeypatch.setattr(app_state.json, "dumps", lambda *a, **k: dumped.append(1) or dumps(*a, **k))
+
+    for _ in range(3):
+        state.set("slideshows", {"last_show": {"order": tuple(order), "current": "id-1"}})
+        state.save()
+
+    assert dumped == []

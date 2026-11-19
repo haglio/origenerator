@@ -89,7 +89,9 @@ def test_the_document_names_every_line_a_hosted_core_writes_in_its_status_file(
 
     qtbot.waitUntil(status_file.exists, timeout=3000)
 
-    assert sorted(read_key_values(status_file)) == sorted(_document()["status_keys"])
+    written_only_when_a_region_could_not_be_filled = {contract.START_FAILED}
+    assert sorted(read_key_values(status_file)) == sorted(
+        set(_document()["status_keys"]) - written_only_when_a_region_could_not_be_filled)
 
 
 def test_the_document_names_where_the_gallery_names_are_kept_in_the_production_checkout():

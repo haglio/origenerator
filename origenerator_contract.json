@@ -327,7 +327,8 @@
   ],
   "status_keys": [
     "ready",
-    "core_ready"
+    "core_ready",
+    "start_failed"
   ],
   "gallery_names_file": "state/gallery_names.json"
 }

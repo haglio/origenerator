@@ -70,7 +70,8 @@ LOCK_HELD = "lock_held"
 
 UP = "ready"
 CORE_READY = "core_ready"
-STATUS_KEYS = (UP, CORE_READY)
+START_FAILED = "start_failed"
+STATUS_KEYS = (UP, CORE_READY, START_FAILED)
 
 TASKBAR_IDENTITY_FLAG = "--taskbar-identity"
 

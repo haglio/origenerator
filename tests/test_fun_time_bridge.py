@@ -768,9 +768,9 @@ def test_cancel_all_below_on_the_job_queue_a_funestra_draws_cancels_the_jobs_und
     bridge = FunTimeBridge(view._fun_time, view, parent=view)
     tall = tmp_path / "tall.png"
     Image.new("RGB", (100, 200)).save(tall)
-    monkeypatch.setattr(view._slideshows, "rows_at", lambda key: [_row_of(
+    monkeypatch.setattr(view.slideshows, "rows_at", lambda key: [_row_of(
         (str(tall), "image", "id-tall", str(tall)))] if key == "__all__::portrait" else [])
-    monkeypatch.setattr(view._slideshows, "items_of", _items_of)
+    monkeypatch.setattr(view.slideshows, "items_of", _items_of)
     _press(bridge, tmp_path, "portrait_open_slideshow")
     shown = view.region_slideshow("portrait").shown
     stopped = []

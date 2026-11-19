@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 
-from app_support import haglio_settings, kino_folder
+from app_support import haglio_settings
 
 from origenerator import gallery, library_views
 from origenerator.db import Database, NewGeneration
@@ -560,9 +561,13 @@ def test_the_versions_of_many_videos_read_where_kino_files_its_upscales_once(
         rows.append({"prompt_id": f"v{n}", "workflow_name": "wan22_i2v", "params": "{}",
                      "thumbnail_path": None,
                      "output_files": json.dumps([{"filename": video.name, "path": str(video)}])})
+    settings = tmp_path / "settings.json"
+    settings.write_text(json.dumps({"kino_dir": str(tmp_path / "kino")}), encoding="utf-8")
+    monkeypatch.setenv(haglio_settings.SETTINGS_ENV, str(settings))
     asked = []
-    kino_dir = kino_folder.kino_dir
-    monkeypatch.setattr(kino_folder, "kino_dir", lambda: asked.append(1) or kino_dir())
+    read_text = Path.read_text
+    monkeypatch.setattr(Path, "read_text", lambda path, *a, **k: (
+        asked.append(1) if path == settings else None) or read_text(path, *a, **k))
 
     assert LibrarySnapshot(rows, evolvers_folder=tmp_path / "AI").versions_of(rows) == {}
     assert len(asked) <= 1

@@ -34,10 +34,12 @@ class RequestAim:
             at = index - len(self.earlier)
             self.turns[at] = self.turns[at]._replace(made=prompt_id)
 
-    def forget_what_never_came(self, still_there) -> None:
-        for index, turn in enumerate(self.every_turn()):
-            if turn.made and not still_there(turn.made):
-                self.note_made(index, "")
+    def forget_what_never_came(self, still_there) -> list[int]:
+        forgotten = [index for index, turn in enumerate(self.every_turn())
+                     if turn.made and not still_there(turn.made)]
+        for index in forgotten:
+            self.note_made(index, "")
+        return forgotten
 
     def turns_up_to(self, prompt_id: str) -> int | None:
         made = [turn.made for turn in self.turns]

@@ -70,7 +70,7 @@ def parse_tabs_state(state) -> tuple[list[SavedTab], int]:
 class GeneratePane(QTabWidget):
     tab_added = Signal(object)
     generate_requested = Signal(str, list)
-    turn_generate_requested = Signal(object, str, dict, dict)
+    turn_generate_requested = Signal(object, str, dict, dict, bool)
     modify_batch_requested = Signal(str, str, dict)
     folder_requested = Signal(str)
 
@@ -177,7 +177,8 @@ class GeneratePane(QTabWidget):
             lambda key, name, params, p=tab: self._on_tab_changes(p, key, name, params)
         )
         tab.turn_generate_requested.connect(
-            lambda name, params, asked, p=tab: self._on_turn_generate(p, name, params, asked))
+            lambda name, params, asked, last, p=tab: self._on_turn_generate(
+                p, name, params, asked, last))
         self.setCurrentIndex(index)
         if preview:
             self._set_preview_tab(tab)
@@ -324,9 +325,10 @@ class GeneratePane(QTabWidget):
         self._pin_tab(tab)
         self.generate_requested.emit(workflow_name, batch)
 
-    def _on_turn_generate(self, tab, workflow_name: str, params: dict, asked: dict):
+    def _on_turn_generate(self, tab, workflow_name: str, params: dict, asked: dict,
+                          last: bool):
         self._pin_tab(tab)
-        self.turn_generate_requested.emit(tab, workflow_name, params, asked)
+        self.turn_generate_requested.emit(tab, workflow_name, params, asked, last)
 
     def _on_tab_changes(self, tab, folder_key: str, workflow_name: str,
                            params: dict):

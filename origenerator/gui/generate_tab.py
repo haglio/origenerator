@@ -219,7 +219,7 @@ class GenerateTab(DropZones):
     context_menu_requested = Signal(str, QPoint)
     go_to_folder_requested = Signal(str)
     generate_requested = Signal(str, list)
-    turn_generate_requested = Signal(str, dict, dict)
+    turn_generate_requested = Signal(str, dict, dict, bool)
     modify_batch_requested = Signal(str, str, dict)
     cancel_requested = Signal()
     how_many_chosen = Signal(int)
@@ -1457,7 +1457,8 @@ class GenerateTab(DropZones):
         if launch is None:
             return
         self._turn_being_made = index
-        self.turn_generate_requested.emit(*launch)
+        self.turn_generate_requested.emit(
+            *launch, index == len(self._request_aim.every_turn()) - 1)
 
     def _still_there(self, prompt_id: str) -> bool:
         row = self._db.get_generation(prompt_id)
@@ -1465,8 +1466,12 @@ class GenerateTab(DropZones):
 
     def note_in_flight(self, readings: dict) -> None:
         exchange = self._param_form.request_exchange() if self._param_form else None
-        if exchange is not None:
-            exchange.note_in_flight(readings)
+        if exchange is None:
+            return
+        if self._request_aim is not None:
+            for index in self._request_aim.forget_what_never_came(self._still_there):
+                exchange.mark_made(index, "")
+        exchange.note_in_flight(readings)
 
     def note_turn_made(self, prompt_id: str) -> None:
         aim, index = self._request_aim, self._turn_being_made

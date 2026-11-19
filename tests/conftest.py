@@ -35,6 +35,7 @@ from origenerator.gui import (
     generation_job,
     off_the_machine,
     omnipause,
+    viewport,
     voice_router,
 )
 from origenerator.gui.combine_controller import CombineController
@@ -521,6 +522,8 @@ def _off_thread_work_runs_inline(request, monkeypatch):
 
     monkeypatch.setattr(GalleryView, "off_thread",
                         lambda self, work, done: done(work()))
+    monkeypatch.setattr(viewport, "run_off_thread",
+                        lambda work, done, *, owner: done(work()))
     monkeypatch.setattr(CombineController, "_after_painting",
                         lambda self, work: work())
 

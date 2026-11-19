@@ -1435,3 +1435,64 @@ def test_an_image_behind_another_tab_asks_the_player_nothing(make_preview, tmp_p
     w.set_behind(False)
 
     assert _pauses_and_plays(w._player) == []
+
+
+@pytest.fixture
+def decodes_held(monkeypatch):
+    held = []
+    monkeypatch.setattr(viewport, "run_off_thread",
+                        lambda work, done, *, owner: held.append((work, done)))
+    return held
+
+
+def _finish(held, *, last_asked_first=False):
+    for work, done in reversed(held) if last_asked_first else list(held):
+        done(work())
+    held.clear()
+
+
+def test_an_image_is_decoded_off_the_window_thread_and_shown_once_it_is_ready(
+        make_preview, tmp_path, decodes_held):
+    w = make_preview()
+    w._image_label.resize(200, 200)
+
+    w.show_image(_make_png(tmp_path / "p.png"))
+    assert len(decodes_held) == 1 and w._image_label.pixmap().isNull(), (
+        "a full-size image takes a tenth of a second and more to decode, which the window "
+        "would spend frozen")
+    assert w.media_size() == (32, 24), "its size is read off the file's header at once"
+
+    _finish(decodes_held)
+    assert w._image_label.pixmap().size() == QSize(200, 150)
+
+
+def test_an_image_stepped_past_before_it_was_decoded_never_shows(make_preview, tmp_path,
+                                                                 decodes_held):
+    w = make_preview()
+    w._image_label.resize(200, 200)
+    w.show_image(_make_tall_png(tmp_path / "passed.png"))
+
+    w.show_image(_make_png(tmp_path / "landed.png"))
+    _finish(decodes_held, last_asked_first=True)
+
+    assert w._image_label.pixmap().size() == QSize(200, 150)
+
+
+def test_a_video_stepped_off_stays_on_screen_until_the_image_after_it_is_decoded(
+        make_preview, tmp_path, decodes_held):
+    w = make_preview()
+    w._image_label.resize(200, 200)
+    w.show_video(tmp_path / "clip.mp4", "gen1")
+    frame = QImage(160, 120, QImage.Format.Format_RGB32)
+    frame.fill(QColor(0, 200, 0))
+    w._video.video_sink().setVideoFrame(QVideoFrame(frame))
+
+    w.show_image(_make_png(tmp_path / "p.png"))
+
+    still = w._image_label.pixmap().toImage()
+    assert still.pixelColor(still.width() // 2, still.height() // 2) == QColor(0, 200, 0), (
+        "the window used to stand still on the video's last frame while the image decoded, "
+        "so a blank pane in its place would be new")
+    _finish(decodes_held)
+    shown = w._image_label.pixmap().toImage()
+    assert shown.pixelColor(shown.width() // 2, shown.height() // 2) == QColor(10, 120, 200)

@@ -44,11 +44,17 @@ def records_for_the_phone(rows: list[dict], played_from: PlayedFrom, *,
 
 
 def _videos_in(folder: Path, library_root: Path) -> Iterator[Path]:
-    for video in sorted(folder.rglob("*")) if folder.is_dir() else ():
+    for video in sorted(_files_under(folder)):
         if (media_type_from_filename(video.name) == MediaType.VIDEO
                 and PARTIAL_MARKER not in video.name
-                and is_ai_video(video.relative_to(library_root)) and video.is_file()):
+                and is_ai_video(video.relative_to(library_root))):
             yield video
+
+
+def _files_under(folder: Path) -> Iterator[Path]:
+    for where, _folders, files in os.walk(folder):
+        for name in files:
+            yield Path(where) / name
 
 
 def _timer(seconds: float, work: Callable[[], object]) -> Callable[[], None]:

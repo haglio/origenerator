@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
+from pathlib import Path
 
 from origenerator import config, warm_gun_records
 from origenerator.db import Database
@@ -281,3 +282,19 @@ def test_a_video_made_here_is_opened_once_for_its_size_and_its_running_time_toge
         1, "480x832", "9:16", 4.0)
     assert {(record["video"]["resolution"], record["video"]["aspect_ratio"])
             for record in _written(tmp_path).values()} == {("480x832", "9:16")}
+
+
+def test_the_phones_records_list_the_videos_folders_rather_than_asking_after_each_video(
+        tmp_path, monkeypatch):
+    db, played_from = Database(tmp_path / "gallery.db"), _played_from(tmp_path)
+    for n in range(4):
+        _outside(db, f"o{n}", _filed(played_from.kino, f"scene {n}.mp4"))
+    asked = []
+    real = Path.is_file
+    monkeypatch.setattr(Path, "is_file", lambda path: (
+        asked.append(path.name) if path.suffix == ".mp4" else None) or real(path))
+
+    records = records_for_the_phone(db.list_generations(), played_from, measured=_lasting(5.0))
+
+    assert len(records) == 4
+    assert asked == []

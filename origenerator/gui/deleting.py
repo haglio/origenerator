@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtWidgets import QMessageBox
+from shared_ui.asking import asked
 
 
 def deleting_a_folder(label: str, held: str) -> str:
@@ -12,8 +12,4 @@ def deleting_folders(count: int, held: str) -> str:
 
 
 def asked_to_delete(parent, text: str) -> bool:
-    reply = QMessageBox.question(
-        parent, "Delete", text,
-        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-    )
-    return reply == QMessageBox.StandardButton.Yes
+    return asked(parent, "Delete", text)

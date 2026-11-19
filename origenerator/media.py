@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from origenerator.one_look import is_file
+
 IMAGE_EXTS = frozenset({".png", ".jpg", ".jpeg", ".webp"})
 VIDEO_EXTS = frozenset({".mp4", ".webm"})
 
@@ -30,7 +32,7 @@ def sibling_of_type(path: Path, media: MediaType) -> Path | None:
     exts = IMAGE_EXTS if media == MediaType.IMAGE else VIDEO_EXTS
     for ext in sorted(exts):
         sibling = path.with_suffix(ext)
-        if sibling != path and sibling.exists():
+        if sibling != path and is_file(sibling):
             return sibling
     return None
 

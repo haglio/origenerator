@@ -1210,13 +1210,13 @@ def test_clearing_another_apps_work_goes_back_to_the_gallery(qtbot):
     assert cleared == [True]
 
 
-def test_cancel_all_goes_back_to_the_gallery_which_asks_first(qtbot):
-    asked = []
-    view = _view(qtbot, actions=SlideshowActions(cancel_all=lambda: asked.append(True)))
+def test_cancel_all_goes_back_to_the_gallery_which_asks_over_this_slideshow(qtbot):
+    asked_over = []
+    view = _view(qtbot, actions=SlideshowActions(cancel_all=asked_over.append))
 
     view.queue_foot.cancel_all()
 
-    assert asked == [True]
+    assert asked_over == [view]
 
 
 def test_start_now_goes_back_to_the_gallery(qtbot):

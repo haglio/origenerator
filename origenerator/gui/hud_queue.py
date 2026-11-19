@@ -537,12 +537,13 @@ class QueueFoot:
 
     def cancel_all(self) -> None:
         if self._actions.cancel_all is not None:
-            self._actions.cancel_all()
+            self._actions.cancel_all(self._beside())
 
     def menu_for(self, key: str) -> None:
+        over = self._beside()
         if (self._actions.cancel_below is not None
-                and picks_cancel_below(None, self._items, key, QCursor.pos())):
-            self._actions.cancel_below(key)
+                and picks_cancel_below(over, self._items, key, QCursor.pos())):
+            self._actions.cancel_below(key, over)
 
 
 class JobQueueFile:

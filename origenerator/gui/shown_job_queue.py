@@ -91,16 +91,18 @@ class ShownJobQueue(QObject):
         self._jobs.start_now()
         self.update()
 
-    def cancel_all(self) -> None:
+    def cancel_all(self, over: QWidget | None = None) -> None:
         items = jobs_to_cancel(self.items())
-        self._cancel_once_asked(items, CANCEL_ALL_TEXT, cancel_all_question(len(items)))
+        self._cancel_once_asked(items, CANCEL_ALL_TEXT, cancel_all_question(len(items)), over)
 
-    def cancel_below(self, key: str) -> None:
+    def cancel_below(self, key: str, over: QWidget | None = None) -> None:
         items = jobs_below(self.items(), key)
-        self._cancel_once_asked(items, CANCEL_ALL_BELOW_TEXT, cancel_below_question(len(items)))
+        self._cancel_once_asked(items, CANCEL_ALL_BELOW_TEXT,
+                                cancel_below_question(len(items)), over)
 
-    def _cancel_once_asked(self, items: list, title: str, question: str) -> None:
-        if not items or not self._confirmed(title, question):
+    def _cancel_once_asked(self, items: list, title: str, question: str,
+                           over: QWidget | None) -> None:
+        if not items or not self._confirmed(title, question, over):
             return
         for item in reversed(items):
             item.cancel()
@@ -130,5 +132,5 @@ class ShownJobQueue(QObject):
             f"{clear_queue_tooltip(total)}?\n\nAnything you queued from here is left alone;"
             " one of theirs already running is interrupted.")
 
-    def _confirmed(self, title: str, question: str) -> bool:
-        return asked_at(self._cursor(), self._asks_over, title, question)
+    def _confirmed(self, title: str, question: str, over: QWidget | None = None) -> bool:
+        return asked_at(self._cursor(), over or self._asks_over, title, question)

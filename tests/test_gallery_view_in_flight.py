@@ -2570,6 +2570,32 @@ def test_a_row_with_nothing_below_it_to_cancel_opens_no_menu(qtbot, monkeypatch)
         "the user's call: Cancel All Below is left off where it can do nothing, not grayed")
 
 
+def test_the_huds_cancel_all_below_asks_over_the_slideshow_never_raising_core(
+        qtbot, monkeypatch):
+    keep_rows_on_disk(monkeypatch)
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._slideshows.start()
+    shown = view._slideshows.showing.shown
+    qtbot.addWidget(shown)
+    jobs = [_cancelable(key, []) for key in ("a", "b", "c")]
+    monkeypatch.setattr(view.job_queue, "items", lambda rows=None, requests=None: jobs)
+    shown.queue_foot.set(jobs)
+    faking_exec(monkeypatch, QMenu, lambda menu, *_a: next(
+        action for action in menu.actions() if action.text() == "Cancel All Below"))
+    asked_over = []
+    faking_exec(monkeypatch, QMessageBox, lambda box, *_a: asked_over.append(
+        box.parentWidget()) or QMessageBox.StandardButton.No)
+
+    shown.queue_foot.menu_for("a")
+    shown.queue_foot.cancel_all()
+
+    assert asked_over == [shown, shown], (
+        "a question asked over Core brings Core up over the slideshow it was asked from")
+
+
 def test_cancel_all_leaves_populate_on_to_start_its_next_seed(
         qtbot, tmp_path, monkeypatch):
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())

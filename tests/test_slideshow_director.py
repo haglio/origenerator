@@ -500,10 +500,10 @@ class FakeHost:
     def start_now(self):
         self.started_now += 1
 
-    def cancel_all(self):
+    def cancel_all(self, over=None):
         self.cancelled_all += 1
 
-    def cancel_below(self, key):
+    def cancel_below(self, key, over=None):
         self.cancelled_below.append(key)
 
     def follow_link(self, prompt_id):

@@ -12,6 +12,7 @@ from PySide6.QtGui import (
     QDragLeaveEvent,
     QEnterEvent,
     QFocusEvent,
+    QImage,
     QPixmap,
 )
 from PySide6.QtTest import QTest
@@ -34,6 +35,7 @@ from shared_ui.testing import appending_to
 from shared_ui.toggle_switch import ToggleSwitch
 
 import origenerator.gui.enhance_pane as enhance_pane_module
+import origenerator.gui.enhance_versions as enhance_versions_module
 import origenerator.gui.training_controls as training_controls_module
 import origenerator.workflows.detail_parts as parts
 from origenerator import config, fix_training
@@ -60,8 +62,9 @@ from origenerator.gui.enhance_versions import (
     RunningEnhancement,
     _AddRow,
     _PendingRow,
+    _scaled,
+    _Thumbnails,
     _VersionRow,
-    _VersionThumbnails,
     enhance_version_mime,
     params_from_mime,
 )
@@ -1662,8 +1665,8 @@ def version_drags(monkeypatch):
     return started
 
 
-def _thumbnails_of(path):
-    return _VersionThumbnails(QPixmap).of(_an_image(path))
+def _thumbnails_of(path, size=(16, 16)):
+    return _Thumbnails.from_scaled(_scaled(QImage(str(_an_image(path, size)))))
 
 
 def _an_image(path, size=(16, 16)):
@@ -1715,7 +1718,7 @@ def test_a_version_with_no_settings_moved_far_while_pressed_is_still_a_click(
 
 def test_a_big_versions_thumbnail_drags_at_the_shared_size(qtbot, tmp_path, version_drags):
     thumbnail = _VersionRow(_versions(1, {"enhance_scale": 2.0})[0], 0,
-                     _VersionThumbnails(QPixmap).of(_an_image(tmp_path / "big.png", (1024, 768))))
+                     _thumbnails_of(tmp_path / "big.png", (1024, 768)))
     qtbot.addWidget(thumbnail)
 
     qtbot.mousePress(thumbnail, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
@@ -2661,7 +2664,7 @@ def test_showing_the_same_versions_again_decodes_none_of_their_files_again(qtbot
 
     def reading(path):
         decoded.append(path)
-        return QPixmap(path)
+        return QImage(path)
 
     versions = EnhanceVersions(read=reading)
     qtbot.addWidget(versions)
@@ -2677,4 +2680,23 @@ def test_showing_the_same_versions_again_decodes_none_of_their_files_again(qtbot
     assert len(decoded) == 2, (
         "every settings change, start and end of an enhancement and refresh of the item "
         "lists its versions again, and each of their files is full size")
+    assert all(not row._thumbnail.pixmap().isNull() for row in _rows(versions))
+
+
+def test_the_versions_list_shows_its_rows_before_their_files_are_decoded(qtbot, tmp_path,
+                                                                        monkeypatch):
+    held = []
+    monkeypatch.setattr(enhance_versions_module, "run_off_thread",
+                        lambda work, done, *, owner: held.append((work, done)))
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    files = [_an_image(tmp_path / name, (64, 48)) for name in ("e1.png", "src.png")]
+
+    versions.show_versions(list(zip(_versions(1), files, strict=True)))
+
+    assert len(_rows(versions)) == 2, (
+        "an enhanced version's file is full size, and the list stood still decoding each")
+    assert all(row._thumbnail.pixmap().isNull() for row in _rows(versions))
+    for work, done in held:
+        done(work())
     assert all(not row._thumbnail.pixmap().isNull() for row in _rows(versions))

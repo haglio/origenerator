@@ -4,8 +4,9 @@ import json
 import os
 from typing import NamedTuple
 
+import shiboken6
 from PySide6.QtCore import QByteArray, QMimeData, QPoint, Qt, Signal
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QGraphicsOpacityEffect,
     QGridLayout,
@@ -26,6 +27,7 @@ from origenerator.gui.copy_button import IconButton
 from origenerator.gui.drag_thumbnail import DragOut, fit_thumbnail
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.metadata_section import label_column_width, metadata_cells
+from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.param_fields import NOT_KNOWN
 from origenerator.gui.picking import Picking
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
@@ -193,7 +195,16 @@ class _Thumbnails(NamedTuple):
     shown: QPixmap
     dragged: QPixmap
 
+    @classmethod
+    def from_scaled(cls, scaled: tuple[QImage, QImage] | None) -> _Thumbnails | None:
+        return None if scaled is None else cls(*map(QPixmap.fromImage, scaled))
 
+
+def _scaled(image: QImage) -> tuple[QImage, QImage] | None:
+    return None if image.isNull() else (fitted_in_the_box(image), fit_thumbnail(image))
+
+
+_STILL_COMING = object()
 _THUMBNAILS_KEPT = 64
 
 
@@ -202,22 +213,38 @@ class _VersionThumbnails:
         self._read = read
         self._kept: dict[tuple, _Thumbnails] = {}
 
-    def of(self, image_path) -> _Thumbnails | None:
-        if not image_path:
-            return None
-        try:
-            seen = os.stat(image_path)
-        except OSError:
-            return None
-        key = (str(image_path), seen.st_mtime_ns, seen.st_size)
-        if key not in self._kept:
-            pixmap = self._read(str(image_path))
-            if pixmap.isNull():
-                return None
+    def ask(self, image_path, show, *, owner) -> None:
+        key = _file_key(image_path)
+        if key is None:
+            show(None)
+        elif key in self._kept:
+            show(self._kept[key])
+        else:
+            run_off_thread(lambda: _scaled(self._read(str(image_path))),
+                           lambda scaled: show(self._keep(key, _Thumbnails.from_scaled(scaled))),
+                           owner=owner)
+
+    def _keep(self, key: tuple, thumbnails: _Thumbnails | None) -> _Thumbnails | None:
+        if thumbnails is not None:
             if len(self._kept) >= _THUMBNAILS_KEPT:
                 self._kept.clear()
-            self._kept[key] = _Thumbnails(fitted_in_the_box(pixmap), fit_thumbnail(pixmap))
-        return self._kept[key]
+            self._kept[key] = thumbnails
+        return thumbnails
+
+
+def _file_key(image_path) -> tuple | None:
+    if not image_path:
+        return None
+    try:
+        seen = os.stat(image_path)
+    except OSError:
+        return None
+    return str(image_path), seen.st_mtime_ns, seen.st_size
+
+
+def _fill_in(row, thumbnails: _Thumbnails | None) -> None:
+    if shiboken6.isValid(row):
+        row.take_thumbnails(thumbnails)
 
 
 class _VersionRow(_Row):
@@ -225,18 +252,15 @@ class _VersionRow(_Row):
     context_requested = Signal(int, QPoint)
     delete_pressed = Signal(int)
 
-    def __init__(self, version, position: int, thumbnails: _Thumbnails | None,
+    def __init__(self, version, position: int, thumbnails=_STILL_COMING,
                  dating: Dating = UNDATED, deletable: bool = False):
         super().__init__(version.label)
         self._position = position
         self._params = dict(version.params)
         self.drag_out = DragOut()
-        self._drag_thumbnail = thumbnails.dragged if thumbnails is not None else QPixmap()
-        if thumbnails is not None:
-            self._thumbnail.setPixmap(thumbnails.shown)
-        else:
-            self._thumbnail.setText(NOT_KNOWN)
-            self._thumbnail.setToolTip("This version's file is no longer on disk")
+        self._drag_thumbnail = QPixmap()
+        if thumbnails is not _STILL_COMING:
+            self.take_thumbnails(thumbnails)
         items = []
         if version.settings:
             items.append(MetadataItem("Enhancement", version.settings))
@@ -262,6 +286,14 @@ class _VersionRow(_Row):
 
     def position(self) -> int:
         return self._position
+
+    def take_thumbnails(self, thumbnails: _Thumbnails | None) -> None:
+        self._drag_thumbnail = thumbnails.dragged if thumbnails is not None else QPixmap()
+        if thumbnails is not None:
+            self._thumbnail.setPixmap(thumbnails.shown)
+        else:
+            self._thumbnail.setText(NOT_KNOWN)
+            self._thumbnail.setToolTip("This version's file is no longer on disk")
 
     def set_highlighted(self, on: bool) -> None:
         self._thumbnail.setStyleSheet(
@@ -354,7 +386,7 @@ class EnhanceVersions(QWidget):
     enhance_requested = Signal()
     delete_requested = Signal(list)
 
-    def __init__(self, parent=None, *, read=QPixmap):
+    def __init__(self, parent=None, *, read=QImage):
         super().__init__(parent)
         self._thumbnails = _VersionThumbnails(read)
         column = QVBoxLayout(self)
@@ -409,8 +441,10 @@ class EnhanceVersions(QWidget):
                 lambda on, at=add.duplicate_of: self._highlight_version(at, on))
             column.addWidget(self._enhance_row)
         for position, (version, image_path) in enumerate(items):
-            row = _VersionRow(version, position, self._thumbnails.of(image_path), dating,
+            row = _VersionRow(version, position, dating=dating,
                             deletable=bool(self._deleted_by([position])))
+            self._thumbnails.ask(image_path, lambda thumbnails, row=row: _fill_in(row, thumbnails),
+                                 owner=self)
             row.clicked.connect(self._on_row_clicked)
             row.context_requested.connect(self._on_row_menu)
             row.delete_pressed.connect(lambda at: self.delete_requested.emit([at]))

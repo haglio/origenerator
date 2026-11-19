@@ -112,3 +112,21 @@ def test_the_leaf_folders_are_those_of_the_sides_the_last_read_was_taken_for(tmp
 
     [in_the_one_leaf] = readings.leaf_folders().values()
     assert sorted(row["prompt_id"] for row in in_the_one_leaf) == ["a", "b"]
+
+
+def test_a_poll_of_an_unchanged_library_reads_none_of_its_rows_again(tmp_path, monkeypatch):
+    _readings_, db, _published = _readings(tmp_path, _image("a"), _image("b"))
+    last = read_whole(db)
+    listed = []
+    monkeypatch.setattr(db, "list_generations", lambda: listed.append(1) or [])
+
+    assert read_whole(db, last) is last
+    assert listed == []
+
+
+def test_a_poll_after_any_write_reads_the_library_again(tmp_path):
+    _readings_, db, _published = _readings(tmp_path, _image("a"))
+    last = read_whole(db)
+    db.set_generation_favorite("a", True)
+
+    assert read_whole(db, last).rows[0]["starred"]

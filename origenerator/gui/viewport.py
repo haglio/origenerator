@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 
 from app_support.funscript import read_actions
@@ -40,6 +41,7 @@ from origenerator.gui.drag_thumbnail import (
 )
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.off_thread import run_off_thread
+from origenerator.gui.playhead import Playhead
 from origenerator.gui.scrubber import Scrubber
 from origenerator.gui.video_surface import VideoSurface
 from origenerator.media import MediaType
@@ -50,6 +52,13 @@ _MESSAGE_PLATE = (f"color: {as_hex(WHITE)}; background: {as_rgba(BLACK, 0.78)};"
                  f" padding: {MESSAGE_PAD_V}px {MESSAGE_PAD_H}px;"
                  f" border-radius: {MESSAGE_RADIUS}px;")
 _MESSAGE_MARGIN = MESSAGE_TOP_MARGIN
+
+
+_WINDOW_SHOWN_BY = {
+    QEvent.Type.Hide: lambda _window: False,
+    QEvent.Type.Show: lambda _window: True,
+    QEvent.Type.WindowStateChange: lambda window: not window.isMinimized(),
+}
 
 
 def _path_key(path) -> str:
@@ -67,7 +76,7 @@ class Viewport(QWidget):
     context_requested = Signal(str, QPoint)
 
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
-                 show_scrubber: bool = False):
+                 show_scrubber: bool = False, clock=time.monotonic):
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
         self._image_size: QSize | None = None
@@ -80,12 +89,15 @@ class Viewport(QWidget):
         self.drag_out = DragOut()
         self._playing_before_the_scrub = False
         self._behind = False
+        self._window_hidden = False
+        self._watched_window: QWidget | None = None
 
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._on_context_menu)
 
         self._player = player if player is not None else QMediaPlayer(self)
+        self._playhead = Playhead(self._player, clock=clock)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -147,8 +159,8 @@ class Viewport(QWidget):
         if held:
             self._playing_before_the_scrub = self._player.isPlaying()
             self._player.pause()
-        elif self._playing_before_the_scrub and not self._behind:
-            self._player.play()
+        elif self._playing_before_the_scrub:
+            self._play_where_it_is_seen()
 
     def _take_the_pane(self, media, *, generation: str | None = None,
                        stop_player: bool = True, enhancing: bool = False,
@@ -214,6 +226,7 @@ class Viewport(QWidget):
                          else "a viewer shows a video that is no item")
         self._image_label.clear()
         self._player.setSource(QUrl.fromLocalFile(str(Path(path))))
+        self._playhead.forget()
         self._stack.setCurrentWidget(self._video)
         self._play_where_it_is_seen()
         self._show_scrubber(path)
@@ -319,6 +332,9 @@ class Viewport(QWidget):
     def player(self) -> QMediaPlayer:
         return self._player
 
+    def playhead(self) -> Playhead:
+        return self._playhead
+
     def set_frozen(self, frozen: bool) -> None:
         if self._movie is not None:
             self._movie.setPaused(frozen)
@@ -331,10 +347,30 @@ class Viewport(QWidget):
             self._play_where_it_is_seen()
 
     def _play_where_it_is_seen(self) -> None:
-        if omnipause.frozen() or self._behind:
-            self._player.pause()
-        else:
+        seen = not (self._behind or self._window_hidden)
+        if not seen and not self._playhead.held:
+            self._playhead.hold()
+        self._playhead.run(not omnipause.frozen())
+        if seen and self._playhead.held:
+            self._player.setPosition(self._playhead.release())
+        if seen and not omnipause.frozen():
             self._player.play()
+        else:
+            self._player.pause()
+
+    def showEvent(self, event) -> None:
+        window = self.window()
+        if window is not self and window is not self._watched_window:
+            if self._watched_window is not None:
+                self._watched_window.removeEventFilter(self)
+            self._watched_window = window
+            window.installEventFilter(self)
+        super().showEvent(event)
+
+    def _window_shown(self, shown: bool) -> None:
+        self._window_hidden = not shown
+        if self.is_showing_video():
+            self._play_where_it_is_seen()
 
     def media_size(self) -> tuple[int, int] | None:
         if self._movie is not None:
@@ -422,6 +458,7 @@ class Viewport(QWidget):
         return self._fullscreen
 
     def _stop_playback(self) -> None:
+        self._playhead.forget()
         self._player.stop()
         self._player.setSource(QUrl())
 
@@ -470,6 +507,9 @@ class Viewport(QWidget):
         )
 
     def eventFilter(self, obj, event):
+        if obj is self._watched_window and event.type() in _WINDOW_SHOWN_BY:
+            self._window_shown(_WINDOW_SHOWN_BY[event.type()](obj))
+            return super().eventFilter(obj, event)
         # Qt resizes the label a beat after the widget going fullscreen, so refit off the label's own resize, not the widget's
         if obj is self._image_label and event.type() == QEvent.Type.Resize:
             if self._movie is not None:

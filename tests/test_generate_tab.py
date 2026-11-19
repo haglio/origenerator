@@ -2384,7 +2384,7 @@ def _script_for(video_path, output_dir=None):
     return actions
 
 
-def test_osr2_drive_target_gives_path_player_and_actions_for_a_scripted_video(
+def test_osr2_drive_target_gives_path_playhead_and_actions_for_a_scripted_video(
     saved_panel, tmp_path
 , kept):
     tab, db = saved_panel
@@ -2394,7 +2394,7 @@ def test_osr2_drive_target_gives_path_player_and_actions_for_a_scripted_video(
     actions = _script_for(vpath)
     tab.show_saved_generation(kept(db, video, vpath), [])
 
-    assert tab.osr2_drive_target() == (vpath, tab._viewport.player(), actions)
+    assert tab.osr2_drive_target() == (vpath, tab._viewport.playhead(), actions)
 
 
 def test_osr2_drive_target_reads_the_scripts_folder(saved_panel, monkeypatch, tmp_path, kept):
@@ -2407,7 +2407,7 @@ def test_osr2_drive_target_reads_the_scripts_folder(saved_panel, monkeypatch, tm
     actions = _script_for(vpath, output_dir=tmp_path)
     tab.show_saved_generation(kept(db, video, vpath), [])
 
-    assert tab.osr2_drive_target() == (vpath, tab._viewport.player(), actions)
+    assert tab.osr2_drive_target() == (vpath, tab._viewport.playhead(), actions)
 
 
 def test_osr2_drive_target_is_none_for_a_video_without_a_funscript(saved_panel, tmp_path, kept):
@@ -2442,7 +2442,7 @@ def test_osr2_drive_target_follows_an_idle_autoshow_not_just_a_selection(
 
     tab.show_recent_preview()
 
-    assert tab.osr2_drive_target() == (vpath, tab._viewport.player(), actions)
+    assert tab.osr2_drive_target() == (vpath, tab._viewport.playhead(), actions)
 
 
 def test_showing_a_generation_emits_displayed_changed(saved_panel, tmp_path, kept):

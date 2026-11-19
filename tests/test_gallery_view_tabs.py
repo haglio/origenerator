@@ -32,7 +32,7 @@ from tests.real_db import database_of, keep_rows_on_disk, kept_file
 
 
 def _animations(view):
-    return view._generate_pane.current_generate_tab()._related._animations
+    return view.generate_pane.current_generate_tab()._related._animations
 
 
 def test_selecting_an_image_lists_the_videos_it_was_animated_into(qtbot):
@@ -60,7 +60,7 @@ def test_animation_strip_is_hidden_for_a_video_or_an_unanimated_image(qtbot):
     view = GalleryView(database_of([image, lonely, video]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
-    for tab in view._generate_pane.generate_tabs():
+    for tab in view.generate_pane.generate_tabs():
         tab._viewport.show_media = MagicMock()
 
     view._on_thumbnail_clicked("vid1")
@@ -126,7 +126,7 @@ def test_gallery_panes_sit_in_a_draggable_splitter(qtbot):
 def test_the_generate_panes_floor_is_the_tab_it_holds(qtbot):
     view = GalleryView(database_of([]))
     qtbot.addWidget(view)
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     assert view._arrangement.panes.widget(1).minimumWidth() == 0
     assert view._arrangement.panes.widget(1).minimumSizeHint().width() >= tab.minimumSizeHint().width()
     assert tab.minimumSizeHint().width() == tab._contents_floor()
@@ -135,10 +135,10 @@ def test_the_generate_panes_floor_is_the_tab_it_holds(qtbot):
 def test_the_generate_pane_is_a_tab_widget_of_editable_generate_tabs(qtbot):
     view = GalleryView(database_of([]))
     qtbot.addWidget(view)
-    assert isinstance(view._generate_pane, QTabWidget)
-    assert view._arrangement.panes.widget(1).isAncestorOf(view._generate_pane)
-    assert isinstance(view._generate_pane.widget(0), GenerateTab)
-    assert view._generate_pane.widget(0).isAncestorOf(_viewport_of(view))
+    assert isinstance(view.generate_pane, QTabWidget)
+    assert view._arrangement.panes.widget(1).isAncestorOf(view.generate_pane)
+    assert isinstance(view.generate_pane.widget(0), GenerateTab)
+    assert view.generate_pane.widget(0).isAncestorOf(_viewport_of(view))
 
 
 def test_selecting_a_thumbnail_loads_it_into_the_front_tab(qtbot):
@@ -148,8 +148,8 @@ def test_selecting_a_thumbnail_loads_it_into_the_front_tab(qtbot):
 
     view._on_thumbnail_clicked("i1")
 
-    tab = view._generate_pane.current_generate_tab()
-    assert tab is view._generate_pane.currentWidget()
+    tab = view.generate_pane.current_generate_tab()
+    assert tab is view.generate_pane.currentWidget()
     assert tab._displayed_row["prompt_id"] == "i1"
 
 
@@ -158,21 +158,21 @@ def test_a_rebuilds_reselection_leaves_the_active_tab_alone(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
-    editing = view._generate_pane._add_subtab()
+    editing = view.generate_pane._add_subtab()
     editing._viewport.show_media = MagicMock()
-    count = view._generate_pane.count()
+    count = view.generate_pane.count()
 
     view._reselect_generation("i1")
 
     assert view._selected_row["prompt_id"] == "i1"
-    assert view._generate_pane.currentWidget() is editing
-    assert view._generate_pane.count() == count
+    assert view.generate_pane.currentWidget() is editing
+    assert view.generate_pane.count() == count
     assert editing._displayed_row is None
     editing._viewport.show_media.assert_not_called()
 
 
 def _current_form(view):
-    return view._generate_pane.current_generate_tab()._param_form
+    return view.generate_pane.current_generate_tab()._param_form
 
 
 def test_selecting_a_thumbnail_loads_its_params_into_the_form(qtbot, tmp_path):
@@ -231,7 +231,7 @@ def test_selecting_an_unregistered_thumbnail_leaves_no_settings_from_before(qtbo
 
     view._on_thumbnail_clicked("unreg")
 
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     assert tab._displayed_row["prompt_id"] == "unreg"
     assert tab._workflow_dropdown.currentIndex() == -1
     assert tab._param_form is None
@@ -255,7 +255,7 @@ def test_a_restored_selection_leaves_the_resting_tab_empty(qtbot, monkeypatch):
     view.refresh()
 
     assert view.selected_generation() == "i2"
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     assert tab.is_blank(), (
         "restoring the selection refreshes the tab in front, and one that holds no generation must not "
         "come up as a blank form under someone else's image")
@@ -284,7 +284,7 @@ def test_clicking_a_thumbnail_seeds_the_tab_with_its_parameters(qtbot, tmp_path)
 
     view._on_thumbnail_clicked("p1")
 
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     assert tab._workflow_dropdown.currentData() == "sdxl_t2i"
     values = tab._param_form.get_values()
     assert (values["steps"], values["positive_prompt"], values["negative_prompt"],
@@ -296,13 +296,13 @@ def test_double_clicking_a_thumbnail_pins_the_tab_it_opened(qtbot, tmp_path):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view._on_thumbnail_clicked("p1")
-    assert view._generate_pane._preview_tab is view._generate_pane.current_generate_tab()
+    assert view.generate_pane._preview_tab is view.generate_pane.current_generate_tab()
 
     view._gallery_pane._thumbnail_double_clicked("p1")
 
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     assert tab.displayed_row()["prompt_id"] == "p1"
-    assert view._generate_pane._preview_tab is None
+    assert view.generate_pane._preview_tab is None
 
 
 def test_browsing_item_after_item_costs_one_tab(qtbot, tmp_path):
@@ -319,7 +319,7 @@ def test_browsing_item_after_item_costs_one_tab(qtbot, tmp_path):
     for i in range(1, 5):
         view._on_thumbnail_clicked(f"p{i}")
 
-    assert view._generate_pane.count() == 1
+    assert view.generate_pane.count() == 1
 
 
 def test_a_double_click_then_a_click_leaves_two_tabs(qtbot, tmp_path):
@@ -335,8 +335,8 @@ def test_a_double_click_then_a_click_leaves_two_tabs(qtbot, tmp_path):
     view._gallery_pane._thumbnail_double_clicked("p1")
     view._on_thumbnail_clicked("p2")
 
-    assert view._generate_pane.count() == 2
-    kept = view._generate_pane.widget(0)
+    assert view.generate_pane.count() == 2
+    kept = view.generate_pane.widget(0)
     assert kept.displayed_row()["prompt_id"] == "p1"
 
 
@@ -351,7 +351,7 @@ def test_double_clicking_an_unregistered_thumbnail_still_pins_its_tab(qtbot, tmp
 
     view._gallery_pane._thumbnail_double_clicked("unreg")
 
-    assert view._generate_pane._preview_tab is None
+    assert view.generate_pane._preview_tab is None
 
 
 def test_selecting_generation_shows_typical_time_in_the_loaded_tab(qtbot):
@@ -363,11 +363,11 @@ def test_selecting_generation_shows_typical_time_in_the_loaded_tab(qtbot):
     view = GalleryView(database_of(rows), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
-    for tab in view._generate_pane.generate_tabs():
+    for tab in view.generate_pane.generate_tabs():
         tab._viewport.show_media = MagicMock()
 
     view._on_thumbnail_clicked("v1")
-    estimate = view._generate_pane.current_generate_tab()._estimate_label
+    estimate = view.generate_pane.current_generate_tab()._estimate_label
     assert estimate.text() == "~12 min (based on 3 runs)"
 
 
@@ -458,7 +458,7 @@ def test_a_rebuild_takes_an_item_that_has_gone_off_the_tab_showing_it(qtbot, tmp
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("i2")
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     gone = tmp_path / "gone.png"
     gone.write_bytes(_png_bytes())
     tab._viewport.show_image(gone)

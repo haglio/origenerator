@@ -136,7 +136,7 @@ def test_cores_left_pane_holds_its_osr2_controls_the_toc_and_the_combine_and_not
     held = [sections.widget(index) for index in range(sections.count())]
 
     assert held == [section for section in (view._motion_pane, view._tree.parentWidget(),
-                                            view._combine.widget.parentWidget())
+                                            view.combine.widget.parentWidget())
                     if section is not None], (
         "a slideshow shows what was heard at its top center, so Core keeps no line of its own "
         "for it")
@@ -224,11 +224,11 @@ def test_the_poll_runs_over_a_slideshow_being_spoken_to(qtbot, tmp_path):
     view = GalleryView(_enhanceable_db(tmp_path, count=1))
     qtbot.addWidget(view)
     view.refresh()
-    view._slideshows._slideshow = _VoiceSurface("g0")
+    view.slideshows._slideshow = _VoiceSurface("g0")
 
     view.job_queue.update()
 
-    assert view._slideshows.showing.queued == []
+    assert view.slideshows.showing.queued == []
 
 
 def test_a_slideshow_opening_and_closing_leaves_the_mic_as_it_found_it(
@@ -241,12 +241,12 @@ def test_a_slideshow_opening_and_closing_leaves_the_mic_as_it_found_it(
     _select_first_leaf(view)
     view._buttons.mic.setChecked(True)
 
-    view._slideshows.start()
-    qtbot.addWidget(view._slideshows.showing.shown)
+    view.slideshows.start()
+    qtbot.addWidget(view.slideshows.showing.shown)
     assert view._voice.listener.commands_on
 
-    view._slideshows.showing.close()
-    assert view._slideshows.showing is None
+    view.slideshows.showing.close()
+    assert view.slideshows.showing is None
     assert view._voice.listener.commands_on
 
 
@@ -285,8 +285,8 @@ def _fix_slideshow(qtbot, tmp_path, monkeypatch, *detectors):
     view.refresh()
     _select_first_leaf(view)
     view._buttons.mic.setChecked(True)
-    view._slideshows.start()
-    qtbot.addWidget(view._slideshows.showing.shown)
+    view.slideshows.start()
+    qtbot.addWidget(view.slideshows.showing.shown)
     return view
 
 
@@ -299,8 +299,8 @@ def test_a_spoken_fix_launches_the_targeted_pass_on_the_slide(
     (job,) = view._live_jobs.values()
     assert job.workflow.name == "image_enhance"
     assert job.params["enhance_detail_fixes"] == {"teeth": DEFAULT_FIX_DENOISE}
-    assert "fixing teeth" in words(view._slideshows.showing.shown._note)
-    assert view._slideshows.showing.hud_item_note == "Enhancement queued"
+    assert "fixing teeth" in words(view.slideshows.showing.shown._note)
+    assert view.slideshows.showing.hud_item_note == "Enhancement queued"
 
 
 def test_a_spoken_fix_of_two_parts_runs_a_pass_for_each(
@@ -313,7 +313,7 @@ def test_a_spoken_fix_of_two_parts_runs_a_pass_for_each(
     (job,) = view._live_jobs.values()
     assert job.params["enhance_detail_fixes"] == {
         "hands": DEFAULT_FIX_DENOISE, "teeth": DEFAULT_FIX_DENOISE}
-    assert "fixing hands & teeth" in words(view._slideshows.showing.shown._note)
+    assert "fixing hands & teeth" in words(view.slideshows.showing.shown._note)
 
 
 def test_fix_all_goes_over_every_part_something_can_find(
@@ -326,7 +326,7 @@ def test_fix_all_goes_over_every_part_something_can_find(
     (job,) = view._live_jobs.values()
     assert job.params["enhance_detail_fixes"] == {
         "hands": DEFAULT_FIX_DENOISE, "teeth": DEFAULT_FIX_DENOISE}
-    assert "fixing hands & teeth" in words(view._slideshows.showing.shown._note)
+    assert "fixing hands & teeth" in words(view.slideshows.showing.shown._note)
 
 
 def test_a_spoken_fix_with_nothing_to_find_it_answers_on_the_slideshow(
@@ -336,7 +336,7 @@ def test_a_spoken_fix_with_nothing_to_find_it_answers_on_the_slideshow(
     view._voice.listener.speak_command("fix teeth")
 
     assert view._live_jobs == {}
-    assert "no teeth detector" in words(view._slideshows.showing.shown._note)
+    assert "no teeth detector" in words(view.slideshows.showing.shown._note)
 
 
 
@@ -353,15 +353,15 @@ def _voiceable(qtbot, tmp_path, monkeypatch):
 
 def test_start_slideshow_opens_one_at_the_standard_pace(qtbot, tmp_path, monkeypatch):
     view = _voiceable(qtbot, tmp_path, monkeypatch)
-    assert view._slideshows.showing is None
+    assert view.slideshows.showing is None
 
     view._voice.listener.speak_command("start slideshow")
 
-    assert view._slideshows.showing is not None
-    qtbot.addWidget(view._slideshows.showing.shown)
-    assert view._slideshows.showing.dwell_s == DEFAULT_S
-    assert _will_move_on(view._slideshows.showing)
-    view._slideshows.showing.close()
+    assert view.slideshows.showing is not None
+    qtbot.addWidget(view.slideshows.showing.shown)
+    assert view.slideshows.showing.dwell_s == DEFAULT_S
+    assert _will_move_on(view.slideshows.showing)
+    view.slideshows.showing.close()
 
 
 def test_open_slideshow_says_the_same_thing(qtbot, tmp_path, monkeypatch):
@@ -369,9 +369,9 @@ def test_open_slideshow_says_the_same_thing(qtbot, tmp_path, monkeypatch):
 
     view._voice.listener.speak_command("open slideshow")
 
-    assert view._slideshows.showing is not None
-    qtbot.addWidget(view._slideshows.showing.shown)
-    view._slideshows.showing.close()
+    assert view.slideshows.showing is not None
+    qtbot.addWidget(view.slideshows.showing.shown)
+    view.slideshows.showing.close()
 
 
 def test_a_double_clicked_images_slideshow_opens_at_the_clip_seconds_set(
@@ -390,13 +390,13 @@ def test_pause_slideshow_pauses_the_whole_room_as_esc_does_and_play_slideshow_pl
         qtbot, tmp_path, monkeypatch):
     view = _voiceable(qtbot, tmp_path, monkeypatch)
     view._voice.listener.speak_command("start slideshow")
-    slideshow = view._slideshows.showing
+    slideshow = view.slideshows.showing
     qtbot.addWidget(slideshow.shown)
 
     view._voice.listener.speak_command("pause slideshow")
     assert omnipause.frozen()
     assert slideshow.shown._paused
-    assert view._slideshows.showing is slideshow
+    assert view.slideshows.showing is slideshow
     assert slideshow.dwell_s == DEFAULT_S
 
     view._voice.listener.speak_command("play slideshow")
@@ -410,14 +410,14 @@ def test_pause_slideshow_pauses_the_whole_room_as_esc_does_and_play_slideshow_pl
 def test_stopping_the_slideshow_closes_it(qtbot, tmp_path, monkeypatch, said):
     view = _voiceable(qtbot, tmp_path, monkeypatch)
     view._voice.listener.speak_command("start slideshow")
-    slideshow = view._slideshows.showing
+    slideshow = view.slideshows.showing
     qtbot.addWidget(slideshow.shown)
     slideshow.shown.show()
 
     view._voice.listener.speak_command(said)
 
     assert is_closed(slideshow.shown)
-    assert view._slideshows.showing is None
+    assert view.slideshows.showing is None
 
 
 def test_a_spoken_fix_with_no_slideshow_up_makes_nothing(
@@ -434,37 +434,37 @@ def test_a_spoken_fix_with_no_slideshow_up_makes_nothing(
 def test_start_slideshow_is_heard_with_no_slideshow_and_no_populate(qtbot, tmp_path,
                                                           monkeypatch):
     view = _voiceable(qtbot, tmp_path, monkeypatch)
-    assert view._slideshows.showing is None
+    assert view.slideshows.showing is None
 
     view._voice.listener.speak_command("start slideshow")
 
-    assert view._slideshows.showing is not None
-    qtbot.addWidget(view._slideshows.showing.shown)
-    view._slideshows.showing.close()
+    assert view.slideshows.showing is not None
+    qtbot.addWidget(view.slideshows.showing.shown)
+    view.slideshows.showing.close()
 
 
 
 def _speak_request(view, qtbot, *utterances):
     for text in utterances:
         view._voice.listener.speak(text)
-    qtbot.waitUntil(lambda: view._slideshows.showing.shown._promise.note == "", timeout=5000)
+    qtbot.waitUntil(lambda: view.slideshows.showing.shown._promise.note == "", timeout=5000)
 
 
 def test_saying_request_pauses_the_slideshow_until_over(qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
 
     view._voice.listener.speak("Request.")
-    assert view._slideshows.showing._keeps()
-    assert "Request" in words(view._slideshows.showing.shown._note)
+    assert view.slideshows.showing._keeps()
+    assert "Request" in words(view.slideshows.showing.shown._note)
 
     view._voice.listener.speak("no hat. Over.")
-    assert not view._slideshows.showing._keeps()
+    assert not view.slideshows.showing._keeps()
 
 
 def test_a_finished_request_stands_in_every_job_queue_until_its_job_does(
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
-    shown = view._slideshows.showing.shown
+    shown = view.slideshows.showing.shown
 
     view._voice.listener.speak("Request, no hat, over.")
 
@@ -526,7 +526,7 @@ def test_a_queued_request_the_rules_made_says_what_they_changed(qtbot, tmp_path,
 
     _speak_request(view, qtbot, "Request, no hat, over.")
 
-    assert words(view._slideshows.showing.shown._note) == "Took out hat."
+    assert words(view.slideshows.showing.shown._note) == "Took out hat."
 
 
 def test_a_request_the_model_answered_says_its_sentence_and_keeps_the_turn(
@@ -539,7 +539,7 @@ def test_a_request_the_model_answered_says_its_sentence_and_keeps_the_turn(
 
     _speak_request(view, qtbot, "Request, no hat, over.")
 
-    assert words(view._slideshows.showing.shown._note) == "Took the hat off her."
+    assert words(view.slideshows.showing.shown._note) == "Took the hat off her."
     (job,) = view._live_jobs.values()
     assert job.params["positive_prompt"] == "a woman, soft light"
     (turn,) = view._db.requests.exchange_of(job.prompt_id)
@@ -557,7 +557,7 @@ def test_a_spoken_request_about_a_setting_remakes_the_image_with_that_setting(
 
     _speak_request(view, qtbot, "Request, fewer steps, over.")
 
-    assert words(view._slideshows.showing.shown._note) == "Fewer steps."
+    assert words(view.slideshows.showing.shown._note) == "Fewer steps."
     (job,) = view._live_jobs.values()
     assert job.params["steps"] == 30
     assert job.params["positive_prompt"] == "a woman, a hat, soft light"
@@ -619,8 +619,8 @@ def test_the_request_lands_on_the_slide_it_was_opened_over(
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     view._voice.listener.speak("Request.")
 
-    view._slideshows.showing._set.playlist.add(("other.png", "image", "elsewhere", None))
-    view._slideshows.showing.slideshow_step(1)
+    view.slideshows.showing._set.playlist.add(("other.png", "image", "elsewhere", None))
+    view.slideshows.showing.slideshow_step(1)
     _speak_request(view, qtbot, "no hat. Over.")
 
     (job,) = view._live_jobs.values()
@@ -635,8 +635,8 @@ def test_a_request_that_never_hears_over_says_so_and_resumes(
     view._voice.listener.speak("Request.")
     view._voice.listener.speak("no hat")
 
-    assert not view._slideshows.showing._keeps()
-    assert "never heard" in words(view._slideshows.showing.shown._note)
+    assert not view.slideshows.showing._keeps()
+    assert "never heard" in words(view.slideshows.showing.shown._note)
     assert view._live_jobs == {}
 
 
@@ -647,7 +647,7 @@ def test_a_request_naming_nothing_is_answered_not_generated(
     _speak_request(view, qtbot, "Request. Over.")
 
     assert view._live_jobs == {}
-    assert "didn't catch" in words(view._slideshows.showing.shown._note)
+    assert "didn't catch" in words(view.slideshows.showing.shown._note)
 
 
 def test_the_words_of_a_request_never_reach_the_fix_matcher(
@@ -664,13 +664,13 @@ def test_a_request_item_links_back_to_what_it_was_asked_about(
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     _speak_request(view, qtbot, "Request, no hat, over.")
-    view._slideshows.showing.close()
+    view.slideshows.showing.close()
     (job,) = view._live_jobs.values()
     _finish_reroll(view, job)
 
     view._on_thumbnail_clicked(job.prompt_id)
 
-    section = view._generate_pane.current_generate_tab()._related._requests
+    section = view.generate_pane.current_generate_tab()._related._requests
     assert not section.isHidden()
     assert [(tile.heading, tile._prompt_id) for tile in section.findChildren(SourceTile)] == [
         ("Requested from", "orig")]
@@ -680,7 +680,7 @@ def test_a_request_landing_takes_the_place_of_its_image_on_a_slideshow_locked_on
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     _speak_request(view, qtbot, "Request, no hat, over.")
-    slideshow = view._slideshows.showing
+    slideshow = view.slideshows.showing
     slideshow.show_item(kept_file("sdxl_t2i_orig.png"), lock=True)
     (job,) = view._live_jobs.values()
 
@@ -694,13 +694,13 @@ def test_a_request_item_shows_its_words_in_its_tab_s_request_section(
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     _speak_request(view, qtbot, "Request, no hat, over.")
-    view._slideshows.showing.close()
+    view.slideshows.showing.close()
     (job,) = view._live_jobs.values()
     _finish_reroll(view, job)
 
     view._on_thumbnail_clicked(job.prompt_id)
 
-    exchange = view._generate_pane.current_generate_tab()._param_form.request_exchange()
+    exchange = view.generate_pane.current_generate_tab()._param_form.request_exchange()
     assert exchange.turns() == [("no hat", "Took out hat.")]
 
 
@@ -710,7 +710,7 @@ def test_what_the_microphone_heard_reaches_the_slideshow(
 
     view._voice.listener.heard.emit("something off the mic")
 
-    assert "something off the mic" in words(view._slideshows.showing.shown._note), (
+    assert "something off the mic" in words(view.slideshows.showing.shown._note), (
         "from a slideshow this window cannot be seen, so a mic that heard nothing and one that "
         "heard the wrong words used to look exactly alike")
 
@@ -720,7 +720,7 @@ def test_a_voice_failure_reaches_the_slideshow_too(qtbot, tmp_path, monkeypatch)
 
     view._voice.listener.error.emit("mic unavailable — No module named 'sounddevice'")
 
-    assert "mic unavailable" in words(view._slideshows.showing.shown._note)
+    assert "mic unavailable" in words(view.slideshows.showing.shown._note)
 
 
 def test_the_slideshow_shows_the_request_as_it_is_being_said(
@@ -728,10 +728,10 @@ def test_the_slideshow_shows_the_request_as_it_is_being_said(
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
 
     view._voice.listener.speak("Request.")
-    assert "Request" in words(view._slideshows.showing.shown._note)
+    assert "Request" in words(view.slideshows.showing.shown._note)
 
     view._voice.listener.speak("no hat")
-    assert "no hat" in words(view._slideshows.showing.shown._note)
+    assert "no hat" in words(view.slideshows.showing.shown._note)
 
 
 
@@ -742,7 +742,7 @@ def test_a_spoken_loop_takes_the_one_action_the_sorted_image_leaves(qtbot, tmp_p
                                                                  monkeypatch):
     view = _genau_view(qtbot, tmp_path)
 
-    prompt_id, message, kind = view._combine.animate_it("img_action", _SPOKEN_LOOP)
+    prompt_id, message, kind = view.combine.animate_it("img_action", _SPOKEN_LOOP)
 
     assert prompt_id == "img_action"
     assert "alpha" in message
@@ -758,7 +758,7 @@ def test_a_spoken_loop_over_an_unsorted_image_asks_for_its_action(qtbot, tmp_pat
                                                                   monkeypatch):
     view = _genau_view(qtbot, tmp_path)
 
-    prompt_id, message, kind = view._combine.animate_it("img", _SPOKEN_LOOP)
+    prompt_id, message, kind = view.combine.animate_it("img", _SPOKEN_LOOP)
 
     assert prompt_id is None
     assert "hasn't been sorted" in message
@@ -785,7 +785,7 @@ def test_a_spoken_loop_says_so_when_the_action_has_no_loop_behind_it(qtbot, tmp_
     qtbot.addWidget(view)
     view.refresh()
 
-    prompt_id, message, kind = view._combine.animate_it("img_delta", _SPOKEN_LOOP)
+    prompt_id, message, kind = view.combine.animate_it("img_delta", _SPOKEN_LOOP)
 
     assert prompt_id is None
     assert "to take settings from yet" in message
@@ -797,7 +797,7 @@ def test_a_spoken_loop_says_so_when_the_action_has_no_loop_behind_it(qtbot, tmp_
 def test_a_spoken_loop_declines_a_video(qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path)
 
-    prompt_id, message, kind = view._combine.animate_it("loop", _SPOKEN_LOOP)
+    prompt_id, message, kind = view.combine.animate_it("loop", _SPOKEN_LOOP)
 
     assert prompt_id is None
     assert "image" in message
@@ -809,7 +809,7 @@ def test_a_spoken_loop_is_answered_on_the_surface_that_heard_it(qtbot, tmp_path,
     view = _genau_view(qtbot, tmp_path)
 
     surface = _VoiceSurface("img_action")
-    view._slideshows._slideshow = surface
+    view.slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
 
@@ -827,7 +827,7 @@ def _spoken_genau_rows(view):
 def test_a_second_spoken_loop_over_the_same_image_is_refused(qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path)
     surface = _VoiceSurface("img_action")
-    view._slideshows._slideshow = surface
+    view.slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
     assert len(_spoken_genau_rows(view)) == 1
@@ -845,7 +845,7 @@ def test_an_image_whose_clip_has_landed_is_answered_the_same_way(
         qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path)
     surface = _VoiceSurface("img_action")
-    view._slideshows._slideshow = surface
+    view.slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
     (made,) = _spoken_genau_rows(view)
@@ -861,7 +861,7 @@ def test_an_image_whose_clip_has_landed_is_answered_the_same_way(
 def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(
         qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path)
-    view._slideshows._slideshow = _VoiceSurface("img_action")
+    view.slideshows._slideshow = _VoiceSurface("img_action")
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
     (failed,) = _spoken_genau_rows(view)
@@ -875,8 +875,8 @@ def test_a_run_that_errored_made_no_clip_and_does_not_stand_in_for_one(
 def test_a_pressed_generate_of_the_same_action_is_not_what_the_guard_counts(
         qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path)
-    view._combine.generate_category("img_action", "alpha", action_settings.GENAU)
-    view._slideshows._slideshow = _VoiceSurface("img_action")
+    view.combine.generate_category("img_action", "alpha", action_settings.GENAU)
+    view.slideshows._slideshow = _VoiceSurface("img_action")
 
     view._voice.on_command(SurfaceCommand(_SPOKEN_LOOP))
 
@@ -892,7 +892,7 @@ def test_a_spoken_enhance_asks_for_the_better_version_of_the_slide(qtbot, tmp_pa
     view.refresh()
     _set_enhance(view, params={"enhance_steps": 29})
     surface = _VoiceSurface("g0")
-    view._slideshows._slideshow = surface
+    view.slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
@@ -913,7 +913,7 @@ def test_a_spoken_enhance_leaves_an_already_enhanced_image_alone(qtbot, tmp_path
     qtbot.addWidget(view)
     view.refresh()
     surface = _VoiceSurface("g0")
-    view._slideshows._slideshow = surface
+    view.slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
@@ -931,7 +931,7 @@ def test_a_spoken_enhance_over_a_clip_says_there_is_nothing_to_enhance(qtbot, tm
     qtbot.addWidget(view)
     view.refresh()
     surface = _VoiceSurface("g0")
-    view._slideshows._slideshow = surface
+    view.slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
@@ -947,7 +947,7 @@ def test_a_spoken_enhance_over_a_row_that_names_no_file_says_so(qtbot, tmp_path)
     qtbot.addWidget(view)
     view.refresh()
     surface = _VoiceSurface("g0")
-    view._slideshows._slideshow = surface
+    view.slideshows._slideshow = surface
 
     view._voice.on_command(SurfaceCommand(gallery.ENHANCE_COMMAND))
 
@@ -1067,8 +1067,8 @@ def test_a_collection_name_said_over_a_slideshow_still_moves_the_toc(
     keep_on_disk(db)
     view = _listening(qtbot, tmp_path, db=db)
     _select_first_leaf(view)
-    view._slideshows.start()
-    qtbot.addWidget(view._slideshows.showing.shown)
+    view.slideshows.start()
+    qtbot.addWidget(view.slideshows.showing.shown)
 
     view._voice.listener.speak("go to experiments")
 
@@ -1080,7 +1080,7 @@ def test_a_collection_name_said_over_a_slideshow_still_moves_the_toc(
 def test_fun_times_own_words_do_here_what_they_do_there(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
-    view._slideshows._slideshow = surface
+    view.slideshows._slideshow = surface
 
     view._voice.listener.speak("trash")
     assert surface.culled == 1
@@ -1100,7 +1100,7 @@ def test_fun_times_own_words_do_here_what_they_do_there(qtbot, tmp_path):
 def test_the_transport_words_step_the_slideshow_they_are_said_over(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
-    view._slideshows._slideshow = surface
+    view.slideshows._slideshow = surface
 
     for said in ("next", "skip", "back", "previous"):
         view._voice.listener.speak(said)
@@ -1111,7 +1111,7 @@ def test_the_transport_words_step_the_slideshow_they_are_said_over(qtbot, tmp_pa
 def test_a_spoken_favorite_over_a_slideshow_favorites_the_slide(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
-    view._slideshows._slideshow = surface
+    view.slideshows._slideshow = surface
 
     view._voice.listener.speak("favorite")
 
@@ -1224,7 +1224,7 @@ def test_human_inspired_motion_can_be_asked_for_outright_rather_than_flipped(qtb
 def test_a_motion_word_answers_from_a_slideshow_too(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
-    view._slideshows._slideshow = surface
+    view.slideshows._slideshow = surface
 
     view._voice.listener.speak("next shape")
 
@@ -1236,7 +1236,7 @@ def test_a_motion_word_answers_from_a_slideshow_too(qtbot, tmp_path):
 def test_a_sentence_holding_a_command_word_is_no_command(qtbot, tmp_path):
     view = _listening(qtbot, tmp_path)
     surface = _VoiceSurface("orig")
-    view._slideshows._slideshow = surface
+    view.slideshows._slideshow = surface
 
     assert view._voice.listener.speak("a lock of hair over her eye") is None
     assert surface.said is None

@@ -290,7 +290,7 @@ def test_the_tile_opens_the_folders_prompt_in_a_tab_rather_than_launching(qtbot,
 
     _request_tile(view).clicked.emit()
 
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     assert tab._modify_batch.folder_key == key
     assert tab._viewport._stack.currentWidget() is tab._viewport._sheet
     client.submit_job.assert_not_called()
@@ -625,7 +625,7 @@ def test_a_tab_watching_populate_follows_it_onto_the_next_seed(qtbot, tmp_path):
     key = _select_first_leaf(view)
     view._toggle_populate(True)
     _generating_tile(view).selected.emit()
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
 
     tab._cancel_btn.click()
     client.preview_image.emit(view._live_jobs[key].prompt_id, _png_bytes())
@@ -654,8 +654,8 @@ def test_only_the_populate_toggle_ends_populate_not_a_string_of_cancels(qtbot, t
 
 def _folder_tab(view, db):
     row = db.get_generation("orig")
-    view._generate_pane.load_selection(row, [row])
-    return view._generate_pane.current_generate_tab()
+    view.generate_pane.load_selection(row, [row])
+    return view.generate_pane.current_generate_tab()
 
 
 def test_populate_rewords_the_cancel_hover_in_all_three_panes(qtbot, tmp_path):
@@ -673,7 +673,7 @@ def test_populate_rewords_the_cancel_hover_in_all_three_panes(qtbot, tmp_path):
     assert _generating_tile(view)._cancel.toolTip() == next_seed
     assert [row._cancel.text() for row in view.job_queue.view.rows()] == ["Cancel"]
     assert [row._cancel.toolTip() for row in view.job_queue.view.rows()] == [next_seed]
-    assert view._generate_pane.current_generate_tab()._cancel_btn.toolTip() == next_seed
+    assert view.generate_pane.current_generate_tab()._cancel_btn.toolTip() == next_seed
 
 
 def test_turning_populate_off_hovers_a_plain_cancel_again_with_the_run_still_in_flight(
@@ -692,7 +692,7 @@ def test_turning_populate_off_hovers_a_plain_cancel_again_with_the_run_still_in_
     plain = "Cancel this generation"
     assert _generating_tile(view)._cancel.toolTip() == plain
     assert [row._cancel.toolTip() for row in view.job_queue.view.rows()] == [plain]
-    assert view._generate_pane.current_generate_tab()._cancel_btn.toolTip() == plain
+    assert view.generate_pane.current_generate_tab()._cancel_btn.toolTip() == plain
 
 
 def test_the_tiles_new_seed_lights_the_tab_showing_that_folder(qtbot, tmp_path):
@@ -705,7 +705,7 @@ def test_the_tiles_new_seed_lights_the_tab_showing_that_folder(qtbot, tmp_path):
 
     _new_tile(view).add_requested.emit()
 
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     job = next(iter(view._live_jobs.values()))
     assert tab._cancel_btn.isHidden() is False
     assert tab.launched_runs() == [job.origin]
@@ -722,11 +722,11 @@ def test_populate_lights_the_tab_showing_that_folder_too(qtbot, tmp_path):
 
     view._toggle_populate(True)
     first = view._live_jobs[key]
-    assert view._generate_pane.current_generate_tab().launched_runs() == [first.origin]
+    assert view.generate_pane.current_generate_tab().launched_runs() == [first.origin]
 
     client.job_completed.emit(first.prompt_id, _REROLL_HISTORY)
 
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     assert tab._cancel_btn.isHidden() is False
     assert tab.launched_runs() == [view._live_jobs[key].origin]
 
@@ -743,14 +743,14 @@ def test_populate_opens_no_tabs(qtbot, tmp_path):
     for _ in range(3):
         client.job_completed.emit(view._live_jobs[key].prompt_id, _REROLL_HISTORY)
 
-    assert view._generate_pane.count() == 1
-    tab = view._generate_pane.current_generate_tab()
+    assert view.generate_pane.count() == 1
+    tab = view.generate_pane.current_generate_tab()
     assert tab.displayed_row()["prompt_id"] == "orig"
 
     landed = next(r for r in db.list_generations() if r["status"] == "completed")
     view._on_thumbnail_clicked(landed["prompt_id"])
 
-    assert view._generate_pane.count() == 1, (
+    assert view.generate_pane.count() == 1, (
         "a variation loaded into the pane's resting tab would stop that tab being blank, and "
         "the next clicked generation would open a tab beside it")
 
@@ -787,7 +787,7 @@ def test_watching_populate_in_the_pane_carries_on_to_the_next_variation(qtbot, t
     key = _select_first_leaf(view)
     view._toggle_populate(True)
     _generating_tile(view).selected.emit()
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     tab._viewport.show_frame = MagicMock()
 
     client.job_completed.emit(view._live_jobs[key].prompt_id, _REROLL_HISTORY)
@@ -841,7 +841,7 @@ def test_a_run_no_open_tab_is_for_opens_one_of_its_own(qtbot, tmp_path):
 
     _new_tile(view).add_requested.emit()
 
-    opened = view._generate_pane.current_generate_tab()
+    opened = view.generate_pane.current_generate_tab()
     assert opened is not parked
     assert opened.watched_key() == key, (
         "filling a tab in with a run's settings ends its following of a run, so a tab pointed at"
@@ -860,7 +860,7 @@ def test_the_tab_opened_on_the_tiles_run_is_kept(qtbot, tmp_path):
 
     _new_tile(view).add_requested.emit()
 
-    assert view._generate_pane._preview_tab is None, (
+    assert view.generate_pane._preview_tab is None, (
         "that run's Cancel and its filling bar are in the opened tab, so it is no longer one a later "
         "click may take over")
 
@@ -974,12 +974,12 @@ def test_a_tabs_go_to_folder_opens_the_folder_its_settings_have_made(qtbot, tmp_
     qtbot.addWidget(view)
     view.refresh()
     folder = _select_first_leaf(view)
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     tab.prefill("sdxl_t2i",
                   dict(_SDXL.default_params(), seed=7, positive_prompt="a cat"))
     view._tree.setCurrentItem(_image_workflow(view._tree))
 
-    view._generate_pane.folder_requested.emit(tab.settings_folder_key())
+    view.generate_pane.folder_requested.emit(tab.settings_folder_key())
 
     assert _selected_folder(view) == folder
 
@@ -988,14 +988,14 @@ def test_a_tabs_go_to_folder_puts_a_running_search_away(qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     tab.prefill("sdxl_t2i",
                   dict(_SDXL.default_params(), seed=7, positive_prompt="a cat"))
     _search_for(view, "cat")
 
-    view._generate_pane.folder_requested.emit(tab.settings_folder_key())
+    view.generate_pane.folder_requested.emit(tab.settings_folder_key())
 
-    assert view._search.field.text() == ""
+    assert view.search.field.text() == ""
 
 
 def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbot, tmp_path):
@@ -1004,7 +1004,7 @@ def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbo
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("orig")
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     view._voice.requests._wait_for_the_graphics_card = lambda comfyui, holder, **settings: True
     view._voice.requests._work_out = lambda positive, negative, words, **_: work_out(
         positive, negative, words, ask=lambda p, n, r, known: ("two cats", n, "Two cats."))
@@ -1031,7 +1031,7 @@ def test_generate_under_a_turn_runs_it_records_its_request_and_leaves_the_tab_on
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("orig")
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     view._voice.requests._wait_for_the_graphics_card = lambda comfyui, holder, **settings: True
     view._voice.requests._work_out = lambda positive, negative, words, **_: work_out(
         positive, negative, words, ask=lambda p, n, r, known: ("two cats", n, "Two cats."))
@@ -1119,7 +1119,7 @@ def test_a_press_for_several_puts_every_one_in_its_folder_at_once(qtbot, tmp_pat
     view = GalleryView(_seeded_db(tmp_path), client=client)
     qtbot.addWidget(view)
     view.refresh()
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     tab._workflow_dropdown.setCurrentIndex(tab._workflow_dropdown.findData("sdxl_t2i"))
     tab._how_many.set_how_many(4)
 
@@ -1136,7 +1136,7 @@ def test_a_press_for_several_puts_every_one_in_its_folder_at_once(qtbot, tmp_pat
 def test_the_genau_lane_runs_looping_settings(qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path)
 
-    view._combine.generate_category("img", "alpha", action_settings.GENAU)
+    view.combine.generate_category("img", "alpha", action_settings.GENAU)
 
     job = next(iter(view._live_jobs.values()))
     assert job.workflow.name == "wan22_flf2v_loop"
@@ -1153,8 +1153,8 @@ def test_the_view_asks_the_video_lane_unless_told_otherwise(qtbot, tmp_path, mon
 
     monkeypatch.setattr(combine_controller.action_settings, "most_used_video", spy)
 
-    view._combine.generate_category("img", "dancing")
-    view._combine.generate_category("img", "dancing", action_settings.GENAU)
+    view.combine.generate_category("img", "dancing")
+    view.combine.generate_category("img", "dancing", action_settings.GENAU)
 
     assert asked == [action_settings.VIDEO, action_settings.GENAU]
 
@@ -1166,7 +1166,7 @@ def test_a_pressed_generate_leaves_its_clip_in_the_gallery(qtbot, tmp_path, monk
     monkeypatch.setattr(evolver_export, "export_video",
                         lambda src, dest, funscript=None: sent.append(src))
 
-    view._combine.generate_category("img", "alpha", action_settings.GENAU)
+    view.combine.generate_category("img", "alpha", action_settings.GENAU)
     job = next(iter(view._live_jobs.values()))
     assert view._db.get_generation(job.prompt_id)["genau_requested_at"] is None
 
@@ -1180,7 +1180,7 @@ def test_a_tabs_generate_goes_off_the_moment_its_folder_is_making_one(qtbot, tmp
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     tab._workflow_dropdown.setCurrentIndex(tab._workflow_dropdown.findData("sdxl_t2i"))
     assert tab._generate_btn.isEnabled() is True
     config = tab.current_config()
@@ -1197,7 +1197,7 @@ def test_a_second_press_into_a_folder_already_making_one_makes_nothing(qtbot, tm
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     tab._workflow_dropdown.setCurrentIndex(tab._workflow_dropdown.findData("sdxl_t2i"))
     config = tab.current_config()
 
@@ -1223,7 +1223,7 @@ def test_the_tile_counts_a_run_for_every_image_with_or_without_a_thumbnail(qtbot
 
     _request_tile(view).clicked.emit()
 
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     assert tab._modify_batch.count == 3
 
 

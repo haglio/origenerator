@@ -47,7 +47,7 @@ def _within(*containers: QWidget) -> list[QWidget]:
 
 
 def _tabs(view) -> list:
-    return view._generate_pane.generate_tabs()
+    return view.generate_pane.generate_tabs()
 
 
 def _request_auto_generates(view) -> list[QWidget]:
@@ -60,7 +60,7 @@ REMEMBERED = {
         widget for tab in _tabs(view) for widget in _within(tab)
         if widget is not tab._how_many and not tab._action.isAncestorOf(widget)
         and widget not in _request_auto_generates(view)
-    ] + [view._generate_pane.tabBar()],
+    ] + [view.generate_pane.tabBar()],
     "how_many": lambda view: [tab._how_many for tab in _tabs(view)],
     "request_auto_generate": _request_auto_generates,
     "toc_shapes": lambda view: [view._tree.separate_button, view._tree.together_button],
@@ -68,16 +68,16 @@ REMEMBERED = {
     "pane_sizes": lambda view: [splitter for splitter in view.findChildren(PaneSplitter)
                                 if splitter.remembered_as],
     "experiments_enabled": lambda view: [view._experiments_cb],
-    "enhance_settings": lambda view: _within(view._enhance.pane),
-    "search_sort": lambda view: [view._search._sort_dropdown],
-    "gallery_combine": lambda view: _within(view._combine.widget),
+    "enhance_settings": lambda view: _within(view.enhance.pane),
+    "search_sort": lambda view: [view.search._sort_dropdown],
+    "gallery_combine": lambda view: _within(view.combine.widget),
     "audio_enabled": lambda view: [view._buttons.radio],
     "mic_enabled": lambda view: [view._buttons.mic],
 }
 
 NO_SETTING = {
     "what is being looked for, which is not a place to come back to": lambda view: [
-        view._search.field, *_within(view._find_bar), *_within(view._folder_path)],
+        view.search.field, *_within(view._find_bar), *_within(view._folder_path)],
     "what one item shows, which the library keeps with the item": lambda view: [
         widget for tab in _tabs(view) for widget in _within(tab._action)],
     "what the items of a folder show, which the library keeps with each item": lambda view: [
@@ -110,8 +110,8 @@ def _a_window_with_every_control_built(qtbot, tmp_path):
     win = _window(qtbot, tmp_path, AppState(tmp_path / "ui.json"))
     view = win._gallery_view
     view.refresh()
-    view._generate_pane.currentWidget().prefill("sdxl_t2i", {})
-    view._generate_pane.open_config("wan22_i2v", {})
+    view.generate_pane.currentWidget().prefill("sdxl_t2i", {})
+    view.generate_pane.open_config("wan22_i2v", {})
     return win
 
 

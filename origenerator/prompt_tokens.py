@@ -43,6 +43,7 @@ class _Reader(NamedTuple):
     reads_well: int
     past_it: str
     weighted: bool
+    reads: tuple[str, ...] = ()
 
 
 _built: dict[tuple, Tokenizer] = {}
@@ -122,9 +123,28 @@ def boxed_as_typed(workflow_name: str, params: dict, key: str, text: str) -> str
     return text if reading is None else BOX_BREAK.join(reading.boxes_of(text))
 
 
+def _what_readings_hang_on(workflow_name: str, params: dict) -> tuple:
+    workflow = WORKFLOW_REGISTRY.get(workflow_name)
+    names = sorted({name for key in (*_TEXT_ENCODER_PROMPTS, *AUDIO_PROMPT_KEYS)
+                    if (name := _reader_of(workflow, key)) in _READERS})
+    return (workflow_name, config.COMFYUI_DIR, os.environ.get("HF_HOME"),
+            os.environ.get("HF_HUB_CACHE"),
+            *((name, *(params.get(read) for read in _READERS[name].reads)) for name in names))
+
+
+_readings_found: dict[tuple, dict[str, PromptReading | None]] = {}
+
+
 def prompt_readings(workflow_name: str, params: dict) -> dict[str, PromptReading | None]:
-    return {key: prompt_reading(workflow_name, params, key)
-            for key in (*_TEXT_ENCODER_PROMPTS, *AUDIO_PROMPT_KEYS)}
+    hangs_on = _what_readings_hang_on(workflow_name, params)
+    if hangs_on in _readings_found:
+        return _readings_found[hangs_on]
+    keys = (*_TEXT_ENCODER_PROMPTS, *AUDIO_PROMPT_KEYS)
+    readings = {key: prompt_reading(workflow_name, params, key) for key in keys}
+    workflow = WORKFLOW_REGISTRY.get(workflow_name)
+    if all(readings[key] is not None for key in keys if _reader_of(workflow, key) in _READERS):
+        _readings_found[hangs_on] = readings
+    return readings
 
 
 def _reader_of(workflow, key: str) -> str | None:
@@ -342,7 +362,7 @@ _READERS = {
         _shipped_with_comfyui("text_encoders", "qwen25_tokenizer")),
         _qwen, 507, READ_WHOLE, weighted=False),
     UMT5: _Reader(lambda params: (_text_encoder_file(params.get("clip_name")),),
-                  _umt5, 511, READ_WHOLE, weighted=True),
+                  _umt5, 511, READ_WHOLE, weighted=True, reads=("clip_name",)),
     _CLAP: _Reader(lambda _params: (_hub_file("laion/larger_clap_general", "tokenizer.json"),),
                    _from_file, 76, CUT_OFF, weighted=False),
 }

@@ -32,6 +32,8 @@ class FoldHeader(ElidingButton):
         self.update()
 
     def set_mark(self, mark: QPixmap | None, tip: str) -> None:
+        if (mark, tip) == (self._mark, self.toolTip()):
+            return
         self._mark = mark
         self.setToolTip(tip)
         self.updateGeometry()

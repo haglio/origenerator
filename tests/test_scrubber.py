@@ -5,7 +5,7 @@ from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
 from PySide6.QtGui import QColor, QMouseEvent
 from PySide6.QtWidgets import QApplication
 
-from origenerator.funscript import synthesize_actions
+from origenerator.funscript import heatmap_colors, synthesize_actions
 from origenerator.gui.scrubber import Scrubber
 
 
@@ -182,3 +182,40 @@ def test_the_video_is_held_from_the_press_until_the_button_is_let_go(qtbot):
     qtbot.mouseRelease(scrubber, Qt.MouseButton.LeftButton, pos=QPoint(BAR_INSET_Y + 40, y))
 
     assert holds == [True, False]
+
+
+def _counting_heatmap(colored: list):
+    def coloring(actions, buckets):
+        colored.append(buckets)
+        return heatmap_colors(actions, buckets)
+    return coloring
+
+
+def test_the_motion_is_colored_once_however_often_the_cursor_moves(qtbot):
+    colored = []
+    scrubber = Scrubber(heatmap=_counting_heatmap(colored))
+    qtbot.addWidget(scrubber)
+    scrubber.resize(120, scrubber.height())
+    scrubber.set_actions(synthesize_actions(3.0, hz=1.2))
+    scrubber.set_duration(3000)
+
+    for position in range(0, 3000, 500):
+        scrubber.set_position(position)
+        scrubber.grab()
+
+    assert len(colored) == 1
+
+
+def test_a_new_script_or_a_new_width_colors_the_motion_again(qtbot):
+    colored = []
+    scrubber = Scrubber(heatmap=_counting_heatmap(colored))
+    qtbot.addWidget(scrubber)
+    scrubber.resize(120, scrubber.height())
+    scrubber.set_actions(synthesize_actions(3.0, hz=1.2))
+    scrubber.grab()
+    scrubber.set_actions(synthesize_actions(4.0, hz=1.0))
+    scrubber.grab()
+    scrubber.resize(200, scrubber.height())
+    scrubber.grab()
+
+    assert len(colored) == 3

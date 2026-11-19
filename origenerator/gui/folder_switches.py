@@ -7,6 +7,7 @@ from origenerator.branch_session import is_branch_session
 from origenerator.folder_arrivals import arrivals_in
 from origenerator.gui.enhance_controller import NO_VIDEO_ENHANCER, all_video
 from origenerator.gui.gallery_pane_buttons import Button
+from origenerator.item_shape import split_key
 
 ONLY_A_LEAF_IS_FAVORITED = "Only a leaf folder can be favorited"
 ONLY_A_LEAF_IS_ENHANCED = "Only a leaf folder can be enhanced as a whole"
@@ -91,8 +92,14 @@ class FolderSwitches:
         kept = held.get("enhance_settings")
         return gallery.EnhanceSettings.parse(kept) if kept else self._enhance.settings
 
-    def enhance_params_of_the_one_enhancing(self, keys: list[str]) -> dict | None:
-        held = [settings for key in keys if (settings := self.enhance_settings_of(key))]
+    def enhance_params_of_the_open_folder(self) -> dict | None:
+        leaf = self._host.open_leaf_folder()
+        held = None if leaf is None else self.enhance_settings_of(leaf.key)
+        return None if held is None else held.params
+
+    def enhance_params_of_the_one_enhancing(self, toc_keys: list[str]) -> dict | None:
+        held = [settings for toc_key in toc_keys
+                if (settings := self.enhance_settings_of(split_key(toc_key)[0]))]
         return held[0].params if len(held) == 1 else None
 
     def keep_the_settings_of_folders_switched_on_before_settings_were_kept(self) -> None:

@@ -82,6 +82,7 @@ from origenerator.gui import corner_buttons, omnipause
 from origenerator.gui.app_keys import AppKeys, Presses
 from origenerator.gui.app_title import under
 from origenerator.gui.busy_cursor import working
+from origenerator.gui.button_drag import EnhanceSettingsDrag
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController, CombineParts
 from origenerator.gui.copy_names import copy_names, offer_copy_names_above_a_line
@@ -514,6 +515,8 @@ class GalleryView(QWidget):
             ),
             hosted=self._fun_time is not None, two_screens=self._two_screens,
         )
+        EnhanceSettingsDrag(self._buttons.enhance,
+                            self._folder_switches.enhance_params_of_the_open_folder)
         gallery_column.addLayout(_top_section(self._folder_path, self._buttons, self._folder_actions))
         self._experiments_cb = TickControl("Run experiments while the app is closed")
         self._experiments_cb.toggled.connect(self._on_experiments_toggled)

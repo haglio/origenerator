@@ -507,15 +507,17 @@ def test_latest_tiles_wear_an_image_or_video_item_type_icon(qtbot):
     assert icon_type("v1") == "video"
 
 
-def test_a_folder_of_one_kind_leaves_the_item_type_icon_off_its_tiles(qtbot):
+def test_a_folder_of_one_kind_still_marks_each_tile_with_its_kind(qtbot):
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
     _select_first_leaf(view)
 
-    assert view._gallery_pane._thumb_widgets["i1"].findChildren(ItemTypeIcon) == [], (
-        "inside a folder of one kind the icon would only repeat what the folder already says")
+    (mark,) = view._gallery_pane._thumb_widgets["i1"].findChildren(ItemTypeIcon)
+    assert mark.media_type == "image", (
+        "every tile says its kind wherever it is drawn, so a video's tile in a settings folder "
+        "shows its length beside the mark as it does in Latest")
 
 
 def test_an_inflight_tile_wears_the_item_type_icon_of_its_media_type(qtbot):

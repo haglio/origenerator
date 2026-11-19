@@ -811,6 +811,8 @@ class GalleryPane(QObject):
             self._draw_tile(
                 flow, row, _SEEDS_TILE if i2v else _FOLDER_TILE, wire,
                 TileAppearance(
+                    media_type=gallery.media_type_of_row(row),
+                    video_seconds=row.get("video_seconds"),
                     movie_path=self._host.animated_preview(row),
                     favorite=bool(row.get("starred")),
                     enhance=self._enhance_state(row),

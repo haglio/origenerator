@@ -336,7 +336,8 @@ def test_a_folder_draws_a_page_at_a_time_of_everything_it_lists(qtbot, db, opene
         "page at a time")
 
 
-@pytest.mark.parametrize("opened", [_latest_of, _trash_of], ids=["latest", "trash"])
+@pytest.mark.parametrize("opened", [_latest_of, _settings_folder_of, _trash_of],
+                         ids=["latest", "settings_folder", "trash"])
 def test_a_video_tile_says_how_long_its_video_runs(qtbot, db, opened):
     video = {**_row("v1", 1), "output_files": json.dumps([{"filename": "v1.mp4", "subfolder": ""}]),
              "video_seconds": 7.2}

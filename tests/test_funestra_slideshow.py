@@ -2762,3 +2762,24 @@ def test_a_slideshow_of_the_latest_on_its_last_slide_hands_the_funestra_nothing_
 
     assert _on_the_last_slide(slideshow) == before
     assert "RELOAD_PLAYLIST" not in _sent(slideshow)
+
+
+_A_SEED_ROW = (Slide("one.png", "image", "id-1"), Slide("one-b.png", "image", "id-1b"))
+
+
+def _in_the_seed_row(prompt_id):
+    return NavMapNeighbors(seeds=tuple(seed for seed in _A_SEED_ROW if seed.prompt_id != prompt_id),
+                           label="fox")
+
+
+def test_a_slideshow_of_one_item_whose_next_seed_arrives_shows_that_row_looping(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, items=[("one.png", "image", "id-1")],
+                           actions=SlideshowActions(neighbors=_in_the_seed_row))
+
+    slideshow.note_added(_A_SEED_ROW[1])
+
+    assert slideshow.hud_map().loop == "seed", (
+        "a Satellite left on a folder of one picture went on to play that picture's seeds "
+        "round and round as they were made, with no rectangle on the map and no loop in the title")
+    assert [entry.path.name for entry in read_playlist(slideshow.channel.playlist)] == [
+        "one.png", "one-b.png"]

@@ -63,19 +63,20 @@ class SlideshowSet:
                               dealing=self._dealing)
         if deal.start is None:
             self.lead_with_what_is_being_made()
-        self._a_row_played_whole_is_its_loop()
+        self.a_row_played_whole_is_its_loop()
 
-    def _a_row_played_whole_is_its_loop(self) -> None:
+    def a_row_played_whole_is_its_loop(self) -> bool:
         current = self.playlist.current()
         whole = self._browse()
-        if current is None or current.prompt_id is None or len(whole) <= 1:
-            return
-        if self._is_one_row([current, *whole]):
-            played = self.playlist.in_play_order()
-            sat_out = [slide for slide in whole if slide not in played]
-            for slide in sat_out:
-                self.playlist.add(slide)
-            self.loop = Loop(SEED, tuple(rotated_onto([*played, *sat_out], current)))
+        if (self.loop is not None or current is None or current.prompt_id is None
+                or len(whole) <= 1 or not self._is_one_row([current, *whole])):
+            return False
+        played = self.playlist.in_play_order()
+        sat_out = [slide for slide in whole if slide not in played]
+        for slide in sat_out:
+            self.playlist.add(slide)
+        self.loop = Loop(SEED, tuple(rotated_onto([*played, *sat_out], current)))
+        return True
 
     def _is_one_row(self, slides) -> bool:
         if not slides:
@@ -85,7 +86,7 @@ class SlideshowSet:
         return all(slide.prompt_id in row for slide in slides)
 
     def replace_items(self, items, *, keep_slide: bool, shuffle=None,
-                      new_set: bool = False) -> bool:
+                      new_set: bool = False, loop_switched_off: bool = False) -> bool:
         current = self.playlist.current()
         keep_id = current.prompt_id if keep_slide and current is not None else None
         start = next((index for index, item in enumerate(items)
@@ -94,7 +95,8 @@ class SlideshowSet:
                               start=start, dealing=self._dealing)
         if new_set:
             self.lead_with_what_is_being_made()
-            self._a_row_played_whole_is_its_loop()
+        if not loop_switched_off:
+            self.a_row_played_whole_is_its_loop()
         kept = start is not None
         self._on_pass_change(kept)
         return kept
@@ -170,7 +172,8 @@ class SlideshowSet:
         if not kept:
             self.filters = SlideshowFilters()
             kept = self.all_items
-        self.replace_items(kept, keep_slide=keep_slide, new_set=not keep_slide)
+        self.replace_items(kept, keep_slide=keep_slide, new_set=not keep_slide,
+                           loop_switched_off=keep_slide)
 
     def passes(self, item, filters: SlideshowFilters | None = None) -> bool:
         filters = self.filters if filters is None else filters
@@ -297,7 +300,7 @@ class SlideshowSet:
         current = self.playlist.current()
         if current is not None and not any(same_slide(item, current) for item in browse):
             browse = [current, *browse]
-        self.replace_items(browse, keep_slide=True)
+        self.replace_items(browse, keep_slide=True, loop_switched_off=True)
         return True
 
     def come_to(self, item_index: int) -> None:

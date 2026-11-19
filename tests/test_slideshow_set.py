@@ -593,6 +593,16 @@ def test_a_set_that_is_one_seed_row_opens_as_that_row_looping():
     assert dealt == []
 
 
+def test_a_row_opened_under_a_switch_that_keeps_all_of_it_still_shows_it_looping():
+    slideshow_set, _dealt = _set(items=_ROW, neighbors=_row_mates)
+
+    slideshow_set.take_up(SlideshowFilters(videos=False), keep_the_slide=True)
+
+    assert slideshow_set.map().loop == "seed", (
+        "a Satellite reopened on a folder of one row under its Images switch went on "
+        "playing that row's seeds with no rectangle on the map and no loop in the title")
+
+
 def test_a_row_opened_part_way_along_lights_its_cells_in_the_order_they_play():
     slideshow_set, _dealt = _set(items=_ROW, neighbors=_row_mates, start=1)
 

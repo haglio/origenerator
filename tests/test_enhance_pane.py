@@ -64,6 +64,7 @@ from origenerator.gui.enhance_versions import (
     _AddRow,
     _PendingRow,
     _VersionRow,
+    _VersionThumbnails,
     enhance_version_mime,
     params_from_mime,
 )
@@ -1663,6 +1664,10 @@ def version_drags(monkeypatch):
     return started
 
 
+def _thumbnails_of(path):
+    return _VersionThumbnails(QPixmap).of(_an_image(path))
+
+
 def _an_image(path, size=(16, 16)):
     Image.new("RGB", size, (200, 80, 40)).save(path)
     return path
@@ -1670,7 +1675,7 @@ def _an_image(path, size=(16, 16)):
 
 def test_the_dragged_version_trails_the_cursor(qtbot, tmp_path, version_drags):
     thumbnail = _VersionRow(_versions(1, {"enhance_scale": 2.0})[0], 0,
-                     _an_image(tmp_path / "e1.png"))
+                     _thumbnails_of(tmp_path / "e1.png"))
     qtbot.addWidget(thumbnail)
 
     qtbot.mousePress(thumbnail, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
@@ -1683,7 +1688,7 @@ def test_the_dragged_version_trails_the_cursor(qtbot, tmp_path, version_drags):
 
 def test_a_small_move_on_a_version_is_a_click_not_a_drag(qtbot, tmp_path, version_drags):
     thumbnail = _VersionRow(_versions(1, {"enhance_scale": 2.0})[0], 0,
-                     _an_image(tmp_path / "e1.png"))
+                     _thumbnails_of(tmp_path / "e1.png"))
     qtbot.addWidget(thumbnail)
 
     qtbot.mousePress(thumbnail, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
@@ -1696,7 +1701,7 @@ def test_a_small_move_on_a_version_is_a_click_not_a_drag(qtbot, tmp_path, versio
 
 def test_a_version_with_no_settings_moved_far_while_pressed_is_still_a_click(
         qtbot, tmp_path, version_drags):
-    thumbnail = _VersionRow(_versions(1, {})[0], 0, _an_image(tmp_path / "e1.png"))
+    thumbnail = _VersionRow(_versions(1, {})[0], 0, _thumbnails_of(tmp_path / "e1.png"))
     qtbot.addWidget(thumbnail)
     clicks = []
     thumbnail.clicked.connect(lambda position, _modifiers: clicks.append(position))
@@ -1712,7 +1717,7 @@ def test_a_version_with_no_settings_moved_far_while_pressed_is_still_a_click(
 
 def test_a_big_versions_thumbnail_drags_at_the_shared_size(qtbot, tmp_path, version_drags):
     thumbnail = _VersionRow(_versions(1, {"enhance_scale": 2.0})[0], 0,
-                     _an_image(tmp_path / "big.png", (1024, 768)))
+                     _VersionThumbnails(QPixmap).of(_an_image(tmp_path / "big.png", (1024, 768))))
     qtbot.addWidget(thumbnail)
 
     qtbot.mousePress(thumbnail, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
@@ -2660,7 +2665,7 @@ def test_a_new_frame_at_the_same_settings_leaves_the_rows_facts_in_place(qtbot):
 
 
 def test_the_original_does_not_drag(qtbot, tmp_path, version_drags):
-    original = _VersionRow(_versions(1)[-1], 1, _an_image(tmp_path / "src.png"))
+    original = _VersionRow(_versions(1)[-1], 1, _thumbnails_of(tmp_path / "src.png"))
     qtbot.addWidget(original)
 
     qtbot.mousePress(original, Qt.MouseButton.LeftButton, pos=QPoint(2, 2))
@@ -2668,3 +2673,27 @@ def test_the_original_does_not_drag(qtbot, tmp_path, version_drags):
 
     assert version_drags == [], (
         "a drag onto the Enhance pane says do that again, and the original was made by no enhancement")
+
+
+def test_showing_the_same_versions_again_decodes_none_of_their_files_again(qtbot, tmp_path):
+    decoded = []
+
+    def reading(path):
+        decoded.append(path)
+        return QPixmap(path)
+
+    versions = EnhanceVersions(read=reading)
+    qtbot.addWidget(versions)
+    files = []
+    for name in ("e1.png", "src.png"):
+        Image.new("RGB", (64, 48), (10, 120, 200)).save(tmp_path / name)
+        files.append(tmp_path / name)
+    items = list(zip(_versions(1), files, strict=True))
+
+    for _ in range(3):
+        versions.show_versions(items)
+
+    assert len(decoded) == 2, (
+        "every settings change, start and end of an enhancement and refresh of the item "
+        "lists its versions again, and each of their files is full size")
+    assert all(not row._thumbnail.pixmap().isNull() for row in _rows(versions))

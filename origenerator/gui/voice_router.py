@@ -10,6 +10,7 @@ from shared_ui.message_shape import ERROR, INFO, WARNING
 
 from origenerator import gallery, request_settings
 from origenerator.animate_command import AnimateRequest
+from origenerator.gallery.collection import collection
 from origenerator.gallery.voice_commands import said_in
 from origenerator.generation_config import filled_params
 from origenerator.gui.inflight_items import requested_of
@@ -86,22 +87,7 @@ _ABOUT_THE_SLIDE = frozenset({
 
 
 class VoiceHost(Protocol):
-    def collection_label(self, key: str) -> str: ...
-
-    def stand_in_collection(self, key: str, shape: str | None) -> bool: ...
-
     def selected_generation(self) -> str | None: ...
-
-    def picks(self) -> Picks: ...
-
-    def pick_again(self, picks: Picks) -> None: ...
-
-    def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str, str]: ...
-
-    def fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str, str]: ...
-
-    def animate_it(self, image_id: str | None,
-                   asked) -> tuple[str | None, str, str]: ...
 
     def queue_request(self, row, workflow, params, spoken, revision) -> tuple[str, str]: ...
 
@@ -118,6 +104,10 @@ class VoiceRouter(QObject):
         self._slideshows = sources.slideshows
         self._client = sources.client
         self._starting = sources.starting
+        self._toc = sources.toc
+        self._pane = sources.pane
+        self._enhancing = sources.enhance
+        self._combine = sources.combine
         self._setters = sources.setters if sources.setters is not None else OpenSetters()
         self.listener = CommandAndRequestListener(
             command_matcher=match_voice_command,
@@ -261,8 +251,8 @@ class VoiceRouter(QObject):
         self._picks_over_time.observe(name, now=now, playing_for=0.0)
 
     def _go_to_collection(self, key: str, shape: str | None = None) -> None:
-        label = self._host.collection_label(key)
-        if not self._host.stand_in_collection(key, shape):
+        label = collection(key).label
+        if not self._toc.stand_in_collection(key, shape):
             self._slideshows.note_voice_command(f"no {label} collection yet", kind=WARNING)
             return
         self._slideshows.note_voice_command(label)
@@ -313,8 +303,8 @@ class VoiceRouter(QObject):
         if said_at is None:
             return
         picks = self._picks_named.get(self._picks_over_time.path_at(said_at))
-        if picks is not None and picks.picked and picks != self._host.picks():
-            self._host.pick_again(picks)
+        if picks is not None and picks.picked and picks != self._pane.picks():
+            self._pane.pick_again(picks)
 
     def _press_gallery_pane_button(self, button, press, refusal: str | None = None) -> None:
         if button.isHidden() or not button.isEnabled():
@@ -332,11 +322,11 @@ class VoiceRouter(QObject):
             return
         target = slideshow.back_to_what_was_said_over(said_at)
         if isinstance(command.command, AnimateRequest):
-            prompt_id, message, kind = self._host.animate_it(target, command.command)
+            prompt_id, message, kind = self._combine.animate_it(target, command.command)
         elif command.command == gallery.ENHANCE_COMMAND:
-            prompt_id, message, kind = self._host.enhance_it(target)
+            prompt_id, message, kind = self._enhancing.enhance_it(target)
         else:
-            prompt_id, message, kind = self._host.fix_parts(target, command.command)
+            prompt_id, message, kind = self._enhancing.fix_parts(target, command.command)
         slideshow.note_voice_run(prompt_id, message, kind=kind)
 
     def on_spoken_request(self, spoken, shape: str | None = None) -> None:

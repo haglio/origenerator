@@ -615,7 +615,8 @@ def slideshows(monkeypatch):
                                 "record_loops_of": records.loops_of}
                                if records else {})),
             DirectorSurroundings(pace=SlideshowPace(), motion=None, osr2=_NoOsr2(),
-                                 job_queue=host, fun_time=fun_time))
+                                 job_queue=host, fun_time=fun_time,
+                                 enhancing_of=lambda: host))
         host.slideshows = director
         director.items_of = lambda rows: [
             (f"{r['prompt_id']}.png", "image", r["prompt_id"], None) for r in rows]
@@ -1541,7 +1542,7 @@ def _director():
         DirectorSources(db=db, jobs=FakeJobQueue(), names=ItemNames(db),
                         library=lambda: LibrarySnapshot([]), listing=host.listing),
         DirectorSurroundings(pace=SlideshowPace(), motion=None, osr2=_NoOsr2(), job_queue=host,
-                             fun_time=None))
+                             fun_time=None, enhancing_of=lambda: host))
 
 
 def test_a_video_evolver_upscaled_plays_as_the_upscale(tmp_path, monkeypatch):

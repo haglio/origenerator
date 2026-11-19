@@ -160,8 +160,12 @@ def stored(tmp_path):
 class FakeGalleryPane:
     def __init__(self, selected=()):
         self.selected_ids = set(selected)
+        self._picked_in_shown_order = list(selected)
         self.enhancing = None
         self.corner_refreshes = 0
+
+    def selected_prompt_ids(self):
+        return self._picked_in_shown_order
 
     def show_enhancing(self, by_prompt):
         self.enhancing = dict(by_prompt)
@@ -213,32 +217,36 @@ class FakeGroup:
         self.rows = list(rows)
 
 
-class FakeHost:
-    def __init__(self, *, picked=(), rows=(), group=None):
-        self.picked = list(picked)
+class FakeLibrary:
+    def __init__(self, rows=()):
         self.rows = list(rows)
-        self.group = group
-        self.offers = 0
         self.walks = 0
-
-    def selected_prompt_ids(self):
-        return self.picked
 
     def row_for(self, prompt_id):
         return next((r for r in self.rows if r["prompt_id"] == prompt_id), None)
 
+    @property
+    def reading(self):
+        return self
+
+    @property
     def image_rows(self):
         self.walks += 1
         return self.rows
 
-    def image_config_index(self):
+    @property
+    def image_index(self):
         return {}
+
+
+class FakeHost:
+    def __init__(self, *, rows=(), group=None):
+        self.library = FakeLibrary(rows)
+        self.group = group
+        self.offers = 0
 
     def current_group(self):
         return self.group
-
-    def typical_run_seconds(self, job):
-        return 42.0
 
     def enhance_offer_changed(self):
         self.offers += 1
@@ -283,7 +291,7 @@ def enhance(monkeypatch, stored):
 
 def _assembled(host, parts, db):
     host = host or FakeHost()
-    return EnhanceController(host, parts, db=db), host
+    return EnhanceController(host, parts, db=db, library=host.library), host
 
 
 
@@ -292,7 +300,7 @@ def test_a_pick_of_images_is_what_the_button_aims_at(enhance, monkeypatch, store
     monkeypatch.setattr(module.gallery, "version_matching_settings",
                         lambda row, settings: None)
     controller, _host = enhance(
-        FakeHost(picked=["i1", "i2"]),
+        FakeHost(),
         db=stored([_image("i1"), _image("i2")]), gallery_pane=FakeGalleryPane(["i1", "i2"]))
 
     offer = controller.offer()
@@ -305,7 +313,7 @@ def test_a_pick_of_images_is_what_the_button_aims_at(enhance, monkeypatch, store
 
 def test_a_picked_clip_is_nothing_to_run_rather_than_a_run_that_fails(enhance, stored):
     controller, _host = enhance(
-        FakeHost(picked=["v1"]), db=stored([_video("v1")]), gallery_pane=FakeGalleryPane(["v1"]))
+        FakeHost(), db=stored([_video("v1")]), gallery_pane=FakeGalleryPane(["v1"]))
 
     offer = controller.offer()
 
@@ -319,7 +327,7 @@ def test_an_image_already_made_at_these_settings_says_so_rather_than_no(enhance,
     monkeypatch.setattr(module.gallery, "version_matching_settings",
                         lambda row, settings: {"file": "one-enhanced.png"})
     controller, _host = enhance(
-        FakeHost(picked=["i1"]), db=stored([_image("i1")]), gallery_pane=FakeGalleryPane(["i1"]))
+        FakeHost(), db=stored([_image("i1")]), gallery_pane=FakeGalleryPane(["i1"]))
 
     assert controller.offer() == (False, ALREADY_AT_THESE_SETTINGS)
 
@@ -507,7 +515,7 @@ def test_pressing_the_panels_enhance_enhances_what_the_bank_button_would(enhance
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
     monkeypatch.setattr(module, "randomize_seeds", lambda params, keys: params)
     jobs = FakeReroll()
-    controller, _host = enhance(FakeHost(picked=["i1"]), db=stored([_image("i1")]),
+    controller, _host = enhance(FakeHost(), db=stored([_image("i1")]),
                                 gallery_pane=FakeGalleryPane(["i1"]), jobs=jobs)
 
     controller.pane.enhance_requested.emit()
@@ -586,7 +594,7 @@ def test_a_preset_renamed_on_the_panel_keeps_its_settings_under_the_new_name(enh
 def test_the_panel_greys_out_where_nothing_it_says_could_run(enhance, monkeypatch):
     monkeypatch.setattr(module.gallery, "media_type_of_row", lambda row: "video")
     rows = [_video("v1")]
-    controller, _host = enhance(FakeHost(picked=["v1"], rows=rows),
+    controller, _host = enhance(FakeHost(rows=rows),
                                 gallery_pane=FakeGalleryPane(["v1"]))
 
     controller.sync_pane(Offer(False, NO_VIDEO_ENHANCER))
@@ -596,7 +604,7 @@ def test_the_panel_greys_out_where_nothing_it_says_could_run(enhance, monkeypatc
 
 def test_a_mixed_folder_keeps_its_settings_live(enhance):
     rows = [_video("v1"), _image("i1")]
-    controller, _host = enhance(FakeHost(picked=["v1", "i1"], rows=rows),
+    controller, _host = enhance(FakeHost(rows=rows),
                                 gallery_pane=FakeGalleryPane(["v1", "i1"]))
 
     controller.sync_pane(Offer(True, "Enhance 1 item"))
@@ -614,7 +622,7 @@ def test_the_panels_enhance_button_is_aimed_with_the_offer_the_bank_button_is(en
 
 def test_the_panel_hears_which_picked_thumbnails_are_in_front(enhance):
     rows = [_image("i1"), _image("i2"), _video("v1")]
-    controller, _host = enhance(FakeHost(picked=["i1", "v1"], rows=rows),
+    controller, _host = enhance(FakeHost(rows=rows),
                                 gallery_pane=FakeGalleryPane(["i1", "v1"]))
 
     controller.sync_pane(Offer(True, "Enhance 1 item"))
@@ -646,10 +654,13 @@ def test_every_live_job_is_searched_not_each_folders_leading_one(enhance,
 
 
 def test_a_queued_job_shows_as_queued_rather_than_borrowing_a_frame(enhance,
-                                                                    monkeypatch):
+                                                                    monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
-    controller, _host = enhance(jobs=FakeReroll([FakeJob("run-a", state="queued")]))
+    an_earlier_run = {"prompt_id": "earlier", "workflow_name": ENHANCE, "status": "completed",
+                      "duration_seconds": 42.0}
+    controller, _host = enhance(db=stored([an_earlier_run]),
+                                jobs=FakeReroll([FakeJob("run-a", state="queued")]))
 
     run = controller.run_of(_image("i1"))
 
@@ -742,7 +753,7 @@ def test_which_image_a_run_is_of_is_worked_out_once_while_the_runs_stay_the_same
     for _frame in range(5):
         controller.reconcile()
 
-    assert host.walks == 1, (
+    assert host.library.walks == 1, (
         "the match walks every image and frames come several times a second, so it is "
         "worked out again only when the set of runs changes")
 

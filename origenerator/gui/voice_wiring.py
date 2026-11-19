@@ -13,6 +13,10 @@ class VoiceSources:
     slideshows: object
     client: object
     starting: StartingRows
+    toc: object
+    pane: object
+    enhance: object
+    combine: object
     jobs: object = None
     requests: object = None
     setters: object = None

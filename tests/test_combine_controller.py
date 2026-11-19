@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import urllib.request
+from types import SimpleNamespace
 
 import pytest
 from PIL import Image
@@ -236,23 +237,25 @@ class FakeGenerateTab:
         self.combination = combination
 
 
-class FakeHost:
-    def __init__(self, *, rows=()):
-        self.rows = list(rows)
-        self.revealed = []
-        self.told = []
-
-    def image_config_index(self):
-        return gallery.build_image_config_index(self.rows)
-
-    def animated_preview(self, row):
-        return f"{row['prompt_id']}.webp"
+class FakeLibrary:
+    def __init__(self, rows):
+        self.reading = SimpleNamespace(image_index=gallery.build_image_config_index(list(rows)))
 
     def folder_key_of(self, row):
         return f"folder-of-{row['prompt_id']}"
 
     def folder_key_for(self, workflow_name, params, workflow_version=None):
         return f"folder-for-{workflow_name}-{workflow_version}"
+
+
+class FakeHost:
+    def __init__(self, *, rows=()):
+        self.library = FakeLibrary(rows)
+        self.revealed = []
+        self.told = []
+
+    def animated_preview(self, row):
+        return f"{row['prompt_id']}.webp"
 
     def reveal_launch(self, key):
         self.revealed.append(key)
@@ -321,7 +324,7 @@ def _assembled(qtbot, host, parts, db):
     host = host or FakeHost()
     parent = QWidget()
     qtbot.addWidget(parent)
-    controller = CombineController(host, parts, parent=parent, db=db)
+    controller = CombineController(host, parts, parent=parent, db=db, library=host.library)
     controller._after_painting = lambda work: work()
     return controller, host
 

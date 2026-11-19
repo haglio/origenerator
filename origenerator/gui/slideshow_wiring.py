@@ -113,6 +113,7 @@ class DirectorSurroundings:
     osr2: object
     job_queue: object
     fun_time: object
+    enhancing_of: Callable
     radio: object = None
     buttons_of: Callable | None = None
     two_screens: object = None

@@ -60,7 +60,6 @@ from origenerator.gallery.collection import (
 )
 from origenerator.gallery.collection import (
     FolderCollection,
-    collection,
     folder_collection,
 )
 from origenerator.gallery.shapes import (
@@ -116,15 +115,13 @@ from origenerator.gui.gallery_pane_buttons import (
     GalleryPaneButtons,
     OfferedPress,
 )
-from origenerator.gui.gallery_search import GallerySearchController
+from origenerator.gui.gallery_search import GallerySearchController, SearchScope
 from origenerator.gui.gallery_tree import (
     GROUP_ROLE as _GROUP_ROLE,
 )
 from origenerator.gui.gallery_tree import (
     GalleryTree,
-    PathStep,
     ShapeModel,
-    path_text,
     takes_a_favorite,
 )
 from origenerator.gui.gallery_view_parts import NO_SHARED, Shared
@@ -155,7 +152,6 @@ from origenerator.gui.panes import (
     hold_the_borders_still,
     pane,
 )
-from origenerator.gui.picking import Picks
 from origenerator.gui.populate_controller import PopulateController
 from origenerator.gui.prompt_reveal import reveal_prompt
 from origenerator.gui.shown_job_queue import ShownJobQueue, read_foreign_queue
@@ -205,15 +201,6 @@ logger = logging.getLogger(__name__)
 
 
 _POLL_INTERVAL_MS = 1500
-
-
-class _SearchScope(NamedTuple):
-    steps: tuple[PathStep, ...]
-    ids: set[str] | None
-
-    @property
-    def path(self) -> str:
-        return path_text(self.steps)
 
 
 def _row_under(row, folder_key: str):
@@ -349,7 +336,6 @@ class GalleryView(QWidget):
 
     def _build_the_panes(self, db, client):
         self._build_the_toc()
-        self._search = GallerySearchController(self, parent=self)
         self._selected_row: dict | None = None
         self._scroll = GalleryPaneScrollArea()
         self._gallery_pane = GalleryPane(
@@ -368,6 +354,8 @@ class GalleryView(QWidget):
                 ),
             ),
         )
+        self._search = GallerySearchController(
+            self, parent=self, library=self.library, toc=self.toc, pane=self._gallery_pane)
         self._gallery_pane.pane_reset.connect(self._forget_generating_tile)
         self._gallery_pane.thumbnail_activated.connect(self._on_thumbnail_clicked)
         self._gallery_pane.tab_pin_requested.connect(self.pin_generate_tab)
@@ -385,7 +373,8 @@ class GalleryView(QWidget):
         self._pending_key: str | None = None
         self._pending_selection: str | None = None
         self._pending_combine_key: str | None = None
-        self._navigation = NavigationController(self, search=self._search)
+        self._navigation = NavigationController(
+            self, search=self._search, toc=self.toc, pane=self._gallery_pane)
         self._trail = (False, False)
         self._starting = StartingRows(self)
         self.job_queue = ShownJobQueue(
@@ -400,6 +389,7 @@ class GalleryView(QWidget):
                 pace=self._pace, motion=self.osr2.motion, osr2=self.osr2,
                 job_queue=self.job_queue, fun_time=self._fun_time,
                 radio=self._radio, buttons_of=lambda: self._buttons,
+                enhancing_of=lambda: self._enhance,
                 two_screens=self._two_screens))
         self._gallery_pane.slideshow_requested.connect(self._slideshows.open_on_tile)
         self._combine = CombineController(
@@ -408,14 +398,14 @@ class GalleryView(QWidget):
                 jobs=self._jobs, client=client, info_tabs_of=lambda: self._generate_pane,
                 slideshows=self._slideshows, starting=self._starting,
                 names=self._item_names, inbox=self._inbox),
-            parent=self, db=db)
+            parent=self, db=db, library=self.library)
         self._enhance = EnhanceController(
             self,
             EnhanceParts(
                 jobs=self._jobs, gallery_pane=self._gallery_pane,
                 slideshows=self._slideshows, info_tabs_of=lambda: self._generate_pane),
-            db=db)
-        self._folder_switches = FolderSwitches(self, db, self._enhance)
+            db=db, library=self.library)
+        self._folder_switches = FolderSwitches(self, db, self._enhance, library=self.library)
         self._jobs.changed.connect(self._enhance.reconcile)
         self._jobs.enhance_images_with(self._enhance.enhance_a_videos_start_image)
         self._look_training = LookTrainingController(
@@ -426,7 +416,9 @@ class GalleryView(QWidget):
             open_setters.hold)
         self._voice = VoiceRouter(
             self, VoiceSources(db=db, slideshows=self._slideshows, client=client,
-                               starting=self._starting, jobs=self._jobs, setters=open_setters),
+                               starting=self._starting, jobs=self._jobs, setters=open_setters,
+                               toc=self.toc, pane=self._gallery_pane, enhance=self._enhance,
+                               combine=self._combine),
             parent=self, motion=self.osr2.motion)
         self._gallery_pane.selection_changed.connect(
             lambda: self._voice.note_picks(self._gallery_pane.picks(), now=time.monotonic()))
@@ -710,16 +702,8 @@ class GalleryView(QWidget):
             self._re_aim_every_button()
         self.refresh()
 
-    def folder_key_for(self, workflow_name: str, params: dict,
-                        workflow_version: str | None = None) -> str:
-        return gallery.folder_key_for(workflow_name, params, self.image_config_index(),
-                                      workflow_version)
-
-    def folder_key_of(self, row: dict) -> str:
-        return gallery.settings_folder_key(row, self.image_config_index())
-
     def _config_folder_key(self, config) -> str:
-        return self.folder_key_for(config.workflow_name, config.params)
+        return self.library.folder_key_for(config.workflow_name, config.params)
 
     def _reconcile_generating(self):
         for tab in self._generate_pane.generate_tabs():
@@ -790,7 +774,7 @@ class GalleryView(QWidget):
         if self._client is None or wf is None:
             return None
         batch = [{**wf.default_params(), **params} for params in batch]
-        key = self.folder_key_for(workflow_name, batch[0])
+        key = self.library.folder_key_for(workflow_name, batch[0])
         if key in self._live_jobs:
             return None
         if self.would_reproduce_a_completed_run(wf, batch[0]):
@@ -1015,17 +999,11 @@ class GalleryView(QWidget):
             typing.setTextCursor(caret)
 
 
-    def image_config_index(self) -> dict:
-        return self.library.reading.image_index
-
-    def name_search_on_screen(self, query: str, scope: _SearchScope) -> None:
+    def name_search_on_screen(self, query: str, scope: SearchScope) -> None:
         self._folder_path.show_search(f"Search: “{query}” in ", scope.steps)
         self._folder_actions.show_folder(None)
         self._avg_label.setText("")
         self._experiments_bar.hide()
-
-    def show_search_results(self, tiles, terms) -> None:
-        self._gallery_pane.show_search_results(tiles, terms)
 
     def search_results_drawn(self) -> None:
         self._re_aim_every_button()
@@ -1036,9 +1014,6 @@ class GalleryView(QWidget):
 
     def selected_prompt_id(self) -> str | None:
         return self._selected["prompt_id"] if self._selected else None
-
-    def pane_holds(self, prompt_id: str) -> bool:
-        return prompt_id in self._gallery_pane.listed_prompt_ids()
 
     def show_folder(self, key: str) -> bool:
         row = self.toc.item_for(key)
@@ -1056,7 +1031,7 @@ class GalleryView(QWidget):
             return True
         row = self._db.get_generation(prompt_id)
         return row is not None and self._gallery_pane.reveal_folder(
-            gallery.settings_folder_key(row, self.image_config_index()))
+            self.library.folder_key_of(row))
 
     def clear_selection(self) -> None:
         self._clear_metadata()
@@ -1068,20 +1043,17 @@ class GalleryView(QWidget):
     def hand_pane_back(self) -> None:
         self._on_folder_selected(self._tree.currentItem(), None)
 
-    def search_scope(self) -> _SearchScope:
+    def search_scope(self) -> SearchScope:
         item = self._tree.currentItem()
         if self._current_collection_key() is not None:
             rows = self._gallery_pane.selected_collection_rows() or []
-            return _SearchScope(tuple(self.toc.path_steps(item)),
-                                {row["prompt_id"] for row in rows})
+            return SearchScope(tuple(self.toc.path_steps(item)),
+                               {row["prompt_id"] for row in rows})
         group = item.data(0, _GROUP_ROLE) if item is not None else None
         if group is None:
-            return self.everything_scope()
-        return _SearchScope(tuple(self.toc.path_steps(item)),
-                            {row["prompt_id"] for row in gallery.rows_under(group)})
-
-    def everything_scope(self) -> _SearchScope:
-        return _SearchScope((PathStep(gallery.ALL_LABEL, None),), self.library.live_ids)
+            return SearchScope.everything(self.library.live_ids)
+        return SearchScope(tuple(self.toc.path_steps(item)),
+                           {row["prompt_id"] for row in gallery.rows_under(group)})
 
     def search_sort(self) -> str:
         return self._search.sort()
@@ -1285,7 +1257,7 @@ class GalleryView(QWidget):
     def _generating_tile_for(self, key: str, job) -> GeneratingTile:
         tile = GeneratingTile(job,
                               populating=self._populate.is_active(key),
-                              typical_seconds=self.typical_run_seconds(job),
+                              typical_seconds=timing.typical_run_seconds(self._db, job),
                               made_from=self._job_made_from(
                                   job, lambda source_video: source_video.get("thumbnail_path")))
         tile.set_selected(key == self._selected_reroll_key)
@@ -1343,7 +1315,7 @@ class GalleryView(QWidget):
         if self._client is None or wf is None or not rows:
             return
         params = {**wf.default_params(), **params}
-        key = self.folder_key_for(workflow_name, params)
+        key = self.library.folder_key_for(workflow_name, params)
         launching = self._generate_pane.current_generate_tab()
         seed_keys = wf.seed_keys()
         olds = [(row, filled_params(row, wf)) for row in reversed(rows)]
@@ -1388,11 +1360,6 @@ class GalleryView(QWidget):
             source_video_media(source_video) if source_video is not None else None,
             source_video is not None
             and gallery.prompts_differ_from(job.params, source_video, job.workflow))
-
-    def typical_run_seconds(self, job) -> float | None:
-        if job is None:
-            return None
-        return timing.estimate_seconds(self._db.recent_durations(job.workflow.name))
 
     def _start_populate_reroll(self, key: str) -> bool:
         return self._start_reroll(key, from_populate=True)
@@ -1464,16 +1431,6 @@ class GalleryView(QWidget):
         self._rerender_current_leaf()
         self.job_queue.update()
         self._reconcile_generating()
-
-    def collection_label(self, key: str) -> str:
-        return collection(key).label
-
-    def stand_in_collection(self, key: str, shape: str | None) -> bool:
-        item = self.toc.item_for(shaped_key(key, shape) if shape else key)
-        if item is None:
-            return False
-        self._tree.setCurrentItem(item)
-        return True
 
     def run_spoken_command(self, text: str, said_at: float | None = None) -> bool:
         return self._voice.run_spoken_command(text, said_at)
@@ -1620,15 +1577,6 @@ class GalleryView(QWidget):
             return None
         return group
 
-    def leaf_folders(self) -> dict[str, list[dict]]:
-        return self.library.reading.leaf_folders(self._tree.shapes)
-
-    def highest_id_listed(self) -> int:
-        return self.library.reading.highest_id
-
-    def folder_meta(self) -> dict[str, dict]:
-        return self.library.folder_meta
-
     def _switch_the_open_folders_favorite(self, on: bool):
         leaf = self.open_leaf_folder()
         if leaf is not None:
@@ -1670,7 +1618,7 @@ class GalleryView(QWidget):
         revised = {**params, **dict(revision.settings),
                    **{key: boxed_as_typed(name, params, key, said) for key, said in (
                        ("positive_prompt", revision.positive), ("negative_prompt", revision.negative))}}
-        key = self.folder_key_for(name, revised)
+        key = self.library.folder_key_for(name, revised)
         if not self._jobs.start_prepared(key, workflow, revised):
             return "couldn't queue the request — see the log", ERROR
         job = self._jobs.newest_job_for(key)
@@ -1744,7 +1692,7 @@ class GalleryView(QWidget):
         row = self._db.get_generation(prompt_id)
         if row is None:
             return
-        key = self.folder_key_of(row)
+        key = self.library.folder_key_of(row)
         if key in self._live_jobs:
             return
         if which == REROLL_VIDEO:
@@ -1768,18 +1716,6 @@ class GalleryView(QWidget):
     def enhance_items(self, prompt_ids: list[str]) -> None:
         self._enhance.enhance_items(prompt_ids)
 
-    def enhance_from_slideshow(self, prompt_id: str) -> bool:
-        return self._enhance.enhance_from_slideshow(prompt_id)
-
-    def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str, str]:
-        return self._enhance.enhance_it(prompt_id)
-
-    def fix_parts(self, prompt_id: str | None, parts) -> tuple[str | None, str, str]:
-        return self._enhance.fix_parts(prompt_id, parts)
-
-    def image_rows(self) -> list[dict]:
-        return self.library.reading.image_rows
-
     def tell(self, title: str, message: str) -> None:
         QMessageBox.information(self, title, message)
 
@@ -1788,10 +1724,6 @@ class GalleryView(QWidget):
 
     def restore_combine_selection(self, saved) -> None:
         self._combine.restore(saved)
-
-    def animate_it(self, image_id: str | None,
-                   asked) -> tuple[str | None, str, str]:
-        return self._combine.animate_it(image_id, asked)
 
     def reveal_launch(self, key: str):
         if self._stand_on_the_run_in(key):
@@ -1986,12 +1918,6 @@ class GalleryView(QWidget):
     def select_generation(self, prompt_id: str | None):
         self._pending_selection = prompt_id or None
 
-    def picks(self) -> Picks:
-        return self._gallery_pane.picks()
-
-    def pick_again(self, picks: Picks) -> None:
-        self._gallery_pane.pick_again(picks)
-
     def capture_generate_tabs(self) -> dict:
         return self._generate_pane.capture_state()
 
@@ -2152,7 +2078,7 @@ class GalleryView(QWidget):
         self._edit_then_redraw(
             lambda: trash_collection.restore_from_trash(self._db, self._jobs, prompt_ids,
                                                         self._edits.restore_deleted,
-                                                        self.image_config_index()),
+                                                        self.library.reading.image_index),
             lambda restored: restored and self.go_to_generation(restored),
             failed="Restore failed", could_not="Could not restore the selected item(s)",
             logged=f"Failed to restore {len(prompt_ids)} deleted item(s)")
@@ -2261,7 +2187,7 @@ class GalleryView(QWidget):
         self.follow_link(prompt_id)
 
     def go_to_generation(self, prompt_id: str):
-        prompt_id = gallery.landing_for(prompt_id, self.library.reading.rows, self.image_config_index())
+        prompt_id = gallery.landing_for(prompt_id, self.library.reading.rows, self.library.reading.image_index)
         item = self._folder_row_for(prompt_id)
         if item is not None:
             with self._navigation.off_the_record():
@@ -2283,7 +2209,7 @@ class GalleryView(QWidget):
         if row is None:
             held = self.row_for(prompt_id)
             return self.toc.item_for(shaped_key(_TRASH_KEY, row_shape(held))) if held else None
-        key = self.folder_key_of(row)
+        key = self.library.folder_key_of(row)
         return self.toc.item_for(key) if key else None
 
     def _current_collection_key(self) -> str | None:

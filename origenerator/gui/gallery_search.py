@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Protocol
+from typing import NamedTuple, Protocol
 
 from PySide6.QtCore import QObject, Qt, QTimer
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
@@ -8,6 +8,7 @@ from shared_ui.spacing import GAP_SMALL
 
 from origenerator import gallery, search
 from origenerator.gui.gallery_pane import SEARCH_DRAW_LIMIT
+from origenerator.gui.gallery_tree import PathStep, path_text
 from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.scope_search_edit import ScopeSearchEdit
 from origenerator.gui.search_expander import SearchExpander
@@ -23,16 +24,21 @@ _SEARCH_ALL_GRAYED_TIP = (f"Type at least {MIN_CHARS} characters in the search "
                           "than only the folder open in the TOC")
 
 
+class SearchScope(NamedTuple):
+    steps: tuple[PathStep, ...]
+    ids: set[str] | None
+
+    @classmethod
+    def everything(cls, live_ids) -> SearchScope:
+        return cls((PathStep(gallery.ALL_LABEL, None),), live_ids)
+
+    @property
+    def path(self) -> str:
+        return path_text(self.steps)
+
+
 class SearchHost(Protocol):
-    def search_scope(self): ...
-
-    def everything_scope(self): ...
-
-    def image_config_index(self) -> dict: ...
-
-    def group_for_key(self, key: str): ...
-
-    def show_search_results(self, tiles, terms: search.SearchTerms) -> None: ...
+    def search_scope(self) -> SearchScope: ...
 
     def name_search_on_screen(self, query: str, scope) -> None: ...
 
@@ -43,11 +49,22 @@ class SearchHost(Protocol):
     def suppress_history(self): ...
 
 
+def _once_after(pause_ms: int, then, *, owner: QObject) -> QTimer:
+    timer = QTimer(owner)
+    timer.setSingleShot(True)
+    timer.setInterval(pause_ms)
+    timer.timeout.connect(then)
+    return timer
+
+
 class GallerySearchController(QObject):
-    def __init__(self, host: SearchHost, *, parent: QObject,
+    def __init__(self, host: SearchHost, *, parent: QObject, library, toc, pane,
                  expander: SearchExpander | None = None):
         super().__init__(parent)
         self._host = host
+        self._library = library
+        self._toc = toc
+        self._pane = pane
         self._index = search.GallerySearch()
         self._query = ""
         self._everywhere = False
@@ -59,14 +76,8 @@ class GallerySearchController(QObject):
         self._collapsed: set[str] = set()
         self._expander = expander or SearchExpander(self)
         self._expander.expanded.connect(self._on_expanded)
-        self._timer = QTimer(self)
-        self._timer.setSingleShot(True)
-        self._timer.setInterval(_DELAY_MS)
-        self._timer.timeout.connect(self._run_pending)
-        self._expand_timer = QTimer(self)
-        self._expand_timer.setSingleShot(True)
-        self._expand_timer.setInterval(_ONE_ASK_PER_PAUSE_MS)
-        self._expand_timer.timeout.connect(self._request_expansion)
+        self._timer = _once_after(_DELAY_MS, self._run_pending, owner=self)
+        self._expand_timer = _once_after(_ONE_ASK_PER_PAUSE_MS, self._request_expansion, owner=self)
 
         self.field = ScopeSearchEdit()
         self.field.set_scope(gallery.ALL_LABEL)
@@ -139,7 +150,7 @@ class GallerySearchController(QObject):
         self._everywhere = False
 
     def run(self) -> None:
-        scope = (self._host.everything_scope() if self._everywhere
+        scope = (SearchScope.everything(self._library.live_ids) if self._everywhere
                  else self._host.search_scope())
         self._outcome = self._index.search(
             self._query, expansions=self._expansions, within=scope.ids
@@ -148,7 +159,7 @@ class GallerySearchController(QObject):
         self._host.name_search_on_screen(self._query, scope)
         self._count.setText(self._count_text())
         self.bar.show()
-        self._host.show_search_results(self._tiles, search.SearchTerms(
+        self._pane.show_search_results(self._tiles, search.SearchTerms(
             sort_mode=self._sort, query=self._query, outcome=self._outcome,
             scope=scope.path, collapsed=self._collapsed,
             on_section_toggled=self._on_section_toggled,
@@ -248,7 +259,7 @@ class GallerySearchController(QObject):
     def _matched_folders_first(self, tiles) -> list:
         first = []
         for key in self._outcome.folders:
-            group = self._host.group_for_key(key)
+            group = self._toc.group_for_key(key)
             if group is not None:
                 first.append(next((tile for tile in tiles if tile.group is group), None)
                              or search.SearchTile(row=gallery.rows_under(group)[0],
@@ -256,14 +267,14 @@ class GallerySearchController(QObject):
         return [*first, *(tile for tile in tiles if all(tile is not led for led in first))]
 
     def _collapse_to_folders(self, results) -> list:
-        image_index = self._host.image_config_index()
+        image_index = self._library.reading.image_index
         by_folder: dict[str, list] = {}
         for result in results:
             key = gallery.settings_folder_key(result.row, image_index)
             by_folder.setdefault(key, []).append(result.row)
         tiles = []
         for key, rows in by_folder.items():
-            group = self._host.group_for_key(key) if len(rows) > 1 else None
+            group = self._toc.group_for_key(key) if len(rows) > 1 else None
             if group is not None:
                 tiles.append(search.SearchTile(row=rows[0], group=group, rows=list(rows)))
             else:

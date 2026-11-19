@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import NamedTuple
 
-from origenerator import trash_collection
+from origenerator import gallery, trash_collection
 from origenerator.gallery.tree import is_an_enhance_being_made
 from origenerator.library_views import LibrarySnapshot
 
@@ -31,6 +31,7 @@ class LibraryReadings:
         self.requests: list[dict] = []
         self.live_ids: set[str] = set()
         self.customs_by_shape: dict[str, list] = {}
+        self._shapes: tuple = ()
         self.drawn_version = 0
         self._fingerprint: tuple = (None, None)
         self._lists_built_from = None
@@ -59,6 +60,7 @@ class LibraryReadings:
         self.drawn_version += 1
         library = self.reading = self._reading_of(rows, meta)
         self.live_ids = {row["prompt_id"] for row in library.rows}
+        self._shapes = tuple(shapes)
         self.customs_by_shape = {shape: library.custom_collections(shape) for shape in shapes}
         self.requests = self._db.list_requests()
         return library
@@ -77,6 +79,17 @@ class LibraryReadings:
                                   library.readings)
             self._publish_names(self._item_names.by_file(library.rows))
         return library
+
+    def folder_key_of(self, row: dict) -> str:
+        return gallery.settings_folder_key(row, self.reading.image_index)
+
+    def folder_key_for(self, workflow_name: str, params: dict,
+                       workflow_version: str | None = None) -> str:
+        return gallery.folder_key_for(workflow_name, params, self.reading.image_index,
+                                      workflow_version)
+
+    def leaf_folders(self) -> dict[str, list[dict]]:
+        return self.reading.leaf_folders(self._shapes)
 
     def folder_meta_edited(self) -> None:
         self._fingerprint = (self._fingerprint[0], _folder_meta_fingerprint(self.folder_meta))

@@ -16,19 +16,14 @@ _NEVER_SWITCHED = {"custom_name": None, "starred": False}
 class FolderSwitchesHost(Protocol):
     def open_leaf_folder(self) -> gallery.SettingsGroup | None: ...
 
-    def leaf_folders(self) -> dict[str, list[dict]]: ...
-
-    def folder_meta(self) -> dict[str, dict]: ...
-
-    def highest_id_listed(self) -> int: ...
-
     def set_items_favorite(self, prompt_ids, favorite: bool) -> None: ...
 
 
 class FolderSwitches:
-    def __init__(self, host: FolderSwitchesHost, db, enhance):
+    def __init__(self, host: FolderSwitchesHost, db, enhance, *, library):
         self._host = host
         self._db = db
+        self._library = library
         self._enhance = enhance
         self._takes_up_older_stars = not is_branch_session()
 
@@ -55,13 +50,13 @@ class FolderSwitches:
                       checked=False)
 
     def enhancing(self, key: str) -> bool:
-        return (self._host.folder_meta().get(key) or {}).get("enhance_after_id") is not None
+        return (self._library.folder_meta.get(key) or {}).get("enhance_after_id") is not None
 
     def set_favorite(self, key: str, favorite: bool) -> bool:
-        meta = self._host.folder_meta()
+        meta = self._library.folder_meta
         if bool(meta.get(key, {}).get("starred")) == favorite:
             return False
-        after_id = self._host.highest_id_listed() if favorite else None
+        after_id = self._library.reading.highest_id if favorite else None
         self._db.set_folder_favorite(key, favorite, after_id=after_id)
         meta[key] = {**meta.get(key, _NEVER_SWITCHED), "starred": favorite,
                      "favorite_after_id": after_id}
@@ -69,26 +64,26 @@ class FolderSwitches:
 
     def star_what_is_in(self, key: str) -> None:
         self._host.set_items_favorite(
-            [row["prompt_id"] for row in self._host.leaf_folders().get(key, [])
+            [row["prompt_id"] for row in self._library.leaf_folders().get(key, [])
              if not row.get("starred")], True)
 
     def set_enhancing(self, key: str, on: bool) -> None:
-        after_id = self._host.highest_id_listed() if on else None
+        after_id = self._library.reading.highest_id if on else None
         self._db.set_folder_enhance(key, after_id=after_id)
-        self._host.folder_meta().setdefault(key, dict(_NEVER_SWITCHED))[
+        self._library.folder_meta.setdefault(key, dict(_NEVER_SWITCHED))[
             "enhance_after_id"] = after_id
         if on:
-            self._enhance.enhance_what_awaits(self._host.leaf_folders().get(key, []))
+            self._enhance.enhance_what_awaits(self._library.leaf_folders().get(key, []))
 
     def take_in_the_arrivals(self) -> None:
-        meta = self._host.folder_meta()
+        meta = self._library.folder_meta
         switched_on = {key for key, held in meta.items()
                        if held.get("enhance_after_id") is not None
                        or (held.get("starred") and (held.get("favorite_after_id") is not None
                                                     or self._takes_up_older_stars))}
         if not switched_on:
             return
-        leaves = {key: rows for key, rows in self._host.leaf_folders().items()
+        leaves = {key: rows for key, rows in self._library.leaf_folders().items()
                   if key in switched_on}
         found = arrivals_in(leaves, meta, would_enhance=self._enhance.would_enhance,
                             older_stars=self._takes_up_older_stars)

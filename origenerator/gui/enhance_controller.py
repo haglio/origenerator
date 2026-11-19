@@ -19,6 +19,7 @@ from origenerator.gui.generation_job import display_status
 from origenerator.gui.inflight import RunReading
 from origenerator.gui.training_run import TrainingRun
 from origenerator.media import MediaType
+from origenerator.timing import typical_run_seconds
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.detail_parts import detector_folder, name_parts, part_named
 
@@ -80,17 +81,7 @@ NOTHING_LEFT_TO_ENHANCE = ("No items without this enhancement selected, and no r
 
 
 class EnhanceHost(Protocol):
-    def selected_prompt_ids(self) -> list[str]: ...
-
-    def row_for(self, prompt_id: str) -> dict | None: ...
-
-    def image_rows(self) -> list[dict]: ...
-
-    def image_config_index(self) -> dict: ...
-
     def current_group(self): ...
-
-    def typical_run_seconds(self, job) -> float | None: ...
 
     def enhance_offer_changed(self) -> None: ...
 
@@ -99,9 +90,10 @@ EnhanceParts = namedtuple("EnhanceParts", "jobs gallery_pane slideshows info_tab
 
 
 class EnhanceController:
-    def __init__(self, host: EnhanceHost, parts: EnhanceParts, *, db):
+    def __init__(self, host: EnhanceHost, parts: EnhanceParts, *, db, library):
         self._host = host
         self._db = db
+        self._library = library
         (self._jobs, self._gallery_pane, self._slideshows,
          self._generate_pane_of) = parts
         self._settings = gallery.EnhanceSettings()
@@ -190,8 +182,8 @@ class EnhanceController:
         self._gallery_pane.refresh_corners()
 
     def sync_pane(self, offer: Offer) -> None:
-        picked = [row for pid in self._host.selected_prompt_ids()
-                  if (row := self._host.row_for(pid)) is not None]
+        picked = [row for pid in self._gallery_pane.selected_prompt_ids()
+                  if (row := self._library.row_for(pid)) is not None]
         folder = None if picked or self._gallery_pane.selected_ids else self._host.current_group()
         in_front = picked or list(getattr(folder, "rows", []) or [])
         self.pane.set_applicable(not all_video(in_front), NO_VIDEO_ENHANCER)
@@ -222,7 +214,7 @@ class EnhanceController:
             rows, self._db.rows_made_by(gallery.ENHANCE_WORKFLOW))
 
     def enhanceable_selection(self) -> list[str]:
-        return [prompt_id for prompt_id in self._host.selected_prompt_ids()
+        return [prompt_id for prompt_id in self._gallery_pane.selected_prompt_ids()
                 if (row := self._db.get_generation(prompt_id)) is not None
                 and self.would_enhance(row)]
 
@@ -231,7 +223,7 @@ class EnhanceController:
                 and gallery.version_matching_settings(row, self._settings) is None)
 
     def _selection_isall_video(self) -> bool:
-        return all_video(row for pid in self._host.selected_prompt_ids()
+        return all_video(row for pid in self._gallery_pane.selected_prompt_ids()
                           if (row := self._db.get_generation(pid)) is not None)
 
     def enhance_the_selection(self) -> None:
@@ -269,12 +261,12 @@ class EnhanceController:
                 continue
             asks.append((row, params))
         for launched in launch_enhancements(self._jobs, self._db, asks,
-                                            self._host.image_config_index()):
+                                            self._library.reading.image_index):
             self._note_launch(*launched)
 
     def _launch(self, row: dict, params: dict) -> bool:
         launched = launch_enhancements(self._jobs, self._db, [(row, params)],
-                                       self._host.image_config_index())
+                                       self._library.reading.image_index)
         return bool(launched) and self._note_launch(*launched[0])
 
     def _note_launch(self, row: dict, params: dict, key: str, prompt_id: str | None) -> bool:
@@ -346,7 +338,7 @@ class EnhanceController:
 
     def put_what_is_locked_first(self) -> None:
         locked = [row for prompt_id in self._slideshows.locked_prompt_ids()
-                  if (row := self._host.row_for(prompt_id)) is not None]
+                  if (row := self._library.row_for(prompt_id)) is not None]
         self._jobs.put_first(job.prompt_id for job in self.jobs_targeting(locked))
 
     def _enhances_in_flight(self) -> list:
@@ -381,7 +373,7 @@ class EnhanceController:
             pass_progress=job.last_pass_progress,
             stage=job.last_stage,
             started_at=job.started_at,
-            typical_seconds=self._host.typical_run_seconds(job),
+            typical_seconds=typical_run_seconds(self._db, job),
         )
 
     def reconcile(self) -> None:
@@ -414,7 +406,7 @@ class EnhanceController:
             self._by_prompt = {
                 row["prompt_id"]: job
                 for job in running
-                for row in self._host.image_rows()
+                for row in self._library.reading.image_rows
                 if self._of_row(job, row)
             }
         self._gallery_pane.show_enhancing({

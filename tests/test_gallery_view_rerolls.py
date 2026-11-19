@@ -1289,7 +1289,7 @@ def test_a_rewrite_lands_in_the_folder_of_its_words_on_the_workflows_defaults(qt
 
     view._on_modify_batch_requested(key, "sdxl_t2i", {"positive_prompt": "a dog"})
 
-    assert list(view._jobs.jobs_by_folder) == [view.folder_key_for(
+    assert list(view._jobs.jobs_by_folder) == [view.library.folder_key_for(
         "sdxl_t2i", dict(_SDXL.default_params(), positive_prompt="a dog"))]
 
 
@@ -1438,7 +1438,7 @@ def _a_portrait_launch_while_landscape_is_browsed(qtbot, tmp_path):
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     params = dict(_SDXL.default_params(), positive_prompt="a tall one", width=720, height=1280)
-    key = view.folder_key_for("sdxl_t2i", params)
+    key = view.library.folder_key_for("sdxl_t2i", params)
     view._jobs.start_prepared(key, _SDXL, params)
     return view, key
 

@@ -7,11 +7,7 @@ from origenerator.navigation import Location, NavigationHistory
 
 
 class NavigationHost(Protocol):
-    def selected_folder_key(self) -> str | None: ...
-
     def selected_prompt_id(self) -> str | None: ...
-
-    def pane_holds(self, prompt_id: str) -> bool: ...
 
     def show_folder(self, key: str) -> bool: ...
 
@@ -25,9 +21,11 @@ class NavigationHost(Protocol):
 
 
 class NavigationController:
-    def __init__(self, host: NavigationHost, *, search):
+    def __init__(self, host: NavigationHost, *, search, toc, pane):
         self._host = host
         self._search = search
+        self._toc = toc
+        self._pane = pane
         self._history = NavigationHistory()
         self._suppressed = False
 
@@ -55,7 +53,7 @@ class NavigationController:
     def record(self, item: str | None = None) -> None:
         if self._suppressed:
             return
-        view = self._host.selected_folder_key()
+        view = self._toc.selected_folder_key()
         if view is None:
             return
         location = Location(view, self._search.query, item, self._search.everywhere)
@@ -80,11 +78,11 @@ class NavigationController:
         self._sync_buttons()
 
     def _current_location(self) -> Location | None:
-        view = self._host.selected_folder_key()
+        view = self._toc.selected_folder_key()
         if view is None:
             return None
         item = self._host.selected_prompt_id()
-        if item is not None and not self._host.pane_holds(item):
+        if item is not None and item not in self._pane.listed_prompt_ids():
             item = None
         return Location(view, self._search.query, item, self._search.everywhere)
 
@@ -103,7 +101,7 @@ class NavigationController:
                 self._host.clear_selection()
 
     def _reveal_in_pane(self, prompt_id: str) -> None:
-        if self._host.pane_holds(prompt_id):
+        if prompt_id in self._pane.listed_prompt_ids():
             self._host.reveal(prompt_id)
 
     def _sync_buttons(self) -> None:

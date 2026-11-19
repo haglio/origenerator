@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
+from typing import Protocol
 
 from PySide6.QtCore import QPoint
 from PySide6.QtWidgets import QInputDialog, QMenu, QWidget
@@ -35,10 +37,69 @@ def _kept_on_removal(custom) -> str:
     return f"The {held} it holds are kept."
 
 
-def _offer_taking_out(menu: QMenu, open_custom, group):
-    if open_custom and any(m.key == group.key for m in gallery.child_groups(open_custom)):
-        return menu.addAction(f"Remove from “{open_custom.label}”")
-    return None
+@dataclass(frozen=True)
+class FolderAsked:
+    key: str
+    group: object
+    holder: object
+    toc_rows: tuple
+
+
+class FolderAction(Protocol):
+    def offer(self, menu: QMenu, asked: FolderAsked, editing: TocEditing) -> dict: ...
+
+
+class FavoriteIt:
+    def offer(self, menu, asked, editing) -> dict:
+        if not takes_a_favorite(asked.group):
+            return {}
+        return {menu.addAction("Unfavorite" if asked.group.favorite else "Favorite"):
+                lambda: editing.toggle_favorite(asked.key)}
+
+
+class TakeItOutOfItsCollection:
+    def offer(self, menu, asked, editing) -> dict:
+        holder, group = asked.holder, asked.group
+        if not holder or all(m.key != group.key for m in gallery.child_groups(holder)):
+            return {}
+        return {menu.addAction(f"Remove from “{holder.label}”"):
+                lambda: editing.remove_from_collection(holder, [group.key])}
+
+
+class AddItToACollection:
+    def offer(self, menu, asked, editing) -> dict:
+        targets = editing.collections_that_could_take(asked)
+        if not targets:
+            return {}
+        submenu = menu.addMenu("Add to collection")
+        return {submenu.addAction(folder.label): partial(editing.dropped, folder.key, [asked.key])
+                for folder in targets}
+
+
+class RemoveTheCollection:
+    def offer(self, menu, asked, editing) -> dict:
+        if not isinstance(asked.group, gallery.CustomCollection):
+            return {}
+        return {menu.addAction("Remove collection…"):
+                lambda: editing.remove_collection(asked.group)}
+
+
+class DeleteTheFolder:
+    def offer(self, menu, asked, editing) -> dict:
+        if not is_deletable_folder(asked.group):
+            return {}
+        menu.addSeparator()
+        return {menu.addAction("Delete folder…"): lambda: editing.delete_folders([asked.group])}
+
+
+class CollapseAndExpandIt:
+    def offer(self, menu, asked, editing) -> dict:
+        return offer_collapse_and_expand(menu, asked.toc_rows)
+
+
+FOLDER_ACTIONS: tuple[FolderAction, ...] = (
+    FavoriteIt(), TakeItOutOfItsCollection(), AddItToACollection(), RemoveTheCollection(),
+    DeleteTheFolder(), CollapseAndExpandIt())
 
 
 def _folder_of_your_own_above(rows):
@@ -65,7 +126,9 @@ def is_deletable_folder(group) -> bool:
 
 class TocEditing:
     def __init__(self, tree, toc, *, edits, library, folder_switches, screen: AroundAnEdit,
-                 asks_over: QWidget) -> None:
+                 asks_over: QWidget,
+                 folder_actions: tuple[FolderAction, ...] = FOLDER_ACTIONS) -> None:
+        self._folder_actions = folder_actions
         self._tree = tree
         self._toc = toc
         self._edits = edits
@@ -240,54 +303,22 @@ class TocEditing:
             return
         holder = (_folder_of_your_own_above(toc_rows) if toc_rows
                   else saved_custom_collection(self._screen.current_group()))
-        if isinstance(group, gallery.CustomCollection):
-            self._custom_collection_context_menu(group, global_pos, holder, toc_rows)
-            return
+        asked = FolderAsked(key, group, holder, tuple(toc_rows))
         menu = QMenu(self._asks_over)
         offer_copy_names_above_a_line(menu, [group.label])
-        favorite_action = (menu.addAction("Unfavorite" if group.favorite else "Favorite")
-                           if takes_a_favorite(group) else None)
-        remove_action = _offer_taking_out(menu, holder, group)
-        add_menu = self._add_to_folder_menu(menu, key)
-        delete_action = None
-        if is_deletable_folder(group):
-            menu.addSeparator()
-            delete_action = menu.addAction("Delete folder…")
-        collapse_and_expand = offer_collapse_and_expand(menu, toc_rows)
+        offered: dict = {}
+        for action in self._folder_actions:
+            offered.update(action.offer(menu, asked, self))
         chosen = menu.exec(global_pos)
-        if favorite_action is not None and chosen == favorite_action:
-            self.toggle_favorite(key)
-        elif remove_action is not None and chosen == remove_action:
-            self.remove_from_collection(holder, [group.key])
-        elif chosen in add_menu:
-            self.dropped(add_menu[chosen], [key])
-        elif delete_action is not None and chosen == delete_action:
-            self.delete_folders([group])
-        elif chosen in collapse_and_expand:
-            collapse_and_expand[chosen]()
+        if chosen in offered:
+            offered[chosen]()
 
-    def _add_to_folder_menu(self, menu: QMenu, key: str) -> dict:
-        shape = shape_of(key) or self._toc.shape_in_view()
-        targets = [f for f in self._library.customs_by_shape.get(shape, ())
-                   if not any(m.key == base_of(key) for m in gallery.child_groups(f))]
-        if not targets:
-            return {}
-        submenu = menu.addMenu("Add to collection")
-        return {submenu.addAction(folder.label): folder.key for folder in targets}
-
-    def _custom_collection_context_menu(self, group, global_pos: QPoint, holder, toc_rows):
-        menu = QMenu(self._asks_over)
-        offer_copy_names_above_a_line(menu, [group.label])
-        take_out_action = _offer_taking_out(menu, holder, group)
-        remove_action = menu.addAction("Remove collection…")
-        collapse_and_expand = offer_collapse_and_expand(menu, toc_rows)
-        chosen = menu.exec(global_pos)
-        if take_out_action is not None and chosen == take_out_action:
-            self.remove_from_collection(holder, [group.key])
-        elif chosen == remove_action:
-            self.remove_collection(group)
-        elif chosen in collapse_and_expand:
-            collapse_and_expand[chosen]()
+    def collections_that_could_take(self, asked: FolderAsked) -> list:
+        if isinstance(asked.group, gallery.CustomCollection):
+            return []
+        shape = shape_of(asked.key) or self._toc.shape_in_view()
+        return [f for f in self._library.customs_by_shape.get(shape, ())
+                if not any(m.key == base_of(asked.key) for m in gallery.child_groups(f))]
 
     def toggle_favorite(self, key: str):
         group = self._toc.group_for_key(key)

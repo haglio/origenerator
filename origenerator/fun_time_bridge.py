@@ -68,15 +68,7 @@ def _split_argument(line: str) -> tuple[str, str, str]:
     return line[:cut], line[cut], line[cut + 1:]
 
 
-def _without_when_said(said: str) -> tuple[str, float | None, bool]:
-    heard = said.endswith(HEARD)
-    words, when = _without_the_time(said.removesuffix(HEARD))
-    if heard and when is None:
-        return said, None, False
-    return words, when, heard
-
-
-def _without_the_time(said: str) -> tuple[str, float | None]:
+def _without_when_said(said: str) -> tuple[str, float | None]:
     words, marked, stamp = said.rpartition(SAID_AT)
     try:
         said_at_epoch_seconds = float(stamp) if marked else None
@@ -164,9 +156,10 @@ class FunTimeBridge(QObject):
         keyword, marker, argument = _split_argument(line)
         said_at, heard = None, False
         if marker == ":":
-            argument, said_at, heard = _without_when_said(argument)
+            argument, said_at = _without_when_said(argument)
         elif not marker:
-            keyword, said_at, heard = _without_when_said(keyword)
+            heard = keyword.endswith(HEARD)
+            keyword, said_at = _without_when_said(keyword.removesuffix(HEARD))
         with answering_what_he_said() if heard else nullcontext():
             self._answer(line, keyword.upper(), marker, argument, said_at)
 

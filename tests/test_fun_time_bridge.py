@@ -282,6 +282,17 @@ def test_a_line_fun_time_says_he_said_aloud_is_answered_with_the_microphone(
     assert show.done == [("media", HEARD_MARK)]
 
 
+def test_a_line_fun_time_says_he_said_aloud_with_no_time_is_answered_with_the_microphone(
+        qtbot, tmp_path, monkeypatch):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    show = _AnsweringShow()
+    monkeypatch.setattr(view, "region_slideshow", lambda shape: show)
+
+    _press(bridge, tmp_path, f"portrait_media_videos{contract.declaration()['heard_suffix']}")
+
+    assert show.done == [("media", HEARD_MARK)]
+
+
 def test_a_line_pressed_with_its_time_is_answered_without_the_microphone(
         qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
@@ -300,7 +311,7 @@ def test_the_word_heard_said_as_part_of_a_request_stays_in_the_request(
     monkeypatch.setattr(view, "run_spoken_command",
                         lambda text, said_at: spoken.append(text))
 
-    _press(bridge, tmp_path, "PORTRAIT_SAY:the words he heard")
+    _press(bridge, tmp_path, "PORTRAIT_SAY:the words he heard @100.000")
 
     assert spoken == ["portrait the words he heard"]
 
@@ -960,7 +971,7 @@ def _said_aloud(template: str, tmp_path) -> str:
 
 def _heard(template: str, tmp_path) -> str:
     heard = contract.declaration()["heard_suffix"]
-    return _said_aloud(template, tmp_path) + ("" if "|" in template else heard)
+    return _said_aloud(template, tmp_path) + ("" if "|" in template or ":" in template else heard)
 
 
 def test_a_host_matches_each_line_fun_time_says_he_said_aloud_by_its_published_pattern(

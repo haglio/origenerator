@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 from typing import NamedTuple
 
@@ -612,7 +612,8 @@ class GalleryPane(QObject):
         return tile
 
     def _tile_items(self, rows=None, requests=None) -> list[InFlightItem]:
-        return [item for item in self.inflight_items(rows, requests)
+        return [replace(item, caption=self._host.item_name(item.key) or item.caption)
+                for item in self.inflight_items(rows, requests)
                 if item.job_kind != gallery.JobKind.ENHANCE and not item.going_to_trash]
 
     def _latest_inflight_items(self, rows=None, requests=None) -> list[InFlightItem]:
@@ -660,6 +661,9 @@ class GalleryPane(QObject):
 
     def _inflight_context_menu(self, key: str, global_pos):
         item = self._inflight_by_key.get(key)
+        if item is not None and item.is_an_item:
+            self.menu_requested.emit([key], global_pos)
+            return
         if item is None or item.cancel is None:
             return
         menu = QMenu(self._scroll)

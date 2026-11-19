@@ -35,6 +35,33 @@ def test_each_item_is_named_by_its_folder_and_the_order_it_was_made_in_there(db)
         f"{_code(first)} 000", f"{_code(first)} 001", f"{_code(elsewhere)} 000"]
 
 
+def test_an_item_still_being_made_already_wears_the_name_it_keeps(db):
+    finished = _image("gen-one", 1)
+    on_its_way = _image("gen-two", 2, status="running", output_files=None)
+    names = ItemNames(db)
+
+    names.take([on_its_way, finished], [], {})
+    assert names.of("gen-two") == f"{_code(finished)} 001", (
+        "a tile being generated shows the item's name, like any other tile (his ruling, 2026-11-19)")
+
+    names.take([{**on_its_way, "status": "completed",
+                 "output_files": finished["output_files"].replace("gen-one", "gen-two")},
+                finished], [], {})
+    assert names.of("gen-two") == f"{_code(finished)} 001"
+
+
+def test_a_run_canceled_before_it_finished_leaves_its_number_to_the_next_item(db):
+    finished = _image("gen-one", 1)
+    canceled = _image("gen-two", 2, status="pending", output_files=None)
+    names = ItemNames(db)
+    names.take([canceled, finished], [], {})
+
+    names.take([_image("gen-three", 3), finished], [], {})
+
+    assert names.of("gen-three") == f"{_code(finished)} 001", (
+        "a seed Populate throws away is no item, so it leaves no gap in the count")
+
+
 def test_items_brought_in_after_they_were_made_are_numbered_by_when_they_were_made(db):
     made_last = _image("gen-one", 1, created_at="2025-06-01 00:00:00")
     made_first = _image("gen-two", 2, created_at="2025-01-01 00:00:00")
@@ -86,11 +113,10 @@ def test_read_straight_from_the_database_the_trash_keeps_its_place_too(db):
 
 
 @pytest.mark.parametrize("not_an_item", [
-    {"status": "pending", "output_files": None},
     {"status": "error", "output_files": None},
     {"source": "base_render"},
-], ids=["still being made", "failed", "a base render repairing an image"])
-def test_only_a_finished_item_takes_a_number(db, not_an_item):
+], ids=["failed", "a base render repairing an image"])
+def test_neither_a_failed_run_nor_a_repair_takes_a_number(db, not_an_item):
     other, item = _image("gen-one", 1, **not_an_item), _image("gen-two", 2)
     names = ItemNames(db)
 

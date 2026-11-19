@@ -245,6 +245,15 @@ def _generate_with_random_seeds_text(rows: list[dict]) -> str:
         return "Generate with random seed"
     return f"Generate {gallery.counted(rows)} with random seeds"
 
+def _an_image_on_its_way(row: dict) -> bool:
+    return gallery.is_in_progress(row) and gallery.media_type_of_row(row) == MediaType.IMAGE
+
+
+def _enhance_of_a_run(job, row: dict) -> str | None:
+    if job.workflow.output_type != MediaType.IMAGE:
+        return None
+    return icons.ENHANCE_QUEUED if row.get("enhance_requested_at") else icons.ENHANCE_OPEN
+
 
 class GalleryView(QWidget):
     run_ended = Signal(object)
@@ -1288,10 +1297,10 @@ class GalleryView(QWidget):
     def _generating_tile_for(self, key: str, job) -> GeneratingTile:
         row = self._db.get_generation(job.prompt_id) or {}
         tile = GeneratingTile(job,
-                              title=gallery.generate_tab_title(job.workflow.name, job.params),
+                              name=self._item_names.of(job.prompt_id),
                               favorite=bool(row.get("starred")),
-                              enhance=(icons.ENHANCE_OPEN
-                                       if job.workflow.output_type == MediaType.IMAGE else None),
+                              enhance=_enhance_of_a_run(job, row),
+                              kind=job.workflow.output_type,
                               populating=self._populate.is_active(key),
                               typical_seconds=timing.typical_run_seconds(self._db, job),
                               made_from=self._job_made_from(
@@ -1300,26 +1309,10 @@ class GalleryView(QWidget):
         tile.cancel_requested.connect(lambda: self._cancel_reroll(key))
         tile.control_triggered.connect(
             lambda action: self.run_item_action(job.prompt_id, action))
-        tile.context_requested.connect(lambda pos: self._generating_tile_menu(key, pos))
+        tile.context_requested.connect(lambda pos: self.generation_menu([job.prompt_id], pos))
         tile.selected.connect(lambda: self._select_reroll(key))
         self._generating_tile = tile
         return tile
-
-    def _generating_tile_menu(self, key: str, global_pos):
-        menu = QMenu(self)
-        populate = self._populate.is_active(key)
-        discard = menu.addAction(CANCEL_TEXT)
-        discard.setToolTip(cancel_tooltip(populate))
-        stop = None
-        if populate:
-            stop = menu.addAction(stop_populate_text())
-            stop.setToolTip(stop_populate_tooltip())
-        chosen = menu.exec(global_pos)
-        if chosen is discard:
-            self._cancel_reroll(key)
-        elif stop is not None and chosen is stop:
-            self._populate.stop(key)
-            self._cancel_reroll(key)
 
     def _can_modify_batch(self, group) -> bool:
         return self._can_reroll(group) and bool(self._modify_batch_rows(group))
@@ -1932,6 +1925,9 @@ class GalleryView(QWidget):
 
     def _rerender_current_leaf(self):
         group = self.current_group()
+        if isinstance(group, gallery.SettingsGroup) and self.library.moved_to(*self.library.read()):
+            self.refresh()
+            return
         if isinstance(group, gallery.SettingsGroup):
             place = self._gallery_pane.place()
             self._gallery_pane.show_thumbnails(group)
@@ -1968,59 +1964,90 @@ class GalleryView(QWidget):
                 if (row := self._db.get_generation(pid)) is not None]
         if not rows:
             return
-        count = len(rows)
-        suffix = " " + gallery.counted(rows)
         menu = QMenu(self)
-        folder_action = None
-        if count == 1 and self._can_open_containing_folder(rows[0]):
-            folder_action = menu.addAction("Go to folder")
-        to_generate = self._made_again_from_here(rows)
-        generate_action = (menu.addAction(_generate_with_random_seeds_text(to_generate))
-                           if to_generate else None)
-        offer_copy_names_above_a_line(
-            menu, [self._item_names.of(row["prompt_id"]) for row in rows])
+        choices = {}
+
+        def offer(label, carry_out, *, enabled=True, tip=None):
+            action = menu.addAction(label)
+            action.setEnabled(enabled)
+            if tip:
+                action.setToolTip(tip)
+                menu.setToolTipsVisible(True)
+            choices[action] = carry_out
+
+        ids = [row["prompt_id"] for row in rows]
+        suffix = " " + gallery.counted(rows)
+        if len(rows) == 1 and self._can_open_containing_folder(rows[0]):
+            offer("Go to folder", lambda: self.follow_link(ids[0]))
+        if to_generate := self._made_again_from_here(rows):
+            offer(_generate_with_random_seeds_text(to_generate),
+                  lambda: self._generate_with_random_seeds(to_generate))
+        offer_copy_names_above_a_line(menu, [self._item_names.of(pid) for pid in ids])
         all_favorites = all(row.get("starred") for row in rows)
-        favorite_action = menu.addAction(("Unfavorite" if all_favorites else "Favorite") + suffix)
+        offer(("Unfavorite" if all_favorites else "Favorite") + suffix,
+              lambda: self.set_items_favorite(ids, not all_favorites))
+        self._offer_out_of_the_open_folder(offer, ids)
+        self._offer_to_enhance(offer, rows)
+        self._offer_to_cancel_runs(offer, [row for row in rows if gallery.is_in_progress(row)])
+        offer("Delete" + suffix, lambda: self._delete_or_ask_when_finished(rows))
+        chosen = menu.exec(global_pos)
+        if chosen in choices:
+            choices[chosen]()
+
+    def _offer_out_of_the_open_folder(self, offer, ids: list[str]) -> None:
         open_custom = saved_custom_collection(self.current_group())
         held = {row["prompt_id"] for row in open_custom.rows} if open_custom else set()
-        held_here = [row["prompt_id"] for row in rows if row["prompt_id"] in held]
-        remove_action = (menu.addAction(f"Remove from “{open_custom.label}”")
-                         if held_here else None)
-        enhanceable = [row for row in rows if gallery.is_enhanceable_row(row)]
-        to_enhance = [row["prompt_id"] for row in enhanceable if self.enhance.would_enhance(row)]
-        enhance_action = None
+        held_here = [pid for pid in ids if pid in held]
+        if held_here:
+            offer(f"Remove from “{open_custom.label}”",
+                  lambda: self.toc_editing.remove_from_collection(open_custom, items=held_here))
+
+    def _offer_to_enhance(self, offer, rows: list[dict]) -> None:
+        enhanceable = [row for row in rows if gallery.is_enhanceable_row(row)
+                       or _an_image_on_its_way(row)]
+        to_enhance = [row["prompt_id"] for row in enhanceable
+                      if (not row.get("enhance_requested_at") if gallery.is_in_progress(row)
+                          else self.enhance.would_enhance(row))]
         if enhanceable:
             n = len(to_enhance) or len(enhanceable)
-            enhance_action = menu.addAction(
-                f"Enhance {n} image{'s' if n != 1 else ''}"
-            )
-            if not to_enhance:
-                enhance_action.setEnabled(False)
-                enhance_action.setToolTip(ALREADY_AT_THESE_SETTINGS)
-                menu.setToolTipsVisible(True)
-        in_flight = self.enhance.jobs_targeting(rows)
-        cancel_action = None
-        if in_flight:
+            offer(f"Enhance {n} image{'s' if n != 1 else ''}",
+                  lambda: [self.run_item_action(pid, corner_buttons.ENHANCE) for pid in to_enhance],
+                  enabled=bool(to_enhance),
+                  tip=None if to_enhance else ALREADY_AT_THESE_SETTINGS)
+        if in_flight := self.enhance.jobs_targeting(rows):
             n = len(in_flight)
-            cancel_action = menu.addAction(
-                f"Cancel {n} enhancement{'s' if n != 1 else ''}"
-            )
-        delete_action = menu.addAction("Delete" + suffix)
-        chosen = menu.exec(global_pos)
-        if folder_action is not None and chosen is folder_action:
-            self.follow_link(rows[0]["prompt_id"])
-        elif generate_action is not None and chosen is generate_action:
-            self._generate_with_random_seeds(to_generate)
-        elif chosen is favorite_action:
-            self.set_items_favorite([row["prompt_id"] for row in rows], not all_favorites)
-        elif remove_action is not None and chosen is remove_action:
-            self.toc_editing.remove_from_collection(open_custom, items=held_here)
-        elif enhance_action is not None and chosen is enhance_action:
-            self.enhance.enhance_items(to_enhance)
-        elif cancel_action is not None and chosen is cancel_action:
-            self.enhance.cancel_for(rows)
-        elif chosen is delete_action:
-            self._delete_rows(rows)
+            offer(f"Cancel {n} enhancement{'s' if n != 1 else ''}",
+                  lambda: self.enhance.cancel_for(rows))
+
+    def _delete_or_ask_when_finished(self, rows: list[dict]) -> None:
+        for row in rows:
+            if gallery.is_in_progress(row):
+                self._ask_when_finished(row["prompt_id"], corner_buttons.TRASH)
+        self._delete_rows([row for row in rows if not gallery.is_in_progress(row)])
+
+    def _populating_folders_of(self, rows: list[dict]) -> set[str]:
+        keys = {self._job_folder_key(self._jobs.job_for_prompt(row["prompt_id"])) for row in rows}
+        return {key for key in keys if key is not None and self._populate.is_active(key)}
+
+    def _offer_to_cancel_runs(self, offer, on_their_way: list[dict]) -> None:
+        ids = [row["prompt_id"] for row in on_their_way
+               if self._jobs.job_for_prompt(row["prompt_id"]) is not None]
+        if not ids:
+            return
+        populating = self._populating_folders_of(on_their_way)
+
+        def cancel():
+            for pid in ids:
+                self._cancel_job(pid)
+
+        def stop_and_cancel():
+            for key in populating:
+                self._populate.stop(key)
+            cancel()
+
+        offer(CANCEL_TEXT, cancel, tip=cancel_tooltip(bool(populating)))
+        if populating:
+            offer(stop_populate_text(), stop_and_cancel, tip=stop_populate_tooltip())
 
     def _can_open_containing_folder(self, row: dict) -> bool:
         if row.get("deleted_at") is not None:
@@ -2050,6 +2077,11 @@ class GalleryView(QWidget):
         self._db.ask_when_finished(prompt_id, wish)
         if wish == TRASH_WHEN_FINISHED:
             self.refresh()
+            return
+        tile = self._generating_tile
+        if tile is not None and tile.prompt_id == prompt_id:
+            tile.set_enhance(icons.ENHANCE_QUEUED)
+        self._gallery_pane.refresh_inflight()
 
     def carry_out_when_finished(self):
         for prompt_id, wish in self._db.asked_when_finished():
@@ -2066,6 +2098,8 @@ class GalleryView(QWidget):
         for pid in prompt_ids:
             self._db.set_generation_favorite(pid, favorite)
         ids = set(prompt_ids)
+        if self._generating_tile is not None and self._generating_tile.prompt_id in ids:
+            self._generating_tile.set_favorite(favorite)
         for row in self.library.reading.rows:
             if row["prompt_id"] in ids:
                 row["starred"] = 1 if favorite else 0

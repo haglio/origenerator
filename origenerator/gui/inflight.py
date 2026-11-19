@@ -46,6 +46,7 @@ class InFlightItem:
     favorite: bool = False
     enhanceable: bool = False
     going_to_trash: bool = False
+    enhance_queued: bool = False
 
     @property
     def is_an_item(self) -> bool:

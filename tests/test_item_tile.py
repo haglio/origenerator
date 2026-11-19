@@ -564,6 +564,17 @@ def test_an_enhancing_tiles_bar_leaves_its_lower_corners_clear(qtbot):
     assert bar.intersected(plus.geometry()).isEmpty()
 
 
+def test_an_image_whose_enhancement_waits_in_the_queue_blinks_its_plus(qtbot):
+    tw = ItemTile("p1", None, "label", TileAppearance(enhance=icons.ENHANCE_OPEN))
+    qtbot.addWidget(tw)
+
+    tw.set_enhancing(_run(status="queued"))
+    assert tw._controls._blink.isActive()
+
+    tw.set_enhancing(_run())
+    assert not tw._controls._blink.isActive(), "once the enhancement runs, the bar says so"
+
+
 def test_an_enhancing_tiles_corners_are_drawn_over_its_scrim(qtbot):
     tw = ItemTile("p1", None, "label", TileAppearance(enhance=icons.ENHANCE_OPEN,
                          enhancing=_run()))

@@ -141,6 +141,7 @@ class InFlightItems:
                 favorite=bool(row.get("starred")),
                 enhanceable=kind == gallery.JobKind.IMAGE,
                 going_to_trash=bool(row.get("trash_requested_at")),
+                enhance_queued=bool(row.get("enhance_requested_at")),
             ))
             if row.get("status") == GenerationStatus.RUNNING:
                 sent.add(pid)

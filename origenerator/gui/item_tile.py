@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 from shared_ui.palette import BLUE, as_rgba
 from shared_ui.spacing import BUTTON_RADIUS
 
-from origenerator.gui import palette, tile_shape
+from origenerator.gui import icons, palette, tile_shape
 from origenerator.gui.corner_buttons import (
     CORNER_GAP,
     CORNER_INSET,
@@ -235,11 +235,14 @@ class ItemTile(QWidget):
         self._sync_controls()
 
     def _sync_controls(self):
-        self._controls.show_for(favorite=self._favorite, enhance=self._enhance,
+        waiting = self._enhancing is not None and not self._enhancing.rendering
+        self._controls.show_for(favorite=self._favorite,
+                                enhance=icons.ENHANCE_QUEUED if waiting else self._enhance,
                                 kind=self._media_type)
 
     def set_enhancing(self, run: RunReading | None):
         self._enhancing = run
+        self._sync_controls()
         if run is None and self._resting_pixmap is not None:
             self._image_label.setPixmap(self._resting_pixmap)
             self._resting_pixmap = None

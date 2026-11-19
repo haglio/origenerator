@@ -209,6 +209,7 @@ def media_type_icon(media_type: str) -> QIcon:
 ENHANCE_OPEN = "open"
 ENHANCE_HELD = "held"
 ENHANCE_MORE = "more"
+ENHANCE_QUEUED = "queued"
 
 _CORNER_REST = TEXT_MUTED
 _CORNER_ARMED = TEXT_SECONDARY
@@ -244,6 +245,8 @@ def corner_restore_icon(*, can_restore: bool, armed: bool) -> QIcon:
 
 @cache
 def corner_enhance_icon(state: str, *, armed: bool) -> QIcon:
+    if state == ENHANCE_QUEUED:
+        state = ENHANCE_OPEN
     if state == ENHANCE_HELD:
         return _corner_icon("plus", YELLOW, armed=False)
     ink = _CORNER_ARMED if armed else _CORNER_REST

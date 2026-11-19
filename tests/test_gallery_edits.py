@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 import pytest
@@ -13,8 +12,6 @@ from origenerator.gallery_edits import GalleryEdits, GalleryEnvironment
 from origenerator.output_places import OutputPlaces
 from origenerator.trash import Genau, KeptBesideItsTrash, Kino, Trash
 from origenerator.workflows.non_ai import non_ai_workflow
-
-_YEARS_FROM_NOW = (4_000_000_000, 4_000_000_000)
 
 
 def _completed_row(db, output_dir, pid, file, *, thumb_dir=None):
@@ -968,48 +965,6 @@ def test_restoring_a_video_this_app_made_puts_its_upscale_back_in_kino(tmp_path)
     actions.restore_deleted(["v1"])
 
     assert upscale.read_bytes() == b"upscale"
-
-
-def _own_video_waiting_for_evolver(tmp_path):
-    db = Database(tmp_path / "test.db")
-    kino = Kino(library=tmp_path / "upscaled", trash=tmp_path / "kino trash",
-                own_source="origenerator", originals=tmp_path / "sorted")
-    output_dir = tmp_path / "output"
-    actions = GalleryEdits(db, OutputPlaces.in_one_folder(output_dir),
-                           Trash(tmp_path / "trash"), environment=GalleryEnvironment(kino=kino))
-    _completed_row(db, output_dir, "v1", "wan22_i2v_00007_.mp4")
-    original = kino.originals / "origenerator" / "portrait" / "wan22_i2v_00007_.mp4"
-    original.parent.mkdir(parents=True)
-    original.write_bytes(b"sent to kino")
-    return actions, db, original, kino.trash
-
-
-def test_sending_a_video_to_trash_takes_the_copy_evolver_has_yet_to_enhance_out_too(tmp_path):
-    actions, db, original, kino_trash = _own_video_waiting_for_evolver(tmp_path)
-
-    actions.delete_rows([db.get_generation("v1")])
-
-    assert not original.exists(), (
-        "left there, Evolver enhances it and Kino plays a video whose item is in Trash")
-    assert (kino_trash / original.name).read_bytes() == b"sent to kino"
-
-
-def test_restoring_a_video_puts_the_copy_evolver_has_yet_to_enhance_back(tmp_path):
-    actions, db, original, _kino_trash = _own_video_waiting_for_evolver(tmp_path)
-    actions.delete_rows([db.get_generation("v1")])
-
-    actions.restore_deleted(["v1"])
-
-    assert original.read_bytes() == b"sent to kino"
-
-
-def test_a_later_video_that_took_a_deleted_ones_name_keeps_its_copy_with_evolver(tmp_path):
-    actions, db, original, _kino_trash = _own_video_waiting_for_evolver(tmp_path)
-    os.utime(tmp_path / "output" / original.name, _YEARS_FROM_NOW)
-
-    actions.delete_rows([db.get_generation("v1")])
-
-    assert original.exists()
 
 
 def test_a_kino_copy_sent_to_trash_sends_its_whole_gallery_entry_there(tmp_path):

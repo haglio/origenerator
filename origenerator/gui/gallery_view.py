@@ -35,7 +35,6 @@ from origenerator.branch_session import is_branch_session
 from origenerator.comfyui_api import format_execution_error
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
-    EVOLVER_ORIGINALS_DIR,
     EVOLVER_SOURCE,
     GENAU_DIR,
     KINO_TRASH_DIR,
@@ -276,8 +275,7 @@ class GalleryView(QWidget):
             environment=GalleryEnvironment(
                 release_files=self._release_held_media, thumb_dir=THUMB_DIR,
                 cancel_enhancements=self._enhance.cancel_for_delete,
-                kino=Kino(KINO_UPSCALES_DIR, KINO_TRASH_DIR, EVOLVER_SOURCE, non_ai=NON_AI_DIR,
-                          originals=EVOLVER_ORIGINALS_DIR),
+                kino=Kino(KINO_UPSCALES_DIR, KINO_TRASH_DIR, EVOLVER_SOURCE, non_ai=NON_AI_DIR),
                 genau=Genau.in_folder(GENAU_DIR),
                 vr=KeptBesideItsTrash(VR_DIR) if VR_DIR is not None else None,
                 bring_in=partial(outside_videos.bring_in_one, db),

@@ -188,12 +188,7 @@ class GalleryEdits:
             return []
         return [(kino, video) for video in dict.fromkeys(filter(kino.plays, [
             *map(Path, library_paths_in(row.get("output_files"))),
-            *self._upscale_in_kino(row, upscales), *self._waiting_for_evolver(row),
-            *pressed_now]))]
-
-    def _waiting_for_evolver(self, row: dict) -> list[Path]:
-        waiting = (self._environment.kino.original_waiting_for(file) for file in output_disk_files(row, self._places))
-        return [original for original in waiting if original is not None]
+            *self._upscale_in_kino(row, upscales), *pressed_now]))]
 
     def _upscale_in_kino(self, row: dict, upscales) -> list[Path]:
         preview = resolve_preview(row, self._places)

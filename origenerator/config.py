@@ -102,7 +102,6 @@ EVOLVER_AI_DIR = LIBRARY_VIDEOS_DIR / "2D" / "AI"
 NON_AI_DIR = LIBRARY_VIDEOS_DIR / "2D" / "non_AI"
 VIDEO_RECORDS_DIR = LIBRARY_VIDEOS_DIR.parent / "metadata"
 EVOLVER_INBOX_DIR = EVOLVER_AI_DIR / "0_inbox"
-EVOLVER_ORIGINALS_DIR = EVOLVER_AI_DIR / "1_sorted"
 EVOLVER_SOURCE = "origenerator"
 KINO_DIR = kino_folder.kino_dir()
 KINO_UPSCALES_DIR = kino_folder.upscales_in(KINO_DIR)

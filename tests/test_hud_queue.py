@@ -695,8 +695,9 @@ def test_nothing_the_job_queue_draws_lets_the_slideshow_show_through_the_hud(tmp
     section = queue_section([_item("j1", status="running", progress=(3, 10),
                                    pass_progress=(1, 4)),
                              _item("j2", folder_thumbnails=[not_yet_made] * 4)], 0)
-    hud = Hud(440, section.size()[1] + 20)
-    section.paint(hud.image, 10, 10, 400, None)
+    painted = JobQueueFile(tmp_path / "portrait_hud.json", "portrait").of(section)
+    hud = Hud(painted.width + 40, painted.height + 20)
+    painted.paint(hud.image, 10, 10, painted.width, None)
 
     inside = np.asarray(hud.image)[2:-2, 2:-2, 3]
     assert inside.min() >= HUD_ALPHA, (

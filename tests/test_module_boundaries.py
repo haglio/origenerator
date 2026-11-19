@@ -149,13 +149,14 @@ def test_the_voice_router_routes_and_leaves_the_doing_to_its_host():
         "stay with the seams that run them")
 
 
-def test_only_the_slideshows_fill_the_screen():
+def test_no_window_of_this_apps_fills_the_screen():
     package = REPO_ROOT / "origenerator"
     filling_the_screen = {path.relative_to(package).as_posix() for path in package.rglob("*.py")
                           if "showFullScreen" in path.read_text(encoding="utf-8")}
 
-    assert filling_the_screen == {"gui/slideshow_director.py"}, (
-        "the full-screen slideshow window is the one way this app fills the screen with an item")
+    assert filling_the_screen == set(), (
+        "what fills a screen with an item is a slideshow's Funestra, a program of its own, "
+        "which this app places on a monitor; no window of this app's does")
 
 
 OPENS_WINDOWS = {"action_setter_tool.py", "app.py", "default_animation_settings.py", "downtime.py",

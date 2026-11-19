@@ -51,6 +51,7 @@ from origenerator.gui.slideshow_set import (
 from origenerator.gui.slideshow_wiring import SlideshowActions
 from origenerator.library_views import Version
 from origenerator.media import MediaType
+from origenerator.one_look import looking_once
 from origenerator.osr2_driver import drive_target_for
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
 
@@ -151,6 +152,7 @@ class FunestraSlideshow(QObject):
         self._hand_over(land=True)
         self._publish()
 
+    @looking_once
     def _hand_over(self, *, land: bool = False) -> None:
         current = self._set.playlist.current()
         rotated = rotated_onto(self._set.playlist.in_play_order(), current)

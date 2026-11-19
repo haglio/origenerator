@@ -433,6 +433,16 @@ class JobQueue(QObject):
 
     def flush_to_server(self) -> int:
         self.close()
+        self._settle_the_filings()
+        handed = self._hand_comfyui_the_line()
+        self._settle_the_filings()
+        return handed
+
+    def _settle_the_filings(self) -> None:
+        for job in self.all_jobs:
+            job.settle()
+
+    def _hand_comfyui_the_line(self) -> int:
         handed = 0
         for job in list(self._waiting):
             if queue_line.waits_for_any(job, self.all_jobs):

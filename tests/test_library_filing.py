@@ -3,6 +3,7 @@ import os
 from dataclasses import replace
 from pathlib import Path
 
+from origenerator import library_filing
 from origenerator.library_filing import (
     file_into_library,
     file_what_comfyui_left,
@@ -366,3 +367,27 @@ def test_a_number_once_given_is_never_given_again_after_every_copy_of_it_is_gone
 
     assert (first[0]["filename"], again[0]["filename"]) == (
         "beta_i2v_00001_.mp4", "beta_i2v_00002_.mp4")
+
+
+def test_two_runs_finishing_together_are_numbered_into_the_library_one_after_the_other(
+        tmp_path, monkeypatch):
+    places = _places(tmp_path)
+    for run in ("run-one", "run-two"):
+        _saved_by_comfyui(places, run, "image", "alpha_t2i_00001_.png")
+    file_one_place = library_filing._file_into_its_home
+    others_could_file = []
+
+    def filing_while_watching(*args):
+        held = library_filing.filing_one_at_a_time.acquire(blocking=False)
+        if held:
+            library_filing.filing_one_at_a_time.release()
+        others_could_file.append(held)
+        return file_one_place(*args)
+
+    monkeypatch.setattr(library_filing, "_file_into_its_home", filing_while_watching)
+    filed = [file_into_library([_listed(run, "image", "alpha_t2i_00001_.png")], places, run)
+             for run in ("run-one", "run-two")]
+
+    assert others_could_file == [False, False]
+    assert sorted(entry["filename"] for files in filed for entry in files) == [
+        "alpha_t2i_00001_.png", "alpha_t2i_00002_.png"]

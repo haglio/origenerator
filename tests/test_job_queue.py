@@ -19,6 +19,7 @@ from origenerator import config, gallery
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
 from origenerator.generation_state import GenerationSource
+from origenerator.gui import generation_job as generation_job_module
 from origenerator.gui import job_queue as job_queue_module
 from origenerator.gui.job_queue import COMFYUI_DID_NOT_START, JobQueue, _parse_progress_state
 from origenerator.media import MediaType
@@ -26,6 +27,7 @@ from origenerator.queue_line import VIDEOS_WAIT_AFTER_AN_IMAGE_S
 from origenerator.run_toast import RunOutcome
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.comfyui_folders import SUITE_FOLDERS
+from tests.never_answered import NeverAnswered
 from tests.story_voices import voices_asked_for
 
 _I2V = WORKFLOW_REGISTRY["wan22_i2v"]
@@ -2433,3 +2435,24 @@ def test_a_queue_let_go_of_with_a_job_in_flight_is_freed_with_the_job(qtbot, tmp
     assert job() is None, (
         "a job's own signals hold what is connected to them where the cycle collector cannot "
         "see, so a handler holding the job or its queue keeps both for the rest of the session")
+
+
+def test_a_job_still_being_filed_as_the_app_closes_is_recorded_once_by_the_flush(
+        qtbot, tmp_path, monkeypatch):
+    run = NeverAnswered()
+    monkeypatch.setattr(generation_job_module, "run_off_thread", run)
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    finished = []
+    queue.finished.connect(lambda *told: finished.append(told))
+    image = _launch_image(queue, "k1", seed=1)
+    client.job_completed.emit(image.prompt_id, {"outputs": {image.workflow.output_node_id: {
+        "images": [{"filename": "made_up_00001_.png", "subfolder": "", "type": "output"}]}}})
+    queue.close()
+
+    queue.flush_to_server()
+
+    assert db.get_generation(image.prompt_id)["status"] == "completed"
+    run.answer_late()
+    assert len(finished) == 1

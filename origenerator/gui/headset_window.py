@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import shiboken6
 from app_support.frame_channel import FrameLooks, FrameWriter
 from funestra.file_channel import consume_command_file
-from PySide6.QtCore import QObject, QPoint, QPointF, Qt, QTimer
+from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, Qt, QTimer
 from PySide6.QtGui import QContextMenuEvent, QImage, QMouseEvent, QPainter, QWheelEvent
 from PySide6.QtWidgets import QApplication, QWidget
 
@@ -107,6 +107,36 @@ def within_the_cap(image: QImage) -> QImage:
         QImage.Format.Format_RGBA8888)
 
 
+_A_CHANGE_TO_HOW_IT_LOOKS = frozenset({
+    QEvent.Type.UpdateRequest, QEvent.Type.Resize, QEvent.Type.Show, QEvent.Type.Hide})
+
+
+class Repaints(QObject):
+    def __init__(self, window: QWidget, parent: QObject) -> None:
+        super().__init__(parent)
+        self.since_looked = True
+        self._over: list[QWidget] = []
+        window.installEventFilter(self)
+
+    def eventFilter(self, _watched: QObject, event: QEvent) -> bool:
+        if event.type() in _A_CHANGE_TO_HOW_IT_LOOKS:
+            self.since_looked = True
+        return False
+
+    def watch(self, opened: list[QWidget]) -> None:
+        if len(opened) == len(self._over) and all(
+                now is was for now, was in zip(opened, self._over, strict=True)):
+            return
+        for top in opened:
+            if not any(top is watched for watched in self._over):
+                top.installEventFilter(self)
+        self._over = opened
+        self.since_looked = True
+
+    def looked(self) -> None:
+        self.since_looked = False
+
+
 class HeadsetWindow(QObject):
     def __init__(self, window: QWidget, session: FunTimeSession, parent=None) -> None:
         super().__init__(parent)
@@ -118,6 +148,7 @@ class HeadsetWindow(QObject):
         self._windows_pointed_into: list[QWidget] = []
         self._published: tuple[int, int] | None = None
         self._looks = FrameLooks()
+        self._repaints = Repaints(window, self)
         self._taken = 0
         self._threw = False
         self._said_at: float | None = None
@@ -252,6 +283,9 @@ class HeadsetWindow(QObject):
     def publish(self, now: float | None = None) -> None:
         if not self._window.isVisible():
             return
+        self._repaints.watch(opened_over(self._window))
+        if not self._repaints.since_looked:
+            return
         now = time.monotonic() if now is None else now
         if not self._looks.due(now):
             return
@@ -259,6 +293,7 @@ class HeadsetWindow(QObject):
         grabbed = self._window.grab().toImage().convertToFormat(QImage.Format.Format_RGBA8888)
         image = within_the_cap(painted_over(grabbed, windows_opened_over(
             self._window, scale=pixels_per_coordinate(grabbed, self._window))))
+        self._repaints.looked()
         pixels = bytes(image.constBits())
         if not self._looks.worth_sending(pixels):
             return

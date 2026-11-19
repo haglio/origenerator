@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 
 import shiboken6
 from app_support.frame_channel import LOOK_AGAIN_AFTER_S
+from app_support.threading_utils import wait_until
 from PySide6.QtCore import QEvent, QPoint, Qt
 from PySide6.QtGui import QColor, QImage
 from PySide6.QtMultimedia import QVideoFrame
@@ -114,6 +115,18 @@ class TestHowBigAPublishedFrameMayBe:
         assert within.width() == CAP_PX
         assert within.height() == CAP_PX // 2
         assert within.format() == QImage.Format.Format_RGBA8888
+
+
+def _counting_grabs(window) -> list[int]:
+    grabbed: list[int] = []
+    grab = window.grab
+
+    def counted(*args, **kwargs):
+        grabbed.append(1)
+        return grab(*args, **kwargs)
+
+    window.grab = counted
+    return grabbed
 
 
 def _presses_on(label: QLabel) -> list[str]:
@@ -282,24 +295,13 @@ class TestTheRoomsPressesReachTheWindow:
         assert again == first, "the same frame was published twice"
 
 
-    def _counting_grabs(self, window) -> list[int]:
-        grabbed: list[int] = []
-        grab = window.grab
-
-        def counted(*args, **kwargs):
-            grabbed.append(1)
-            return grab(*args, **kwargs)
-
-        window.grab = counted
-        return grabbed
-
     def test_a_hover_alone_does_not_grab_the_window_again(self, tmp_path, qtbot):
         window = self._window(qtbot)
         window.show()
         headset = HeadsetWindow(window, _hosted(tmp_path))
         try:
             headset.publish(now=1.0)
-            grabbed = self._counting_grabs(window)
+            grabbed = _counting_grabs(window)
 
             headset._heard("hover 30 40")
             headset.publish(now=1.0 + LOOK_AGAIN_AFTER_S / 2)
@@ -313,20 +315,62 @@ class TestTheRoomsPressesReachTheWindow:
         finally:
             headset.close()
 
-    def test_a_press_has_it_looked_at_once(self, tmp_path, qtbot):
+    def test_a_press_that_changes_the_window_has_it_looked_at_without_waiting(
+            self, tmp_path, qtbot):
         window = self._window(qtbot)
         window.show()
+        label = window.findChild(QLabel, "target")
+        label.mousePressEvent = lambda event: label.setText("pressed")
         headset = HeadsetWindow(window, _hosted(tmp_path))
         try:
             headset.publish(now=1.0)
-            grabbed = self._counting_grabs(window)
+            grabbed = _counting_grabs(window)
 
             headset._heard("press 30 40")
+            QApplication.processEvents()
             headset.publish(now=1.0 + LOOK_AGAIN_AFTER_S / 2)
 
             assert grabbed == [1], (
                 "what a press does to the window is what the room is waiting to see, so that "
                 "one is worth the grab it costs")
+        finally:
+            headset.close()
+
+    def test_a_window_nothing_has_changed_on_is_never_grabbed_again(self, tmp_path, qtbot):
+        window = self._window(qtbot)
+        window.show()
+        QApplication.processEvents()
+        headset = HeadsetWindow(window, _hosted(tmp_path))
+        try:
+            headset.publish(now=1.0)
+            grabbed = _counting_grabs(window)
+
+            headset._heard("press 30 40")
+            headset._heard("release")
+            for tick in range(1, 6):
+                QApplication.processEvents()
+                headset.publish(now=1.0 + tick * LOOK_AGAIN_AFTER_S)
+
+            assert grabbed == [], (
+                "a grab draws every widget of the window again, so a window that looks as it "
+                "did is never grabbed, however often the timer comes round")
+        finally:
+            headset.close()
+
+    def test_a_change_on_the_window_is_grabbed_once(self, tmp_path, qtbot):
+        window = self._window(qtbot)
+        window.show()
+        headset = HeadsetWindow(window, _hosted(tmp_path))
+        try:
+            headset.publish(now=1.0)
+            grabbed = _counting_grabs(window)
+
+            window.findChild(QLabel, "target").setText("changed")
+            for tick in range(1, 6):
+                QApplication.processEvents()
+                headset.publish(now=1.0 + tick * LOOK_AGAIN_AFTER_S)
+
+            assert grabbed == [1]
         finally:
             headset.close()
 
@@ -378,6 +422,30 @@ class TestWhatOpensOverTheWindow:
         assert (patch.width, patch.height) == (
             round(menu.width() * 0.5), round(menu.height() * 0.5))
         menu.close()
+
+    def test_a_menu_that_opens_over_a_published_window_is_grabbed_into_it(
+            self, tmp_path, qtbot):
+        window = self._window(qtbot)
+        headset = HeadsetWindow(window, _hosted(tmp_path))
+        menu = QMenu(window)
+        menu.addAction("one")
+        try:
+            headset.publish(now=1.0)
+            grabbed = _counting_grabs(window)
+
+            menu.popup(window.mapToGlobal(QPoint(40, 60)))
+            wait_until(menu.isVisible, pump=QApplication.processEvents)
+            headset.publish(now=1.0 + LOOK_AGAIN_AFTER_S)
+            QApplication.processEvents()
+            headset.publish(now=1.0 + 2 * LOOK_AGAIN_AFTER_S)
+            menu.close()
+            QApplication.processEvents()
+            headset.publish(now=1.0 + 3 * LOOK_AGAIN_AFTER_S)
+        finally:
+            headset.close()
+            menu.close()
+
+        assert grabbed == [1, 1], "the menu opening and the menu closing are each one grab"
 
     def test_a_menu_open_over_the_window_is_off_the_monitors_too(
             self, tmp_path, qtbot, monkeypatch):

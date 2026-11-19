@@ -114,7 +114,8 @@ def test_the_map_of_a_shape_holds_what_is_on_the_map_in_that_shape():
 def test_a_reading_knows_which_items_are_starred():
     library = LibrarySnapshot([_listed("pic-1", starred=True), _listed("pic-2")])
 
-    assert library.favorite_ids == {"pic-1"}
+    assert [library.is_favorite(name) for name in ("pic-1", "pic-2", "not-listed")] == [
+        True, False, False]
 
 
 def test_a_readings_tree_of_a_shape_is_the_gallery_tree_of_that_shapes_rows():
@@ -299,11 +300,11 @@ def test_a_reading_deals_its_rows_to_a_shape_once_however_often_it_is_asked(monk
 def test_a_star_given_after_the_reading_was_taken_still_counts_since_the_gallery_stars_rows_in_place():
     row = _listed("pic-1")
     library = LibrarySnapshot([row])
-    assert library.favorite_ids == set()
+    assert library.is_favorite("pic-1") is False
 
     row["starred"] = 1
 
-    assert library.favorite_ids == {"pic-1"}
+    assert library.is_favorite("pic-1") is True
 
 
 def test_a_folder_key_with_its_shape_names_what_a_reading_holds_under_that_folder():
@@ -484,7 +485,7 @@ def test_a_video_that_plays_as_its_evolver_upscale_counts_as_enhanced(tmp_path, 
              "output_files": json.dumps([{"filename": plain_file.name, "path": str(plain_file)}])}
     library = LibrarySnapshot([upscaled, plain])
 
-    assert library.enhanced_ids_of(library.rows) == {"vid-1"}
+    assert [library.is_enhanced_id(name) for name in ("vid-1", "vid-2")] == [True, False]
 
 
 def test_a_video_with_an_upscale_is_enhanced_in_the_enhanced_folder_and_on_a_slideshow_alike(
@@ -493,7 +494,7 @@ def test_a_video_with_an_upscale_is_enhanced_in_the_enhanced_folder_and_on_a_sli
     library = LibrarySnapshot([upscaled])
 
     assert library.is_enhanced(upscaled) is True
-    assert library.enhanced_ids_of([upscaled]) == {"vid-1"}
+    assert library.is_enhanced_id("vid-1") is True
     assert [row["prompt_id"] for row in library.enhanced_rows] == ["vid-1"]
 
 
@@ -518,20 +519,20 @@ def test_an_image_origenerator_enhanced_counts_as_enhanced_and_one_it_did_not_do
     enhanced = on_disk({**_listed("pic-1"), "params_json": json.dumps({"enhance": True})})
     library = LibrarySnapshot([enhanced, on_disk(_listed("pic-2"))])
 
-    assert library.enhanced_ids_of(library.rows) == {"pic-1"}
+    assert [library.is_enhanced_id(name) for name in ("pic-1", "pic-2")] == [True, False]
 
 
 def test_a_video_brought_in_as_another_sites_upscale_counts_as_enhanced(tmp_path, monkeypatch):
     row, _upscale, _original = _another_sites_upscale(tmp_path / "AI", monkeypatch)
 
-    assert LibrarySnapshot([row]).enhanced_ids_of([row]) == {"o1"}
+    assert LibrarySnapshot([row]).is_enhanced_id("o1") is True
 
 
 def test_a_video_with_no_file_yet_is_not_enhanced(tmp_path, monkeypatch):
     upscaled = _video_upscaled_by_evolver(tmp_path, monkeypatch, "vid-1")
     being_made = {**upscaled, "status": "running", "output_files": None}
 
-    assert LibrarySnapshot([being_made]).enhanced_ids_of([being_made]) == set()
+    assert LibrarySnapshot([being_made]).is_enhanced_id("vid-1") is False
 
 
 def test_the_videos_files_are_indexed_once_for_every_file_asked_after(monkeypatch):

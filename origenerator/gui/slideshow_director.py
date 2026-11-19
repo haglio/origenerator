@@ -343,12 +343,11 @@ class SlideshowDirector:
 
     def _order(self, latest: bool) -> dict:
         return {"shuffle": in_order if latest else None,
-                "hud": HudFacts(order_label=LATEST_LABEL if latest else SHUFFLE_LABEL,
-                                favorite_ids=self._favorite_prompt_ids())}
+                "hud": HudFacts(order_label=LATEST_LABEL if latest else SHUFFLE_LABEL)}
 
     @looking_once
     def open_on_preview(self, media, generation):
-        hud = HudFacts(order_label=LATEST_LABEL, favorite_ids=self._favorite_prompt_ids())
+        hud = HudFacts(order_label=LATEST_LABEL)
         if media is None:
             listed = self._listed_rows()
             return self.open([], rows=listed, start=0, shuffle=in_order,
@@ -369,7 +368,7 @@ class SlideshowDirector:
     @looking_once
     def open_in_its_folder(self, media, generation):
         listed = self._listed_rows()
-        hud = HudFacts(order_label=LATEST_LABEL, favorite_ids=self._favorite_prompt_ids())
+        hud = HudFacts(order_label=LATEST_LABEL)
         if any(row["prompt_id"] == generation for row in listed):
             location, rows = self._listing().location, listed
         else:
@@ -431,10 +430,7 @@ class SlideshowDirector:
         if follows_a_run:
             items, kwargs["start"] = carrying.folder_items or [], None
         opening = kwargs.pop("opening", None)
-        hud = replace(kwargs.pop("hud", HudFacts()),
-                      enhanced_ids=(self._enhanced_ids_of(rows) if opening is None
-                                    else opening.enhanced_ids),
-                      enhancing=self._enhance_status)
+        hud = replace(kwargs.pop("hud", HudFacts()), enhancing=self._enhance_status)
         versions = self.versions_of(rows) if carrying.versions is None else carrying.versions
         showing = Showing(self._slideshow_actions(where), hud, versions, opening)
         keep_the_slide = kwargs.get("start") is not None
@@ -483,6 +479,8 @@ class SlideshowDirector:
             delete=self._host.trash_generation,
             enhance=self._enhancing_of().enhance_from_slideshow,
             favorite=self._host.favorite_generation,
+            is_favorite=self._is_favorite,
+            is_enhanced=self._is_enhanced,
             unfavorite=partial(self._host.favorite_generation, favorite=False),
             lock=(partial(lock_held, LockedOn(self._row_for, self._host.show_generation,
                                               self._host.favorite_generation), self.items_of,
@@ -861,8 +859,7 @@ class SlideshowDirector:
                          location=held.state.location, shape=held.shape,
                          carrying=Carrying(resume=held.state, filters=held.filters),
                          shuffle=None if held.order_label == SHUFFLE_LABEL else in_order,
-                         hud=HudFacts(order_label=held.order_label,
-                                      favorite_ids=self._favorite_prompt_ids()))
+                         hud=HudFacts(order_label=held.order_label))
 
     def close_the_slideshows(self) -> None:
         self._regions_wanted.clear()
@@ -934,7 +931,6 @@ class SlideshowDirector:
         if not opening.items:
             return False
         self.open(opening.items, rows=opening.rows, location=self.base_location(shape), shape=shape,
-                  hud=HudFacts(favorite_ids=self._favorite_prompt_ids()),
                   carrying=Carrying(versions=opening.versions), opening=opening)
         logger.info("The %s region opens on the library of its shape: "
                     "%d items, filled in %d ms",
@@ -951,7 +947,6 @@ class SlideshowDirector:
         self._groups.learn(videos)
         return RegionOpening(
             rows=rows, items=items, versions=self.versions_of(rows),
-            enhanced_ids=self._enhanced_ids_of(rows),
             scripts={str(path): funscript_of(path, places=OUTPUT_PLACES) for path in videos},
             lead=randrange(len(items)) if items else 0)
 
@@ -995,7 +990,7 @@ class SlideshowDirector:
             return
         self._repoint(slideshow, key)
         slideshow.set_versions(self.versions_of(rows))
-        slideshow.retune(items, enhanced_ids=self._enhanced_ids_of(rows))
+        slideshow.retune(items)
 
     def _repoint(self, slideshow, key: str) -> None:
         self._live_slideshows = [(live, key if live is slideshow else where)
@@ -1025,8 +1020,7 @@ class SlideshowDirector:
             return False
         self._repoint(slideshow, key)
         slideshow.set_versions(self.versions_of(rows))
-        slideshow.reorder(items, latest=latest, enhanced_ids=self._enhanced_ids_of(rows),
-                     keep_slide=keep_slide)
+        slideshow.reorder(items, latest=latest, keep_slide=keep_slide)
         return True
 
     def set_room_paused(self, paused: bool) -> None:
@@ -1072,10 +1066,8 @@ class SlideshowDirector:
                 self._hand_the_file_to(slideshow, row)
 
     def _hand_the_file_to(self, slideshow, row: dict) -> None:
-        enhanced = bool(self._enhanced_ids_of([row]))
         for item in self.items_of([row]):
-            slideshow.note_added(Slide(*item), favorite=bool(row.get("starred")),
-                                 enhanced=enhanced)
+            slideshow.note_added(Slide(*item))
 
     def note_generating(self, prompt_id: str, frame: bytes):
         for slideshow, location in self._live_slideshows:
@@ -1248,11 +1240,11 @@ class SlideshowDirector:
                           else ("nothing was locked", WARNING))
         self.note_voice_command(said, kind=kind)
 
-    def _favorite_prompt_ids(self) -> set[str]:
-        return self._library().favorite_ids
+    def _is_favorite(self, prompt_id: str) -> bool:
+        return self._library().is_favorite(prompt_id)
 
-    def _enhanced_ids_of(self, rows) -> set[str]:
-        return self._library().enhanced_ids_of(rows)
+    def _is_enhanced(self, prompt_id: str) -> bool:
+        return self._library().is_enhanced_id(prompt_id)
 
 
 def _plays_latest(location) -> bool:

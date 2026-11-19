@@ -652,7 +652,7 @@ def test_a_latest_slideshow_plays_newest_first_not_shuffled(qtbot, tmp_path, mon
 def test_favorites_on_a_slideshow_narrows_the_set_to_the_favorites(qtbot, tmp_path, monkeypatch):
     view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view.slideshows, "_favorite_prompt_ids", lambda: {"id-tall-1"})
+    monkeypatch.setattr(view.slideshows, "_is_favorite", lambda prompt_id: prompt_id == "id-tall-1")
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
     slideshow = view.slideshows._region_slideshows["portrait"]
     qtbot.addWidget(slideshow.shown)
@@ -860,7 +860,7 @@ def test_a_region_the_session_wants_never_stays_empty(qtbot, tmp_path, monkeypat
 def test_a_spoken_favorites_is_the_slideshows_own_favorites_switch(qtbot, tmp_path, monkeypatch):
     view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view.slideshows, "_favorite_prompt_ids", lambda: {"id-tall-1"})
+    monkeypatch.setattr(view.slideshows, "_is_favorite", lambda prompt_id: prompt_id == "id-tall-1")
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
     slideshow = view.region_slideshow("portrait")
     qtbot.addWidget(slideshow.shown)
@@ -961,6 +961,7 @@ def test_a_standalone_slideshow_lock_opens_no_tab(qtbot, tmp_path, monkeypatch):
     row = _image("id-tall-0", "a cat", 50, 1)
     view = GalleryView(database_of([row]))
     qtbot.addWidget(view)
+    view.refresh()
     opened = []
     monkeypatch.setattr(view.generate_pane, "load_selection",
                         lambda row, images, **kw: opened.append(row["prompt_id"]))
@@ -1001,7 +1002,7 @@ def test_a_closed_slideshows_window_is_deleted(qtbot, tmp_path, monkeypatch):
 def test_reset_on_a_slideshow_puts_the_side_back_how_it_started(qtbot, tmp_path, monkeypatch):
     view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view.slideshows, "_favorite_prompt_ids", lambda: {"id-tall-1"})
+    monkeypatch.setattr(view.slideshows, "_is_favorite", lambda prompt_id: prompt_id == "id-tall-1")
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
     slideshow = view.slideshows._region_slideshows["portrait"]
     qtbot.addWidget(slideshow.shown)
@@ -1805,7 +1806,7 @@ def test_a_hosted_slideshows_hud_carries_the_media_pair_then_enhanceds_and_favor
         qtbot, tmp_path, monkeypatch):
     view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view.slideshows, "_enhanced_ids_of", lambda rows: {"id-tall-1"})
+    monkeypatch.setattr(view.slideshows, "_is_enhanced", lambda prompt_id: prompt_id == "id-tall-1")
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
     slideshow = view.slideshows._region_slideshows["portrait"]
     qtbot.addWidget(slideshow.shown)
@@ -1829,8 +1830,8 @@ def test_a_hosted_slideshows_hud_carries_the_media_pair_then_enhanceds_and_favor
 def test_a_spoken_enhanced_only_narrows_the_named_regions_slideshow(qtbot, tmp_path, monkeypatch):
     view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view.slideshows, "_enhanced_ids_of", lambda rows: {"id-tall-1"})
-    monkeypatch.setattr(view.slideshows, "_favorite_prompt_ids", lambda: {"id-tall-1", "id-tall-2"})
+    monkeypatch.setattr(view.slideshows, "_is_enhanced", lambda prompt_id: prompt_id == "id-tall-1")
+    monkeypatch.setattr(view.slideshows, "_is_favorite", {"id-tall-1", "id-tall-2"}.__contains__)
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
     slideshow = view.region_slideshow("portrait")
     qtbot.addWidget(slideshow.shown)
@@ -1852,7 +1853,7 @@ def test_a_spoken_enhanced_only_narrows_the_named_regions_slideshow(qtbot, tmp_p
 def test_a_regions_reset_drops_the_enhanced_switch_with_the_rest(qtbot, tmp_path, monkeypatch):
     view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view.slideshows, "_enhanced_ids_of", lambda rows: {"id-tall-1"})
+    monkeypatch.setattr(view.slideshows, "_is_enhanced", lambda prompt_id: prompt_id == "id-tall-1")
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
     slideshow = view.slideshows._region_slideshows["portrait"]
     qtbot.addWidget(slideshow.shown)

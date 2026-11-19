@@ -160,15 +160,15 @@ class FakeSlideshow:
         self.hud_favorites_filter = filters.favorites
         self.hud_enhanced_filter = filters.enhanced
 
-    def retune(self, items, *, enhanced_ids):
-        self.retuned = (list(items), set(enhanced_ids))
+    def retune(self, items):
+        self.retuned = list(items)
 
-    def reorder(self, items, *, latest, enhanced_ids, keep_slide=False):
-        self.reordered = (list(items), latest, set(enhanced_ids))
+    def reorder(self, items, *, latest, keep_slide=False):
+        self.reordered = (list(items), latest)
         self.kept_the_slide = keep_slide
 
-    def note_added(self, slide, *, favorite, enhanced):
-        self.added.append((slide.prompt_id, favorite, enhanced))
+    def note_added(self, slide):
+        self.added.append(slide.prompt_id)
 
     def note_generating(self, prompt_id, frame):
         self.generating.append((prompt_id, frame))
@@ -745,7 +745,7 @@ def test_a_slideshow_put_back_goes_on_taking_in_what_lands_where_it_plays(slides
     director.note_finished(landed)
 
     assert again is not made[0]
-    assert again.added == [("g2", False, False)]
+    assert again.added == ["g2"]
 
 
 def _request(prompt_id, asked_of, asked="two dogs"):
@@ -1382,7 +1382,7 @@ def test_a_landing_reaches_the_slideshow_whose_own_folder_holds_it(slideshows):
 
     director.note_finished(_row("g9", favorite=True))
 
-    assert made[0].added == [("g9", True, False)]
+    assert made[0].added == ["g9"]
     assert made[1].added == []
 
 
@@ -1394,7 +1394,7 @@ def test_an_arrival_from_outside_is_lined_up_on_a_slideshow_playing_latest(slide
 
     director.note_arrived([_row("g9", favorite=True)])
 
-    assert made[0].added == [("g9", True, False)]
+    assert made[0].added == ["g9"]
 
 
 def test_an_arrival_from_outside_leaves_a_slideshow_in_shuffle_as_it_was(slideshows):
@@ -1605,7 +1605,7 @@ def test_a_region_reset_re_points_what_feeds_it(slideshows):
     director.reset_region(slideshow)
 
     assert director._live_slideshows == [(slideshow, ALL_LANDSCAPE)]
-    assert slideshow.retuned == ([("g4.png", "image", "g4", None)], set())
+    assert slideshow.retuned == ([("g4.png", "image", "g4", None)])
 
 
 def test_a_region_is_at_its_start_only_on_its_regions_base_state(slideshows):
@@ -1621,26 +1621,22 @@ def test_a_region_is_at_its_start_only_on_its_regions_base_state(slideshows):
         " from its region's base state, which only the gallery knows")
 
 
-def test_a_slideshow_counts_as_enhanced_what_the_library_counts_as_enhanced(slideshows):
-    gallery_pane = FakeGalleryPane(collections={ALL_LANDSCAPE: [_row("g4"), _row("g5")]})
+def test_a_slideshow_asks_the_library_which_items_are_favorites(slideshows):
+    gallery_pane = FakeGalleryPane(collections={ALL_LANDSCAPE: [_row("g4")]})
     director, _host, made = slideshows(gallery_pane=gallery_pane, fun_time=FakeSession())
-    gallery_pane.library.enhanced_ids_of = lambda rows: {"g5"}
+    gallery_pane.library.is_favorite = lambda prompt_id: prompt_id == "g8"
     director.open([("a.png", "image", "g1", None)], location="workflow/a", shape=LANDSCAPE)
 
-    director.reset_region(made[0])
-
-    assert made[0].retuned[1] == {"g5"}
+    assert [made[0].actions.is_favorite(name) for name in ("g1", "g8")] == [False, True]
 
 
-def test_an_item_that_lands_is_enhanced_when_the_library_counts_it_so(slideshows):
-    gallery_pane = FakeGalleryPane(collections={"collection/a": [_row("g9")]})
+def test_a_slideshow_asks_the_library_which_items_are_enhanced(slideshows):
+    gallery_pane = FakeGalleryPane(collections={ALL_LANDSCAPE: [_row("g4"), _row("g5")]})
     director, _host, made = slideshows(gallery_pane=gallery_pane, fun_time=FakeSession())
-    gallery_pane.library.enhanced_ids_of = lambda rows: {"g9"}
-    director.open([("a.png", "image", "g1", None)], location="collection/a", shape=LANDSCAPE)
+    gallery_pane.library.is_enhanced_id = lambda prompt_id: prompt_id == "g5"
+    director.open([("a.png", "image", "g1", None)], location="workflow/a", shape=LANDSCAPE)
 
-    director.note_finished(_row("g9"))
-
-    assert made[0].added == [("g9", False, True)]
+    assert [made[0].actions.is_enhanced(name) for name in ("g4", "g5")] == [False, True]
 
 
 def test_a_set_handed_to_a_running_slideshow_brings_its_own_versions_with_it(slideshows):
@@ -1671,7 +1667,7 @@ def test_latest_points_a_region_slideshow_at_its_sides_latest_and_feeds_it_from_
     director.reorder_slideshow(made[0], True)
 
     assert made[0].reordered == (
-        [("g9.png", "image", "g9", None), ("g4.png", "image", "g4", None)], True, set())
+        [("g9.png", "image", "g9", None), ("g4.png", "image", "g4", None)], True)
     assert director._live_slideshows == [(made[0], LATEST_LANDSCAPE)]
     assert made[0].said == ["Latest"]
 
@@ -1685,7 +1681,7 @@ def test_shuffle_points_a_region_slideshow_back_at_its_sides_whole_library(slide
 
     director.reorder_slideshow(made[0], False)
 
-    assert made[0].reordered == ([("g4.png", "image", "g4", None)], False, set())
+    assert made[0].reordered == ([("g4.png", "image", "g4", None)], False)
     assert director._live_slideshows == [(made[0], ALL_PORTRAIT)]
     assert made[0].said == ["Shuffle"]
 
@@ -1697,7 +1693,7 @@ def test_a_slideshow_on_its_own_takes_latest_of_the_shape_it_opened_on(slideshow
 
     director.reorder_slideshow(made[0], True)
 
-    assert made[0].reordered == ([("g9.png", "image", "g9", None)], True, set())
+    assert made[0].reordered == ([("g9.png", "image", "g9", None)], True)
 
 
 def test_an_order_with_nothing_to_play_says_so_and_leaves_the_slideshow_alone(slideshows):
@@ -1730,7 +1726,7 @@ def test_a_loop_ending_on_a_folder_slideshow_hands_it_the_library_it_is_ordered_
 
     assert director.browse_it_all(made[0]) is True
 
-    assert made[0].reordered == ([("g4.png", "image", "g4", None)], False, set())
+    assert made[0].reordered == ([("g4.png", "image", "g4", None)], False)
     assert made[0].kept_the_slide is True
     assert director._live_slideshows == [(made[0], ALL_LANDSCAPE)]
     assert made[0].said == [], (
@@ -1746,7 +1742,7 @@ def test_a_slideshow_playing_latest_falls_back_to_latest_rather_than_to_the_shuf
 
     assert director.browse_it_all(made[0]) is True
 
-    assert made[0].reordered == ([("g9.png", "image", "g9", None)], True, set())
+    assert made[0].reordered == ([("g9.png", "image", "g9", None)], True)
 
 
 def test_a_way_out_with_nothing_of_that_shape_to_play_leaves_the_slideshow_alone(slideshows):
@@ -1769,7 +1765,7 @@ def test_a_second_set_in_the_one_window_brings_its_own_sides_library_with_it(sli
     director.open([("b.png", "image", "g2", None)], shape=LANDSCAPE)
 
     assert director.browse_it_all(made[0]) is True
-    assert made[0].reordered == ([("g7.png", "image", "g7", None)], False, set())
+    assert made[0].reordered == ([("g7.png", "image", "g7", None)], False)
 
 
 def test_a_slideshow_asks_this_director_for_the_way_out_of_a_loop(slideshows):
@@ -2823,7 +2819,7 @@ def test_a_seed_landing_while_latest_plays_reaches_it_as_its_runs_newest(slidesh
     gallery_pane.collections[LATEST_PORTRAIT] = [a_new_image, another_seed, *sitting]
     director.note_finished(a_new_image)
 
-    assert [added[0] for added in made[0].added] == ["g6", "g7"]
+    assert made[0].added == ["g6", "g7"]
 
 
 def test_a_slideshow_of_favorites_plays_the_sides_whole_library_with_the_filter_on(slideshows):

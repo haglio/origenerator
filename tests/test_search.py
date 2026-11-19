@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from origenerator import gallery, local_llm, model_titles, search
+from origenerator import gallery, model_titles, search
 from origenerator.gallery.signatures import workflow_model_keys
 from origenerator.generation_state import GenerationSource
 
@@ -39,7 +39,6 @@ def _index(rows, folder_names=None):
 
 def _hits(index, query, **kwargs):
     return [result.row["prompt_id"] for result in index.search(query, **kwargs).results]
-
 
 
 def test_stop_words_are_dropped_from_a_query():
@@ -97,7 +96,6 @@ def test_a_word_two_prompts_share_is_not_stemmed_twice(monkeypatch):
     monkeypatch.setattr(search, "_IRREGULAR_PLURALS", stemmed)
     _index([_row("g1", "a vermilion kite"), _row("g2", "a vermilion hat")])
     assert stemmed.about.get("vermilion", 0) <= 1
-
 
 
 def test_a_synonym_satisfies_a_term_the_prompt_never_used():
@@ -185,13 +183,6 @@ def test_a_file_name_finds_an_item_brought_in_from_the_library():
     assert _hits(_index(rows), "an example clip") == ["brought in"]
 
 
-def test_a_file_name_is_never_widened():
-    rows = [_made_as("made", "wan_loop_00042_.mp4"), _made_as("other", "wan_loop_00043_.mp4")]
-    index = _index(rows)
-    assert not index.widens("wan_loop_00042_.mp4")
-    assert _hits(index, "wan_loop_00042_.mp4", expansions={"wan": ["street"]}) == ["made"]
-
-
 def test_the_code_leading_a_name_finds_every_item_of_its_folder():
     rows = [_row("g1", "a quiet street"), _row("g2", "a quiet street"),
             _row("g3", "a quiet street")]
@@ -241,16 +232,6 @@ def test_a_word_that_starts_a_name_still_finds_the_prompts_that_use_it():
     index.update(rows, item_name=names.get)
 
     assert _hits(index, "face") == ["g1", "g2"]
-
-
-def test_a_word_that_starts_a_name_is_never_widened():
-    rows = [_row("g1", "a quiet street"), _row("g2", "a quiet street")]
-    names = {"g1": "79BB46F1 000", "g2": "3FA9C0D2 004"}
-    index = search.GallerySearch()
-    index.update(rows, item_name=names.get)
-
-    assert _hits(index, "79bb", expansions={"79bb": ["street"]}) == ["g1"]
-    assert not index.widens("79bb")
 
 
 def test_quoted_words_find_only_prompts_that_have_them_side_by_side_in_that_order():
@@ -307,29 +288,6 @@ def test_an_empty_query_matches_nothing_rather_than_everything():
     assert _index(rows).search("   ") == search.SearchOutcome((), ())
 
 
-
-def test_a_volunteered_word_widens_the_match():
-    rows = [_row("g1", "a lone kitten"), _row("g2", "a lone puppy")]
-    index = _index(rows)
-    assert _hits(index, "cat") == []
-    assert _hits(index, "cat", expansions={"cat": ["kitten"]}) == ["g1"]
-
-
-def test_a_volunteered_word_ranks_below_a_word_actually_written():
-    rows = [_row("g1", "a lone kitten"), _row("g2", "a lone cat")]
-    outcome = _index(rows).search("cat", expansions={"cat": ["kitten"]})
-    by_id = {result.row["prompt_id"]: result.score for result in outcome.results}
-    assert by_id["g2"] > by_id["g1"]
-
-
-def test_a_volunteered_word_ranks_below_a_synonym_from_the_table():
-    rows = [_row("g1", "a lone kitten"), _row("g2", "a lone couch")]
-    index = _index(rows)
-    volunteered, = index.search("cat", expansions={"cat": ["kitten"]}).results
-    from_the_table, = index.search("sofa").results
-    assert from_the_table.score > volunteered.score
-
-
 def test_what_made_an_item_ranks_below_what_it_shows_and_a_folders_name_ranks_with_that():
     shown = _row("g1", "a harbor at dawn")
     made_with = _row("g2", "a quiet street", params={"checkpoint": "harbor_xl.safetensors"})
@@ -361,12 +319,6 @@ def test_every_row_of_a_settings_folder_falls_under_one_model_and_lora_heading()
     assert gallery.settings_folder_key(one) == gallery.settings_folder_key(other)
     assert search.model_lora_heading(one) == search.model_lora_heading(other), \
         "a folder's one tile in the results is filed under a heading by one of its rows alone"
-
-
-def test_an_expansion_for_a_word_not_in_the_query_is_ignored():
-    rows = [_row("g1", "a lone kitten")]
-    assert _hits(_index(rows), "puppy", expansions={"cat": ["kitten"]}) == []
-
 
 
 def test_only_generations_that_produced_something_are_searchable():
@@ -403,7 +355,6 @@ def test_a_generation_that_leaves_the_gallery_leaves_the_index():
     assert _hits(index, "lamp") == []
 
 
-
 def _lora_row(prompt_id, lora, prompt="a quiet street"):
     return _row(prompt_id, prompt, workflow="wan22_i2v", params={
         "unet_high": "example_high.safetensors",
@@ -411,7 +362,6 @@ def _lora_row(prompt_id, lora, prompt="a quiet street"):
         "lora_high": f"{lora}_high.safetensors",
         "lora_low": f"{lora}_low.safetensors",
     })
-
 
 
 def test_a_folder_name_finds_what_is_in_it():
@@ -521,7 +471,6 @@ def test_a_heading_names_both_the_model_and_the_lora():
     assert "driftstyle_high" in heading
 
 
-
 def test_an_overlay_group_extends_a_built_in_one_it_shares_a_word_with():
     synonyms = search._synonym_index((("doll", "marionette"),))
     assert "marionette" in synonyms["woman"]
@@ -534,82 +483,6 @@ def test_a_multi_word_overlay_entry_is_dropped_rather_than_shredded():
 
 def test_a_one_word_group_widens_nothing():
     assert "solo" not in search._synonym_index((("solo",),))
-
-
-
-def _completion(content):
-    return {"message": {"content": content}}
-
-
-def test_the_widening_request_names_every_word_of_the_query():
-    messages = search.build_expansion_messages(("two", "dolls"), "RULES")
-    assert messages[0] == {"role": "system", "content": "RULES"}
-    assert "- two" in messages[1]["content"]
-    assert "- dolls" in messages[1]["content"]
-
-
-def test_a_widening_reply_is_read_back_per_word():
-    parsed = search.parse_expansion(
-        _completion('{"women": ["dolls", "ladies"]}'), ("women",))
-    assert parsed == {"women": ("dolls", "ladies")}
-
-
-def test_a_widening_reply_wrapped_in_prose_still_parses():
-    parsed = search.parse_expansion(
-        _completion('Sure!\n```json\n{"women": ["dolls"]}\n```'), ("women",))
-    assert parsed == {"women": ("dolls",)}
-
-
-def test_a_widening_keeps_only_single_words_that_were_asked_about():
-    parsed = search.parse_expansion(
-        _completion('{"women": ["dolls", "young women", "women"], '
-                    '"boys": ["lads"]}'),
-        ("women",),
-    )
-    assert parsed == {"women": ("dolls",)}
-
-
-def test_a_widening_that_will_not_parse_leaves_the_table_tier_standing(monkeypatch):
-    def explode(*_args, **_kwargs):
-        raise ValueError("no JSON here")
-
-    monkeypatch.setattr(local_llm.urllib.request, "urlopen", explode)
-    assert search.expand_query(
-        "two women", base_url="http://localhost:1", model="m", system_prompt="R"
-    ) == {}
-
-
-def _calls_to_the_model(monkeypatch):
-    calls = []
-    monkeypatch.setattr(local_llm.urllib.request, "urlopen",
-                        lambda *args, **kwargs: calls.append(args))
-    return calls
-
-
-def test_a_query_with_no_words_asks_the_model_nothing(monkeypatch):
-    calls = _calls_to_the_model(monkeypatch)
-
-    assert search.expand_query(
-        "   ", base_url="http://localhost:1", model="m", system_prompt="R") == {}
-    assert calls == []
-
-
-def test_an_items_name_is_never_sent_to_the_model_to_widen(monkeypatch):
-    calls = _calls_to_the_model(monkeypatch)
-
-    search.expand_query(
-        "3FA9C0D2 004", base_url="http://localhost:1", model="m", system_prompt="R")
-
-    assert calls == []
-
-
-def test_quoted_words_are_never_sent_to_the_model_to_widen(monkeypatch):
-    calls = _calls_to_the_model(monkeypatch)
-
-    search.expand_query(
-        '"two lamps"', base_url="http://localhost:1", model="m", system_prompt="R")
-
-    assert calls == []
 
 
 def test_both_is_not_a_count_of_two():

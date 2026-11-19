@@ -1,21 +1,18 @@
 from __future__ import annotations
 
-import logging
 import re
 from dataclasses import dataclass, field, replace
 from functools import lru_cache
 
 from app_support.video_names import stem_of_either_copy
 
-from origenerator import gallery, local_llm
+from origenerator import gallery
 from origenerator.content import load_content
 from origenerator.gallery.item_numbers import name_starts_in, without_name_starts
 from origenerator.gallery.output import stems_made_as
 from origenerator.gallery.signatures import READINGS_KEPT
 from origenerator.generation_state import in_sight
 from origenerator.model_titles import each_title_worked_out_once
-
-logger = logging.getLogger(__name__)
 
 SORT_RECENT = "recent"
 SORT_MODEL_LORA = "model_lora"
@@ -71,7 +68,6 @@ _TIGHT_PUBLIC_SYNONYMS = (
 
 _EXACT = 1.0
 _SYNONYM = 0.7
-_RELATED = 0.6
 
 _POSITIVE_WEIGHT = 1.0
 _FOLDER_WEIGHT = 1.0
@@ -154,7 +150,6 @@ class QueryTerm:
     text: str
     stem: str
     synonyms: frozenset[str] = frozenset()
-    related: frozenset[str] = frozenset()
     side_by_side: tuple[str, ...] = ()
 
 
@@ -209,7 +204,7 @@ def query_words(query: str) -> tuple[str, ...]:
     return tuple(ordered)
 
 
-def parse_query(query: str, *, expansions=None, synonyms=None) -> list[QueryTerm]:
+def parse_query(query: str, *, synonyms=None) -> list[QueryTerm]:
     synonyms = _SYNONYMS if synonyms is None else synonyms
     terms = [QueryTerm(text=start, stem=start.lower())
              for start in dict.fromkeys(name_starts_in(_unquoted(query)))]
@@ -217,13 +212,10 @@ def parse_query(query: str, *, expansions=None, synonyms=None) -> list[QueryTerm
               for words in _quoted(query)]
     for word in query_words(query):
         stem = _crude_stem(word)
-        table = set(synonyms.get(stem, ())) - {stem}
-        volunteered = {_crude_stem(w) for w in (expansions or {}).get(word, ())}
         terms.append(QueryTerm(
             text=word,
             stem=stem,
-            synonyms=frozenset(table),
-            related=frozenset(volunteered - table - {stem}),
+            synonyms=frozenset(synonyms.get(stem, ())) - {stem},
         ))
     return terms
 
@@ -233,8 +225,6 @@ def _field_score(term: QueryTerm, stems: frozenset[str]) -> float:
         return _EXACT
     if term.synonyms & stems:
         return _SYNONYM
-    if term.related & stems:
-        return _RELATED
     return 0.0
 
 
@@ -346,27 +336,17 @@ class GallerySearch:
                                  frozenset(folder.prompt_ids) & entries.keys())
                          for folder in folders]
 
-    def widens(self, query: str) -> bool:
-        if self._made_as(query):
-            return False
-        return any(not self._starts_a_name(word) for word in query_words(query))
-
-    def _starts_a_name(self, word: str) -> bool:
-        return any(_starts_the_name(word, entry.name) for entry in self._entries.values())
-
     def _made_as(self, query: str) -> list[str]:
         named = stem_of_either_copy(query.strip())
         return [prompt_id for prompt_id in self._order
                 if named and named in self._entries[prompt_id].files]
 
-    def search(self, query: str, *, expansions=None, within=None) -> SearchOutcome:
+    def search(self, query: str, *, within=None) -> SearchOutcome:
         if made_as := self._made_as(query):
             return SearchOutcome(tuple(SearchResult(self._entries[prompt_id].row, _EXACT)
                                        for prompt_id in made_as
                                        if within is None or prompt_id in within), ())
-        expansions = {word: related for word, related in (expansions or {}).items()
-                      if not self._starts_a_name(word)}
-        terms = parse_query(query, expansions=expansions, synonyms=self._synonyms)
+        terms = parse_query(query, synonyms=self._synonyms)
         if not terms:
             return SearchOutcome((), ())
         results = []
@@ -405,7 +385,6 @@ class SearchTerms:
     scope: str = ""
     collapsed: object = ()
     on_section_toggled: object = None
-    still_searching: bool = False
 
 
 @dataclass(frozen=True)
@@ -420,53 +399,3 @@ def group_by_model_lora(results) -> list[tuple[str, list]]:
     for result in results:
         sections.setdefault(model_lora_heading(result.row), []).append(result)
     return sorted(sections.items(), key=lambda item: (-len(item[1]), item[0]))
-
-
-
-def build_expansion_messages(words, system_prompt: str) -> list[dict]:
-    listing = "\n".join(f"- {word}" for word in words)
-    user = (
-        "Search words:\n"
-        f"{listing}\n\n"
-        'Reply with only JSON: {"<search word>": ["<other word>", ...], …}, '
-        "one key per search word above."
-    )
-    return [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user},
-    ]
-
-
-def parse_expansion(completion: dict, words) -> dict[str, tuple[str, ...]]:
-    obj = local_llm.answer_of(completion)
-    wanted = {word.lower(): word for word in words}
-    expansions: dict[str, tuple[str, ...]] = {}
-    for key, value in (obj or {}).items():
-        word = wanted.get(str(key).strip().lower())
-        if word is None or not isinstance(value, (list, tuple)):
-            continue
-        related = []
-        for item in value:
-            item_words = _words(item)
-            if len(item_words) == 1 and item_words[0] != word:
-                related.append(item_words[0])
-        if related:
-            expansions[word] = tuple(dict.fromkeys(related))
-    return expansions
-
-
-def expand_query(query: str, *, base_url: str, model: str, system_prompt: str,
-                 timeout: float = 15.0) -> dict[str, tuple[str, ...]]:
-    words = query_words(query)
-    if not words:
-        return {}
-    try:
-        expansions = parse_expansion(local_llm.ask(
-            build_expansion_messages(words, system_prompt),
-            base_url=base_url, model=model, temperature=0.2, timeout=timeout), words)
-    except Exception as exc:
-        logger.warning("search: widening %r failed (%s)", query, exc)
-        return {}
-    logger.info("search: widened %d of %d words of %r",
-                len(expansions), len(words), query)
-    return expansions

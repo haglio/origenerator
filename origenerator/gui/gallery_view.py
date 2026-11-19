@@ -82,7 +82,6 @@ from origenerator.gui import corner_buttons, omnipause
 from origenerator.gui.app_keys import AppKeys, Presses
 from origenerator.gui.app_title import under
 from origenerator.gui.busy_cursor import working
-from origenerator.gui.button_drag import EnhanceSettingsDrag
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController, CombineParts
 from origenerator.gui.copy_names import copy_names, offer_copy_names_above_a_line
@@ -93,6 +92,7 @@ from origenerator.gui.enhance_controller import (
     EnhanceController,
     EnhanceParts,
 )
+from origenerator.gui.enhance_settings_drags import EnhanceSettingsDrag, SettingsDropOnTheButton
 from origenerator.gui.folder_actions import FolderActions
 from origenerator.gui.folder_icons import collection_mark
 from origenerator.gui.folder_path import FolderPath
@@ -517,6 +517,10 @@ class GalleryView(QWidget):
         )
         EnhanceSettingsDrag(self._buttons.enhance,
                             self._folder_switches.enhance_params_of_the_open_folder)
+        SettingsDropOnTheButton(
+            self._buttons.enhance, self._folder_switches.enhance_params_of_the_one_enhancing,
+            takes_them=self._folder_switches.enhancing_the_open_folder,
+            keep=self._folder_switches.keep_enhance_params_of_the_open_folder)
         gallery_column.addLayout(_top_section(self._folder_path, self._buttons, self._folder_actions))
         self._experiments_cb = TickControl("Run experiments while the app is closed")
         self._experiments_cb.toggled.connect(self._on_experiments_toggled)

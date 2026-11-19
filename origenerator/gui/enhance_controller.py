@@ -297,11 +297,8 @@ class EnhanceController:
         return False
 
     def enhance_when_wanted(self, row: dict | None) -> None:
-        if row is None or not self._settings.auto:
-            return
-        awaiting = self._awaiting([row])
-        if awaiting:
-            self._enqueue(awaiting, self._settings)
+        if row is not None and self._settings.auto and self.would_enhance(row):
+            self._enqueue([row], self._settings)
 
     def enhance_it(self, prompt_id: str | None) -> tuple[str | None, str, str]:
         return self._enhance_one(prompt_id, self._settings)

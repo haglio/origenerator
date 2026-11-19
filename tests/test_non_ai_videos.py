@@ -27,7 +27,13 @@ from origenerator.generation_state import GenerationSource
 from origenerator.gui.generate_tab import GenerateTab
 from origenerator.item_names import ItemNames
 from origenerator.media import MediaType
-from origenerator.non_ai_videos import Kept, NonAiPlaces, more_places_here, scan
+from origenerator.non_ai_videos import (
+    Kept,
+    NonAiPlaces,
+    more_places_here,
+    scan,
+    take_up_what_the_records_say,
+)
 from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import animated_thumbnail_path
 from origenerator.trash import Trash
@@ -91,6 +97,33 @@ def test_a_scan_brings_each_non_ai_video_in_once_from_where_it_is_kept(tmp_path)
         kept, MediaType.VIDEO)
     assert Path(row["thumbnail_path"]).exists()
     assert animated_thumbnail_path(places.thumb_dir, row["prompt_id"]).exists()
+
+
+def test_a_video_replaced_by_its_enhanced_copy_keeps_its_item_which_then_names_that_copy(
+        tmp_path):
+    db, places = Database(tmp_path / "test.db"), _library(tmp_path)
+    kept = write_mp4(places.videos / "sample" / "full" / "video one.mp4")
+    scan(db, places)
+    [before] = _videos(db)
+    db.set_generation_favorite(before["prompt_id"], True)
+    enhanced = kept.rename(kept.with_name("video one_topaz.mp4"))
+
+    assert scan(db, places) == 0, "the enhanced copy is the same video, never one more item"
+    [row] = _videos(db)
+    assert (row["prompt_id"], json.loads(row["output_files"])) == (
+        before["prompt_id"], [{"filename": enhanced.name, "library_path": str(enhanced)}])
+
+
+def test_the_records_take_up_at_every_start_follows_an_enhanced_copy_too(tmp_path):
+    db, places = Database(tmp_path / "test.db"), _library(tmp_path)
+    kept = write_mp4(places.videos / "sample" / "full" / "video one.mp4")
+    scan(db, places)
+    enhanced = kept.rename(kept.with_name("video one_topaz.mp4"))
+
+    take_up_what_the_records_say(db, places)
+
+    [row] = _videos(db)
+    assert json.loads(row["output_files"])[0]["library_path"] == str(enhanced)
 
 
 def test_a_non_ai_video_is_named_as_fun_time_names_it(db, tmp_path):

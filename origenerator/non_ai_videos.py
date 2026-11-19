@@ -9,7 +9,7 @@ from pathlib import Path
 
 from app_support import favorites, video_ids
 from app_support.mirrored_tree import filed_record, record_path
-from app_support.video_names import full_video_id_of, title_while_playing
+from app_support.video_names import UPSCALE_SUFFIX, full_video_id_of, title_while_playing
 
 from origenerator import config
 from origenerator.evolver_export import PARTIAL_MARKER
@@ -76,6 +76,7 @@ def scan_in_turn(db, places: NonAiPlaces, *, wait_s: float = WAIT_S) -> int:
 
 
 def scan(db, places: NonAiPlaces, *, videos_per_write: int = VIDEOS_PER_WRITE) -> int:
+    follow_enhanced_copies(db)
     held = db.library_paths() | db.trashed_library_paths()
     new = ((video, kept) for kept in places.kept for video in non_ai_videos(kept.folder)
            if str(video) not in held)
@@ -85,11 +86,36 @@ def scan(db, places: NonAiPlaces, *, videos_per_write: int = VIDEOS_PER_WRITE) -
                                    videos_per_write):
         db.insert_rows(list(batch))
         brought_in += len(batch)
-    take_up_what_the_records_say(db, places)
+    _take_up_the_records(db, places)
     return brought_in
 
 
 def take_up_what_the_records_say(db, places: NonAiPlaces) -> int:
+    return follow_enhanced_copies(db) + _take_up_the_records(db, places)
+
+
+def follow_enhanced_copies(db) -> int:
+    followed = 0
+    for row in db.list_generations():
+        if row["source"] != GenerationSource.NON_AI:
+            continue
+        files = json.loads(row["output_files"] or "[]")
+        now = [_the_copy_that_is_there(entry) for entry in files]
+        if now != files:
+            db.update_generation(row["prompt_id"], output_files=json.dumps(now))
+            followed += 1
+    return followed
+
+
+def _the_copy_that_is_there(entry: dict) -> dict:
+    video = Path(entry["library_path"])
+    enhanced = video.with_name(f"{video.stem}{UPSCALE_SUFFIX}{video.suffix}")
+    if video.exists() or not enhanced.is_file():
+        return entry
+    return {**entry, "filename": enhanced.name, "library_path": str(enhanced)}
+
+
+def _take_up_the_records(db, places: NonAiPlaces) -> int:
     recorded = [(row, Path(video), places.record_of(Path(video)))
                 for row in db.list_generations() if row["source"] == GenerationSource.NON_AI
                 for video in library_paths_in(row["output_files"])]

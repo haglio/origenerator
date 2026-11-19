@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 
-from app_support import haglio_settings
+from app_support import haglio_settings, kino_folder
 
 from origenerator import gallery, library_views
 from origenerator.db import Database, NewGeneration
@@ -548,3 +548,21 @@ def test_the_videos_files_are_indexed_once_for_every_file_asked_after(monkeypatc
              for name in ("made_here_00001_.mp4", "made_here_00001__topaz.mp4", "other.mp4")]
 
     assert (found, indexed) == (["vid-1", "vid-1", None], [1])
+
+
+def test_the_versions_of_many_videos_read_where_kino_files_its_upscales_once(
+        tmp_path, monkeypatch):
+    rows = []
+    for n in range(5):
+        video = tmp_path / "videos" / f"video {n}.mp4"
+        video.parent.mkdir(parents=True, exist_ok=True)
+        video.write_bytes(b"video")
+        rows.append({"prompt_id": f"v{n}", "workflow_name": "wan22_i2v", "params": "{}",
+                     "thumbnail_path": None,
+                     "output_files": json.dumps([{"filename": video.name, "path": str(video)}])})
+    asked = []
+    kino_dir = kino_folder.kino_dir
+    monkeypatch.setattr(kino_folder, "kino_dir", lambda: asked.append(1) or kino_dir())
+
+    assert LibrarySnapshot(rows, evolvers_folder=tmp_path / "AI").versions_of(rows) == {}
+    assert len(asked) <= 1

@@ -6,6 +6,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import NamedTuple
 
+from app_support import kino_folder
 from app_support.media_renditions import original_rendition
 
 from origenerator import gallery, points_of_interest, trash_collection
@@ -272,9 +273,14 @@ class LibrarySnapshot:
                    for version in versions]
         return str(entries[0].path), entries
 
+    @cached_property
+    def _kinos_upscales(self) -> Path:
+        return kino_folder.upscales_in(kino_folder.kino_dir())
+
     def _beside_its_original(self, resolved) -> list[EnhanceVersion]:
         original = (original_rendition(resolved[0], self._evolvers_folder)
-                    if resolved is not None else "")
+                    if resolved is not None
+                    and Path(resolved[0]).is_relative_to(self._kinos_upscales) else "")
         if not original:
             return []
         return upscale_and_original(file_at(Path(resolved[0])), file_at(Path(original)))

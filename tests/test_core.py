@@ -24,6 +24,7 @@ from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import QApplication, QMessageBox, QWidget
 from shared_ui.hard_to_miss import FadedBackground
 from shared_ui.preview import Preview
+from shared_ui.testing import questions_answered
 
 from origenerator import (
     action_settings,
@@ -61,7 +62,12 @@ from tests import gestures
 from tests.closed_windows import is_closed
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import _collection, _select_first_leaf, _selected_folder
-from tests.his_monitors import HIS_TWO_MONITORS, LANDSCAPE_MONITOR, PORTRAIT_MONITOR, TASKBAR
+from tests.his_monitors import (
+    HIS_TWO_MONITORS,
+    LANDSCAPE_MONITOR,
+    PORTRAIT_MONITOR,
+    TASKBAR,
+)
 from tests.real_db import keep_on_disk
 from tests.test_combine import _listed_under_recent
 
@@ -174,10 +180,7 @@ def _close_from_the_title_bar(win):
 
 
 def _answer_the_close_question(monkeypatch, button):
-    asked = []
-    monkeypatch.setattr(QMessageBox, "question",
-                        staticmethod(lambda *args: asked.append(args) or button))
-    return asked
+    return questions_answered(monkeypatch, button)
 
 
 def test_quit_shortcut_fires_from_anywhere_in_the_app(qtbot, tmp_path):
@@ -216,8 +219,7 @@ def test_the_question_names_origenerator_in_full_since_its_title_is_cut_short(
 
     _close_from_the_title_bar(win)
 
-    _parent, _title, text, *_buttons = asked[0]
-    assert text == "Are you sure you want to close Origenerator?"
+    assert asked[0].text == "Are you sure you want to close Origenerator?"
 
 
 def test_the_close_question_sounds_the_alert(qtbot, tmp_path, monkeypatch, alert_sounds):
@@ -235,9 +237,8 @@ def test_the_window_behind_the_close_question_fades_out(qtbot, tmp_path, monkeyp
     with qtbot.waitExposed(win):
         win.show()
     faded_while_asked = []
-    monkeypatch.setattr(QMessageBox, "question", staticmethod(
-        lambda *_args: faded_while_asked.extend(_faded_backgrounds(win))
-        or QMessageBox.StandardButton.No))
+    questions_answered(monkeypatch, QMessageBox.StandardButton.No,
+                       lambda _box: faded_while_asked.extend(_faded_backgrounds(win)))
 
     _close_from_the_title_bar(win)
 

@@ -23,9 +23,9 @@ from PySide6.QtGui import (
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (
     QMenu,
-    QMessageBox,
     QSplitter,
 )
+from shared_ui.testing import questions_answered
 
 from origenerator import (
     gallery,
@@ -380,8 +380,7 @@ def _answer_menu(monkeypatch, label):
 
 
 def _answer_confirmation(monkeypatch, button):
-    monkeypatch.setattr(QMessageBox, "question", staticmethod(lambda *a, **kw: button))
-    faking_exec(monkeypatch, QMessageBox, lambda _box, *a: button)
+    questions_answered(monkeypatch, button)
 
 
 def _menu_labels(monkeypatch, labels):

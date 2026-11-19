@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import QEvent, QObject, QPoint, QRect, QSize, Qt
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QMessageBox, QWidget
+from shared_ui.asking import yes_or_no
 
 
 def placed_at(point: QPoint, size: QSize, area: QRect) -> QPoint:
@@ -28,8 +29,7 @@ class _PlacedWhenShown(QObject):
 
 
 def asked_at(point: QPoint, over: QWidget, title: str, question: str) -> bool:
-    box = QMessageBox(QMessageBox.Icon.Question, title, question,
-                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, over)
+    box = yes_or_no(over, title, question)
     box.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
     _PlacedWhenShown(box, point)
     return box.exec() == QMessageBox.StandardButton.Yes

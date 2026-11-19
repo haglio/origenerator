@@ -1,8 +1,9 @@
 from PySide6.QtCore import QObject, QPoint, QRect, QSize, Signal
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QMessageBox, QWidget
+from shared_ui.testing import questions_answered
 
-from origenerator.gui.asked_at_the_cursor import placed_at
+from origenerator.gui.asked_at_the_cursor import asked_at, placed_at
 from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.shown_job_queue import ShownJobQueue
 from tests.qt_exec import faking_exec
@@ -65,3 +66,15 @@ def test_cancel_all_asks_its_question_where_the_pointer_is(qtbot, monkeypatch):
     assert (center - pointer).manhattanLength() <= 2, (
         "in a Fun Time session Core sits out of sight, so a question placed over Core "
         "opened where nobody was looking")
+
+
+def test_a_question_asked_at_the_pointer_has_yes_as_the_default(qtbot, monkeypatch):
+    over = QWidget()
+    qtbot.addWidget(over)
+
+    asked = questions_answered(monkeypatch, QMessageBox.StandardButton.No)
+
+    asked_at(QPoint(900, 500), over, "Clear ComfyUI's queue", "Clear it?")
+
+    [box] = asked
+    assert box.default == QMessageBox.StandardButton.Yes

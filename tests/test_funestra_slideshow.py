@@ -16,7 +16,7 @@ from funestra.playback_rate import NORMAL_RATE
 from funestra.playlist import PlaylistItem, read_playlist
 from funestra.satellite_hud import parse_hud
 from funestra.status import FunestraStatus, status_fields
-from shared_ui.message_shape import ERROR, HEARD_MARK, WARNING
+from shared_ui.message_shape import ERROR, HEARD_MARK, WARNING, answering_what_he_said
 from shared_ui.testing import appending_to
 
 from origenerator import osr2_driver
@@ -775,6 +775,17 @@ def test_a_press_of_the_huds_including_images_says_videos_only_where_fun_time_sh
 
     assert (pressed, _what_fun_time_reads(slideshow)) == (
         "portrait_media_videos", SaidMessage(0.0, MessageLevel.NORMAL, "Videos only"))
+
+
+def test_the_same_press_said_aloud_says_videos_only_with_the_microphone(qtbot, tmp_path):
+    slideshow = _on_a_sessions_satellite(
+        tmp_path, [("one.png", "image", "id-1"), ("two.mp4", "video", "id-2")])
+
+    with answering_what_he_said():
+        answer(slideshow, "media_videos")
+
+    assert _what_fun_time_reads(slideshow) == SaidMessage(
+        0.0, MessageLevel.NORMAL, "Videos only", HEARD_MARK)
 
 
 def test_a_session_that_hands_over_no_message_file_is_told_nothing_and_nothing_fails(

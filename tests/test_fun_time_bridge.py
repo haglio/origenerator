@@ -14,6 +14,7 @@ from funestra.playlist import PlaylistItem, read_playlist
 from funestra.radio import radio_file_for, read_radio
 from funestra.satellite_hud import parse_hud
 from PIL import Image
+from shared_ui.message_shape import HEARD_MARK, mark_of_a_message_said_now
 
 from origenerator import fun_time_mode as contract
 from origenerator.fun_time_bridge import (
@@ -262,6 +263,46 @@ def test_a_word_about_the_slide_goes_back_to_the_slide_it_was_said_over_first(
     bridge._tick()
 
     assert show.done == [("back to", pytest.approx(on_this_clock, abs=0.1)), done]
+
+
+class _AnsweringShow(_SaidOverShow):
+    def set_media(self, kept):
+        self.done.append(("media", mark_of_a_message_said_now()))
+
+
+def test_a_line_fun_time_says_he_said_aloud_is_answered_with_the_microphone(
+        qtbot, tmp_path, monkeypatch):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    show = _AnsweringShow()
+    monkeypatch.setattr(view, "region_slideshow", lambda shape: show)
+
+    _press(bridge, tmp_path, "portrait_media_videos @100.000"
+                             f"{contract.declaration()['heard_suffix']}")
+
+    assert show.done == [("media", HEARD_MARK)]
+
+
+def test_a_line_pressed_with_its_time_is_answered_without_the_microphone(
+        qtbot, tmp_path, monkeypatch):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    show = _AnsweringShow()
+    monkeypatch.setattr(view, "region_slideshow", lambda shape: show)
+
+    _press(bridge, tmp_path, "portrait_media_videos @100.000")
+
+    assert show.done == [("media", "")]
+
+
+def test_the_word_heard_said_as_part_of_a_request_stays_in_the_request(
+        qtbot, tmp_path, monkeypatch):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    spoken = []
+    monkeypatch.setattr(view, "run_spoken_command",
+                        lambda text, said_at: spoken.append(text))
+
+    _press(bridge, tmp_path, "PORTRAIT_SAY:the words he heard")
+
+    assert spoken == ["portrait the words he heard"]
 
 
 @pytest.mark.parametrize(("pressed", "delta"), [("next", 1), ("prev", -1)])
@@ -915,6 +956,29 @@ def _said_aloud(template: str, tmp_path) -> str:
     said_at = contract.declaration()["said_at_suffix"].format(
         said_at_epoch_seconds="1761390000.250")
     return _a_line_like(template, tmp_path) + ("" if "|" in template else said_at)
+
+
+def _heard(template: str, tmp_path) -> str:
+    heard = contract.declaration()["heard_suffix"]
+    return _said_aloud(template, tmp_path) + ("" if "|" in template else heard)
+
+
+def test_a_host_matches_each_line_fun_time_says_he_said_aloud_by_its_published_pattern(
+        tmp_path):
+    document = contract.declaration()
+    lines = [_heard(template, tmp_path) for template in document["command_lines"]]
+
+    unmatched = [line for line, pattern in zip(lines, document["command_patterns"], strict=True)
+                 if not re.fullmatch(pattern, line)]
+
+    assert unmatched == []
+
+
+def test_every_line_fun_time_says_he_said_aloud_is_answered(qtbot, tmp_path, caplog):
+    for template in contract.declaration()["command_lines"]:
+        _told_on_a_fresh_bridge(tmp_path, _heard(template, tmp_path))
+
+    assert "dropped" not in caplog.text
 
 
 def test_every_line_said_aloud_is_answered_with_when_it_was_said_on_its_end(

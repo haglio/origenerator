@@ -9,6 +9,7 @@ from functools import cache
 from pathlib import Path
 
 from origenerator import config
+from origenerator.one_look import stat_of
 
 SDXL = "sdxl"
 SD15 = "sd15"
@@ -97,7 +98,7 @@ _THIS_READER = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:16]
 
 def describe(path: Path) -> ModelFile:
     try:
-        stat = path.stat()
+        stat = stat_of(path)
     except OSError:
         return _describe(path)
     key = (str(path), stat.st_size, stat.st_mtime_ns)

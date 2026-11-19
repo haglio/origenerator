@@ -109,6 +109,7 @@ from origenerator.gui.zone_items import ZoneFolders, ZoneItems
 from origenerator.item_names import ItemNames
 from origenerator.library_views import NO_VIEWS, LibraryViews, TabViews
 from origenerator.media import MediaType
+from origenerator.one_look import one_look
 from origenerator.osr2_driver import drive_target_for
 from origenerator.prompt_tokens import prompt_readings
 from origenerator.published_actions import set_many_actions
@@ -586,6 +587,10 @@ class GenerateTab(DropZones):
         return wf.missing_inputs(self._param_form.get_values())
 
     def _on_workflow_changed(self):
+        with one_look():
+            self._switch_to_the_picked_workflow()
+
+    def _switch_to_the_picked_workflow(self):
         self._forget_settings_source()
         self._end_modify_batch()
         self._fresh_form = False

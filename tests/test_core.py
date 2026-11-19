@@ -405,6 +405,36 @@ def test_closing_it_on_its_own_asks_the_broker_to_remind_him_to_turn_the_osr2_of
     assert reminders == [True]
 
 
+def test_saying_yes_to_the_power_button_reminds_him_to_turn_the_osr2_off(
+        qtbot, tmp_path, monkeypatch, reminders):
+    _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.Yes)
+    win = _window(qtbot, tmp_path)
+    win.show()
+
+    win._gallery_view._buttons.power.click()
+
+    assert reminders == [True]
+
+
+def test_ctrl_alt_q_closes_it_without_asking_and_without_a_reminder(
+        qtbot, tmp_path, monkeypatch, reminders):
+    win = _window(qtbot, tmp_path)
+    win.show()
+
+    _quit_shortcut(win).activated.emit()
+
+    assert reminders == []
+
+
+def test_windows_signing_out_closes_it_without_a_reminder(qtbot, tmp_path, reminders):
+    win = _window(qtbot, tmp_path)
+    win.show()
+
+    QApplication.closeAllWindows()
+
+    assert reminders == []
+
+
 def test_a_close_he_calls_off_asks_for_no_reminder(qtbot, tmp_path, monkeypatch, reminders):
     _answer_the_close_question(monkeypatch, QMessageBox.StandardButton.No)
     win = _window(qtbot, tmp_path)

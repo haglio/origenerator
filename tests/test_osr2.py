@@ -10,6 +10,7 @@ from app_support.file_channel import consume_command_file
 from app_support.osr2_device import SILENT_ONCE_OFF_S, Osr2Mode, Osr2Trouble
 from app_support.osr2_hold import PARK
 from app_support.osr2_slot import Osr2Slot
+from app_support.osr2_turn_off_reminder import what_closed
 from app_support.state_files import (
     BROKER_CMD,
     BROKER_HEARTBEAT,
@@ -131,19 +132,11 @@ def test_the_broker_is_running_while_its_heartbeat_in_the_shared_directory_is_fr
     assert broker_running(now=1000.0, state_dir=tmp_path)
 
 
-def test_closing_asks_the_broker_its_checkout_names_to_remind_him_to_turn_the_osr2_off(
+def test_closing_asks_the_broker_to_remind_him_to_turn_the_osr2_off_naming_origenerator(
         tmp_path):
-    checkout = tmp_path / "relay"
-    checkout.mkdir()
-    (checkout / CONTRACT_FILE).write_text(json.dumps({
-        "app_name": "Relay", "package_dir": "relay_pkg", "broker_module": "relay_pkg.app",
-        "tray_module": "relay_pkg.tray", "tray_launcher": "launch_relay_tray.vbs",
-        "turn_off_reminder_request": "relay_reminder.txt",
-    }), encoding="utf-8")
+    ask_for_the_turn_off_reminder(state_dir=tmp_path)
 
-    ask_for_the_turn_off_reminder(state_dir=tmp_path, checkout=checkout)
-
-    assert (tmp_path / "relay_reminder.txt").read_text(encoding="utf-8") == "Origenerator"
+    assert what_closed(tmp_path) == "Origenerator"
 
 
 def test_a_press_on_the_broker_goes_through_the_launcher_its_checkout_names(

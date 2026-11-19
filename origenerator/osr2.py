@@ -5,6 +5,7 @@ from pathlib import Path
 from app_support import osr2_device
 from app_support.osr2_hold import ask_the_broker
 from app_support.osr2_slot import Osr2Sender
+from app_support.osr2_turn_off_reminder import remind_to_turn_off
 from funestra import broker
 from funestra.tcode import format_tcode_command, to_tcode_position
 
@@ -36,10 +37,8 @@ def press_the_broker(*, state_dir=None, checkout: Path | None = None) -> None:
     broker.press(_state_dir(state_dir), broker.tray_launcher_in(checkout))
 
 
-def ask_for_the_turn_off_reminder(*, state_dir=None, checkout: Path | None = None) -> None:
-    checkout = project_dir("broker") if checkout is None else checkout
-    broker.remind_to_turn_off(_state_dir(state_dir), broker.tray_launcher_in(checkout),
-                              closed="Origenerator")
+def ask_for_the_turn_off_reminder(*, state_dir=None) -> None:
+    remind_to_turn_off(_state_dir(state_dir), closed="Origenerator")
 
 
 def format_position(pos_0_100: float, interval_ms: float) -> str:

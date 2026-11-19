@@ -87,9 +87,11 @@ def test_asking_of_many_items_lists_the_installed_models_once(tmp_path, monkeypa
     monkeypatch.setattr(type(workflow), "param_definitions",
                         lambda self: built.append(1) or build(self))
     rows = [_row("sdxl_t2i", seed=n) for n in range(3)]
+    why_it_cannot_be_made_again(rows[0], _folders(tmp_path))
+    built.clear()
 
     with one_look():
         for row in rows:
             why_it_cannot_be_made_again(row, _folders(tmp_path))
 
-    assert len(built) <= 2
+    assert len(built) == 1

@@ -6,6 +6,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QMessageBox, QPlainTextEdit, QPushButton
 
 from origenerator.gui.prompt_marks import only_unread_emphasis_to_resolve, problem_to_resolve
+from origenerator.gui.style_property import set_style_property
 
 _GUARD_MS = 2500
 DEFAULT_CAPTION = "Generate"
@@ -40,9 +41,7 @@ class GenerateButton(QPushButton):
         self._wear_warning(False)
 
     def _wear_warning(self, warning: bool) -> None:
-        self.setProperty("warning", warning)
-        self.style().unpolish(self)
-        self.style().polish(self)
+        set_style_property(self, "warning", warning)
 
 
 def _wants_emphasis_removed(button: GenerateButton) -> bool:

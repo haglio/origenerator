@@ -4,7 +4,8 @@ from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtWidgets import QAbstractScrollArea
 
 from origenerator.gui.drags import under_way
-from origenerator.gui.drop_style import AIMED, LIT, DropEdge, light
+from origenerator.gui.drop_style import AIMED, LIT, DropEdge
+from origenerator.gui.style_property import set_style_property
 
 _DRAG_EVENTS = (QEvent.Type.DragEnter, QEvent.Type.DragMove, QEvent.Type.Drop)
 
@@ -31,7 +32,7 @@ class DropTarget(QObject):
         self._wear(AIMED, False)
 
     def _wear(self, state, on):
-        light(self._zone, state, on)
+        set_style_property(self._zone, state, on)
         self._edge.setVisible(bool(self._zone.property(LIT) or self._zone.property(AIMED)))
 
     def eventFilter(self, _watched, event):

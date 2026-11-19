@@ -800,3 +800,29 @@ def test_skip_said_while_its_button_is_gray_does_nothing(window):
 
     assert (store.item_actions, _said(made, STATUS_LINE)[:2]) == (
         {}, "2 ")
+
+
+class _CountingStyle:
+    def __init__(self):
+        self.polished = []
+
+    def unpolish(self, widget):
+        pass
+
+    def polish(self, widget):
+        self.polished.append(widget)
+
+
+def test_a_press_restyles_no_button_whose_yellow_box_stays_as_it_was(window, monkeypatch):
+    made, _store, _stage = window(folders=_set_before(
+        ("first", None), ("second", None), ("third", None), ("fourth", None)))
+    counting = _CountingStyle()
+    for name in _BUTTONS:
+        for widget in {_tile(made, name), made._face(name)}:
+            monkeypatch.setattr(widget, "style", lambda counting=counting: counting)
+
+    for _ in range(3):
+        _tile(made, "button one").click()
+
+    assert counting.polished == [], (
+        "each press restyled every button and its face twice, though no yellow box moved")

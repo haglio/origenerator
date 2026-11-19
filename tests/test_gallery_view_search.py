@@ -5,6 +5,7 @@ from PySide6.QtCore import (
     QCoreApplication,
     QEvent,
     Qt,
+    QTimer,
 )
 from PySide6.QtGui import (
     QKeyEvent,
@@ -19,6 +20,7 @@ from shared_ui.colors import YELLOW
 
 from origenerator import (
     config,
+    local_llm,
     search,
 )
 from origenerator.gallery.collection import (
@@ -367,7 +369,6 @@ def test_an_empty_search_names_the_folder_it_looked_in(qtbot):
     videos = _video_workflow(view._tree)
     view._tree.setCurrentItem(videos)
     _search_for(view, "dog")
-    view.search._expander.expanded.emit("dog", {})
 
     assert videos.text(0) in view._scroll.widget().text()
 
@@ -665,47 +666,32 @@ def test_an_empty_search_names_the_word_that_emptied_it(qtbot):
     view.refresh()
 
     _search_for(view, "cat aardvark")
-    view.search._expander.expanded.emit("cat aardvark", {})
 
     assert view.listed_prompt_ids() == []
     assert "aardvark" in view._scroll.widget().text()
 
 
-def test_an_empty_search_names_nothing_until_it_has_finished(qtbot):
-    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
+def test_a_word_no_item_says_finds_nothing_whatever_the_local_model_would_offer(
+        qtbot, monkeypatch):
+    asked = []
+
+    def the_model_offers_kitten(messages, **_how):
+        asked.append(messages)
+        return {"message": {"content": '{"aardvark": ["kitten"]}'}}
+
+    monkeypatch.setattr(local_llm, "ask", the_model_offers_kitten)
+    view = GalleryView(database_of([_image("i1", "a lone kitten", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
 
     _search_for(view, "aardvark")
-    assert "aardvark" not in view._scroll.widget().text()
+    for timer in view.search.findChildren(QTimer):
+        if timer.isActive():
+            timer.stop()
+            timer.timeout.emit()
 
-    view.search._expander.expanded.emit("aardvark", {})
-    assert "aardvark" in view._scroll.widget().text()
-
-
-def test_the_llm_widening_re_runs_the_search_when_it_lands(qtbot):
-    rows = [_image("i1", "a lone kitten", 50, 1), _image("i2", "a dog", 50, 2)]
-    view = GalleryView(database_of(rows))
-    qtbot.addWidget(view)
-    view.refresh()
-    _search_for(view, "cat")
     assert view.listed_prompt_ids() == []
-
-    view.search._expander.expanded.emit("cat", {"cat": ("kitten",)})
-
-    assert view.listed_prompt_ids() == ["i1"]
-
-
-def test_a_widening_for_an_abandoned_query_is_ignored(qtbot):
-    rows = [_image("i1", "a lone kitten", 50, 1), _image("i2", "a dog", 50, 2)]
-    view = GalleryView(database_of(rows))
-    qtbot.addWidget(view)
-    view.refresh()
-    _search_for(view, "dog")
-
-    view.search._expander.expanded.emit("cat", {"cat": ("kitten",)})
-
-    assert view.listed_prompt_ids() == ["i2"]
+    assert asked == [], "the search never asks the local model for other words"
 
 
 def test_a_search_offers_no_folder_action_for_the_folder_behind_it(qtbot):

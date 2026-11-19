@@ -9,7 +9,6 @@ PACKAGE = Path(__file__).resolve().parents[1] / "origenerator"
 
 SYSTEM_PROMPTS = (
     "REQUEST_SYSTEM_PROMPT",
-    "SEARCH_EXPANSION_SYSTEM_PROMPT",
     "COLLECTION_NOTES_SYSTEM_PROMPT",
 )
 

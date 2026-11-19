@@ -11,9 +11,7 @@ from origenerator.gui.gallery_pane import SEARCH_DRAW_LIMIT
 from origenerator.gui.gallery_tree import PathStep, path_text
 from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.scope_search_edit import ScopeSearchEdit
-from origenerator.gui.search_expander import SearchExpander
 
-_ONE_ASK_PER_PAUSE_MS = 700
 _DELAY_MS = 300
 MIN_CHARS = 3
 _SORTS = (("Recent", search.SORT_RECENT), ("Model / LoRA", search.SORT_MODEL_LORA))
@@ -58,8 +56,7 @@ def _once_after(pause_ms: int, then, *, owner: QObject) -> QTimer:
 
 
 class GallerySearchController(QObject):
-    def __init__(self, host: SearchHost, *, parent: QObject, library, toc, pane,
-                 expander: SearchExpander | None = None):
+    def __init__(self, host: SearchHost, *, parent: QObject, library, toc, pane):
         super().__init__(parent)
         self._host = host
         self._library = library
@@ -68,16 +65,11 @@ class GallerySearchController(QObject):
         self._index = search.GallerySearch()
         self._query = ""
         self._everywhere = False
-        self._expansions = None
-        self._widening_awaited = False
         self._outcome = search.SearchOutcome((), ())
         self._tiles: list = []
         self._sort = search.SORT_RECENT
         self._collapsed: set[str] = set()
-        self._expander = expander or SearchExpander(self)
-        self._expander.expanded.connect(self._on_expanded)
         self._timer = _once_after(_DELAY_MS, self._run_pending, owner=self)
-        self._expand_timer = _once_after(_ONE_ASK_PER_PAUSE_MS, self._request_expansion, owner=self)
 
         self.field = ScopeSearchEdit()
         self.field.set_scope(gallery.ALL_LABEL)
@@ -152,9 +144,7 @@ class GallerySearchController(QObject):
     def run(self) -> None:
         scope = (SearchScope.everything(self._library.live_ids) if self._everywhere
                  else self._host.search_scope())
-        self._outcome = self._index.search(
-            self._query, expansions=self._expansions, within=scope.ids
-        )
+        self._outcome = self._index.search(self._query, within=scope.ids)
         self._tiles = self._matched_folders_first(self._collapse_to_folders(self._outcome.results))
         self._host.name_search_on_screen(self._query, scope)
         self._count.setText(self._count_text())
@@ -163,7 +153,6 @@ class GallerySearchController(QObject):
             sort_mode=self._sort, query=self._query, outcome=self._outcome,
             scope=scope.path, collapsed=self._collapsed,
             on_section_toggled=self._on_section_toggled,
-            still_searching=self._widening_awaited,
         ))
         self._host.search_results_drawn()
 
@@ -176,12 +165,9 @@ class GallerySearchController(QObject):
     def clear_state(self) -> None:
         self._query = ""
         self._everywhere = False
-        self._expansions = None
-        self._widening_awaited = False
         self._outcome = search.SearchOutcome((), ())
         self._tiles = []
         self._timer.stop()
-        self._expand_timer.stop()
         self.field.set_working(False)
         self.bar.hide()
 
@@ -195,33 +181,25 @@ class GallerySearchController(QObject):
         self._query = query
         self._everywhere = everywhere and bool(query)
         self._gray_search_all(len(query) < MIN_CHARS)
-        if query:
-            self._expansions = self._expander.cached(query)
 
     def _on_text_changed(self, text: str) -> None:
         query = (text or "").strip()
         self._timer.stop()
-        self._expand_timer.stop()
         self._gray_search_all(len(query) < MIN_CHARS)
         if len(query) < MIN_CHARS:
             if self._query:
                 self._exit()
             self._query = ""
             return
-        if query != self._query:
-            self._expansions = None
         self._query = query
-        self._widening_awaited = self._index.widens(query) and self._expander.unanswered(query)
         self._timer.start()
-        self._expand_timer.start()
         self.field.set_working(True)
 
     def _run_pending(self) -> None:
         if not self._query:
             return
-        self._expansions = self._expander.cached(self._query)
         self.run()
-        self.field.set_working(self._widening_awaited)
+        self.field.set_working(False)
 
     def _search_everywhere(self) -> None:
         if not self._query:
@@ -241,19 +219,6 @@ class GallerySearchController(QObject):
     def _on_sort_changed(self, _index=0) -> None:
         self._sort = self._sort_dropdown.currentData() or search.SORT_RECENT
         if self._query:
-            self.run()
-
-    def _request_expansion(self) -> None:
-        if self._widening_awaited:
-            self._expander.request(self._query)
-
-    def _on_expanded(self, query: str, expansions) -> None:
-        if not self._expander.same_words(query, self._query):
-            return
-        self._widening_awaited = False
-        self.field.set_working(False)
-        if expansions or not self._tiles:
-            self._expansions = expansions
             self.run()
 
     def _matched_folders_first(self, tiles) -> list:

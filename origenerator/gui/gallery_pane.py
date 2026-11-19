@@ -442,8 +442,7 @@ class GalleryPane(QObject):
         self._reset_pane_state()
         if not tiles:
             self.show_widget(self._empty_state(
-                "" if terms.still_searching
-                else _search_empty_hint(terms.outcome, terms.query, terms.scope)))
+                _search_empty_hint(terms.outcome, terms.query, terms.scope)))
             self._showing_search = True
             return
         drawn = list(tiles)[:SEARCH_DRAW_LIMIT]

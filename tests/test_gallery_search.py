@@ -12,7 +12,6 @@ from PySide6.QtWidgets import QApplication, QWidget
 from origenerator import gallery
 from origenerator.gui.gallery_pane import SEARCH_DRAW_LIMIT
 from origenerator.gui.gallery_search import MIN_CHARS, GallerySearchController
-from origenerator.gui.search_expander import SearchExpander
 
 
 class _Scope(NamedTuple):
@@ -76,11 +75,11 @@ class FakeHost:
 def controller(qtbot):
     built = []
 
-    def build(rows=(), host=None, expander=None):
+    def build(rows=(), host=None):
         parent = QWidget()
         qtbot.addWidget(parent)
         host = host or FakeHost()
-        found = GallerySearchController(host, parent=parent, expander=expander, toc=host,
+        found = GallerySearchController(host, parent=parent, toc=host,
                                         pane=host, library=_A_LIBRARY_OF_NO_IMAGES)
         found.index.update(list(rows))
         # A QObject whose parent is collected takes its timers down with it, so each parent is kept.
@@ -95,12 +94,6 @@ def _type(found, text):
     if found._timer.isActive():
         found._timer.stop()
         found._run_pending()
-
-
-def _let_the_widening_land(qtbot, found):
-    with qtbot.waitSignal(found._expander.expanded):
-        found._expand_timer.stop()
-        found._request_expansion()
 
 
 _A_FOLDER = _Scope("All > Folder", {"g1"})
@@ -166,100 +159,22 @@ def test_search_all_is_grayed_until_a_search_can_start(controller):
     assert f"{MIN_CHARS} characters" in grayed_tip
 
 
-def test_the_field_shows_a_search_is_still_going_until_its_widening_lands(controller, qtbot):
-    expander = SearchExpander(expand=lambda query: {"kitten": ("tabby",)})
-    found = controller([_row("g1", "a tabby on a wall")], expander=expander)
-
-    _type(found, "kitten")
-    assert found.field.working()
-    assert found._expand_timer.isActive(), (
-        "the model is asked only after a real pause, not in a gap between two characters: the "
-        "results the table widened are on screen throughout, so nothing is being waited for, "
-        "and the wait only decides how often the model is asked")
-
-    _let_the_widening_land(qtbot, found)
-    assert not found.field.working()
-
-
-def test_the_searches_run_while_typing_ask_the_model_nothing(controller, qtbot):
-    asked = []
-
-    def widen(query):
-        asked.append(query)
-        return {"kitten": ("tabby",)}
-
-    expander = SearchExpander(expand=widen)
-    found = controller([_row("g1", "a tabby on a wall")], expander=expander)
-    with qtbot.waitSignal(expander.expanded):
-        expander.request("kitten")
-    asked.clear()
-
-    for typed in ("kit", "kitt", "kitte", "kitten"):
-        _type(found, typed)
-
-    assert (asked, expander._in_flight, found._expansions) == (
-        [], set(), {"kitten": ("tabby",)}), (
-        "each search run while typing reads the widenings already known and asks the model "
-        "nothing, so typing costs lookups rather than a model call per character")
-
-
-def test_a_search_for_a_name_alone_has_finished_once_it_is_drawn(controller):
+def test_a_search_has_finished_once_it_is_drawn(controller):
     found = controller([_row("g1", "a tabby on a wall")])
 
-    _type(found, "3FA9C0D2 004")
-
-    assert not found.field.working()
-
-
-def test_a_search_for_the_start_of_a_name_has_finished_once_it_is_drawn(controller):
-    found = controller()
-    found.index.update([_row("g1", "a tabby on a wall")], item_name={"g1": "79BB46F1 000"}.get)
-
-    _type(found, "79BB")
-
-    assert not found.field.working()
-
-
-def test_a_search_for_quoted_words_alone_has_finished_once_it_is_drawn(controller):
-    found = controller([_row("g1", "two lamps on a bench")])
-
-    _type(found, '"two lamps"')
+    _type(found, "kitten")
 
     assert not found.field.working()
 
 
 def test_leaving_a_search_stops_the_circle(controller):
     found = controller([_row("g1", "a tabby on a wall")])
-    _type(found, "kitten")
+    found.field.setText("kitten")
+    assert found.field.working()
 
     found.leave()
 
     assert not found.field.working()
-
-
-def test_an_answer_for_the_same_words_typed_another_way_ends_the_wait(controller, qtbot):
-    expander = SearchExpander(expand=lambda query: {"kitten": ("tabby",)})
-    found = controller([_row("g1", "a tabby on a wall")], expander=expander)
-    _type(found, "kitten")
-
-    with qtbot.waitSignal(expander.expanded):
-        found._request_expansion()
-        _type(found, "the kitten")
-        found._request_expansion()
-
-    assert not found.field.working()
-
-
-def test_an_empty_search_says_so_only_once_it_has_finished(controller, qtbot):
-    host = FakeHost()
-    expander = SearchExpander(expand=lambda query: {})
-    found = controller([_row("g1", "a tabby on a wall")], host=host, expander=expander)
-
-    _type(found, "aardvark")
-    assert host.shown[-1][1]["still_searching"]
-
-    _let_the_widening_land(qtbot, found)
-    assert not host.shown[-1][1]["still_searching"]
 
 
 def test_a_query_reaches_the_pane_as_the_rows_that_matched_it(controller):
@@ -360,33 +275,6 @@ def test_a_folder_the_tree_has_no_row_for_falls_back_to_its_own_items(controller
     assert all(tile.group is None for tile in tiles)
 
 
-def test_a_widening_that_lands_for_the_running_query_re_runs_it(controller, qtbot):
-    host = FakeHost()
-    expander = SearchExpander(expand=lambda query: {"kitten": ("tabby",)})
-    found = controller([_row("g1", "a tabby on a wall"), _row("g2", "a hound")],
-                       host=host, expander=expander)
-    _type(found, "kitten")
-    assert host.shown[-1][0] == []
-
-    _let_the_widening_land(qtbot, found)
-
-    assert [tile.row["prompt_id"] for tile in host.shown[-1][0]] == ["g1"]
-
-
-def test_a_widening_for_a_query_the_user_has_typed_past_is_ignored(controller, qtbot):
-    host = FakeHost()
-    expander = SearchExpander(expand=lambda query: {"kitten": ("tabby",)})
-    found = controller([_row("g1", "a tabby on a wall")], host=host, expander=expander)
-    _type(found, "kitten")
-
-    with qtbot.waitSignal(expander.expanded):
-        found._request_expansion()
-        _type(found, "hound")
-        drawn = len(host.shown)
-
-    assert len(host.shown) == drawn
-
-
 def test_a_folded_band_stays_folded_across_a_redraw(controller):
     host = FakeHost()
     found = controller([_row("g1", "a tabby on a wall")], host=host)
@@ -420,41 +308,6 @@ def test_a_back_onto_a_stop_with_no_search_forgets_it_without_drawing_the_pane(c
         "the restore fills the pane itself, so forgetting the search draws nothing")
 
 
-def _typed_past_a_widened_query(controller, qtbot):
-    host = FakeHost()
-    expander = SearchExpander(expand=lambda query: {"kitten": ("tabby",)})
-    found = controller([_row("g1", "a tabby on a wall")], host=host, expander=expander)
-    _type(found, "kitten")
-    _let_the_widening_land(qtbot, found)
-    _type(found, "a box")
-    return host, found
-
-
-def test_a_restored_query_already_widened_comes_back_widened_from_its_first_draw(
-        controller, qtbot):
-    host, found = _typed_past_a_widened_query(controller, qtbot)
-
-    found.restore("kitten")
-    found.run()
-
-    tiles, _terms = host.shown[-1]
-    assert [tile.row["prompt_id"] for tile in tiles] == ["g1"], (
-        "a query the local model has already widened is read from its answers when put back, "
-        "so it is not drawn narrow first")
-
-
-def test_a_query_typed_again_after_its_widening_landed_is_widened_from_its_first_draw(
-        controller, qtbot):
-    host, found = _typed_past_a_widened_query(controller, qtbot)
-
-    _type(found, "kitten")
-
-    tiles, _terms = host.shown[-1]
-    assert [tile.row["prompt_id"] for tile in tiles] == ["g1"], (
-        "a query the local model has already widened is read from its answers when typed "
-        "again, so it is not drawn narrow first")
-
-
 def test_the_count_line_says_a_capped_search_is_showing_a_slice(controller):
     host = FakeHost()
     found = controller(
@@ -483,32 +336,6 @@ def test_a_remembered_order_this_version_does_not_offer_is_ignored(controller):
     found.set_sort("an_order_a_later_version_offered")
 
     assert found.sort() == before
-
-
-def test_a_widening_that_found_nothing_leaves_results_already_on_screen(controller, qtbot):
-    host = FakeHost()
-    found = controller([_row("g1", "a tabby on a wall")], host=host,
-                       expander=SearchExpander(expand=lambda query: {}))
-    _type(found, "tabby")
-    drawn = len(host.shown)
-
-    _let_the_widening_land(qtbot, found)
-
-    assert len(host.shown) == drawn, (
-        "the plain search draws first and the model only ever adds words, so a widening that "
-        "arrives improves a view the user is already looking at")
-
-
-def test_a_widening_that_found_nothing_redraws_an_empty_pane_to_say_so(controller, qtbot):
-    host = FakeHost()
-    found = controller([_row("g1", "a tabby on a wall")], host=host,
-                       expander=SearchExpander(expand=lambda query: {}))
-    _type(found, "kitten")
-    drawn = len(host.shown)
-
-    _let_the_widening_land(qtbot, found)
-
-    assert len(host.shown) == drawn + 1
 
 
 def test_the_field_says_what_a_query_typed_in_it_would_search(controller):

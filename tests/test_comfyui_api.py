@@ -17,6 +17,7 @@ from origenerator.comfyui_api import (
     comfyui_responding,
     format_execution_error,
     format_prompt_error,
+    one_queue_read,
 )
 from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.output_places import OutputPlaces
@@ -255,6 +256,18 @@ def test_queue_reads_on_the_poll_path_use_the_short_timeout():
         with urlopen as m:
             call()
         assert m.call_args.kwargs.get("timeout") == _POLL_TIMEOUT_S
+
+def test_a_history_asked_for_by_the_poll_waits_no_longer_than_the_polls_other_reads():
+    client = ComfyUIApi(folders=SUITE_FOLDERS)
+    with patch("urllib.request.urlopen", return_value=_mock_response(200, b"{}")) as m:
+        with one_queue_read():
+            client.fetch_history("comfy-X")
+        polled = m.call_args.kwargs.get("timeout")
+        client.fetch_history("comfy-X")
+        asked_alone = m.call_args.kwargs.get("timeout")
+
+    assert (polled, asked_alone) == (_POLL_TIMEOUT_S, _HTTP_TIMEOUT_S)
+
 
 def test_interrupt_posts_to_interrupt_endpoint():
     client = ComfyUIApi(folders=SUITE_FOLDERS)

@@ -1082,3 +1082,15 @@ def test_a_page_of_tiles_lists_each_folder_its_tiles_look_in_once(tmp_path, monk
     pages.draw(3)
 
     assert len(listed) == 1
+
+
+def test_restarring_many_drawn_tiles_reads_their_rows_in_one_query(qtbot, db, monkeypatch):
+    rows = [_row(f"g{n}", n) for n in range(4)]
+    pane, _scroll = _pane(qtbot, db, rows)
+    _open_latest(pane, rows)
+    asked_one_by_one = []
+    monkeypatch.setattr(db, "get_generation", asked_one_by_one.append)
+
+    pane.refresh_corners()
+
+    assert asked_one_by_one == []

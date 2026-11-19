@@ -325,6 +325,19 @@ class GenerationStore(Store):
             ).fetchone()
             return as_read(row) if row else None
 
+    def get_generations(self, prompt_ids) -> dict[str, dict]:
+        prompt_ids = list(dict.fromkeys(prompt_ids))
+        found = {}
+        with self._connect() as conn:
+            for start in range(0, len(prompt_ids), _IDS_PER_QUERY):
+                chunk = prompt_ids[start:start + _IDS_PER_QUERY]
+                for row in conn.execute(
+                        f"SELECT * FROM generations WHERE prompt_id IN ({', '.join('?' * len(chunk))})"
+                        f" AND {_OF_A_KNOWN_SOURCE}", (*chunk, *_KNOWN_SOURCES)):
+                    read = as_read(row)
+                    found[read["prompt_id"]] = read
+        return found
+
     def library_version(self) -> int:
         return self._version()
 

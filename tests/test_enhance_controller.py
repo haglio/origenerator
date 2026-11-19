@@ -140,10 +140,15 @@ class SpiedDB(Database):
         super().__init__(path)
         self.targets = []
         self.looked_up = []
+        self.batches = []
 
     def get_generation(self, prompt_id):
         self.looked_up.append(prompt_id)
         return super().get_generation(prompt_id)
+
+    def get_generations(self, prompt_ids):
+        self.batches.append(list(prompt_ids))
+        return super().get_generations(prompt_ids)
 
     def set_enhance_target(self, prompt_id, source_prompt_id):
         self.targets.append((prompt_id, source_prompt_id))
@@ -293,6 +298,17 @@ def _assembled(host, parts, db):
     host = host or FakeHost()
     return EnhanceController(host, parts, db=db, library=host.library), host
 
+
+
+def test_a_pick_of_many_items_reads_their_rows_in_one_query(enhance, stored):
+    picked = [f"v{n}" for n in range(5)]
+    db = stored([_video(pid) for pid in picked])
+    controller, _host = enhance(FakeHost(), db=db,
+                                gallery_pane=FakeGalleryPane(picked))
+
+    assert controller.offer() == (False, NO_VIDEO_ENHANCER)
+    assert db.looked_up == []
+    assert db.batches == [picked]
 
 
 def test_a_pick_of_images_is_what_the_button_aims_at(enhance, monkeypatch, stored):

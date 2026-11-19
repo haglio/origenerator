@@ -567,7 +567,8 @@ class _Applying:
                 lines.append(line)
             elif (not self.took_out and not he_named_the_negative_prompt
                   and self._names_what_he_asked(words)
-                  and not any(word in shown for word in _naming(words))):
+                  and not any(word in shown for word in _naming(words))
+                  and not _naming(words) & _naming(self.positive)):
                 lines.append(f"Couldn't find {_quoted(words)} in the Positive Prompt.")
         return " ".join(dict.fromkeys(lines))
 

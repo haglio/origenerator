@@ -470,6 +470,15 @@ def test_which_way_a_body_lies_stays_open_when_he_did_not_say(change, made, said
     assert (outcome.positive, outcome.line) == (made, said)
 
 
+def test_what_is_kept_out_beside_an_added_thing_is_not_looked_for_in_the_positive_prompt():
+    outcome = _applied([{"prompt": "positive", "add": "a navy wool cap", "for": "give him a cap"},
+                        {"prompt": "negative", "add": "plastic cap, baseball cap", "for": "give him a cap"}],
+                       pair=("a sailor on a pier", "blurry"), asked=("give him a cap",))
+
+    assert outcome.line == ('Added "a navy wool cap" to the Positive Prompt. '
+                            'Added "plastic cap, baseball cap" to the Negative Prompt.')
+
+
 def test_which_way_a_body_lies_is_written_when_he_says_it():
     outcome = _applied([{"prompt": "positive", "replace": "kneeling", "with": "lying prone",
                          "for": "lying prone instead of kneeling"}],

@@ -69,6 +69,10 @@ def hand_over_off_the_window_thread(work, done, *, owner) -> None:
     run_off_thread(work, done, owner=owner, waits_long=True)
 
 
+def save_off_the_window_thread(work, done, *, owner) -> None:
+    run_off_thread(work, done, owner=owner)
+
+
 def _the_users_own(source: str) -> bool:
     return source == GenerationSource.GENERATED
 
@@ -121,6 +125,7 @@ class JobQueue(QObject):
         self._jobs: dict[str, list[GenerationJob]] = {}
         self._finishing: weakref.WeakKeyDictionary[GenerationJob, object] = weakref.WeakKeyDictionary()
         self._progress_persist_at: dict[str, float] = {}
+        self._progress_being_saved: set[str] = set()
         self._on_server: list[GenerationJob] = []
         self._waiting: list[GenerationJob] = []
         self._in_flight: GenerationJob | None = None
@@ -536,15 +541,20 @@ class JobQueue(QObject):
 
     def _persist_progress(self, job: GenerationJob):
         now = time.monotonic()
-        if now - self._progress_persist_at.get(job.prompt_id, 0.0) < _PROGRESS_PERSIST_INTERVAL_S:
+        if (now - self._progress_persist_at.get(job.prompt_id, 0.0) < _PROGRESS_PERSIST_INTERVAL_S
+                or job.prompt_id in self._progress_being_saved):
             return
         self._progress_persist_at[job.prompt_id] = now
-        try:
-            self._db.update_generation(
-                job.prompt_id, progress_json=json.dumps(job.progress_state())
-            )
-        except Exception as e:
-            logger.debug("Could not persist progress for %s: %s", job.prompt_id, e)
+        self._progress_being_saved.add(job.prompt_id)
+        db, prompt_id, progress = self._db, job.prompt_id, json.dumps(job.progress_state())
+        Errand(lambda: db.save_running_progress(prompt_id, progress),
+               lambda saved: self._progress_saved(prompt_id, saved)).send(
+            owner=self, run=save_off_the_window_thread)
+
+    def _progress_saved(self, prompt_id: str, saved: Errand) -> None:
+        self._progress_being_saved.discard(prompt_id)
+        if saved.error is not None:
+            logger.debug("Could not persist progress for %s: %s", prompt_id, saved.error)
 
     def reconnect_running(self):
         if self._client is None:

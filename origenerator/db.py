@@ -90,6 +90,9 @@ class Database:
     def set_shielded(self, prompt_id: str, shielded: bool):
         return self.generations.set_shielded(prompt_id, shielded)
 
+    def save_running_progress(self, prompt_id: str, progress_json: str):
+        return self.generations.save_running_progress(prompt_id, progress_json)
+
     def set_source(self, prompt_id: str, source: str):
         return self.generations.set_source(prompt_id, source)
 

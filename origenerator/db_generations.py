@@ -224,6 +224,13 @@ class GenerationStore(Store):
     def set_shielded(self, prompt_id: str, shielded: bool):
         self._set(prompt_id, "shielded", 1 if shielded else 0)
 
+    def save_running_progress(self, prompt_id: str, progress_json: str):
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE generations SET progress_json = ? WHERE prompt_id = ? AND status = ?",
+                (progress_json, prompt_id, GenerationStatus.RUNNING),
+            )
+
     def set_source(self, prompt_id: str, source: str):
         self._set(prompt_id, "source", source)
 

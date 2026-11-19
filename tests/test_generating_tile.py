@@ -4,9 +4,11 @@ import time
 from dataclasses import dataclass
 from io import BytesIO
 
+from app_support.threading_utils import wait_until
 from PIL import Image
-from PySide6.QtCore import QObject, QPoint, Qt, Signal
-from PySide6.QtWidgets import QWidget
+from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, Qt, Signal
+from PySide6.QtGui import QEnterEvent
+from PySide6.QtWidgets import QApplication, QWidget
 from shared_ui.colors import BLUE, TEXT_PRIMARY
 from shared_ui.testing import appending_to
 
@@ -48,24 +50,37 @@ def test_a_queued_tile_says_waiting_over_the_thumbnail(qtbot):
     assert tile._status_scrim.text() == "Waiting…", (
         "the stage is read on the scrim over the thumbnail, the way an in-flight tile and an "
         "enhancing thumbnail say theirs")
-    assert not tile._cancel.isHidden()
-    assert tile._cancel.text() == "Cancel"
 
 
-def test_an_populating_folders_tile_says_cancel_and_hovers_the_next_seed(qtbot):
+def test_the_bar_reads_cancel_while_the_cursor_is_over_it(qtbot):
+    tile = GeneratingTile(FakeJob(state="running", last_progress=(10, 20)))
+    qtbot.addWidget(tile)
+    progress = tile._bar.text()
+
+    QApplication.sendEvent(tile._bar, QEnterEvent(QPointF(), QPointF(), QPointF()))
+    assert tile._bar.text() == "Cancel"
+    assert (tile._bar.value(), tile._bar.maximum()) == (10, 20), (
+        "only the words change; the blue bar goes on showing the run")
+
+    QApplication.sendEvent(tile._bar, QEvent(QEvent.Type.Leave))
+    assert tile._bar.text() == progress != "Cancel"
+
+
+def test_the_bar_hovers_the_next_seed_on_a_populating_folders_tile(qtbot):
     tile = GeneratingTile(FakeJob(state="running"), populating=True)
     qtbot.addWidget(tile)
-    assert tile._cancel.text() == "Cancel"
-    assert "seed" in tile._cancel.toolTip()
+    assert "seed" in tile._bar.toolTip()
 
 
-def test_the_cancel_button_emits_cancel_requested(qtbot):
+def test_a_click_on_the_bar_cancels_the_run(qtbot):
     tile = GeneratingTile(FakeJob(state="queued"))
     qtbot.addWidget(tile)
-    cancels = []
+    cancels, picks = [], []
     tile.cancel_requested.connect(lambda: cancels.append(True))
-    tile._cancel.click()
-    assert cancels == [True]
+    tile.selected.connect(lambda: picks.append(True))
+    qtbot.mouseClick(tile._bar, Qt.MouseButton.LeftButton)
+    wait_until(lambda: cancels == [True], pump=QApplication.processEvents)
+    assert picks == [], "the press cancels and does not also pick the tile"
 
 
 def test_a_click_on_the_tile_selects_it(qtbot):
@@ -104,7 +119,7 @@ def _picked_tile_drawn(qtbot):
 
 def test_a_picked_tile_is_filled_with_the_familys_blue(qtbot):
     tile, image = _picked_tile_drawn(qtbot)
-    button = tile._cancel.geometry()
+    button = tile._title.geometry()
 
     beside = tile.mapToParent(QPoint(button.left() - 1, button.center().y()))
     assert image.pixelColor(beside).name() == BLUE.name()
@@ -208,17 +223,43 @@ def test_preview_signal_renders_image(qtbot):
     assert _has_image(tile)
 
 
-def test_the_bar_sits_along_the_foot_of_the_thumbnail(qtbot):
+def test_the_bar_sits_between_the_thumbnails_bottom_corners(qtbot):
     tile = GeneratingTile(FakeJob(state="running"))
     qtbot.addWidget(tile)
     thumbnail, bar = tile._image.geometry(), tile._bar.geometry()
 
-    assert bar.bottomLeft().y() == thumbnail.bottomLeft().y(), (
-        "the bar rides over the thumbnail, taking no row of its own, so the tile is the size and "
-        "shape of every tile beside it")
-    assert bar.left() == thumbnail.left()
-    assert bar.width() == thumbnail.width()
-    assert bar.top() > thumbnail.center().y()
+    assert thumbnail.contains(bar), "the bar rides over the thumbnail, as an enhancing image's does"
+    assert bar.left() - thumbnail.left() == thumbnail.right() - bar.right()
+    for icon in (tile._controls._trash, tile._controls._enhance_button):
+        assert not icon.geometry().intersects(bar), (
+            "the trash and the enhance button keep the thumbnail's lower corners")
+
+
+def test_the_tile_shows_its_generate_tab_title_under_the_thumbnail(qtbot):
+    tile = GeneratingTile(FakeJob(state="running"), title="SDXL › a lighthouse")
+    qtbot.addWidget(tile)
+    assert tile._title.text() == "SDXL › a lighthouse"
+    assert tile._title.geometry().top() > tile._image.geometry().bottomLeft().y()
+
+
+def test_the_tile_offers_its_favorite_trash_and_enhance_icons(qtbot):
+    tile = GeneratingTile(FakeJob(state="running"), enhance="open")
+    qtbot.addWidget(tile)
+    pressed = []
+    tile.control_triggered.connect(pressed.append)
+
+    for icon in tile._controls.buttons():
+        assert not icon.isHidden()
+        icon.click()
+
+    assert pressed == ["star", "trash", "enhance"]
+
+
+def test_a_video_being_generated_offers_no_enhance_icon(qtbot):
+    tile = GeneratingTile(FakeJob(state="running"), enhance=None)
+    qtbot.addWidget(tile)
+    assert tile._controls._enhance_button.isHidden()
+    assert not tile._controls._trash.isHidden()
 
 
 def test_a_tile_rebuilt_mid_run_shows_the_jobs_cached_state(qtbot):
@@ -254,12 +295,3 @@ def test_right_clicking_the_tile_asks_for_its_menu(qtbot):
     tile.customContextMenuRequested.emit(QPoint(5, 5))
 
     assert len(asked) == 1
-
-
-def test_the_bar_is_drawn_over_the_scrim_it_sits_on(qtbot):
-    tile = GeneratingTile(FakeJob(state="running"))
-    qtbot.addWidget(tile)
-
-    order = tile._bar.parentWidget().children()
-    assert order.index(tile._bar) > order.index(tile._status_scrim), (
-        "the scrim raises itself over everything each time it covers the thumbnail, the bar included")

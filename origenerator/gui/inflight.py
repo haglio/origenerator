@@ -43,6 +43,13 @@ class InFlightItem:
     starting: bool = False
     move_up: Callable[[], None] | None = None
     move_down: Callable[[], None] | None = None
+    favorite: bool = False
+    enhanceable: bool = False
+    going_to_trash: bool = False
+
+    @property
+    def is_an_item(self) -> bool:
+        return self.job_kind in (JobKind.IMAGE, JobKind.VIDEO)
 
 
 def queue_lead_text(item: InFlightItem) -> str:

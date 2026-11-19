@@ -613,7 +613,7 @@ class GalleryPane(QObject):
 
     def _tile_items(self, rows=None, requests=None) -> list[InFlightItem]:
         return [item for item in self.inflight_items(rows, requests)
-                if item.job_kind != gallery.JobKind.ENHANCE]
+                if item.job_kind != gallery.JobKind.ENHANCE and not item.going_to_trash]
 
     def _latest_inflight_items(self, rows=None, requests=None) -> list[InFlightItem]:
         if rows is None:
@@ -850,6 +850,7 @@ class GalleryPane(QObject):
     def _add_inflight_tile(self, flow, item):
         tile = InFlightTile(item)
         tile.clicked.connect(self._on_inflight_clicked)
+        tile.control_triggered.connect(self._on_tile_control)
         tile.context_requested.connect(self._inflight_context_menu)
         flow.addWidget(tile)
         self._inflight_tiles[item.key] = tile
@@ -981,3 +982,4 @@ class GalleryPane(QObject):
             if row is not None:
                 tile.set_enhance(self._enhance_state(row))
                 tile.set_favorite(bool(row.get("starred")))
+        self.refresh_inflight()

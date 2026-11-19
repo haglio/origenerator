@@ -138,6 +138,9 @@ class InFlightItems:
                 folder_thumbnails=self._folder_thumbnails(folder_key, stablemates),
                 move_up=move_up,
                 move_down=move_down,
+                favorite=bool(row.get("starred")),
+                enhanceable=kind == gallery.JobKind.IMAGE,
+                going_to_trash=bool(row.get("trash_requested_at")),
             ))
             if row.get("status") == GenerationStatus.RUNNING:
                 sent.add(pid)

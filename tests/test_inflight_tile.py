@@ -3,8 +3,11 @@ from __future__ import annotations
 import io
 import time
 
+from app_support.threading_utils import wait_until
 from PIL import Image
-from PySide6.QtCore import QPoint, Qt
+from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
+from PySide6.QtGui import QEnterEvent
+from PySide6.QtWidgets import QApplication
 
 from origenerator.gui.inflight import InFlightItem, RunReading, foreign_queue_text
 from origenerator.gui.inflight_tile import InFlightTile
@@ -159,8 +162,8 @@ def test_the_clock_advances_between_polls(qtbot):
     assert tile._bar.caption() == "~1:31 left"
 
 
-def test_the_bar_sits_along_the_foot_of_the_frame(qtbot):
-    tile = InFlightTile(_item(status="running"))
+def test_the_bar_sits_on_the_frame_between_its_bottom_corners(qtbot):
+    tile = InFlightTile(_item(status="running", job_kind="Image"))
     qtbot.addWidget(tile)
     frame, bar = tile._image.geometry(), tile._bar.geometry()
 
@@ -168,6 +171,73 @@ def test_the_bar_sits_along_the_foot_of_the_frame(qtbot):
         "the bar rides over the frame, taking no row of its own, so the thumbnail keeps the height a "
         "finished tile's has")
     assert bar.top() > frame.center().y()
+    for icon in (tile._controls._trash, tile._controls._enhance_button):
+        assert not icon.geometry().intersects(bar), (
+            "the trash and the enhance button keep the frame's lower corners, as on an enhancing image")
+
+
+def test_the_bar_reads_cancel_while_the_cursor_is_over_it(qtbot):
+    tile = InFlightTile(_item(status="running", progress=(10, 20), cancel=lambda: None))
+    qtbot.addWidget(tile)
+    progress = tile._bar.text()
+
+    QApplication.sendEvent(tile._bar, QEnterEvent(QPointF(), QPointF(), QPointF()))
+    assert tile._bar.text() == "Cancel"
+    assert (tile._bar.value(), tile._bar.maximum()) == (10, 20), (
+        "only the words change; the blue bar goes on showing the run")
+
+    QApplication.sendEvent(tile._bar, QEvent(QEvent.Type.Leave))
+    assert tile._bar.text() == progress != "Cancel"
+
+
+def test_a_click_on_the_bar_cancels_the_item(qtbot):
+    canceled = []
+    tile = InFlightTile(_item(status="queued", cancel=lambda: canceled.append(True)))
+    qtbot.addWidget(tile)
+    opened = []
+    tile.clicked.connect(opened.append)
+
+    qtbot.mouseClick(tile._bar, Qt.MouseButton.LeftButton)
+
+    wait_until(lambda: canceled == [True], pump=QApplication.processEvents)
+    assert opened == [], "the press cancels and does not also open the item"
+
+
+def test_a_run_that_cannot_be_canceled_keeps_its_progress_text_under_the_cursor(qtbot):
+    tile = InFlightTile(_item(status="running", progress=(10, 20)))
+    qtbot.addWidget(tile)
+    progress = tile._bar.text()
+
+    QApplication.sendEvent(tile._bar, QEnterEvent(QPointF(), QPointF(), QPointF()))
+    assert tile._bar.text() == progress != "Cancel"
+
+
+def test_an_image_on_its_way_offers_its_favorite_trash_and_enhance_icons(qtbot):
+    tile = InFlightTile(_item(key="p9", job_kind="Image", enhanceable=True))
+    qtbot.addWidget(tile)
+    pressed = []
+    tile.control_triggered.connect(lambda key, action: pressed.append((key, action)))
+
+    for icon in tile._controls.buttons():
+        assert not icon.isHidden()
+        icon.click()
+
+    assert pressed == [("p9", "star"), ("p9", "trash"), ("p9", "enhance")]
+
+
+def test_a_favorited_item_on_its_way_wears_a_full_star(qtbot):
+    tile = InFlightTile(_item(job_kind="Video"))
+    qtbot.addWidget(tile)
+    tile.update_item(_item(job_kind="Video", favorite=True))
+    assert tile._controls._star.toolTip() == "Unfavorite this item"
+    assert tile._controls._enhance_button.isHidden()
+
+
+def test_an_enhancement_on_its_way_offers_no_corner_icons(qtbot):
+    tile = InFlightTile(_item(job_kind="Enhance"))
+    qtbot.addWidget(tile)
+    assert all(icon.isHidden() for icon in tile._controls.buttons()), (
+        "an enhancement is no item of its own, so there is nothing to favorite or trash")
 
 
 def test_foreign_queue_text_counts_the_whole_of_somebody_elses_queue():

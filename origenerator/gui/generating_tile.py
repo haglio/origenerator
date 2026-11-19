@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QPoint, QRect, QSize, Qt, QTimer, Signal
+from PySide6.QtCore import QPoint, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
+from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 from shared_ui.palette import TEXT_MUTED, as_hex
 from shared_ui.spacing import BUTTON_RADIUS
 
 from origenerator.gui import palette, tile_shape
+from origenerator.gui.cancel_bar import CancelBar
 from origenerator.gui.combination import Combination
 from origenerator.gui.combination_view import combination_pixmap
+from origenerator.gui.corner_buttons import CornerButtons, bar_between_the_bottom_corners
 from origenerator.gui.generation_job import display_status
-from origenerator.gui.inflight import CANCEL_TEXT, TICK_MS, RunReading, cancel_tooltip
-from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
+from origenerator.gui.inflight import TICK_MS, RunReading, cancel_tooltip
 from origenerator.gui.tile_status_scrim import TileStatusScrim
 
 _RESTING_FRAME_CSS = tile_shape.idle_css("generatingTile")
@@ -25,9 +26,11 @@ class GeneratingTile(QFrame):
     cancel_requested = Signal()
     selected = Signal()
     context_requested = Signal(QPoint)
+    control_triggered = Signal(str)
 
-    def __init__(self, job, parent=None, *, populating=False,
-                 typical_seconds=None, made_from=_MADE_FROM_NOTHING):
+    def __init__(self, job, parent=None, *, title="", populating=False,
+                 typical_seconds=None, made_from=_MADE_FROM_NOTHING,
+                 favorite=False, enhance=None):
         super().__init__(parent)
         self._job = job
         self._selected = False
@@ -49,17 +52,24 @@ class GeneratingTile(QFrame):
         self._image.setStyleSheet(
             f"background: {palette.EMPTY_PLATE}; border-radius: {BUTTON_RADIUS}px; color: {as_hex(TEXT_MUTED)};"
         )
+        self._title = QLabel(title)
+        self._title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._title.setWordWrap(True)
+        tile_shape.style_caption(self._title)
+        self._title.setStyleSheet("background-color: transparent;")
+        self._title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         layout.addWidget(self._image)
-
-        self._cancel = QPushButton(CANCEL_TEXT)
-        self._cancel.setToolTip(cancel_tooltip(populating))
-        self._cancel.clicked.connect(self.cancel_requested.emit)
-        layout.addWidget(self._cancel)
+        layout.addWidget(self._title)
 
         self._status_scrim = TileStatusScrim(self)
-        self._bar = ProgressBar(self)
-        self._bar.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self._place_bar()
+        self.layout().activate()  # Qt positions the thumbnail only once the layout has run, and the scrim and the bar are laid over where it is
+        self._bar = CancelBar(cancel_tooltip(populating), self)
+        self._bar.setGeometry(bar_between_the_bottom_corners(self._image.geometry()))
+        self._bar.clicked.connect(self.cancel_requested.emit)
+        self._controls = CornerButtons(self)
+        self._controls.place(self._image.geometry())
+        self._controls.triggered.connect(self.control_triggered.emit)
+        self._controls.show_for(favorite=favorite, enhance=enhance)
 
         self._tick = QTimer(self)
         self._tick.setInterval(TICK_MS)
@@ -76,6 +86,9 @@ class GeneratingTile(QFrame):
                 self._image.setPixmap(pair)
         self._render_state()
         self._tick.start()
+
+    def set_favorite(self, favorite: bool, enhance=None):
+        self._controls.show_for(favorite=favorite, enhance=enhance)
 
     def set_selected(self, selected: bool):
         self._selected = selected
@@ -96,20 +109,12 @@ class GeneratingTile(QFrame):
             "Generating…" if self._reading().rendering else "Waiting…",
         )
         self._bar.raise_()
+        self._controls.place(self._image.geometry())
         self._render_timing()
 
     def _render_timing(self):
         self._bar.show_progress(self._reading().caption(compact=True),
                                 *self._reading().bars())
-
-    def _place_bar(self):
-        # Qt: the thumbnail is positioned only once the layout has run, so force it; a bar placed before sits in the top-left corner
-        self.layout().activate()
-        frame = self._image.geometry()
-        self._bar.setGeometry(QRect(
-            frame.x(), frame.y() + frame.height() - BAR_HEIGHT,
-            frame.width(), BAR_HEIGHT,
-        ))
 
     def _on_preview(self, data: bytes):
         pixmap = QPixmap()

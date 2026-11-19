@@ -46,7 +46,7 @@ class ProgressBar(QProgressBar):
         return self._caption
 
     def scrolling(self) -> bool:
-        return QFontMetrics(self.font()).horizontalAdvance(self._caption) > self._room()
+        return QFontMetrics(self.font()).horizontalAdvance(self.text()) > self._room()
 
     def scrolled(self) -> float:
         return self._scrolled
@@ -66,10 +66,10 @@ class ProgressBar(QProgressBar):
             self.setValue(progress[0])
         else:
             self.setRange(0, 0)
-        self._retime_scroll()
+        self.retime_scroll()
         self.update()
 
-    def _retime_scroll(self) -> None:
+    def retime_scroll(self) -> None:
         if self.scrolling() and self.isVisible():
             if not self._scroll.isActive():
                 self._scrolled, self._hold = 0.0, _HOLD_TICKS
@@ -88,11 +88,11 @@ class ProgressBar(QProgressBar):
         self.update()
 
     def _lap(self) -> float:
-        return QFontMetrics(self.font()).horizontalAdvance(self._caption) + _SCROLL_GAP
+        return QFontMetrics(self.font()).horizontalAdvance(self.text()) + _SCROLL_GAP
 
     def showEvent(self, event):
         super().showEvent(event)
-        self._retime_scroll()
+        self.retime_scroll()
 
     def hideEvent(self, event):
         super().hideEvent(event)
@@ -100,7 +100,7 @@ class ProgressBar(QProgressBar):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self._retime_scroll()
+        self.retime_scroll()
 
     def paintEvent(self, event):
         painter = QStylePainter(self)

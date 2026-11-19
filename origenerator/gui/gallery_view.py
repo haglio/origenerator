@@ -43,6 +43,7 @@ from origenerator.config import (
     TRASH_DIR,
 )
 from origenerator.db import Database, NewRequest
+from origenerator.db_generations import ENHANCE_WHEN_FINISHED, TRASH_WHEN_FINISHED
 from origenerator.evolver_trash import in_the_background as delete_through_evolver
 from origenerator.fun_time_bridge import ask_for_origenerator_mode
 from origenerator.fun_time_mode import FunTimeSession
@@ -78,13 +79,14 @@ from origenerator.generation_config import (
     would_reproduce_a_completed_run,
 )
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import corner_buttons, omnipause
+from origenerator.gui import corner_buttons, icons, omnipause
 from origenerator.gui.app_keys import AppKeys, Presses
 from origenerator.gui.app_title import under
 from origenerator.gui.busy_cursor import working
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController, CombineParts
 from origenerator.gui.copy_names import copy_names, offer_copy_names_above_a_line
+from origenerator.gui.deferred import defer
 from origenerator.gui.deleting import asked_to_delete
 from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.enhance_controller import (
@@ -188,6 +190,7 @@ from origenerator.item_shape import (
     split_key as _split_collection_key,
 )
 from origenerator.library_readings import LibraryReadings, arrived, read_whole
+from origenerator.media import MediaType
 from origenerator.one_look import looking_once
 from origenerator.prompt_tokens import boxed_as_typed
 from origenerator.published_actions import give_the_launch_its_actions
@@ -364,6 +367,7 @@ class GalleryView(QWidget):
         self._poll_timer.timeout.connect(self._poll)
         self._poll_timer.start()
         self.rest_built = True
+        defer(self, self.carry_out_when_finished)
 
     def _build_the_queue_of_runs(self, db, client):
         self._jobs = JobQueue(db, client)
@@ -1265,19 +1269,27 @@ class GalleryView(QWidget):
             reroll=plus,
             modify_batch=(self._modify_batch_tile_for(group)
                            if self._can_modify_batch(group) else None),
-            generating=None if job is None else self._generating_tile_for(group.key, job))
+            generating=(None if job is None or self._going_to_trash(job.prompt_id)
+                        else self._generating_tile_for(group.key, job)))
 
     def _forget_generating_tile(self):
         self._generating_tile = None
 
     def _generating_tile_for(self, key: str, job) -> GeneratingTile:
+        row = self._db.get_generation(job.prompt_id) or {}
         tile = GeneratingTile(job,
+                              title=gallery.generate_tab_title(job.workflow.name, job.params),
+                              favorite=bool(row.get("starred")),
+                              enhance=(icons.ENHANCE_OPEN
+                                       if job.workflow.output_type == MediaType.IMAGE else None),
                               populating=self._populate.is_active(key),
                               typical_seconds=timing.typical_run_seconds(self._db, job),
                               made_from=self._job_made_from(
                                   job, lambda source_video: source_video.get("thumbnail_path")))
         tile.set_selected(key == self._selected_reroll_key)
         tile.cancel_requested.connect(lambda: self._cancel_reroll(key))
+        tile.control_triggered.connect(
+            lambda action: self.run_item_action(job.prompt_id, action))
         tile.context_requested.connect(lambda pos: self._generating_tile_menu(key, pos))
         tile.selected.connect(lambda: self._select_reroll(key))
         self._generating_tile = tile
@@ -1874,6 +1886,7 @@ class GalleryView(QWidget):
                 finished_row = self._db.get_generation(source_id)
                 self.slideshows.note_enhanced(finished_row)
         self.combine.send_to_genau_if_requested(finished_row)
+        self.carry_out_when_finished()
         if key == self._selected_reroll_key and not self._populate.is_active(key):
             self._clear_reroll_selection()
         self.slideshows.note_landed(finished_row)
@@ -2009,12 +2022,35 @@ class GalleryView(QWidget):
         row = self._db.get_generation(prompt_id)
         if row is None:
             return
-        if action == corner_buttons.STAR:
+        if gallery.is_in_progress(row) and action != corner_buttons.STAR:
+            self._ask_when_finished(prompt_id, action)
+        elif action == corner_buttons.STAR:
             self.set_items_favorite([prompt_id], not row.get("starred"))
         elif action == corner_buttons.TRASH:
             self._delete_rows([row])
         elif action == corner_buttons.ENHANCE:
             self.enhance.enhance_items([prompt_id])
+
+    def _going_to_trash(self, prompt_id: str) -> bool:
+        return bool((self._db.get_generation(prompt_id) or {}).get("trash_requested_at"))
+
+    def _ask_when_finished(self, prompt_id: str, action: str):
+        wish = (TRASH_WHEN_FINISHED if action == corner_buttons.TRASH
+                else ENHANCE_WHEN_FINISHED)
+        self._db.ask_when_finished(prompt_id, wish)
+        if wish == TRASH_WHEN_FINISHED:
+            self.refresh()
+
+    def carry_out_when_finished(self):
+        for prompt_id, wish in self._db.asked_when_finished():
+            self._db.forget_when_finished(prompt_id, wish)
+            row = self._db.get_generation(prompt_id)
+            if row is None:
+                continue
+            if wish == TRASH_WHEN_FINISHED:
+                self._delete_rows([row])
+            else:
+                self.enhance.enhance_items([prompt_id])
 
     def set_items_favorite(self, prompt_ids, favorite: bool):
         for pid in prompt_ids:

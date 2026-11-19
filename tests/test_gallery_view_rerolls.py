@@ -4,6 +4,7 @@ import json
 import threading
 from unittest.mock import MagicMock
 
+from app_support.threading_utils import wait_until
 from PIL import Image
 from PySide6.QtCore import (
     QObject,
@@ -11,6 +12,7 @@ from PySide6.QtCore import (
     Signal,
     Slot,
 )
+from PySide6.QtWidgets import QApplication
 
 from origenerator import (
     action_settings,
@@ -189,11 +191,13 @@ def test_a_second_press_where_the_runs_cancel_was_starts_no_new_run(qtbot, tmp_p
     _on_screen(qtbot, view, 1200, 800)
     key = _select_first_leaf(view)
     _new_tile(view).add_requested.emit()
-    cancel = _generating_tile(view)._cancel
+    cancel = _generating_tile(view)._bar
     spot = cancel.mapTo(view._scroll.widget(), cancel.rect().center())
 
     _press_at(qtbot, view, spot)
+    wait_until(lambda: key not in view._live_jobs, pump=QApplication.processEvents)
     _press_at(qtbot, view, spot)
+    QApplication.processEvents()
 
     assert key not in view._live_jobs
     assert client.submit_job.call_count == 1
@@ -669,8 +673,7 @@ def test_populate_rewords_the_cancel_hover_in_all_three_panes(qtbot, tmp_path):
     view._toggle_populate(True)
 
     next_seed = "Throw away this seed and start the next"
-    assert _generating_tile(view)._cancel.text() == "Cancel"
-    assert _generating_tile(view)._cancel.toolTip() == next_seed
+    assert _generating_tile(view)._bar.toolTip() == next_seed
     assert [row._cancel.text() for row in view.job_queue.view.rows()] == ["Cancel"]
     assert [row._cancel.toolTip() for row in view.job_queue.view.rows()] == [next_seed]
     assert view.generate_pane.current_generate_tab()._cancel_btn.toolTip() == next_seed
@@ -690,7 +693,7 @@ def test_turning_populate_off_hovers_a_plain_cancel_again_with_the_run_still_in_
 
     assert key in view._live_jobs
     plain = "Cancel this generation"
-    assert _generating_tile(view)._cancel.toolTip() == plain
+    assert _generating_tile(view)._bar.toolTip() == plain
     assert [row._cancel.toolTip() for row in view.job_queue.view.rows()] == [plain]
     assert view.generate_pane.current_generate_tab()._cancel_btn.toolTip() == plain
 

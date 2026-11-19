@@ -123,6 +123,15 @@ class Database:
     def mark_genau_requested(self, prompt_id: str):
         return self.generations.mark_genau_requested(prompt_id)
 
+    def ask_when_finished(self, prompt_id: str, wish: str):
+        return self.generations.ask_when_finished(prompt_id, wish)
+
+    def forget_when_finished(self, prompt_id: str, wish: str):
+        return self.generations.forget_when_finished(prompt_id, wish)
+
+    def asked_when_finished(self) -> list[tuple[str, str]]:
+        return self.generations.asked_when_finished()
+
     def recent_durations(self, workflow_name: str, limit: int = 10) -> list[float]:
         return self.generations.recent_durations(workflow_name, limit)
 

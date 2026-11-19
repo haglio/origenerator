@@ -1457,9 +1457,10 @@ def test_an_image_is_decoded_off_the_window_thread_and_shown_once_it_is_ready(
     w._image_label.resize(200, 200)
 
     w.show_image(_make_png(tmp_path / "p.png"))
-    assert len(decodes_held) == 1 and w._image_label.pixmap().isNull(), (
+    assert len(decodes_held) == 1, (
         "a full-size image takes a tenth of a second and more to decode, which the window "
         "would spend frozen")
+    assert w._image_label.pixmap().isNull()
     assert w.media_size() == (32, 24), "its size is read off the file's header at once"
 
     _finish(decodes_held)

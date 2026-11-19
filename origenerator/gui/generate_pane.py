@@ -26,7 +26,6 @@ from origenerator.library_views import NO_VIEWS, LibraryViews, TabViews
 from origenerator.media import MediaType
 from origenerator.workflows import workflow_named
 
-
 _MARKS_KEPT = 64
 
 

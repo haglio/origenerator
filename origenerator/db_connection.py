@@ -16,14 +16,22 @@ class SqliteFile:
         self._owning = threading.RLock()
         self._seen_others_at: int | None = None
         self._told_of_writes: list = []
+        self._in_a_transaction = False
 
     @contextmanager
     def connect(self, *, tells_of_writes: bool = True):
         with self._owning:
             conn = self._own_connection()
-            before = conn.total_changes
-            with conn:
+            if self._in_a_transaction:
                 yield conn
+                return
+            before = conn.total_changes
+            self._in_a_transaction = True
+            try:
+                with conn:
+                    yield conn
+            finally:
+                self._in_a_transaction = False
             written = conn.total_changes != before
         if written and tells_of_writes:
             for told in list(self._told_of_writes):

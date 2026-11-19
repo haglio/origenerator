@@ -14,6 +14,7 @@ from app_support.trash_names import spot_in_trash
 
 from origenerator.evolver_upscales import EvolverUpscales
 from origenerator.file_numbers import NUMBERED, next_number, numbered
+from origenerator.one_look import is_file
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +143,7 @@ class Kino:
         return video.is_relative_to(self.library)
 
     def plays(self, video: Path) -> bool:
-        return self.holds(video) and video.is_file()
+        return self.holds(video) and is_file(video)
 
     def waits_at(self, video: Path) -> Path:
         return self.trash / video.name
@@ -169,7 +170,7 @@ class Genau:
         return video.is_relative_to(self.flicks)
 
     def plays(self, video: Path) -> bool:
-        return self.holds(video) and video.is_file()
+        return self.holds(video) and is_file(video)
 
     def waits_at(self, video: Path) -> Path:
         return self.trash / video.relative_to(self.flicks)

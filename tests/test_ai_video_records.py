@@ -192,6 +192,17 @@ def test_the_command_the_document_names_answers_in_its_last_line_when_evolver_ru
     assert json.loads(answered.stdout.strip().splitlines()[-1]) == {"done": 0, "no_row": 1}
 
 
+def test_the_command_the_document_names_for_one_rewrite_of_the_phones_file_answers_evolver(
+        tmp_path):
+    interpreter, *arguments = gallery_contract.declaration()["phones_file_command"]
+
+    answered = run_python(arguments, env={**os.environ, "ORIGENERATOR_STATE_DIR": str(tmp_path)})
+
+    assert interpreter == ".venv/Scripts/python.exe"
+    assert answered.returncode == 0, answered.stderr
+    assert json.loads(answered.stdout.strip().splitlines()[-1]) == {"done": 0, "no_row": 0}
+
+
 def test_where_the_library_keeps_no_records_folder_the_phones_file_is_written_nowhere(tmp_path):
     assert ai_video_records.this_librarys_phone_records(_the_gallery(tmp_path)).write() == 0
 

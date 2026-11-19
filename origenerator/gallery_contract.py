@@ -90,6 +90,7 @@ def declaration() -> dict:
         "downtime_command": list(DOWNTIME_COMMAND),
         "outside_video_entries_command": list(OUTSIDE_VIDEO_ENTRIES_COMMAND),
         "records_command": list(RECORDS_COMMAND),
+        "phones_file_command": [*RECORDS_COMMAND, "phones_file"],
         "outside_workflow_prefixes": published_prefixes(),
     }
 

@@ -19,6 +19,8 @@ class FolderSwitchesHost(Protocol):
 
     def set_items_favorite(self, prompt_ids, favorite: bool) -> None: ...
 
+    def enhance_offer_changed(self) -> None: ...
+
 
 class FolderSwitches:
     def __init__(self, host: FolderSwitchesHost, db, enhance, *, library):
@@ -96,6 +98,17 @@ class FolderSwitches:
         leaf = self._host.open_leaf_folder()
         held = None if leaf is None else self.enhance_settings_of(leaf.key)
         return None if held is None else held.params
+
+    def enhancing_the_open_folder(self) -> bool:
+        leaf = self._host.open_leaf_folder()
+        return leaf is not None and self.enhancing(leaf.key)
+
+    def keep_enhance_params_of_the_open_folder(self, params: dict) -> None:
+        leaf = self._host.open_leaf_folder()
+        held = self._library.folder_meta.get(leaf.key) or {}
+        self._keep_enhance(leaf.key, held.get("enhance_after_id"),
+                           gallery.EnhanceSettings(params=gallery.full_settings(params)))
+        self._host.enhance_offer_changed()
 
     def enhance_params_of_the_one_enhancing(self, toc_keys: list[str]) -> dict | None:
         held = [settings for toc_key in toc_keys

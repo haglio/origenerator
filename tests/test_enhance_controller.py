@@ -504,8 +504,7 @@ def test_an_image_with_an_enhancement_at_these_settings_on_its_way_is_not_enhanc
 
 
 def test_the_auto_tick_enhances_what_just_landed(enhance, monkeypatch, stored):
-    monkeypatch.setattr(module.gallery, "rows_awaiting_enhancement",
-                        lambda rows, everything: list(rows))
+    monkeypatch.setattr(module.gallery, "version_matching_settings", lambda row, settings: None)
     monkeypatch.setattr(module.gallery, "enhance_params_for",
                         lambda row, settings: {"input_image": "one.png"})
     monkeypatch.setattr(module.gallery, "settings_folder_key", lambda row, index: "k")
@@ -518,6 +517,18 @@ def test_the_auto_tick_enhances_what_just_landed(enhance, monkeypatch, stored):
     controller.enhance_when_wanted(_image("i1"))
 
     assert len(jobs.prepared) == 1
+
+
+def test_the_auto_tick_leaves_an_image_that_has_a_version_at_its_settings(
+        enhance, monkeypatch, stored):
+    monkeypatch.setattr(module.gallery, "version_matching_settings", lambda row, settings: 0)
+    jobs = FakeReroll()
+    controller, _host = enhance(db=stored([_image("i1")]), jobs=jobs)
+    controller.restore_settings(json.dumps({"auto": True}))
+
+    controller.enhance_when_wanted(_image("i1"))
+
+    assert jobs.prepared == []
 
 
 def test_pressing_the_panels_enhance_enhances_what_the_bank_button_would(enhance,

@@ -7,7 +7,16 @@ from PySide6.QtGui import QDrag
 
 from origenerator.gui.drag_thumbnail import DragOut
 from origenerator.gui.drags import carry
-from origenerator.gui.enhance_versions import enhance_version_mime
+from origenerator.gui.drop_target import DropTarget
+from origenerator.gui.enhance_versions import enhance_version_mime, params_from_mime
+from origenerator.gui.folder_tree import folder_keys_in
+
+FoldersSettings = Callable[[list[str]], dict | None]
+
+
+def settings_carried(mime, folders_settings: FoldersSettings) -> dict | None:
+    params = params_from_mime(mime)
+    return params if params is not None else folders_settings(folder_keys_in(mime))
 
 
 class EnhanceSettingsDrag(QObject):
@@ -42,3 +51,18 @@ class EnhanceSettingsDrag(QObject):
         drag.setMimeData(mime)
         carry(drag, mime, self._button, Qt.DropAction.CopyAction)
         self._button.setDown(False)
+
+
+class SettingsDropOnTheButton(QObject):
+    def __init__(self, button, folders_settings: FoldersSettings, *,
+                 takes_them: Callable[[], bool], keep: Callable[[dict], None]):
+        super().__init__(button)
+        self._folders_settings = folders_settings
+        self._takes_them = takes_them
+        DropTarget(button, self._landing, keep)
+
+    def _landing(self, mime, _source) -> tuple[dict] | None:
+        if not self._takes_them():
+            return None
+        params = settings_carried(mime, self._folders_settings)
+        return None if params is None else (params,)

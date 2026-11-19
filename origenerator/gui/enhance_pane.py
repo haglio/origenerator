@@ -45,7 +45,7 @@ from origenerator.gallery import (
 from origenerator.gallery.enhance_settings import match_source_model_label
 from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.eliding import open_the_list_in_full
-from origenerator.gui.enhance_versions import params_from_mime
+from origenerator.gui.enhance_settings_drags import settings_carried
 from origenerator.gui.fix_prompts_parts import (
     foot_row,
     lora_dropdown,
@@ -56,7 +56,6 @@ from origenerator.gui.fix_prompts_parts import (
     window_column,
 )
 from origenerator.gui.flow_layout import FieldGrid, FlowLayout
-from origenerator.gui.folder_tree import folder_keys_in
 from origenerator.gui.lora_offers import trashed
 from origenerator.gui.no_wheel import (
     NoWheelDoubleSpinBox,
@@ -270,9 +269,7 @@ class EnhancePane(QWidget):
         self._folders_settings = folders_settings
 
     def _settings_dragged(self, mime, _source) -> tuple[dict] | None:
-        params = params_from_mime(mime)
-        if params is None:
-            params = self._folders_settings(folder_keys_in(mime))
+        params = settings_carried(mime, self._folders_settings)
         return None if params is None else (params,)
 
     def _build_the_settings(self) -> QWidget:

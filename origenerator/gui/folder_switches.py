@@ -72,12 +72,14 @@ class FolderSwitches:
             [row["prompt_id"] for row in self._library.leaf_folders().get(key, [])
              if not row.get("starred")], True)
 
-    def set_enhancing(self, key: str, on: bool) -> None:
+    def set_enhancing(self, key: str, on: bool,
+                      settings: gallery.EnhanceSettings | None = None) -> None:
         after_id = self._library.reading.highest_id if on else None
-        self._keep_enhance(key, after_id, self._enhance.settings if on else None)
+        settings = (settings or self._enhance.settings) if on else None
+        self._keep_enhance(key, after_id, settings)
         if on:
             self._enhance.enhance_what_awaits(self._library.leaf_folders().get(key, []),
-                                              self._enhance.settings)
+                                              settings)
 
     def _keep_enhance(self, key: str, after_id: int | None,
                       settings: gallery.EnhanceSettings | None) -> None:
@@ -99,15 +101,16 @@ class FolderSwitches:
         held = None if leaf is None else self.enhance_settings_of(leaf.key)
         return None if held is None else held.params
 
-    def enhancing_the_open_folder(self) -> bool:
-        leaf = self._host.open_leaf_folder()
-        return leaf is not None and self.enhancing(leaf.key)
+    def the_open_folder_takes_enhance_settings(self) -> bool:
+        return self.enhance_switch().enabled
 
     def keep_enhance_params_of_the_open_folder(self, params: dict) -> None:
-        leaf = self._host.open_leaf_folder()
-        held = self._library.folder_meta.get(leaf.key) or {}
-        self._keep_enhance(leaf.key, held.get("enhance_after_id"),
-                           gallery.EnhanceSettings(params=gallery.full_settings(params)))
+        key = self._host.open_leaf_folder().key
+        settings = gallery.EnhanceSettings(params=gallery.full_settings(params))
+        if self.enhancing(key):
+            self._keep_enhance(key, self._library.folder_meta[key]["enhance_after_id"], settings)
+        else:
+            self.set_enhancing(key, True, settings)
         self._host.enhance_offer_changed()
 
     def enhance_params_of_the_one_enhancing(self, toc_keys: list[str]) -> dict | None:

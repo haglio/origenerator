@@ -2,7 +2,17 @@ from __future__ import annotations
 
 import math
 
-from PySide6.QtCore import QEvent, QItemSelectionModel, QMimeData, QRect, QRectF, QSize, Qt, Signal
+from PySide6.QtCore import (
+    QEvent,
+    QItemSelectionModel,
+    QMimeData,
+    QPersistentModelIndex,
+    QRect,
+    QRectF,
+    QSize,
+    Qt,
+    Signal,
+)
 from PySide6.QtGui import QDrag, QDragLeaveEvent, QFontMetricsF, QIcon, QPainter
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -185,6 +195,7 @@ class FolderTree(QTreeWidget):
         self._hover_key = None
         self._delete_on_picked_rows = True
         self._pressed_on_frozen = False
+        self._opens_on_release = None
         counts = _CountBeforeName(self)
         self.setItemDelegate(counts)
         for changed in (self.model().dataChanged, self.model().rowsInserted,
@@ -417,8 +428,34 @@ class FolderTree(QTreeWidget):
             self._pressed_on_frozen = False
             event.accept()
             return
+        pressed, self._opens_on_release = self._opens_on_release, None
+        if pressed is not None:
+            event.accept()
+            if self.indexAt(event.position().toPoint()) == pressed:
+                self.setCurrentItem(self.itemFromIndex(pressed))
+            return
         if not self._swallowed_by_frozen(event, event.position().toPoint()):
             super().mouseReleaseEvent(event)
+
+    def selectionCommand(self, index, event=None):
+        if self._opens_on_release is not None:
+            return QItemSelectionModel.SelectionFlag.NoUpdate
+        return super().selectionCommand(index, event)
+
+    def _press_without_opening(self, event) -> None:
+        row = QPersistentModelIndex(self.indexAt(event.position().toPoint()))
+        was_open, current = self.isExpanded(row), self.currentIndex()
+        self._opens_on_release = row
+        blocked, scrolls = self.blockSignals(True), self.hasAutoScroll()
+        self.setAutoScroll(False)
+        try:
+            super().mousePressEvent(event)
+            self.selectionModel().setCurrentIndex(current, QItemSelectionModel.SelectionFlag.NoUpdate)
+        finally:
+            self.setAutoScroll(scrolls)
+            self.blockSignals(blocked)
+        if self.isExpanded(row) != was_open:
+            self._opens_on_release = None
 
     def viewportEvent(self, event):
         if event.type() == QEvent.Type.ContextMenu and self._swallowed_by_frozen(event, event.pos()):
@@ -446,6 +483,11 @@ class FolderTree(QTreeWidget):
             if star_rect.contains(event.position().toPoint()):
                 self.favorite_clicked.emit(group.key)
                 return
+        plain = not event.modifiers() & (Qt.KeyboardModifier.ShiftModifier
+                                         | Qt.KeyboardModifier.ControlModifier)
+        if plain and index.isValid():
+            self._press_without_opening(event)
+            return
         super().mousePressEvent(event)
 
     def selected_folder_keys(self) -> list[str]:
@@ -453,7 +495,8 @@ class FolderTree(QTreeWidget):
                 if item.data(0, self._role) is not None]
 
     def startDrag(self, supported_actions):
-        pressed = self.currentItem()
+        held, self._opens_on_release = self._opens_on_release, None
+        pressed = self.itemFromIndex(held) if held is not None else self.currentItem()
         if pressed is None or pressed.data(0, self._role) is None:
             return
         keys = self.selected_folder_keys()

@@ -517,9 +517,10 @@ class GalleryView(QWidget):
         )
         EnhanceSettingsDrag(self._buttons.enhance,
                             self._folder_switches.enhance_params_of_the_open_folder)
+        EnhanceSettingsDrag(self.enhance.pane, lambda: self.enhance.settings.params)
         SettingsDropOnTheButton(
             self._buttons.enhance, self._folder_switches.enhance_params_of_the_one_enhancing,
-            takes_them=self._folder_switches.enhancing_the_open_folder,
+            takes_them=self._folder_switches.the_open_folder_takes_enhance_settings,
             keep=self._folder_switches.keep_enhance_params_of_the_open_folder)
         gallery_column.addLayout(_top_section(self._folder_path, self._buttons, self._folder_actions))
         self._experiments_cb = TickControl("Run experiments while the app is closed")

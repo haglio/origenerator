@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from origenerator import animation_samples
+from origenerator import action_vocabulary, animation_paths, animation_samples
 from origenerator.action_settings import GENAU, VIDEO
 
 _PATHS = {
@@ -127,7 +127,7 @@ def test_the_animations_with_the_most_kept_clips_come_first(samples):
         _video("c", made_from="one", action="alpha", starred=1),
     ]
 
-    order = animation_samples.paths_in_order(rows, content=_PATHS)
+    order = animation_samples.paths_in_order(samples(rows), content=_PATHS)
 
     assert order[0] == (VIDEO, "beta", "state two")
     assert order[1] == (VIDEO, "alpha", "state one")
@@ -136,14 +136,14 @@ def test_the_animations_with_the_most_kept_clips_come_first(samples):
 def test_the_animations_with_nothing_behind_them_fall_to_the_end(samples):
     rows = [_image("one", "state one"), _video("c", made_from="one", starred=1)]
 
-    order = animation_samples.paths_in_order(rows, content=_PATHS)
+    order = animation_samples.paths_in_order(samples(rows), content=_PATHS)
 
     assert order[0] == (VIDEO, "alpha", "state one")
     assert len(order) == _EVERY_ANIMATION_THE_TABLE_HOLDS
 
 
 def test_animations_nothing_separates_keep_the_tables_own_order(samples):
-    order = animation_samples.paths_in_order([], content=_PATHS)
+    order = animation_samples.paths_in_order(samples([]), content=_PATHS)
 
     assert order == [
         (VIDEO, "alpha", "state one"),
@@ -151,3 +151,21 @@ def test_animations_nothing_separates_keep_the_tables_own_order(samples):
         (VIDEO, "beta", "state two"),
         (GENAU, "alpha", "state two"),
     ]
+
+
+def test_sorting_many_videos_reads_the_content_and_builds_the_words_once(monkeypatch):
+    rows = [_image("pic", "state two"),
+            *(_video(f"clip {n}", made_from="pic", starred=1) for n in range(6))]
+    read, built = [], []
+    for module in (animation_samples, animation_paths, action_vocabulary):
+        monkeypatch.setattr(module, "load_content", lambda: read.append(1) or _PATHS,
+                            raising=False)
+    build = action_vocabulary.vocabulary
+    monkeypatch.setattr(animation_paths, "vocabulary",
+                        lambda *a, **k: built.append(1) or build(*a, **k))
+
+    found = animation_samples.samples_by_path(rows)
+
+    assert len(found[(VIDEO, "alpha", "state two")]) == 6
+    assert len(read) <= 1
+    assert len(built) <= 1

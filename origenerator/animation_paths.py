@@ -60,8 +60,16 @@ def actions_for(state: str, lane: str = VIDEO, *, content: dict | None = None
 
 def allows(lane: str, name: str, state: str, *, content: dict | None = None) -> bool:
     content = _read(content)
-    action = named(name, vocabulary(MediaType.VIDEO, content)).action
-    return state in _table(content).get(lane, {}).get(action, ())
+    return allows_in(starts_from(content), vocabulary(MediaType.VIDEO, content),
+                     lane, name, state)
+
+
+def starts_from(content: dict) -> dict:
+    return _table(content)
+
+
+def allows_in(table: dict, words, lane: str, name: str, state: str) -> bool:
+    return state in table.get(lane, {}).get(named(name, words).action, ())
 
 
 def every_path(*, content: dict | None = None) -> tuple[tuple[str, str, str], ...]:

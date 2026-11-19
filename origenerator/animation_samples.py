@@ -8,6 +8,7 @@ from origenerator import animation_paths, gallery
 from origenerator.action_settings import GENAU, VIDEO, loops
 from origenerator.action_vocabulary import vocabulary
 from origenerator.animation_names import animation_of, image_button_of
+from origenerator.content import load_content
 from origenerator.db_generations import was_kept
 from origenerator.generation_state import GenerationStatus
 from origenerator.media import MediaType
@@ -40,8 +41,10 @@ def _kept_videos(rows: list[dict]) -> list[dict]:
 
 def samples_by_path(rows: list[dict], *, content: dict | None = None
                      ) -> dict[Path, list[dict]]:
+    content = load_content() if content is None else content
     states = _states_by_image(rows, content)
     words = vocabulary(MediaType.VIDEO, content)
+    table = animation_paths.starts_from(content)
     found: dict[Path, list[dict]] = defaultdict(list)
     for video in sorted(_kept_videos(rows), key=_made, reverse=True):
         action = animation_of(video, words)
@@ -51,12 +54,12 @@ def samples_by_path(rows: list[dict], *, content: dict | None = None
             continue
         lanes = (VIDEO, GENAU) if loops(video) else (VIDEO,)
         for lane in lanes:
-            if animation_paths.allows(lane, action, state, content=content):
+            if animation_paths.allows_in(table, words, lane, action, state):
                 found[(lane, action, state)].append(video)
     return dict(found)
 
 
-def paths_in_order(rows: list[dict], *, content: dict | None = None) -> list[Path]:
-    samples = samples_by_path(rows, content=content)
+def paths_in_order(samples: dict[Path, list[dict]], *, content: dict | None = None
+                   ) -> list[Path]:
     listed = animation_paths.every_path(content=content)
     return sorted(listed, key=lambda path: -len(samples.get(path, ())))

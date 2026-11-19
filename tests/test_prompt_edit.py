@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 import pytest
+from urllib.error import HTTPError
 
 from origenerator import config, request_settings
 from origenerator.box_breaks import BOX_BREAK
@@ -411,6 +412,96 @@ def test_the_model_reads_in_the_smallest_window_that_holds_the_question(characte
     ask_the_model("a woman", "", "a hat", known, llm=ask)
 
     assert sent["reads_tokens"] == window
+
+
+def _answers_in_turn(*answers):
+    asked = []
+
+    def ask(messages, **settings):
+        asked.append((messages, settings))
+        answer = answers[len(asked) - 1]
+        if isinstance(answer, Exception):
+            raise answer
+        return {"message": {"content": answer}}
+
+    return ask, asked
+
+
+_LYING_PRONE = ('{"changes": [{"prompt": "positive", "replace": "kneeling", "with": "lying prone", '
+                '"for": "lying instead of kneeling"}]}')
+
+
+def test_the_model_is_asked_which_of_its_added_words_settle_what_he_left_open_and_they_go():
+    ask, asked = _answers_in_turn(_LYING_PRONE, '{"left_open": ["prone"]}')
+
+    answered = ask_the_model("a woman kneeling", "", "lying instead of kneeling", WhatIsKnown(), llm=ask)
+
+    assert answered["changes"][0]["with"] == "lying"
+    check, settings = asked[1]
+    assert check[:-2] == asked[0][0]
+    assert check[-2] == {"role": "assistant", "content": _LYING_PRONE}
+    assert '"lying instead of kneeling"' in check[-1]["content"]
+    assert '"lying prone" where the prompt said "kneeling"' in check[-1]["content"]
+    assert (settings["temperature"], settings["reads_tokens"]) == (0, asked[0][1]["reads_tokens"])
+
+
+def test_an_added_thing_is_checked_the_same_way_and_a_phrase_goes_with_its_comma():
+    ask, _asked = _answers_in_turn(
+        '{"changes": [{"prompt": "positive", "add": "a small terrier, beside her, brown", '
+        '"for": "add a dog"}]}', '{"left_open": ["beside her"]}')
+
+    answered = ask_the_model("a woman", "", "add a dog", WhatIsKnown(), llm=ask)
+
+    assert answered["changes"][0]["add"] == "a small terrier, brown"
+
+
+@pytest.mark.parametrize(("request_words", "check"), [
+    ("lying prone instead of kneeling", '{"left_open": ["prone"]}'),
+    ("lying instead of kneeling", '{"left_open": ["lying prone"]}'),
+    ("lying instead of kneeling", '{"left_open": []}'),
+    ("lying instead of kneeling", "no json here"),
+    ("lying instead of kneeling", TimeoutError("the model gave no answer"))])
+def test_words_he_said_a_check_that_would_leave_nothing_and_a_check_that_fails_change_nothing(
+        request_words, check):
+    ask, _asked = _answers_in_turn(_LYING_PRONE.replace("lying instead of kneeling", request_words),
+                                   check)
+
+    answered = ask_the_model("a woman kneeling", "", request_words, WhatIsKnown(), llm=ask)
+
+    assert answered["changes"][0]["with"] == "lying prone"
+
+
+def _refused(code):
+    return HTTPError("http://localhost:11434/api/chat", code, "refused", None, None)
+
+
+def test_a_model_that_fails_to_load_is_asked_once_more():
+    ask, asked = _answers_in_turn(_refused(500), '{"changes": []}')
+
+    assert ask_the_model("a woman", "", "a hat", WhatIsKnown(), llm=ask) == {"changes": []}
+    assert asked[1] == asked[0]
+
+
+@pytest.mark.parametrize("failure", [_refused(500), _refused(404), TimeoutError("no answer")])
+def test_a_second_failure_and_any_other_failure_are_the_models_answer(failure):
+    first = failure if isinstance(failure, TimeoutError) or failure.code != 500 else _refused(500)
+    ask, asked = _answers_in_turn(first, failure)
+
+    with pytest.raises(type(failure)):
+        ask_the_model("a woman", "", "a hat", WhatIsKnown(), llm=ask)
+
+    assert len(asked) == (2 if first is not failure or getattr(failure, "code", 0) == 500 else 1)
+
+
+def test_only_words_put_into_the_positive_prompt_are_checked():
+    ask, asked = _answers_in_turn(
+        '{"changes": [{"prompt": "negative", "add": "tan lines", "for": "no tan lines"}, '
+        '{"prompt": "positive", "remove": "tan", "for": "no tan lines"}, '
+        '{"setting": "width", "to": 720, "for": "portrait"}]}')
+
+    ask_the_model("a woman, tan", "", "no tan lines, portrait", WhatIsKnown(), llm=ask)
+
+    assert len(asked) == 1
 
 
 def test_asking_the_model_sends_one_question_and_leaves_the_model_loaded():

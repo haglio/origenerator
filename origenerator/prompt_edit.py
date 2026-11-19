@@ -4,6 +4,7 @@ import logging
 import re
 from dataclasses import dataclass, replace
 from functools import partial
+from urllib.error import HTTPError
 
 from origenerator import local_llm, request_settings
 from origenerator.box_breaks import unboxed
@@ -346,11 +347,70 @@ def build_request_messages(positive: str, negative: str, request: str, known: Wh
 
 _STAYS_LOADED = f"{REQUEST_MODEL_STAYS_LOADED_S + 60}s"
 
+_LEFT_OPEN_CHECK = (
+    'He asked: "{asked}". Your change writes "{new}" where the prompt said "{old}". '
+    "List the words of yours in it that he did not say and that settle something he left open: "
+    "which way a body lies or faces, a pose, a place, a person, a garment, a camera or a time that "
+    "neither his words nor the prompt had. Words that only say more about the thing he asked for "
+    "(its size, color, material, look) are not such words. "
+    'Reply with only a JSON object: {{"left_open": ["<each such word or phrase, exactly as you '
+    'wrote it>"]}}, an empty list when there are none.')
+_PUT_INTO_A_PROMPT = ("with", "add")
+_FAILED_TO_LOAD = 500
+
+
+def _asked_again_if_the_model_failed_to_load(asking):
+    try:
+        return asking()
+    except HTTPError as refused:
+        if refused.code != _FAILED_TO_LOAD:
+            raise
+        logger.warning("prompt_edit: the model failed to load; asking once more")
+        return asking()
+
+
+def _without(words: str, phrase: str) -> str:
+    gone = re.sub(rf"(?<!\w){re.escape(phrase)}(?!\w)", "", words, flags=re.IGNORECASE)
+    parts = [" ".join(part.split()) for part in gone.split(",")]
+    return ", ".join(part for part in parts if part)
+
+
+def _he_said(phrase: str, request: str) -> bool:
+    said = {word for word, *_ in _tokens(request)}
+    return all(word in said for word, *_ in _tokens(phrase))
+
+
+def _leaving_open_what_he_did(answer: dict, request: str, ask_again) -> dict:
+    for change in answer.get("changes") or ():
+        key = next((key for key in _PUT_INTO_A_PROMPT if change.get(key)), None)
+        if key is None or change.get("prompt") != "positive":
+            continue
+        try:
+            left_open = local_llm.answer_of(ask_again(_LEFT_OPEN_CHECK.format(
+                asked=request, new=change[key], old=change.get("replace") or ""))).get("left_open")
+        except Exception as exc:  # noqa: BLE001 -- the check is extra: the model's change stands
+            logger.warning("prompt_edit: the model could not check its change (%s)",
+                           type(exc).__name__)
+            continue
+        kept = str(change[key])
+        for phrase in left_open if isinstance(left_open, list) else ():
+            if isinstance(phrase, str) and phrase.strip() and not _he_said(phrase, request):
+                kept = _without(kept, phrase.strip())
+        if kept:
+            change[key] = kept
+    return answer
+
 
 def ask_the_model(positive: str, negative: str, request: str, known: WhatIsKnown, *,
                   llm=None) -> dict:
     messages = build_request_messages(positive, negative, request, known, REQUEST_SYSTEM_PROMPT)
-    return local_llm.answer_of((llm or local_llm.ask)(
-        messages, base_url=LOCAL_LLM_BASE_URL, model=REQUEST_LLM_MODEL, temperature=0.4,
-        timeout=_ASK_TIMEOUT_S, json_answer=True, reads_tokens=_window_tokens(messages),
-        stays_loaded=_STAYS_LOADED))
+    asking = partial(llm or local_llm.ask, base_url=LOCAL_LLM_BASE_URL, model=REQUEST_LLM_MODEL,
+                     timeout=_ASK_TIMEOUT_S, json_answer=True,
+                     reads_tokens=_window_tokens(messages), stays_loaded=_STAYS_LOADED)
+    said = _asked_again_if_the_model_failed_to_load(partial(asking, messages, temperature=0.4))
+
+    def ask_again(question: str) -> dict:
+        return asking([*messages, {"role": "assistant", "content": local_llm.text_of(said)},
+                       {"role": "user", "content": question}], temperature=0)
+
+    return _leaving_open_what_he_did(local_llm.answer_of(said), request, ask_again)

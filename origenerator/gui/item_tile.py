@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
 
-from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, Signal
+from PySide6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QCursor, QIcon, QMovie, QPixmap
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 from shared_ui.palette import BLUE, as_rgba
@@ -18,6 +18,7 @@ from origenerator.gui.corner_buttons import (
     GROUND_CSS,
     CornerButtons,
     RestoreOffer,
+    bar_between_the_bottom_corners,
 )
 from origenerator.gui.drag_thumbnail import DragOut, label_thumbnail
 from origenerator.gui.generation_drag import generation_mime
@@ -25,7 +26,7 @@ from origenerator.gui.inflight import TICK_MS, RunReading
 from origenerator.gui.item_type_icon import ItemTypeIcon, VideoLength
 from origenerator.gui.looping_preview import play_in, what_plays_in
 from origenerator.gui.looping_preview import set_in_sight as video_in_sight
-from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
+from origenerator.gui.progress_bar import ProgressBar
 from origenerator.gui.style_property import set_style_property
 from origenerator.gui.tile_status_scrim import TileStatusScrim
 from origenerator.media import MediaType
@@ -285,14 +286,8 @@ class ItemTile(QWidget):
         )
 
     def _place_enhancing_bar(self):
-        area = self._image_label.geometry()
-        clear_of_a_corner = CORNER_INSET + CORNER_SIZE + CORNER_GAP
-        self._enhancing_bar.setGeometry(QRect(
-            area.x() + clear_of_a_corner,
-            area.y() + area.height() - _BORDER_PX - BAR_HEIGHT,
-            area.width() - 2 * clear_of_a_corner,
-            BAR_HEIGHT,
-        ))
+        self._enhancing_bar.setGeometry(
+            bar_between_the_bottom_corners(self._image_label.geometry(), _BORDER_PX))
 
     def _style_by_selection(self):
         for widget, sheet in ((self, _TILE_CSS), (self._image_label, _THUMBNAIL_CSS)):

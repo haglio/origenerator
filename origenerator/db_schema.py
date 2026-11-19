@@ -144,7 +144,12 @@ CREATE TABLE IF NOT EXISTS generations (
     video_seconds REAL,
     genau_flipped INTEGER NOT NULL DEFAULT 0,
     video_resolution TEXT,
-    video_aspect_ratio TEXT
+    video_aspect_ratio TEXT,
+    -- Set on an item still being made when its trash or enhance corner icon is
+    -- pressed, so its completion trashes or enhances it, a restart between the
+    -- two included; cleared once carried out.
+    trash_requested_at TEXT,
+    enhance_requested_at TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_generations_status ON generations(status);
@@ -325,6 +330,8 @@ ADDED_COLUMNS = {
         "genau_flipped": "INTEGER NOT NULL DEFAULT 0",
         "video_resolution": "TEXT",
         "video_aspect_ratio": "TEXT",
+        "trash_requested_at": "TEXT",
+        "enhance_requested_at": "TEXT",
     },
     "folder_meta": {
         "level": "TEXT",
@@ -372,7 +379,7 @@ GENERATION_COLUMNS = (
     "why_it_cannot_be_made_again", "evolver_upscale", "evolver_upscaled_at", "finale_id",
     "watch_completions", "watch_skips", "watch_locks", "web_url", "library_id",
     "upscale_provenance", "video_seconds", "genau_flipped", "video_resolution",
-    "video_aspect_ratio",
+    "video_aspect_ratio", "trash_requested_at", "enhance_requested_at",
 )
 
 

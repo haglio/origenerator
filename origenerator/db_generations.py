@@ -27,6 +27,15 @@ LIFECYCLE_COLUMNS = frozenset({
 
 SENT_COLUMNS = ("evolver_exported_at", "genau_exported_at")
 
+TRASH_WHEN_FINISHED = "trash"
+ENHANCE_WHEN_FINISHED = "enhance"
+_FORGET_THE_TRASH = "UPDATE generations SET trash_requested_at = NULL WHERE prompt_id = ?"
+_FORGET_THE_ENHANCE = "UPDATE generations SET enhance_requested_at = NULL WHERE prompt_id = ?"
+_ASKED_WHEN_FINISHED = (
+    "SELECT prompt_id, trash_requested_at, enhance_requested_at FROM generations"
+    " WHERE status = ? AND (trash_requested_at IS NOT NULL"
+    " OR enhance_requested_at IS NOT NULL)")
+
 WATCH_COLUMNS = tuple((field, f"watch_{field}") for field in COUNT_FIELDS)
 def watch_columns_of(counts: dict) -> dict[str, int]:
     return {column: int(counts.get(field) or 0) for field, column in WATCH_COLUMNS}
@@ -282,6 +291,24 @@ class GenerationStore(Store):
 
     def mark_genau_requested(self, prompt_id: str):
         self._stamp(prompt_id, "genau_requested_at")
+
+    def ask_when_finished(self, prompt_id: str, wish: str):
+        if wish == TRASH_WHEN_FINISHED:
+            self._stamp(prompt_id, "trash_requested_at")
+        else:
+            self._stamp(prompt_id, "enhance_requested_at")
+
+    def forget_when_finished(self, prompt_id: str, wish: str):
+        statement = (_FORGET_THE_TRASH if wish == TRASH_WHEN_FINISHED
+                     else _FORGET_THE_ENHANCE)
+        with self._connect() as conn:
+            conn.execute(statement, (prompt_id,))
+
+    def asked_when_finished(self) -> list[tuple[str, str]]:
+        with self._connect() as conn:
+            rows = conn.execute(_ASKED_WHEN_FINISHED, (GenerationStatus.COMPLETED,)).fetchall()
+        return ([(row[0], TRASH_WHEN_FINISHED) for row in rows if row[1]]
+                + [(row[0], ENHANCE_WHEN_FINISHED) for row in rows if row[2]])
 
     def recent_durations(self, workflow_name: str, limit: int = 10) -> list[float]:
         with self._connect() as conn:

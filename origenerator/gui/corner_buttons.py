@@ -9,6 +9,7 @@ from shared_ui.spacing import BUTTON_GAP, BUTTON_RADIUS, BUTTON_SIZE, GAP_SMALL
 
 from origenerator import gallery
 from origenerator.gui import icons
+from origenerator.gui.progress_bar import BAR_HEIGHT
 
 STAR = "star"
 TRASH = "trash"
@@ -31,6 +32,12 @@ _TIPS = {
                           "change one to make a different version"),),
     icons.ENHANCE_MORE: ("Enhance again, at the settings now on the panel",),
 }
+
+
+def bar_between_the_bottom_corners(area: QRect, inset: int = 0) -> QRect:
+    clear_of_a_corner = CORNER_INSET + CORNER_SIZE + CORNER_GAP
+    return QRect(area.x() + clear_of_a_corner, area.y() + area.height() - inset - BAR_HEIGHT,
+                 area.width() - 2 * clear_of_a_corner, BAR_HEIGHT)
 
 
 class RestoreOffer(NamedTuple):

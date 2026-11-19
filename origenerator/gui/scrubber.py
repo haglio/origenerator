@@ -21,9 +21,11 @@ class Scrubber(QWidget):
     scrubbed = Signal(int)
     held = Signal(bool)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, heatmap=heatmap_colors):
         super().__init__(parent)
         self._actions: list[dict] = []
+        self._heatmap_of = heatmap
+        self._colored: tuple[int, list] | None = None
         self._position: int | None = None
         self._duration = 0
         self._scrub = Scrub(seek=self._go_to, hold=self.held.emit)
@@ -31,6 +33,7 @@ class Scrubber(QWidget):
 
     def set_actions(self, actions) -> None:
         self._actions = list(actions or [])
+        self._colored = None
         self._position = None
         self.update()
 
@@ -70,6 +73,11 @@ class Scrubber(QWidget):
     def sizeHint(self) -> QSize:
         return QSize(0, SCRUBBER_HEIGHT)
 
+    def _heatmap(self, buckets: int) -> list:
+        if self._colored is None or self._colored[0] != buckets:
+            self._colored = buckets, self._heatmap_of(self._actions, buckets)
+        return self._colored[1]
+
     def paintEvent(self, event) -> None:
         x0, x1 = self._track_x()
         if x1 - x0 < 2 * _FLOAT_OFF_EVERY_EDGE:
@@ -77,7 +85,7 @@ class Scrubber(QWidget):
         position = None if self._duration <= 0 or self._position is None else min(
             self._position, self._duration)
         bar = progress_bar_bgra(TrackMarks(position, self._duration), self.width(), self.height(),
-                                heatmap=heatmap_colors(self._actions, buckets=x1 - x0) or None,
+                                heatmap=self._heatmap(x1 - x0) or None,
                                 track=(x0, x1), opaque=True)
         image = QImage(bar.data, bar.shape[1], bar.shape[0], bar.strides[0], QImage.Format.Format_ARGB32)
         QPainter(self).drawImage(0, 0, image)

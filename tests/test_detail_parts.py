@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from origenerator.one_look import one_look
 from origenerator.workflows import detail_parts
 from origenerator.workflows.detail_parts import (
     DetailFixPass,
@@ -340,3 +341,15 @@ def test_prompts_for_a_part_the_enhancement_does_not_fix_are_never_run():
 
 def test_a_fix_is_found_by_the_name_the_panel_knows_it_by():
     assert detail_parts.part_named("hands").name == "hands"
+
+
+def test_every_part_table_asked_for_in_one_look_comes_from_one_read_of_the_content(monkeypatch):
+    read = []
+    monkeypatch.setattr(detail_parts, "load_content",
+                        lambda: read.append(1) or {"detail_fix_parts": [{"name": "zeta"}]})
+
+    with one_look():
+        tables = [detail_parts.part_table() for _ in range(5)]
+
+    assert len(read) == 1
+    assert all("zeta" in [part.name for part in table] for table in tables)

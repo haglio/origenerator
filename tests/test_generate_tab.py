@@ -71,9 +71,9 @@ from origenerator.generation_config import ConfigSnapshot
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import corner_buttons, diff_text, icons, tracked_prompt
 from origenerator.gui import generate_tab as generate_tab_module
+from origenerator.gui import modify_batch as modify_batch_module
 from origenerator.gui import param_form as param_form_module
 from origenerator.gui import prompt_boxes as prompt_boxes_module
-from origenerator.gui import modify_batch as modify_batch_module
 from origenerator.gui.action_row import SIDE_LABELS, action_checkbox, action_pills
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.combination import Combination
@@ -83,13 +83,13 @@ from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.enhance_versions import RunningEnhancement, _AddRow, _PendingRow, _VersionRow
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.gallery_view_parts import Shared
-from origenerator.gui.generate_tab import TYPICAL_TIME, GenerateTab
+from origenerator.gui.generate_tab import TYPICAL_TIME, GenerateTab, icon_of_mark_source
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.label_cells import LabelCell
 from origenerator.gui.look_training_controller import LookTrainingController
 from origenerator.gui.param_form import STRENGTH_ONE_HELP, ParamForm
-from origenerator.gui.seed_dropdown import SeedDropdown
 from origenerator.gui.pills import Pill
+from origenerator.gui.seed_dropdown import SeedDropdown
 from origenerator.gui.source_tile import SourceTile
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.tracked_prompt import _Tracker
@@ -1611,15 +1611,15 @@ def test_the_mark_is_the_shown_items_own_thumbnail(tab, tmp_path):
 
     tab.show_saved_generation(row, [row])
 
-    assert tab.tab_icon().availableSizes() == [QSize(4, 4)]
+    assert icon_of_mark_source(tab.tab_mark_source()).availableSizes() == [QSize(4, 4)]
 
 
 def test_the_mark_falls_back_to_what_the_config_makes(tab):
-    assert tab.tab_icon().cacheKey() == icons.media_type_icon(MediaType.IMAGE).cacheKey()
+    assert icon_of_mark_source(tab.tab_mark_source()).cacheKey() == icons.media_type_icon(MediaType.IMAGE).cacheKey()
 
 
 def test_a_tab_with_no_workflow_yet_wears_no_mark(blank_panel):
-    assert blank_panel.tab_icon().isNull(), (
+    assert icon_of_mark_source(blank_panel.tab_mark_source()).isNull(), (
         "nothing is known yet, and a mark guessing at a workflow would be the tab's most confident claim")
 
 
@@ -5269,11 +5269,13 @@ def test_typing_in_a_prompt_draws_no_seed_thumbnail_again(tab, qtbot, monkeypatc
              if isinstance(widget, SeedDropdown)]
     drawn = []
     for seed in seeds:
-        monkeypatch.setattr(seed, "_refresh_thumbnail", lambda *_said: drawn.append(seed))
+        monkeypatch.setattr(seed, "_refresh_thumbnail",
+                            lambda *_said, seed=seed: drawn.append(seed))
 
     type_()
 
-    assert seeds and drawn == [], (
+    assert seeds
+    assert drawn == [], (
         "a seed's thumbnail is the shown item's, found on the disk, and a prompt's words "
         "change neither")
 

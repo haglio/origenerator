@@ -1073,9 +1073,6 @@ class GenerateTab(DropZones):
         media = media_type_of_row(row) if row is not None else self._makes()
         return (media,) if media else ()
 
-    def tab_icon(self) -> QIcon:
-        return icon_of_mark_source(self.tab_mark_source())
-
     def prefill(self, workflow_name: str, params: dict):
         with self._loading():
             self._fresh_form = False

@@ -13,8 +13,8 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
 from origenerator.gallery.keys import folder_id
 from origenerator.gallery.tree import settings_folder_key
-from origenerator.gui.combination import Combination
 from origenerator.gui import generate_pane
+from origenerator.gui.combination import Combination
 from origenerator.gui.eliding_tab_bar import ElidingTabBar
 from origenerator.gui.generate_pane import GeneratePane, parse_tabs_state
 from origenerator.gui.generate_tab import GenerateTab
@@ -1292,8 +1292,8 @@ def test_only_the_tab_in_front_lets_its_video_play(tabs):
     first = tabs.currentWidget()
     second = tabs._add_subtab()
     told = {first: [], second: []}
-    for tab in told:
-        tab._viewport.set_behind = told[tab].append
+    for tab, heard in told.items():
+        tab._viewport.set_behind = heard.append
 
     tabs.setCurrentWidget(first)
 

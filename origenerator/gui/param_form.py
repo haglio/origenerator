@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import random
 from collections.abc import Sequence
 from pathlib import Path
@@ -131,6 +132,14 @@ _DIMENSION_MAX = 8192
 _DIMENSION_STEP = 16
 _PADLOCK = {False: "lock", True: "unlock"}
 
+
+@dataclasses.dataclass
+class _ShownSoFar:
+    row_help: dict[str, tuple] = dataclasses.field(default_factory=dict)
+    warned_at: dict[str, tuple[str, ...]] = dataclasses.field(default_factory=dict)
+    options: dict[str, tuple] = dataclasses.field(default_factory=dict)
+    recommended: tuple | None = None
+
 class ParamForm(QWidget):
     changed = Signal()
     text_fields_changed = Signal()
@@ -181,10 +190,7 @@ class ParamForm(QWidget):
         self._request_section: CollapsibleSection | None = None
         self._present_keys: dict[str, list[str]] = {}
         self._shut_down: dict[str, str] = {}
-        self._explained: dict[str, tuple] = {}
-        self._warned: dict[str, tuple[str, ...]] = {}
-        self._offered: dict[str, tuple] = {}
-        self._marked_recommended: tuple | None = None
+        self._shown = _ShownSoFar()
         self._param_defs = [pd for pd in param_defs if pd.key not in self._hidden_keys]
         self._defs = {pd.key: pd for pd in self._param_defs}
         scenes_def = next((pd for pd in self._param_defs if pd.type == ParamType.SCENES), None)
@@ -247,11 +253,11 @@ class ParamForm(QWidget):
         dropdown = self._widgets[pd.key]
         beside = values.get(pd.beside_model)
         asked = (beside, dropdown.currentData(), dropdown.count())
-        if self._offered.get(pd.key) == asked:
+        if self._shown.options.get(pd.key) == asked:
             return
         offer_only(pd, dropdown, loras_offered_beside(beside, pd.options)
                    if pd.beside_model in values else pd.options)
-        self._offered[pd.key] = (beside, dropdown.currentData(), dropdown.count())
+        self._shown.options[pd.key] = (beside, dropdown.currentData(), dropdown.count())
 
     def _set_row_visible(self, key: str, visible: bool) -> None:
         title = param_sections.section_title(key)
@@ -360,9 +366,9 @@ class ParamForm(QWidget):
                 self._shut_down.get(key),
                 self._read_field(self._defs[key])
                 if widget is not None and key in self._lora_keys else None)
-        if self._explained.get(key) == said:
+        if self._shown.row_help.get(key) == said:
             return
-        self._explained[key] = said
+        self._shown.row_help[key] = said
         help_text, label = self._help(key), self._labels[key]
         if isinstance(widget, PromptBoxes):
             set_in_use(widget, label, self._shut_down.get(key), help_text)
@@ -394,10 +400,11 @@ class ParamForm(QWidget):
               for other in self._warned_at(key))]))
 
     def _warned_at(self, key: str) -> tuple[str, ...]:
-        if key not in self._warned:
-            self._warned[key] = tuple(other.key for other in self._param_defs
-                                      if other.key != key and self._row_of(other.key) == key)
-        return self._warned[key]
+        if key not in self._shown.warned_at:
+            self._shown.warned_at[key] = tuple(
+                other.key for other in self._param_defs
+                if other.key != key and self._row_of(other.key) == key)
+        return self._shown.warned_at[key]
 
     def show_readings(self, readings: dict[str, PromptReading | None]) -> None:
         for key, widget in self._widgets.items():
@@ -500,9 +507,9 @@ class ParamForm(QWidget):
         offered = tuple((key, tuple(dropdown.itemText(index) for index in range(dropdown.count())))
                         for key in choices
                         if isinstance((dropdown := self._widgets.get(key)), QComboBox))
-        if self._marked_recommended == (choices, offered):
+        if self._shown.recommended == (choices, offered):
             return
-        self._marked_recommended = (dict(choices), offered)
+        self._shown.recommended = (dict(choices), offered)
         for key, good in choices.items():
             dropdown = self._widgets.get(key)
             if isinstance(dropdown, QComboBox):

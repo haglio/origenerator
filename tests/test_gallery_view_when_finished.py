@@ -32,7 +32,7 @@ def test_the_star_on_a_tile_being_generated_favorites_the_item_at_once(qtbot, tm
     _generating_tile(view).control_triggered.emit(STAR)
 
     assert db.get_generation(prompt_id)["starred"] == 1
-    assert _generating_tile(view)._controls._star.toolTip() == "Unfavorite this item", (
+    assert _generating_tile(view)._controls._star.toolTip() == "Unfavorite this image", (
         "the star on the tile itself fills, in the item's own folder as in Latest")
 
 

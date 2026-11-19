@@ -1181,7 +1181,7 @@ def test_right_clicking_an_inflight_tile_offers_to_cancel_the_run(
         "a tile is the whole of what the collection shows of a run being made, and it used to "
         "answer a right-click with nothing at all: stopping the run meant finding it again "
         "among the Job Queue's rows")
-    assert {"Go to folder", "Favorite 1 item", "Delete 1 item"} <= set(offered), (
+    assert {"Go to folder", "Favorite 1 image", "Delete 1 image"} <= set(offered), (
         "an item being made answers a right-click with the menu any item does (his ask, "
         "2026-11-19)")
     assert view._jobs.all_jobs == []

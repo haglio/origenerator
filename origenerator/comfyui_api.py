@@ -256,7 +256,9 @@ class ComfyUIApi:
             raise RuntimeError(format_prompt_error(detail)) from e
 
     def fetch_history(self, prompt_id: str) -> dict:
-        return self._history_entry(prompt_id, timeout=_HTTP_TIMEOUT_S)
+        in_a_poll = _QUEUE_READ_THIS_POLL.get() is not None
+        return self._history_entry(prompt_id,
+                                   timeout=_POLL_TIMEOUT_S if in_a_poll else _HTTP_TIMEOUT_S)
 
     def forget_history(self, prompt_id: str):
         body = json.dumps({"delete": [prompt_id]}).encode()

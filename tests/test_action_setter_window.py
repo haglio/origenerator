@@ -416,7 +416,7 @@ def test_trash_asks_first_whether_to_delete_the_folder_and_its_items(window):
 
     _press(made, TRASH_BUTTON).click()
 
-    assert (asked, rubbish.thrown) == (["Delete “3FA9C0D2” and its 2 items?"], [])
+    assert (asked, rubbish.thrown) == (["Delete “3FA9C0D2” and its 2 images?"], [])
 
 
 def test_closing_the_window_lets_go_of_what_it_was_showing(window):

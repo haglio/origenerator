@@ -62,7 +62,7 @@ class FolderTile(QFrame):
 
     _KIND_ICON = BUTTON_ICON
 
-    def __init__(self, key, text, preview_paths, count, marks=NO_MARKS):
+    def __init__(self, key, text, preview_paths, count: str, marks=NO_MARKS):
         super().__init__()
         favorite, context, kind_icon = marks.favorite, marks.context, marks.kind_icon
         self._key = key
@@ -107,7 +107,7 @@ class FolderTile(QFrame):
         caption_row.addWidget(caption, 1)
         layout.addLayout(caption_row)
 
-        count_label = QLabel(f"{count} item{'s' if count != 1 else ''}")
+        count_label = QLabel(count)
         color_text(count_label, colors.TEXT_MUTED)
         count_label.setFont(tile_shape.caption_font())
         count_label.setFixedHeight(tile_shape.line_height())

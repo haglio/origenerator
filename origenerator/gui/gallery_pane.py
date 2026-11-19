@@ -368,7 +368,7 @@ class GalleryPane(QObject):
     def _add_folder_tile(self, flow, group, *, favorite, context=""):
         tile = FolderTile(
             group.key, group.label, self._preview_paths(group),
-            len(gallery.rows_under(group)),
+            gallery.counted(gallery.rows_under(group)),
             FolderMarks(favorite, context, folder_icons.folder_kind_icon(group)),
         )
         tile.clicked.connect(self._drill_into)
@@ -411,7 +411,7 @@ class GalleryPane(QObject):
     def _add_collection_tile(self, flow, key: str):
         rows = self.rows_for_collection(key)
         which = folder_collection(base_of(key)).which
-        tile = FolderTile(key, collection(which).label, _thumbnails_of(rows), len(rows),
+        tile = FolderTile(key, collection(which).label, _thumbnails_of(rows), gallery.counted(rows),
                           FolderMarks(kind_icon=folder_icons.collection_kind_icon(which)))
         tile.clicked.connect(self._drill_into)
         flow.addWidget(tile)

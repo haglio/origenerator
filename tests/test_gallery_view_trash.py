@@ -273,7 +273,7 @@ def test_a_trash_tiles_menu_offers_the_names_and_the_two_acts_a_deleted_item_has
 
     _right_click(view, "d1")
 
-    assert labels == ["Copy 2 names", "", "Restore 2 items", "Delete 2 items permanently"]
+    assert labels == ["Copy 2 names", "", "Restore 2 images", "Delete 2 images permanently"]
 
 
 def test_a_trash_tiles_menu_copies_the_names_the_picked_items_had(qtbot, monkeypatch):
@@ -295,7 +295,7 @@ def test_restoring_from_a_trash_tiles_menu_brings_the_whole_pick_back(qtbot, mon
     view = _trash_collection_view(qtbot, actions, held=_TWO_HELD)
     view._gallery_pane.apply_selection("d2", _CTRL)
     picked = view.selected_prompt_ids()
-    _answer_menu(monkeypatch, "Restore 2 items")
+    _answer_menu(monkeypatch, "Restore 2 images")
 
     _right_click(view, "d1")
 
@@ -307,7 +307,7 @@ def test_the_trash_tiles_menu_can_end_the_whole_pick_for_good(qtbot, monkeypatch
     view = _trash_collection_view(qtbot, actions, held=_TWO_HELD)
     view._gallery_pane.apply_selection("d2", _CTRL)
     picked = view.selected_prompt_ids()
-    _answer_menu(monkeypatch, "Delete 2 items permanently")
+    _answer_menu(monkeypatch, "Delete 2 images permanently")
     _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
 
     _right_click(view, "d1")
@@ -318,7 +318,7 @@ def test_the_trash_tiles_menu_can_end_the_whole_pick_for_good(qtbot, monkeypatch
 def test_right_clicking_an_unpicked_trash_tile_narrows_to_that_one(qtbot, monkeypatch):
     actions = FakeActions()
     view = _trash_collection_view(qtbot, actions, held=_TWO_HELD)
-    _answer_menu(monkeypatch, "Restore 1 item")
+    _answer_menu(monkeypatch, "Restore 1 image")
 
     _right_click(view, "d2")
 
@@ -598,7 +598,7 @@ def test_the_right_click_menu_grays_restore_when_nothing_picked_can_be_made_agai
     _in_the_trash(view, qtbot)
     menu = QMenu()
 
-    action = trash_collection.restore_action_on(menu, "Restore 1 item", [view.row_for("d1")])
+    action = trash_collection.restore_action_on(menu, "Restore 1 image", [view.row_for("d1")])
 
     assert not action.isEnabled()
     assert "can't be made again" in action.toolTip()

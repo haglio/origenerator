@@ -174,10 +174,11 @@ class GalleryTree:
             self.item_by_key[key].setExpanded(True)
 
     def _add_custom_collection(self, group, parent_item, shape, inside=()) -> QTreeWidgetItem:
-        count = len(gallery.rows_under(group))
+        rows = gallery.rows_under(group)
+        count = len(rows)
         item = QTreeWidgetItem([group.label])
         item.setIcon(0, icons.custom_collection_icon())
-        item.setToolTip(0, f"{group.label} — {count} item{'s' if count != 1 else ''} "
+        item.setToolTip(0, f"{group.label} — {gallery.counted(rows)} "
                            "in a folder you made; drop folders or items here to add them")
         item.setData(0, GROUP_ROLE, group)
         item.setData(0, COUNT_ROLE, count)

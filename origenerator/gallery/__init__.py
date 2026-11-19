@@ -82,6 +82,8 @@ from origenerator.gallery.labels import (
 )
 from origenerator.gallery.output import (
     animated_preview_if_made,
+    counted,
+    counted_of,
     input_image_reference,
     is_in_progress,
     make_animated_preview,
@@ -190,6 +192,8 @@ __all__ = [
     "command_phrases",
     "config_folder_key",
     "config_folder_name",
+    "counted",
+    "counted_of",
     "custom_collection_key",
     "custom_folder_id",
     "cycle_shaped",

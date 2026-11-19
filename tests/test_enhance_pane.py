@@ -540,9 +540,9 @@ def test_the_enhance_button_says_what_it_would_do_and_goes_dark_with_nothing_to_
     pane, _ = _panel(qtbot)
     (button,) = [b for b in pane.findChildren(QPushButton) if b.text() == "Enhance"]
 
-    pane.show_offer(True, "Enhance 2 items")
+    pane.show_offer(True, "Enhance 2 images")
     assert button.isEnabled()
-    assert button.toolTip() == "Enhance 2 items"
+    assert button.toolTip() == "Enhance 2 images"
 
     pane.show_offer(False, "Nothing here to enhance")
     assert not button.isEnabled()

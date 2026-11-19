@@ -227,7 +227,10 @@ class JobQueue(QObject):
     def start_reroll(self, key: str, group, image_rows: list[dict]):
         if not isinstance(group, gallery.SettingsGroup) or not group.rows:
             return
-        self._reroll_variation(key, group.rows[0], image_rows, new_image=True, new_video=True)
+        self.reroll_every_seed(key, group.rows[0], image_rows)
+
+    def reroll_every_seed(self, key: str, row: dict, image_rows: list[dict]):
+        self._reroll_variation(key, row, image_rows, new_image=True, new_video=True)
 
     def reroll_video_seed(self, key: str, row: dict):
         self._reroll_variation(key, row, (), new_image=False, new_video=True)

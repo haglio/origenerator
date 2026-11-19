@@ -21,6 +21,7 @@ from origenerator.gallery import (
     build_image_config_index,
     child_groups,
     config_folder_name,
+    counted,
     enhance_params_for,
     enhanced_generations,
     favorite_folders,
@@ -155,6 +156,18 @@ def _row(**kw):
     }
     base.update(kw)
     return base
+
+
+@pytest.mark.parametrize(("workflows", "said"), [
+    (["sdxl_t2i"], "1 image"),
+    (["sdxl_t2i", "sdxl_t2i"], "2 images"),
+    (["wan22_i2v"], "1 video"),
+    (["wan22_i2v", "wan22_i2v", "wan22_i2v"], "3 videos"),
+    (["sdxl_t2i", "wan22_i2v"], "2 items"),
+    ([], "0 items"),
+])
+def test_a_count_of_items_names_them_images_or_videos_when_they_are_all_one_kind(workflows, said):
+    assert counted([_row(workflow_name=name) for name in workflows]) == said
 
 
 def test_make_animated_preview_generates_a_cached_webp_for_a_video(tmp_path, monkeypatch):

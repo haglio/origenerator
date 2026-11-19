@@ -10,6 +10,7 @@ from app_support.video_names import stem_of_either_copy
 from origenerator import trash_collection
 from origenerator.db_generations import library_paths_in
 from origenerator.gallery import (
+    counted,
     output_disk_files,
     remove_enhance_versions,
     resolve_preview,
@@ -103,7 +104,7 @@ class GalleryEdits:
                     self._db.forget_trashed(row["prompt_id"])
             return batches[0][0]["prompt_id"]
 
-        self._history.push(UndoEntry(_delete_label(len(rows)), undo,
+        self._history.push(UndoEntry(_delete_label(rows), undo,
                               redo=lambda: self.delete_rows(rows, pressed=pressed)))
 
     def delete_enhance_versions(self, row: dict, filenames: list[str]) -> bool:
@@ -373,9 +374,8 @@ def _copies_of(row: dict, genau_videos: list[Path]) -> list[Path]:
     return [video for video in genau_videos if stem_of_either_copy(video) in made]
 
 
-def _delete_label(count: int) -> str:
-
-    return f"Delete {count} item{'s' if count != 1 else ''}"
+def _delete_label(rows: list[dict]) -> str:
+    return f"Delete {counted(rows)}"
 
 
 def _version_label(count: int) -> str:

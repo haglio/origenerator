@@ -520,19 +520,6 @@ def test_the_panel_watches_the_device_for_as_long_as_it_is_shown(qtbot):
     assert not controls._device_watch.isActive()
 
 
-def test_the_panel_asks_whether_the_device_is_answering_on_every_draw(qtbot):
-    answers = [Osr2Mode.OFF, Osr2Mode.CONTROLLED]
-    motion = FakeMotion()
-    motion.active = True
-    controls = Osr2Controls(motion, device=lambda: answers.pop(0))
-    qtbot.addWidget(controls)
-
-    controls.drawing()
-    assert answers == [Osr2Mode.CONTROLLED]
-    controls.drawing()
-    assert answers == []
-
-
 def _first_named_button(controls) -> tuple[int, int, int, int]:
     controls.grab()
     return next(rect for rect, button in controls._painter.buttons if button.tooltip)
@@ -741,3 +728,25 @@ def test_the_panel_follows_the_device_again_once_the_app_has_finished_re_aiming_
     control.settled.emit()
 
     assert controls._repaint.isActive()
+
+
+def test_repaints_draw_the_device_the_last_watch_read_without_reading_it_again(qtbot):
+    asked = []
+    controls = Osr2Controls(FakeMotion(), device=lambda: asked.append(1) or Osr2Mode.OFF,
+                            trouble=lambda: None)
+    qtbot.addWidget(controls)
+
+    for _ in range(5):
+        controls.drawing()
+
+    assert len(asked) == 1
+
+
+def test_the_watch_hands_the_next_repaint_the_device_it_found_switched(qtbot):
+    modes = iter([Osr2Mode.OFF, Osr2Mode.CONTROLLED])
+    controls = Osr2Controls(FakeMotion(), device=lambda: next(modes), trouble=lambda: None)
+    qtbot.addWidget(controls)
+    controls.drawing()
+
+    assert controls._redraw_if_the_device_switched() is True
+    assert controls.situation().device == Osr2Mode.CONTROLLED

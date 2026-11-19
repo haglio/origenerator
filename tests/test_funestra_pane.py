@@ -255,12 +255,32 @@ def test_the_pointer_reaches_the_funestra_in_the_windows_own_pixels(qtbot, tmp_p
                         lambda x, y, *, held, viewport: reached.append((x, y, held)))
     monkeypatch.setattr(pane._funestra, "wheel",
                         lambda x, y, steps, *, viewport: reached.append((x, y, steps)))
+    monkeypatch.setattr(pane._funestra, "wheel_press",
+                        lambda x, y, *, viewport: reached.append(("wheel button", x, y)))
 
     pane.press(QPointF(10, 20))
     pane.motion(QPointF(11, 21), held=True)
     pane.wheel(QPointF(12, 22), -3)
+    pane.wheel_press(QPointF(13, 23))
 
-    assert reached == [(20, 40), (22, 42, True), (24, 44, -3)]
+    assert reached == [(20, 40), (22, 42, True), (24, 44, -3), ("wheel button", 26, 46)]
+
+
+def test_the_wheel_button_going_down_and_up_on_the_window_reaches_the_funestra(
+        qtbot, tmp_path, monkeypatch):
+    pane, _engine, _running = _pane(qtbot)
+    _hand_over(pane, _items(tmp_path, "one"))
+    heard = []
+    monkeypatch.setattr(pane._funestra, "wheel_press",
+                        lambda x, y, *, viewport: heard.append(("down", x, y)))
+    monkeypatch.setattr(pane._funestra, "wheel_release", lambda: heard.append(("up",)))
+
+    QTest.mousePress(pane._window, Qt.MouseButton.MiddleButton,
+                     Qt.KeyboardModifier.NoModifier, QPoint(5, 6))
+    QTest.mouseRelease(pane._window, Qt.MouseButton.MiddleButton,
+                       Qt.KeyboardModifier.NoModifier, QPoint(5, 6))
+
+    assert heard == [("down", 5, 6), ("up",)]
 
 
 def test_a_right_click_reaches_the_funestra_as_one_in_the_windows_own_pixels(

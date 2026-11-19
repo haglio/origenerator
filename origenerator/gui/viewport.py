@@ -65,6 +65,14 @@ def _path_key(path) -> str:
     return os.path.normcase(os.path.abspath(str(path)))
 
 
+def _message_over(host: QWidget) -> QLabel:
+    message = _lets_the_mouse_through(QLabel(host))
+    message.setStyleSheet(_MESSAGE_PLATE)
+    message.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+    message.hide()
+    return message
+
+
 def _lets_the_mouse_through(widget):
     widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
     return widget
@@ -128,10 +136,7 @@ class Viewport(QWidget):
 
         self._stack.setCurrentWidget(self._image_label)
 
-        self._message = _lets_the_mouse_through(QLabel(media_host))
-        self._message.setStyleSheet(_MESSAGE_PLATE)
-        self._message.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        self._message.hide()
+        self._message = _message_over(media_host)
 
         self._controls = CornerButtons(self)
         self._controls.triggered.connect(self._on_control)

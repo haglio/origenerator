@@ -33,7 +33,7 @@ from funestra.on_screen_history import OnScreenHistory
 from funestra.playlist import PlaylistItem
 from funestra.status import STATUS_INTERVAL_S, parse_status
 from PySide6.QtCore import QObject, QTimer, Signal
-from shared_ui.message_shape import HEARD_MARK, INFO, WARNING
+from shared_ui.message_shape import HEARD_MARK, INFO, WARNING, mark_of_a_message_said_now
 
 from origenerator.gui.action_presses import ActionPresses
 from origenerator.gui.funestra_transport import FunestraTransport
@@ -840,7 +840,7 @@ class FunestraSlideshow(QObject):
         self.note_voice_command(message, kind=kind)
 
     def _flash(self, message: str, *, kind: str = INFO, mark: str = "") -> None:
-        self.shown.flash(message, kind=kind, mark=mark)
+        self.shown.flash(message, kind=kind, mark=mark_of_a_message_said_now(mark))
 
     def release_media(self, paths, *, the_item_stays: bool = False) -> None:
         doomed = {str(path) for path in paths}

@@ -64,6 +64,7 @@ GO_TO = "GO_TO"
 TRASH_FILE = "TRASH_FILE"
 SAY = "say"
 SAID_AT = " @"
+HEARD = " heard"
 REQUEST_OPEN = "request_open"
 REQUEST_CLOSED = "request_closed"
 LOCK_HELD = "lock_held"
@@ -144,7 +145,7 @@ def _lines_said_to(shape: str) -> tuple[str, ...]:
 
 
 _CARRIED = re.compile(r"(\{\w+\})")
-_MAYBE_SAID_AT = rf"(?:{re.escape(SAID_AT)}[0-9]+(?:\.[0-9]+)?)?"
+_MAYBE_SAID_AT = rf"(?:{re.escape(SAID_AT)}[0-9]+(?:\.[0-9]+)?(?:{re.escape(HEARD)})?)?"
 
 
 def command_patterns() -> tuple[str, ...]:
@@ -171,6 +172,7 @@ def declaration() -> dict:
         "command_lines": list(command_lines()),
         "command_patterns": list(command_patterns()),
         "said_at_suffix": f"{SAID_AT}{{said_at_epoch_seconds}}",
+        "heard_suffix": HEARD,
         "request_lines": [spelled_for(shape, line) for shape in SHAPES
                           for line in (REQUEST_OPEN, REQUEST_CLOSED)],
         "lock_lines": [f"{spelled_for(shape, LOCK_HELD)}|{{file}}" for shape in SHAPES],

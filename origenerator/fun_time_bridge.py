@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from contextlib import nullcontext
 from pathlib import Path
 
 from funestra.file_channel import (
@@ -11,6 +12,7 @@ from funestra.file_channel import (
     read_paused_state,
 )
 from PySide6.QtCore import QCoreApplication, QObject, QTimer, Signal
+from shared_ui.message_shape import answering_what_he_said
 
 from origenerator.config import RADIO_DIR
 from origenerator.fun_time_mode import (
@@ -18,6 +20,7 @@ from origenerator.fun_time_mode import (
     CORE_READY,
     GO_TO,
     HAND_OVER,
+    HEARD,
     LOCK_HELD,
     OPEN_SLIDESHOW,
     RELEASE,
@@ -65,7 +68,15 @@ def _split_argument(line: str) -> tuple[str, str, str]:
     return line[:cut], line[cut], line[cut + 1:]
 
 
-def _without_when_said(said: str) -> tuple[str, float | None]:
+def _without_when_said(said: str) -> tuple[str, float | None, bool]:
+    heard = said.endswith(HEARD)
+    words, when = _without_the_time(said.removesuffix(HEARD))
+    if heard and when is None:
+        return said, None, False
+    return words, when, heard
+
+
+def _without_the_time(said: str) -> tuple[str, float | None]:
     words, marked, stamp = said.rpartition(SAID_AT)
     try:
         said_at_epoch_seconds = float(stamp) if marked else None
@@ -151,12 +162,16 @@ class FunTimeBridge(QObject):
         if not line:
             return
         keyword, marker, argument = _split_argument(line)
-        said_at = None
+        said_at, heard = None, False
         if marker == ":":
-            argument, said_at = _without_when_said(argument)
+            argument, said_at, heard = _without_when_said(argument)
         elif not marker:
-            keyword, said_at = _without_when_said(keyword)
-        keyword = keyword.upper()
+            keyword, said_at, heard = _without_when_said(keyword)
+        with answering_what_he_said() if heard else nullcontext():
+            self._answer(line, keyword.upper(), marker, argument, said_at)
+
+    def _answer(self, line: str, keyword: str, marker: str, argument: str,
+                said_at: float | None) -> None:
         if keyword == HAND_OVER and marker == "|":
             frames, _, taken = argument.partition("|")
             self.hand_over_asked.emit(Path(frames), Path(taken))

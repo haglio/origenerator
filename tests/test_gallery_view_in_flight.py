@@ -2512,7 +2512,7 @@ def test_cancel_all_asks_about_the_jobs_it_would_cancel(qtbot, monkeypatch):
                      ("Cancel all", "Cancel the job in the Job Queue?")]
 
 
-def _right_click_row(view, key, monkeypatch, pick="Cancel All Below"):
+def _right_click_row(view, key, monkeypatch, pick="Cancel all below"):
     offered = []
 
     def choose(menu, *_args):
@@ -2553,8 +2553,8 @@ def test_cancel_all_below_asks_about_the_jobs_under_the_row_and_cancels_none_on_
     _right_click_row(view, "a", monkeypatch)
     _right_click_row(view, "b", monkeypatch)
 
-    assert asked == [("Cancel All Below", "Cancel the 2 jobs below this one in the Job Queue?"),
-                     ("Cancel All Below", "Cancel the job below this one in the Job Queue?")]
+    assert asked == [("Cancel all below", "Cancel the 2 jobs below this one in the Job Queue?"),
+                     ("Cancel all below", "Cancel the job below this one in the Job Queue?")]
     assert cancelled == []
 
 
@@ -2566,8 +2566,8 @@ def test_a_row_with_nothing_below_it_to_cancel_opens_no_menu(qtbot, monkeypatch)
 
     offered = [_right_click_row(view, key, monkeypatch, pick=None) for key in ("a", "b", "c")]
 
-    assert offered == [[("Cancel All Below", True)], [], []], (
-        "the user's call: Cancel All Below is left off where it can do nothing, not grayed")
+    assert offered == [[("Cancel all below", True)], [], []], (
+        "the user's call: Cancel all below is left off where it can do nothing, not grayed")
 
 
 def test_the_huds_cancel_all_below_asks_over_the_slideshow_never_raising_core(
@@ -2584,7 +2584,7 @@ def test_the_huds_cancel_all_below_asks_over_the_slideshow_never_raising_core(
     monkeypatch.setattr(view.job_queue, "items", lambda rows=None, requests=None: jobs)
     shown.queue_foot.set(jobs)
     faking_exec(monkeypatch, QMenu, lambda menu, *_a: next(
-        action for action in menu.actions() if action.text() == "Cancel All Below"))
+        action for action in menu.actions() if action.text() == "Cancel all below"))
     asked_over = []
     faking_exec(monkeypatch, QMessageBox, lambda box, *_a: asked_over.append(
         box.parentWidget()) or QMessageBox.StandardButton.No)

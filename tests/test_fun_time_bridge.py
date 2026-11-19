@@ -779,7 +779,7 @@ def test_cancel_all_below_on_the_job_queue_a_funestra_draws_cancels_the_jobs_und
     monkeypatch.setattr(view.job_queue, "items", lambda rows=None, requests=None: jobs)
     shown.set_queue(jobs)
     faking_exec(monkeypatch, QMenu, lambda menu, *_a: next(
-        action for action in menu.actions() if action.text() == "Cancel All Below"))
+        action for action in menu.actions() if action.text() == "Cancel all below"))
     _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
     x, y, width, height = shown.queue_foot.pointer.where(f"{OPEN}|j1")
 

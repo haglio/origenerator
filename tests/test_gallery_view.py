@@ -1918,7 +1918,7 @@ def test_going_to_an_item_draws_its_folder_even_when_that_row_is_already_current
     view._gallery_pane.show_empty()
     assert "i1" not in view.listed_prompt_ids()
 
-    view._go_to_generation("i1")
+    view.go_to_generation("i1")
 
     assert "i1" in view.listed_prompt_ids()
     assert view._selected["prompt_id"] == "i1"
@@ -1933,7 +1933,7 @@ def test_going_to_a_failed_generation_opens_the_folder_its_settings_name(qtbot):
     view.refresh()
     assert "x1" not in view.toc.leaf_by_id
 
-    view._go_to_generation("x1")
+    view.go_to_generation("x1")
 
     assert "i1" in view.listed_prompt_ids()
     assert view._selected["prompt_id"] == "x1"
@@ -1945,7 +1945,7 @@ def test_following_a_link_is_one_look_at_the_disk(qtbot):
     qtbot.addWidget(view)
     looked = []
     look = once_a_look(lambda: looked.append("looked"))
-    view._go_to_generation = lambda prompt_id: (look(), look())
+    view.go_to_generation = lambda prompt_id: (look(), look())
 
     view.follow_link("img1")
 
@@ -1989,6 +1989,24 @@ def test_back_and_forward_walk_the_viewed_generations(qtbot):
     assert view._selected["prompt_id"] == "i1"
     view._navigation.go_forward()
     assert view._selected["prompt_id"] == "i2"
+
+
+def test_back_to_an_item_whose_folder_has_gone_finds_it_in_the_folder_it_is_in_now(qtbot):
+    db = database_of([_image("a1", "a cat", 50, 1), _image("b1", "a dog", 50, 1)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view.toc.leaf_by_id["a1"])
+    _pick_by_clicking(view, "a1")
+    view._tree.setCurrentItem(view.toc.leaf_by_id["b1"])
+    _pick_by_clicking(view, "b1")
+    db.set_params_json("a1", json.dumps({"positive_prompt": "a fox", "steps": 50, "seed": 1}))
+    view.refresh()
+
+    view._navigation.go_back()
+
+    assert view._selected["prompt_id"] == "a1"
+    assert view._tree.currentItem() is view.toc.leaf_by_id["a1"]
 
 
 def test_back_returns_from_a_followed_input_image_link_to_the_video(qtbot):

@@ -459,7 +459,7 @@ def test_clicking_a_deleted_tile_opens_it_like_any_other_generation(qtbot):
     _pick_by_clicking(view, "d1")
 
     assert view._selected_row["prompt_id"] == "d1"
-    shown = view._generate_pane.current_generate_tab().displayed_row()
+    shown = view.generate_pane.current_generate_tab().displayed_row()
     assert shown["prompt_id"] == "d1", (
         "the Trash kept it whole, so it fills a Generate tab with the settings that made it: being "
         "able to look before deciding is the point")
@@ -473,9 +473,9 @@ def test_double_clicking_a_deleted_tile_keeps_its_tab(qtbot):
 
     view._gallery_pane._thumbnail_double_clicked("d1")
 
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     assert tab.displayed_row()["prompt_id"] == "d1"
-    assert view._generate_pane._preview_tab is not tab
+    assert view.generate_pane._preview_tab is not tab
 
 
 def test_the_slideshow_button_is_gray_in_the_trash_and_starts_nothing(qtbot, monkeypatch):
@@ -489,9 +489,9 @@ def test_the_slideshow_button_is_gray_in_the_trash_and_starts_nothing(qtbot, mon
     assert not view._buttons.slideshow.isHidden()
     assert not view._buttons.slideshow.isEnabled()
     assert view._buttons.slideshow.toolTip() == "Trash doesn't play as a slideshow"
-    view._slideshows.start()
+    view.slideshows.start()
 
-    assert view._slideshows.showing is None
+    assert view.slideshows.showing is None
 
 
 def _emptied_db(workflow_name="sdxl_t2i"):
@@ -518,7 +518,7 @@ def test_an_item_in_the_trash_is_left_alone_by_each_action_that_changes_an_item(
     changed = []
     view.set_items_favorite = lambda *asked: changed.append(STAR)
     view._delete_rows = lambda rows: changed.append(TRASH)
-    view._enhance.enhance_items = lambda prompt_ids: changed.append(ENHANCE)
+    view.enhance.enhance_items = lambda prompt_ids: changed.append(ENHANCE)
     assert view.row_for("d1") is not None
 
     view.run_item_action("d1", action)
@@ -778,7 +778,7 @@ def test_clicking_the_pane_background_drops_the_selection(qtbot):
     qtbot.mouseClick(pane, Qt.MouseButton.LeftButton, pos=QPoint(560, 560))
 
     assert view.selected_prompt_ids() == []
-    assert "folder" in view._enhance.pane._enhance_button.toolTip()
+    assert "folder" in view.enhance.pane._enhance_button.toolTip()
 
 
 def test_clicking_the_pane_background_leaves_the_tiles_on_screen(qtbot):
@@ -1148,9 +1148,9 @@ def test_releasing_held_media_clears_a_pane_under_the_one_in_front(qtbot, tmp_pa
     qtbot.addWidget(view)
     doomed = tmp_path / "doomed.png"
     doomed.write_bytes(b"x")
-    covered = view._generate_pane.current_generate_tab()
+    covered = view.generate_pane.current_generate_tab()
     covered._viewport.show_image(doomed)
-    view._generate_pane._add_subtab()
+    view.generate_pane._add_subtab()
 
     view._release_held_media([doomed])
 
@@ -1160,12 +1160,12 @@ def test_releasing_held_media_clears_a_pane_under_the_one_in_front(qtbot, tmp_pa
 def test_releasing_held_media_reaches_an_open_slideshow(qtbot, tmp_path):
     view = GalleryView(database_of([]))
     qtbot.addWidget(view)
-    view._slideshows._slideshow = MagicMock()
+    view.slideshows._slideshow = MagicMock()
 
     view._release_held_media([tmp_path / "clip.mp4"])
 
     # Windows refuses to move a file that is open, so the paths must reach the slideshow.
-    view._slideshows.showing.release_media.assert_called_once_with(
+    view.slideshows.showing.release_media.assert_called_once_with(
         [tmp_path / "clip.mp4"], the_item_stays=False)
 
 
@@ -1173,11 +1173,11 @@ def test_a_slideshow_hears_when_the_file_it_lets_go_of_is_a_version_of_an_item_t
         qtbot, tmp_path):
     view = GalleryView(database_of([]))
     qtbot.addWidget(view)
-    view._slideshows._slideshow = MagicMock()
+    view.slideshows._slideshow = MagicMock()
 
     view._release_held_media([tmp_path / "better.png"], the_item_stays=True)
 
-    view._slideshows.showing.release_media.assert_called_once_with(
+    view.slideshows.showing.release_media.assert_called_once_with(
         [tmp_path / "better.png"], the_item_stays=True)
 
 
@@ -1232,7 +1232,7 @@ def test_delete_after_a_click_in_the_generate_pane_wipes_no_thumbnail(qtbot, tmp
         view.activateWindow()
     thumb = view._gallery_pane._thumb_widgets["i1"]
     gestures.click(thumb, thumb.rect().center())
-    form = view._generate_pane.current_generate_tab()._param_form
+    form = view.generate_pane.current_generate_tab()._param_form
     header = next(iter(form._sections.values()))._header
     _scroll_into_view(header)
     gestures.click(header, header.rect().center())

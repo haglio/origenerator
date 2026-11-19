@@ -125,6 +125,9 @@ class GeneratePane(QTabWidget):
         for tab in self.generate_tabs():
             tab.set_how_many(count)
 
+    def restore_how_many(self, saved) -> None:
+        self.set_how_many(saved if saved in HOW_MANY else HOW_MANY[0])
+
     def request_auto_generate(self) -> bool:
         return self._request_auto_generate
 
@@ -132,6 +135,9 @@ class GeneratePane(QTabWidget):
         self._request_auto_generate = on
         for tab in self.generate_tabs():
             tab.set_request_auto_generate(on)
+
+    def restore_request_auto_generate(self, saved) -> None:
+        self.set_request_auto_generate(saved is True)
 
     def current_generate_tab(self) -> GenerateTab | None:
         widget = self.currentWidget()

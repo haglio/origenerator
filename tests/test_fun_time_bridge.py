@@ -82,9 +82,9 @@ def _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path, count=3):
         items.append((str(still), "image", f"id{n}", str(still)))
     monkeypatch.setattr(view, "rows_to_play",
                         lambda: [_row_of(item) for item in items])
-    monkeypatch.setattr(view._slideshows, "items_of", lambda rows: list(items))
+    monkeypatch.setattr(view.slideshows, "items_of", lambda rows: list(items))
     monkeypatch.setattr(view, "slideshow_subject", lambda: "a folder")
-    view._slideshows.start()
+    view.slideshows.start()
     slideshow = view.region_slideshow("portrait")
     qtbot.addWidget(slideshow.shown)
     funestra_of(slideshow.shown)
@@ -157,9 +157,9 @@ def test_the_order_verbs_play_the_side_newest_first_or_shuffled(qtbot, tmp_path,
     still = str(tmp_path / "tall.png")
     library = {key: [(still, "image", f"{key}-{n}", still) for n in range(3)]
                for key in ("__recents__::portrait", "__all__::portrait")}
-    monkeypatch.setattr(view._slideshows, "rows_at",
+    monkeypatch.setattr(view.slideshows, "rows_at",
                         lambda key: [_row_of(item) for item in library.get(key, [])])
-    monkeypatch.setattr(view._slideshows, "items_of", _items_of)
+    monkeypatch.setattr(view.slideshows, "items_of", _items_of)
     orders = []
 
     for verb in ("PORTRAIT_LATEST", "PORTRAIT_SHUFFLE"):
@@ -295,7 +295,7 @@ def test_a_lock_the_session_sends_is_taken_on_the_slide_it_brought_back(qtbot, t
 def test_a_spoken_phrase_is_matched_by_this_apps_own_vocabulary(qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     played = []
-    monkeypatch.setattr(view._slideshows, "play_collection", played.append)
+    monkeypatch.setattr(view.slideshows, "play_collection", played.append)
 
     (tmp_path / "origenerator_cmd.txt").write_text(
         "LANDSCAPE_SAY:favorites\n", encoding="utf-8")
@@ -501,7 +501,7 @@ def test_the_words_of_a_request_are_not_read_as_commands(qtbot, tmp_path, monkey
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     played = []
-    monkeypatch.setattr(view._slideshows, "play_collection", played.append)
+    monkeypatch.setattr(view.slideshows, "play_collection", played.append)
     monkeypatch.setattr(view._voice, "_begin_request", lambda *a, **kw: None)
 
     (tmp_path / "origenerator_cmd.txt").write_text(
@@ -565,7 +565,7 @@ def _press(bridge, tmp_path, line: str) -> None:
 
 def test_a_funestras_filter_presses_reach_the_slideshow_on_that_side(qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
-    monkeypatch.setattr(view._slideshows, "_favorite_prompt_ids", lambda: {"id1"})
+    monkeypatch.setattr(view.slideshows, "_favorite_prompt_ids", lambda: {"id1"})
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
 
     _press(bridge, tmp_path, "portrait_favorites")
@@ -639,9 +639,9 @@ def test_a_session_that_hands_over_its_funestras_gets_both_sides_on_them(
     Image.new("RGB", (200, 100)).save(wide)
     library = {"__all__::portrait": [(str(tall), "image", "id-tall", str(tall))],
                "__all__::landscape": [(str(wide), "image", "id-wide", str(wide))]}
-    monkeypatch.setattr(view._slideshows, "rows_at",
+    monkeypatch.setattr(view.slideshows, "rows_at",
                         lambda key: [_row_of(item) for item in library.get(key, [])])
-    monkeypatch.setattr(view._slideshows, "items_of", _items_of)
+    monkeypatch.setattr(view.slideshows, "items_of", _items_of)
 
     _press(bridge, tmp_path, "portrait_open_slideshow")
     _press(bridge, tmp_path, "landscape_open_slideshow")
@@ -673,9 +673,9 @@ def test_a_press_on_the_job_queue_a_funestra_draws_reaches_that_job(
     bridge = FunTimeBridge(view._fun_time, view, parent=view)
     tall = tmp_path / "tall.png"
     Image.new("RGB", (100, 200)).save(tall)
-    monkeypatch.setattr(view._slideshows, "rows_at", lambda key: [_row_of(
+    monkeypatch.setattr(view.slideshows, "rows_at", lambda key: [_row_of(
         (str(tall), "image", "id-tall", str(tall)))] if key == "__all__::portrait" else [])
-    monkeypatch.setattr(view._slideshows, "items_of", _items_of)
+    monkeypatch.setattr(view.slideshows, "items_of", _items_of)
     _press(bridge, tmp_path, "portrait_open_slideshow")
     shown = view.region_slideshow("portrait").shown
     stopped = []
@@ -711,9 +711,9 @@ def _funestras_playing_their_libraries(qtbot, tmp_path, monkeypatch):
     bridge = FunTimeBridge(view._fun_time, view, parent=view)
     library = {"__all__::landscape": _stills(tmp_path, "library-wide", 3, (200, 100)),
                "__all__::portrait": _stills(tmp_path, "library-tall", 1, (100, 200))}
-    monkeypatch.setattr(view._slideshows, "rows_at",
+    monkeypatch.setattr(view.slideshows, "rows_at",
                         lambda key: [_row_of(item) for item in library.get(key, [])])
-    monkeypatch.setattr(view._slideshows, "items_of", _items_of)
+    monkeypatch.setattr(view.slideshows, "items_of", _items_of)
     _press(bridge, tmp_path, "portrait_open_slideshow")
     _press(bridge, tmp_path, "landscape_open_slideshow")
     for shape in ("landscape", "portrait"):
@@ -733,12 +733,12 @@ def test_a_preview_double_click_takes_over_the_funestra_of_its_shape_for_good(
     monkeypatch.setattr(view, "listed_prompt_ids", lambda: [item[2] for item in folder])
     monkeypatch.setattr(view.library.reading, "row_for", lambda pid: next(
         (_row_of(item) for item in folder if item[2] == pid), None))
-    monkeypatch.setattr(view._slideshows, "items_of", lambda rows: [
+    monkeypatch.setattr(view.slideshows, "items_of", lambda rows: [
         row if isinstance(row, tuple)
         else (row["thumbnail_path"], "image", row["prompt_id"], row["thumbnail_path"])
         for row in rows])
 
-    view._slideshows.open_in_its_folder((clicked[0], "image"), clicked[2])
+    view.slideshows.open_in_its_folder((clicked[0], "image"), clicked[2])
 
     played = [str(item.path) for item in read_playlist(tmp_path / "landscape.tsv")]
     assert played == [clicked[0], folder[0][0]]
@@ -755,7 +755,7 @@ def test_a_double_click_over_frames_of_no_run_in_flight_leaves_the_funestras_alo
     view = _funestras_playing_their_libraries(qtbot, tmp_path, monkeypatch)
     playing = (tmp_path / "landscape.tsv").read_text(encoding="utf-8")
 
-    assert view._slideshows.open_on_preview(None, None) is None
+    assert view.slideshows.open_on_preview(None, None) is None
 
     assert (tmp_path / "landscape.tsv").read_text(encoding="utf-8") == playing
     assert _told(tmp_path, "landscape") == []

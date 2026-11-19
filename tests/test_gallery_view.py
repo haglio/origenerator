@@ -422,11 +422,11 @@ def test_opening_a_folder_lands_on_its_first_item(qtbot):
     assert view.listed_prompt_ids()[0] == "i1"
     assert view.selected_generation() == "i1"
     assert view.selected_prompt_ids() == ["i1"]
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     assert tab.displayed_row()["prompt_id"] == "i1", (
         "picking a folder is picking what is in it, so it opens ready to work in rather than beside "
         "whatever the tab in front happened to hold")
-    assert view._generate_pane._preview_tab is tab
+    assert view.generate_pane._preview_tab is tab
 
 
 def _first_leaf(view):
@@ -475,7 +475,7 @@ def test_a_slideshow_started_on_videos_plays_the_videos_alone(qtbot):
 
     assert [row["prompt_id"] for row in view.rows_to_play()] == ["v1"]
     assert [row["prompt_id"]
-            for row in view._slideshows.rows_at(view.slideshow_location())] == ["v1"]
+            for row in view.slideshows.rows_at(view.slideshow_location())] == ["v1"]
 
 
 def test_all_shows_its_collections_then_images_and_videos_as_squares(qtbot):
@@ -768,7 +768,7 @@ def test_the_tick_after_a_star_finds_nothing_to_redraw(qtbot):
 def test_each_tick_puts_what_a_slideshow_is_locked_on_first(qtbot, monkeypatch):
     view, _cat, _dog = _two_leaf_view(qtbot)
     ticks = []
-    monkeypatch.setattr(view._enhance, "put_what_is_locked_first", lambda: ticks.append(1))
+    monkeypatch.setattr(view.enhance, "put_what_is_locked_first", lambda: ticks.append(1))
 
     view._poll()
 
@@ -780,7 +780,7 @@ def test_each_tick_puts_what_a_slideshow_is_locked_on_first(qtbot, monkeypatch):
 def test_a_tick_hands_the_slideshows_each_item_another_process_filed(qtbot, monkeypatch):
     view, _cat, _dog = _two_leaf_view(qtbot)
     arrived = []
-    monkeypatch.setattr(view._slideshows, "note_arrived",
+    monkeypatch.setattr(view.slideshows, "note_arrived",
                         lambda rows: arrived.append([row["prompt_id"] for row in rows]))
     filed = _image("i3", "a bird", 50, 1)
     put_rows(view._db, [filed])
@@ -793,7 +793,7 @@ def test_a_tick_hands_the_slideshows_each_item_another_process_filed(qtbot, monk
 def test_a_tick_hands_the_slideshows_an_item_evolver_just_upscaled(qtbot, monkeypatch):
     view, _cat, _dog = _two_leaf_view(qtbot)
     arrived = []
-    monkeypatch.setattr(view._slideshows, "note_arrived",
+    monkeypatch.setattr(view.slideshows, "note_arrived",
                         lambda rows: arrived.append([row["prompt_id"] for row in rows]))
     view._db.set_evolver_upscale("i1", "video_one_topaz.mp4", None)
 
@@ -1286,11 +1286,11 @@ def test_double_clicking_a_recent_item_also_keeps_its_tab(qtbot):
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     _pick_by_clicking(view, "i2")
-    assert view._generate_pane._preview_tab is not None
+    assert view.generate_pane._preview_tab is not None
 
     view._gallery_pane._thumb_widgets["i2"].double_clicked.emit("i2")
 
-    assert view._generate_pane._preview_tab is None
+    assert view.generate_pane._preview_tab is None
 
 
 def test_latest_collection_shows_empty_state_when_nothing_has_a_result(qtbot):
@@ -1370,7 +1370,7 @@ def test_a_double_click_on_an_image_in_latest_plays_everything_latest_lists(qtbo
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
-    slideshow = view._slideshows.open_in_its_folder(("i119.png", "image"), "i119")
+    slideshow = view.slideshows.open_in_its_folder(("i119.png", "image"), "i119")
     qtbot.addWidget(slideshow.shown)
 
     assert len(slideshow._set.playlist.in_play_order()) == 120
@@ -1385,7 +1385,7 @@ def test_a_double_clicked_tile_plays_its_folder_from_it(qtbot, monkeypatch):
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
     view._gallery_pane._thumbnail_double_clicked("i110")
-    slideshow = view._slideshows.showing
+    slideshow = view.slideshows.showing
     qtbot.addWidget(slideshow.shown)
 
     assert len(slideshow._set.playlist.in_play_order()) == 120
@@ -1400,7 +1400,7 @@ def test_a_double_clicked_preview_plays_its_item_alone_locked(qtbot, monkeypatch
     view.refresh()
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
-    slideshow = view._slideshows.open_on_preview(("i119.png", "image"), "i119")
+    slideshow = view.slideshows.open_on_preview(("i119.png", "image"), "i119")
     qtbot.addWidget(slideshow.shown)
 
     assert [item[2] for item in slideshow._set.playlist.in_play_order()] == ["i119"]
@@ -1579,8 +1579,8 @@ def test_a_minimized_gallery_with_no_slideshow_up_reads_nothing_on_its_tick(
 def test_a_minimized_gallery_under_an_open_slideshow_reads_on_its_tick(qtbot, monkeypatch):
     view = _a_minimized_gallery(qtbot, monkeypatch)
     _select_first_leaf(view)
-    view._slideshows.start()
-    qtbot.addWidget(view._slideshows.showing.shown)
+    view.slideshows.start()
+    qtbot.addWidget(view.slideshows.showing.shown)
     reads = []
     monkeypatch.setattr(view, "off_thread", lambda *hop: reads.append(hop))
 
@@ -1789,7 +1789,7 @@ def test_clicking_a_step_of_the_path_puts_a_running_search_away(qtbot):
 
     _click_path_step(view, workflow.text(0))
 
-    assert (view._search.field.text(), view._tree.currentItem()) == ("", workflow), (
+    assert (view.search.field.text(), view._tree.currentItem()) == ("", workflow), (
         "a step of the path opens its folder by the one move under every gesture that names a "
         "folder, as a folder tile's click and a tab's Go to folder do")
 
@@ -1885,7 +1885,7 @@ def test_a_tile_and_the_tab_it_opens_both_wear_the_items_name(qtbot):
     view = GalleryView(database_of([newer, older]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
-    for tab in view._generate_pane.generate_tabs():
+    for tab in view.generate_pane.generate_tabs():
         tab._viewport.show_media = MagicMock()
     _select_first_leaf(view)
 
@@ -1893,21 +1893,21 @@ def test_a_tile_and_the_tab_it_opens_both_wear_the_items_name(qtbot):
 
     name = f"{gallery.folder_id(gallery.settings_folder_key(newer))} 001"
     assert view._gallery_pane._thumb_widgets["g2"]._text_label.text() == name
-    assert view._generate_pane.tabText(view._generate_pane.currentIndex()) == name
+    assert view.generate_pane.tabText(view.generate_pane.currentIndex()) == name
 
 
 def test_a_tab_put_back_before_the_gallery_first_loads_takes_its_items_name_then(qtbot):
     row = _image("g1", "a cat", 50, 1)
     view = GalleryView(database_of([row]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
-    for tab in view._generate_pane.generate_tabs():
+    for tab in view.generate_pane.generate_tabs():
         tab._viewport.show_media = MagicMock()
-    view._generate_pane.load_selection(row, [row])
+    view.generate_pane.load_selection(row, [row])
 
     view.refresh()
 
     name = f"{gallery.folder_id(gallery.settings_folder_key(row))} 000"
-    assert view._generate_pane.tabText(view._generate_pane.currentIndex()) == name
+    assert view.generate_pane.tabText(view.generate_pane.currentIndex()) == name
 
 
 def test_going_to_an_item_draws_its_folder_even_when_that_row_is_already_current(qtbot):
@@ -1962,18 +1962,18 @@ def test_following_a_link_lands_in_one_tab(qtbot):
     view = GalleryView(database_of([video, image]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)
     view.refresh()
-    for tab in view._generate_pane.generate_tabs():
+    for tab in view.generate_pane.generate_tabs():
         tab._viewport.show_media = MagicMock()
     view._tree.setCurrentItem(view.toc.leaf_by_id["vid1"])
     _pick_by_clicking(view, "vid1")
-    tabs = view._generate_pane.count()
+    tabs = view.generate_pane.count()
 
     view.follow_link("img1")
 
-    assert view._generate_pane.count() == tabs, (
+    assert view.generate_pane.count() == tabs, (
         "a followed link fills the tab a click would rather than opening another: going to look "
         "at something costs no more tabs than browsing to it")
-    assert view._generate_pane.current_generate_tab().displayed_row()["prompt_id"] == "img1"
+    assert view.generate_pane.current_generate_tab().displayed_row()["prompt_id"] == "img1"
 
 
 def test_back_and_forward_walk_the_viewed_generations(qtbot):
@@ -2379,7 +2379,7 @@ def test_a_poll_redrawing_a_search_is_not_a_stop(qtbot):
 
     view.refresh()
     view._poll()
-    view._search._on_sort_changed()
+    view.search._on_sort_changed()
 
     assert len(view._navigation._history._stack) == depth
 
@@ -2429,7 +2429,7 @@ def test_back_returns_to_the_search_results_a_hit_was_opened_from(qtbot):
     view._navigation.go_back()
 
     assert view._gallery_pane.showing_search()
-    assert view._search.field.text() == "cat"
+    assert view.search.field.text() == "cat"
     assert view.listed_prompt_ids() == ["i1"]
 
 
@@ -2445,7 +2445,7 @@ def test_a_hit_previewed_in_the_results_is_a_stop_in_them(qtbot):
     view._navigation.go_back()
 
     assert view._gallery_pane.showing_search()
-    assert view._search.field.text() == "cat"
+    assert view.search.field.text() == "cat"
 
 
 def test_typing_on_does_not_stack_a_stop_per_pause(qtbot):
@@ -2611,7 +2611,7 @@ def test_the_panes_keep_their_contents_the_standard_margin_off_their_edges(qtbot
     for _ in range(4):
         QApplication.processEvents()
 
-    for inside in (view._tree, view._scroll, view._osr2_controls, view._enhance.pane):
+    for inside in (view._tree, view._scroll, view._osr2_controls, view.enhance.pane):
         pane = _pane_holding(inside)
         room = pane.rect().marginsRemoved(QMargins(*[MARGIN_STANDARD] * 4))
         for child in pane.findChildren(
@@ -2629,7 +2629,7 @@ def test_the_hud_sits_top_left_over_the_search_with_a_draggable_divider_between(
     assert view._arrangement.folder_panes.widget(0) is divider
     assert divider.orientation() == Qt.Orientation.Vertical
     assert divider.widget(0).isAncestorOf(view._osr2_controls)
-    assert any(divider.widget(n).isAncestorOf(view._search.field)
+    assert any(divider.widget(n).isAncestorOf(view.search.field)
                for n in range(1, divider.count()))
     assert divider.handleWidth() == view._arrangement.panes.handleWidth()
 
@@ -2642,7 +2642,7 @@ def test_a_draggable_divider_parts_the_thumbnails_from_the_panels_below(qtbot, t
     assert isinstance(divider, QSplitter)
     assert divider.orientation() == Qt.Orientation.Vertical
     assert divider.widget(0).isAncestorOf(view._scroll)
-    assert divider.widget(1).isAncestorOf(view._enhance.pane)
+    assert divider.widget(1).isAncestorOf(view.enhance.pane)
     assert divider.handleWidth() == view._arrangement.panes.handleWidth()
 
 
@@ -2654,7 +2654,7 @@ def test_with_room_to_spare_the_enhance_settings_under_the_thumbnails_open_whole
     view.show()
     for _ in range(4):
         QApplication.processEvents()
-    (settings,) = view._enhance.pane.findChildren(QScrollArea)
+    (settings,) = view.enhance.pane.findChildren(QScrollArea)
 
     assert settings.verticalScrollBar().maximum() == 0
 
@@ -2679,7 +2679,7 @@ def test_the_enhance_settings_take_the_whole_foot_under_the_thumbnails(qtbot, tm
     qtbot.addWidget(view)
     divider = _pane_holding(view._scroll).parentWidget()
 
-    assert divider.widget(1) is _pane_holding(view._enhance.pane)
+    assert divider.widget(1) is _pane_holding(view.enhance.pane)
 
 
 def test_squeezed_smaller_than_the_hud_its_pane_scrolls_rather_than_spilling(qtbot,
@@ -3149,7 +3149,7 @@ def test_actions_set_for_a_folder_reach_every_item_in_it_and_the_tab_showing_one
 
     _the_folders_actions(view).findChild(TickControl, action_checkbox(MediaType.IMAGE, name)).click()
 
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     assert [actions_of(db.get_generation(prompt_id), MediaType.IMAGE).checked
             for prompt_id in ("i1", "i2")] == [(name,), (name,)]
     assert tab._action.form().parentWidget().findChild(

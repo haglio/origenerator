@@ -453,7 +453,7 @@ def test_finishing_a_reroll_loads_its_result_into_the_tab_that_launched_it(qtbot
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
     qtbot.addWidget(view)
     view.refresh()
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     key = _generate_in_current_tab(view, positive_prompt="a cat", seed=9)
     job = view._live_jobs[key]
 
@@ -470,14 +470,14 @@ def test_a_run_ending_behind_another_tab_leaves_the_tab_in_front_as_it_was(qtbot
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
     qtbot.addWidget(view)
     view.refresh()
-    launcher = view._generate_pane.current_generate_tab()
+    launcher = view.generate_pane.current_generate_tab()
     key = _generate_in_current_tab(view, positive_prompt="a cat", seed=9)
     job = view._live_jobs[key]
-    in_front = view._generate_pane._add_subtab()
+    in_front = view.generate_pane._add_subtab()
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
-    assert view._generate_pane.current_generate_tab() is in_front
+    assert view.generate_pane.current_generate_tab() is in_front
     assert in_front.displayed_row() is None, (
         "what a tab's preview shows is only ever that tab's own run: nothing paints the tab "
         "in front from outside")
@@ -493,8 +493,8 @@ def test_the_tiles_run_lands_in_the_tab_standing_on_its_folder(qtbot, tmp_path):
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
-    assert view._generate_pane.count() == 1
-    tab = view._generate_pane.current_generate_tab()
+    assert view.generate_pane.count() == 1
+    tab = view.generate_pane.current_generate_tab()
     assert tab.displayed_row()["prompt_id"] == job.prompt_id
 
 
@@ -503,7 +503,7 @@ def test_the_tab_claiming_the_tiles_run_is_kept(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    tabs = view._generate_pane
+    tabs = view.generate_pane
     assert tabs._preview_tab is tabs.current_generate_tab()
 
     _new_tile(view).add_requested.emit()
@@ -519,15 +519,15 @@ def test_opening_a_runs_folder_from_its_tile_loads_no_saved_item(qtbot, tmp_path
     view.refresh()
     key, _job = _running_reroll(view)
     view._tree.setCurrentItem(_image_workflow(view._tree))
-    view._generate_pane.load_selection = MagicMock()
+    view.generate_pane.load_selection = MagicMock()
 
     view._reveal_reroll(key)
 
-    assert view._generate_pane.load_selection.call_count == 0, (
+    assert view.generate_pane.load_selection.call_count == 0, (
         "the open is a step on the way to that run's tile rather than somewhere browsed to, so "
         "it lands on no saved item of its own: one would paint an item nobody asked for over the "
         "very tab the run belongs to, and re-seed that tab's form from a saved row mid-run")
-    assert view._generate_pane.current_generate_tab().watched_key() == key
+    assert view.generate_pane.current_generate_tab().watched_key() == key
 
 
 def test_finishing_a_reroll_keeps_a_prompt_typed_while_it_ran(qtbot, tmp_path):
@@ -535,7 +535,7 @@ def test_finishing_a_reroll_keeps_a_prompt_typed_while_it_ran(qtbot, tmp_path):
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
     qtbot.addWidget(view)
     view.refresh()
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     key = _generate_in_current_tab(view, positive_prompt="a cat", seed=9)
     job = view._live_jobs[key]
     tab._param_form.set_values({"positive_prompt": "a wizard mid-edit"})
@@ -552,7 +552,7 @@ def test_canceling_a_selected_reroll_releases_the_generate_pane(qtbot, tmp_path)
     view.refresh()
     key, _job = _running_reroll(view)
     _generating_tile(view).selected.emit()
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     assert tab.watched_key() == key
 
     view._cancel_reroll(key)
@@ -617,7 +617,7 @@ def test_a_run_watched_fullscreen_lands_as_its_generation_among_its_folder(
         view.listed_prompt_ids()
     assert slideshow._set.playlist.current().prompt_id == job.prompt_id
     qtbot.keyClick(slideshow.shown, Qt.Key.Key_Down)
-    assert view._enhance.run_of(view.row_for(job.prompt_id)) is not None
+    assert view.enhance.run_of(view.row_for(job.prompt_id)) is not None
     slideshow.close()
 
 
@@ -664,7 +664,7 @@ def test_clicking_add_opens_a_tab_on_the_run_it_started(qtbot, tmp_path):
 
     _new_tile(view).add_requested.emit()
 
-    assert view._generate_pane.current_generate_tab().watched_key() == key
+    assert view.generate_pane.current_generate_tab().watched_key() == key
     assert view._selected_reroll_key == key
     assert _generating_tile(view)._selected
 
@@ -777,7 +777,7 @@ def test_selected_reroll_survives_the_rebuild_its_running_row_triggers(qtbot, tm
     frame = _png_bytes()
     client.preview_image.emit(job.prompt_id, frame)
     _generating_tile(view).selected.emit()
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     assert tab.watched_key() == key
     assert _frame_shown(tab._viewport, frame)
 
@@ -785,7 +785,7 @@ def test_selected_reroll_survives_the_rebuild_its_running_row_triggers(qtbot, tm
 
     assert view._selected_reroll_key == key
     assert _generating_tile(view)._selected
-    assert view._generate_pane.current_generate_tab() is tab
+    assert view.generate_pane.current_generate_tab() is tab
     assert tab.watched_key() == key
     assert _frame_shown(tab._viewport, frame)
 
@@ -836,7 +836,7 @@ def test_i2v_video_stage_keeps_the_last_image_frame_until_it_previews(qtbot, tmp
     view._poll()
 
     assert view._selected_reroll_key == key
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     assert tab.watched_key() == key
     assert _frame_shown(tab._viewport, image_frame)
 
@@ -923,7 +923,7 @@ def test_a_video_made_on_a_fresh_image_lands_in_the_tab_that_launched_the_run(qt
     view.refresh()
     key = _select_leaf_of(view, "vid")
     _new_tile(view).add_requested.emit()
-    launcher = view._generate_pane.current_generate_tab()
+    launcher = view.generate_pane.current_generate_tab()
     client.job_completed.emit(view._live_jobs[key].prompt_id, _IMG_REROLL_HISTORY)
     (enhance_job,) = [job for job in view._jobs.all_jobs if job.enhances]
     enhance_job.finished.emit(
@@ -1404,9 +1404,9 @@ def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypa
     view.refresh()
     _select_first_leaf(view)
 
-    view._slideshows.start()
-    qtbot.addWidget(view._slideshows.showing.shown)
-    slideshow = view._slideshows.showing
+    view.slideshows.start()
+    qtbot.addWidget(view.slideshows.showing.shown)
+    slideshow = view.slideshows.showing
 
     assert [item.key for item in slideshow.shown.queue_foot.hud_queue[0]] == view.job_queue.view.keys() == ["gen1"]
     assert queue_section(*slideshow.shown.queue_foot.hud_queue).leader.key == "gen1"
@@ -1433,16 +1433,16 @@ def test_a_row_dragged_in_the_slideshows_queue_moves_the_job_and_redraws_both_at
     view._jobs._waiting = [_queued_job("w1"), _queued_job("w2")]
     view.refresh()
     _select_first_leaf(view)
-    view._slideshows.start()
-    qtbot.addWidget(view._slideshows.showing.shown)
-    slideshow = view._slideshows.showing
+    view.slideshows.start()
+    qtbot.addWidget(view.slideshows.showing.shown)
+    slideshow = view.slideshows.showing
 
     slideshow.shown.queue_foot.move("w2", "w1")
 
     assert [item.key for item in slideshow.shown.queue_foot.hud_queue[0]] == ["gen1", "w2", "w1"], (
         "not a poll later: a row that sits still after the drop reads as one missed")
     assert view.job_queue.view.keys() == ["gen1", "w2", "w1"]
-    view._slideshows.showing.close()
+    view.slideshows.showing.close()
 
 
 def test_the_queue_lists_every_waiting_job_not_just_the_running_one(qtbot):
@@ -1507,7 +1507,7 @@ def test_clicking_an_enhancements_row_in_the_queue_goes_to_its_image(qtbot, tmp_
 
     assert view.selected_prompt_ids() == ["g1"]
     assert view._gallery_pane._thumb_widgets["g1"]._selected
-    assert view._generate_pane.current_generate_tab().displayed_row()["prompt_id"] == "g1"
+    assert view.generate_pane.current_generate_tab().displayed_row()["prompt_id"] == "g1"
 
 
 def test_the_strip_times_the_job_against_the_workflows_recent_runs(qtbot):
@@ -1762,7 +1762,7 @@ def test_generate_inflight_tile_persists_across_navigation_and_polls(qtbot, tmp_
     gv = GalleryView(db, client=client)
     qtbot.addWidget(gv)
     gv.refresh()
-    gv._generate_pane._add_subtab()
+    gv.generate_pane._add_subtab()
     tab = _tab_with_prompts(gv)
     tab._param_form.set_values({"seed": 2, "positive_prompt": "a dog"})
     tab._on_generate()
@@ -1872,7 +1872,7 @@ def _two_image_db(tmp_path, prompts=("the first one", "a completely different on
 
 
 def _click_thumbnail(view, row, image_rows):
-    view._generate_pane.load_selection(row, image_rows)
+    view.generate_pane.load_selection(row, image_rows)
     return _front_panel(view)
 
 
@@ -1907,12 +1907,12 @@ def test_another_images_tab_can_still_generate_while_the_first_runs(qtbot, tmp_p
     view.refresh()
     rows = {r["prompt_id"]: r for r in db.list_generations()}
     image_rows = list(rows.values())
-    view._generate_pane.load_selection(rows["a"], image_rows)
+    view.generate_pane.load_selection(rows["a"], image_rows)
     first = _front_panel(view)
     first._param_form.set_values({"positive_prompt": "a re-roll of the first one"})
     first._on_generate()
 
-    view._generate_pane.load_selection(rows["b"], image_rows)
+    view.generate_pane.load_selection(rows["b"], image_rows)
 
     second = _front_panel(view)
     assert second is not first
@@ -1970,11 +1970,11 @@ def test_finishing_a_reroll_hides_the_front_tabs_cancel_button(qtbot, tmp_path):
 
 def test_finishing_a_reroll_hides_the_cancel_button_of_a_tab_under_another(qtbot, tmp_path):
     client, view, launcher, job = _a_run_launched_from_the_front_tab(qtbot, tmp_path)
-    in_front = view._generate_pane._add_subtab()
+    in_front = view.generate_pane._add_subtab()
 
     client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
 
-    assert view._generate_pane.current_generate_tab() is in_front
+    assert view.generate_pane.current_generate_tab() is in_front
     assert launcher._cancel_btn.isHidden() is True, (
         "every tab is set against the runs in flight, not just the front one, so a tab now "
         "under another still shows what its own run is doing")
@@ -2119,7 +2119,7 @@ def test_a_run_lands_after_the_tab_that_launched_it_is_closed(qtbot, tmp_path):
     panel, _ = _edited_tab_showing_the_saved_image(view, qtbot)
     panel._on_generate()
     job = next(iter(view._live_jobs.values()))
-    view._generate_pane._close_subtab(view._generate_pane.indexOf(panel))
+    view.generate_pane._close_subtab(view.generate_pane.indexOf(panel))
 
     _finish_reroll(view, job)
 
@@ -2217,11 +2217,11 @@ def test_pressing_generate_shows_a_row_before_there_is_a_job(qtbot, tmp_path, mo
     qtbot.addWidget(view)
     view.refresh()
     deferred = []
-    monkeypatch.setattr(view._combine, "_after_painting", deferred.append)
+    monkeypatch.setattr(view.combine, "_after_painting", deferred.append)
 
-    view._combine.widget.combine_requested.emit(
+    view.combine.widget.combine_requested.emit(
         CombineRequest(image_id="img", video_id="vid",
-                       intent=view._combine.widget.selected_intent()))
+                       intent=view.combine.widget.selected_intent()))
 
     assert len(view.job_queue.view.rows()) == 1, (
         "checking every stored generation for a duplicate, building the settings and posting "
@@ -2244,9 +2244,9 @@ def test_the_stand_in_row_already_carries_the_action_that_was_picked(qtbot, tmp_
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(view._combine, "_after_painting", lambda work: None)
+    monkeypatch.setattr(view.combine, "_after_painting", lambda work: None)
 
-    view._combine._on_generate_category("img", "dancing", action_settings.VIDEO)
+    view.combine._on_generate_category("img", "dancing", action_settings.VIDEO)
 
     item = view.job_queue.view._items[0]
     assert item.action == "dancing", (
@@ -2263,11 +2263,11 @@ def test_the_stand_in_row_shows_the_dropped_video(qtbot, tmp_path, monkeypatch):
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(view._combine, "_after_painting", lambda work: None)
+    monkeypatch.setattr(view.combine, "_after_painting", lambda work: None)
 
-    view._combine.widget.combine_requested.emit(
+    view.combine.widget.combine_requested.emit(
         CombineRequest(image_id="img", video_id="vid",
-                       intent=view._combine.widget.selected_intent()))
+                       intent=view.combine.widget.selected_intent()))
 
     item = view.job_queue.view._items[0]
     assert item.source_video_thumbnail == "thumbs/vid.jpg"
@@ -2281,7 +2281,7 @@ def test_the_stand_in_row_goes_when_the_action_has_no_past_video(qtbot, tmp_path
     view.refresh()
     monkeypatch.setattr(gallery_view_module.QMessageBox, "information", lambda *a, **k: None)
 
-    view._combine._on_generate_category("img", "epsilon", action_settings.VIDEO)
+    view.combine._on_generate_category("img", "epsilon", action_settings.VIDEO)
 
     assert view.job_queue.view.rows() == []
     assert view._live_jobs == {}
@@ -2292,7 +2292,7 @@ def test_the_stand_in_row_goes_when_the_dropped_image_is_gone(qtbot, tmp_path, m
     qtbot.addWidget(view)
     view.refresh()
 
-    view._combine._on_generate_category("missing", "dancing", action_settings.VIDEO)
+    view.combine._on_generate_category("missing", "dancing", action_settings.VIDEO)
 
     assert view.job_queue.view.rows() == []
 
@@ -2661,7 +2661,7 @@ def test_clicking_a_runs_tile_puts_a_running_search_away(qtbot, tmp_path):
     view._reveal_reroll(key)
 
     assert not view._gallery_pane.showing_search()
-    assert view._search.field.text() == ""
+    assert view.search.field.text() == ""
 
 
 def test_a_run_in_a_folder_the_tree_has_not_drawn_yet_is_gone_to_all_the_same(qtbot):
@@ -2688,13 +2688,13 @@ def test_a_runs_tile_goes_to_the_tab_following_it_before_the_tab_that_launched_i
     launcher._on_generate()
     (key,) = view._live_jobs
     launcher.stop_watching()
-    following = view._generate_pane._add_subtab()
+    following = view.generate_pane._add_subtab()
     following.watch_folder(key, None, None)
-    view._generate_pane.setCurrentWidget(launcher)
+    view.generate_pane.setCurrentWidget(launcher)
 
     view._select_reroll(key)
 
-    assert view._generate_pane.current_generate_tab() is following
+    assert view.generate_pane.current_generate_tab() is following
 
 
 def test_a_run_no_tab_launched_lands_in_the_front_tab_when_it_stands_on_that_folder(qtbot, tmp_path):
@@ -2703,15 +2703,15 @@ def test_a_run_no_tab_launched_lands_in_the_front_tab_when_it_stands_on_that_fol
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
-    front = view._generate_pane.current_generate_tab()
-    view._generate_pane.pin_tab(front)
+    front = view.generate_pane.current_generate_tab()
+    view.generate_pane.pin_tab(front)
     view._jobs.start_reroll(key, view.group_for_key(key), view.library.reading.image_rows)
-    count = view._generate_pane.count()
+    count = view.generate_pane.count()
 
     view._select_reroll(key)
 
-    assert view._generate_pane.current_generate_tab() is front
-    assert view._generate_pane.count() == count
+    assert view.generate_pane.current_generate_tab() is front
+    assert view.generate_pane.count() == count
 
 
 def test_a_run_that_made_no_file_is_not_loaded_into_the_tab_that_launched_it(qtbot, tmp_path):
@@ -2723,7 +2723,7 @@ def test_a_run_that_made_no_file_is_not_loaded_into_the_tab_that_launched_it(qtb
     tab.use_random_seed()
     tab._on_generate()
     ((key, job),) = view._live_jobs.items()
-    following = view._generate_pane._add_subtab()
+    following = view.generate_pane._add_subtab()
     following.watch_folder(key, None, None)
     shown = []
     tab.show_completed_result = lambda row, rows: shown.append(row)
@@ -2775,7 +2775,7 @@ def test_a_landing_shows_in_the_tabs_following_it_and_the_launcher_only_its_end_
     launcher.use_random_seed()
     launcher._on_generate()
     ((key, job),) = view._live_jobs.items()
-    following = view._generate_pane._add_subtab()
+    following = view.generate_pane._add_subtab()
     following.watch_folder(key, None, None)
     told = []
     launcher.show_finished_media = lambda row: told.append(("launcher", row["prompt_id"]))

@@ -164,7 +164,7 @@ def test_a_preset_saved_in_the_window_is_the_one_its_dropdown_shows_after_a_rest
         qtbot, tmp_path, monkeypatch):
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    pane = first._gallery_view._enhance.pane
+    pane = first._gallery_view.enhance.pane
     pane._steps.setValue(44)
     monkeypatch.setattr(enhance_pane.QInputDialog, "getText",
                         staticmethod(lambda *_args, **_kwargs: ("Crisp", True)))
@@ -173,5 +173,5 @@ def test_a_preset_saved_in_the_window_is_the_one_its_dropdown_shows_after_a_rest
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    dropdown = reopened._gallery_view._enhance.pane._preset_dropdown
+    dropdown = reopened._gallery_view.enhance.pane._preset_dropdown
     assert dropdown.currentText() == "Crisp"

@@ -59,9 +59,9 @@ def test_the_enhance_panes_button_lives_on_but_goes_dark_with_nothing_awaiting(q
     view.refresh()
     _select_first_leaf(view)
     _click_off(view)
-    assert not view._enhance.pane._enhance_button.isHidden()
-    assert view._enhance.pane._enhance_button.isEnabled()
-    assert "1 not-yet-enhanced image" in view._enhance.pane._enhance_button.toolTip()
+    assert not view.enhance.pane._enhance_button.isHidden()
+    assert view.enhance.pane._enhance_button.isEnabled()
+    assert "1 not-yet-enhanced image" in view.enhance.pane._enhance_button.toolTip()
 
     db.insert_generation(NewGeneration(
         prompt_id="e0", workflow_name="image_enhance", workflow_version="v001",
@@ -73,10 +73,10 @@ def test_the_enhance_panes_button_lives_on_but_goes_dark_with_nothing_awaiting(q
     view.refresh()
     key = gallery.settings_folder_key(db.get_generation("g0"))
     view._tree.setCurrentItem(view.toc.item_for(key))
-    assert not view._enhance.pane._enhance_button.isHidden(), (
+    assert not view.enhance.pane._enhance_button.isHidden(), (
         "a button that vanishes is one the user has to go looking for")
-    assert not view._enhance.pane._enhance_button.isEnabled()
-    assert view._enhance.pane._enhance_button.toolTip() == NOTHING_LEFT_TO_ENHANCE
+    assert not view.enhance.pane._enhance_button.isEnabled()
+    assert view.enhance.pane._enhance_button.toolTip() == NOTHING_LEFT_TO_ENHANCE
 
 
 def test_enhance_all_never_stops_one_of_its_own_images_for_the_next(qtbot, tmp_path):
@@ -86,7 +86,7 @@ def test_enhance_all_never_stops_one_of_its_own_images_for_the_next(qtbot, tmp_p
     view.refresh()
     _select_first_leaf(view)
 
-    view._enhance._enhance_all()
+    view.enhance._enhance_all()
 
     client.interrupt.assert_not_called()
     client.submit_job.assert_called_once()
@@ -99,7 +99,7 @@ def test_enhance_all_queues_every_image_in_the_folder(qtbot, tmp_path):
     view.refresh()
     _select_first_leaf(view)
 
-    view._enhance._enhance_all()
+    view.enhance._enhance_all()
 
     jobs = view._jobs.all_jobs
     assert len(jobs) == 2
@@ -126,7 +126,7 @@ def test_a_finished_enhancement_reaches_the_open_tabs_version_list(qtbot, tmp_pa
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("g0")
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     assert len(tab._versions._host.findChildren(_VersionRow)) == 1
     view.enhance_items(["g0"])
     (job,) = view._jobs.all_jobs
@@ -145,7 +145,7 @@ def test_a_finished_enhancement_leaves_a_tab_on_another_image_alone(qtbot, tmp_p
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("g1")
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     view.enhance_items(["g0"])
     (job,) = view._jobs.all_jobs
 
@@ -180,7 +180,7 @@ def _cancel_from_the_queue(view, job):
 
 
 def _cancel_from_the_images_menu(view, job):
-    view._enhance.cancel_for([view._db.get_generation("g0")])
+    view.enhance.cancel_for([view._db.get_generation("g0")])
 
 
 def _fail_on_comfyui(view, job):
@@ -201,7 +201,7 @@ def test_an_enhancement_that_ends_unfinished_leaves_its_tab_as_before_the_press(
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("g0")
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     (plus,) = tab._versions._host.findChildren(_AddRow)
     qtbot.mouseClick(plus, Qt.MouseButton.LeftButton)
     (job,) = view._jobs.all_jobs
@@ -222,14 +222,14 @@ def test_binning_a_version_reaches_a_tab_on_that_image_that_is_not_in_front(qtbo
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("g0")
-    first_tab = view._generate_pane.current_generate_tab()
+    first_tab = view.generate_pane.current_generate_tab()
     view.enhance_items(["g0"])
     (job,) = view._jobs.all_jobs
     client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
     assert len(first_tab._versions._host.findChildren(_VersionRow)) == 2
-    view._generate_pane.pin_current_tab()
-    view._generate_pane.open_config("sdxl_t2i", {"positive_prompt": "a dog"})
-    assert view._generate_pane.current_generate_tab() is not first_tab
+    view.generate_pane.pin_current_tab()
+    view.generate_pane.open_config("sdxl_t2i", {"positive_prompt": "a dog"})
+    assert view.generate_pane.current_generate_tab() is not first_tab
     db.update_generation("g0", output_files=json.dumps(
         [{"filename": "sdxl_t2i_g0.png", "subfolder": "image", "type": "output"}]))
 
@@ -248,7 +248,7 @@ def test_binning_a_version_tells_the_slideshows_what_the_image_has_left(qtbot, t
     (job,) = view._jobs.all_jobs
     client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
     told = []
-    view._slideshows.note_versions_deleted = told.append
+    view.slideshows.note_versions_deleted = told.append
 
     view.delete_enhance_versions("g0", ["image_enhance_00001_.png"])
 
@@ -272,10 +272,10 @@ def test_the_enhance_panes_button_is_aimed_and_pressed_at_what_awaits_in_the_fol
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    button = view._enhance.pane._enhance_button
+    button = view.enhance.pane._enhance_button
 
     assert button.isEnabled()
-    assert button.toolTip() == view._enhance.offer().tip
+    assert button.toolTip() == view.enhance.offer().tip
 
     button.click()
 
@@ -288,13 +288,13 @@ def test_enhance_pane_stays_up_wherever_you_are(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    assert not view._enhance.pane.isHidden()
+    assert not view.enhance.pane.isHidden()
 
     for item in (_image_workflow(view._tree), _collection(view, LATEST_KEY),
                  _collection(view, FAVORITES_KEY), _collection(view, EXPERIMENTS_KEY),
                  _collection(view, TRASH_KEY)):
         view._tree.setCurrentItem(item)
-        assert not view._enhance.pane.isHidden()
+        assert not view.enhance.pane.isHidden()
 
 
 def test_the_enhance_panel_shows_in_the_collections_what_it_shows_on_a_folder(qtbot, tmp_path):
@@ -302,11 +302,11 @@ def test_the_enhance_panel_shows_in_the_collections_what_it_shows_on_a_folder(qt
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._enhance.pane._steps.setValue(33)
+    view.enhance.pane._steps.setValue(33)
 
     for which in (LATEST_KEY, FAVORITES_KEY, EXPERIMENTS_KEY):
         view._tree.setCurrentItem(_collection(view, which))
-        assert view._enhance.pane.settings().params["enhance_steps"] == 33, (
+        assert view.enhance.pane.settings().params["enhance_steps"] == 33, (
             "the enhancement settings are the app's, not a folder's, so they follow the user into "
             "the collections as they were on the folder")
 
@@ -317,11 +317,11 @@ def test_the_panel_opens_on_the_settings_the_session_left(qtbot, tmp_path):
     _set_enhance(view, auto=True, params={"enhance_scale": 3.0, "enhance_steps": 42,
                                           "enhance_denoise": 0.4})
 
-    shown = view._enhance.pane.settings()
+    shown = view.enhance.pane.settings()
     assert shown.auto is True
     assert shown.params["enhance_scale"] == 3.0
     assert shown.params["enhance_steps"] == 42
-    assert gallery.EnhanceSettings.parse(view.enhance_settings()).auto is True
+    assert gallery.EnhanceSettings.parse(view.enhance.settings_json()).auto is True
 
 
 def test_editing_the_panel_takes_effect_at_once(qtbot, tmp_path):
@@ -330,10 +330,10 @@ def test_editing_the_panel_takes_effect_at_once(qtbot, tmp_path):
     view.refresh()
     _select_first_leaf(view)
 
-    view._enhance.pane._steps.setValue(33)
+    view.enhance.pane._steps.setValue(33)
 
     assert gallery.EnhanceSettings.parse(
-        view.enhance_settings()
+        view.enhance.settings_json()
     ).params["enhance_steps"] == 33
 
 
@@ -346,7 +346,7 @@ def test_enhance_all_runs_at_the_panels_settings(qtbot, tmp_path):
                                "enhance_denoise": 0.3})
     _select_first_leaf(view)
 
-    view._enhance._enhance_all()
+    view.enhance._enhance_all()
 
     (job,) = view._live_jobs.values()
     assert job.params["enhance_scale"] == 1.5
@@ -413,7 +413,7 @@ def test_a_running_enhance_shows_in_the_strip_of_the_tab_showing_that_image(qtbo
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     row = db.get_generation("g0")
     tab.show_saved_generation(row, view.library.reading.image_rows)
 
@@ -435,9 +435,9 @@ def test_each_tab_reads_its_own_image_out_of_a_batch_of_enhances(qtbot, tmp_path
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    first = view._generate_pane.current_generate_tab()
+    first = view.generate_pane.current_generate_tab()
     first.show_saved_generation(db.get_generation("g0"), view.library.reading.image_rows)
-    second = view._generate_pane._add_subtab()
+    second = view.generate_pane._add_subtab()
     second.show_saved_generation(db.get_generation("g1"), view.library.reading.image_rows)
 
     view.enhance_items(["g0", "g1"])
@@ -446,7 +446,7 @@ def test_each_tab_reads_its_own_image_out_of_a_batch_of_enhances(qtbot, tmp_path
     assert [j.workflow.name for j in (leader, follower)] == \
         ["image_enhance", "image_enhance"]
     assert len(view._jobs.jobs) == 1
-    assert view._enhance.run_of(db.get_generation("g1")).status == "queued"
+    assert view.enhance.run_of(db.get_generation("g1")).status == "queued"
 
     view._client.preview_image.emit(leader.prompt_id, b"a frame")
     assert first._pending_enhancement == (
@@ -478,7 +478,7 @@ def test_a_running_enhance_also_streams_onto_the_images_own_tile(qtbot, tmp_path
     assert not tile._image_label.pixmap().isNull()
 
     view._jobs._jobs.clear()
-    view._enhance.reconcile()
+    view.enhance.reconcile()
     assert tile._enhancing is None
 
 
@@ -598,8 +598,8 @@ def test_a_locked_slide_says_queued_until_comfyui_picks_its_run_up(qtbot, tmp_pa
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._slideshows.start()
-    slideshow = view._slideshows.showing
+    view.slideshows.start()
+    slideshow = view.slideshows.showing
     qtbot.addWidget(slideshow.shown)
     funestra_of(slideshow.shown)
 
@@ -696,7 +696,7 @@ def test_the_version_lists_delete_trashes_that_level_and_keeps_the_image(qtbot, 
     qtbot.addWidget(view)
     row = _enhanced_in_place(db)
     view.refresh()
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     tab.show_saved_generation(row, view.library.reading.image_rows)
 
     tab._versions.delete_requested.emit([0])
@@ -717,7 +717,7 @@ def test_pressing_a_versions_trash_can_trashes_that_level_and_the_last_one_has_n
     qtbot.addWidget(view)
     row = _enhanced_in_place(db)
     view.refresh()
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     tab.show_saved_generation(row, view.library.reading.image_rows)
     enhancement = tab._versions._host.findChildren(_VersionRow)[0]
 
@@ -773,7 +773,7 @@ def test_the_add_tile_enhances_the_image_the_tab_is_showing(qtbot, tmp_path):
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     tab.show_saved_generation(db.get_generation("g0"), view.library.reading.image_rows)
     _set_enhance(view, params={"enhance_steps": 29})
 
@@ -789,7 +789,7 @@ def test_a_tab_turned_to_an_image_being_enhanced_shows_that_run(qtbot, tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     tab.show_saved_generation(db.get_generation("g1"), view.library.reading.image_rows)
     view.enhance_items(["g0"])
     assert not tab._versions._host.findChildren(_PendingRow)
@@ -809,8 +809,8 @@ def test_a_tick_tells_a_locked_slide_its_run_began_though_no_frame_has_come(qtbo
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    view._slideshows.start()
-    slideshow = view._slideshows.showing
+    view.slideshows.start()
+    slideshow = view.slideshows.showing
     qtbot.addWidget(slideshow.shown)
     funestra_of(slideshow.shown)
     slideshow.shown.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))
@@ -830,16 +830,16 @@ def test_a_landed_enhancement_retires_the_enhance_panes_button_and_the_tabs_live
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    tab = view._generate_pane.current_generate_tab()
-    assert view._enhance.pane._enhance_button.isEnabled()
+    tab = view.generate_pane.current_generate_tab()
+    assert view.enhance.pane._enhance_button.isEnabled()
     view.enhance_items(["g0"])
     (job,) = view._jobs.all_jobs
 
     client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
 
-    assert not view._enhance.pane._enhance_button.isEnabled()
+    assert not view.enhance.pane._enhance_button.isEnabled()
     assert tab._pending_enhancement is None
-    assert view._enhance._by_prompt == {}
+    assert view.enhance._by_prompt == {}
 
 
 def test_pressing_enhance_leaves_the_image_picked_and_new_settings_offer_another(qtbot, tmp_path):
@@ -851,10 +851,10 @@ def test_pressing_enhance_leaves_the_image_picked_and_new_settings_offer_another
     pane = view._gallery_pane
     pane.apply_selection("g0", Qt.KeyboardModifier.NoModifier)
 
-    view._enhance.enhance_the_selection()
+    view.enhance.enhance_the_selection()
 
     assert pane.selected_prompt_ids() == ["g0"]
-    enhance_pane = view._enhance.pane
+    enhance_pane = view.enhance.pane
     enhance_pane._denoise.setValue(enhance_pane._denoise.value() + 0.1)
     assert enhance_pane._enhance_button.isEnabled()
 
@@ -869,10 +869,10 @@ def test_an_enhancement_that_lands_is_no_longer_told_to_the_slideshows_as_enhanc
     view.enhance_items(["g0"])
     (job,) = view._jobs.all_jobs
     heard = []
-    view._slideshows.note_enhancing = lambda statuses, frames: heard.append(statuses)
+    view.slideshows.note_enhancing = lambda statuses, frames: heard.append(statuses)
 
     view._client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
-    view._enhance.tell_the_slideshows()
+    view.enhance.tell_the_slideshows()
 
     assert heard[-1] == {}, "the poll tells the slideshows what is enhancing every second"
 
@@ -886,7 +886,7 @@ def test_an_image_auto_enhanced_as_it_lands_leaves_the_folders_enhance_offer_at_
     _select_first_leaf(view)
     _click_off(view)
     _set_enhance(view, auto=True)
-    button = view._enhance.pane._enhance_button
+    button = view.enhance.pane._enhance_button
     assert button.toolTip().startswith("Enhance 2 not-yet-enhanced images in this folder")
 
     view._on_reroll_finished(gallery.settings_folder_key(db.get_generation("g0")), "g0")

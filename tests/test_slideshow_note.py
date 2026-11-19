@@ -124,7 +124,7 @@ def test_a_line_keeps_its_color_and_the_corner_falls_back_to_white(qtbot):
 
 
 def test_the_app_says_it_is_working_for_as_long_as_it_is(qtbot, tmp_path, monkeypatch):
-    window = _mid_request(qtbot, tmp_path, monkeypatch)._slideshows.showing.shown
+    window = _mid_request(qtbot, tmp_path, monkeypatch).slideshows.showing.shown
     assert "working out" in words_shown(window._note)
 
     _fade(window)
@@ -134,7 +134,7 @@ def test_the_app_says_it_is_working_for_as_long_as_it_is(qtbot, tmp_path, monkey
 
 def test_the_mic_going_on_hearing_does_not_empty_the_corner(qtbot, tmp_path, monkeypatch):
     view = _mid_request(qtbot, tmp_path, monkeypatch)
-    window = view._slideshows.showing.shown
+    window = view.slideshows.showing.shown
 
     view._voice.listener.heard.emit("something else entirely")
 

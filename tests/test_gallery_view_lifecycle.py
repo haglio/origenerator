@@ -120,7 +120,7 @@ def test_a_tick_whose_answers_raise_leaves_the_next_tick_free_to_read(qtbot):
     def raises():
         raise RuntimeError("made-up failure")
 
-    view._enhance.put_what_is_locked_first = raises
+    view.enhance.put_what_is_locked_first = raises
     with pytest.raises(RuntimeError):
         held[0](None)
     view._poll()

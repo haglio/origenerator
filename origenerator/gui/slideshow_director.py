@@ -822,7 +822,7 @@ class SlideshowDirector:
                 "volume": None if volume is None else asdict(volume)}
 
     def remember(self, saved) -> None:
-        if not isinstance(saved, dict):
+        if self._fun_time is not None or not isinstance(saved, dict):
             return
         self._slideshow_state = SlideshowState.restored(saved.get("last_show"))
         self._filters = SlideshowFilters.restored(saved.get("filters"))

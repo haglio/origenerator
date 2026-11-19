@@ -5125,7 +5125,7 @@ def test_a_tab_the_gallery_opens_sends_into_the_inbox_the_gallery_was_handed(
     inbox = tmp_path / "the gallery's inbox"
     view = GalleryView(db, shared=Shared(inbox=evolver_export.EvolverInbox(inbox)))
     qtbot.addWidget(view)
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     tab._viewport.show_media = MagicMock()
     video = tmp_path / "vid1.mp4"
     video.write_bytes(b"pixels")

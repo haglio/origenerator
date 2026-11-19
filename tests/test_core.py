@@ -264,8 +264,8 @@ def test_ctrl_alt_q_in_a_slideshow_takes_the_slideshow_down_with_the_app(
     win.show()
     win._gallery_view.refresh()
     _select_first_leaf(win._gallery_view)
-    win._gallery_view._slideshows.start()
-    slideshow = win._gallery_view._slideshows.showing
+    win._gallery_view.slideshows.start()
+    slideshow = win._gallery_view.slideshows.showing
     qtbot.addWidget(slideshow.shown)
     with qtbot.waitActive(slideshow.shown):
         slideshow.shown.activateWindow()
@@ -388,7 +388,7 @@ def test_a_window_a_session_handed_back_asks_again(qtbot, tmp_path, monkeypatch)
 
 def test_opening_a_config_fills_the_resting_tab(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
-    tabs = win._gallery_view._generate_pane
+    tabs = win._gallery_view.generate_pane
     assert tabs.count() == 1
 
     tabs.open_config("wan22_i2v", {"positive_prompt": "hi"})
@@ -407,7 +407,7 @@ def test_restores_generate_tabs_from_app_state(qtbot, tmp_path):
     ], "current": 2})
     win = _window(qtbot, tmp_path, state)
 
-    tabs = win._gallery_view._generate_pane.generate_tabs()
+    tabs = win._gallery_view.generate_pane.generate_tabs()
     assert len(tabs) == 2
     assert tabs[1]._workflow_dropdown.currentData() == "wan22_i2v"
 
@@ -613,7 +613,7 @@ def test_restores_the_dragged_prompt_heights_from_app_state(
     win = _window(qtbot, tmp_path, state)
 
     assert forget_prompt_heights.height("positive_prompt") == 260
-    tab = win._gallery_view._generate_pane.widget(0)
+    tab = win._gallery_view.generate_pane.widget(0)
     assert tab._param_form is not None, (
         "the resting tab lays out no form until a workflow is picked, so a restored tab is what "
         "makes a form at launch")
@@ -675,16 +675,16 @@ def test_a_slideshow_started_after_a_relaunch_comes_back_on_enhanced_only(
     first = _window(qtbot, tmp_path, AppState(path))
     first._gallery_view.refresh()
     _select_first_leaf(first._gallery_view)
-    first._gallery_view._slideshows.start()
-    qtbot.addWidget(first._gallery_view._slideshows.showing.shown)
-    first._gallery_view._slideshows.showing.set_enhanced_filter(True)
+    first._gallery_view.slideshows.start()
+    qtbot.addWidget(first._gallery_view.slideshows.showing.shown)
+    first._gallery_view.slideshows.showing.set_enhanced_filter(True)
 
     first.close()
     second = _window(qtbot, tmp_path, AppState(path))
     second._gallery_view.refresh()
-    second._gallery_view._slideshows.start()
+    second._gallery_view.slideshows.start()
 
-    slideshow = second._gallery_view._slideshows.showing
+    slideshow = second._gallery_view.slideshows.showing
     qtbot.addWidget(slideshow.shown)
     assert slideshow.hud_enhanced_filter
 
@@ -938,13 +938,13 @@ def test_reconnected_reroll_lights_its_tabs_generate_button(qtbot, tmp_path):
     win = _a_restart_with_a_video_of_an_image_still_running(qtbot, tmp_path)
     win._gallery_view.refresh()
 
-    tab = win._gallery_view._generate_pane.current_generate_tab()
+    tab = win._gallery_view.generate_pane.current_generate_tab()
     assert tab._generating is True
 
 
 def test_the_rebuild_after_a_restart_holds_the_running_folders_generate(qtbot, tmp_path):
     win = _a_restart_with_a_video_of_an_image_still_running(qtbot, tmp_path)
-    tab = win._gallery_view._generate_pane.current_generate_tab()
+    tab = win._gallery_view.generate_pane.current_generate_tab()
 
     win._gallery_view.refresh()
 
@@ -982,7 +982,7 @@ def test_restores_gallery_folder_from_app_state(qtbot, tmp_path):
 def test_close_event_persists_session(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     win = _window(qtbot, tmp_path, AppState(path))
-    tabs = win._gallery_view._generate_pane
+    tabs = win._gallery_view.generate_pane
     tabs.currentWidget().prefill("sdxl_t2i", {})
     tabs.open_config("wan22_i2v", {"positive_prompt": "x"})
     win._gallery_view.select_folder("image/sdxl_t2i")
@@ -1159,7 +1159,7 @@ def test_window_still_tiles_while_showing_an_images_versions(qtbot, tmp_path):
                                                 "enhance_steps": 20}}]),
     )
     row = db.get_generation("img1")
-    win._gallery_view._generate_pane.current_generate_tab().show_saved_generation(row, [row])
+    win._gallery_view.generate_pane.current_generate_tab().show_saved_generation(row, [row])
 
     effective_min_width = _least_width_once_shown_and_laid_out(win)
     assert effective_min_width <= 704
@@ -1167,7 +1167,7 @@ def test_window_still_tiles_while_showing_an_images_versions(qtbot, tmp_path):
 
 def test_window_still_tiles_with_a_generate_tab_open(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
-    win._gallery_view._generate_pane.open_config("wan22_i2v", {"positive_prompt": "x"})
+    win._gallery_view.generate_pane.open_config("wan22_i2v", {"positive_prompt": "x"})
     effective_min_width = _least_width_once_shown_and_laid_out(win)
     assert effective_min_width <= 704
 
@@ -1175,7 +1175,7 @@ def test_window_still_tiles_with_a_generate_tab_open(qtbot, tmp_path):
 def test_generate_inflight_shows_on_latest_and_reveals_its_folder(qtbot, tmp_path):
     win = _window(qtbot, tmp_path)
     gv = win._gallery_view
-    tabs = gv._generate_pane
+    tabs = gv.generate_pane
     tabs._client.submit_job = lambda payload, prompt_id: prompt_id
     tabs._client.fetch_history = lambda prompt_id: {}
     tab = tabs.current_generate_tab()
@@ -1237,8 +1237,8 @@ def test_close_event_persists_combine_selection(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     _seed_combine_db(tmp_path)
     win = _window(qtbot, tmp_path, AppState(path))
-    win._gallery_view._combine.widget.image_zone.set_item("img")
-    win._gallery_view._combine.widget.video_zone.set_item("vid")
+    win._gallery_view.combine.widget.image_zone.set_item("img")
+    win._gallery_view.combine.widget.video_zone.set_item("vid")
 
     win.close()
 
@@ -1254,8 +1254,8 @@ def test_restores_combine_selection_from_app_state(qtbot, tmp_path):
 
     win = _window(qtbot, tmp_path, state)
 
-    assert win._gallery_view._combine.widget.image_zone.current_id() == "img"
-    assert win._gallery_view._combine.widget.video_zone.current_id() == "vid"
+    assert win._gallery_view.combine.widget.image_zone.current_id() == "img"
+    assert win._gallery_view.combine.widget.video_zone.current_id() == "vid"
 
 
 def test_a_combine_selection_saved_before_the_lane_was_kept_still_restores(qtbot, tmp_path):
@@ -1265,31 +1265,31 @@ def test_a_combine_selection_saved_before_the_lane_was_kept_still_restores(qtbot
 
     win = _window(qtbot, tmp_path, state)
 
-    assert win._gallery_view._combine.widget.image_zone.current_id() == "img"
-    assert win._gallery_view._combine.widget.video_zone.current_id() == "vid"
+    assert win._gallery_view.combine.widget.image_zone.current_id() == "img"
+    assert win._gallery_view.combine.widget.video_zone.current_id() == "vid"
 
 
 def test_how_many_generate_makes_at_once_survives_close_and_reopen(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    first._gallery_view._generate_pane.set_how_many(8)
+    first._gallery_view.generate_pane.set_how_many(8)
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    tab = reopened._gallery_view._generate_pane.current_generate_tab()
+    tab = reopened._gallery_view.generate_pane.current_generate_tab()
     assert tab._how_many.how_many() == 8
 
 
 def test_the_requests_auto_generate_survives_close_and_reopen(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    first._gallery_view._generate_pane.set_request_auto_generate(True)
+    first._gallery_view.generate_pane.set_request_auto_generate(True)
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    assert reopened._gallery_view._generate_pane.request_auto_generate()
+    assert reopened._gallery_view.generate_pane.request_auto_generate()
 
 
 def test_a_saved_how_many_the_dropdown_does_not_offer_opens_on_one(qtbot, tmp_path):
@@ -1298,13 +1298,13 @@ def test_a_saved_how_many_the_dropdown_does_not_offer_opens_on_one(qtbot, tmp_pa
 
     win = _window(qtbot, tmp_path, state)
 
-    assert win._gallery_view.how_many() == 1
+    assert win._gallery_view.generate_pane.how_many() == 1
 
 
 def test_a_tabs_open_and_shut_sections_come_back_after_a_restart(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    tab = first._gallery_view._generate_pane.currentWidget()
+    tab = first._gallery_view.generate_pane.currentWidget()
     tab.prefill("sdxl_t2i", {})
     sections = tab._param_form._sections
     assert (sections["Prompts & Seed"].is_collapsed(), sections["Size"].is_collapsed()) == (False, True)
@@ -1314,14 +1314,14 @@ def test_a_tabs_open_and_shut_sections_come_back_after_a_restart(qtbot, tmp_path
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    sections = reopened._gallery_view._generate_pane.currentWidget()._param_form._sections
+    sections = reopened._gallery_view.generate_pane.currentWidget()._param_form._sections
     assert (sections["Prompts & Seed"].is_collapsed(), sections["Size"].is_collapsed()) == (True, False)
 
 
 def test_a_tabs_enhancements_and_details_come_back_folded(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    tab = first._gallery_view._generate_pane.currentWidget()
+    tab = first._gallery_view.generate_pane.currentWidget()
     tab.prefill("sdxl_t2i", {})
     tab._versions.set_collapsed(True)
     tab._metadata_section.set_folded(True)
@@ -1329,14 +1329,14 @@ def test_a_tabs_enhancements_and_details_come_back_folded(qtbot, tmp_path):
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    tab = reopened._gallery_view._generate_pane.currentWidget()
+    tab = reopened._gallery_view.generate_pane.currentWidget()
     assert (tab._versions.is_collapsed(), tab._metadata_section.is_folded()) == (True, True)
 
 
 def test_a_tabs_link_sections_come_back_folded_as_they_were_left(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    tab = first._gallery_view._generate_pane.currentWidget()
+    tab = first._gallery_view.generate_pane.currentWidget()
     tab.prefill("sdxl_t2i", {})
     left = {"Links": True}
     tab._related.set_folds(left)
@@ -1344,29 +1344,29 @@ def test_a_tabs_link_sections_come_back_folded_as_they_were_left(qtbot, tmp_path
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    assert reopened._gallery_view._generate_pane.currentWidget()._related.folds() == left
+    assert reopened._gallery_view.generate_pane.currentWidget()._related.folds() == left
 
 
 def test_a_tabs_border_under_its_preview_is_where_it_was_left_after_a_restart(qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
-    first._gallery_view._generate_pane.currentWidget().prefill("sdxl_t2i", {})
+    first._gallery_view.generate_pane.currentWidget().prefill("sdxl_t2i", {})
     dragged = _drag_the_first_open_handle(
-        first._gallery_view._generate_pane.currentWidget()._media_split)
+        first._gallery_view.generate_pane.currentWidget()._media_split)
     first.close()
 
     reopened = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
 
-    assert reopened._gallery_view._generate_pane.currentWidget()._media_split.sizes() == dragged
+    assert reopened._gallery_view.generate_pane.currentWidget()._media_split.sizes() == dragged
 
 
 def test_a_tabs_border_saved_under_its_old_name_is_where_it_was_left_after_a_restart(
         qtbot, tmp_path):
     path = tmp_path / "ui.json"
     first = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
-    first._gallery_view._generate_pane.currentWidget().prefill("sdxl_t2i", {})
+    first._gallery_view.generate_pane.currentWidget().prefill("sdxl_t2i", {})
     dragged = _drag_the_first_open_handle(
-        first._gallery_view._generate_pane.currentWidget()._media_split)
+        first._gallery_view.generate_pane.currentWidget()._media_split)
     first.close()
     saved = path.read_text(encoding="utf-8")
     path.write_text(saved.replace('"media_border"', '"picture_border"'), encoding="utf-8")
@@ -1374,7 +1374,7 @@ def test_a_tabs_border_saved_under_its_old_name_is_where_it_was_left_after_a_res
     reopened = _shown_at_the_same_size(qtbot, _window(qtbot, tmp_path, AppState(path)))
 
     assert '"media_border"' in saved
-    assert reopened._gallery_view._generate_pane.currentWidget()._media_split.sizes() == dragged
+    assert reopened._gallery_view.generate_pane.currentWidget()._media_split.sizes() == dragged
 
 
 def test_the_toc_reopens_together_when_it_was_closed_together(qtbot, tmp_path):
@@ -1441,14 +1441,14 @@ def test_combine_selection_survives_close_and_reopen(qtbot, tmp_path):
     _seed_combine_db(tmp_path)
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    first._gallery_view._combine.widget.image_zone.set_item("img")
-    first._gallery_view._combine.widget.video_zone.set_item("vid")
-    first._gallery_view._combine.widget._genau_radio.setChecked(True)
+    first._gallery_view.combine.widget.image_zone.set_item("img")
+    first._gallery_view.combine.widget.video_zone.set_item("vid")
+    first._gallery_view.combine.widget._genau_radio.setChecked(True)
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    combine = reopened._gallery_view._combine.widget
+    combine = reopened._gallery_view.combine.widget
     assert combine.image_zone.current_id() == "img"
     assert combine.selected_intent() == action_settings.GENAU, (
         "the lane matters as much as the drop zones: it is which videos the next Generate is "
@@ -1462,13 +1462,13 @@ def test_the_videos_recent_lists_come_back_after_close_and_reopen(qtbot, tmp_pat
     _seed_combine_db(tmp_path, videos=("vid", "vid2"))
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
-    first._gallery_view._combine.widget.video_zone.set_item("vid")
-    first._gallery_view._combine.widget.video_zone.set_item("vid2")
+    first._gallery_view.combine.widget.video_zone.set_item("vid")
+    first._gallery_view.combine.widget.video_zone.set_item("vid2")
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
 
-    combine = reopened._gallery_view._combine.widget
+    combine = reopened._gallery_view.combine.widget
     assert combine.video_zone.current_id() == "vid2"
     assert _listed_under_recent(combine) == ["vid2", "vid"]
 
@@ -1846,7 +1846,7 @@ def test_a_video_watched_in_the_window_takes_its_toast_back(qtbot, tmp_path, mon
     win._gallery_view._jobs.run_ended.emit(
         RunOutcome(kind="Video", display_name="I2V WAN 2.2", seconds=252.0,
                    ok=True, source=GenerationSource.GENERATED, generation="alpha-1"))
-    front_tab = win._gallery_view._generate_pane.current_generate_tab()
+    front_tab = win._gallery_view.generate_pane.current_generate_tab()
     monkeypatch.setattr(front_tab, "video_on_screen", lambda: "alpha-1")
 
     win._toasts.look()
@@ -1948,7 +1948,7 @@ def test_a_window_names_the_side_its_gallerys_slideshow_is_showing_on(
     win = _window(qtbot, tmp_path)
     assert win.slideshow_showing_on() is None
 
-    monkeypatch.setattr(win._gallery_view._slideshows, "slideshow_showing_on",
+    monkeypatch.setattr(win._gallery_view.slideshows, "slideshow_showing_on",
                         lambda: "portrait")
 
     assert win.slideshow_showing_on() == "portrait"
@@ -2060,7 +2060,7 @@ def test_a_window_a_session_launched_leaves_the_standalone_slideshows_as_it_foun
     state.save()
 
     win = _window(qtbot, tmp_path, AppState(path), fun_time=_fun_time_session())
-    assert win._gallery_view._slideshows.hud_place("landscape") == (HudCorner.UPPER_LEFT, False)
+    assert win._gallery_view.slideshows.hud_place("landscape") == (HudCorner.UPPER_LEFT, False)
     win.close()
 
     assert AppState(path).get("slideshows") == kept
@@ -2079,7 +2079,7 @@ def test_a_window_keeps_what_each_sessions_region_was_left_on_from_one_launch_to
 
     win = _window(qtbot, tmp_path, AppState(path),
                   fun_time=_fun_time_session() if hosted else None)
-    assert json.loads(json.dumps(win._gallery_view._slideshows.remembered_regions())) == kept
+    assert json.loads(json.dumps(win._gallery_view.slideshows.remembered_regions())) == kept
     win.close()
 
     assert AppState(path).get("session_slideshows") == kept
@@ -2416,7 +2416,7 @@ def test_on_two_monitors_core_wears_its_logo_and_name_at_its_top_left(
 
     title = win._title
     win.show()
-    gallery_pane, generate_pane = win._gallery_view._scroll, win._gallery_view._generate_pane
+    gallery_pane, generate_pane = win._gallery_view._scroll, win._gallery_view.generate_pane
     assert (title.isHidden(), title.name.text(), title.mapTo(win, QPoint(0, 0)).x() < 20,
             title.mapTo(win, QPoint(0, 0)).y() < 20) == (False, "Origenerator", True, True)
     assert title.mapTo(win, QPoint(title.width(), 0)).x() <= gallery_pane.mapTo(win, QPoint(0, 0)).x(), (

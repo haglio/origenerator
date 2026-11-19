@@ -209,7 +209,7 @@ def _collection(view, key, shape=UNMEASURABLE_SHAPE):
 
 def _shape_rows(view, shape):
     return [row["prompt_id"]
-            for row in view._slideshows.rows_at(shaped_key(gallery.ALL_KEY, shape))]
+            for row in view.slideshows.rows_at(shaped_key(gallery.ALL_KEY, shape))]
 
 
 def _key(item):
@@ -260,7 +260,7 @@ def _children_by_prompt(item):
 
 
 def _viewport_of(view):
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     return tab._viewport if tab is not None else None
 
 
@@ -273,10 +273,10 @@ def _frame_shown(preview, frame: bytes) -> bool:
 
 
 def _search_for(view, text):
-    view._search.field.setText(text)
-    if view._search._timer.isActive():
-        view._search._timer.stop()
-        view._search._run_pending()
+    view.search.field.setText(text)
+    if view.search._timer.isActive():
+        view.search._timer.stop()
+        view.search._run_pending()
 
 
 def _of_both_kinds(qtbot, actions=None):
@@ -302,7 +302,7 @@ def _press_ctrl_f(view, monkeypatch):
 
 
 def _tab_with_prompts(view, key="sdxl_t2i"):
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     tab._workflow_dropdown.setCurrentIndex(tab._workflow_dropdown.findData(key))
     return tab
 
@@ -487,7 +487,7 @@ def _seeded_db(tmp_path, seed=7):
 
 
 def _generate_in_current_tab(view, positive_prompt, seed):
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     params = dict(_SDXL.default_params(), positive_prompt=positive_prompt, seed=seed)
     tab.prefill("sdxl_t2i", params)
     tab._param_form.set_seed_random(False)
@@ -645,7 +645,7 @@ def _struck_and_lit(field) -> tuple[str, str]:
 
 
 def _front_panel(view):
-    return view._generate_pane.current_generate_tab()
+    return view.generate_pane.current_generate_tab()
 
 
 _ENHANCE_HISTORY = {"outputs": {"12": {"images": [
@@ -674,7 +674,7 @@ def _enhanceable_db(tmp_path, count=2):
 
 def _set_enhance(view, **fields):
     settings = gallery.EnhanceSettings(**fields)
-    view.set_enhance_settings(settings.to_json())
+    view.enhance.restore_settings(settings.to_json())
     return settings
 
 
@@ -702,8 +702,8 @@ def _enhanced_in_place(db, pid="g0"):
 
 
 def _double_click_slideshow(view, qtbot, *, media=("shown.png", "image"), target=None):
-    slideshow = (view._slideshows.open_on_preview(None, None) if media is None
-                 else view._slideshows.open_in_its_folder(media, view.selected_prompt_id()))
+    slideshow = (view.slideshows.open_on_preview(None, None) if media is None
+                 else view.slideshows.open_in_its_folder(media, view.selected_prompt_id()))
     qtbot.addWidget(slideshow.shown)
     if target is not None:
         _aim_slideshow(view, slideshow, target)
@@ -833,8 +833,8 @@ def _a_slideshow_standing_on_its_own(qtbot, monkeypatch, **gallery):
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)
-    view._slideshows.start()
-    slideshow = view._slideshows.showing
+    view.slideshows.start()
+    slideshow = view.slideshows.showing
     qtbot.addWidget(slideshow.shown)
     funestra_of(slideshow.shown)
     return view, slideshow
@@ -938,8 +938,8 @@ def _requesting_view(qtbot, tmp_path, monkeypatch, **kw):
     view._buttons.mic.setChecked(True)
     view.refresh()
     _select_first_leaf(view)
-    view._slideshows.start()
-    qtbot.addWidget(view._slideshows.showing.shown)
+    view.slideshows.start()
+    qtbot.addWidget(view.slideshows.showing.shown)
     return view
 
 

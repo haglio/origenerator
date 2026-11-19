@@ -742,7 +742,7 @@ def test_a_folder_holding_both_shapes_is_drawn_on_both_sides(qtbot, tmp_path):
     assert drawn == [shaped_key("image/sdxl_t2i", "portrait"),
                      shaped_key("image/sdxl_t2i", "landscape")]
     for key, expected in zip(drawn, (["t1"], ["w1"]), strict=True):
-        assert [row["prompt_id"] for row in view._slideshows.rows_at(key)] == expected
+        assert [row["prompt_id"] for row in view.slideshows.rows_at(key)] == expected
         assert view.group_for_key(key).key == "image/sdxl_t2i"
 
 
@@ -759,9 +759,9 @@ def test_a_slideshow_goes_to_the_region_its_side_names(qtbot, tmp_path):
         opened.append(kwargs)
         return stub
 
-    view._slideshows.open = record
+    view.slideshows.open = record
     view._tree.setCurrentItem(view.toc.item_by_key[shaped_key(LATEST_KEY, "portrait")])
-    view._slideshows.start()
+    view.slideshows.start()
 
     assert opened
     assert opened[0]["shape"] == "portrait"
@@ -776,6 +776,6 @@ def test_a_regions_base_state_is_its_side_of_the_library(qtbot, tmp_path):
     view.refresh()
 
     for shape, expected in (("portrait", ["t1"]), ("landscape", ["w1"])):
-        key = view._slideshows.base_location(shape)
+        key = view.slideshows.base_location(shape)
         assert key in view.toc.item_by_key
-        assert [row["prompt_id"] for row in view._slideshows.rows_at(key)] == expected
+        assert [row["prompt_id"] for row in view.slideshows.rows_at(key)] == expected

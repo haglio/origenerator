@@ -27,11 +27,16 @@ from origenerator.flick_finales import drop_finales_in_flight
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import WINDOW_TITLE, FunTimeSession, Rect
 from origenerator.gui.app_title import AppTitle
+from origenerator.gui.combine_controller import CombineController
+from origenerator.gui.enhance_controller import EnhanceController
+from origenerator.gui.gallery_search import GallerySearchController
 from origenerator.gui.gallery_view import GalleryView, Shared
+from origenerator.gui.generate_pane import GeneratePane
 from origenerator.gui.headset_window import CAP_PX, HeadsetWindow
 from origenerator.gui.osr2_driving import Osr2Driving
 from origenerator.gui.panes import RememberedBorders
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
+from origenerator.gui.slideshow_director import SlideshowDirector
 from origenerator.gui.taskbar_identity import TaskbarIdentity
 from origenerator.gui.toasts import Toasts
 from origenerator.gui.two_screens import TwoScreens
@@ -60,27 +65,53 @@ def _osr2(its_own) -> OwnedBy:
     return OwnedBy(attrgetter("osr2"), its_own)
 
 
+def _generate_pane(its_own) -> OwnedBy:
+    return OwnedBy(attrgetter("generate_pane"), its_own)
+
+
+def _slideshows(its_own) -> OwnedBy:
+    return OwnedBy(attrgetter("slideshows"), its_own)
+
+
+def _combine(its_own) -> OwnedBy:
+    return OwnedBy(attrgetter("combine"), its_own)
+
+
+def _enhance(its_own) -> OwnedBy:
+    return OwnedBy(attrgetter("enhance"), its_own)
+
+
+def _search(its_own) -> OwnedBy:
+    return OwnedBy(attrgetter("search"), its_own)
+
+
 SESSION_UI_STATE = (
-    ("generate_tabs", GalleryView.capture_generate_tabs, GalleryView.restore_generate_tabs),
+    ("generate_tabs", _generate_pane(GeneratePane.capture_state),
+     _generate_pane(GeneratePane.restore_state)),
     ("toc_shapes", GalleryView.toc_shapes, GalleryView.set_toc_sides),
     ("open_folders", GalleryView.open_folders, GalleryView.set_open_folders),
     ("gallery_folder", GalleryView.selected_folder, GalleryView.select_folder),
     ("gallery_selection", GalleryView.selected_generation, GalleryView.select_generation),
-    ("gallery_combine", GalleryView.combine_selection, GalleryView.restore_combine_selection),
+    ("gallery_combine", _combine(CombineController.selection),
+     _combine(CombineController.restore)),
     ("osr2_enabled", _osr2(Osr2Driving.state), _osr2(Osr2Driving.restore_state)),
     ("max_intensity", _osr2(Osr2Driving.max_intensity), _osr2(Osr2Driving.set_max_intensity)),
     ("motion", _osr2(Osr2Driving.motion_settings), _osr2(Osr2Driving.set_motion_settings)),
     ("experiments_enabled", GalleryView.experiments_enabled, GalleryView.set_experiments_enabled),
     ("audio_enabled", GalleryView.radio_enabled, GalleryView.set_radio_enabled),
     ("mic_enabled", GalleryView.mic_enabled, GalleryView.set_mic_enabled),
-    ("enhance_settings", GalleryView.enhance_settings, GalleryView.set_enhance_settings),
-    ("search_sort", GalleryView.search_sort, GalleryView.set_search_sort),
-    ("slideshows", GalleryView.remembered_slideshows, GalleryView.remember_slideshows),
-    ("session_slideshows", GalleryView.remembered_session_slideshows,
-     GalleryView.remember_session_slideshows),
-    ("how_many", GalleryView.how_many, GalleryView.set_how_many),
-    ("request_auto_generate", GalleryView.request_auto_generate,
-     GalleryView.set_request_auto_generate),
+    ("enhance_settings", _enhance(EnhanceController.settings_json),
+     _enhance(EnhanceController.restore_settings)),
+    ("search_sort", _search(GallerySearchController.sort),
+     _search(GallerySearchController.set_sort)),
+    ("slideshows", _slideshows(SlideshowDirector.remembered),
+     _slideshows(SlideshowDirector.remember)),
+    ("session_slideshows", _slideshows(SlideshowDirector.remembered_regions),
+     _slideshows(SlideshowDirector.remember_regions)),
+    ("how_many", _generate_pane(GeneratePane.how_many),
+     _generate_pane(GeneratePane.restore_how_many)),
+    ("request_auto_generate", _generate_pane(GeneratePane.request_auto_generate),
+     _generate_pane(GeneratePane.restore_request_auto_generate)),
 )
 
 _PROMPT_HEIGHTS_KEY = "prompt_heights"

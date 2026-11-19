@@ -120,7 +120,7 @@ def test_clearing_the_search_gives_the_pane_back_to_the_open_folder(qtbot):
     _search_for(view, "dog")
     assert view.listed_prompt_ids() == ["i2"]
 
-    view._search.field.setText("")
+    view.search.field.setText("")
 
     assert view.listed_prompt_ids() == ["i2"]
     assert not view._gallery_pane.showing_search()
@@ -150,7 +150,7 @@ def test_picking_another_folder_re_asks_the_search_there(qtbot):
 
     view._tree.setCurrentItem(_image_workflow(view._tree))
 
-    assert view._search.field.text() == "cat"
+    assert view.search.field.text() == "cat"
     assert view._gallery_pane.showing_search()
     assert view.listed_prompt_ids() == ["i1"]
 
@@ -178,7 +178,7 @@ def test_search_all_searches_the_whole_library_and_keeps_the_folder_highlighted(
     view._tree.setCurrentItem(videos)
     _search_for(view, "cat")
 
-    view._search.search_all.click()
+    view.search.search_all.click()
 
     assert set(view.listed_prompt_ids()) == {"i1", "v1"}
     assert view._tree.currentItem() is videos
@@ -192,7 +192,7 @@ def test_picking_another_folder_after_search_all_searches_that_folder(qtbot):
     view.refresh()
     view._tree.setCurrentItem(_video_workflow(view._tree))
     _search_for(view, "cat")
-    view._search.search_all.click()
+    view.search.search_all.click()
 
     view._tree.setCurrentItem(_image_workflow(view._tree))
 
@@ -207,7 +207,7 @@ def test_back_to_a_search_all_searches_the_whole_library_again(qtbot):
     videos = _video_workflow(view._tree)
     view._tree.setCurrentItem(videos)
     _search_for(view, "cat")
-    view._search.search_all.click()
+    view.search.search_all.click()
     view._tree.setCurrentItem(_image_workflow(view._tree))
 
     view._navigation.go_back()
@@ -262,7 +262,7 @@ def test_a_folders_collection_scopes_the_search_and_names_its_path(qtbot):
                  "wan22_i2v_00001_.mp4")]
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
-    view._search.field.setFixedWidth(_WIDE_ENOUGH_THAT_NO_PATH_ELIDES)
+    view.search.field.setFixedWidth(_WIDE_ENOUGH_THAT_NO_PATH_ELIDES)
     view.refresh()
     workflow = _image_workflow(view._tree)
     view._tree.setCurrentItem(workflow.child(0))
@@ -270,7 +270,7 @@ def test_a_folders_collection_scopes_the_search_and_names_its_path(qtbot):
     _search_for(view, "cat")
 
     assert view.listed_prompt_ids() == ["i1"]
-    assert view._search.field.placeholderText() == (
+    assert view.search.field.placeholderText() == (
         f"Search {SHAPE_LABELS[LANDSCAPE]}  \u203a  All  \u203a  Images  \u203a  {workflow.text(0)}  \u203a  Latest…")
 
 
@@ -317,23 +317,23 @@ def test_the_field_says_what_it_would_search(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
-    view._search.field.setFixedWidth(_WIDE_ENOUGH_THAT_NO_PATH_ELIDES)
+    view.search.field.setFixedWidth(_WIDE_ENOUGH_THAT_NO_PATH_ELIDES)
     view.refresh()
-    assert view._search.field.placeholderText() == "Search Landscape  \u203a  All…"
+    assert view.search.field.placeholderText() == "Search Landscape  \u203a  All…"
 
     videos = _video_workflow(view._tree)
     view._tree.setCurrentItem(videos)
-    assert view._search.field.placeholderText() ==         f"Search {view.toc.folder_path(videos)}…"
+    assert view.search.field.placeholderText() ==         f"Search {view.toc.folder_path(videos)}…"
 
     leaf = _at(videos, 0, 0, 0, 0)
     view._tree.setCurrentItem(leaf)
-    placeholder = view._search.field.placeholderText()
+    placeholder = view.search.field.placeholderText()
     assert placeholder == f"Search {view.toc.folder_path(leaf)}…"
     assert leaf.text(0) in placeholder
     assert videos.text(0) in placeholder
 
     view._tree.setCurrentItem(_collection(view, LATEST_KEY))
-    assert view._search.field.placeholderText() == "Search Landscape  \u203a  All  \u203a  Latest…"
+    assert view.search.field.placeholderText() == "Search Landscape  \u203a  All  \u203a  Latest…"
 
 
 def test_the_field_shows_the_tail_of_a_path_too_long_for_it(qtbot):
@@ -344,12 +344,12 @@ def test_the_field_shows_the_tail_of_a_path_too_long_for_it(qtbot):
     leaf = _at(videos, 0, 0, 0, 0)
     view._tree.setCurrentItem(leaf)
 
-    metrics = view._search.field.fontMetrics()
-    view._search.field.setFixedWidth(
+    metrics = view.search.field.fontMetrics()
+    view.search.field.setFixedWidth(
         metrics.horizontalAdvance("Search …" + leaf.text(0)) + 24)
 
-    scope = view._search.field._scope
-    placeholder = view._search.field.placeholderText()
+    scope = view.search.field._scope
+    placeholder = view.search.field.placeholderText()
     assert placeholder.startswith("Search …")
     tail = placeholder[len("Search …"):]
     assert scope.endswith(tail), (
@@ -367,7 +367,7 @@ def test_an_empty_search_names_the_folder_it_looked_in(qtbot):
     videos = _video_workflow(view._tree)
     view._tree.setCurrentItem(videos)
     _search_for(view, "dog")
-    view._search._expander.expanded.emit("dog", {})
+    view.search._expander.expanded.emit("dog", {})
 
     assert videos.text(0) in view._scroll.widget().text()
 
@@ -406,18 +406,18 @@ def test_toc_pane_holds_the_search_field_above_the_tree(qtbot):
     view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     toc = _pane_holding(view._tree)
-    assert isinstance(view._search.field, QLineEdit)
-    assert toc.isAncestorOf(view._search.field)
+    assert isinstance(view.search.field, QLineEdit)
+    assert toc.isAncestorOf(view.search.field)
     section = view._tree.parentWidget().layout()
-    assert section.indexOf(view._search.row) < section.indexOf(view._tree)
+    assert section.indexOf(view.search.row) < section.indexOf(view._tree)
 
 
 def test_search_all_sits_to_the_right_of_the_search_field(qtbot):
     view = GalleryView(database_of([]))
     qtbot.addWidget(view)
-    row = view._search.row.layout()
-    assert row.indexOf(view._search.field) < row.indexOf(view._search.search_all)
-    assert view._search.search_all.text() == "Search all"
+    row = view.search.row.layout()
+    assert row.indexOf(view.search.field) < row.indexOf(view.search.search_all)
+    assert view.search.search_all.text() == "Search all"
 
 
 def test_search_matches_a_generation_by_its_seed(qtbot):
@@ -560,7 +560,7 @@ def test_the_model_lora_sort_bands_the_results_by_model_and_lora(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _search_for(view, "cat")
-    view.set_search_sort(search.SORT_MODEL_LORA)
+    view.search.set_sort(search.SORT_MODEL_LORA)
 
     headings = [w.text() for w in _section_headers(view)]
 
@@ -579,7 +579,7 @@ def test_a_sectioned_search_in_a_tall_gallery_leaves_each_section_its_own_height
     qtbot.addWidget(view)
     view.refresh()
     _search_for(view, "cat")
-    view.set_search_sort(search.SORT_MODEL_LORA)
+    view.search.set_sort(search.SORT_MODEL_LORA)
     view.resize(900, 2400)
     view.show()
     column = view._scroll.widget().layout()
@@ -594,9 +594,9 @@ def test_the_model_lora_order_remembered_under_its_old_name_comes_back(qtbot):
     view = GalleryView(database_of([]))
     qtbot.addWidget(view)
 
-    view.set_search_sort("recipe")
+    view.search.set_sort("recipe")
 
-    assert view.search_sort() == search.SORT_MODEL_LORA
+    assert view.search.sort() == search.SORT_MODEL_LORA
 
 
 def test_a_model_lora_band_folds_shut_on_its_heading(qtbot):
@@ -606,7 +606,7 @@ def test_a_model_lora_band_folds_shut_on_its_heading(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _search_for(view, "cat")
-    view.set_search_sort(search.SORT_MODEL_LORA)
+    view.search.set_sort(search.SORT_MODEL_LORA)
     header = _section_headers(view)[0]
     section = view._scroll.widget().layout().itemAt(1).widget()
     assert section.isVisible() or not view.isVisible()
@@ -625,7 +625,7 @@ def test_a_bands_heading_reaches_across_the_whole_column(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _search_for(view, "cat")
-    view.set_search_sort(search.SORT_MODEL_LORA)
+    view.search.set_sort(search.SORT_MODEL_LORA)
     view.resize(3000, 600)
     view.show()
     column = view._scroll.widget()
@@ -645,7 +645,7 @@ def test_a_folded_band_stays_folded_across_a_redraw(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     _search_for(view, "cat")
-    view.set_search_sort(search.SORT_MODEL_LORA)
+    view.search.set_sort(search.SORT_MODEL_LORA)
     shut = next(h for h in _section_headers(view) if "styleA" in h.text())
     shut.click()
 
@@ -665,7 +665,7 @@ def test_an_empty_search_names_the_word_that_emptied_it(qtbot):
     view.refresh()
 
     _search_for(view, "cat aardvark")
-    view._search._expander.expanded.emit("cat aardvark", {})
+    view.search._expander.expanded.emit("cat aardvark", {})
 
     assert view.listed_prompt_ids() == []
     assert "aardvark" in view._scroll.widget().text()
@@ -679,7 +679,7 @@ def test_an_empty_search_names_nothing_until_it_has_finished(qtbot):
     _search_for(view, "aardvark")
     assert "aardvark" not in view._scroll.widget().text()
 
-    view._search._expander.expanded.emit("aardvark", {})
+    view.search._expander.expanded.emit("aardvark", {})
     assert "aardvark" in view._scroll.widget().text()
 
 
@@ -691,7 +691,7 @@ def test_the_llm_widening_re_runs_the_search_when_it_lands(qtbot):
     _search_for(view, "cat")
     assert view.listed_prompt_ids() == []
 
-    view._search._expander.expanded.emit("cat", {"cat": ("kitten",)})
+    view.search._expander.expanded.emit("cat", {"cat": ("kitten",)})
 
     assert view.listed_prompt_ids() == ["i1"]
 
@@ -703,7 +703,7 @@ def test_a_widening_for_an_abandoned_query_is_ignored(qtbot):
     view.refresh()
     _search_for(view, "dog")
 
-    view._search._expander.expanded.emit("cat", {"cat": ("kitten",)})
+    view.search._expander.expanded.emit("cat", {"cat": ("kitten",)})
 
     assert view.listed_prompt_ids() == ["i2"]
 
@@ -737,8 +737,8 @@ def test_a_search_too_wide_to_draw_says_so_and_says_what_to_do(qtbot):
         "narrowing tool, so the answer to too many is another word; the cap is written out "
         "here rather than read from the constant that sets it, or this test would pass at "
         "any cap at all")
-    assert "205 results" in view._search._count.text()
-    assert "add a word" in view._search._count.text(), (
+    assert "205 results" in view.search._count.text()
+    assert "add a word" in view.search._count.text(), (
         "the cap is stated rather than silent: the count alone would read as that many tiles to "
         "scroll to")
 
@@ -756,7 +756,7 @@ def test_several_hits_in_one_folder_come_back_as_that_folder(qtbot):
         "a settings folder's rows share a prompt and differ only by seed, so a prompt match hits all "
         "of them, and near-copies of one image bury every other place the query reached")
     assert len(view._gallery_pane._listed_folders) == 1
-    assert "1 result" in view._search._count.text()
+    assert "1 result" in view.search._count.text()
 
 
 def test_a_folders_lone_hit_stays_the_item_itself(qtbot):
@@ -783,7 +783,7 @@ def test_opening_a_result_folder_puts_the_search_away(qtbot):
 
     view._gallery_pane._drill_into(key)
 
-    assert view._search.field.text() == ""
+    assert view.search.field.text() == ""
     assert not view._gallery_pane.showing_search()
     assert set(view.listed_prompt_ids()) == {"i1", "i2"}
 
@@ -794,15 +794,15 @@ def test_nothing_is_searched_until_a_beat_of_quiet(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._search.field.setText("cat")
+    view.search.field.setText("cat")
 
     assert not view._gallery_pane.showing_search(), (
         "a search scores the whole library and rebuilds the pane; one per character churns the "
         "results under a word still being typed")
-    assert view._search._timer.isActive()
+    assert view.search._timer.isActive()
 
-    view._search._timer.stop()
-    view._search._run_pending()
+    view.search._timer.stop()
+    view.search._run_pending()
 
     assert view.listed_prompt_ids() == ["i1"]
 
@@ -813,16 +813,16 @@ def test_a_query_under_three_characters_searches_nothing(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._search.field.setText("ca")
+    view.search.field.setText("ca")
 
-    assert not view._search._timer.isActive(), (
+    assert not view.search._timer.isActive(), (
         "one or two letters reach a large part of any library through stemming alone")
     assert not view._gallery_pane.showing_search()
 
     _search_for(view, "cat")
     assert view._gallery_pane.showing_search()
 
-    view._search.field.setText("ca")
+    view.search.field.setText("ca")
     assert not view._gallery_pane.showing_search()
 
 
@@ -938,22 +938,22 @@ def test_ctrl_f_falls_back_to_the_tree_find_with_no_prompts_in_front(qtbot, tmp_
     _press_ctrl_f(view, monkeypatch)
 
     assert not view._find_bar.isVisible()
-    assert view.focusWidget() is view._search.field
+    assert view.focusWidget() is view.search.field
 
 
 def test_switching_tabs_points_an_open_find_at_the_new_prompts(qtbot, tmp_path, monkeypatch):
     view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
     first = _tab_with_prompts(view)
     first.prompt_fields()[0].setPlainText("a cat")
-    view._generate_pane._add_subtab()
+    view.generate_pane._add_subtab()
     second = _tab_with_prompts(view)
     second.prompt_fields()[0].setPlainText("a cat and a cat")
-    view._generate_pane.setCurrentWidget(first)
+    view.generate_pane.setCurrentWidget(first)
     _press_ctrl_f(view, monkeypatch)
     _find_query(view).setText("cat")
     assert _find_count(view) == "1 of 1"
 
-    view._generate_pane.setCurrentWidget(second)
+    view.generate_pane.setCurrentWidget(second)
 
     assert _find_count(view) == "1 of 2"
     assert not first.prompt_fields()[0].extraSelections()
@@ -965,7 +965,7 @@ def test_closing_the_searched_tab_puts_an_open_find_away(qtbot, tmp_path, monkey
     _press_ctrl_f(view, monkeypatch)
     assert view._find_bar.isVisible()
 
-    view._generate_pane._close_subtab(view._generate_pane.currentIndex())
+    view.generate_pane._close_subtab(view.generate_pane.currentIndex())
 
     assert not view._find_bar.isVisible()
 
@@ -976,7 +976,7 @@ def test_ctrl_f_after_the_searched_prompts_are_gone_opens_over_the_ones_in_front
     searched = _tab_with_prompts(view).prompt_fields()
     _press_ctrl_f(view, monkeypatch)
     view.keys.eventFilter(view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, _NO_MOD))
-    view._generate_pane._close_subtab(view._generate_pane.currentIndex())
+    view.generate_pane._close_subtab(view.generate_pane.currentIndex())
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     assert all(not shiboken6.isValid(field) for field in searched)
     in_front = _tab_with_prompts(view)
@@ -1011,8 +1011,8 @@ def test_a_search_asks_its_question_once_through_a_rebuild(qtbot):
     view.refresh()
     _search_for(view, "cat")
     asked = []
-    run = view._search.run
-    view._search.run = lambda: asked.append("run") or run()
+    run = view.search.run
+    view.search.run = lambda: asked.append("run") or run()
 
     view.refresh()
 
@@ -1054,4 +1054,4 @@ def test_following_a_link_puts_a_running_search_away(qtbot):
     view.follow_link("i2")
 
     assert not view._gallery_pane.showing_search()
-    assert view._search.field.text() == ""
+    assert view.search.field.text() == ""

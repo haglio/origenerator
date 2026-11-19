@@ -436,7 +436,7 @@ class ActionSetterWindow(QWidget):
             return
         self._status.setText(f"{self._session.remaining} left · {folder.get('name')}")
         self._set_the_boxes_for(folder)
-        self._stage.show_folder(folder["thumbnails"])
+        self._stage.show_folder(folder["shown"])
 
     def _mark_the_button_set_before(self, folder: dict | None) -> None:
         item_actions = (folder or {}).get("actions") or ItemActions()

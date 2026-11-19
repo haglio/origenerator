@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from typing import NamedTuple
 
 from origenerator.one_look import is_file
 
@@ -13,6 +14,12 @@ VIDEO_EXTS = frozenset({".mp4", ".webm"})
 class MediaType(StrEnum):
     IMAGE = "image"
     VIDEO = "video"
+
+
+class ShownFile(NamedTuple):
+    path: str
+    media_type: MediaType
+    thumbnail: str | None = None
 
 
 def icon_name(media_type: str) -> str:

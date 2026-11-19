@@ -61,8 +61,8 @@ class _Stage(QWidget):
         super().__init__()
         self.shown = []
 
-    def show_folder(self, paths):
-        self.shown.append(list(paths))
+    def show_folder(self, files):
+        self.shown.append(list(files))
 
     def show_message(self, text):
         self.shown.append(text)
@@ -98,7 +98,7 @@ def _said(made, name) -> str:
 
 def _a_folder_of(item: dict) -> dict:
     return {"key": item["prompt_id"], "name": item.get("name"), "items": [item],
-            "thumbnails": [item.get("path")], "actions": item.get("actions")}
+            "shown": [item.get("path")], "actions": item.get("actions")}
 
 
 @pytest.fixture
@@ -399,7 +399,7 @@ def test_the_folder_on_screen_shows_all_its_items_at_once_under_its_name(window)
     _made, _store, stage = window(folders=[{
         "key": "folder", "name": "3FA9C0D2", "actions": None,
         "items": [{"prompt_id": "first"}, {"prompt_id": "second"}],
-        "thumbnails": ["first.jpg", "second.jpg"]}])
+        "shown": ["first.jpg", "second.jpg"]}])
 
     assert (stage.shown, _said(_made, STATUS_LINE)) == (
         [["first.jpg", "second.jpg"]], "1 left · 3FA9C0D2")
@@ -410,7 +410,7 @@ def test_trash_asks_first_whether_to_delete_the_folder_and_its_items(window):
     rubbish = _Bin()
     made, _store, stage = window(folders=[{
         "key": "folder", "name": "3FA9C0D2", "actions": None,
-        "items": [{"prompt_id": "first"}, {"prompt_id": "second"}], "thumbnails": []}],
+        "items": [{"prompt_id": "first"}, {"prompt_id": "second"}], "shown": []}],
         rubbish=rubbish, confirm=lambda _parent, text: asked.append(text) or False)
     rubbish.stage = stage
 

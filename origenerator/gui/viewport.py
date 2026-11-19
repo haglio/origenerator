@@ -41,7 +41,11 @@ from origenerator.gui.drag_thumbnail import (
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.scrubber import Scrubber
-from origenerator.gui.video_surface import VideoSurface
+from origenerator.gui.video_surface import (
+    VideoSurface,
+    release_media_player,
+    stop_and_let_go_of_the_file,
+)
 from origenerator.media import MediaType
 
 _PLACEHOLDER = "Select a generation to preview"
@@ -82,7 +86,7 @@ class Viewport(QWidget):
     context_requested = Signal(str, QPoint)
 
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
-                 show_scrubber: bool = False):
+                 make_player=QMediaPlayer, show_scrubber: bool = False):
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
         self._image_size: QSize | None = None
@@ -102,7 +106,7 @@ class Viewport(QWidget):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._on_context_menu)
 
-        self._player = player if player is not None else QMediaPlayer(self)
+        self._player = player if player is not None else make_player(self)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -127,7 +131,7 @@ class Viewport(QWidget):
         self._player.metaDataChanged.connect(self._place_controls)
 
         self._combination = _lets_the_mouse_through(CombinationView())
-        self._sheet = _lets_the_mouse_through(ContactSheet())
+        self._sheet = _lets_the_mouse_through(ContactSheet(make_player=make_player))
         for page in (self._image_label, self._video, self._combination, self._sheet):
             self._stack.addWidget(page)
 
@@ -249,10 +253,10 @@ class Viewport(QWidget):
     def mark_prompt_edited(self, edited: bool) -> None:
         self._combination.mark_prompt_edited(edited)
 
-    def show_folder(self, paths) -> None:
+    def show_folder(self, files) -> None:
         self._take_the_pane(None)
         self._image_label.clear()
-        self._sheet.show_thumbnails(paths)
+        self._sheet.show_files(files)
         self._stack.setCurrentWidget(self._sheet)
 
     def show_message(self, text: str, *, live: bool = False) -> None:
@@ -451,13 +455,11 @@ class Viewport(QWidget):
         return self._fullscreen
 
     def _stop_playback(self) -> None:
-        self._player.stop()
-        self._player.setSource(QUrl())
+        stop_and_let_go_of_the_file(self._player)
 
     def release_player(self) -> None:
-        # Qt Multimedia: a stop alone leaves the backend winding down into a surface a closing widget takes down.
-        self._stop_playback()
-        self._player.setVideoOutput(None)
+        self._sheet.clear()
+        release_media_player(self._player)
 
     def _set_movie(self, movie: QMovie | None, native_size=None) -> None:
         # Qt: the movie is parented to this widget so the label's pointer cannot dangle when Python drops the wrapper

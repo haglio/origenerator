@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock
 
 from app_support.threading_utils import wait_until
 from PIL import Image
@@ -813,7 +813,7 @@ def test_watching_populate_in_the_pane_carries_on_to_the_next_variation(qtbot, t
     client.preview_image.emit(view._live_jobs[key].prompt_id, b"the next one")
 
     assert view._selected_reroll_key == key
-    tab._viewport.show_frame.assert_called_with(b"the next one")
+    tab._viewport.show_frame.assert_called_with(b"the next one", generation=ANY)
 
 
 def test_populate_ending_lets_the_pane_go(qtbot, tmp_path):

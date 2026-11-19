@@ -195,6 +195,10 @@ class _BeingMade(NamedTuple):
     source: Combination | None = None
 
 
+def _prompt_id_of(made: _BeingMade) -> str | None:
+    return (made.row or {}).get("prompt_id")
+
+
 def _same_item(one: dict | None, other: dict | None) -> bool:
     return (one or {}).get("prompt_id") == (other or {}).get("prompt_id")
 
@@ -1239,7 +1243,7 @@ class GenerateTab(DropZones):
         self._being_made = made._replace(note=None, source=made_from)
         lone_image = None if made_from.source_video else Path(made_from.image or "")
         if lone_image is not None and lone_image.is_file():
-            self._viewport.show_frame(lone_image.read_bytes())
+            self._viewport.show_frame(lone_image.read_bytes(), generation=_prompt_id_of(made))
         else:
             self.show_combination(made_from)
 
@@ -1248,7 +1252,7 @@ class GenerateTab(DropZones):
         if made is None:
             return
         self._being_made = made._replace(note=None, source=None)
-        self._viewport.show_frame(frame)
+        self._viewport.show_frame(frame, generation=_prompt_id_of(made))
 
     def show_live_wait(self, note: str | None):
         made, text = self._being_made, note or _WAITING_NOTE

@@ -4,7 +4,7 @@ import json
 import time
 from io import BytesIO
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock
 
 import pytest
 import shiboken6
@@ -374,7 +374,7 @@ def test_selecting_a_running_reroll_shows_its_live_preview_in_the_generate_pane(
 
     _generating_tile(view).selected.emit()
 
-    _viewport_of(view).show_frame.assert_called_once_with(frame)
+    _viewport_of(view).show_frame.assert_called_once_with(frame, generation=ANY)
 
 
 def test_new_frames_route_to_the_generate_pane_while_the_reroll_is_selected(qtbot, tmp_path):
@@ -388,7 +388,7 @@ def test_new_frames_route_to_the_generate_pane_while_the_reroll_is_selected(qtbo
 
     client.preview_image.emit(job.prompt_id, _png_bytes())
 
-    _viewport_of(view).show_frame.assert_called_once_with(_png_bytes())
+    _viewport_of(view).show_frame.assert_called_once_with(_png_bytes(), generation=ANY)
 
 
 def test_selecting_a_thumbnail_stops_the_reroll_from_driving_the_generate_pane(qtbot, tmp_path):
@@ -598,6 +598,41 @@ def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
     assert engine_of(win.shown).on_screen == done
     assert not win._set.playlist.current().is_live
     win.close()
+
+
+def test_a_run_double_clicked_from_another_folder_is_the_one_its_slideshow_follows(
+        qtbot, tmp_path):
+    client = _reroll_client()
+    db = _seeded_db(tmp_path, seed=7)
+    put_rows(db, [_image("other", "a paper boat", 30, 3)])
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key, job = _a_streaming_run_listed_in_flight(view, client)
+    other = view.toc.leaf_by_id["other"]
+    view._tree.setCurrentItem(other)
+    assert other.data(0, _GROUP_ROLE).key != key
+    assert job.prompt_id not in view.listed_prompt_ids()
+
+    win = view.slideshows.open_on_preview(None, job.prompt_id)
+    qtbot.addWidget(win.shown)
+
+    assert win._set.current_prompt_id() == job.prompt_id, (
+        "a double click on the picture of an item being made opens the slideshow on that item's "
+        "generation as it goes, whatever the Gallery pane happens to be showing")
+    assert engine_of(win.shown).on_screen.read_bytes() == _png_bytes()
+    win.close()
+
+
+def test_the_live_picture_of_a_run_says_which_item_it_is(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _key, job = _a_streaming_run_listed_in_flight(view, client)
+
+    assert _viewport_of(view)._generation == job.prompt_id, (
+        "a double click hands the slideshow the item the picture belongs to")
 
 
 def test_a_run_watched_fullscreen_lands_as_its_generation_among_its_folder(

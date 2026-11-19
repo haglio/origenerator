@@ -461,7 +461,9 @@ overlay's `display_names` can give any of them another name
 (`workflows/non_ai.py`). A Non-AI folder holds its leaf folders directly, with
 no Model or LoRA folder between, one leaf per folder on disk, labeled with that
 folder's path past the two parts that name the N folder. The command Evolver
-runs for a Site's videos (`outside_video_entries`) brings these in too.
+runs for a Site's videos (`outside_video_entries`) brings these in too. A
+video Evolver replaces with its enhanced copy keeps its item, which then
+names that copy (`follow_enhanced_copies`, at every scan and every start).
 
 What such a video is called, whether it is a favorite and which full video a
 clip was cut from are kept in the video's record under the library's

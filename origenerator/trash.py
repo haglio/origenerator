@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import uuid
 from collections import defaultdict
@@ -114,22 +115,21 @@ class Trash:
         return TrashedBatch(moves=moves, subdir=subdir)
 
     def held_names(self) -> set[str]:
-        if not self.root.is_dir():
-            return set()
-        return {_name_before(held.name) for batch in self.root.iterdir() if batch.is_dir()
-                for held in batch.iterdir()}
+        return {_name_before(held) for batch in self._batches() for held in os.listdir(batch)}
 
     def purge_orphans(self, keep) -> int:
-        if not self.root.exists():
-            return 0
-        held = {Path(path).resolve() for path in keep if path}
-        removed = 0
-        for child in self.root.iterdir():
-            if not child.is_dir() or child.resolve() in held:
-                continue
-            shutil.rmtree(child, ignore_errors=True)
-            removed += 1
-        return removed
+        held = {_spelled_alike(path) for path in keep if path}
+        orphans = [batch for batch in self._batches() if _spelled_alike(batch) not in held]
+        for batch in orphans:
+            shutil.rmtree(batch, ignore_errors=True)
+        return len(orphans)
+
+    def _batches(self) -> list[str]:
+        try:
+            with os.scandir(self.root) as entries:
+                return [entry.path for entry in entries if entry.is_dir()]
+        except OSError:
+            return []
 
 
 @dataclass(frozen=True)
@@ -175,8 +175,13 @@ class Genau:
         return self.trash / video.relative_to(self.flicks)
 
     def videos(self) -> list[Path]:
-        return sorted(path for path in self.flicks.rglob("*") if path.is_file())
+        return sorted(Path(where) / name for where, _folders, names in os.walk(self.flicks)
+                      for name in names)
 
+
+
+def _spelled_alike(path) -> str:
+    return os.path.normcase(os.path.abspath(path))
 
 
 def take_out_of_play(place: Kino | Genau, video: Path) -> tuple[Path, Path] | None:

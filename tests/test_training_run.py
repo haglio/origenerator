@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import itertools
 import json
+import os
 import time
 import types
 from pathlib import Path
@@ -54,8 +56,14 @@ def _run(qtbot, monkeypatch, tmp_path):
     return run, queue, started
 
 
+_EACH_WRITE_ITS_OWN_TIME = itertools.count()
+
+
 def _say(tmp_path, **status) -> None:
-    Path(tmp_path / "status.json").write_text(json.dumps(status), encoding="utf-8")
+    path = Path(tmp_path / "status.json")
+    path.write_text(json.dumps(status), encoding="utf-8")
+    when = time.time_ns() + next(_EACH_WRITE_ITS_OWN_TIME) * 10_000_000
+    os.utime(path, ns=(when, when))
 
 
 def test_a_fixs_training_starts_the_moment_it_is_asked_for_since_it_gives_way_to_comfyui_itself(

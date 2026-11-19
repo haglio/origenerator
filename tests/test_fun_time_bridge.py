@@ -304,6 +304,18 @@ def test_a_line_pressed_with_its_time_is_answered_without_the_microphone(
     assert show.done == [("media", "")]
 
 
+def test_a_command_said_to_a_satellite_is_answered_with_the_microphone(
+        qtbot, tmp_path, monkeypatch):
+    view, bridge = _view_with_bridge(qtbot, tmp_path)
+    answered = []
+    monkeypatch.setattr(view.slideshows, "set_enhanced_filter",
+                        lambda shape, on: answered.append(mark_of_a_message_said_now()))
+
+    _press(bridge, tmp_path, "PORTRAIT_SAY:enhanced only @100.000")
+
+    assert answered == [HEARD_MARK]
+
+
 def test_the_word_heard_said_as_part_of_a_request_stays_in_the_request(
         qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)

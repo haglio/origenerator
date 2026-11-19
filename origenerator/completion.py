@@ -5,7 +5,7 @@ import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
-from origenerator.config import MOTION_DEFAULT_HZ
+from origenerator.config import MOTION_DEFAULT_HZ, OUTPUT_PLACES
 from origenerator.funscript import (
     funscript_path_for,
     synthesize_funscript,
@@ -19,6 +19,7 @@ from origenerator.media import MediaType
 from origenerator.output_places import OutputFolders, OutputPlaces
 from origenerator.thumbnail import animate_if_video, generate_thumbnail
 from origenerator.timing import execution_duration_seconds
+from origenerator.video_lengths import video_seconds_of
 
 logger = logging.getLogger(__name__)
 
@@ -92,5 +93,9 @@ def mark_generation_completed(db, prompt_id, files, thumb_path, duration):
     }
     if duration is not None:
         fields["duration_seconds"] = duration
-    fields["shape"] = shape_its_files_say({**(db.get_generation(prompt_id) or {}), **fields})
+    finished = {**(db.get_generation(prompt_id) or {}), **fields}
+    fields["shape"] = shape_its_files_say(finished)
     db.update_generation(prompt_id, **fields)
+    seconds = video_seconds_of(finished, OUTPUT_PLACES)
+    if seconds is not None:
+        db.set_library_record(prompt_id, video_seconds=seconds)

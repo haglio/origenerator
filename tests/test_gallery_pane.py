@@ -31,6 +31,7 @@ from origenerator.gui.gallery_pane import (
     TreeNavigation,
 )
 from origenerator.gui.item_tile import ItemTile
+from origenerator.gui.item_type_icon import VideoLength
 from origenerator.item_shape import shaped_key
 from origenerator.library_views import LibrarySnapshot
 from tests.real_db import put_rows
@@ -333,6 +334,17 @@ def test_a_folder_draws_a_page_at_a_time_of_everything_it_lists(qtbot, db, opene
     assert [tile.prompt_id for tile in _drawn(scroll)] == listed[:gallery_pane._PAGE], (
         "building thousands of thumbnails in one pass locks the window, so a folder draws a "
         "page at a time")
+
+
+@pytest.mark.parametrize("opened", [_latest_of, _trash_of], ids=["latest", "trash"])
+def test_a_video_tile_says_how_long_its_video_runs(qtbot, db, opened):
+    video = {**_row("v1", 1), "output_files": json.dumps([{"filename": "v1.mp4", "subfolder": ""}]),
+             "video_seconds": 7.2}
+    pane, scroll = _pane(qtbot, db)
+
+    opened(pane, [video])
+
+    assert [length.text() for length in _drawn(scroll, VideoLength)] == ["0:07"]
 
 
 def test_a_folder_of_folders_draws_a_page_of_them_at_a_time(qtbot, db):

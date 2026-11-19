@@ -22,11 +22,12 @@ from origenerator.gui.corner_buttons import (
 from origenerator.gui.drag_thumbnail import DragOut, label_thumbnail
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.inflight import TICK_MS, RunReading
-from origenerator.gui.item_type_icon import ItemTypeIcon
+from origenerator.gui.item_type_icon import ItemTypeIcon, VideoLength
 from origenerator.gui.looping_preview import play_in
 from origenerator.gui.looping_preview import set_in_sight as video_in_sight
 from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
 from origenerator.gui.tile_status_scrim import TileStatusScrim
+from origenerator.media import MediaType
 from origenerator.trash_collection import why_it_cannot_be_restored
 
 _IMAGE_SIZE = tile_shape.thumbnail_size()
@@ -52,6 +53,7 @@ class CornerButton(NamedTuple):
 class TileAppearance:
     caption: str | None = None
     media_type: str | None = None
+    video_seconds: float | None = None
     movie_path: str | None = None
     favorite: bool = False
     enhance: str | None = None
@@ -133,8 +135,7 @@ class ItemTile(QWidget):
         layout.addWidget(self._text_label)
         self._apply_styles()
 
-        if appearance.media_type:
-            ItemTypeIcon(appearance.media_type, self)
+        self._mark_its_kind(appearance)
 
         layout.activate()  # Qt gives the thumbnail its rectangle only once the layout has run
         self._controls = CornerButtons(self, restore=appearance.restore)
@@ -148,6 +149,13 @@ class ItemTile(QWidget):
         self._build_the_enhancing_bar()
 
         self._build_corner_buttons(appearance.corner_buttons or [])
+
+    def _mark_its_kind(self, appearance: TileAppearance) -> None:
+        if not appearance.media_type:
+            return
+        mark = ItemTypeIcon(appearance.media_type, self)
+        if appearance.media_type == MediaType.VIDEO and appearance.video_seconds:
+            VideoLength(appearance.video_seconds, mark)
 
     def _build_the_enhancing_bar(self) -> None:
         self._status_scrim = TileStatusScrim(self)
@@ -165,7 +173,7 @@ class ItemTile(QWidget):
     def look_of(prompt_id: str, thumb_path: str | None, label_text: str,
                 appearance: TileAppearance = PLAIN_APPEARANCE) -> tuple:
         return (prompt_id, thumb_path, label_text, appearance.media_type,
-                appearance.movie_path, appearance.restore,
+                appearance.video_seconds, appearance.movie_path, appearance.restore,
                 tuple(action.action_id for action in appearance.corner_buttons or ()))
 
     def set_selected(self, selected: bool):

@@ -9,6 +9,7 @@ from PIL import Image
 from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
 from PySide6.QtGui import QEnterEvent, QIcon, QMovie
 from shared_ui.colors import BLUE, TEXT_PRIMARY
+from shared_ui.spacing import GAP_SMALL
 from shared_ui.testing import appending_to
 
 from origenerator.gui import corner_buttons, drag_thumbnail, icons, omnipause
@@ -16,7 +17,7 @@ from origenerator.gui.corner_buttons import CORNER_INSET, RestoreOffer
 from origenerator.gui.gallery_pane import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.inflight import RunReading
 from origenerator.gui.item_tile import CornerButton, ItemTile, TileAppearance
-from origenerator.gui.item_type_icon import ItemTypeIcon
+from origenerator.gui.item_type_icon import ItemTypeIcon, VideoLength
 from origenerator.media import MediaType
 from tests.heard_drags import HeardDrags
 from tests.tile_drawing import drawn_under_the_app_stylesheet
@@ -222,6 +223,28 @@ def test_the_item_type_icon_stands_in_one_place_whatever_else_the_tile_wears(qtb
     assert beside_a_collections_own_buttons == plain, (
         "a mark that only reports stays where it has always been, or it moves depending on which "
         "collection is open")
+
+
+def test_a_video_tile_shows_how_long_the_video_runs_just_right_of_its_video_mark(qtbot):
+    tile = _video_tile(qtbot, video_seconds=65.4)
+    (length,) = tile.findChildren(VideoLength)
+    mark = _type_icon_at(tile)
+    at = length.geometry()
+
+    beside_the_mark = (at.left() > mark.right(), at.left() - mark.right() <= GAP_SMALL + 1,
+                       at.center().y() == mark.center().y())
+    under_a_control = any(at.intersects(corner.geometry()) for corner in _corners(tile))
+    assert (length.text(), beside_the_mark, under_a_control, length.isVisibleTo(tile)) == (
+        "1:05", (True, True, True), False, True)
+
+
+def test_a_tile_with_no_known_length_shows_none(qtbot):
+    unmeasured = _video_tile(qtbot)
+    image = ItemTile("p2", None, "label", TileAppearance(media_type=MediaType.IMAGE,
+                                                         video_seconds=3.0))
+    qtbot.addWidget(image)
+
+    assert (unmeasured.findChildren(VideoLength), image.findChildren(VideoLength)) == ([], [])
 
 
 def test_no_corner_buttons_by_default(qtbot):
@@ -643,6 +666,7 @@ def test_a_tile_told_the_selection_it_already_has_is_not_styled_again(qtbot):
 _A_CHANGE_TO = {
     "caption": lambda: "another name",
     "media_type": lambda: MediaType.VIDEO,
+    "video_seconds": lambda: 5.0,
     "movie_path": lambda: "moving.webp",
     "favorite": lambda: True,
     "enhance": lambda: "2x",

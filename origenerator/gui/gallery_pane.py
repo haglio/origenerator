@@ -585,6 +585,7 @@ class GalleryPane(QObject):
             flow, row, _REVIEW_TILE if corner_buttons else _COLLECTION_TILE, wire,
             TileAppearance(
                 media_type=gallery.media_type_of_row(row),
+                video_seconds=row.get("video_seconds"),
                 movie_path=self._host.animated_preview(row),
                 favorite=bool(row.get("starred")),
                 enhance=self._enhance_state(row),
@@ -738,6 +739,7 @@ class GalleryPane(QObject):
             TileAppearance(
                 caption=f"{OLD_VERSION} · {name}" if row.get("old_version_of") else name,
                 media_type=gallery.media_type_of_row(row),
+                video_seconds=row.get("video_seconds"),
                 movie_path=self._host.animated_preview(row),
                 favorite=bool(row.get("starred")),
                 restore=restore_offer_of(row)),

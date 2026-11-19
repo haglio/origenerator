@@ -30,8 +30,8 @@ _TOC_INITIALS = {
     "source_image": ("I", GREEN),
 }
 
-_ITEM_TYPE_ICON_GROUND = QColor(*palette.BLACK, 160)
-_ITEM_TYPE_ICON_INK = WHITE
+ITEM_TYPE_ICON_GROUND = QColor(*palette.BLACK, 160)
+ITEM_TYPE_ICON_INK = WHITE
 _ITEM_TYPE_ICON_SIZE = 22
 _DRAWN_BIGGER = {"S": SIZE_BODY}
 
@@ -198,7 +198,7 @@ def experiment_verdict_icon(verdict: str) -> QIcon:
 @cache
 def item_type_icon(media_type: str) -> QPixmap:
     icon = icon_name(media_type)
-    return _display_size(_render_on_ground(_ITEM_TYPE_ICON_GROUND, icon, _ITEM_TYPE_ICON_INK))
+    return _display_size(_render_on_ground(ITEM_TYPE_ICON_GROUND, icon, ITEM_TYPE_ICON_INK))
 
 
 @cache

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 from PySide6.QtCore import QPoint, Qt
@@ -755,7 +755,7 @@ def test_a_wait_note_is_repainted_only_when_it_changes(tabs):
 
     tab.show_live_frame(b"frame")
 
-    tab._viewport.show_frame.assert_called_once_with(b"frame")
+    tab._viewport.show_frame.assert_called_once_with(b"frame", generation=ANY)
     assert not tab.is_awaiting_frame()
 
 
@@ -763,7 +763,7 @@ def test_watching_with_a_frame_puts_it_up_at_once(tabs):
     tab = tabs.currentWidget()
     tab._viewport.show_frame = MagicMock()
     tab.watch_folder("k", None, b"frame")
-    tab._viewport.show_frame.assert_called_once_with(b"frame")
+    tab._viewport.show_frame.assert_called_once_with(b"frame", generation=ANY)
 
 
 def test_watchers_of_lists_only_the_tabs_following_that_folder(tabs):

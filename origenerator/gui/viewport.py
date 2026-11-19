@@ -236,11 +236,12 @@ class Viewport(QWidget):
         self._play_where_it_is_seen()
         self._show_scrubber(path)
 
-    def show_frame(self, data: bytes, *, enhancing: bool = False) -> None:
+    def show_frame(self, data: bytes, *, enhancing: bool = False,
+                   generation: str | None = None) -> None:
         pixmap = QPixmap()
         if not pixmap.loadFromData(data) or pixmap.isNull():
             return
-        self._take_the_pane(None, enhancing=enhancing, live=True)
+        self._take_the_pane(None, generation=generation, enhancing=enhancing, live=True)
         self._show_image(pixmap)
         self._raise_message()
 

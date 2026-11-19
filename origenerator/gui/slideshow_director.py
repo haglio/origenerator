@@ -357,8 +357,9 @@ class SlideshowDirector:
     def open_on_preview(self, media, generation):
         hud = HudFacts(order_label=LATEST_LABEL)
         if media is None:
-            listed = self._listed_rows()
-            return self.open([], rows=listed, start=0, shuffle=in_order,
+            location = self._location_of(self._row_for(generation)) if generation else None
+            listed = self.rows_at(location) if location else self._listed_rows()
+            return self.open([], rows=listed, start=0, shuffle=in_order, location=location,
                              carrying=Carrying(folder_items=self.items_of(listed)), hud=hud)
         rows = [row for row in [self._row_for(generation)] if row]
         items = self.items_of(rows) or [(media[0], media[1], generation, None)]

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QSize
-from PySide6.QtGui import QColor, QImage
+from PySide6.QtGui import QColor, QImage, QPixmap
 
 from origenerator.gallery.enhance import EnhanceVersion
 from origenerator.gui.drop_zone import DropZone, ZoneLookups
-from origenerator.gui.enhance_versions import _VersionRow
+from origenerator.gui.enhance_versions import _VersionRow, _VersionThumbnails
 from origenerator.gui.source_tile import SourceTile
 from origenerator.media import MediaType
 
@@ -40,7 +40,8 @@ def test_a_source_tile_draws_a_thumbnail_the_size_the_drop_box_does(qtbot, tmp_p
 
 def test_an_enhancement_level_draws_a_thumbnail_the_size_the_drop_box_does(qtbot, tmp_path):
     path = _wide_thumbnail(tmp_path)
-    row = _VersionRow(EnhanceVersion(1, "Enhance 1", {"filename": "wide.png"}, {}), 1, path)
+    row = _VersionRow(EnhanceVersion(1, "Enhance 1", {"filename": "wide.png"}, {}), 1,
+                      _VersionThumbnails(QPixmap).of(path))
     qtbot.addWidget(row)
 
     assert row._thumbnail.pixmap().size() == _as_the_drop_box_draws_it(qtbot, path)

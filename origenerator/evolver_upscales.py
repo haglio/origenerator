@@ -7,6 +7,7 @@ from pathlib import Path
 from app_support.video_names import UPSCALE_SUFFIX
 
 from origenerator.media import MediaType, media_type_from_filename
+from origenerator.one_look import stat_of
 
 SHAPES = ("landscape", "portrait")
 
@@ -61,7 +62,7 @@ def original_stem(path) -> str | None:
 
 def _predates(video: Path, upscale: Path) -> bool:
     try:
-        written, upscaled = video.stat(), upscale.stat()
+        written, upscaled = stat_of(video), stat_of(upscale)
     except OSError:
         return False
     return written.st_mtime <= _filed_stamp(upscaled)
@@ -69,7 +70,7 @@ def _predates(video: Path, upscale: Path) -> bool:
 
 def filed_at(upscale) -> datetime | None:
     try:
-        upscaled = Path(upscale).stat()
+        upscaled = stat_of(upscale)
     except OSError:
         return None
     return datetime.fromtimestamp(_filed_stamp(upscaled), UTC)

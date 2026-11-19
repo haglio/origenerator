@@ -4,6 +4,7 @@ import json
 import os
 import sqlite3
 from contextlib import closing
+from pathlib import Path
 
 from origenerator import library_views
 from origenerator.db import Database
@@ -115,3 +116,26 @@ def test_a_video_of_ours_upscaled_after_a_newer_one_was_made_leads_latest(
 
     latest = library_views.LibrarySnapshot(db.list_generations()).recent_rows
     assert [row["prompt_id"] for row in latest] == ["video_one", "video_two"]
+
+
+def test_marking_many_videos_lists_their_folders_rather_than_asking_after_each_file(
+        tmp_path, monkeypatch):
+    db = Database(tmp_path / "test.db")
+    upscales = {}
+    for n in range(4):
+        _video_of_ours(tmp_path, db, f"video_{n}")
+        upscale = tmp_path / "kino" / "landscape" / "origenerator" / f"video_{n}_topaz.mp4"
+        upscale.parent.mkdir(parents=True, exist_ok=True)
+        upscale.write_bytes(b"video")
+        upscales[f"video_{n}"] = upscale
+    monkeypatch.setattr(library_views.EvolverUpscales, "scan",
+                        lambda *args: library_views.EvolverUpscales(upscales))
+    asked = []
+    for name in ("is_file", "stat"):
+        real = getattr(Path, name)
+        monkeypatch.setattr(Path, name, lambda path, *a, _real=real, **k: (
+            asked.append(path.name) if tmp_path in path.parents and path.suffix == ".mp4"
+            else None) or _real(path, *a, **k))
+
+    assert mark_own_upscales(db) == 4
+    assert asked == []

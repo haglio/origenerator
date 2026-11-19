@@ -997,3 +997,17 @@ def test_a_record_of_a_video_this_app_made_keeps_only_its_page_and_its_upscale(t
     made = db.get_generation("made-1")
     assert (json.loads(made["params_json"]), made["action"], made["web_url"]) == (
         {"seed": 5}, None, "https://example.com/watch/2")
+
+
+def test_a_scan_dates_the_videos_it_holds_from_their_folders_listing(tmp_path, monkeypatch):
+    db, places = Database(tmp_path / "test.db"), _places(tmp_path)
+    for n in range(4):
+        _filed(places.upscaled_dir, "portrait", "a-site", f"c{n}_topaz.mp4")
+    scan(db, places, grab=_still)
+    dated = []
+    real = Path.stat
+    monkeypatch.setattr(Path, "stat", lambda path, *a, **k: (
+        dated.append(path.name) if path.suffix == ".mp4" else None) or real(path, *a, **k))
+
+    assert scan(db, places, grab=_still) == 0
+    assert dated == []

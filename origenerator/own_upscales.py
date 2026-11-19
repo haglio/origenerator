@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from origenerator.evolver_upscales import filed_at
 from origenerator.library_views import LibrarySnapshot
+from origenerator.one_look import looking_once
 
 
+@looking_once
 def mark_own_upscales(db) -> int:
     library = LibrarySnapshot(db.list_generations())
     marked = 0

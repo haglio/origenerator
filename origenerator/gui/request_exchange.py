@@ -214,14 +214,22 @@ class _Conversation(QTextEdit):
         item = self._item_at(place)
         return None if item == self._showing else item
 
+    def _caught_on_a_thumbnail(self, event) -> bool:
+        if (event.button() != Qt.MouseButton.LeftButton
+                or self._item_at(event.position().toPoint()) is None):
+            return False
+        self.clearFocus()
+        return True
+
     def mousePressEvent(self, event) -> None:
-        place = event.position().toPoint()
-        if event.button() == Qt.MouseButton.LeftButton and self._item_at(place) is not None:
-            self.clearFocus()
-            if (link := self._link_at(place)) is not None:
-                self.item_activated.emit(link)
-            return
-        super().mousePressEvent(event)
+        if not self._caught_on_a_thumbnail(event):
+            super().mousePressEvent(event)
+        elif (link := self._link_at(event.position().toPoint())) is not None:
+            self.item_activated.emit(link)
+
+    def mouseDoubleClickEvent(self, event) -> None:
+        if not self._caught_on_a_thumbnail(event):
+            super().mouseDoubleClickEvent(event)
 
     def mouseMoveEvent(self, event) -> None:
         super().mouseMoveEvent(event)

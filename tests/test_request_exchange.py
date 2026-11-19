@@ -13,6 +13,7 @@ from origenerator.gui.inflight import RunReading
 from origenerator.gui.progress_bar import ProgressBar
 from origenerator.gui.request_exchange import RequestExchange
 from origenerator.gui.source_tile import SourceTile
+from tests.waiting import until
 
 EXCHANGE = [("a hat", "Gave her a straw hat."), ("make it red", "The hat is red now.")]
 
@@ -502,13 +503,25 @@ def test_clicking_a_turns_thumbnail_opens_the_item_it_made_as_a_link_tile_does(q
     assert opened == ["first"]
 
 
+def _text_cursor_left_by(qtbot, exchange, click) -> tuple[bool, bool]:
+    exchange.activateWindow()
+    until(exchange.isActiveWindow)
+    click(exchange._conversation.viewport(), Qt.MouseButton.LeftButton,
+          pos=_thumbnail_place(exchange))
+    conversation = exchange._conversation
+    return conversation.hasFocus(), conversation.textCursor().hasSelection()
+
+
 def test_clicking_a_turns_thumbnail_leaves_no_text_cursor_beside_it(qtbot, tmp_path):
     exchange = _shown_with_a_thumbnail(qtbot, tmp_path)
 
-    qtbot.mouseClick(exchange._conversation.viewport(), Qt.MouseButton.LeftButton,
-                     pos=_thumbnail_place(exchange))
+    assert _text_cursor_left_by(qtbot, exchange, qtbot.mouseClick) == (False, False)
 
-    assert not exchange._conversation.hasFocus()
+
+def test_double_clicking_a_turns_thumbnail_leaves_no_text_cursor_beside_it(qtbot, tmp_path):
+    exchange = _shown_with_a_thumbnail(qtbot, tmp_path)
+
+    assert _text_cursor_left_by(qtbot, exchange, qtbot.mouseDClick) == (False, False)
 
 
 def test_the_thumbnail_of_the_item_on_show_is_no_link_and_takes_no_text_cursor(qtbot, tmp_path):
@@ -517,12 +530,13 @@ def test_the_thumbnail_of_the_item_on_show_is_no_link_and_takes_no_text_cursor(q
     opened = []
     exchange.item_activated.connect(appending_to(opened))
     viewport = exchange._conversation.viewport()
-
     _move_to(viewport, _thumbnail_place(exchange))
-    qtbot.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=_thumbnail_place(exchange))
 
-    assert (viewport.cursor().shape(), opened, exchange._conversation.hasFocus()) == (
-        Qt.CursorShape.IBeamCursor, [], False)
+    clicked = _text_cursor_left_by(qtbot, exchange, qtbot.mouseClick)
+    double_clicked = _text_cursor_left_by(qtbot, exchange, qtbot.mouseDClick)
+
+    assert (viewport.cursor().shape(), opened, clicked, double_clicked) == (
+        Qt.CursorShape.IBeamCursor, [], (False, False), (False, False))
 
 
 def _move_to(viewport, place: QPoint) -> None:

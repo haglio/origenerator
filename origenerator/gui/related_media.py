@@ -15,7 +15,7 @@ from origenerator.gallery import (
     was_made_from,
     was_taken_from,
 )
-from origenerator.gallery.non_ai import started_from_no_image
+from origenerator.gallery.non_ai import alternate_versions, started_from_no_image
 from origenerator.gui.change_tip import change_tip
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.flow_layout import FlowLayout
@@ -50,6 +50,7 @@ VIDEO_SETTINGS_USED_FOR_ANIMATION_OF = "Video settings used for animation of"
 TRIMMED_FROM = "Trimmed from"
 TRIMMED_INTO = "Trimmed into"
 FULL_VIDEO = "Full video"
+ALTERNATE_VERSION_OF = "Alternate version of"
 
 
 class _LinkRow(QWidget):
@@ -122,6 +123,7 @@ class RelatedMedia(QWidget):
         self._batch_modified = _LinkRow(self._movie_of)
         self._animations = _LinkRow(self._movie_of)
         self._trims = _LinkRow(self._movie_of)
+        self._versions = _LinkRow(self._movie_of)
         for row in self._rows():
             row.activated.connect(self.link_clicked)
             rows.addWidget(row)
@@ -147,10 +149,14 @@ class RelatedMedia(QWidget):
             + [(into, video) for video in self._animated_videos(row, start_image_of, videos)]
             + self._made_with_settings_of(prompt_id, videos),
             self._name_of, self._trashed())
+        alternates = alternate_versions(row, videos) if prompt_id else []
+        cut_from_here = {prompt_id, *(version["prompt_id"] for version in alternates)} - {None}
         self._trims.show_links(
             trimmed_from + [(_cut_into(row), video) for video in videos
-                            if prompt_id and video.get("trimmed_from") == prompt_id],
+                            if video.get("trimmed_from") in cut_from_here],
             self._name_of, self._trashed())
+        self._versions.show_links([(ALTERNATE_VERSION_OF, version) for version in alternates],
+                                  self._name_of, self._trashed())
         self._follow_the_rows()
 
     def folds(self) -> dict[str, bool]:
@@ -162,7 +168,8 @@ class RelatedMedia(QWidget):
             self._section.set_collapsed(folded)
 
     def _rows(self) -> tuple[_LinkRow, ...]:
-        return (self._requests, self._batch_modified, self._animations, self._trims)
+        return (self._requests, self._batch_modified, self._animations, self._trims,
+                self._versions)
 
     def clear(self) -> None:
         for row in self._rows():
@@ -182,7 +189,9 @@ class RelatedMedia(QWidget):
     def _made_from(self, row: dict, start_image_of, videos: list[dict]):
         trimmed = self._trimmed_from(row)
         if trimmed is not None:
-            return [(FULL_VIDEO if started_from_no_image(row) else TRIMMED_FROM, trimmed)], []
+            heading = FULL_VIDEO if started_from_no_image(row) else TRIMMED_FROM
+            return [(heading, version)
+                    for version in (trimmed, *alternate_versions(trimmed, videos))], []
         frame = self._source_of(row, start_image_of)
         if frame is None:
             return [], []

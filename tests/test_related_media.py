@@ -631,9 +631,11 @@ def test_a_clip_points_at_each_cut_out_of_it_under_trims(make_related):
     assert _links(section) == [("Trimmed into", "cut1"), ("Trimmed into", "cut2")]
 
 
-def _non_ai_row(prompt_id, cut_from=None):
-    return {"prompt_id": prompt_id, "workflow_name": non_ai_workflow("sample full"),
-            "created_at": "2026-01-02 03:05:06", "params_json": '{"folder": "sample/full"}',
+def _non_ai_row(prompt_id, cut_from=None, version_group="", folder="sample full"):
+    return {"prompt_id": prompt_id, "workflow_name": non_ai_workflow(folder),
+            "created_at": "2026-01-02 03:05:06",
+            "params_json": json.dumps({"folder": folder.replace(" ", "/"),
+                                       "version_group": version_group}),
             "output_files": f'[{{"filename": "{prompt_id}.mp4"}}]',
             "thumbnail_path": f"{prompt_id}_thumb.jpg", "trimmed_from": cut_from}
 
@@ -644,6 +646,49 @@ def test_a_non_ai_clip_points_back_at_its_full_video_under_full_video(make_relat
     related.show_row(_non_ai_row("cut1", cut_from="full1"), [])
 
     assert _links(related._trims) == [("Full video", "full1")]
+
+
+def test_a_non_ai_video_points_at_each_other_version_of_it_under_alternate_version_of(
+        make_related):
+    versions = [_non_ai_row(name, version_group="video one")
+                for name in ("first", "second", "third")]
+    related = make_related(*versions, _non_ai_row("another", version_group="video two"),
+                           _non_ai_row("elsewhere", version_group="video one",
+                                       folder="sample clips"))
+
+    related.show_row(versions[1], [])
+
+    assert _links(related._versions) == [("Alternate version of", "first"),
+                                         ("Alternate version of", "third")]
+
+
+def test_a_non_ai_video_with_no_other_version_shows_nothing_under_alternate_version_of(
+        make_related):
+    alone = _non_ai_row("first", version_group="video one")
+    related = make_related(alone, _non_ai_row("unrecorded"))
+
+    related.show_row(alone, [])
+    its_own = (_links(related._versions), related._versions.isHidden())
+    related.show_row(_non_ai_row("unrecorded"), [])
+
+    assert (its_own, _links(related._versions)) == (([], True), [])
+
+
+def test_a_clip_cut_from_one_version_is_linked_with_every_version_of_that_video(make_related):
+    versions = [_non_ai_row(name, version_group="video one") for name in ("first", "second")]
+    clip = _non_ai_row("cut1", cut_from="first", folder="sample clips")
+    related = make_related(*versions, clip)
+
+    related.show_row(clip, [])
+    full_videos = _links(related._trims)
+    clips_of = {}
+    for version in versions:
+        related.show_row(version, [])
+        clips_of[version["prompt_id"]] = _links(related._trims)
+
+    assert (full_videos, clips_of) == (
+        [("Full video", "first"), ("Full video", "second")],
+        {"first": [("Clip", "cut1")], "second": [("Clip", "cut1")]})
 
 
 def test_a_non_ai_full_video_points_at_each_clip_under_the_words_the_shared_settings_give(

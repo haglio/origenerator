@@ -9,7 +9,12 @@ from pathlib import Path
 
 from app_support import favorites, video_ids
 from app_support.mirrored_tree import filed_record, record_path
-from app_support.video_names import UPSCALE_SUFFIX, full_video_id_of, title_while_playing
+from app_support.video_names import (
+    UPSCALE_SUFFIX,
+    full_video_id_of,
+    title_while_playing,
+    version_group_of,
+)
 
 from origenerator import config
 from origenerator.evolver_export import PARTIAL_MARKER
@@ -29,6 +34,7 @@ from origenerator.workflows.non_ai import (
     FOLDER_KEY,
     FOLDER_PARTS_IN_A_NAME,
     TITLE_KEY,
+    VERSION_GROUP_KEY,
     NonAiWorkflow,
     non_ai_workflow,
 )
@@ -133,10 +139,12 @@ def _take_up(db, row: dict, video: Path, record: dict, item_of: dict[str, str]) 
 
 
 def _take_up_its_name_and_star(db, row: dict, video: Path, record: dict) -> bool:
-    params, title = json.loads(row["params_json"]), title_while_playing(record, video)
-    renamed = params.get(TITLE_KEY) != title
+    params = json.loads(row["params_json"])
+    recorded = {**params, TITLE_KEY: title_while_playing(record, video),
+                VERSION_GROUP_KEY: version_group_of(record)}
+    renamed = recorded != params
     if renamed:
-        db.set_params_json(row["prompt_id"], json.dumps({**params, TITLE_KEY: title}))
+        db.set_params_json(row["prompt_id"], json.dumps(recorded))
     favorite = favorites.is_favorite(record)
     restarred = bool(row["starred"]) != favorite
     if restarred:

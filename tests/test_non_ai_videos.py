@@ -20,7 +20,7 @@ from origenerator.gallery import (
     child_groups,
     resolve_preview,
 )
-from origenerator.gallery.non_ai import recorded_title
+from origenerator.gallery.non_ai import alternate_versions, recorded_title
 from origenerator.gallery.tree import ALL_KEY, folder_chain
 from origenerator.gallery_edits import GalleryEdits, GalleryEnvironment
 from origenerator.generation_state import GenerationSource
@@ -198,6 +198,29 @@ def test_a_clip_is_linked_to_the_full_video_its_record_says_it_was_cut_from(db, 
     rows = {json.loads(row["output_files"])[0]["filename"]: row for row in _videos(db)}
     assert (rows["first.mp4"]["trimmed_from"], rows["video one.mp4"]["trimmed_from"]) == (
         rows["video one.mp4"]["prompt_id"], None)
+
+
+def test_the_videos_one_folders_records_group_together_are_alternate_versions(db, tmp_path):
+    places = _library(tmp_path)
+    for name, record in (("video one.mp4", {"version": {"group": "video one"}}),
+                         ("video one remaster.mp4", {"version": {"group": "video one"}}),
+                         ("video two.mp4", {"version": {"group": "video two"}}),
+                         ("video three.mp4", {})):
+        _record(places, write_mp4(places.videos / "sample" / "full" / "set" / name), record)
+    _record(places, write_mp4(places.videos / "sample" / "clips" / "video one.mp4"),
+            {"version": {"group": "video one"}})
+
+    scan(db, places)
+
+    rows = _videos(db)
+    named = {json.loads(row["output_files"])[0]["library_path"]: row for row in rows}
+    full = {Path(path).name: row for path, row in named.items() if "full" in Path(path).parts}
+    assert {name: [json.loads(other["output_files"])[0]["filename"]
+                   for other in alternate_versions(row, rows)]
+            for name, row in full.items()} == {
+        "video one.mp4": ["video one remaster.mp4"],
+        "video one remaster.mp4": ["video one.mp4"],
+        "video two.mp4": [], "video three.mp4": []}
 
 
 def _leaves(db) -> list[list[str]]:

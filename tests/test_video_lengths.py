@@ -55,3 +55,16 @@ def test_a_video_whose_file_is_gone_is_left_unmeasured(db, tmp_path, places):
     _added(db, "gone", [{"filename": "gone.mp4", "library_path": str(tmp_path / "gone.mp4")}])
 
     assert video_lengths.record_video_lengths(db, places) == 0
+
+
+def test_recording_looks_for_no_file_of_an_image(db, tmp_path, places, monkeypatch):
+    _added(db, "image", [{"filename": "made-up.png", "library_path": str(tmp_path / "x.png")}])
+    looked_for = []
+    monkeypatch.setattr(video_lengths.gallery, "video_file_of",
+                        lambda row, _places: looked_for.append(row["prompt_id"]))
+
+    video_lengths.record_video_lengths(db, places)
+
+    assert looked_for == [], (
+        "the library holds thousands of images, and looking each one's file up on every launch "
+        "took over a minute")

@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from origenerator import gallery
 from origenerator.generation_state import GenerationStatus
-from origenerator.media import video_header
+from origenerator.media import MediaType, video_header
 from origenerator.output_places import OutputPlaces
 
 
 def video_seconds_of(row: dict, places: OutputPlaces) -> float | None:
+    if gallery.media_type_of_row(row) != MediaType.VIDEO:
+        return None
     video = gallery.video_file_of(row, places)
     header = video_header(video) if video is not None else None
     return header.seconds if header is not None else None

@@ -1222,10 +1222,14 @@ def test_generate_under_a_turn_shows_the_tab_generating_as_the_tabs_own_generate
     assert _generating_state(tabs_tab)[1:3] == (True, True)
 
 
+def _placed_in_the_conversation(tab, kind) -> list:
+    return [widget for widget in
+            tab._param_form.request_exchange()._conversation.viewport().findChildren(kind)
+            if not widget.isHidden()]
+
+
 def _the_turns_generate(tab) -> GenerateButton:
-    (button,) = [button for button in
-                 tab._param_form.request_exchange()._conversation.viewport().findChildren(
-                     GenerateButton) if not button.isHidden()]
+    (button,) = _placed_in_the_conversation(tab, GenerateButton)
     return button
 
 
@@ -1260,8 +1264,7 @@ def test_generate_pressed_under_a_turn_gives_way_to_its_progress_bar_with_nothin
     qtbot.mouseClick(pressed, Qt.MouseButton.LeftButton)
     QApplication.processEvents()
 
-    (bar,) = [bar for bar in tab._param_form.request_exchange()._conversation.viewport()
-              .findChildren(ProgressBar) if not bar.isHidden()]
+    (bar,) = _placed_in_the_conversation(tab, ProgressBar)
     assert (tab._settings_scroll.verticalScrollBar().value(), _place_on_the_tab(tab, bar)) == (
         scrolled, where)
 
@@ -1411,6 +1414,61 @@ def test_a_request_answered_while_the_last_ones_image_is_made_comes_along_to_tha
     shown, turns, (_struck, lit) = _shown_by_the_tab(view)
     assert (shown, [said for said, _answer in turns], lit) == (
         job.prompt_id, ["two cats", "a hat"], ", a hat")
+
+
+def _what_the_tab_shows(tab) -> tuple:
+    return (tab.displayed_row()["prompt_id"], tab.watched_key(), tab.launched_runs(),
+            tab._param_form._widgets["positive_prompt"].value(),
+            _struck_and_lit(tab._param_form._widgets["positive_prompt"].boxes()[0]))
+
+
+def _generate_under_the_earlier_turn(qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path)
+    _ask_for_a_hat(qtbot, view)
+    tab = view._generate_pane.current_generate_tab()
+    before = _what_the_tab_shows(tab)
+    earlier, _last = _placed_in_the_conversation(tab, GenerateButton)
+    qtbot.mouseClick(earlier, Qt.MouseButton.LeftButton)
+    (job,) = view._live_jobs.values()
+    return view, tab, job, before
+
+
+def test_generate_under_an_earlier_turn_leaves_the_tab_on_what_it_shows(qtbot, tmp_path):
+    _view, tab, job, before = _generate_under_the_earlier_turn(qtbot, tmp_path)
+
+    assert _what_the_tab_shows(tab) == before
+    assert [entry.made for entry in tab._param_form.request_exchange()._entries()] == [
+        job.prompt_id, ""]
+    assert len(_placed_in_the_conversation(tab, ProgressBar)) == 1
+
+
+def test_the_image_an_earlier_turn_made_lands_under_its_turn_with_the_tab_left_alone(
+        qtbot, tmp_path):
+    view, tab, job, before = _generate_under_the_earlier_turn(qtbot, tmp_path)
+    until(lambda: _every_job_is_with_comfyui(view))
+
+    _finish_reroll(view, job)
+
+    assert _what_the_tab_shows(tab) == before
+    assert (tab._param_form.request_exchange()._made_of(0).item,
+            len(_placed_in_the_conversation(tab, GenerateButton)),
+            _placed_in_the_conversation(tab, ProgressBar)) == (job.prompt_id, 1, [])
+
+
+@pytest.mark.parametrize("end", ["canceled", "failed"])
+def test_an_earlier_turns_image_that_never_comes_offers_its_generate_again(qtbot, tmp_path, end):
+    view, tab, job, before = _generate_under_the_earlier_turn(qtbot, tmp_path)
+    until(lambda: _every_job_is_with_comfyui(view))
+
+    if end == "canceled":
+        view._gallery_pane.cancel_requested.emit(job.prompt_id)
+    else:
+        view._client.job_error.emit(job.prompt_id, "boom")
+    view.refresh()
+
+    assert _what_the_tab_shows(tab) == before
+    assert (len(_placed_in_the_conversation(tab, GenerateButton)),
+            _placed_in_the_conversation(tab, ProgressBar)) == (2, [])
 
 
 def _land_the_running_job(qtbot, view):

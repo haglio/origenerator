@@ -172,6 +172,7 @@ class _Conversation(QTextEdit):
 
     def _generate_button_size(self) -> QSize:
         button = GenerateButton(self.viewport())
+        button.hide()
         button.adjustSize()
         size = button.size()
         button.deleteLater()
@@ -346,7 +347,8 @@ class RequestExchange(QWidget):
 
     def mark_made(self, index: int, prompt_id: str) -> None:
         self._held[index].made = prompt_id
-        self._in_flight[prompt_id] = RunReading(JobState.QUEUED)
+        if prompt_id:
+            self._in_flight[prompt_id] = RunReading(JobState.QUEUED)
         self._draw()
 
     def note_in_flight(self, readings: dict[str, RunReading]) -> None:

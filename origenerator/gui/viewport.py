@@ -77,6 +77,7 @@ class Viewport(QWidget):
         self._generation = self._actions_id = None
         self.drag_out = DragOut()
         self._playing_before_the_scrub = False
+        self._behind = False
 
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -144,7 +145,7 @@ class Viewport(QWidget):
         if held:
             self._playing_before_the_scrub = self._player.isPlaying()
             self._player.pause()
-        elif self._playing_before_the_scrub:
+        elif self._playing_before_the_scrub and not self._behind:
             self._player.play()
 
     def _take_the_pane(self, media, *, generation: str | None = None,
@@ -189,9 +190,7 @@ class Viewport(QWidget):
         self._image_label.clear()
         self._player.setSource(QUrl.fromLocalFile(str(Path(path))))
         self._stack.setCurrentWidget(self._video)
-        self._player.play()
-        if omnipause.frozen():
-            self._player.pause()
+        self._play_where_it_is_seen()
         self._show_scrubber(path)
 
     def show_frame(self, data: bytes, *, enhancing: bool = False) -> None:
@@ -298,9 +297,16 @@ class Viewport(QWidget):
     def set_frozen(self, frozen: bool) -> None:
         if self._movie is not None:
             self._movie.setPaused(frozen)
-        if not self.is_showing_video():
-            return
-        if frozen:
+        if self.is_showing_video():
+            self._play_where_it_is_seen()
+
+    def set_behind(self, behind: bool) -> None:
+        self._behind = behind
+        if self.is_showing_video():
+            self._play_where_it_is_seen()
+
+    def _play_where_it_is_seen(self) -> None:
+        if omnipause.frozen() or self._behind:
             self._player.pause()
         else:
             self._player.play()

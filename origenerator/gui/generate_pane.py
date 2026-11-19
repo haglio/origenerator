@@ -92,6 +92,8 @@ class GeneratePane(QTabWidget):
 
     def _front_tab_relayout(self, _index: int = -1) -> None:
         tab = self.currentWidget()
+        for each in self.generate_tabs():
+            each.set_in_front(each is tab)
         refresh = getattr(tab, "refresh_media_layout", None)
         if callable(refresh):
             refresh()

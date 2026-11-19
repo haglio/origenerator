@@ -1676,6 +1676,9 @@ class GenerateTab(DropZones):
     def release_media(self, paths) -> None:
         self._viewport.release_media(paths)
 
+    def set_in_front(self, in_front: bool) -> None:
+        self._viewport.set_behind(not in_front)
+
     def osr2_drive_target(self):
         return drive_target_for(self._displayed_video_path(), self._viewport.player())
 

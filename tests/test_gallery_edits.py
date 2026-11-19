@@ -941,3 +941,17 @@ def test_a_renamed_copy_of_an_upscale_sent_to_trash_leaves_kino_with_its_generat
     assert left
     assert copy.read_bytes() == b"upscale"
     assert not (kino_trash / copy.name).exists()
+
+
+def test_deleting_many_items_and_undoing_it_each_tell_the_gallery_once(tmp_path):
+    actions, db, output_dir = _actions(tmp_path)
+    rows = [_completed_row(db, output_dir, f"p{n}", f"{n}.png") for n in range(3)]
+    told = []
+    db.when_changed(lambda: told.append(1))
+
+    actions.delete_rows(rows)
+    deleted = len(told)
+    actions.undo()
+
+    assert (deleted, len(told)) == (1, 2)
+    assert [db.get_generation(f"p{n}") is not None for n in range(3)] == [True] * 3

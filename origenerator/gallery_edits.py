@@ -16,6 +16,7 @@ from origenerator.gallery import (
     unreviewed_experiments,
 )
 from origenerator.gallery.output import stems_made_as, with_files_renamed
+from origenerator.one_look import looking_once
 from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import generate_thumbnail
 from origenerator.trash import Genau, Kino, TrashedBatch, take_out_of_play
@@ -89,14 +90,17 @@ class GalleryEdits:
         if not rows:
             return
         batches = self._trash_files(rows, pressed=pressed)
-        for row, batch in batches:
-            self._db.delete_generation(row["prompt_id"])
-            self._db.record_trashed(row["prompt_id"], row, batch.record())
+        with self._db.in_one_go():
+            for row, batch in batches:
+                self._db.delete_generation(row["prompt_id"])
+                self._db.record_trashed(row["prompt_id"], row, batch.record())
 
         def undo() -> str | None:
-            for row, batch in batches:
-                self._db.restore_generation(with_files_renamed(row, batch.restore()))
-                self._db.forget_trashed(row["prompt_id"])
+            restored = [(row, batch.restore()) for row, batch in batches]
+            with self._db.in_one_go():
+                for row, moved in restored:
+                    self._db.restore_generation(with_files_renamed(row, moved))
+                    self._db.forget_trashed(row["prompt_id"])
             return batches[0][0]["prompt_id"]
 
         self._history.push(UndoEntry(_delete_label(len(rows)), undo,
@@ -162,6 +166,7 @@ class GalleryEdits:
             batches[0][1].out_of_play.append((pressed.video, pressed.already_at))
         return batches
 
+    @looking_once
     def _in_play(self, rows: list[dict], pressed: Pressed | None = None) -> list[list[tuple]]:
         kino, genau = self._environment.kino, self._environment.genau
         upscales = kino.upscales() if kino is not None else None

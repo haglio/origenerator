@@ -152,20 +152,22 @@ def _tally(file: Path) -> int:
 
 
 class _Progress(threading.Thread):
-    def __init__(self, process, job: dict, done: int):
+    def __init__(self, process, job: dict, done: int, *, report: Callable[..., None] = status):
         super().__init__(daemon=True)
-        self._process, self._job, self._done = process, job, done
+        self._process, self._job, self._done, self._report = process, job, done, report
         self.tail = b""
 
     def run(self) -> None:
+        written = None
         while chunk := self._process.stdout.read1(256):
             sys.stdout.buffer.write(chunk)
             sys.stdout.buffer.flush()
             self.tail = (self.tail + chunk)[-4096:]
             steps = _STEPS.findall(self.tail)
-            if steps:
-                status(self._job, state="training", done=self._done + int(steps[-1][0]),
-                       total=self._job["steps"])
+            done = self._done + int(steps[-1][0]) if steps else None
+            if done is not None and done != written:
+                self._report(self._job, state="training", done=done, total=self._job["steps"])
+                written = done
 
 
 def end_process(process) -> None:

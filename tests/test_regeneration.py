@@ -83,9 +83,8 @@ def test_an_item_told_why_it_cannot_be_made_again_gives_that_reason_first(tmp_pa
 def test_asking_of_many_items_lists_the_installed_models_once(tmp_path, monkeypatch):
     workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
     built = []
-    build = type(workflow).param_definitions
-    monkeypatch.setattr(type(workflow), "param_definitions",
-                        lambda self: built.append(1) or build(self))
+    build = workflow.param_definitions
+    monkeypatch.setattr(workflow, "param_definitions", lambda: built.append(1) or build())
     rows = [_row("sdxl_t2i", seed=n) for n in range(3)]
     why_it_cannot_be_made_again(rows[0], _folders(tmp_path))
     built.clear()

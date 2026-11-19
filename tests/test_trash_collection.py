@@ -533,9 +533,8 @@ class _Action:
 def test_the_restore_offer_for_many_emptied_items_lists_the_installed_models_once(monkeypatch):
     workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
     built = []
-    build = type(workflow).param_definitions
-    monkeypatch.setattr(type(workflow), "param_definitions",
-                        lambda self: built.append(1) or build(self))
+    build = workflow.param_definitions
+    monkeypatch.setattr(workflow, "param_definitions", lambda: built.append(1) or build())
     items = [{"prompt_id": f"p{n}", "workflow_name": "sdxl_t2i", "emptied": True,
               "params_json": json.dumps({"seed": n})} for n in range(3)]
     trash_collection.restore_action_on(_Menu(), "Restore", items[:1])

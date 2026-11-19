@@ -34,6 +34,12 @@ _SETTLING_ROUNDS = 4
 FOLDER_KEYS_MIME = "application/x-origenerator-folder-keys"
 
 
+def folder_keys_mime(keys) -> QMimeData:
+    mime = QMimeData()
+    mime.setData(FOLDER_KEYS_MIME, "\n".join(keys).encode("utf-8"))
+    return mime
+
+
 def folder_keys_in(mime) -> list[str]:
     data = mime.data(FOLDER_KEYS_MIME)
     if data.isEmpty():
@@ -453,8 +459,7 @@ class FolderTree(QTreeWidget):
         keys = self.selected_folder_keys()
         if pressed.data(0, TREE_KEY_ROLE) not in keys:
             keys = [pressed.data(0, TREE_KEY_ROLE)]
-        mime = QMimeData()
-        mime.setData(FOLDER_KEYS_MIME, "\n".join(keys).encode("utf-8"))
+        mime = folder_keys_mime(keys)
         drag = QDrag(self)
         drag.setMimeData(mime)
         carry(drag, mime, self, Qt.DropAction.CopyAction)

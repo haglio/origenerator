@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import json
 
-from PySide6.QtCore import QMimeData
+from PySide6.QtCore import QPoint, Qt
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication
 
 from origenerator import branch_session, gallery
 from origenerator.db import NewGeneration
 from origenerator.gallery.collection import FAVORITES_KEY
-from origenerator.gui.folder_tree import FOLDER_KEYS_MIME
+from origenerator.gui import button_drag
+from origenerator.gui.folder_tree import TREE_KEY_ROLE, folder_keys_mime
 from origenerator.gui.gallery_view import GalleryView
 from tests.drops import dropped_on
 from tests.gallery_view_support import (
@@ -197,10 +200,8 @@ def test_the_enhance_buttons_tooltip_says_which_settings_its_folder_enhances_wit
         {**gallery.EnhanceSettings().params, "enhance_steps": 11}))
 
 
-def _folder_rows_mime(*keys):
-    mime = QMimeData()
-    mime.setData(FOLDER_KEYS_MIME, "\n".join(keys).encode("utf-8"))
-    return mime
+def _folder_rows_mime(view, *keys):
+    return folder_keys_mime([view.toc.item_for(key).data(0, TREE_KEY_ROLE) for key in keys])
 
 
 def test_a_folders_row_dropped_on_the_enhance_pane_brings_its_settings(qtbot, tmp_path):
@@ -208,17 +209,48 @@ def test_a_folders_row_dropped_on_the_enhance_pane_brings_its_settings(qtbot, tm
     _pane_set_to(view, 11)
     view._buttons.enhance.click()
     _pane_set_to(view, 23)
-    mime = _folder_rows_mime(leaf)
+    mime = _folder_rows_mime(view, leaf)
 
     dropped_on(view.enhance.pane, mime)
 
     assert view.enhance.settings.params["enhance_steps"] == 11
 
 
+def _dragged_from(button, monkeypatch) -> list:
+    carried = []
+    monkeypatch.setattr(button_drag, "carry",
+                        lambda _drag, mime, _source, _action: carried.append(mime))
+    at = button.rect().center()
+    QTest.mousePress(button, Qt.MouseButton.LeftButton, pos=at)
+    QTest.mouseMove(button, at + QPoint(QApplication.startDragDistance() + 5, 0))
+    QTest.mouseRelease(button, Qt.MouseButton.LeftButton, pos=at)
+    return carried
+
+
+def test_the_lit_enhance_button_dragged_onto_the_enhance_pane_brings_its_settings(
+        qtbot, tmp_path, monkeypatch):
+    view, _db, _leaf = _enhancing_view(qtbot, tmp_path)
+    _pane_set_to(view, 11)
+    view._buttons.enhance.click()
+    _pane_set_to(view, 23)
+
+    (mime,) = _dragged_from(view._buttons.enhance, monkeypatch)
+    dropped_on(view.enhance.pane, mime)
+
+    assert view.enhance.settings.params["enhance_steps"] == 11
+    assert view._buttons.enhance.isChecked(), "a drag is no press, so the folder stays on"
+
+
+def test_an_enhance_button_that_is_off_drags_nothing(qtbot, tmp_path, monkeypatch):
+    view, _db, _leaf = _enhancing_view(qtbot, tmp_path)
+
+    assert _dragged_from(view._buttons.enhance, monkeypatch) == []
+
+
 def test_a_folder_not_enhancing_carries_no_settings_to_the_enhance_pane(qtbot, tmp_path):
     view, _db, leaf = _enhancing_view(qtbot, tmp_path)
     _pane_set_to(view, 23)
-    mime = _folder_rows_mime(leaf)
+    mime = _folder_rows_mime(view, leaf)
 
     dropped_on(view.enhance.pane, mime)
 

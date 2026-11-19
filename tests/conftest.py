@@ -31,6 +31,7 @@ from origenerator import (
     running_ahead,
 )
 from origenerator.gui import (
+    enhance_versions,
     funestra_slideshow,
     gallery_view,
     generation_job,
@@ -527,10 +528,9 @@ def _off_thread_work_runs_inline(request, monkeypatch):
 
     monkeypatch.setattr(GalleryView, "off_thread",
                         lambda self, work, done: done(work()))
-    monkeypatch.setattr(viewport, "run_off_thread",
-                        lambda work, done, *, owner: done(work()))
-    monkeypatch.setattr(funestra_slideshow, "run_off_thread",
-                        lambda work, done, *, owner: done(work()))
+    for module in (viewport, funestra_slideshow, enhance_versions):
+        monkeypatch.setattr(module, "run_off_thread",
+                            lambda work, done, *, owner: done(work()))
     monkeypatch.setattr(CombineController, "_after_painting",
                         lambda self, work: work())
 

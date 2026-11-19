@@ -34,7 +34,8 @@ class _Task(QRunnable):
             logger.info("An off-thread answer came back after the app let go of it")
 
 
-def run_off_thread(work, done, *, owner: QObject, waits_long: bool = False) -> None:
+def run_off_thread(work, done, *, owner: QObject,
+                   waits_long: bool = False) -> threading.Thread | None:
     result = _Result()
     _in_flight.add(result)
 
@@ -48,7 +49,9 @@ def run_off_thread(work, done, *, owner: QObject, waits_long: bool = False) -> N
 
     result.ready.connect(deliver)
     task = _Task(work, result)
-    if waits_long:
-        threading.Thread(target=task.run, name=LONG_WAIT_THREAD, daemon=True).start()
-    else:
+    if not waits_long:
         QThreadPool.globalInstance().start(task)
+        return None
+    waiting = threading.Thread(target=task.run, name=LONG_WAIT_THREAD, daemon=True)
+    waiting.start()
+    return waiting

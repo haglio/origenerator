@@ -38,8 +38,8 @@ from shared_ui.preview import Preview
 from shared_ui.testing import brought_to_front
 
 from origenerator import app_link, config, content, evolver_agreement, gallery, warm_gun_records
-from origenerator.app import _arm_the_crash_log as unpatched_arm_the_crash_log
 from origenerator.app import (
+    Boot,
     _configure_logging,
     _init_windows_taskbar_identity,
     _open_the_loading,
@@ -50,6 +50,7 @@ from origenerator.app import (
     main,
     resolve_comfyui_client_id,
 )
+from origenerator.app import _arm_the_crash_log as unpatched_arm_the_crash_log
 from origenerator.app_state import AppState
 from origenerator.boot_passes import (
     MAINTENANCE,
@@ -1284,6 +1285,28 @@ def test_main_runs_every_maintenance_pass_in_the_documented_order(qapp):
         assert main([]) == 0
 
     assert ran == [name for _, name in _MAINTENANCE_PASSES]
+
+
+def _a_hosted_boot(tmp_path) -> Boot:
+    return Boot(app=None, fun_time=object(), preview=None, taskbar=None,
+                logger=logging.getLogger("tests.app"), state_dir=tmp_path,
+                library_state_dir=tmp_path)
+
+
+def test_a_hosted_boot_that_closes_first_waits_for_the_tidying_behind_its_window(tmp_path):
+    boot = _a_hosted_boot(tmp_path)
+    window = MagicMock()
+    boot.finish_core_behind(MagicMock(), window)
+    (served,), _ = window.once_the_satellites_are_served.call_args
+    closed = []
+
+    with patch.object(served.keywords["behind"], "wait_for_the_tidying",
+                      side_effect=lambda: closed.append("waited for the tidying")), \
+         patch("origenerator.app._hand_comfyui_what_runs_while_closed",
+               side_effect=lambda *_: closed.append("handed ComfyUI what runs while closed")):
+        boot.close(window, MagicMock())
+
+    assert closed == ["waited for the tidying", "handed ComfyUI what runs while closed"]
 
 
 def _a_window_whose_satellites_are_served(**given):

@@ -1284,3 +1284,17 @@ def test_an_item_gone_from_the_library_leaves_its_tab_empty_not_only_its_preview
     tabs.reconcile_previews(live_ids=set())
 
     assert (tab.shown_item(), tab._metadata_section._shown) == (None, None)
+
+
+def test_only_the_tab_in_front_lets_its_video_play(tabs):
+    first = tabs.currentWidget()
+    second = tabs._add_subtab()
+    told = {first: [], second: []}
+    for tab in told:
+        tab._viewport.set_behind = told[tab].append
+
+    tabs.setCurrentWidget(first)
+
+    assert (told[first][-1], told[second][-1]) == (False, True)
+    tabs.setCurrentWidget(second)
+    assert (told[first][-1], told[second][-1]) == (True, False)

@@ -1391,3 +1391,47 @@ def test_a_folder_shown_fills_the_contact_sheet(make_preview, tmp_path):
     assert w._sheet.count() == 1, (
         "the pane is put down before the contact sheet is laid out, because putting it down "
         "clears the contact sheet")
+
+
+def test_a_video_behind_another_tab_is_held_and_plays_again_once_in_front(make_preview, tmp_path):
+    w = make_preview()
+    w.show_video(tmp_path / "video.mp4")
+
+    w.set_behind(True)
+    assert _told_last(w._player) == "pause", (
+        "a video nobody can see is decoded for nothing, beside the Funestras' own")
+    w.set_behind(False)
+    assert _told_last(w._player) == "play"
+
+
+def test_a_video_shown_or_let_go_by_the_room_while_behind_stays_held(make_preview, tmp_path):
+    w = make_preview()
+    w.set_behind(True)
+
+    w.show_video(tmp_path / "video.mp4")
+    assert _told_last(w._player) == "pause"
+    omnipause.freeze(True)
+    omnipause.freeze(False)
+    assert _told_last(w._player) == "pause"
+
+
+def test_a_video_in_a_frozen_room_stays_held_when_its_tab_comes_to_the_front(make_preview, tmp_path):
+    w = make_preview()
+    w.show_video(tmp_path / "video.mp4")
+    w.set_behind(True)
+    omnipause.freeze(True)
+
+    w.set_behind(False)
+
+    assert _told_last(w._player) == "pause"
+
+
+def test_an_image_behind_another_tab_asks_the_player_nothing(make_preview, tmp_path):
+    w = make_preview()
+    w.show_image(_make_png(tmp_path / "p.png"))
+    w._player.reset_mock()
+
+    w.set_behind(True)
+    w.set_behind(False)
+
+    assert _pauses_and_plays(w._player) == []

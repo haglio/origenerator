@@ -1262,11 +1262,11 @@ def test_generate_pressed_under_a_turn_gives_way_to_its_progress_bar_with_nothin
     assert scrolled > 0
 
     qtbot.mouseClick(pressed, Qt.MouseButton.LeftButton)
-    QApplication.processEvents()
 
+    until(lambda: _placed_in_the_conversation(tab, ProgressBar))
     (bar,) = _placed_in_the_conversation(tab, ProgressBar)
-    assert (tab._settings_scroll.verticalScrollBar().value(), _place_on_the_tab(tab, bar)) == (
-        scrolled, where)
+    until(lambda: _place_on_the_tab(tab, bar) == where)
+    assert tab._settings_scroll.verticalScrollBar().value() == scrolled
 
 
 def _shown_by_the_tab(view) -> tuple[str, list, tuple[str, str]]:

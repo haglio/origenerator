@@ -1353,9 +1353,12 @@ class GenerateTab(DropZones):
         if exchange is None:
             self._request_aim = None
             return
-        offered = row is not None and self._displayed_config is not None
-        self._param_form.request_section().setVisible(offered)
-        if row is None and being_made is not None and self._launched_runs:
+        making_what_it_launched = row is None and being_made is not None and bool(
+            self._launched_runs)
+        self._param_form.request_section().setVisible(
+            self._request_aim is not None if making_what_it_launched
+            else row is not None and self._displayed_config is not None)
+        if making_what_it_launched:
             return
         row = row or being_made
         if row is None:

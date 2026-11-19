@@ -21,11 +21,9 @@ from PySide6.QtWidgets import (
 )
 
 from origenerator import (
-    gallery,
     osr2_driver,
 )
 from origenerator.comfyui_client import ComfyUIClient
-from origenerator.gui import generate_tab as generate_tab_module
 from origenerator.gui import (
     omnipause,
 )
@@ -35,10 +33,10 @@ from tests import gestures
 from tests.closed_windows import is_closed
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import (
-    _REROLL_HISTORY,
     FakeActions,
     _a_slideshow_standing_on_its_own,
     _aim_slideshow,
+    _comfyui_finishes,
     _double_click_slideshow,
     _FakeRadio,
     _generating_tile,
@@ -401,20 +399,19 @@ def test_a_double_click_plays_the_visible_folder_in_its_own_order(qtbot, monkeyp
 
 
 def test_a_double_click_while_populate_runs_opens_on_the_shown_image_alone(
-        qtbot, tmp_path, monkeypatch):
-    def by_id(row, places):
-        return (f"{row['prompt_id']}.png", "image")
-    monkeypatch.setattr(gallery, "resolve_preview", by_id)
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", by_id)
+        qtbot, tmp_path):
     client = _reroll_client()
-    view = GalleryView(_seeded_db(tmp_path), client=client)
+    db = _seeded_db(tmp_path)
+    keep_on_disk(db)
+    view = GalleryView(db, client=client)
     qtbot.addWidget(view)
     view.refresh()
     key = _select_first_leaf(view)
     view._buttons.populate.click()
     _generating_tile(view).selected.emit()
-    landed = view._live_jobs[key].prompt_id
-    client.job_completed.emit(landed, _REROLL_HISTORY)
+    job = view._live_jobs[key]
+    landed = job.prompt_id
+    _comfyui_finishes(client, job)
 
     slideshow = _viewport_of(view).open_fullscreen()
     qtbot.addWidget(slideshow.shown)

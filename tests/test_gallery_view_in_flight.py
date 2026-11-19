@@ -33,7 +33,6 @@ from origenerator.gallery.collection import (
 from origenerator.gallery_edits import GalleryEdits
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import gallery_view as gallery_view_module
-from origenerator.gui import generate_tab as generate_tab_module
 from origenerator.gui.combine import CombineRequest
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.hud_queue import queue_section
@@ -54,6 +53,7 @@ from tests.gallery_view_support import (
     _at,
     _collection,
     _combine_db,
+    _comfyui_finishes,
     _double_click_slideshow,
     _enhanceable_db,
     _FakeRerollJob,
@@ -83,7 +83,7 @@ from tests.gallery_view_support import (
     _viewport_of,
 )
 from tests.qt_exec import faking_exec
-from tests.real_db import database_of, keep_rows_on_disk, put_rows
+from tests.real_db import database_of, keep_on_disk, keep_rows_on_disk, put_rows
 from tests.slideshow_hud_support import engine_of, funestra_of
 
 _IMG_REROLL_HISTORY = {"outputs": {"7": {"images": [
@@ -571,7 +571,7 @@ def _a_streaming_run_listed_in_flight(view, client):
 
 
 def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
-        qtbot, tmp_path, monkeypatch):
+        qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
     qtbot.addWidget(view)
@@ -589,14 +589,7 @@ def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
     client.preview_image.emit(job.prompt_id, buf.getvalue())
     assert engine_of(win.shown).on_screen.read_bytes() == buf.getvalue()
 
-    done = tmp_path / "done.png"
-    Image.new("RGB", (8, 8), (10, 120, 200)).save(done, "PNG")
-    def landed(row, places):
-        return (done, "image") if row["prompt_id"] == job.prompt_id else None
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", landed)
-    monkeypatch.setattr(gallery, "resolve_preview", landed)
-
-    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
+    done = _comfyui_finishes(client, job)
     win.tick()
     win.tick()
 
@@ -606,13 +599,11 @@ def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
 
 
 def test_a_run_watched_fullscreen_lands_as_its_generation_among_its_folder(
-        qtbot, tmp_path, monkeypatch):
-    def by_id(row, places):
-        return (f"{row['prompt_id']}.png", "image")
-    monkeypatch.setattr(gallery, "resolve_preview", by_id)
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", by_id)
+        qtbot, tmp_path):
     client = _reroll_client()
-    view = GalleryView(_seeded_db(tmp_path), client=client)
+    db = _seeded_db(tmp_path)
+    keep_on_disk(db)
+    view = GalleryView(db, client=client)
     qtbot.addWidget(view)
     view.refresh()
     _key, job = _a_streaming_run_listed_in_flight(view, client)
@@ -620,7 +611,7 @@ def test_a_run_watched_fullscreen_lands_as_its_generation_among_its_folder(
     qtbot.addWidget(slideshow.shown)
     funestra_of(slideshow.shown)
 
-    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
+    _comfyui_finishes(client, job)
 
     assert [slide.prompt_id for slide in slideshow._set.playlist.in_play_order()] == \
         view.listed_prompt_ids()

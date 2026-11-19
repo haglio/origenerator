@@ -1,8 +1,10 @@
 import _winapi
+import os
 from pathlib import Path
 
 from origenerator import config, output_places
 from origenerator.output_places import OutputPlaces
+from tests.comfyui_folders import SUITE_FOLDERS
 
 
 def test_a_record_kept_in_one_folder_names_its_file_under_that_folder(tmp_path):
@@ -163,3 +165,10 @@ def test_the_places_keep_the_video_library_they_are_told_of_wherever_the_outputs
     for settings in ({}, _library(tmp_path)):
         places = OutputPlaces.from_settings(settings, comfyui_dir=tmp_path / "ComfyUI", library=library)
         assert places.library == library
+
+
+def test_the_suites_comfyui_saves_in_the_suites_own_folder_where_the_gallery_looks():
+    suites_own = Path(os.environ["ORIGENERATOR_STATE_DIR"])
+
+    assert suites_own in config.OUTPUT_PLACES.comfyui.parents
+    assert SUITE_FOLDERS.places == config.OUTPUT_PLACES

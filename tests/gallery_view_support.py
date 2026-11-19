@@ -430,6 +430,16 @@ def _reroll_client():
     return client
 
 
+def _comfyui_finishes(client, job):
+    saved = OUTPUT_PLACES.run(job.prompt_id) / "image" / f"{job.prompt_id}_00001_.png"
+    saved.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (8, 8), (10, 120, 200)).save(saved, "PNG")
+    client.job_completed.emit(job.prompt_id, {"outputs": {"7": {"images": [{
+        "filename": saved.name, "type": "output",
+        "subfolder": saved.parent.relative_to(OUTPUT_PLACES.comfyui).as_posix()}]}}})
+    return OUTPUT_PLACES.folder("image") / saved.name
+
+
 def _png_bytes() -> bytes:
     buf = BytesIO()
     Image.new("RGB", (8, 8), (10, 120, 200)).save(buf, "PNG")

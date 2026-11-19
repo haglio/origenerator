@@ -487,6 +487,40 @@ def test_switching_workflow_detaches_the_old_form_at_once(tab):
     assert live == [tab._param_form]
 
 
+def _disk_questions_while(act) -> int:
+    asked = []
+    with pytest.MonkeyPatch.context() as counting:
+        for module, name in ((os, "stat"), (os.path, "isfile")):
+            real = getattr(module, name)
+
+            def counted(*args, real=real, **kwargs):
+                asked.append(real)
+                return real(*args, **kwargs)
+            counting.setattr(module, name, counted)
+        act()
+    return len(asked)
+
+
+def test_switching_workflows_asks_the_disk_no_more_however_many_loras_are_installed(
+        blank_panel, installed_models):
+    tab = blank_panel
+    installed = 0
+
+    def switches_after_installing(count: int) -> int:
+        nonlocal installed
+        for number in range(installed, installed + count):
+            installed_models.add("loras", f"example_look_{number}.safetensors", arch="sdxl", lora=True)
+        installed += count
+
+        def switch_back_and_forth():
+            for workflow in ("krea2_t2i", "sdxl_t2i"):
+                tab._workflow_dropdown.setCurrentIndex(_dropdown_index(tab, workflow))
+        switch_back_and_forth()
+        return _disk_questions_while(switch_back_and_forth)
+
+    assert switches_after_installing(2) == switches_after_installing(12)
+
+
 def test_switching_workflow_carries_over_the_users_edits(blank_panel):
     tab = blank_panel
     tab._workflow_dropdown.setCurrentIndex(_dropdown_index(tab, "wan22_flf2v_loop"))

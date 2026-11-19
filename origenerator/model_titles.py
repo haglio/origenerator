@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 from app_support.comfy_file_refs import reference_basename
 
 from origenerator import config, precision, title_words
-from origenerator.one_look import once_a_look
+from origenerator.one_look import is_file, once_a_look, stat_of
 from origenerator.precision import Precision
 from origenerator.what_from_what import kind_first
 from origenerator.workflows.model_arch import describe, safetensors_metadata
@@ -88,7 +88,7 @@ def model_help(value) -> str:
         kept_by_stem(config.MODEL_DESCRIPTIONS_PATH).get(model_stem(value)),
         *title_words.explained(title),
         size and size.explained,
-        size and installed and precision.file_size_sentence(installed.stat().st_size))))
+        size and installed and precision.file_size_sentence(stat_of(installed).st_size))))
 
 
 @once_a_look
@@ -135,7 +135,7 @@ def _notes_of(title: str) -> tuple[str, list[str], list[str]]:
 def _installed(value) -> Path | None:
     for folder in _FOLDERS_SHOWN_BY_TITLE:
         path = config.COMFYUI_DIR / "models" / folder / str(value)
-        if path.is_file():
+        if is_file(path):
             return path
     return None
 
@@ -182,15 +182,25 @@ def _dated_fix_rank(part: str, stem: str) -> int:
 
 
 def kept_by_stem(path) -> dict:
+    stamp = _written(str(path))
+    if stamp is None:
+        return {}
     try:
-        stat = path.stat()
-        stamp = (stat.st_mtime_ns, stat.st_size)
         kept = _read.get(str(path))
         if kept is None or kept[0] != stamp:
             kept = _read[str(path)] = (stamp, json.loads(path.read_text(encoding="utf-8")))
     except (OSError, ValueError):
         return {}
     return kept[1] if isinstance(kept[1], dict) else {}
+
+
+@once_a_look
+def _written(path: str) -> tuple[int, int] | None:
+    try:
+        stat = Path(path).stat()
+    except OSError:
+        return None
+    return stat.st_mtime_ns, stat.st_size
 
 
 def write_kept(path, entries: dict) -> None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 
 import numpy as np
-from funestra.hud import load_font, text_width
+from funestra.hud import HUD_ALPHA, Hud, load_font, text_width
 from funestra.satellite_hud import ELLIPSIS, WORD_PAD, map_block_width
 from PIL import Image
 from shared_ui.palette import RED
@@ -671,3 +671,17 @@ def test_a_rows_cancel_pads_its_word_as_every_hud_word_button_does():
 
     (_x, _y, width, _h), cancel = next((rect, b) for rect, b in targets if b.command == f"{CANCEL}|j1")
     assert width == text_width(load_font(SIZE_TINY), cancel.icon) + 2 * WORD_PAD
+
+
+def test_nothing_the_job_queue_draws_lets_the_slideshow_show_through_the_hud(tmp_path):
+    not_yet_made = tmp_path / "not yet made.png"
+    section = queue_section([_item("j1", status="running", progress=(3, 10),
+                                   pass_progress=(1, 4)),
+                             _item("j2", folder_thumbnails=[not_yet_made] * 4)], 0)
+    hud = Hud(440, section.size()[1] + 20)
+    section.paint(hud.image, 10, 10, 400, None)
+
+    inside = np.asarray(hud.image)[2:-2, 2:-2, 3]
+    assert inside.min() >= HUD_ALPHA, (
+        "the empty thumbnails and the progress bar are laid over the HUD, never cut into it, "
+        "so the slideshow's item never shows through them")

@@ -13,8 +13,8 @@ class Section:
     collapsed: bool
 
 
-WORKFLOW_TITLE = "Workflow, Models & LoRAs"
-PROMPTS_TITLE = "Prompts & Seed"
+WORKFLOW_TITLE = "Workflow, models & LoRAs"
+PROMPTS_TITLE = "Prompts & seed"
 
 SECTIONS: tuple[Section, ...] = (
     Section(PROMPTS_TITLE, ("positive_prompt", "scene_frames", "scene_lines",

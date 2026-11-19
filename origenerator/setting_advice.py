@@ -43,8 +43,8 @@ _LORA_GROUPS = {
     FIRST_PASS_LORA_KEYS: "Good range while another LoRA is picked for this pass",
     SECOND_PASS_LORA_KEYS: "Good range while another LoRA is picked for this pass",
 }
-STRENGTH_BELOW_ONE = ("Below 1 the Negative Prompt works backwards: what you get is pulled toward "
-                      "what it names, and at 0 the Positive Prompt is ignored altogether.")
+STRENGTH_BELOW_ONE = ("Below 1 the Negative prompt works backwards: what you get is pulled toward "
+                      "what it names, and at 0 the Positive prompt is ignored altogether.")
 _LONGEST_TRIGGER_WORD_IN_WORDS = 5
 NOT_INSTALLED = "Not installed anymore, so nothing can be made with it."
 
@@ -115,9 +115,9 @@ class MissingTriggerWords(NamedTuple):
     def said(self) -> str:
         if len(self.words) == 1:
             return (f"{self.value_shown}'s trigger word, {self.words[0]}, isn't in the "
-                    "Positive Prompt. Click to add it.")
+                    "Positive prompt. Click to add it.")
         return (f"{self.value_shown}'s trigger words, {spoken_list(self.words, 'and')}, aren't in "
-                f"the Positive Prompt. Click to add {self.words[0]}.")
+                f"the Positive prompt. Click to add {self.words[0]}.")
 
     def fixed(self, prompt: str) -> str:
         return with_trigger_word(prompt, self.words, in_scenes=self.in_scenes)

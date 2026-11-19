@@ -206,7 +206,7 @@ def test_generate_says_it_draws_a_random_seed_for_a_video_on_its_own_start_image
 
     combine.video_zone.set_item("vid1")
 
-    assert combine._generate_btn.text() == "Generate with Random seed"
+    assert combine._generate_btn.text() == "Generate with random seed"
 
 
 def test_generate_stays_plain_for_a_video_on_another_image(qtbot):

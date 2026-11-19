@@ -70,9 +70,9 @@ class MiniMaxH3I2vWorkflow(WorkflowTemplate):
         defaults = self.default_params()
         rates = rate_options(H3_FPS)
         return [
-            ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
-            ParamDef("input_image", "Start Image", ParamType.IMAGE, defaults["input_image"]),
-            ParamDef("enable_audio", "Enable Audio", ParamType.BOOL, defaults["enable_audio"], switch=True),
+            ParamDef("positive_prompt", "Positive prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
+            ParamDef("input_image", "Start image", ParamType.IMAGE, defaults["input_image"]),
+            ParamDef("enable_audio", "Enable audio", ParamType.BOOL, defaults["enable_audio"], switch=True),
             ParamDef("noise_seed", "Seed", ParamType.SEED, defaults["noise_seed"]),
             ParamDef("frame_count", "Duration", ParamType.INT, defaults["frame_count"], min_val=_FIRST_FRAMES,
                      max_val=_LONGEST_FRAMES, step=_FRAMES_PER_STEP, options=DURATION_OPTIONS,
@@ -80,7 +80,7 @@ class MiniMaxH3I2vWorkflow(WorkflowTemplate):
             ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=100, good=(6, 20)),
             model_dropdown("unet", "Model", defaults["unet"], "diffusion_models", accepts=(MINIMAX_H3,)),
             *lora_rows(defaults, LORA_KEYS, accepts=(MINIMAX_H3,)),
-            ParamDef("frame_rate", "Frame Rate", ParamType.FLOAT, defaults["frame_rate"],
+            ParamDef("frame_rate", "Frame rate", ParamType.FLOAT, defaults["frame_rate"],
                      min_val=H3_FPS, max_val=min(MAX_PLAYBACK_FPS, max(rates)), step=H3_FPS,
                      options=rates, unit="fps"),
         ]

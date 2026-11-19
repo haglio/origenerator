@@ -115,9 +115,9 @@ def test_a_form_offers_three_loras_each_on_none_above_its_own_strength(name):
             for pd in WORKFLOW_REGISTRY[name].param_definitions() if pd.key.startswith("lora")]
 
     assert rows == [
-        ("lora", "LoRA 1", "None", None), ("lora_strength", "LoRA Strength 1", 1.0, (0.6, 1.2)),
-        ("lora_2", "LoRA 2", "None", None), ("lora_strength_2", "LoRA Strength 2", 1.0, (0.6, 1.2)),
-        ("lora_3", "LoRA 3", "None", None), ("lora_strength_3", "LoRA Strength 3", 1.0, (0.6, 1.2)),
+        ("lora", "LoRA 1", "None", None), ("lora_strength", "LoRA strength 1", 1.0, (0.6, 1.2)),
+        ("lora_2", "LoRA 2", "None", None), ("lora_strength_2", "LoRA strength 2", 1.0, (0.6, 1.2)),
+        ("lora_3", "LoRA 3", "None", None), ("lora_strength_3", "LoRA strength 3", 1.0, (0.6, 1.2)),
     ]
 
 
@@ -142,18 +142,18 @@ def test_a_two_pass_form_offers_three_loras_for_each_pass_the_first_pass_first(n
             for pd in workflow.param_definitions() if pd.key.startswith("lora")]
 
     assert rows == [
-        ("lora_high", "LoRA 1 (First Pass)", defaults["lora_high"]),
-        ("lora_strength_high", "LoRA Strength 1 (First Pass)", 1.0),
-        ("lora_high_2", "LoRA 2 (First Pass)", "None"),
-        ("lora_strength_high_2", "LoRA Strength 2 (First Pass)", 1.0),
-        ("lora_high_3", "LoRA 3 (First Pass)", "None"),
-        ("lora_strength_high_3", "LoRA Strength 3 (First Pass)", 1.0),
-        ("lora_low", "LoRA 1 (Second Pass)", defaults["lora_low"]),
-        ("lora_strength_low", "LoRA Strength 1 (Second Pass)", 1.0),
-        ("lora_low_2", "LoRA 2 (Second Pass)", "None"),
-        ("lora_strength_low_2", "LoRA Strength 2 (Second Pass)", 1.0),
-        ("lora_low_3", "LoRA 3 (Second Pass)", "None"),
-        ("lora_strength_low_3", "LoRA Strength 3 (Second Pass)", 1.0),
+        ("lora_high", "LoRA 1 (first pass)", defaults["lora_high"]),
+        ("lora_strength_high", "LoRA strength 1 (first pass)", 1.0),
+        ("lora_high_2", "LoRA 2 (first pass)", "None"),
+        ("lora_strength_high_2", "LoRA strength 2 (first pass)", 1.0),
+        ("lora_high_3", "LoRA 3 (first pass)", "None"),
+        ("lora_strength_high_3", "LoRA strength 3 (first pass)", 1.0),
+        ("lora_low", "LoRA 1 (second pass)", defaults["lora_low"]),
+        ("lora_strength_low", "LoRA strength 1 (second pass)", 1.0),
+        ("lora_low_2", "LoRA 2 (second pass)", "None"),
+        ("lora_strength_low_2", "LoRA strength 2 (second pass)", 1.0),
+        ("lora_low_3", "LoRA 3 (second pass)", "None"),
+        ("lora_strength_low_3", "LoRA strength 3 (second pass)", 1.0),
     ]
 
 

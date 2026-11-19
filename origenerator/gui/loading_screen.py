@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 __all__ = ["CANCEL_HINT", "CAPTION", "Loading", "LoadingCanceled", "loading_screen"]
 
-CAPTION = "Origenerator Loading"
+CAPTION = "Origenerator loading"
 CANCEL_HINT = "Press Esc to cancel opening Origenerator"
 
 

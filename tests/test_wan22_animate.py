@@ -244,7 +244,7 @@ def test_a_video_with_no_script_leaves_the_script_to_the_metronome(tmp_path, mon
 
 def test_a_run_with_no_video_picked_has_nothing_to_start_from():
     wf = Wan22AnimateWorkflow()
-    assert wf.missing_inputs(_params(video="")) == ["Video to Perform"]
+    assert wf.missing_inputs(_params(video="")) == ["Video to perform"]
     assert wf.missing_inputs(_params(input_image="")) == ["Image"]
     assert wf.missing_inputs(_params()) == []
 

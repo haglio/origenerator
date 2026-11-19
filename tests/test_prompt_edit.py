@@ -170,9 +170,9 @@ def test_a_revision_carries_the_prompts_it_started_from():
 
 @pytest.mark.parametrize(("positive", "negative", "asked", "said"), [
     ("a woman, freckles", "blurry", "no freckles", "Took out freckles."),
-    ("a woman", "blurry, freckles", "no freckles", "Made freckles stronger in the Negative Prompt."),
-    ("a woman", "blurry", "no freckles", "Added freckles to the Negative Prompt."),
-    ("a woman", "blurry, freckles", "freckles", "Took freckles out of the Negative Prompt."),
+    ("a woman", "blurry, freckles", "no freckles", "Made freckles stronger in the Negative prompt."),
+    ("a woman", "blurry", "no freckles", "Added freckles to the Negative prompt."),
+    ("a woman", "blurry, freckles", "freckles", "Took freckles out of the Negative prompt."),
     ("a woman, freckles", "blurry", "freckles", "Made freckles stronger."),
     ("a woman", "blurry", "freckles", "Added freckles."),
 ])
@@ -541,7 +541,7 @@ def test_a_field_the_model_leaves_out_is_read_as_unchanged_or_unsaid():
 
 
 _SETTINGS_TOLD = request_settings.settings_to_tell(
-    [ParamDef("lora_strength", "LoRA Strength", ParamType.FLOAT, 0.8, min_val=0.0, max_val=2.0),
+    [ParamDef("lora_strength", "LoRA strength", ParamType.FLOAT, 0.8, min_val=0.0, max_val=2.0),
      ParamDef("steps", "Steps", ParamType.INT, 50, min_val=1, max_val=200)],
     {"lora_strength": 0.8, "steps": 50})
 
@@ -551,7 +551,7 @@ def test_the_messages_list_the_settings_he_may_change_and_ask_for_them_in_the_an
                                      WhatIsKnown(settings=_SETTINGS_TOLD), "S")[1]["content"]
 
     assert "SETTINGS HE MAY ALSO CHANGE" in content
-    assert "LoRA Strength [lora_strength]: 0.8, a number from 0.0 to 2.0" in content
+    assert "LoRA strength [lora_strength]: 0.8, a number from 0.0 to 2.0" in content
     assert content.index("SETTINGS HE MAY") < content.index("CURRENT POSITIVE PROMPT")
     assert '"settings"' in content.rsplit("\n\n", 1)[1]
 
@@ -571,7 +571,7 @@ def test_a_request_about_a_setting_changes_it_within_its_range_and_leaves_the_pr
     assert revision.changed
     assert (revision.positive, revision.negative) == ("a woman", "blurry")
     assert revision.settings == (("lora_strength", 2.0),)
-    assert revision.setting_changes == (("LoRA Strength", "0.8", "2.0"),)
+    assert revision.setting_changes == (("LoRA strength", "0.8", "2.0"),)
     assert revision.answer == "Turned the LoRA up."
 
 

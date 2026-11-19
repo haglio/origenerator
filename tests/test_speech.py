@@ -74,7 +74,7 @@ def test_the_voice_is_a_preset_unless_the_custom_one_is_chosen():
 
 def test_a_custom_voice_without_a_recording_is_a_plain_error(tmp_path):
     run, _ = _speaking_run(tmp_path)
-    with pytest.raises(SpeechError, match="Voice Sample names no file"):
+    with pytest.raises(SpeechError, match="Voice sample names no file"):
         speech.ensure_speech_files(_params(scene_lines=["hi"], voice=speech.CUSTOM_VOICE),
                                    input_dir=tmp_path, python=Path("py"), run=run)
     with pytest.raises(SpeechError, match="not a file"):

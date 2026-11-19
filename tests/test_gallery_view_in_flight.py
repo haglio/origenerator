@@ -2165,7 +2165,7 @@ def test_a_landed_generation_tells_an_open_tab_its_seed_is_now_a_duplicate(qtbot
         [{"filename": "sdxl_done.png", "subfolder": ""}]))
     view.refresh()
 
-    qtbot.waitUntil(lambda: tab._generate_btn.text() == "Generate with Random seed")
+    qtbot.waitUntil(lambda: tab._generate_btn.text() == "Generate with random seed")
 
 
 def test_the_random_seed_survives_a_cancel_so_re_generate_is_another_variation(
@@ -2508,8 +2508,8 @@ def test_cancel_all_asks_about_the_jobs_it_would_cancel(qtbot, monkeypatch):
                  [_cancelable("a", [])]):
         _view_holding(qtbot, monkeypatch, held).job_queue.view._cancel_all.click()
 
-    assert asked == [("Cancel All", "Cancel all 2 jobs in the Job Queue?"),
-                     ("Cancel All", "Cancel the job in the Job Queue?")]
+    assert asked == [("Cancel all", "Cancel all 2 jobs in the Job Queue?"),
+                     ("Cancel all", "Cancel the job in the Job Queue?")]
 
 
 def _right_click_row(view, key, monkeypatch, pick="Cancel All Below"):
@@ -2610,7 +2610,7 @@ def test_cancel_all_leaves_populate_on_to_start_its_next_seed(
     view.job_queue.view._cancel_all.click()
 
     assert view._populate.is_active(key), (
-        "the user's call: Cancel All does not switch Populate off")
+        "the user's call: Cancel all does not switch Populate off")
     (next_seed,) = view._jobs.all_jobs
     assert next_seed.prompt_id != job.prompt_id
 

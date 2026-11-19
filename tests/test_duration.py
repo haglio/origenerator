@@ -37,7 +37,7 @@ def test_a_clip_cut_short_by_the_model_reads_back_at_its_real_length():
 
 
 def test_a_frame_rate_between_two_native_multiples_lands_where_the_graph_puts_it():
-    rate_grid = ParamDef("frame_rate", "Frame Rate", "int", 16, min_val=NATIVE_FPS, max_val=64, step=NATIVE_FPS)
+    rate_grid = ParamDef("frame_rate", "Frame rate", "int", 16, min_val=NATIVE_FPS, max_val=64, step=NATIVE_FPS)
 
     for rate in (20, 24, 28, 40):
         assert on_grid(rate, rate_grid) == playback_rate(rate)

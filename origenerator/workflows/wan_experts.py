@@ -18,22 +18,22 @@ def wan_expert_lora_defaults() -> dict:
 
 def wan_expert_model_params(defaults: dict, accepts=(WAN,)) -> list[ParamDef]:
     return [
-        model_dropdown("unet_high", "Model (First Pass)", defaults["unet_high"],
+        model_dropdown("unet_high", "Model (first pass)", defaults["unet_high"],
                      "diffusion_models", accepts=accepts, expert="high"),
-        model_dropdown("unet_low", "Model (Second Pass)", defaults["unet_low"],
+        model_dropdown("unet_low", "Model (second pass)", defaults["unet_low"],
                      "diffusion_models", accepts=accepts, expert="low"),
     ]
 
 
 def wan_expert_shift_param(defaults: dict) -> ParamDef:
-    return ParamDef("shift_high", "Composition Focus", ParamType.FLOAT, defaults["shift_high"],
+    return ParamDef("shift_high", "Composition focus", ParamType.FLOAT, defaults["shift_high"],
                     min_val=0.0, max_val=20.0, step=0.5, also_sets=("shift_low",), good=(5, 12))
 
 
 def wan_expert_lora_params(defaults: dict, accepts=(WAN, WAN_I2V)) -> list[ParamDef]:
     return [
         *lora_rows(defaults, FIRST_PASS_LORA_KEYS, accepts=accepts, expert="high",
-                   qualifier=" (First Pass)"),
+                   qualifier=" (first pass)"),
         *lora_rows(defaults, SECOND_PASS_LORA_KEYS, accepts=accepts, expert="low",
-                   qualifier=" (Second Pass)"),
+                   qualifier=" (second pass)"),
     ]

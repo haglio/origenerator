@@ -19,7 +19,7 @@ from origenerator.own_window import show_or_say, still_open
 
 ACTION_LABEL = "Action"
 ACTIONS_LABEL = "Actions"
-SIDE_LABELS = {MediaType.IMAGE: "Image Actions", MediaType.VIDEO: "Video Actions"}
+SIDE_LABELS = {MediaType.IMAGE: "Image actions", MediaType.VIDEO: "Video actions"}
 ADD = "Add with setter tool…"
 EDIT = "Edit with setter tool…"
 

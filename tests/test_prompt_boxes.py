@@ -411,7 +411,7 @@ def test_every_box_shares_the_prompts_dragged_height_a_small_gap_apart(qtbot):
 
 
 def _form_with_a_prompt(qtbot) -> ParamForm:
-    form = ParamForm([ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True)])
+    form = ParamForm([ParamDef("positive_prompt", "Positive prompt", "str", "", multiline=True)])
     qtbot.addWidget(form)
     form.show_readings({"positive_prompt": word_reading(3, READ_IN_PIECES)})
     return form

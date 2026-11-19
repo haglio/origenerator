@@ -82,7 +82,7 @@ def test_a_form_with_a_prompt_has_a_request_section_right_after_its_prompts(qtbo
     qtbot.addWidget(form)
 
     titles = _section_titles(form)
-    assert titles[titles.index("Prompts & Seed") + 1] == "Request"
+    assert titles[titles.index("Prompts & seed") + 1] == "Request"
     assert form.request_exchange() is not None
 
 
@@ -107,14 +107,14 @@ def test_prompts_a_request_rewrites_show_their_whole_change_at_once(qtbot):
 
 
 def test_field_labels_fit_the_heading_font(qtbot):
-    label_text = "LoRA Strength (High)"
+    label_text = "LoRA strength (High)"
     form = ParamForm([
         ParamDef("lora_strength_high", label_text, "float", 1.0,
                  min_val=0.0, max_val=2.0, step=0.05),
     ])
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
     qtbot.addWidget(form)
-    form._sections["Workflow, Models & LoRAs"].set_collapsed(False)
+    form._sections["Workflow, models & LoRAs"].set_collapsed(False)
     with qtbot.waitExposed(form):
         form.show()
     form.resize(600, form.height())
@@ -126,7 +126,7 @@ def test_field_labels_fit_the_heading_font(qtbot):
 
 
 def test_browse_button_fits_its_caption(qtbot):
-    form = ParamForm([ParamDef("voice_sample", "Voice Sample", "audio", "")])
+    form = ParamForm([ParamDef("voice_sample", "Voice sample", "audio", "")])
     form.setStyleSheet(build_stylesheet())
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
     qtbot.addWidget(form)
@@ -183,7 +183,7 @@ def test_seed_field_has_a_copy_button_that_copies_its_value(qtbot):
 def test_prompt_copy_button_reads_the_live_edited_text(qtbot):
     QApplication.clipboard().clear()
     form = ParamForm([
-        ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
+        ParamDef("positive_prompt", "Positive prompt", "str", "", multiline=True),
     ])
     qtbot.addWidget(form)
     form._widgets["positive_prompt"].boxes()[0].setPlainText("a red fox in snow")
@@ -195,7 +195,7 @@ def test_prompt_copy_button_reads_the_live_edited_text(qtbot):
 
 def test_prompt_fields_are_draggable_and_filed_under_their_param(qtbot):
     form = ParamForm([
-        ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
+        ParamDef("positive_prompt", "Positive prompt", "str", "", multiline=True),
         ParamDef("name", "Name", "str", ""),
     ])
     qtbot.addWidget(form)
@@ -210,7 +210,7 @@ def test_a_form_hands_its_own_heights_on_to_its_prompt_fields(qtbot):
     mine = PromptHeights()
     mine.set_height("positive_prompt", 260)
 
-    form = ParamForm([ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True)],
+    form = ParamForm([ParamDef("positive_prompt", "Positive prompt", "str", "", multiline=True)],
                      helpers=FormHelpers(heights=mine))
     qtbot.addWidget(form)
     (box,) = form._widgets["positive_prompt"].boxes()
@@ -547,7 +547,7 @@ def test_the_closed_seed_shows_a_blank_of_the_tabs_shape_for_a_seed_nothing_made
 
 def test_the_derived_size_follows_the_field_the_workflow_sizes_itself_off(qtbot):
     form = ParamForm([ParamDef("input_image", "Image", "image", ""),
-                      ParamDef("video", "Video to Perform", "video", "")], WorkflowTraits(size_deriver=lambda values: (864, 480) if values.get("video") else None,
+                      ParamDef("video", "Video to perform", "video", "")], WorkflowTraits(size_deriver=lambda values: (864, 480) if values.get("video") else None,
                      size_source="video"))
     qtbot.addWidget(form)
     assert form._dim_value_labels["width"].text() == "—"
@@ -559,7 +559,7 @@ def test_the_derived_size_follows_the_field_the_workflow_sizes_itself_off(qtbot)
 
 
 def test_the_closed_seed_takes_the_start_images_shape_the_moment_it_is_picked(qtbot):
-    form = ParamForm([ParamDef("input_image", "Start Image", "image", ""),
+    form = ParamForm([ParamDef("input_image", "Start image", "image", ""),
                       ParamDef("seed", "Seed", "seed", 0)], WorkflowTraits(size_deriver=lambda values: (400, 800) if values.get("input_image") else None))
     qtbot.addWidget(form)
 
@@ -819,7 +819,7 @@ def test_swapping_dimensions_emits_changed(qtbot):
 
 def test_swap_button_sits_between_the_rows_and_left_of_the_labels(qtbot):
     form = ParamForm([
-        ParamDef("prompt", "Positive Prompt", "str", "", multiline=True),
+        ParamDef("prompt", "Positive prompt", "str", "", multiline=True),
         *_dimension_defs(),
     ])
     form.setFont(make_font(FONT_UI, SIZE_HEADING))
@@ -865,7 +865,7 @@ def test_locked_dimensions_render_as_plain_values_not_input_fields(qtbot):
 
 
 def test_a_derived_size_names_the_image_it_is_read_from_as_the_form_does(qtbot):
-    form = ParamForm([ParamDef("input_image", "Start Image", "image", "")], WorkflowTraits(size_deriver=lambda params: None))
+    form = ParamForm([ParamDef("input_image", "Start image", "image", "")], WorkflowTraits(size_deriver=lambda params: None))
     qtbot.addWidget(form)
 
     assert form._dimensions_hint.text() == "Sized from the start image. Unlock to override."
@@ -1084,18 +1084,18 @@ def test_a_float_field_keeps_the_second_decimal_place(qtbot, sample_defs):
 @pytest.mark.parametrize(("pd", "written", "read_back"), [
     (ParamDef("enhance", "Enhance", "bool", True), False, False),
     (ParamDef("name", "Name", "str", ""), "a made-up name", "a made-up name"),
-    (ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
+    (ParamDef("positive_prompt", "Positive prompt", "str", "", multiline=True),
      "a lighthouse\nat dusk", "a lighthouse\nat dusk"),
     (ParamDef("seed", "Seed", "seed", 0), 680387713615965, 680387713615965),
     (ParamDef("steps", "Steps", "int", 20, min_val=1, max_val=200), 42, 42),
     (ParamDef("cfg", "CFG", "float", 7.5, min_val=0.0, max_val=30.0, step=0.5), 0.85, 0.85),
     (ParamDef("sampler", "Sampler", "dropdown", "euler", options=["euler", "dpm"]), "dpm", "dpm"),
     (ParamDef("input_image", "Input Image", "image", ""), "  frame.png ", "frame.png"),
-    (ParamDef("voice_sample", "Voice Sample", "audio", ""), " sample.wav ", "sample.wav"),
-    (ParamDef("video", "Video to Perform", "video", ""), " scene one.mp4 ", "scene one.mp4"),
+    (ParamDef("voice_sample", "Voice sample", "audio", ""), " sample.wav ", "sample.wav"),
+    (ParamDef("video", "Video to perform", "video", ""), " scene one.mp4 ", "scene one.mp4"),
     (ParamDef("width", "Width", "int", 512, min_val=64, max_val=2048, step=64,
               options=[512, 768]), 768.0, 768),
-    (ParamDef("frame_rate", "Frame Rate", "float", 24.0, min_val=1.0, max_val=120.0,
+    (ParamDef("frame_rate", "Frame rate", "float", 24.0, min_val=1.0, max_val=120.0,
               step=1.0, options=[16, 24, 60], unit="fps"), 60, 60.0),
     (ParamDef("frame_count", "Duration", "int", 81, min_val=5, max_val=161, step=4,
               options=[1, 5, 10], unit="s", shown_in_seconds_at=16.0), 21, 21),
@@ -1276,7 +1276,7 @@ def test_param_form_browse_opens_in_the_folder_the_param_names(qtbot, monkeypatc
     _stub_file_dialog(monkeypatch, "", captured)
 
     form = ParamForm(
-        [ParamDef("input_image", "Structure Image", "image", "", browse_dir=poses)]
+        [ParamDef("input_image", "Structure image", "image", "", browse_dir=poses)]
     )
     qtbot.addWidget(form)
     _browse_the_zone(form, "input_image")
@@ -1291,7 +1291,7 @@ def test_param_form_browse_falls_back_when_the_named_folder_is_absent(
     _stub_file_dialog(monkeypatch, "", captured)
 
     form = ParamForm([
-        ParamDef("input_image", "Structure Image", "image", "",
+        ParamDef("input_image", "Structure image", "image", "",
                  browse_dir=tmp_path / "not_installed"),
     ])
     qtbot.addWidget(form)
@@ -1303,12 +1303,12 @@ def test_param_form_browse_falls_back_when_the_named_folder_is_absent(
 def test_the_browse_dialog_is_titled_with_the_fields_own_name(qtbot, monkeypatch):
     captured = {}
     _stub_file_dialog(monkeypatch, "", captured)
-    form = ParamForm([ParamDef("input_image", "Structure Image", "image", "")])
+    form = ParamForm([ParamDef("input_image", "Structure image", "image", "")])
     qtbot.addWidget(form)
 
     _browse_the_zone(form, "input_image")
 
-    assert captured["caption"] == "Select Structure Image"
+    assert captured["caption"] == "Select Structure image"
 
 
 def test_param_form_browse_starts_at_current_image_location(qtbot, monkeypatch, tmp_path):
@@ -1338,14 +1338,14 @@ def test_input_image_value_is_cleaned_of_invisible_wrapping_characters(qtbot):
 
 def test_fields_are_grouped_into_collapsible_sections(qtbot):
     form = ParamForm([
-        ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
+        ParamDef("positive_prompt", "Positive prompt", "str", "", multiline=True),
         ParamDef("seed", "Seed", "seed", 0),
         ParamDef("steps", "Steps", "int", 20),
     ])
     qtbot.addWidget(form)
-    assert isinstance(form._sections["Prompts & Seed"], CollapsibleSection)
-    assert "positive_prompt" in form._present_keys["Prompts & Seed"]
-    assert "seed" in form._present_keys["Prompts & Seed"]
+    assert isinstance(form._sections["Prompts & seed"], CollapsibleSection)
+    assert "positive_prompt" in form._present_keys["Prompts & seed"]
+    assert "seed" in form._present_keys["Prompts & seed"]
     assert "steps" in form._present_keys["Calibration"]
 
 
@@ -1354,16 +1354,16 @@ def test_empty_sections_are_hidden(qtbot):
     qtbot.addWidget(form)
     with qtbot.waitExposed(form):
         form.show()
-    assert form._sections["Prompts & Seed"].isHidden() is False
+    assert form._sections["Prompts & seed"].isHidden() is False
     assert form._sections["Video"].isHidden() is True
 
 
 def test_prompts_seed_and_the_workflow_start_open_the_rest_collapsed(qtbot):
     form = ParamForm(WORKFLOW_REGISTRY["wan22_i2v"].param_definitions())
     qtbot.addWidget(form)
-    assert form._sections["Prompts & Seed"].is_collapsed() is False
-    assert form._sections["Prompts & Seed"].is_collapsed() is False
-    assert form._sections["Workflow, Models & LoRAs"].is_collapsed() is False
+    assert form._sections["Prompts & seed"].is_collapsed() is False
+    assert form._sections["Prompts & seed"].is_collapsed() is False
+    assert form._sections["Workflow, models & LoRAs"].is_collapsed() is False
     assert form._sections["Calibration"].is_collapsed() is True
     assert form._sections["Video"].is_collapsed() is True
     assert form._sections["Audio"].is_collapsed() is True
@@ -1471,11 +1471,11 @@ def test_a_section_with_no_fields_stays_hidden_whatever_a_config_carries_for_it(
     form.set_values({"unet_high": "example_high.safetensors",
                      "unet_low": "example_low.safetensors"})
 
-    assert form._sections["Workflow, Models & LoRAs"].isHidden() is True
+    assert form._sections["Workflow, models & LoRAs"].isHidden() is True
 
 
 def _rate_def(default=24.0):
-    return ParamDef("frame_rate", "Frame Rate", "float", default,
+    return ParamDef("frame_rate", "Frame rate", "float", default,
                     min_val=1.0, max_val=120.0, step=1.0,
                     options=[16, 24, 60], unit="fps")
 
@@ -1516,7 +1516,7 @@ def _video_defs(max_frames=161):
     return [
         ParamDef("frame_count", "Duration", "int", 81, min_val=5, max_val=max_frames,
                  step=4, options=[1, 5, 10], unit="s", shown_in_seconds_at=16.0),
-        ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=16.0, max_val=112.0,
+        ParamDef("frame_rate", "Frame rate", "float", 16.0, min_val=16.0, max_val=112.0,
                  step=16.0, options=[16, 32, 48], unit="fps"),
     ]
 
@@ -1537,7 +1537,7 @@ def test_a_duration_this_model_cannot_render_is_offered_grayed_out(qtbot):
 
 
 def test_a_frame_rate_past_the_fastest_the_writer_takes_is_offered_grayed_out_naming_that_rate(qtbot):
-    form = ParamForm([ParamDef("frame_rate", "Frame Rate", "float", 16.0, min_val=16.0,
+    form = ParamForm([ParamDef("frame_rate", "Frame rate", "float", 16.0, min_val=16.0,
                                max_val=112.0, step=16.0, options=[16, 112, 128], unit="fps")])
     qtbot.addWidget(form)
     rate = form._widgets["frame_rate"]
@@ -1624,8 +1624,8 @@ def test_a_frame_rate_the_interpolator_cannot_reach_settles_onto_one_it_can(qtbo
 
 def _scene_defs():
     return [
-        ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True),
-        ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
+        ParamDef("positive_prompt", "Positive prompt", "str", "", multiline=True),
+        ParamDef("negative_prompt", "Negative prompt", "str", "", multiline=True),
         ParamDef("scene_frames", "Scenes", "scenes", [81], min_val=5, max_val=961, step=4,
                  options=[1, 5, 10, 15, 30, 60], unit="s", shown_in_seconds_at=16.0),
         ParamDef("scene_lines", "Lines", "lines", [""]),
@@ -1645,7 +1645,7 @@ def test_a_story_starts_as_one_scene_whose_length_is_the_videos(qtbot):
     assert len(editor.fields("positive_prompt")) == 1
     assert form.get_values() == {"positive_prompt": "", "negative_prompt": "",
                                  "scene_frames": [81], "scene_lines": [""], "frame_count": 81}
-    assert form._present_keys["Prompts & Seed"] == ["scene_frames"]
+    assert form._present_keys["Prompts & seed"] == ["scene_frames"]
 
 
 def test_a_scene_showing_a_change_is_measured_again_from_the_prompt_it_would_generate(qtbot):
@@ -1827,7 +1827,7 @@ def test_each_box_on_a_tile_says_what_it_is(qtbot):
     qtbot.addWidget(form)
     scene = form._widgets["scene_frames"]._scenes[0]
     captions = {label.text() for label in scene.findChildren(ElidingLabel)}
-    assert {"Positive Prompt", "Negative Prompt", "Her Lines"} <= captions, (
+    assert {"Positive prompt", "Negative prompt", "Her lines"} <= captions, (
         "three boxes in a row say nothing about which is which once they hold text")
     assert scene.fields["negative_prompt"].toolTip() == param_help("negative_prompt")
     assert "spoken" in scene.fields["scene_lines"].placeholderText().lower()
@@ -1844,8 +1844,8 @@ def test_a_scene_with_a_line_shuts_its_prompts_down_and_says_why(qtbot):
 
     scene.fields["scene_lines"].setPlainText("Come in.")
     assert scene.speaking()
-    for key, caption in (("positive_prompt", "Positive Prompt"),
-                         ("negative_prompt", "Negative Prompt")):
+    for key, caption in (("positive_prompt", "Positive prompt"),
+                         ("negative_prompt", "Negative prompt")):
         field = scene.fields[key]
         assert field.isReadOnly()
         assert field.property("inert") is True
@@ -1875,8 +1875,8 @@ def test_clearing_a_scenes_line_gives_its_prompts_back(qtbot):
     scene.fields["scene_lines"].setPlainText("Come in.")
     scene.fields["scene_lines"].setPlainText("   ")
     assert not scene.speaking()
-    for key, caption in (("positive_prompt", "Positive Prompt"),
-                         ("negative_prompt", "Negative Prompt")):
+    for key, caption in (("positive_prompt", "Positive prompt"),
+                         ("negative_prompt", "Negative prompt")):
         assert not scene.fields[key].isReadOnly()
         assert scene.fields[key].property("inert") is False
         assert scene.captions[key].property("inert") is False
@@ -1936,7 +1936,7 @@ def test_a_workflow_that_cannot_speak_shows_no_lines_box(qtbot):
     for scene in editor._scenes:
         assert "scene_lines" not in scene.fields, (
             "a field that nothing reads would be an invitation to type into the void")
-        assert "Her Lines" not in {label.text() for label in scene.findChildren(ElidingLabel)}
+        assert "Her lines" not in {label.text() for label in scene.findChildren(ElidingLabel)}
     assert editor.lines() == []
     assert "scene_lines" not in form.get_values()
 
@@ -1954,8 +1954,8 @@ def test_settings_whose_lone_scene_disagrees_with_the_video_follow_the_video(qtb
 def _voice_defs():
     return [
         ParamDef("voice", "Voice", "dropdown", "Vivian", options=list(VOICE_OPTIONS)),
-        ParamDef("voice_sample", "Voice Sample", "audio", ""),
-        ParamDef("voice_sample_text", "Voice Sample Says", "str", "", multiline=True),
+        ParamDef("voice_sample", "Voice sample", "audio", ""),
+        ParamDef("voice_sample_text", "Voice sample Says", "str", "", multiline=True),
     ]
 
 
@@ -1966,7 +1966,7 @@ def _row_visible(form, key):
 
 def test_the_speaking_settings_show_only_while_a_scene_has_a_line(qtbot):
     form = ParamForm(_scene_defs() + _voice_defs() + [
-        ParamDef("unet_s2v", "Speaking Model", "dropdown", "example_s2v.safetensors",
+        ParamDef("unet_s2v", "Speaking model", "dropdown", "example_s2v.safetensors",
                  options=["example_s2v.safetensors"]),
     ])
     qtbot.addWidget(form)
@@ -1980,7 +1980,7 @@ def test_the_speaking_settings_show_only_while_a_scene_has_a_line(qtbot):
 
 
 def test_the_sound_prompts_are_shut_down_while_every_scene_speaks(qtbot):
-    form = ParamForm([*_scene_defs(), ParamDef("audio_prompt", "Positive Prompt", "str", "", multiline=True), ParamDef("audio_negative_prompt", "Negative Prompt", "str", "", multiline=True)])
+    form = ParamForm([*_scene_defs(), ParamDef("audio_prompt", "Positive prompt", "str", "", multiline=True), ParamDef("audio_negative_prompt", "Negative prompt", "str", "", multiline=True)])
     qtbot.addWidget(form)
     editor = form._widgets["scene_frames"]
     editor.add_scene()
@@ -2013,8 +2013,8 @@ def _in_use_with(form, key, tip):
 
 def test_the_things_to_avoid_are_shut_down_while_prompt_strength_is_one(qtbot):
     form = ParamForm([
-        ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
-        ParamDef("cfg", "Prompt Strength", "float", 1.0, min_val=0.0, max_val=30.0, step=0.1),
+        ParamDef("negative_prompt", "Negative prompt", "str", "", multiline=True),
+        ParamDef("cfg", "Prompt strength", "float", 1.0, min_val=0.0, max_val=30.0, step=0.1),
     ])
     qtbot.addWidget(form)
     assert _shut_down_with(form, "negative_prompt", STRENGTH_ONE_HELP)
@@ -2026,10 +2026,10 @@ def test_the_things_to_avoid_are_shut_down_while_prompt_strength_is_one(qtbot):
 
 def test_the_things_to_avoid_are_shut_down_until_either_pass_pushes_the_prompt(qtbot):
     form = ParamForm([
-        ParamDef("negative_prompt", "Negative Prompt", "str", "", multiline=True),
-        ParamDef("cfg_high", "Prompt Strength (First Pass)", "float", 1.0,
+        ParamDef("negative_prompt", "Negative prompt", "str", "", multiline=True),
+        ParamDef("cfg_high", "Prompt strength (first pass)", "float", 1.0,
                  min_val=0.0, max_val=30.0, step=0.1),
-        ParamDef("cfg_low", "Prompt Strength (Second Pass)", "float", 1.0,
+        ParamDef("cfg_low", "Prompt strength (second pass)", "float", 1.0,
                  min_val=0.0, max_val=30.0, step=0.1),
     ])
     qtbot.addWidget(form)
@@ -2047,12 +2047,12 @@ def _scene_text_state(scene, key):
 
 
 def _scene_form_at_strength_one():
-    return ParamForm([*_scene_defs(), ParamDef("cfg", "Prompt Strength", "float", 1.0, min_val=0.0, max_val=30.0, step=0.1)])
+    return ParamForm([*_scene_defs(), ParamDef("cfg", "Prompt strength", "float", 1.0, min_val=0.0, max_val=30.0, step=0.1)])
 
 
-_SHUT_DOWN_AVOID = (False, True, True, STRENGTH_ONE_HELP, STRENGTH_ONE_HELP, "Negative Prompt")
+_SHUT_DOWN_AVOID = (False, True, True, STRENGTH_ONE_HELP, STRENGTH_ONE_HELP, "Negative prompt")
 _IN_USE_AVOID = (False, False, False, param_help("negative_prompt"), param_help("negative_prompt"),
-                 "Negative Prompt")
+                 "Negative prompt")
 
 
 def test_a_scenes_things_to_avoid_are_shut_down_while_prompt_strength_is_one(qtbot):
@@ -2085,8 +2085,8 @@ def test_a_speaking_scene_keeps_the_speaking_help_at_prompt_strength_one(qtbot):
 
     scene.fields["scene_lines"].setPlainText("Come in.")
 
-    for key, caption in (("positive_prompt", "Positive Prompt"),
-                         ("negative_prompt", "Negative Prompt")):
+    for key, caption in (("positive_prompt", "Positive prompt"),
+                         ("negative_prompt", "Negative prompt")):
         assert _scene_text_state(scene, key) == (
             False, True, True, SPEAKING_HELP, SPEAKING_HELP, caption + SPEAKING_NOTE)
 
@@ -2101,7 +2101,7 @@ def test_a_loras_strength_shows_only_while_it_has_a_lora(qtbot, key):
     strength = strength_key_of(key)
     form = ParamForm([
         ParamDef(key, "LoRA", "dropdown", "None", options=["None", "example_style.safetensors"]),
-        ParamDef(strength, "LoRA Strength", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
+        ParamDef(strength, "LoRA strength", "float", 1.0, min_val=0.0, max_val=2.0, step=0.05),
     ])
     qtbot.addWidget(form)
     assert not _row_visible(form, strength)
@@ -2143,7 +2143,7 @@ def test_a_voice_sample_is_picked_with_a_browse_button(qtbot, monkeypatch):
     qtbot.addWidget(form)
     form._browse_buttons["voice_sample"].click()
     assert form._widgets["voice_sample"].text() == "C:/v/her.wav"
-    assert "Voice Sample" in asked["caption"]
+    assert "Voice sample" in asked["caption"]
     assert "*.wav" in asked["kinds"]
     assert form.get_values()["voice_sample"] == "C:/v/her.wav"
 
@@ -2205,7 +2205,7 @@ def test_a_section_warns_with_every_warning_inside_it_one_per_line(qtbot):
         "Steps: 50. Example Model's page recommends 20\u201340 steps. Click to use 40.\n"
         "Sampler: heun. Example Model's page recommends euler_ancestral. "
         "Click to use euler_ancestral.")
-    assert form._sections["Workflow, Models & LoRAs"].warning.isHidden()
+    assert form._sections["Workflow, models & LoRAs"].warning.isHidden()
     form.set_warnings({})
     assert calibration.isHidden()
 
@@ -2263,7 +2263,7 @@ def test_the_whole_forms_warnings_read_and_resolve_in_the_order_of_its_sections(
     form.set_warnings({**_STEPS_ADVICE, **_STRENGTH_ADVICE})
 
     assert form.every_warning() == (
-        "LoRA Strength 1 (First Pass): 1.5. Example LoRA's page recommends a strength of "
+        "LoRA strength 1 (first pass): 1.5. Example LoRA's page recommends a strength of "
         "0.8\u20131.2. Click to use 1.2.\n"
         "Steps: 50. Example Model's page recommends 20\u201340 steps. Click to use 40.")
     form.resolve_every_warning()
@@ -2318,7 +2318,7 @@ def test_resolving_a_warning_leaves_the_rest_of_the_form_as_it_was(qtbot):
 
 _TRIGGER_WORD = {"lora": MissingTriggerWords("example_style.safetensors", ("exmplstyle",))}
 _TRIGGER_WORD_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive "
-                      "Prompt. Click to add it.")
+                      "prompt. Click to add it.")
 
 
 def _krea_form(qtbot):
@@ -2382,7 +2382,7 @@ def test_a_trigger_word_warning_beside_two_fields_is_one_line_of_each_warning_it
     line = f"LoRA 1: Example Style 1.0. {_TRIGGER_WORD_SAID}"
     assert form.every_warning() == line
     assert [form._sections[title].warning.toolTip()
-            for title in ("Prompts & Seed", "Workflow, Models & LoRAs")] == [line, line]
+            for title in ("Prompts & seed", "Workflow, models & LoRAs")] == [line, line]
 
 
 def test_one_click_adds_once_a_word_two_loras_both_lack(qtbot):
@@ -2424,8 +2424,8 @@ def test_the_scenes_warn_about_their_length_and_a_missing_trigger_word_on_two_li
 
 
 def test_the_audio_prompts_oppose_each_other_as_the_other_two_do(qtbot):
-    form = ParamForm([ParamDef("audio_prompt", "Positive Prompt", "str", "", multiline=True),
-                      ParamDef("audio_negative_prompt", "Negative Prompt", "str", "",
+    form = ParamForm([ParamDef("audio_prompt", "Positive prompt", "str", "", multiline=True),
+                      ParamDef("audio_negative_prompt", "Negative prompt", "str", "",
                                multiline=True)])
     qtbot.addWidget(form)
 
@@ -2585,7 +2585,7 @@ def test_an_image_or_video_input_is_a_drop_zone_that_reads_back_what_it_holds(qt
 
 def test_a_dropped_item_lends_the_zone_the_file_the_gallery_says(qtbot):
     form = ParamForm([ParamDef("input_image", "Image", "image", ""),
-                      ParamDef("video", "Video to Perform", "video", "")], helpers=FormHelpers(items=_Lends()))
+                      ParamDef("video", "Video to perform", "video", "")], helpers=FormHelpers(items=_Lends()))
     qtbot.addWidget(form)
     edits = []
     form.changed.connect(lambda: edits.append(form.get_values()))
@@ -2828,7 +2828,7 @@ _READ = " ".join(["rain"] * 76)
 
 
 def test_a_prompt_grays_the_words_its_reader_never_reads(qtbot):
-    form = ParamForm([ParamDef("audio_prompt", "Positive Prompt", "str", "", multiline=True)])
+    form = ParamForm([ParamDef("audio_prompt", "Positive prompt", "str", "", multiline=True)])
     qtbot.addWidget(form)
     form.set_values({"audio_prompt": f"{_READ} on a tin roof"})
 
@@ -2839,7 +2839,7 @@ def test_a_prompt_grays_the_words_its_reader_never_reads(qtbot):
 
 
 def test_a_prompt_read_to_its_end_grays_nothing(qtbot):
-    form = ParamForm([ParamDef("audio_prompt", "Positive Prompt", "str", "", multiline=True)])
+    form = ParamForm([ParamDef("audio_prompt", "Positive prompt", "str", "", multiline=True)])
     qtbot.addWidget(form)
     form.set_values({"audio_prompt": f"{_READ} on a tin roof"})
     form.show_readings({"audio_prompt": word_reading(76, CUT_OFF)})
@@ -2876,7 +2876,7 @@ def test_showing_the_derived_size_is_no_edit_of_it(qtbot):
 
 
 def test_a_prompts_copy_button_sits_at_the_top(qtbot):
-    form = ParamForm([ParamDef("positive_prompt", "Positive Prompt", "str", "", multiline=True)])
+    form = ParamForm([ParamDef("positive_prompt", "Positive prompt", "str", "", multiline=True)])
     qtbot.addWidget(form)
     cell = _field_cell_of(form, "positive_prompt")
     copy = form._copy_buttons["positive_prompt"]
@@ -2902,10 +2902,10 @@ def test_slack_collects_at_the_foot_of_the_form(qtbot):
 def _audio_form(qtbot):
     form = ParamForm([
         *_scene_defs(), *_voice_defs(),
-        ParamDef("enable_audio", "Enable Audio", "bool", False, switch=True),
-        ParamDef("audio_prompt", "Positive Prompt", "str", "", multiline=True),
-        ParamDef("audio_negative_prompt", "Negative Prompt", "str", "", multiline=True),
-        ParamDef("audio_seed", "Audio Seed", "seed", 0),
+        ParamDef("enable_audio", "Enable audio", "bool", False, switch=True),
+        ParamDef("audio_prompt", "Positive prompt", "str", "", multiline=True),
+        ParamDef("audio_negative_prompt", "Negative prompt", "str", "", multiline=True),
+        ParamDef("audio_seed", "Audio seed", "seed", 0),
     ])
     qtbot.addWidget(form)
     form._widgets["scene_frames"].fields("scene_lines")[0].setPlainText("Come in.")
@@ -2950,7 +2950,7 @@ def test_with_audio_on_and_no_lines_the_audio_prompts_take_typing(qtbot):
 
 def test_the_swap_button_sits_between_the_rows_when_size_is_opened_after_the_form_shows(qtbot):
     form = ParamForm([
-        ParamDef("prompt", "Positive Prompt", "str", "", multiline=True),
+        ParamDef("prompt", "Positive prompt", "str", "", multiline=True),
         *_dimension_defs(),
     ])
     form.setFont(make_font(FONT_UI, SIZE_HEADING))

@@ -469,7 +469,7 @@ def test_krea2_offers_a_negative_prompt_and_prompt_strength_for_the_raw_model():
     pds = {pd.key: pd for pd in wf.param_definitions()}
     assert pds["negative_prompt"].type == "str"
     assert pds["negative_prompt"].default == ""
-    assert pds["cfg"].label == "Prompt Strength"
+    assert pds["cfg"].label == "Prompt strength"
     assert pds["cfg"].default == 1.0
     assert pds["steps"].max_val >= 52
 
@@ -2296,14 +2296,14 @@ _GRAPH_JARGON = re.compile(
 )
 
 _NAMES_EVERYONE_USES = {
-    "positive_prompt": "Positive Prompt",
-    "negative_prompt": "Negative Prompt",
-    "audio_prompt": "Positive Prompt",
-    "audio_negative_prompt": "Negative Prompt",
-    "lora_high": "LoRA 1 (First Pass)",
-    "lora_strength_high": "LoRA Strength 1 (First Pass)",
-    "lora_low": "LoRA 1 (Second Pass)",
-    "lora_strength_low": "LoRA Strength 1 (Second Pass)",
+    "positive_prompt": "Positive prompt",
+    "negative_prompt": "Negative prompt",
+    "audio_prompt": "Positive prompt",
+    "audio_negative_prompt": "Negative prompt",
+    "lora_high": "LoRA 1 (first pass)",
+    "lora_strength_high": "LoRA strength 1 (first pass)",
+    "lora_low": "LoRA 1 (second pass)",
+    "lora_strength_low": "LoRA strength 1 (second pass)",
     "sampler_name": "Sampler",
 }
 
@@ -2324,8 +2324,8 @@ def test_the_prompts_loras_and_sampler_keep_the_names_everyone_already_uses(name
 @pytest.mark.parametrize("name", ["wan22_t2i", "wan22_flf2v_loop", "wan22_i2v"])
 def test_a_wan_2_2_form_offers_one_composition_focus_for_both_passes(name):
     focus = [(pd.label, pd.key, pd.also_sets) for pd in WORKFLOW_REGISTRY[name].param_definitions()
-             if pd.label.startswith("Composition Focus")]
-    assert focus == [("Composition Focus", "shift_high", ("shift_low",))], (
+             if pd.label.startswith("Composition focus")]
+    assert focus == [("Composition focus", "shift_high", ("shift_low",))], (
         "two values would hand the result over between the passes at mismatched noise")
 
 
@@ -2509,5 +2509,5 @@ def test_a_video_is_made_without_audio_unless_its_audio_is_enabled(workflow):
 def test_enable_audio_is_a_switch_first_under_audio(workflow):
     switch = next(pd for pd in workflow().param_definitions() if pd.key == "enable_audio")
 
-    assert (switch.label, switch.type, switch.switch) == ("Enable Audio", ParamType.BOOL, True)
+    assert (switch.label, switch.type, switch.switch) == ("Enable audio", ParamType.BOOL, True)
     assert section_title("enable_audio") == "Audio"

@@ -147,7 +147,7 @@ MOVE_UP_TIP = "Move this job up the Job Queue"
 MOVE_DOWN_TIP = "Move this job down the Job Queue"
 SHIELD_ALL_TEXT = "All"
 SHIELD_ALL_TIP = "Shield every job in the Job Queue"
-CANCEL_ALL_TEXT = "Cancel All"
+CANCEL_ALL_TEXT = "Cancel all"
 CANCEL_ALL_TIP = "Cancel every job in the Job Queue"
 
 

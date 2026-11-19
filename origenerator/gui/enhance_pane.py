@@ -300,7 +300,7 @@ class EnhancePane(QWidget):
                      (self._labeled("Upscaler", self._upscaler), self._upscaler)],
             numbers=[(self._labeled(label, widget), widget)
                      for label, widget in (("Scale", self._scale), ("Steps", self._steps),
-                                           ("Redraw Amount", self._denoise))],
+                                           ("Redraw amount", self._denoise))],
             marks={model_caption: self._model_warning},
         ))
 
@@ -492,8 +492,8 @@ class EnhancePane(QWidget):
 
     def _name_the_settings(self) -> None:
         held = self._preset_dropdown.currentIndex()
-        title, given = (("Save Preset", "") if held < 0
-                        else ("Rename Preset", self._presets[held].name))
+        title, given = (("Save preset", "") if held < 0
+                        else ("Rename preset", self._presets[held].name))
         name, ok = QInputDialog.getText(self, title, "Preset name:", text=given)
         if not ok or not name.strip():
             return

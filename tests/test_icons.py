@@ -75,7 +75,7 @@ def test_toc_initial_icons_render_for_each_level(qtbot):
     assert set(folder_icons.LEVEL_LABELS) == {
         "workflow", "site", "model", "lora", "source_image"}
     assert folder_icons.LEVEL_LABELS["lora"] == "LoRA"
-    assert folder_icons.LEVEL_LABELS["source_image"] == "Source Image"
+    assert folder_icons.LEVEL_LABELS["source_image"] == "Source image"
     for level in folder_icons.LEVEL_LABELS:
         icon = icons.toc_initial_icon(level)
         assert not icon.isNull()

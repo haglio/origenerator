@@ -59,20 +59,20 @@ def test_flash_guard_shows_the_message_on_the_button(button):
 
 
 def test_the_caption_is_what_a_flashed_guard_comes_back_to(button):
-    button.set_caption("Generate with Random seed")
-    assert button.text() == "Generate with Random seed"
+    button.set_caption("Generate with random seed")
+    assert button.text() == "Generate with random seed"
 
     button.flash_guard("Rewrite the prompt first")
     button._guard_timer.timeout.emit()
 
-    assert button.text() == "Generate with Random seed"
+    assert button.text() == "Generate with random seed"
 
 
 def test_a_new_caption_waits_for_the_guard_message_to_clear(button):
     button.flash_guard("Rewrite the prompt first")
 
-    button.set_caption("Generate with Random seed")
+    button.set_caption("Generate with random seed")
 
     assert button.text() == "Rewrite the prompt first"
     button._clear_guard()
-    assert button.text() == "Generate with Random seed"
+    assert button.text() == "Generate with random seed"

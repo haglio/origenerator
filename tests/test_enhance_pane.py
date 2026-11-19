@@ -669,7 +669,7 @@ def test_save_asks_for_a_name_and_saves_the_settings_on_the_panel_under_it(qtbot
 
     qtbot.mouseClick(pane._preset_button, Qt.MouseButton.LeftButton)
 
-    assert asked == [("Save Preset", "Preset name:", "")]
+    assert asked == [("Save preset", "Preset name:", "")]
     assert saved == ["Bright"]
 
 
@@ -683,7 +683,7 @@ def test_rename_asks_with_the_presets_own_name_and_renames_that_preset(qtbot, mo
 
     qtbot.mouseClick(pane._preset_button, Qt.MouseButton.LeftButton)
 
-    assert asked == [("Rename Preset", "Preset name:", "Soft")]
+    assert asked == [("Rename preset", "Preset name:", "Soft")]
     assert renamed == [(1, "Gentle")]
 
 
@@ -1948,7 +1948,7 @@ def test_a_narrow_row_puts_its_facts_under_the_thumbnail(qtbot):
 def test_the_panels_captions_use_plain_words(qtbot):
     pane, _edits = _panel(qtbot)
     captions = [w.text() for w in pane.findChildren(QLabel)]
-    assert {"Model", "Upscaler", "Scale", "Steps", "Redraw Amount"} <= set(captions)
+    assert {"Model", "Upscaler", "Scale", "Steps", "Redraw amount"} <= set(captions)
     assert not any("Denoise" in caption or caption.endswith(":") for caption in captions)
 
 
@@ -2220,7 +2220,7 @@ def test_clicking_the_no_guarantee_warning_leaves_the_model_as_it_is(qtbot, hand
     assert pane._model.currentData() == MATCH_SOURCE_MODEL
 
 
-_CAPTIONS = ("Model", "Upscaler", "Scale", "Steps", "Redraw Amount")
+_CAPTIONS = ("Model", "Upscaler", "Scale", "Steps", "Redraw amount")
 
 
 def _caption_lefts(pane) -> dict[str, int]:
@@ -2261,7 +2261,7 @@ def test_a_caption_moved_onto_a_line_of_its_own_keeps_in_line_with_the_others(ha
     assert len(set(_caption_lefts(pane).values())) == 1
 
 
-_STYLE_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive Prompt. "
+_STYLE_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive prompt. "
                "Click to add it.")
 
 
@@ -2314,7 +2314,7 @@ def test_a_fixs_trigger_word_warnings_sit_left_of_the_prompt_and_lora_captions(w
     worded_fix.resize(700, 600)
     worded_fix.layout().activate()
 
-    for mark, caption in ((worded_fix.prompt_warning, "Positive Prompt"),
+    for mark, caption in ((worded_fix.prompt_warning, "Positive prompt"),
                           (worded_fix.lora_warning, "LoRA")):
         label = next(label for label in worded_fix.findChildren(QLabel)
                      if label.text() == caption)

@@ -156,6 +156,7 @@ def test_a_tick_asks_comfyui_only_inside_the_read_it_hands_off(qtbot, tmp_path):
     view.refresh()
     view._start_reroll(_select_first_leaf(view))
     comfyui = MagicMock(spec=ComfyUIClient)
+    comfyui.fetch_queue.return_value = set()
     comfyui.fetch_history.return_value = {}
     comfyui.foreign_backlog.return_value = None
     comfyui.executing_prompts.return_value = []
@@ -181,7 +182,7 @@ def test_a_tick_asks_comfyui_only_inside_the_read_it_hands_off(qtbot, tmp_path):
     asked_since("on the window's thread")
 
     assert asked == {"on the window's thread": [], "in the read handed off": [
-        "fetch_history", "foreign_backlog", "executing_prompts", "foreign_queue"]}, (
+        "fetch_queue", "fetch_history", "foreign_backlog", "executing_prompts", "foreign_queue"]}, (
         "every read a poll tick makes of ComfyUI is in the one read it hands off the window's "
         "thread, so none of them blocks the window")
 

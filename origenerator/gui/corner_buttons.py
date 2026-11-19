@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from PySide6.QtCore import QObject, QRect, QSize, Qt, Signal
+from PySide6.QtCore import QObject, QRect, QSize, Qt, QTimer, Signal
 from PySide6.QtWidgets import QPushButton, QWidget
 from shared_ui.palette import BLACK, as_rgba
 from shared_ui.spacing import BUTTON_GAP, BUTTON_RADIUS, BUTTON_SIZE, GAP_SMALL
@@ -31,7 +31,9 @@ _TIPS = {
     icons.ENHANCE_HELD: (("Already enhanced at these settings — "
                           "change one to make a different version"),),
     icons.ENHANCE_MORE: ("Enhance again, at the settings now on the panel",),
+    icons.ENHANCE_QUEUED: ("An enhancement of this image is queued",),
 }
+BLINK_MS = 900
 
 
 def bar_between_the_bottom_corners(area: QRect, inset: int = 0) -> QRect:
@@ -105,13 +107,25 @@ class CornerButtons(QObject):
             enabled=can_restore)
         self._trash = _CornerButtonFace(host, lambda armed: icons.corner_trash_icon(
             armed=armed))
+        self._lit = False
+        self._blink = QTimer(self)
+        self._blink.setInterval(BLINK_MS)
+        self._blink.timeout.connect(self._blink_once)
         self._enhance_button = _CornerButtonFace(
-            host, lambda armed: icons.corner_enhance_icon(
-                self._enhance or icons.ENHANCE_OPEN, armed=armed))
+            host, lambda armed: icons.corner_enhance_icon(self._enhance_look(), armed=armed))
         self._star.clicked.connect(lambda: self.triggered.emit(STAR if restore is None else RESTORE))
         self._trash.clicked.connect(lambda: self.triggered.emit(TRASH))
         self._enhance_button.clicked.connect(lambda: self.triggered.emit(ENHANCE))
         self._retip()
+
+    def _enhance_look(self) -> str:
+        if self._enhance == icons.ENHANCE_QUEUED and self._lit:
+            return icons.ENHANCE_HELD
+        return self._enhance or icons.ENHANCE_OPEN
+
+    def _blink_once(self):
+        self._lit = not self._lit
+        self._enhance_button.redraw()
 
     def buttons(self) -> list[QPushButton]:
         return [self._star, self._trash, self._enhance_button]
@@ -162,4 +176,11 @@ class CornerButtons(QObject):
         self._star.setVisible(self._available)
         self._trash.setVisible(self._available)
         self._enhance_button.setVisible(self._available and self._enhance is not None)
-        self._enhance_button.setEnabled(self._enhance != icons.ENHANCE_HELD)
+        self._enhance_button.setEnabled(self._enhance not in (icons.ENHANCE_HELD,
+                                                              icons.ENHANCE_QUEUED))
+        queued = self._available and self._enhance == icons.ENHANCE_QUEUED
+        if queued and not self._blink.isActive():
+            self._blink.start()
+        elif not queued:
+            self._blink.stop()
+            self._lit = False

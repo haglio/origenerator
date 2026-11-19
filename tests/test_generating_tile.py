@@ -119,7 +119,7 @@ def _picked_tile_drawn(qtbot):
 
 def test_a_picked_tile_is_filled_with_the_familys_blue(qtbot):
     tile, image = _picked_tile_drawn(qtbot)
-    button = tile._title.geometry()
+    button = tile._name.geometry()
 
     beside = tile.mapToParent(QPoint(button.left() - 1, button.center().y()))
     assert image.pixelColor(beside).name() == BLUE.name()
@@ -235,11 +235,11 @@ def test_the_bar_sits_between_the_thumbnails_bottom_corners(qtbot):
             "the trash and the enhance button keep the thumbnail's lower corners")
 
 
-def test_the_tile_shows_its_generate_tab_title_under_the_thumbnail(qtbot):
-    tile = GeneratingTile(FakeJob(state="running"), title="SDXL › a lighthouse")
+def test_the_tile_shows_the_items_name_under_the_thumbnail(qtbot):
+    tile = GeneratingTile(FakeJob(state="running"), name="5A0C3E7B 004")
     qtbot.addWidget(tile)
-    assert tile._title.text() == "SDXL › a lighthouse"
-    assert tile._title.geometry().top() > tile._image.geometry().bottomLeft().y()
+    assert tile._name.text() == "5A0C3E7B 004"
+    assert tile._name.geometry().top() > tile._image.geometry().bottomLeft().y()
 
 
 def test_the_tile_offers_its_favorite_trash_and_enhance_icons(qtbot):

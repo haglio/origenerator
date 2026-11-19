@@ -1141,10 +1141,14 @@ def test_right_clicking_an_inflight_tile_offers_to_cancel_the_run(
 
     view._gallery_pane._inflight_context_menu(job.prompt_id, QPoint(0, 0))
 
-    assert labels == [["Cancel"]], (
+    (offered,) = labels
+    assert "Cancel" in offered, (
         "a tile is the whole of what the collection shows of a run being made, and it used to "
         "answer a right-click with nothing at all: stopping the run meant finding it again "
         "among the Job Queue's rows")
+    assert {"Go to folder", "Favorite 1 item", "Delete 1 item"} <= set(offered), (
+        "an item being made answers a right-click with the menu any item does (his ask, "
+        "2026-11-19)")
     assert view._jobs.all_jobs == []
 
 
@@ -1162,7 +1166,8 @@ def test_an_populating_folders_tile_offers_a_cancel_and_a_real_stop(
 
     view._gallery_pane._inflight_context_menu(job.prompt_id, QPoint(0, 0))
 
-    assert labels == [["Cancel", "Cancel and stop populating"]]
+    (offered,) = labels
+    assert offered[offered.index("Cancel") + 1] == "Cancel and stop populating"
 
 
 def test_canceling_from_an_populating_folders_tile_ends_populate_too(
@@ -1185,7 +1190,7 @@ def test_canceling_from_an_populating_folders_tile_ends_populate_too(
         "so canceling first would start one")
 
 
-def test_a_tile_with_no_live_job_behind_it_raises_no_menu(qtbot, monkeypatch):
+def test_a_tile_with_no_live_job_behind_it_offers_no_cancel(qtbot, monkeypatch):
     db = database_of([_image("done", "a cat", 50, 1)])
     put_rows(db, [_running_row("gen1")])
     view = GalleryView(db)
@@ -1197,7 +1202,9 @@ def test_a_tile_with_no_live_job_behind_it_raises_no_menu(qtbot, monkeypatch):
 
     view._gallery_pane._inflight_context_menu("gen1", QPoint(0, 0))
 
-    assert labels == []
+    (offered,) = labels
+    assert not any(label.startswith("Cancel") for label in offered), (
+        "nothing here can stop a run no job of this app's is making")
 
 
 def test_right_clicking_a_folders_live_tile_offers_to_cancel_the_run(
@@ -1205,13 +1212,14 @@ def test_right_clicking_a_folders_live_tile_offers_to_cancel_the_run(
     view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    key, _job = _running_reroll(view)
+    _key, _job = _running_reroll(view)
     labels = _menu_offering(monkeypatch, pick="Cancel")
 
-    view._generating_tile_menu(key, QPoint(0, 0))
+    view.generation_menu([_job.prompt_id], QPoint(0, 0))
 
-    assert labels == [["Cancel"]], (
-        "the same act as the button on the tile's face, on the gesture the rest of the Gallery "
+    (offered,) = labels
+    assert "Cancel" in offered, (
+        "the same act as the bar on the tile's face, on the gesture the rest of the Gallery "
         "pane answers")
     assert view._jobs.all_jobs == []
 
@@ -1224,10 +1232,12 @@ def test_an_populating_folders_live_tile_offers_the_stop_its_button_cannot(
     key = _select_first_leaf(view)
     view._toggle_populate(True)
     labels = _menu_offering(monkeypatch, pick="Cancel and stop")
+    (job,) = view._jobs.all_jobs
 
-    view._generating_tile_menu(key, QPoint(0, 0))
+    view.generation_menu([job.prompt_id], QPoint(0, 0))
 
-    assert labels == [["Cancel", "Cancel and stop populating"]]
+    (offered,) = labels
+    assert offered[offered.index("Cancel") + 1] == "Cancel and stop populating"
     assert not view._populate.is_active(key)
     assert view._jobs.all_jobs == []
 

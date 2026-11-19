@@ -18,6 +18,12 @@ _BORDER_PX = 2
 _BORDER = f"{_BORDER_PX}px solid {palette.IN_FLIGHT_BORDER}"
 
 
+def _enhance_of(item: InFlightItem) -> str | None:
+    if not item.enhanceable:
+        return None
+    return icons.ENHANCE_QUEUED if item.enhance_queued else icons.ENHANCE_OPEN
+
+
 class InFlightTile(QWidget):
     clicked = Signal(str)
     context_requested = Signal(str, QPoint)
@@ -85,8 +91,8 @@ class InFlightTile(QWidget):
         self._bar.set_cancelable(item.cancel is not None)
         self._bar.setToolTip(cancel_tooltip(item.populating) if item.cancel is not None else "")
         if item.is_an_item:
-            self._controls.show_for(favorite=item.favorite,
-                                    enhance=icons.ENHANCE_OPEN if item.enhanceable else None)
+            self._controls.show_for(favorite=item.favorite, enhance=_enhance_of(item),
+                                    kind=item.media_type)
         else:
             self._controls.hide_all()
         pixmap = QPixmap()

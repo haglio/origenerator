@@ -114,6 +114,34 @@ def test_a_spent_enhance_corner_is_a_sign_rather_than_a_button(qtbot):
     assert plus.isEnabled()
 
 
+def test_a_queued_enhancement_blinks_the_plus_yellow_slowly(qtbot):
+    _host, controls = _controls(qtbot)
+    controls.show_for(favorite=False, enhance=icons.ENHANCE_QUEUED)
+    plus = controls.buttons()[2]
+    resting = plus.icon().cacheKey()
+
+    controls._blink.timeout.emit()
+    lit = plus.icon().cacheKey()
+    controls._blink.timeout.emit()
+
+    assert controls._blink.isActive()
+    assert controls._blink.interval() >= 500, (
+        "his ask, 2026-11-19: the plus says an enhancement is queued by blinking yellow slowly")
+    assert lit == icons.corner_enhance_icon(icons.ENHANCE_HELD, armed=False).cacheKey() != resting
+    assert plus.icon().cacheKey() == resting
+    assert not plus.isEnabled(), "a second press would queue the same enhancement twice"
+    assert plus.toolTip() == "An enhancement of this image is queued"
+
+
+def test_the_plus_stops_blinking_once_nothing_is_queued(qtbot):
+    _host, controls = _controls(qtbot)
+    controls.show_for(favorite=False, enhance=icons.ENHANCE_QUEUED)
+
+    controls.set_enhance(icons.ENHANCE_HELD)
+
+    assert not controls._blink.isActive()
+
+
 def test_taking_the_item_away_takes_every_corner_with_it(qtbot):
     _host, controls = _controls(qtbot)
     controls.show_for(favorite=True, enhance=icons.ENHANCE_HELD)

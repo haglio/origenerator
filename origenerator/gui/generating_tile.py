@@ -28,9 +28,9 @@ class GeneratingTile(QFrame):
     context_requested = Signal(QPoint)
     control_triggered = Signal(str)
 
-    def __init__(self, job, parent=None, *, title="", populating=False,
+    def __init__(self, job, parent=None, *, name="", populating=False,
                  typical_seconds=None, made_from=_MADE_FROM_NOTHING,
-                 favorite=False, enhance=None):
+                 favorite=False, enhance=None, kind=None):
         super().__init__(parent)
         self._job = job
         self._selected = False
@@ -52,14 +52,14 @@ class GeneratingTile(QFrame):
         self._image.setStyleSheet(
             f"background: {palette.EMPTY_PLATE}; border-radius: {BUTTON_RADIUS}px; color: {as_hex(TEXT_MUTED)};"
         )
-        self._title = QLabel(title)
-        self._title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._title.setWordWrap(True)
-        tile_shape.style_caption(self._title)
-        self._title.setStyleSheet("background-color: transparent;")
-        self._title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._name = QLabel(name)
+        self._name.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._name.setWordWrap(True)
+        tile_shape.style_caption(self._name)
+        self._name.setStyleSheet("background-color: transparent;")
+        self._name.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         layout.addWidget(self._image)
-        layout.addWidget(self._title)
+        layout.addWidget(self._name)
 
         self._status_scrim = TileStatusScrim(self)
         self.layout().activate()  # Qt positions the thumbnail only once the layout has run, and the scrim and the bar are laid over where it is
@@ -69,7 +69,8 @@ class GeneratingTile(QFrame):
         self._controls = CornerButtons(self)
         self._controls.place(self._image.geometry())
         self._controls.triggered.connect(self.control_triggered.emit)
-        self._controls.show_for(favorite=favorite, enhance=enhance)
+        self._favorite, self._enhance, self._kind = favorite, enhance, kind
+        self._controls.show_for(favorite=favorite, enhance=enhance, kind=kind)
 
         self._tick = QTimer(self)
         self._tick.setInterval(TICK_MS)
@@ -87,8 +88,17 @@ class GeneratingTile(QFrame):
         self._render_state()
         self._tick.start()
 
-    def set_favorite(self, favorite: bool, enhance=None):
-        self._controls.show_for(favorite=favorite, enhance=enhance)
+    @property
+    def prompt_id(self) -> str:
+        return self._job.prompt_id
+
+    def set_favorite(self, favorite: bool):
+        self._favorite = favorite
+        self._controls.show_for(favorite=favorite, enhance=self._enhance, kind=self._kind)
+
+    def set_enhance(self, enhance: str | None):
+        self._enhance = enhance
+        self._controls.show_for(favorite=self._favorite, enhance=enhance, kind=self._kind)
 
     def set_selected(self, selected: bool):
         self._selected = selected

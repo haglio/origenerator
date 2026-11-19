@@ -233,6 +233,12 @@ def test_a_favorited_item_on_its_way_wears_a_full_star(qtbot):
     assert tile._controls._enhance_button.isHidden()
 
 
+def test_an_image_on_its_way_with_an_enhancement_asked_for_blinks_its_plus(qtbot):
+    tile = InFlightTile(_item(job_kind="Image", enhanceable=True, enhance_queued=True))
+    qtbot.addWidget(tile)
+    assert tile._controls._blink.isActive()
+
+
 def test_an_enhancement_on_its_way_offers_no_corner_icons(qtbot):
     tile = InFlightTile(_item(job_kind="Enhance"))
     qtbot.addWidget(tile)

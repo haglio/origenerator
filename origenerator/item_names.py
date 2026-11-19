@@ -40,8 +40,9 @@ class ItemNames:
                 folders[folder_of(row)].append(row["prompt_id"])
         recorded = self._numbers.list_item_numbers()
         numbering = number_items(folders, recorded)
+        on_its_way = {row["prompt_id"] for row in rows if gallery.is_in_progress(row)}
         changed = {prompt_id: item for prompt_id, item in numbering.items()
-                   if recorded.get(prompt_id) != item}
+                   if recorded.get(prompt_id) != item and prompt_id not in on_its_way}
         if changed:
             self._numbers.record_item_numbers(changed)
         names = {prompt_id: item_name(item) for prompt_id, item in numbering.items()}
@@ -76,5 +77,5 @@ def _videos_of_starting_frames(rows: list[dict], held_rows: list[dict],
 
 def _items_oldest_first(rows: list[dict], held_rows: list[dict]) -> list[dict]:
     items = [row for row in rows_with_a_folder([*reversed(rows), *held_rows])
-             if gallery.produced_output(row)]
+             if gallery.produced_output(row) or gallery.is_in_progress(row)]
     return sorted(items, key=lambda row: (row.get("created_at") or "", row.get("id") or 0))

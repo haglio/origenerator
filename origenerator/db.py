@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from contextlib import contextmanager
 from pathlib import Path
 
 from origenerator.db_combine_video_uses import CombineVideoUseStore
@@ -22,7 +21,7 @@ class Database:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         salvage_if_malformed(self.path, SCHEMA)
-        file = self._file = SqliteFile(self.path)
+        file = SqliteFile(self.path)
         with file.connect() as conn:
             create(conn)
         self.generations = GenerationStore(file)
@@ -34,10 +33,8 @@ class Database:
         self.custom_collections = CustomCollectionStore(file)
         self.item_numbers = ItemNumberStore(file)
 
-    @contextmanager
     def in_one_go(self):
-        with self._file.connect():
-            yield
+        return self.generations.in_one_go()
 
     def insert_generation(self, new: NewGeneration):
         return self.generations.insert_generation(new)

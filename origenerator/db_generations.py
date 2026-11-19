@@ -339,6 +339,9 @@ class GenerationStore(Store):
             ).fetchone()
             return as_read(row) if row else None
 
+    def in_one_go(self):
+        return self._connect()
+
     def get_generations(self, prompt_ids) -> dict[str, dict]:
         prompt_ids = list(dict.fromkeys(prompt_ids))
         found = {}

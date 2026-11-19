@@ -29,15 +29,6 @@ def paint(painter: QPainter, rect, ground=None) -> None:
     painter.restore()
 
 
-def light(widget: QWidget, state: str, on: bool) -> None:
-    if widget.property(state) == on:
-        return
-    widget.setProperty(state, on)
-    widget.style().unpolish(widget)
-    widget.style().polish(widget)
-    widget.update()
-
-
 class DropEdge(QWidget):
     def __init__(self, zone: QWidget):
         super().__init__(zone)

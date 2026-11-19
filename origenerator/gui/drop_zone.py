@@ -13,11 +13,12 @@ from shared_ui.spacing import GAP_SMALL
 
 from origenerator.gui import tile_shape
 from origenerator.gui.drags import under_way
-from origenerator.gui.drop_style import AIMED, LIT, light
+from origenerator.gui.drop_style import AIMED, LIT
 from origenerator.gui.generation_drag import dragged_generation
 from origenerator.gui.grayscale import grayscale_pixmap
 from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.looping_preview import play_gray_in, play_in
+from origenerator.gui.style_property import set_style_property
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 
 DROP_AN_IMAGE = "Drop an image"
@@ -205,13 +206,13 @@ class DropZone(DropZones):
         return self.lent_by(prompt_id) is not None
 
     def _light_for(self, mime, _source):
-        light(self._label, LIT, bool(self._landing(mime)))
+        set_style_property(self._label, LIT, bool(self._landing(mime)))
 
     def _put_out_for_the_drag(self):
-        light(self._label, LIT, False)
+        set_style_property(self._label, LIT, False)
 
     def set_targeted(self, targeted: bool):
-        light(self._label, AIMED, targeted)
+        set_style_property(self._label, AIMED, targeted)
 
     def mousePressEvent(self, event):
         if event.button() != Qt.MouseButton.LeftButton or self._current_id is None:

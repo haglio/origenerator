@@ -23,6 +23,7 @@ from origenerator.gui.prompt_marks import (
     mark_past_the_limit,
     mark_problems,
 )
+from origenerator.gui.style_property import set_style_property
 from origenerator.gui.text_color import color_text
 from origenerator.prompt_checks import (
     bad_weights,
@@ -413,11 +414,7 @@ def set_in_use(field: QPlainTextEdit | PromptBoxes, label: QLabel, unused_becaus
 
 
 def mark_in_use(widget: QWidget, in_use: bool, tip: str) -> None:
-    if widget.property("inert") != (not in_use):
-        widget.setProperty("inert", not in_use)
-        # Qt reads a stylesheet's property selector again only on a repolish.
-        widget.style().unpolish(widget)
-        widget.style().polish(widget)
+    set_style_property(widget, "inert", not in_use)
     widget.setToolTip(tip)
     if isinstance(widget, QPlainTextEdit):
         widget.setReadOnly(not in_use)

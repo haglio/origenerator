@@ -32,6 +32,7 @@ from shared_ui.tick_control import TickControl
 
 from origenerator.branch_session import titled
 from origenerator.gui.deleting import asked_to_delete, deleting_a_folder
+from origenerator.gui.style_property import set_style_property
 from origenerator.gui.text_color import color_text
 from origenerator.item_actions import ItemActions
 from origenerator.media import MediaType
@@ -440,9 +441,7 @@ class ActionSetterWindow(QWidget):
         set_before = self._vocabulary.button_made_of(item_actions.actions)
         for name, tile in self._tiles.items():
             for marked in {tile, self._face(name)}:
-                marked.setProperty(_SET_BEFORE, name == set_before)
-                marked.style().unpolish(marked)
-                marked.style().polish(marked)
+                set_style_property(marked, _SET_BEFORE, name == set_before)
         self._previously.setHidden(not set_before)
 
     def _set_the_boxes_for(self, folder: dict) -> None:

@@ -54,6 +54,7 @@ from origenerator.gui.inflight import (
 from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
 from origenerator.gui.queue_row_menu import picks_cancel_below
 from origenerator.gui.queue_thumbs import QueueThumbs
+from origenerator.gui.style_property import set_style_property
 from origenerator.gui.stylesheet import CHOSEN
 from origenerator.gui.widget_size import QWIDGETSIZE_MAX
 from origenerator.workflows.derived_size import resolve_input_image_path
@@ -316,9 +317,7 @@ class QueueRow(OpensAFolder, QWidget):
         self._thumbs.clear_block()
 
     def set_dragging(self, dragging: bool):
-        self.setProperty("dragging", dragging)
-        self.style().unpolish(self)
-        self.style().polish(self)
+        set_style_property(self, "dragging", dragging)
 
     def _on_up(self):
         if self._item.move_up is not None:

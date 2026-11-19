@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 
 from origenerator import local_llm, request_settings
@@ -29,7 +29,10 @@ UNANSWERED = "unanswered"
 NO_ANSWER = "The model couldn't answer, so nothing changed."
 NO_GRAPHICS_CARD = "The model couldn't get the graphics card, so nothing changed."
 
-REQUEST_WINDOW_TOKENS = 32768
+_WINDOWS_TOKENS = (8192, 16384, 32768)
+_ANSWER_TOKENS = 512
+_CHARACTERS_A_TOKEN = 3.5
+_NOTES_CHARS = 3000
 _ASK_TIMEOUT_S = 180.0
 
 
@@ -272,6 +275,20 @@ def prompts_touching(request: str, prompts, *, limit: int = 8,
     return chosen
 
 
+def _notes_touching(request: str, notes: CollectionNotes) -> str:
+    asked = _asked_about(request)
+    touching = sorted((-_touches(asked, note), position, note)
+                      for position, note in enumerate(notes.batch_notes))
+    return replace(notes, batch_notes=[note for score, _position, note in touching
+                                       if score]).as_told(_NOTES_CHARS)
+
+
+def _window_tokens(messages: list[dict]) -> int:
+    needed = sum(len(message["content"]) for message in messages) / _CHARACTERS_A_TOKEN
+    return next((window for window in _WINDOWS_TOKENS if needed + _ANSWER_TOKENS <= window),
+                _WINDOWS_TOKENS[-1])
+
+
 def _numbered(examples) -> str:
     return "\n".join(f"{number}. {positive}" + (f"\n   negative: {negative}" if negative else "")
                      for number, (positive, negative) in enumerate(examples, 1))
@@ -307,7 +324,7 @@ def build_request_messages(positive: str, negative: str, request: str, known: Wh
                            system_prompt: str) -> list[dict]:
     parts = []
     if known.notes is not None and known.notes.complete:
-        parts.append(known.notes.as_told())
+        parts.append(_notes_touching(request, known.notes))
     if known.examples:
         parts.append("PROMPTS OF HIS THAT TOUCH WHAT HE ASKS FOR (how he writes such things; "
                      "carry over the details that go with them, and what his negative prompts keep "
@@ -332,8 +349,8 @@ _STAYS_LOADED = f"{REQUEST_MODEL_STAYS_LOADED_S + 60}s"
 
 def ask_the_model(positive: str, negative: str, request: str, known: WhatIsKnown, *,
                   llm=None) -> dict:
+    messages = build_request_messages(positive, negative, request, known, REQUEST_SYSTEM_PROMPT)
     return local_llm.answer_of((llm or local_llm.ask)(
-        build_request_messages(positive, negative, request, known, REQUEST_SYSTEM_PROMPT),
-        base_url=LOCAL_LLM_BASE_URL, model=REQUEST_LLM_MODEL, temperature=0.4,
-        timeout=_ASK_TIMEOUT_S, json_answer=True, reads_tokens=REQUEST_WINDOW_TOKENS,
+        messages, base_url=LOCAL_LLM_BASE_URL, model=REQUEST_LLM_MODEL, temperature=0.4,
+        timeout=_ASK_TIMEOUT_S, json_answer=True, reads_tokens=_window_tokens(messages),
         stays_loaded=_STAYS_LOADED))

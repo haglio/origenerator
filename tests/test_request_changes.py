@@ -89,7 +89,8 @@ def test_words_are_taken_out_of_a_prompt_and_the_commas_close_over_them():
 
     assert (outcome.positive, outcome.negative) == ("a woman", "")
     assert outcome.line == (
-        'Removed "on a couch" from the Positive Prompt. Removed "blurry" from the Negative Prompt.')
+        'Removed "on a couch" from the Positive Prompt. Removed "blurry" from the Negative Prompt. '
+        'The Negative Prompt doesn\'t have "grain", so nothing was taken out of it.')
 
 
 def test_a_prompt_change_answering_nothing_he_asked_for_is_left_out_and_says_so():
@@ -441,13 +442,14 @@ def test_leaving_out_something_the_positive_prompt_names_says_only_what_changed(
         'Removed "a straw hat" from the Positive Prompt. Added "hats" to the Negative Prompt.')
 
 
-def test_looking_in_the_negative_prompt_for_something_wanted_that_is_not_there_says_nothing():
+def test_looking_in_the_negative_prompt_for_something_wanted_that_is_not_there_says_so_once():
     outcome = _applied([{"prompt": "positive", "add": "freckles", "for": "freckles"},
                         {"prompt": "negative", "remove": "freckles", "for": "freckles"},
                         {"prompt": "negative", "replace": "freckles", "with": "", "for": "freckles"}],
                        asked=("freckles",))
 
-    assert outcome.line == 'Added "freckles" to the Positive Prompt.'
+    assert outcome.line == ('Added "freckles" to the Positive Prompt. '
+                            'The Negative Prompt doesn\'t have "freckles", so nothing was taken out of it.')
 
 
 @pytest.mark.parametrize(("change", "made", "said"), [

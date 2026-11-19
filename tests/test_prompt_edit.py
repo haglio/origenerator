@@ -326,8 +326,29 @@ def test_the_request_messages_carry_the_notes_the_exchange_as_turns_the_prompts_
     content = messages[5]["content"]
     assert content.index("comma-separated parts") < content.index("a woman, tan") < content.index(
         "blurry") < content.index("no tan lines")
-    assert "one note" in content
     assert len(messages) == 6
+
+
+def test_a_request_is_told_the_patterns_and_only_the_batch_notes_that_touch_it():
+    notes = CollectionNotes(prompt_count=9, batches=3, patterns="a subject first", batch_notes=[
+        "bakers and their aprons", "sailors wear wool caps", "a cap on every gardener, caps in fog"])
+
+    content = build_request_messages("a sailor", "", "give him a cap", WhatIsKnown(notes=notes),
+                                     "S")[-1]["content"]
+
+    assert content.index("a subject first") < content.index(
+        "sailors wear wool caps") < content.index("a cap on every gardener")
+    assert "bakers" not in content
+
+
+def test_the_batch_notes_a_request_is_told_stop_at_a_few_thousand_characters():
+    notes = CollectionNotes(prompt_count=9, batches=9, patterns="a subject first",
+                            batch_notes=[f"cap {number} " + "wool " * 250 for number in range(9)])
+
+    content = build_request_messages("a sailor", "", "a cap", WhatIsKnown(notes=notes),
+                                     "S")[-1]["content"]
+
+    assert ("cap 0" in content, "cap 1" in content, "cap 2" in content) == (True, True, False)
 
 
 def test_the_messages_show_his_prompts_that_touch_the_request_numbered_before_the_current_pair():
@@ -377,7 +398,22 @@ def test_the_answer_asked_for_is_a_list_of_changes_each_naming_his_words():
     assert "..." not in content.rsplit("\n\n", 1)[0]
 
 
-def test_asking_the_model_sends_one_question_that_reads_long_and_leaves_the_model_loaded():
+@pytest.mark.parametrize(("characters", "window"), [(10_000, 8192), (16_000, 16384),
+                                                     (38_000, 16384), (45_000, 32768)])
+def test_the_model_reads_in_the_smallest_window_that_holds_the_question(characters, window):
+    sent = {}
+
+    def ask(messages, **settings):
+        sent.update(settings)
+        return {"message": {"content": '{"changes": []}'}}
+
+    known = WhatIsKnown(exchange=(("x" * characters, ""),))
+    ask_the_model("a woman", "", "a hat", known, llm=ask)
+
+    assert sent["reads_tokens"] == window
+
+
+def test_asking_the_model_sends_one_question_and_leaves_the_model_loaded():
     sent = {}
 
     def ask(messages, **settings):
@@ -392,7 +428,7 @@ def test_asking_the_model_sends_one_question_that_reads_long_and_leaves_the_mode
     assert "a woman, tan" in sent["messages"][-1]["content"]
     assert sent["settings"]["json_answer"] is True
     assert sent["settings"]["model"] == config.REQUEST_LLM_MODEL != config.LOCAL_LLM_MODEL
-    assert sent["settings"]["reads_tokens"] > 16000
+    assert sent["settings"]["reads_tokens"] == 8192
     assert sent["settings"]["stays_loaded"] == f"{config.REQUEST_MODEL_STAYS_LOADED_S + 60}s"
     assert "thinks" not in sent["settings"]
 

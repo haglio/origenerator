@@ -31,6 +31,7 @@ PROMPTS = {"positive": "Positive Prompt", "negative": "Negative Prompt"}
 _NO_REASON = "The model gave no change and no reason, so nothing changed."
 _NONE_OF_IT_HIS = "None of the model's changes had to do with what you asked, so nothing changed."
 _NO_WORDS = "The model's change named no words, so nothing changed."
+_NOT_IN_THE_NEGATIVE_PROMPT = "The Negative Prompt doesn't have {}, so nothing was taken out of it."
 _LEFT_AS_IT_WAS = "The model's change left {} as it was in the {}, so nothing changed."
 _CALLED_FOR = "The Positive Prompt asks for {}, so it wasn't kept out of the Negative Prompt."
 _SAYING_NOTHING = frozenset({
@@ -532,7 +533,7 @@ class _Applying:
         if len(parts) > 1:
             parts = [part for part in parts if self._names_what_he_asked(part)]
         if which == "negative" and asked and not parts:
-            return []
+            return [_NOT_IN_THE_NEGATIVE_PROMPT.format(_quoted(part)) for part in asked]
         if not parts:
             self._nothing_taken_out(text, asked)
             return []

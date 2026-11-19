@@ -286,14 +286,14 @@ def keep_off_the_device(setattr) -> None:
     setattr(osr2_motion_driver, "_TickThread", _NoTicker)
 
 
-def finish_every_video_on_the_tests_own_thread(setattr) -> None:
+def finish_every_job_on_the_tests_own_thread(setattr) -> None:
     setattr(generation_job, "run_off_thread", lambda work, done, *, owner: done(work()))
 
 
 @pytest.fixture(autouse=True)
 def _never_take_the_real_device(monkeypatch):
     keep_off_the_device(monkeypatch.setattr)
-    finish_every_video_on_the_tests_own_thread(monkeypatch.setattr)
+    finish_every_job_on_the_tests_own_thread(monkeypatch.setattr)
 
 
 @pytest.fixture(scope="session")

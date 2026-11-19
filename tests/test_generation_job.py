@@ -32,6 +32,7 @@ from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.children import HANG_AFTER_S
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.media_files import write_mp4
+from tests.never_answered import NeverAnswered
 
 SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
 I2V = WORKFLOW_REGISTRY["wan22_i2v"]
@@ -99,7 +100,8 @@ def test_a_submit_run_off_the_window_touches_nothing_of_the_jobs_there(
 
     job.start(_off_the_gui_thread)
 
-    assert touched_on == [threading.get_ident()] * 4, (
+    assert len(touched_on) >= 4
+    assert set(touched_on) == {threading.get_ident()}, (
         "the slow submit may run on another thread, while the job's signals and state are only "
         "ever touched on the thread that started it")
 
@@ -264,6 +266,108 @@ def _video_job_that_has_rendered(tmp_path, *, run):
     saved = write_mp4(places.comfyui / subfolder / "wan22_i2v_00001_.mp4")
     return job, saved, {"outputs": {"19": {"images": [{"filename": saved.name,
                                                        "subfolder": subfolder}]}}}
+
+
+def _image_job_that_has_rendered(tmp_path, *, run):
+    places = OutputPlaces.in_one_folder(tmp_path / "out")
+    job = GenerationJob(_client(), JobSpec(SDXL, SDXL.default_params(), prompt_id="comfy-A"),
+                        JobFolders(places=places, thumb_dir=tmp_path / "thumbs"), run=run)
+    job.start()
+    subfolder = places.run("comfy-A").relative_to(places.comfyui).as_posix() + "/image"
+    saved = places.comfyui / subfolder / "sdxl_t2i_00001_.png"
+    saved.parent.mkdir(parents=True)
+    Image.new("RGB", (10, 10), (200, 50, 50)).save(saved)
+    return job, saved, {"outputs": {"7": {"images": [{"filename": saved.name,
+                                                      "subfolder": subfolder}]}}}
+
+
+def test_a_finished_image_is_filed_off_the_window_thread(qtbot, tmp_path):
+    later = _Later()
+    job, saved, history = _image_job_that_has_rendered(tmp_path, run=later)
+    finished = []
+    job.finished.connect(lambda *a: finished.append(a))
+
+    job._client.job_completed.emit("comfy-A", history)
+
+    assert saved.exists(), "the window's thread filed the image into the library itself"
+    assert finished == []
+    assert display_status(job.state) == JobState.RUNNING
+    later.finish_next()
+    assert not saved.exists()
+    assert len(finished) == 1
+    assert job.state == JobState.FINISHED
+
+
+def _filing_refused(monkeypatch):
+    def refused(*_args, **_kwargs):
+        raise PermissionError("made-up refusal to move the file")
+    monkeypatch.setattr(generation_job_module, "extract_completion", refused)
+
+
+def test_an_image_whose_filing_fails_is_filed_again_at_the_next_look(
+        qtbot, tmp_path, monkeypatch):
+    later = _Later()
+    job, saved, history = _image_job_that_has_rendered(tmp_path, run=later)
+    job._client.node_executing.emit("comfy-A", "5")
+    finished = []
+    job.finished.connect(lambda *a: finished.append(a))
+    job._client.job_completed.emit("comfy-A", history)
+    with monkeypatch.context() as refusing:
+        _filing_refused(refusing)
+        later.finish_next()
+
+    assert job.state == JobState.RUNNING
+    job.reconcile_with(history)
+    later.finish_next()
+    assert len(finished) == 1
+    assert not saved.exists()
+
+
+def test_a_video_whose_filing_fails_waits_for_the_watcher_left_at_closing(
+        qtbot, tmp_path, monkeypatch):
+    later = _Later()
+    job, saved, history = _video_job_that_has_rendered(tmp_path, run=later)
+    finished = []
+    job.finished.connect(lambda *a: finished.append(a))
+    job._client.job_completed.emit("comfy-A", history)
+    _filing_refused(monkeypatch)
+
+    later.finish_next()
+    job.reconcile_with(history)
+
+    assert job.state == JobState.FINISHING
+    assert later.waiting == []
+    assert finished == []
+    assert saved.exists()
+
+
+def test_an_image_canceled_before_its_filing_ran_stays_where_comfyui_saved_it(qtbot, tmp_path):
+    later = _Later()
+    job, saved, history = _image_job_that_has_rendered(tmp_path, run=later)
+    finished = []
+    job.finished.connect(lambda *a: finished.append(a))
+    job._client.job_completed.emit("comfy-A", history)
+
+    job.cancel()
+    later.finish_next()
+
+    assert finished == []
+    assert job.state == JobState.CANCELED
+    assert saved.exists()
+
+
+def test_a_filing_the_window_never_heard_back_from_is_told_once_when_settled(qtbot, tmp_path):
+    run = NeverAnswered()
+    job, saved, history = _image_job_that_has_rendered(tmp_path, run=run)
+    finished = []
+    job.finished.connect(lambda *a: finished.append(a))
+    job._client.job_completed.emit("comfy-A", history)
+
+    job.settle()
+    run.answer_late()
+
+    assert len(finished) == 1
+    assert not saved.exists()
 
 
 def test_a_video_is_not_complete_until_its_thumbnail_is_ready_to_animate(qtbot, tmp_path):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import threading
 from pathlib import Path
 
 from app_support.video_names import stem_as_made
@@ -15,6 +16,8 @@ from origenerator.workflows.base import silent_copies_of
 from origenerator.workflows.video_writer import VIDEO_WRITER
 
 ADD_ON_SCRATCH = frozenset({"VRGDG_TEMP"})
+
+filing_one_at_a_time = threading.Lock()
 
 
 def saving_into_its_run_folder(payload: dict, places: OutputPlaces, prompt_id: str) -> dict:
@@ -56,6 +59,12 @@ def _videos_comfyui_reports(names: list[str]) -> list[str]:
 
 
 def file_into_library(files: list[dict], places: OutputPlaces, prompt_id: str) -> list[dict]:
+    with filing_one_at_a_time:
+        return _file_the_run_into_the_library(files, places, prompt_id)
+
+
+def _file_the_run_into_the_library(files: list[dict], places: OutputPlaces,
+                                   prompt_id: str) -> list[dict]:
     run = _run_subfolder(places, prompt_id)
     held = _numbers_given(places)
     homes = _Homes()
@@ -75,6 +84,11 @@ def file_into_library(files: list[dict], places: OutputPlaces, prompt_id: str) -
 def file_what_comfyui_left(places: OutputPlaces) -> int:
     if places.keeps_outputs_in_comfyuis_folder():
         return 0
+    with filing_one_at_a_time:
+        return _file_everything_comfyui_left(places)
+
+
+def _file_everything_comfyui_left(places: OutputPlaces) -> int:
     held, homes = _numbers_given(places), _Homes()
     return sum(_file_everything_under(top, places, held, homes) for top in folders_in(places.comfyui)
                if top != places.working and top.name not in ADD_ON_SCRATCH)

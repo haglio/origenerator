@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -14,6 +15,7 @@ from origenerator import comfyui_api, speech
 from origenerator.completion import animate_before_filing, extract_completion
 from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.generation_state import GenerationSource
+from origenerator.gui.errand import Errand
 from origenerator.gui.job_speaker import Speaker
 from origenerator.gui.job_spec import NO_FOLDERS, JobFolders, JobSpec
 from origenerator.gui.off_thread import run_off_thread
@@ -87,6 +89,8 @@ class GenerationJob(QObject):
         self._thumb_dir = folders.thumb_dir
         self._state = JobState.IDLE
         self._stages = stage_names(self.payload)
+        self._filing: Errand | None = None
+        self._filing_canceled = threading.Event()
         self._forget_the_run()
 
     def _forget_the_run(self):
@@ -248,6 +252,7 @@ class GenerationJob(QObject):
         self.failed.emit(message)
 
     def cancel(self):
+        self._filing_canceled.set()
         self._detach()
         self._stop_on_server()
         self._state = JobState.CANCELED
@@ -359,29 +364,45 @@ class GenerationJob(QObject):
 
     def _finish(self, history_data: dict):
         self._detach()
+        held_before, self._state = self._state, JobState.FINISHING
+        canceled = self._filing_canceled = threading.Event()
+        workflow, places, thumb_dir, prompt_id, params = (
+            self.workflow, self._places, self._thumb_dir, self.prompt_id, self.params)
+        video = self.media_type == MediaType.VIDEO
 
-        def record_what_it_made(_nothing=None):
-            if self._state == JobState.CANCELED:
-                return
-            files, thumb, duration = extract_completion(
-                self.workflow, history_data, OutputFolders(self._places, self._thumb_dir),
-                self.prompt_id, params=self.params,
-            )
-            if not files:
-                self._state = JobState.FAILED
-                self.failed.emit(_NO_OUTPUT_MESSAGE)
-                return
-            self._state = JobState.FINISHED
-            self.finished.emit(files, thumb, duration)
+        def file_what_it_made():
+            if video:
+                animate_before_filing(workflow, history_data, places, thumb_dir, prompt_id)
+            if canceled.is_set():
+                return None
+            return extract_completion(workflow, history_data, OutputFolders(places, thumb_dir),
+                                      prompt_id, params=params)
 
-        if self.media_type != MediaType.VIDEO:
-            record_what_it_made()
+        self._filing = Errand(file_what_it_made,
+                              lambda filing: self._filed(filing, held_before)).send(
+            owner=self, run=self._run)
+
+    def _filed(self, filing: Errand, held_before: JobState) -> None:
+        if self._state == JobState.CANCELED:
             return
-        self._state = JobState.FINISHING
-        workflow, places, thumb_dir, prompt_id = (self.workflow, self._places, self._thumb_dir,
-                                                  self.prompt_id)
-        self._run(lambda: animate_before_filing(workflow, history_data, places, thumb_dir, prompt_id),
-                  record_what_it_made, owner=self)
+        if filing.error is not None:
+            if self.media_type != MediaType.VIDEO:
+                self._state = (JobState.QUEUED if held_before == JobState.IDLE
+                               else held_before)
+            return
+        if filing.value is None:
+            return
+        files, thumb, duration = filing.value
+        if not files:
+            self._state = JobState.FAILED
+            self.failed.emit(_NO_OUTPUT_MESSAGE)
+            return
+        self._state = JobState.FINISHED
+        self.finished.emit(files, thumb, duration)
+
+    def settle(self) -> None:
+        if self._filing is not None:
+            self._filing.settle()
 
     def _on_error(self, prompt_id: str, message: str):
         if not self._is_mine(prompt_id):

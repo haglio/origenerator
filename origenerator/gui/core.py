@@ -150,6 +150,7 @@ class Core(QMainWindow):
         self._app_state = app_state
         self._next_launch = launch.next_launch
         self._fun_time = fun_time
+        self._he_said_yes_to_closing = False
         self._taskbar = launch.taskbar
         preview = launch.preview
 
@@ -397,7 +398,7 @@ class Core(QMainWindow):
         _run_on_its_own(self._remind_to_turn_off_the_osr2)
 
     def _remind_to_turn_off_the_osr2(self) -> None:
-        if self._fun_time is None:
+        if self._he_said_yes_to_closing:
             osr2.ask_for_the_turn_off_reminder()
 
     def hand_comfyui_what_runs_while_closed(self) -> None:
@@ -414,7 +415,9 @@ class Core(QMainWindow):
     def _sure_to_close(self) -> bool:
         if self._fun_time is not None:
             return True
-        return sure(self, "Close Origenerator", "Are you sure you want to close Origenerator?")
+        self._he_said_yes_to_closing = sure(
+            self, "Close Origenerator", "Are you sure you want to close Origenerator?")
+        return self._he_said_yes_to_closing
 
     def _persist_session(self) -> None:
         for key, getter, _setter in SESSION_UI_STATE:

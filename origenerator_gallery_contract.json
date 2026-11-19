@@ -77,6 +77,12 @@
     "-m",
     "origenerator.ai_video_records"
   ],
+  "phones_file_command": [
+    ".venv/Scripts/python.exe",
+    "-m",
+    "origenerator.ai_video_records",
+    "phones_file"
+  ],
   "outside_workflow_prefixes": {
     "video": "outside:",
     "image_to_video": "outside image-to-video:",

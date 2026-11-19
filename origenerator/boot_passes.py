@@ -132,6 +132,12 @@ def _record_shapes(library: Library):
     return record_shapes(library.db)
 
 
+def _record_video_lengths(library: Library):
+    from origenerator.video_lengths import record_video_lengths
+
+    return record_video_lengths(library.db, library.places)
+
+
 def _read_actions_off_earlier_answers(library: Library):
     from origenerator.former_actions import fill_in_actions
 
@@ -201,6 +207,9 @@ MAINTENANCE = (
     BootPass(None, _record_shapes,
              counted="Recorded the shape of %d item(s)",
              failure="Recording shapes failed: %s"),
+    BootPass(None, _record_video_lengths,
+             counted="Recorded how long %d video(s) run",
+             failure="Recording how long videos run failed: %s"),
     BootPass(None, _read_actions_off_earlier_answers,
              counted="Read the actions of %d item(s) off their earlier answers",
              failure="Reading actions off earlier answers failed: %s"),

@@ -9,12 +9,12 @@ from origenerator import collection_notes, downtime, flick_finales, gallery, lor
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.comfyui_inputs import ComfyFolders
 from origenerator.db import Database
-from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.job_queue import JobQueue
 from origenerator.output_places import OutputPlaces
 from origenerator.workflows import WORKFLOW_REGISTRY, detail_parts
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.test_flick_finales import a_flick_sent_to_genau
+from tests.unsent_jobs import leave_every_job_unsent
 
 
 @dataclass
@@ -93,7 +93,7 @@ class _Proposing:
 
 def test_the_work_left_tries_experiments_from_the_policy_handed_in_only_while_they_are_on(
         qtbot, tmp_path, monkeypatch):
-    monkeypatch.setattr(GenerationJob, "start", lambda self, submit=None: None)
+    leave_every_job_unsent(monkeypatch)
     db = Database(tmp_path / "t.db")
     jobs = JobQueue(db, ComfyUIClient(folders=SUITE_FOLDERS))
     workflow = WORKFLOW_REGISTRY["sdxl_t2i"]
@@ -113,7 +113,7 @@ def test_the_work_left_tries_experiments_from_the_policy_handed_in_only_while_th
 
 def test_the_work_left_queues_a_video_for_each_genau_flick_only_while_those_are_on(
         qtbot, tmp_path, monkeypatch):
-    monkeypatch.setattr(GenerationJob, "start", lambda self, submit=None: None)
+    leave_every_job_unsent(monkeypatch)
     db = Database(tmp_path / "t.db")
     jobs = JobQueue(db, ComfyUIClient(folders=SUITE_FOLDERS))
     a_flick_sent_to_genau(db)

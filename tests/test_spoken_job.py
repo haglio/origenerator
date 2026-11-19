@@ -35,8 +35,13 @@ class _Speaker:
         self.asked.append((params, None, None))
 
 
-def _from_a_window(post):
-    post()
+def _from_a_window(post, posted):
+    try:
+        post()
+    except Exception as e:
+        posted(e)
+        return
+    posted(None)
 
 
 def _client():

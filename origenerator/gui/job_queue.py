@@ -3,21 +3,27 @@ from __future__ import annotations
 import json
 import logging
 import math
-import threading
 import time
 import weakref
 from itertools import pairwise
 from types import SimpleNamespace
 
 from app_support.gallery_rows import source_of
-from PySide6.QtCore import QCoreApplication, QEventLoop, QObject, QTimer, Signal
+from PySide6.QtCore import QObject, QTimer, Signal
 
 from origenerator import comfyui_api, comfyui_launcher, gallery, queue_line
 from origenerator.completion import mark_generation_completed
 from origenerator.config import COMFYUI_DIR, COMFYUI_HOST, COMFYUI_PORT
 from origenerator.generation_config import filled_params, prepared_params
 from origenerator.generation_state import GenerationSource, GenerationStatus
-from origenerator.gui.generation_job import GenerationJob, JobPlan, JobSpec, JobState
+from origenerator.gui.errand import Errand
+from origenerator.gui.generation_job import (
+    GenerationJob,
+    JobPlan,
+    JobSpec,
+    JobState,
+    wait_for_the_stops_on_their_way,
+)
 from origenerator.gui.job_records import (
     insert_generation_row,
     record_canceled_run,
@@ -59,28 +65,8 @@ def _the_item_it_is_about(db, job) -> str:
     return row.get("enhance_of") or job.prompt_id
 
 
-def _off_the_gui_thread(run) -> None:
-    """ComfyUI can take a minute to accept a prompt; waiting on the GUI thread freezes the window, so the wait runs on a thread while this one pumps events."""
-    app = QCoreApplication.instance()
-    if app is None:
-        run()
-        return
-    outcome: list = []
-
-    def target():
-        try:
-            run()
-            outcome.append(None)
-        except BaseException as e:
-            outcome.append(e)
-
-    worker = threading.Thread(target=target, name="comfyui-submit", daemon=True)
-    worker.start()
-    while worker.is_alive():
-        app.processEvents(QEventLoop.ProcessEventsFlag.AllEvents, 50)
-        worker.join(0.02)
-    if outcome and outcome[0] is not None:
-        raise outcome[0]
+def hand_over_off_the_window_thread(work, done, *, owner) -> None:
+    run_off_thread(work, done, owner=owner, waits_long=True)
 
 
 def _the_users_own(source: str) -> bool:
@@ -138,6 +124,7 @@ class JobQueue(QObject):
         self._on_server: list[GenerationJob] = []
         self._waiting: list[GenerationJob] = []
         self._in_flight: GenerationJob | None = None
+        self._sending: list[Errand] = []
         self._takes_over_on_landing: GenerationJob | None = None
         self._first: frozenset[str] = frozenset()
         self._training = None
@@ -334,12 +321,7 @@ class JobQueue(QObject):
             if (wait := self._wait_at_the_front()) > 0:
                 self._videos_wait.start(math.ceil(wait * 1000))
                 return
-            job = self._waiting.pop(0)
-            if not self._hand_over(job):
-                continue
-            newcomer, self._takes_over_on_landing = self._takes_over_on_landing, None
-            if newcomer is not None and self._key_of(newcomer) is not None:
-                self._set_aside_for(newcomer)
+            self._hand_over(self._waiting.pop(0))
 
     def start_now(self) -> None:
         self._image_asked_at = None
@@ -363,31 +345,53 @@ class JobQueue(QObject):
             self._waiting[0],
             None if self._image_asked_at is None else self._clock() - self._image_asked_at)
 
-    def _hand_over(self, job: GenerationJob) -> bool:
-        key = self._key_of(job)
+    def _hand_over(self, job: GenerationJob) -> None:
+        self._in_flight = job
+        job.start(self._send, lambda error: self._comfyui_answered(job, error))
+
+    def _send(self, post, posted) -> None:
+        self._sending = [errand for errand in self._sending if not errand.told]
+        self._sending.append(Errand(post, lambda sent: posted(sent.error)).send(
+            owner=self, run=hand_over_off_the_window_thread))
+
+    def _comfyui_answered(self, job: GenerationJob, error: Exception | None) -> None:
+        if self._took_the_answer(job, error):
+            newcomer, self._takes_over_on_landing = self._takes_over_on_landing, None
+            if newcomer is not None and self._key_of(newcomer) is not None:
+                self._set_aside_for(newcomer)
+        self._pump()
+        if not self._closed:
+            self.changed.emit()
+
+    def _hand_over_here(self, job: GenerationJob) -> bool:
         self._in_flight = job
         try:
-            job.start(None if self._closed else _off_the_gui_thread)
+            job.start()
         except Exception as e:
-            if self._key_of(job) is None:
+            return self._took_the_answer(job, e)
+        return self._took_the_answer(job, None)
+
+    def _took_the_answer(self, job: GenerationJob, error: Exception | None) -> bool:
+        self._in_flight = None
+        key = self._key_of(job)
+        if error is not None:
+            if key is None:
                 pass
-            elif comfyui_api.unreachable(e) and self._closed:
+            elif comfyui_api.unreachable(error) and self._closed:
                 self._waiting.insert(0, job)
-            elif comfyui_api.unreachable(e) and self._bring_up_comfyui is not None:
+            elif comfyui_api.unreachable(error) and self._bring_up_comfyui is not None:
                 self._hold_for_comfyui(job)
             elif self._closed and _the_users_own(job.source):
                 logger.warning("Left %s for the next launch to send: ComfyUI refused it as "
-                               "the app closed: %s", key, e)
+                               "the app closed: %s", key, error)
                 self._drop(key, job)
             else:
-                logger.warning("Re-roll submission failed for %s: %s", key, e)
-                self._refuse(key, job, str(e))
+                logger.warning("Re-roll submission failed for %s: %s", key, error)
+                self._refuse(key, job, str(error))
             return False
-        finally:
-            self._in_flight = None
         if job.state == JobState.FINISHED:
             return False
-        if self._key_of(job) is None:
+        if key is None:
             job.cancel()
             return False
         self._on_server.append(job)
@@ -433,9 +437,13 @@ class JobQueue(QObject):
 
     def flush_to_server(self) -> int:
         self.close()
+        for sending in list(self._sending):
+            sending.settle()
         self._settle_the_filings()
+        wait_for_the_stops_on_their_way()
         handed = self._hand_comfyui_the_line()
         self._settle_the_filings()
+        wait_for_the_stops_on_their_way()
         return handed
 
     def _settle_the_filings(self) -> None:
@@ -452,7 +460,7 @@ class JobQueue(QObject):
                             "graphics card with what ComfyUI is making", job.prompt_id)
                 continue
             self._waiting.remove(job)
-            if self._hand_over(job):
+            if self._hand_over_here(job):
                 handed += 1
             elif self._waiting and self._waiting[0] is job:
                 logger.info("Left %d queued job(s) for the next launch: ComfyUI did not answer",

@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import logging
 import threading
 
 from origenerator.gui.off_thread import run_off_thread
-
-logger = logging.getLogger(__name__)
 
 
 class Errand:
@@ -25,10 +22,13 @@ class Errand:
         try:
             self.value = self._work()
         except Exception as e:
-            logger.warning("An errand off the window's thread failed", exc_info=True)
             self.error = e
         finally:
             self._done.set()
+
+    @property
+    def told(self) -> bool:
+        return self._told
 
     def _tell(self, _nothing=None) -> None:
         if self._told:

@@ -83,7 +83,7 @@
     "tests/test_inflight_tile.py": 5,
     "tests/test_item_area.py": 1,
     "tests/test_item_tile.py": 4,
-    "tests/test_job_queue.py": 9,
+    "tests/test_job_queue.py": 8,
     "tests/test_job_queue_view.py": 22,
     "tests/test_link_listener.py": 5,
     "tests/test_link_tip.py": 1,

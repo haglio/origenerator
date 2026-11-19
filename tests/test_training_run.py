@@ -62,7 +62,7 @@ _EACH_WRITE_ITS_OWN_TIME = itertools.count()
 def _say(tmp_path, **status) -> None:
     path = Path(tmp_path / "status.json")
     path.write_text(json.dumps(status), encoding="utf-8")
-    when = time.time_ns() + next(_EACH_WRITE_ITS_OWN_TIME) * 10_000_000
+    when = path.stat().st_mtime_ns + next(_EACH_WRITE_ITS_OWN_TIME) * 10_000_000
     os.utime(path, ns=(when, when))
 
 

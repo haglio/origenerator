@@ -184,14 +184,8 @@ class _Entry:
 @dataclass(frozen=True)
 class _Folder:
     key: str
-    stems: frozenset[str]
-    tags: tuple[tuple[str, ...], ...]
+    name: tuple[str, ...]
     prompt_ids: frozenset[str]
-
-    def answers(self, term: QueryTerm) -> bool:
-        if term.side_by_side:
-            return _said_in(self.tags, term.side_by_side)
-        return bool(_field_score(term, self.stems))
 
 
 def query_words(query: str) -> tuple[str, ...]:
@@ -345,7 +339,7 @@ class GallerySearch:
             order.append(prompt_id)
         self._entries = entries
         self._order = order
-        self._folders = [_Folder(folder.key, _stems(folder.name), _tags(folder.name),
+        self._folders = [_Folder(folder.key, tuple(_words(folder.name)),
                                  frozenset(folder.prompt_ids) & entries.keys())
                          for folder in folders]
 
@@ -362,10 +356,13 @@ class GallerySearch:
         terms = parse_query(query, synonyms=self._synonyms)
         if not terms:
             return SearchOutcome((), ())
+        named = [folder for folder in self._folders if folder.name == tuple(_words(query))
+                 and (folder.prompt_ids if within is None else folder.prompt_ids & within)]
+        inside_a_named_folder = frozenset().union(*(folder.prompt_ids for folder in named))
         results = []
-        reached: set[str] = set()
+        reached: set[str] = {term.text for term in terms} if named else set()
         for prompt_id in self._order:
-            if within is not None and prompt_id not in within:
+            if (within is not None and prompt_id not in within) or prompt_id in inside_a_named_folder:
                 continue
             entry = self._entries[prompt_id]
             scores = [_term_score(term, entry) for term in terms]
@@ -377,9 +374,7 @@ class GallerySearch:
         return SearchOutcome(
             tuple(results),
             tuple(term.text for term in terms if term.text not in reached),
-            tuple(folder.key for folder in self._folders
-                  if (folder.prompt_ids if within is None else folder.prompt_ids & within)
-                  and all(folder.answers(term) for term in terms)),
+            tuple(folder.key for folder in named),
         )
 
 

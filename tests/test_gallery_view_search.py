@@ -30,7 +30,6 @@ from origenerator.gallery.collection import (
 )
 from origenerator.gallery.shapes import LANDSCAPE, SHAPE_LABELS
 from origenerator.gui.gallery_view import GalleryView
-from origenerator.workflows.non_ai import non_ai_workflow
 from tests.gallery_view_support import (
     _NO_MOD,
     FakeActions,
@@ -452,7 +451,7 @@ def test_a_folder_you_named_is_found_by_that_name(qtbot):
     view._tree.setCurrentItem(_top_level(view._tree)["All"])
     _search_for(view, "beach trip")
 
-    assert view.listed_prompt_ids() == ["i2"]
+    assert (len(view._gallery_pane._listed_folders), view.listed_prompt_ids()) == (1, [])
 
 
 def test_a_folder_of_your_own_made_since_the_last_rebuild_is_found_by_its_name(qtbot):
@@ -467,10 +466,9 @@ def test_a_folder_of_your_own_made_since_the_last_rebuild_is_found_by_its_name(q
     view._tree.setCurrentItem(_top_level(view._tree)["All"])
     _search_for(view, "beach trip")
 
-    assert view.listed_prompt_ids() == ["i2"], (
-        "a row is indexed under the names of the folders it sits in, so the indexing waits "
-        "until this rebuild has read the user's own folders; indexed earlier it would carry the "
-        "last rebuild's folder names")
+    assert len(view._gallery_pane._listed_folders) == 1, (
+        "the folders are named to the search once this rebuild has read the folders of his own; "
+        "named earlier it would carry the folder names of the last rebuild")
 
 
 def test_a_folder_is_found_by_the_code_the_tree_shows_for_it(qtbot):
@@ -482,10 +480,10 @@ def test_a_folder_is_found_by_the_code_the_tree_shows_for_it(qtbot):
 
     _search_for(view, code)
 
-    assert view.listed_prompt_ids() == ["i2"]
+    assert (len(view._gallery_pane._listed_folders), view.listed_prompt_ids()) == (1, [])
 
 
-def test_the_workflow_folder_a_search_names_is_the_first_tile(qtbot):
+def test_the_workflow_folder_a_search_names_shows_without_its_items(qtbot):
     view = GalleryView(database_of([_i2v_video("v1", "styleA"), _image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
@@ -494,8 +492,8 @@ def test_the_workflow_folder_a_search_names_is_the_first_tile(qtbot):
 
     _search_for(view, workflow.text(0))
 
-    assert view._gallery_pane._listed_folders[:1] == [_key(workflow)]
-    assert view.listed_prompt_ids() == ["v1"]
+    assert view._gallery_pane._listed_folders == [_key(workflow)]
+    assert view.listed_prompt_ids() == []
 
 
 def test_an_item_is_found_by_the_name_it_wears(qtbot):
@@ -730,7 +728,7 @@ def test_a_search_too_wide_to_draw_says_so_and_says_what_to_do(qtbot):
         "scroll to")
 
 
-def test_several_hits_in_one_folder_come_back_as_that_folder(qtbot):
+def test_several_hits_in_one_folder_come_back_as_the_items(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
             _image("i3", "a cat", 50, 3), _image("i4", "a dog", 50, 4)]
     view = GalleryView(database_of(rows))
@@ -739,43 +737,11 @@ def test_several_hits_in_one_folder_come_back_as_that_folder(qtbot):
 
     _search_for(view, "cat")
 
-    assert view.listed_prompt_ids() == [], (
-        "a settings folder's rows share a prompt and differ only by seed, so a prompt match hits all "
-        "of them, and near-copies of one image bury every other place the query reached")
-    assert len(view._gallery_pane._listed_folders) == 1
-    assert "1 result" in view.search._count.text()
-
-
-def test_a_folders_lone_hit_stays_the_item_itself(qtbot):
-    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
-    view = GalleryView(database_of(rows))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    _search_for(view, "cat")
-
-    assert view.listed_prompt_ids() == ["i1"], (
-        "a folder that answered once has nothing to collapse, and a folder tile there would hide "
-        "the image under a name")
+    assert sorted(view.listed_prompt_ids()) == ["i1", "i2", "i3"], (
+        "a folder shows only when the search is its whole name; every other match is itself")
     assert view._gallery_pane._listed_folders == []
+    assert "3 results" in view.search._count.text()
 
-
-def test_several_non_ai_videos_found_in_one_folder_come_back_as_the_videos(qtbot):
-    rows = [{**_row(prompt_id, non_ai_workflow("sample clips"),
-                    {"folder": "sample/clips/sorted", "title": title}, f"{prompt_id}.mp4"),
-             "source": "non_ai", "workflow_version": "non_ai"}
-            for prompt_id, title in (("n1", "Jane Doe - video one"), ("n2", "Jane Doe - video two"),
-                                     ("n3", "Sample Studio - video three"))]
-    view = GalleryView(database_of(rows))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    _search_for(view, "Jane")
-
-    assert sorted(view.listed_prompt_ids()) == ["n1", "n2"], (
-        "a folder of Non-AI videos is a folder on disk, whose videos have nothing in common but "
-        "where they are kept, so each one found is an answer of its own")
-    assert view._gallery_pane._listed_folders == []
 
 
 def test_opening_a_result_folder_puts_the_search_away(qtbot):
@@ -783,7 +749,8 @@ def test_opening_a_result_folder_puts_the_search_away(qtbot):
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    _search_for(view, "cat")
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
+    _search_for(view, _children_by_prompt(_at(_image_workflow(view._tree), 0, 0))["a cat"].text(0))
     (key,) = view._gallery_pane._listed_folders
 
     view._gallery_pane._drill_into(key)

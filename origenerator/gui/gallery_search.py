@@ -7,7 +7,6 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 from shared_ui.spacing import GAP_SMALL
 
 from origenerator import gallery, search
-from origenerator.gallery.non_ai import started_from_no_image
 from origenerator.gui.gallery_pane import SEARCH_DRAW_LIMIT
 from origenerator.gui.gallery_tree import PathStep, path_text
 from origenerator.gui.no_wheel import NoWheelDropdown
@@ -146,7 +145,8 @@ class GallerySearchController(QObject):
         scope = (SearchScope.everything(self._library.live_ids) if self._everywhere
                  else self._host.search_scope())
         self._outcome = self._index.search(self._query, within=scope.ids)
-        self._tiles = self._matched_folders_first(self._collapse_to_folders(self._outcome.results))
+        self._tiles = [*self._folders_named(), *(search.SearchTile(row=result.row, rows=[result.row])
+                                                for result in self._outcome.results)]
         self._host.name_search_on_screen(self._query, scope)
         self._count.setText(self._count_text())
         self.bar.show()
@@ -222,31 +222,10 @@ class GallerySearchController(QObject):
         if self._query:
             self.run()
 
-    def _matched_folders_first(self, tiles) -> list:
-        first = []
-        for key in self._outcome.folders:
-            group = self._toc.group_for_key(key)
-            if group is not None:
-                first.append(next((tile for tile in tiles if tile.group is group), None)
-                             or search.SearchTile(row=gallery.rows_under(group)[0],
-                                                  group=group, rows=[]))
-        return [*first, *(tile for tile in tiles if all(tile is not led for led in first))]
-
-    def _collapse_to_folders(self, results) -> list:
-        image_index = self._library.reading.image_index
-        by_folder: dict[str, list] = {}
-        for result in results:
-            key = gallery.settings_folder_key(result.row, image_index)
-            by_folder.setdefault(key, []).append(result.row)
-        tiles = []
-        for key, rows in by_folder.items():
-            near_copies = len(rows) > 1 and not started_from_no_image(rows[0])
-            group = self._toc.group_for_key(key) if near_copies else None
-            if group is not None:
-                tiles.append(search.SearchTile(row=rows[0], group=group, rows=list(rows)))
-            else:
-                tiles.extend(search.SearchTile(row=row, rows=[row]) for row in rows)
-        return tiles
+    def _folders_named(self) -> list:
+        groups = (self._toc.group_for_key(key) for key in self._outcome.folders)
+        return [search.SearchTile(row=gallery.rows_under(group)[0], group=group, rows=[])
+                for group in groups if group is not None]
 
     def _on_section_toggled(self, heading: str, collapsed: bool) -> None:
         if collapsed:

@@ -7,11 +7,16 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import NamedTuple
 
 from origenerator.comfyui_inputs import ComfyFolders, within_reach
 
 logger = logging.getLogger(__name__)
+
+_QUEUE_READ_THIS_POLL: ContextVar[dict | None] = ContextVar("queue_read_this_poll", default=None)
 
 # A busy ComfyUI that is answering can take a while. urllib's timeout limits a silence on the
 # socket, never the whole transfer, so ComfyUI streams a large download under it.
@@ -28,6 +33,15 @@ _ACCEPTANCE_GRACE_S = 15.0
 _ACCEPTANCE_POLL_S = 3.0
 # A stalled ComfyUI answers no ask at all, however long each one waits.
 _ACCEPTANCE_READ_TIMEOUT_S = 10.0
+
+
+@contextmanager
+def one_queue_read() -> Iterator[None]:
+    token = _QUEUE_READ_THIS_POLL.set({})
+    try:
+        yield
+    finally:
+        _QUEUE_READ_THIS_POLL.reset(token)
 
 
 class ForeignQueue(NamedTuple):
@@ -312,6 +326,12 @@ class ComfyUIApi:
         }
 
     def _fetch_queue_data(self, timeout: float = _HTTP_TIMEOUT_S) -> dict:
+        read = _QUEUE_READ_THIS_POLL.get()
+        if read is not None and self.base_url in read:
+            return read[self.base_url]
         url = f"{self.base_url}/queue"
         with urllib.request.urlopen(url, timeout=timeout) as resp:
-            return json.loads(resp.read())
+            data = json.loads(resp.read())
+        if read is not None:
+            read[self.base_url] = data
+        return data

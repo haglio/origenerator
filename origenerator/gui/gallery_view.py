@@ -31,7 +31,7 @@ from origenerator import (
 )
 from origenerator.action_setter_tool import SetterHost, ThrownInto
 from origenerator.branch_session import is_branch_session
-from origenerator.comfyui_api import format_execution_error
+from origenerator.comfyui_api import format_execution_error, one_queue_read
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     EVOLVER_SOURCE,
@@ -2240,10 +2240,24 @@ class _PollFacts(NamedTuple):
 
 
 def _fetch_poll_facts(client, targets) -> _PollFacts:
+    with one_queue_read():
+        return _poll_facts_from_one_queue_read(client, targets)
+
+
+def _still_listed(client) -> set[str]:
+    try:
+        return set(client.fetch_queue())
+    except Exception as e:
+        logger.debug("Could not read ComfyUI's queue: %s", e)
+        return set()
+
+
+def _poll_facts_from_one_queue_read(client, targets) -> _PollFacts:
     histories, backlogs, executing = {}, {}, frozenset()
     if client is not None:
+        listed = _still_listed(client)
         for prompt_id, state in targets:
-            if state in ("queued", "running"):
+            if state in ("queued", "running") and prompt_id not in listed:
                 try:
                     histories[prompt_id] = client.fetch_history(prompt_id)
                 except Exception as e:

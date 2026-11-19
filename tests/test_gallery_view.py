@@ -35,7 +35,7 @@ from origenerator import (
 )
 from origenerator.action_vocabulary import vocabulary
 from origenerator.branch_session import ENV_FLAG
-from origenerator.comfyui_api import ForeignQueue
+from origenerator.comfyui_api import ComfyUIApi, ForeignQueue
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
 from origenerator.gallery import output as gallery_output
@@ -2805,6 +2805,42 @@ def test_the_poll_fetch_asks_only_what_each_jobs_state_deserves():
     assert set(facts.histories) == {"q1", "r1"}
     assert facts.backlogs == {"q1": 2}
     assert facts.executing == {"q1"}
+
+
+class _Answer:
+    def __init__(self, body: dict) -> None:
+        self._body = json.dumps(body).encode()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc):
+        return False
+
+    def read(self):
+        return self._body
+
+
+def test_a_poll_of_many_waiting_jobs_reads_comfyui_s_queue_once(monkeypatch):
+    queue = {"queue_running": [[0, "r1", {}, {"client_id": "ours"}, []]],
+             "queue_pending": [[n, f"q{n}", {}, {"client_id": "ours"}, []] for n in (1, 2, 3)]}
+    asked = []
+
+    def answer(url, timeout=None):
+        asked.append(str(url).rsplit("/", 2)[-2:])
+        return _Answer(queue if str(url).endswith("/queue") else {})
+
+    monkeypatch.setattr("urllib.request.urlopen", answer)
+    api = ComfyUIApi(client_id="ours", folders=SUITE_FOLDERS)
+
+    facts = gallery_view_module._fetch_poll_facts(
+        api, [("q1", "queued"), ("q2", "queued"), ("q3", "queued"), ("r1", "running")])
+
+    assert len(asked) == 1, asked
+    assert facts.histories == {}
+    assert facts.backlogs == {"q1": 0, "q2": 0, "q3": 0}
+    assert facts.executing == {"r1"}
+    assert facts.foreign.total == 0
 
 
 def test_the_poll_asks_nothing_of_what_comfyui_is_making_while_no_job_waits_there():

@@ -1371,7 +1371,6 @@ def test_a_double_click_on_an_image_in_latest_plays_everything_latest_lists(qtbo
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
     slideshow = view.slideshows.open_in_its_folder(("i119.png", "image"), "i119")
-    qtbot.addWidget(slideshow.shown)
 
     assert len(slideshow._set.playlist.in_play_order()) == 120
     slideshow.close()
@@ -1386,7 +1385,6 @@ def test_a_double_clicked_tile_plays_its_folder_from_it(qtbot, monkeypatch):
 
     view._gallery_pane._thumbnail_double_clicked("i110")
     slideshow = view.slideshows.showing
-    qtbot.addWidget(slideshow.shown)
 
     assert len(slideshow._set.playlist.in_play_order()) == 120
     assert slideshow._set.current_prompt_id() == "i110"
@@ -1401,7 +1399,6 @@ def test_a_double_clicked_preview_plays_its_item_alone_locked(qtbot, monkeypatch
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
 
     slideshow = view.slideshows.open_on_preview(("i119.png", "image"), "i119")
-    qtbot.addWidget(slideshow.shown)
 
     assert [item[2] for item in slideshow._set.playlist.in_play_order()] == ["i119"]
     assert slideshow.locked
@@ -1542,6 +1539,9 @@ def test_a_hidden_gallery_stops_polling_and_takes_it_up_again_when_shown(qtbot):
 
 
 class _MinimizedCore:
+    def isVisible(self) -> bool:
+        return True
+
     def isMinimized(self) -> bool:
         return True
 
@@ -1580,7 +1580,6 @@ def test_a_minimized_gallery_under_an_open_slideshow_reads_on_its_tick(qtbot, mo
     view = _a_minimized_gallery(qtbot, monkeypatch)
     _select_first_leaf(view)
     view.slideshows.start()
-    qtbot.addWidget(view.slideshows.showing.shown)
     reads = []
     monkeypatch.setattr(view, "off_thread", lambda *hop: reads.append(hop))
 

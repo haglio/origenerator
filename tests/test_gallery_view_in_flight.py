@@ -87,7 +87,7 @@ from tests.gallery_view_support import (
 )
 from tests.qt_exec import faking_exec
 from tests.real_db import database_of, keep_on_disk, keep_rows_on_disk, put_rows
-from tests.slideshow_hud_support import engine_of, funestra_of
+from tests.slideshow_hud_support import engine_of, funestra_of, press_key_on
 
 _IMG_REROLL_HISTORY = {"outputs": {"7": {"images": [
     {"filename": "sdxl_new.png", "subfolder": "image", "type": "output"}]}}}
@@ -582,7 +582,6 @@ def test_a_generation_can_be_watched_fullscreen_while_it_is_still_being_made(
     _key, job = _a_streaming_run_listed_in_flight(view, client)
 
     win = _viewport_of(view).open_fullscreen()
-    qtbot.addWidget(win.shown)
     assert win._set.current_prompt_id() == job.prompt_id
     assert engine_of(win.shown).on_screen.read_bytes() == _png_bytes()
     win.tick()
@@ -611,7 +610,6 @@ def test_a_run_watched_fullscreen_lands_as_its_generation_among_its_folder(
     view.refresh()
     _key, job = _a_streaming_run_listed_in_flight(view, client)
     slideshow = _viewport_of(view).open_fullscreen()
-    qtbot.addWidget(slideshow.shown)
     funestra_of(slideshow.shown)
 
     _comfyui_finishes(client, job)
@@ -619,7 +617,7 @@ def test_a_run_watched_fullscreen_lands_as_its_generation_among_its_folder(
     assert [slide.prompt_id for slide in slideshow._set.playlist.in_play_order()] == \
         view.listed_prompt_ids()
     assert slideshow._set.playlist.current().prompt_id == job.prompt_id
-    qtbot.keyClick(slideshow.shown, Qt.Key.Key_Down)
+    press_key_on(slideshow, Qt.Key.Key_Down)
     assert view.enhance.run_of(view.row_for(job.prompt_id)) is not None
     slideshow.close()
 
@@ -631,7 +629,6 @@ def test_a_canceled_generation_is_taken_out_of_the_slideshow_watching_it(qtbot, 
     view.refresh()
     key, job = _a_streaming_run_listed_in_flight(view, client)
     slideshow = _double_click_slideshow(view, qtbot, media=None)
-    slideshow.shown.show()
     assert job.prompt_id in [slide.prompt_id for slide in slideshow._set.playlist.in_play_order()]
 
     view._cancel_reroll(key)
@@ -651,11 +648,10 @@ def test_a_canceled_generation_leaves_a_slideshow_of_a_saved_file_alone(qtbot, t
     key, _job = _running_reroll(view)
     _generating_tile(view).selected.emit()
     slideshow = _double_click_slideshow(view, qtbot)
-    slideshow.shown.show()
 
     view._cancel_reroll(key)
 
-    assert slideshow.shown.isVisible()
+    assert slideshow.is_showing()
     slideshow.close()
 
 
@@ -1408,7 +1404,6 @@ def test_an_open_slideshow_is_fed_the_same_queue_the_strip_shows(qtbot, monkeypa
     _select_first_leaf(view)
 
     view.slideshows.start()
-    qtbot.addWidget(view.slideshows.showing.shown)
     slideshow = view.slideshows.showing
 
     assert [item.key for item in slideshow.shown.queue_foot.hud_queue[0]] == view.job_queue.view.keys() == ["gen1"]
@@ -1437,7 +1432,6 @@ def test_a_row_dragged_in_the_slideshows_queue_moves_the_job_and_redraws_both_at
     view.refresh()
     _select_first_leaf(view)
     view.slideshows.start()
-    qtbot.addWidget(view.slideshows.showing.shown)
     slideshow = view.slideshows.showing
 
     slideshow.shown.queue_foot.move("w2", "w1")

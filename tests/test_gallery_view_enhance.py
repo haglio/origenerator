@@ -4,12 +4,8 @@ import json
 
 import pytest
 from PySide6.QtCore import (
-    QEvent,
     QPoint,
     Qt,
-)
-from PySide6.QtGui import (
-    QKeyEvent,
 )
 from PySide6.QtWidgets import (
     QPushButton,
@@ -33,7 +29,6 @@ from origenerator.gui.gallery_view import GalleryView
 from origenerator.output_places import OutputPlaces
 from tests.gallery_view_support import (
     _ENHANCE_HISTORY,
-    _NO_MOD,
     _SDXL,
     FakeActions,
     _click_off,
@@ -49,7 +44,7 @@ from tests.gallery_view_support import (
     _set_enhance,
 )
 from tests.real_db import keep_on_disk, keep_rows_on_disk
-from tests.slideshow_hud_support import funestra_of
+from tests.slideshow_hud_support import funestra_of, press_key_on
 
 
 def test_the_enhance_panes_button_lives_on_but_goes_dark_with_nothing_awaiting(qtbot, tmp_path):
@@ -600,10 +595,9 @@ def test_a_locked_slide_says_queued_until_comfyui_picks_its_run_up(qtbot, tmp_pa
     _select_first_leaf(view)
     view.slideshows.start()
     slideshow = view.slideshows.showing
-    qtbot.addWidget(slideshow.shown)
     funestra_of(slideshow.shown)
 
-    slideshow.shown.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))
+    press_key_on(slideshow, Qt.Key.Key_Down)
 
     (job,) = view._jobs.all_jobs
     assert slideshow.hud_item_note == "Enhancement queued"
@@ -811,9 +805,8 @@ def test_a_tick_tells_a_locked_slide_its_run_began_though_no_frame_has_come(qtbo
     _select_first_leaf(view)
     view.slideshows.start()
     slideshow = view.slideshows.showing
-    qtbot.addWidget(slideshow.shown)
     funestra_of(slideshow.shown)
-    slideshow.shown.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, _NO_MOD))
+    press_key_on(slideshow, Qt.Key.Key_Down)
     (job,) = view._jobs.all_jobs
     assert slideshow.hud_item_note == "Enhancement queued"
 

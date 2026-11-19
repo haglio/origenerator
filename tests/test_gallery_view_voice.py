@@ -49,7 +49,6 @@ from origenerator.voice.dictation import RequestDictation
 from origenerator.voice.listener import CommandAndRequestListener
 from origenerator.workflows import detail_parts
 from origenerator.workflows.detail_parts import DEFAULT_FIX_DENOISE
-from tests.closed_windows import is_closed
 from tests.conftest import FakeHearing
 from tests.gallery_view_support import (
     _REROLL_HISTORY,
@@ -242,7 +241,6 @@ def test_a_slideshow_opening_and_closing_leaves_the_mic_as_it_found_it(
     view._buttons.mic.setChecked(True)
 
     view.slideshows.start()
-    qtbot.addWidget(view.slideshows.showing.shown)
     assert view._voice.listener.commands_on
 
     view.slideshows.showing.close()
@@ -286,7 +284,6 @@ def _fix_slideshow(qtbot, tmp_path, monkeypatch, *detectors):
     _select_first_leaf(view)
     view._buttons.mic.setChecked(True)
     view.slideshows.start()
-    qtbot.addWidget(view.slideshows.showing.shown)
     return view
 
 
@@ -358,7 +355,6 @@ def test_start_slideshow_opens_one_at_the_standard_pace(qtbot, tmp_path, monkeyp
     view._voice.listener.speak_command("start slideshow")
 
     assert view.slideshows.showing is not None
-    qtbot.addWidget(view.slideshows.showing.shown)
     assert view.slideshows.showing.dwell_s == DEFAULT_S
     assert _will_move_on(view.slideshows.showing)
     view.slideshows.showing.close()
@@ -370,7 +366,6 @@ def test_open_slideshow_says_the_same_thing(qtbot, tmp_path, monkeypatch):
     view._voice.listener.speak_command("open slideshow")
 
     assert view.slideshows.showing is not None
-    qtbot.addWidget(view.slideshows.showing.shown)
     view.slideshows.showing.close()
 
 
@@ -391,7 +386,6 @@ def test_pause_slideshow_pauses_the_whole_room_as_esc_does_and_play_slideshow_pl
     view = _voiceable(qtbot, tmp_path, monkeypatch)
     view._voice.listener.speak_command("start slideshow")
     slideshow = view.slideshows.showing
-    qtbot.addWidget(slideshow.shown)
 
     view._voice.listener.speak_command("pause slideshow")
     assert omnipause.frozen()
@@ -411,12 +405,10 @@ def test_stopping_the_slideshow_closes_it(qtbot, tmp_path, monkeypatch, said):
     view = _voiceable(qtbot, tmp_path, monkeypatch)
     view._voice.listener.speak_command("start slideshow")
     slideshow = view.slideshows.showing
-    qtbot.addWidget(slideshow.shown)
-    slideshow.shown.show()
 
     view._voice.listener.speak_command(said)
 
-    assert is_closed(slideshow.shown)
+    assert not slideshow.is_showing()
     assert view.slideshows.showing is None
 
 
@@ -439,7 +431,6 @@ def test_start_slideshow_is_heard_with_no_slideshow_and_no_populate(qtbot, tmp_p
     view._voice.listener.speak_command("start slideshow")
 
     assert view.slideshows.showing is not None
-    qtbot.addWidget(view.slideshows.showing.shown)
     view.slideshows.showing.close()
 
 
@@ -1068,7 +1059,6 @@ def test_a_collection_name_said_over_a_slideshow_still_moves_the_toc(
     view = _listening(qtbot, tmp_path, db=db)
     _select_first_leaf(view)
     view.slideshows.start()
-    qtbot.addWidget(view.slideshows.showing.shown)
 
     view._voice.listener.speak("go to experiments")
 

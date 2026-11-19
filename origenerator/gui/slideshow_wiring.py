@@ -118,6 +118,7 @@ class DirectorSurroundings:
     radio: object = None
     buttons_of: Callable | None = None
     two_screens: object = None
+    own_funestras: object = None
 
 
 @dataclass(frozen=True)

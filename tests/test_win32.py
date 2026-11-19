@@ -14,7 +14,6 @@ from origenerator.win32 import (
     keep_out_of_sight,
     out_of_sight,
     place_window_in_device_pixels,
-    raise_window_without_activating,
     register_link_handler,
     register_toast_identity,
 )
@@ -25,24 +24,6 @@ def _user32_with_a_window(alive: bool = True):
     with (patch("origenerator.win32._user32") as user32,
           patch("origenerator.win32.window_exists", return_value=alive)):
         yield user32
-
-
-class TestRaiseWindowWithoutActivating:
-    def test_puts_the_window_above_its_siblings_without_moving_sizing_or_activating_it(self):
-        with _user32_with_a_window() as user32:
-
-            raise_window_without_activating(111)
-
-        (hwnd, insert_after, *rect, flags), _kwargs = user32.SetWindowPos.call_args
-        assert (hwnd.value, insert_after, rect) == (111, None, [0, 0, 0, 0])
-        assert flags == 0x0001 | 0x0002 | 0x0010  # Windows' SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE
-
-    def test_a_dead_handle_is_left_alone(self):
-        with _user32_with_a_window(alive=False) as user32:
-
-            assert raise_window_without_activating(111) is False
-
-        user32.SetWindowPos.assert_not_called()
 
 
 def _edges(rect: ctypes.wintypes.RECT) -> tuple[int, int, int, int]:

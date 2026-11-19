@@ -3,18 +3,17 @@ from __future__ import annotations
 from dataclasses import FrozenInstanceError
 
 import pytest
-from funestra.testing import FakeEngine
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeyEvent
 
-from origenerator.gui.slideshow_view import SlideshowView, ViewShow, ViewWiring
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
+from tests.own_funestra_support import standalone
 
 _ITEMS = [("a.png", "image", "id-a", None), ("b.png", "image", "id-b", None)]
 
 
 def _press(view, key, modifier=Qt.KeyboardModifier.NoModifier):
-    view.keyPressEvent(QKeyEvent(QKeyEvent.Type.KeyPress, key, modifier))
+    view.take_key(QKeyEvent(QKeyEvent.Type.KeyPress, key, modifier))
 
 
 @pytest.fixture
@@ -37,9 +36,8 @@ def wired(qtbot):
         reset=record("reset"),
         drive_toggle=record("drive_toggle"),
     )
-    view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None,
-                         actions=actions), ViewWiring(engine=FakeEngine()))
-    qtbot.addWidget(view)
+    view = standalone(_ITEMS, shuffle=lambda order: None,
+                         actions=actions)
     return view, calls
 
 
@@ -59,8 +57,7 @@ def test_the_six_acts_travel_as_one_record_and_land_where_they_did(wired):
 
 
 def test_a_slideshow_handed_no_acts_at_all_just_does_less(qtbot):
-    view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None), ViewWiring(engine=FakeEngine()))
-    qtbot.addWidget(view)
+    view = standalone(_ITEMS, shuffle=lambda order: None)
 
     _press(view, Qt.Key.Key_Down)
 
@@ -68,11 +65,9 @@ def test_a_slideshow_handed_no_acts_at_all_just_does_less(qtbot):
 
 
 def test_the_hud_facts_travel_as_one_record(qtbot):
-    view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None,
-                         hud=HudFacts(order_label="Latest"),
-                         actions=SlideshowActions(is_favorite={"id-b"}.__contains__)),
-                         ViewWiring(engine=FakeEngine()))
-    qtbot.addWidget(view)
+    view = standalone(_ITEMS, shuffle=lambda order: None,
+                      hud=HudFacts(order_label="Latest"),
+                      actions=SlideshowActions(is_favorite={"id-b"}.__contains__))
 
     assert view.slideshow.hud_order_label == "Latest"
     assert view.slideshow.hud_is_favorite is False
@@ -84,8 +79,7 @@ def test_the_hud_facts_travel_as_one_record(qtbot):
 
 
 def test_the_hud_facts_default_to_a_shuffled_set_of_nothing_favorite(qtbot):
-    view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None), ViewWiring(engine=FakeEngine()))
-    qtbot.addWidget(view)
+    view = standalone(_ITEMS, shuffle=lambda order: None)
 
     as_it_opens = (view.slideshow.hud_order_label, view.slideshow.hud_map().loop,
                    view.slideshow.hud_is_favorite)
@@ -95,11 +89,9 @@ def test_the_hud_facts_default_to_a_shuffled_set_of_nothing_favorite(qtbot):
 
 
 def test_retuning_a_slideshow_dresses_it_as_a_base_state(qtbot):
-    view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None,
-                         hud=HudFacts(order_label="Latest"),
-                         actions=SlideshowActions(is_favorite={"id-c"}.__contains__)),
-                         ViewWiring(engine=FakeEngine()))
-    qtbot.addWidget(view)
+    view = standalone(_ITEMS, shuffle=lambda order: None,
+                      hud=HudFacts(order_label="Latest"),
+                      actions=SlideshowActions(is_favorite={"id-c"}.__contains__))
 
     view.slideshow.retune([("c.png", "image", "id-c", None)])
 

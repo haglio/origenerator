@@ -235,8 +235,6 @@ class FunestraChannel:
 @dataclass(frozen=True)
 class FunTimeSession:
     main_rect: Rect
-    portrait_rect: Rect
-    landscape_rect: Rect
     command_file: Path | None
     paused_file: Path | None
     status_file: Path | None
@@ -250,9 +248,6 @@ class FunTimeSession:
     @property
     def in_a_headset(self) -> bool:
         return self.frames_file is not None and self.input_file is not None
-
-    def region_rect(self, shape: str) -> Rect:
-        return self.portrait_rect if shape == "portrait" else self.landscape_rect
 
     def funestra(self, shape: str) -> FunestraChannel | None:
         return self.portrait_funestra if shape == "portrait" else self.landscape_funestra
@@ -360,8 +355,6 @@ def _session_of(args: argparse.Namespace) -> FunTimeSession | None:
         return None
     return FunTimeSession(
         main_rect=_rect(args, MAIN_RECT_PREFIX),
-        portrait_rect=_rect(args, REGION_RECT_PREFIXES["portrait"]),
-        landscape_rect=_rect(args, REGION_RECT_PREFIXES["landscape"]),
         command_file=args.command_file,
         paused_file=args.paused_file,
         status_file=args.status_file,

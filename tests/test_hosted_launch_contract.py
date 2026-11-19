@@ -143,7 +143,6 @@ def test_a_region_rect_is_not_required_of_a_launch():
             "on launching")
 
     assert session is not None
-    assert session.region_rect("portrait") == contract.Rect(0, 0, 0, 0)
 
 
 def test_the_document_names_every_fix_a_session_should_hear_for_the_built_in_parts():

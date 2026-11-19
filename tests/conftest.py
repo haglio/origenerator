@@ -32,6 +32,7 @@ from origenerator import (
 )
 from origenerator.gui import (
     enhance_versions,
+    funestra_program,
     funestra_slideshow,
     gallery_view,
     generation_job,
@@ -42,6 +43,7 @@ from origenerator.gui import (
     voice_router,
 )
 from origenerator.gui.combine_controller import CombineController
+from origenerator.gui.funestra_asks import AsksFromTheFunestra
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.off_the_machine import (
     keep_out_of_windows,
@@ -53,6 +55,7 @@ from origenerator.gui.off_the_machine import (
 from origenerator.workflows import detail_parts
 from tests import real_db
 from tests.alert_windows import alerts_kept
+from tests.own_funestra_support import FakeProgram, files_go_under
 from tests.real_db import database_in
 
 pytest_plugins = ("shared_ui.testing",)
@@ -296,9 +299,20 @@ def finish_every_job_on_the_tests_own_thread(setattr) -> None:
         setattr(job_queue, off_the_window_thread, lambda work, done, *, owner: done(work()))
 
 
+def start_no_funestra_program(setattr) -> None:
+    def started(folder, wearing):
+        program = FakeProgram(folder, wearing)
+        program.start()
+        return program
+
+    setattr(funestra_program, "_started", started)
+    setattr(AsksFromTheFunestra, "start", lambda self: None)
+
+
 @pytest.fixture(autouse=True)
 def _never_take_the_real_device(monkeypatch):
     keep_off_the_device(monkeypatch.setattr)
+    start_no_funestra_program(monkeypatch.setattr)
     finish_every_job_on_the_tests_own_thread(monkeypatch.setattr)
 
 
@@ -313,6 +327,11 @@ def _this_tests_own_folder(_a_folder_for_each_test) -> Path:
     folder = next(_a_folder_for_each_test)
     folder.mkdir()
     return folder
+
+
+@pytest.fixture(autouse=True)
+def _each_funestras_files_in_this_tests_own_folder(_this_tests_own_folder):
+    files_go_under(_this_tests_own_folder / "funestras")
 
 
 @pytest.fixture(autouse=True)

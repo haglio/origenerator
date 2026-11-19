@@ -36,10 +36,10 @@ from origenerator.gui.funestra_slideshow import (
 )
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.hud_queue import OPEN
+from origenerator.gui.on_its_own_funestra import OnItsOwnFunestra
 from origenerator.gui.region_openings import RegionOpening
 from origenerator.gui.slideshow_hud import slideshow_hud_model
 from origenerator.gui.slideshow_pace import DEFAULT_S, SlideshowPace
-from origenerator.gui.slideshow_view import SlideshowView
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.one_look import one_look
 from origenerator.output_places import OutputPlaces
@@ -162,8 +162,8 @@ def _public(cls) -> set[str]:
             if not name.startswith("_") and not name.endswith("Event") and name != "staticMetaObject"}
 
 
-def test_the_window_answers_only_what_a_window_has_and_the_slideshow_in_it_the_rest():
-    assert _public(SlideshowView) & _public(FunestraSlideshow) == set()
+def test_what_shows_a_slideshow_and_the_slideshow_share_only_the_presses_on_the_job_queue():
+    assert _public(OnItsOwnFunestra) & _public(FunestraSlideshow) == {"press_the_queue"}
 
 
 def _probes_in(relative_path: str) -> list[str]:
@@ -2735,7 +2735,7 @@ def test_on_a_sessions_funestra_a_request_and_what_is_being_dictated_are_said_wh
 def test_a_press_on_the_job_queue_on_a_sessions_funestra_reaches_its_foot(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path)
     pressed = []
-    slideshow.shown._press_the_foot = lambda verb, payload: pressed.append((verb, payload))
+    slideshow.shown.queue_foot.press = lambda verb, payload: pressed.append((verb, payload))
 
     slideshow.shown.press_the_queue("a press", "1|2")
 

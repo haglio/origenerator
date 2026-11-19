@@ -10,7 +10,6 @@ from funestra.main_hud import (
 from funestra.modes import Osr2State
 from funestra.volume import VolumeHud
 from PySide6.QtCore import (
-    QPoint,
     Qt,
 )
 from PySide6.QtTest import QTest
@@ -30,7 +29,6 @@ from origenerator.gui import (
 from origenerator.gui.gallery_view import GalleryView, Shared
 from origenerator.gui.osr2_controls_state import osr2_controls_state
 from tests import gestures
-from tests.closed_windows import is_closed
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import (
     FakeActions,
@@ -59,8 +57,16 @@ from tests.gallery_view_support import (
 )
 from tests.lit_switches import lit_in
 from tests.osr2_fakes import FakeBroker
+from tests.own_funestra_support import VIEWPORT
 from tests.real_db import database_of, keep_on_disk, keep_rows_on_disk, kept_file
-from tests.slideshow_hud_support import engine_of, funestra_of
+from tests.slideshow_hud_support import (
+    click,
+    double_click,
+    engine_of,
+    funestra_of,
+    press_key_on,
+    tick_the_funestra,
+)
 from tests.test_fun_time_gallery import _session
 from tests.test_osr2_driver import ACTIONS, FakePlayer
 
@@ -414,13 +420,12 @@ def test_a_double_click_while_populate_runs_opens_on_the_shown_image_alone(
     _comfyui_finishes(client, job)
 
     slideshow = _viewport_of(view).open_fullscreen()
-    qtbot.addWidget(slideshow.shown)
     funestra_of(slideshow.shown)
 
     assert [slide.prompt_id for slide in slideshow._set.playlist.in_play_order()] == [landed]
     assert view.enhance.run_of(view.row_for(landed)) is None
-    qtbot.keyClick(slideshow.shown, Qt.Key.Key_Down)
-    qtbot.keyClick(slideshow.shown, Qt.Key.Key_Down)
+    press_key_on(slideshow, Qt.Key.Key_Down)
+    press_key_on(slideshow, Qt.Key.Key_Down)
     assert view.enhance.run_of(view.row_for(landed)) is not None
     slideshow.close()
 
@@ -438,7 +443,6 @@ def test_a_double_click_on_an_image_from_another_folder_opens_that_folder(
     view._tree.setCurrentItem(view.toc.leaf_by_id["a1"])
 
     slideshow = view.slideshows.open_in_its_folder(("b1.png", "image"), "b1")
-    qtbot.addWidget(slideshow.shown)
 
     assert [slide.prompt_id for slide in slideshow._set.playlist.in_play_order()] == folder_b
     assert slideshow._set.playlist.current().prompt_id == "b1"
@@ -502,25 +506,12 @@ def test_double_clicking_a_generating_preview_opens_it_fullscreen(qtbot, monkeyp
 
     win = tab._viewport.open_fullscreen()
 
-    qtbot.addWidget(win.shown)
     assert win is not None
     assert view.slideshows.showing is win
     assert [slide.prompt_id for slide in win.whole_set()] == ["i1"], (
         "even in a folder Populate is filling, a double-click means this one, bigger, and no second "
         "slideshow: watching the frames come in is what fullscreen is for")
     win.close()
-
-
-def test_a_slideshow_closed_before_it_became_active_asks_for_no_keyboard_focus(qtbot, monkeypatch):
-    _view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch)
-    window = slideshow.shown
-    window.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
-
-    window.close()
-    QApplication.processEvents()
-    window.show()
-
-    assert window.focusWidget() is None
 
 
 def test_a_funscript_coming_into_view_takes_the_device_off_the_motion(qtbot, monkeypatch):
@@ -545,9 +536,10 @@ def test_a_slideshow_standing_on_its_own_plays_the_radio_while_its_image_is_up(
         qtbot, monkeypatch):
     radio = _FakeRadio()
     _view, slideshow = _a_slideshow_standing_on_its_own(qtbot, monkeypatch, radio=radio)
-    engine_of(slideshow.shown).showing_image = True
+    engine_of(slideshow).showing_image = True
 
-    slideshow.shown._pane.tick()
+    tick_the_funestra(slideshow)
+    slideshow.tick()
 
     assert radio.held[-1].ticked == (True, 100, False)
 
@@ -571,7 +563,8 @@ def test_the_next_standing_slideshow_opens_at_the_volume_the_last_was_left_at(
 
     view.slideshows.start()
 
-    engine = engine_of(view.slideshows.showing.shown)
+    funestra_of(view.slideshows.showing)
+    engine = engine_of(view.slideshows.showing)
     assert (engine.volume, engine.muted) == (40, False)
 
 
@@ -586,22 +579,17 @@ def test_a_standing_slideshows_volume_comes_back_after_a_restart(qtbot, monkeypa
     second.refresh()
     _open_leaf(second)
     second.slideshows.start()
-    qtbot.addWidget(second.slideshows.showing.shown)
 
-    engine = engine_of(second.slideshows.showing.shown)
+    funestra_of(second.slideshows.showing)
+    engine = engine_of(second.slideshows.showing)
     assert (engine.volume, engine.muted) == (40, True)
 
 
-def _clear_of_the_hud(window) -> QPoint:
-    return QPoint(window.width() * 3 // 4, window.height() * 3 // 4)
+_CLEAR_OF_THE_HUD = (VIEWPORT[0] * 3 // 4, VIEWPORT[1] * 3 // 4)
 
 
 def _click_the_slide(slideshow):
-    engine_of(slideshow.shown)
-    slideshow.shown.showFullScreen()
-    QTest.qWaitForWindowExposed(slideshow.shown)
-    window = slideshow.shown._pane._window
-    gestures.click(window, _clear_of_the_hud(window))
+    click(slideshow, _CLEAR_OF_THE_HUD)
 
 
 def test_a_click_on_a_slideshow_pauses_the_device_the_sound_and_the_slides_with_it(
@@ -621,8 +609,7 @@ def test_a_click_on_a_slideshow_pauses_the_device_the_sound_and_the_slides_with_
 
 
 def _double_click_the_slide(slideshow):
-    window = slideshow.shown._pane._window
-    gestures.double_click(window, _clear_of_the_hud(window))
+    double_click(slideshow, _CLEAR_OF_THE_HUD)
 
 
 @pytest.mark.parametrize("leave", [_double_click_the_slide, _press_enter],
@@ -634,7 +621,7 @@ def test_leaving_a_paused_slideshow_leaves_the_room_paused(qtbot, monkeypatch, l
     _click_the_slide(slideshow)
 
     leave(slideshow)
-    qtbot.waitUntil(lambda: is_closed(slideshow.shown))
+    qtbot.waitUntil(lambda: not slideshow.is_showing())
 
     assert (motion.frozen, radio.frozen, omnipause.frozen()) == (True, True, True)
 
@@ -643,7 +630,6 @@ def test_closing_a_slideshow_leaves_the_motion_running(qtbot, monkeypatch):
     keep_rows_on_disk(monkeypatch)
     view, _key = _populating_view(qtbot, monkeypatch, [_image("i1", "a cat", 50, 1)])
     view.slideshows.start()
-    qtbot.addWidget(view.slideshows.showing.shown)
     assert view.slideshows.showing._actions.drive_toggle == view.osr2.toggle
     view.osr2.control.setChecked(True)
     view.slideshows.showing.close()
@@ -849,9 +835,6 @@ def _a_gallery_with_its_slideshow_in_front(qtbot, tmp_path, monkeypatch):
     view._buttons.radio.setChecked(True)
     view.slideshows.start()
     slideshow = view.slideshows.showing
-    qtbot.addWidget(slideshow.shown)
-    slideshow.shown.activateWindow()
-    QTest.qWaitForWindowActive(slideshow.shown)
     return view, radio, slideshow
 
 
@@ -859,12 +842,12 @@ def test_esc_at_a_standalone_slideshow_pauses_the_whole_room_and_leaves_it_up(
         qtbot, tmp_path, monkeypatch):
     view, radio, slideshow = _a_gallery_with_its_slideshow_in_front(qtbot, tmp_path, monkeypatch)
 
-    gestures.press_key(slideshow.shown, Qt.Key.Key_Escape)
+    press_key_on(slideshow, Qt.Key.Key_Escape)
 
     assert omnipause.frozen()
     assert radio.frozen
     assert view.slideshows.showing is slideshow
-    assert slideshow.shown.isVisible()
+    assert slideshow.is_showing()
     assert view._buttons.radio.isChecked()
 
 
@@ -873,10 +856,10 @@ def test_esc_at_a_standalone_slideshow_has_cores_osr2_line_say_parked_until_a_se
     view, _radio, slideshow = _a_gallery_with_its_slideshow_in_front(qtbot, tmp_path, monkeypatch)
     view.osr2.control.setChecked(True)
 
-    gestures.press_key(slideshow.shown, Qt.Key.Key_Escape)
+    press_key_on(slideshow, Qt.Key.Key_Escape)
     assert _cores_osr2_line(view) == OSR2_PARKED
 
-    gestures.press_key(slideshow.shown, Qt.Key.Key_Escape)
+    press_key_on(slideshow, Qt.Key.Key_Escape)
     assert _cores_osr2_line(view) == Osr2State.ROBOT_HAND
 
 

@@ -45,10 +45,6 @@ def test_fun_time_launch_carries_rects_channels_and_identity():
     ])
     session = args.fun_time
     assert session.main_rect == Rect(10, 206, 840, 1200)
-    assert session.portrait_rect == Rect(2560, 0, 1440, 1870)
-    assert session.landscape_rect == Rect(853, 0, 1707, 1400)
-    assert session.region_rect("portrait") == session.portrait_rect
-    assert session.region_rect("landscape") == session.landscape_rect
     assert session.command_file == Path("st/origenerator_cmd.txt")
     assert session.paused_file == Path("st/origenerator_paused.txt")
     assert session.status_file == Path("st/origenerator_status.txt")

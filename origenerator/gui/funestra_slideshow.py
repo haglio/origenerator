@@ -91,7 +91,7 @@ class FunestraSlideshow(QObject):
         self._outbox = FunestraOutbox(seat.channel, run=self._off_the_window,
                                       lost=self._dropped)
         self._actions = playing.actions if playing.actions is not None else SlideshowActions()
-        self.shown = hosting.shown if hosting.shown is not None else OnASessionsFunestra(
+        self.shown = hosting.shown(self) if hosting.shown is not None else OnASessionsFunestra(
             self, seat.shape, seat.channel, hosting.messages, actions=self._actions)
         self._scripts_on_opening = opening.scripts if opening is not None else {}
         self._request_holds_it = False

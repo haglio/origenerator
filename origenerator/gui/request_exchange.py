@@ -26,8 +26,9 @@ from shared_ui.toggle_switch import ToggleSwitch
 from origenerator.db_requests import Turn
 from origenerator.gui.change_tip import change_tip, fitted
 from origenerator.gui.generate_button import GenerateButton
+from origenerator.gui.generation_job import JobState
 from origenerator.gui.inflight import RunReading
-from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
+from origenerator.gui.progress_bar import ProgressBar
 
 _ASK = "What to change, e.g. two women"
 _REQUEST = "Request"
@@ -154,7 +155,7 @@ class _Conversation(QTextEdit):
                             made: _Made) -> None:
         if made.reading is not None:
             bar = ProgressBar(self.viewport())
-            bar.setFixedHeight(BAR_HEIGHT)
+            bar.setFixedSize(self._generate_button_size())
             bar.show_progress(made.reading.caption(), *made.reading.bars())
             self._reserve(cursor, bar, entry)
         elif made.item:
@@ -168,6 +169,13 @@ class _Conversation(QTextEdit):
             button = GenerateButton(self.viewport())
             button.clicked.connect(lambda _checked=False, at=index: self.generate_asked.emit(at))
             self._reserve(cursor, button, entry)
+
+    def _generate_button_size(self) -> QSize:
+        button = GenerateButton(self.viewport())
+        button.adjustSize()
+        size = button.size()
+        button.deleteLater()
+        return size
 
     def _thumbnail_box(self) -> QSize:
         tall = self.fontMetrics().lineSpacing() * _THUMBNAIL_LINES
@@ -338,6 +346,7 @@ class RequestExchange(QWidget):
 
     def mark_made(self, index: int, prompt_id: str) -> None:
         self._held[index].made = prompt_id
+        self._in_flight[prompt_id] = RunReading(JobState.QUEUED)
         self._draw()
 
     def note_in_flight(self, readings: dict[str, RunReading]) -> None:

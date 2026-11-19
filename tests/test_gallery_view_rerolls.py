@@ -9,6 +9,8 @@ from app_support.threading_utils import wait_until
 from PIL import Image
 from PySide6.QtCore import (
     QObject,
+    QPoint,
+    QRect,
     Qt,
     Signal,
     Slot,
@@ -32,6 +34,7 @@ from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.item_tile import ItemTile
 from origenerator.gui.modify_batch_tile import ModifyBatchTile
 from origenerator.gui.new_tile import NewTile
+from origenerator.gui.progress_bar import ProgressBar
 from origenerator.item_shape import base_of
 from origenerator.prompt_edit import work_out
 from tests.gallery_view_support import (
@@ -1217,6 +1220,50 @@ def test_generate_under_a_turn_shows_the_tab_generating_as_the_tabs_own_generate
     (job,) = by_the_turn._live_jobs.values()
     assert _generating_state(turns_tab) == (None, True, True, [job.prompt_id], ("", ""))
     assert _generating_state(tabs_tab)[1:3] == (True, True)
+
+
+def _the_turns_generate(tab) -> GenerateButton:
+    (button,) = [button for button in
+                 tab._param_form.request_exchange()._conversation.viewport().findChildren(
+                     GenerateButton) if not button.isHidden()]
+    return button
+
+
+def test_generate_pressed_under_a_turn_leaves_the_request_section_on_the_tab(qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path)
+    view.resize(1400, 700)
+    view.show()
+    tab = view._generate_pane.current_generate_tab()
+
+    qtbot.mouseClick(_the_turns_generate(tab), Qt.MouseButton.LeftButton)
+
+    assert view._live_jobs
+    assert tab._param_form.request_section().isVisibleTo(tab)
+
+
+def _place_on_the_tab(tab, widget) -> QRect:
+    return QRect(widget.mapTo(tab, QPoint(0, 0)), widget.size())
+
+
+def test_generate_pressed_under_a_turn_gives_way_to_its_progress_bar_with_nothing_scrolled(
+        qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path)
+    view.resize(1400, 500)
+    view.show()
+    tab = view._generate_pane.current_generate_tab()
+    pressed = _the_turns_generate(tab)
+    tab._settings_scroll.ensureWidgetVisible(pressed)
+    QApplication.processEvents()
+    scrolled, where = tab._settings_scroll.verticalScrollBar().value(), _place_on_the_tab(tab, pressed)
+    assert scrolled > 0
+
+    qtbot.mouseClick(pressed, Qt.MouseButton.LeftButton)
+    QApplication.processEvents()
+
+    (bar,) = [bar for bar in tab._param_form.request_exchange()._conversation.viewport()
+              .findChildren(ProgressBar) if not bar.isHidden()]
+    assert (tab._settings_scroll.verticalScrollBar().value(), _place_on_the_tab(tab, bar)) == (
+        scrolled, where)
 
 
 def _shown_by_the_tab(view) -> tuple[str, list, tuple[str, str]]:

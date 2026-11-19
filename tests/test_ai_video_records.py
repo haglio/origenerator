@@ -207,3 +207,38 @@ def test_a_flick_turned_over_in_genau_is_turned_over_on_its_row_and_back(tmp_pat
 
     assert (on, flipped, off, db.get_generation("o1")["genau_flipped"]) == (
         {"done": 1, "no_row": 0}, 1, {"done": 1, "no_row": 0}, 0)
+
+
+def test_the_watch_totals_of_many_videos_are_written_in_one_go_and_only_when_they_moved(
+        tmp_path, capsys, monkeypatch):
+    db = _the_gallery(tmp_path)
+    videos = [_filed(_places(tmp_path), f"c{n}_topaz.mp4") for n in range(4)]
+    for n, video in enumerate(videos):
+        _outside(db, f"o{n}", video)
+    totals = {str(video): {"completions": 2, "skips": 1, "locks": 0} for video in videos}
+    monkeypatch.setattr(Database, "set_watch_counts",
+                        lambda *_a: (_ for _ in ()).throw(AssertionError("one video at a time")))
+
+    said = _run(tmp_path, capsys, "watched", "--totals", _json_file(tmp_path, "w.json", totals))
+    version = _the_gallery(tmp_path).library_version()
+    _run(tmp_path, capsys, "watched", "--totals", _json_file(tmp_path, "w.json", totals))
+
+    assert said == {"done": 4, "no_row": 0}
+    assert [row["watch_completions"] for row in _the_gallery(tmp_path).list_generations()] == [2] * 4
+    assert _the_gallery(tmp_path).library_version() == version
+
+
+def test_a_verb_told_to_leave_the_phones_file_leaves_it_for_one_rewrite_at_the_end(
+        tmp_path, capsys):
+    db = _the_gallery(tmp_path)
+    video = _filed(_places(tmp_path))
+    _outside(db, "o1", video)
+    phone = _Phone()
+
+    _run(tmp_path, capsys, "favorite", "--video", str(video), "--on",
+         "--leave-the-phones-file", phone=phone)
+    left = list(phone.written)
+    _run(tmp_path, capsys, "phones_file", phone=phone)
+
+    assert left == []
+    assert phone.written == [tmp_path / "origenerator.db"]

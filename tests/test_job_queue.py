@@ -2371,14 +2371,10 @@ def test_a_progress_write_that_fails_leaves_the_run_going(qtbot, tmp_path, monke
     key = "video/wf/deadbeef"
     queue.start_prepared(key, _I2V, _params(steps=20))
     job = queue.jobs[key]
-    write = db.update_generation
+    def refusing_progress(prompt_id, progress_json):
+        raise OSError("the database is locked")
 
-    def refusing_progress(prompt_id, **fields):
-        if "progress_json" in fields:
-            raise OSError("the database is locked")
-        return write(prompt_id, **fields)
-
-    monkeypatch.setattr(db, "update_generation", refusing_progress)
+    monkeypatch.setattr(db, "save_running_progress", refusing_progress)
 
     with qtbot.capture_exceptions() as raised:
         client.progress.emit(job.prompt_id, "s", 5, 10)
@@ -2500,3 +2496,52 @@ def test_a_job_is_handed_to_comfyui_while_the_window_thread_goes_on(qtbot, tmp_p
     assert db.get_generation(job.prompt_id)["status"] == "running"
     assert db.get_generation(second.prompt_id)["status"] == "pending"
     assert sending.waiting == []
+
+
+class _SavedLater:
+    def __init__(self):
+        self.waiting = []
+
+    def __call__(self, work, done, *, owner):
+        self.waiting.append((work, done))
+
+    def save_all(self):
+        while self.waiting:
+            work, done = self.waiting.pop(0)
+            done(work())
+
+
+@pytest.fixture
+def saving(monkeypatch):
+    later = _SavedLater()
+    monkeypatch.setattr(job_queue_module, "save_off_the_window_thread", later)
+    return later
+
+
+def test_a_runs_progress_is_saved_off_the_window_thread(qtbot, tmp_path, saving):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    video = _launch_video(queue, "v", seed=1)
+
+    client.progress.emit(video.prompt_id, "s", 5, 10)
+
+    assert db.get_generation(video.prompt_id)["progress_json"] is None
+    saving.save_all()
+    assert json.loads(db.get_generation(video.prompt_id)["progress_json"])["last_progress"] == list(
+        video.last_progress)
+
+
+def test_a_progress_save_that_lands_after_its_run_was_set_aside_writes_nothing(
+        qtbot, tmp_path, saving):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    video = _launch_video(queue, "v", seed=1)
+    client.progress.emit(video.prompt_id, "s", 5, 10)
+
+    _launch_image(queue, "i")
+    saving.save_all()
+
+    row = db.get_generation(video.prompt_id)
+    assert (row["status"], row["progress_json"]) == ("pending", None)

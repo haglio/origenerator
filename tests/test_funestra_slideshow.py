@@ -315,6 +315,27 @@ def test_a_slideshow_opened_in_one_look_finds_its_videos_scripts_by_listing_thei
     assert handed == [scripts["clip.mp4"], None]
 
 
+def test_every_later_hand_over_finds_its_videos_scripts_by_listing_their_folders(
+        qtbot, tmp_path, monkeypatch):
+    scripts = _scripted(monkeypatch, tmp_path, "clip.mp4")
+    items = [("clip.mp4", "video", "id-1"), ("bare.mp4", "video", "id-2"),
+             ("more.mp4", "video", "id-3")]
+    slideshow = _slideshow(qtbot, tmp_path, items=items)
+    is_file = Path.is_file
+
+    def refused(path):
+        if tmp_path in path.parents:
+            pytest.fail(f"asked after {path.name} alone")
+        return is_file(path)
+
+    with monkeypatch.context() as asked:
+        asked.setattr(Path, "is_file", refused)
+        slideshow.play(Playing(items, shuffle=in_order))
+
+    handed = [item.funscript for item in read_playlist(slideshow.channel.playlist)]
+    assert handed == [scripts["clip.mp4"], None, None]
+
+
 def test_a_video_the_session_s_funestra_plays_is_none_on_this_app_s_own_screen(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path, items=[("clip.mp4", "video", "id-1")])
 

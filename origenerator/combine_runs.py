@@ -40,9 +40,10 @@ def offered_actions(videos: list[dict], lane: str, checked: tuple[str, ...],
 
 
 def _accepted_over(state: str, lane: str, checked: tuple[str, ...]) -> set[str]:
+    accepted = animation_settings.every_accepted()
     return {action for action in vocabulary(MediaType.VIDEO).buttons
-            if animation_settings.settings_for(lane, Animation(action, checked).name, state)
-            is not None}
+            if animation_settings.accepted_in(accepted, lane, Animation(action, checked).name,
+                                              state) is not None}
 
 
 def readied(settings: dict, reference: str) -> CombineRun | None:

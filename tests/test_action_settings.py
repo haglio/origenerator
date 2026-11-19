@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from origenerator import action_settings
+from origenerator import action_settings, animation_names
 from origenerator.animation_names import item_actions_named
 from origenerator.item_actions import stored
 
@@ -174,3 +174,15 @@ def test_an_action_with_no_past_video_says_so_in_its_lanes_own_words(monkeypatch
 
 def test_a_line_that_opens_a_sentence_capitalizes_its_first_letter_alone():
     assert action_settings.as_sentence("no past “Alpha” video") == "No past “Alpha” video"
+
+
+def test_offering_every_button_builds_the_video_words_once(monkeypatch):
+    rows = [_video(f"v{n}", "alpha", "2026-01-01") for n in range(5)]
+    built = []
+    build = animation_names.vocabulary
+    monkeypatch.setattr(animation_names, "vocabulary",
+                        lambda *a, **k: built.append(1) or build(*a, **k))
+
+    action_settings.available_categories(rows)
+
+    assert built == []

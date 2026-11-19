@@ -21,8 +21,8 @@ _CURATED_BY_INTENT: dict[str, dict] = {
 }
 
 
-def pinned_settings(name: str, intent: str = VIDEO) -> dict | None:
-    animation = named(name)
+def pinned_settings(name: str, intent: str = VIDEO, words=None) -> dict | None:
+    animation = named(name, words)
     pinned_as = (animation.name, *animation.checked) if animation.checked else (animation.action,)
     table = _CURATED_BY_INTENT.get(intent, {})
     return next((spec for said in pinned_as if (spec := _pinned_as(table, said)) is not None),
@@ -113,7 +113,7 @@ def available_categories(video_rows, intent: str = VIDEO, checked=()) -> set[str
     made = {animation_of(row, words) for row in video_rows if intent != GENAU or loops(row)}
     return {action for action in words.buttons
             if (name := Animation(action, tuple(checked)).name) in made
-            or pinned_settings(name, intent) is not None}
+            or pinned_settings(name, intent, words) is not None}
 
 
 def most_used_video(name: str, video_rows, intent: str = VIDEO) -> str | None:

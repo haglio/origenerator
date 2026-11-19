@@ -1239,9 +1239,10 @@ def _accepted_only(monkeypatch, *accepted):
     _paths(monkeypatch)
     monkeypatch.setattr(module.action_settings, "available_categories",
                         lambda rows, intent, checked=(): set())
-    monkeypatch.setattr(animation_settings, "settings_for",
-                        lambda lane, name, state: {"workflow": VIDEO_WORKFLOW}
-                        if (lane, name, state) in accepted else None)
+    table: dict = {}
+    for lane, name, state in accepted:
+        table.setdefault(lane, {}).setdefault(name, {})[state] = {"workflow": VIDEO_WORKFLOW}
+    monkeypatch.setattr(animation_settings, "every_accepted", lambda: table)
 
 
 def test_an_action_with_settings_accepted_for_the_dropped_images_button_is_offered(

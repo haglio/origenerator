@@ -1249,7 +1249,7 @@ def test_a_fresh_tab_generates_nothing_until_its_start_image_is_picked(qtbot, tm
     assert requested == []
     assert tab._db.list_generations() == []
     assert not tab._generate_btn.isEnabled()
-    assert tab._generate_btn.toolTip() == "Nothing to start from — pick a Start Image first"
+    assert tab._generate_btn.toolTip() == "Nothing to start from — pick a Start image first"
 
 
 def test_workflow_picker_hides_machinery_workflows(qtbot, tmp_path):
@@ -3415,7 +3415,7 @@ def test_hovering_the_request_that_made_an_image_shows_the_whole_prompts_with_it
     struck, lit = _struck_and_lit_in(tip)
     assert ("a cat" in tip)
     assert ("blurry" in tip)
-    assert "Positive Prompt" in tip
+    assert "Positive prompt" in tip
     assert "a hat" in struck
     assert "hat" in lit
 
@@ -3707,7 +3707,7 @@ def test_generate_says_it_will_draw_a_random_seed_over_a_finished_run(tab, qtbot
 
     tab.prefill("sdxl_t2i", params)
 
-    qtbot.waitUntil(lambda: tab._generate_btn.text() == "Generate with Random seed")
+    qtbot.waitUntil(lambda: tab._generate_btn.text() == "Generate with random seed")
     assert "already been generated" in tab._generate_btn.toolTip()
 
 
@@ -3720,7 +3720,7 @@ def test_a_video_back_on_its_own_seeds_says_generate_will_draw_a_random_seed(sav
         tab._param_form._randomize_checks[key].click()
 
     assert _message(tab) == ""
-    qtbot.waitUntil(lambda: tab._generate_btn.text() == "Generate with Random seed")
+    qtbot.waitUntil(lambda: tab._generate_btn.text() == "Generate with random seed")
 
 
 def test_a_video_just_clicked_says_generate_will_draw_a_random_seed(saved_panel, qtbot):
@@ -3730,7 +3730,7 @@ def test_a_video_just_clicked_says_generate_will_draw_a_random_seed(saved_panel,
         _video_row(db, input_image="frame.png [output]", noise_seed=22, audio_seed=33), [])
 
     assert tab._param_form.seed_is_random()
-    qtbot.waitUntil(lambda: tab._generate_btn.text() == "Generate with Random seed")
+    qtbot.waitUntil(lambda: tab._generate_btn.text() == "Generate with random seed")
 
 
 def test_a_tab_on_an_imported_images_own_settings_says_generate_will_draw_a_random_seed(
@@ -3747,7 +3747,7 @@ def test_a_tab_on_an_imported_images_own_settings_says_generate_will_draw_a_rand
     tab.show_saved_generation(db.get_generation("imp"), [])
 
     assert _message(tab) == ""
-    qtbot.waitUntil(lambda: tab._generate_btn.text() == "Generate with Random seed")
+    qtbot.waitUntil(lambda: tab._generate_btn.text() == "Generate with random seed")
 
 
 def test_editing_the_settings_takes_the_random_seed_caption_back_off(tab, qtbot):
@@ -3755,7 +3755,7 @@ def test_editing_the_settings_takes_the_random_seed_caption_back_off(tab, qtbot)
     params = dict(wf.default_params(), positive_prompt="a cat", seed=42)
     _completed_generation(tab._db, "sdxl_t2i", params)
     tab.prefill("sdxl_t2i", params)
-    qtbot.waitUntil(lambda: tab._generate_btn.text() == "Generate with Random seed")
+    qtbot.waitUntil(lambda: tab._generate_btn.text() == "Generate with random seed")
 
     tab._param_form.set_values({"positive_prompt": "a dog"})
 
@@ -4582,7 +4582,7 @@ def test_the_workflows_warning_carries_every_warning_and_resolves_them_all(
     form.set_values({"steps": 80, "cfg": 9.0})
     assert warning.toolTip() == (
         "Steps: 80. Default Model's page recommends 20\u201340 steps. Click to use 40.\n"
-        "Prompt Strength: 9. Default Model's page recommends 3\u20136. Click to use 6.")
+        "Prompt strength: 9. Default Model's page recommends 3\u20136. Click to use 6.")
     qtbot.mouseClick(warning, Qt.MouseButton.LeftButton)
 
     assert warning.isHidden()
@@ -4601,7 +4601,7 @@ def test_a_story_too_long_for_its_good_range_is_among_the_workflows_warnings(qtb
     assert form.get_values()["frame_count"] == 161
 
 
-_STYLE_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive Prompt. "
+_STYLE_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive prompt. "
                "Click to add it.")
 
 
@@ -4698,7 +4698,7 @@ def test_the_workflows_warning_sits_in_the_column_of_its_sections_rows_warnings(
     def left(widget):
         return widget.mapTo(tab, QPoint(0, 0)).x()
 
-    section = tab._param_form._sections["Workflow, Models & LoRAs"]
+    section = tab._param_form._sections["Workflow, models & LoRAs"]
     assert section.content().isAncestorOf(tab._workflow_dropdown)
     marks = tab._param_form._warning_marks
     assert left(tab._workflow_warning) == left(marks["unet_high"])

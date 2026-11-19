@@ -72,7 +72,7 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
         # ComfyUI keeps GGUF Flux models under diffusion_models beside the WAN UNETs and others.
         defaults = self.default_params()
         return [
-            ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
+            ParamDef("positive_prompt", "Positive prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
             model_dropdown("unet", "Model", defaults["unet"], "diffusion_models",
                          accepts=(FLUX,)),
             *lora_rows(defaults, LORA_KEYS, accepts=(FLUX,)),
@@ -80,13 +80,13 @@ class FluxT2iUpscaledWorkflow(WorkflowTemplate):
             ParamDef("width", "Width", ParamType.INT, defaults["width"], min_val=64, max_val=4096, step=16),
             ParamDef("height", "Height", ParamType.INT, defaults["height"], min_val=64, max_val=4096, step=16),
             ParamDef("steps", "Steps", ParamType.INT, defaults["steps"], min_val=1, max_val=100, good=(20, 30)),
-            ParamDef("guidance", "Prompt Strength", ParamType.FLOAT, defaults["guidance"],
+            ParamDef("guidance", "Prompt strength", ParamType.FLOAT, defaults["guidance"],
                      min_val=0.0, max_val=20.0, step=0.1, good=(2.5, 4.5)),
             ParamDef("enhance", "Enhance (upscale + re-sample)", ParamType.BOOL, defaults["enhance"]),
-            ParamDef("enhance_scale", "Upscale Factor", ParamType.FLOAT, defaults["enhance_scale"],
+            ParamDef("enhance_scale", "Upscale factor", ParamType.FLOAT, defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25, good=(1.5, 2.0)),
-            ParamDef("enhance_steps", "Enhance Steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100, good=(15, 25)),
-            ParamDef("enhance_denoise", "Enhance Redraw Amount", ParamType.FLOAT, defaults["enhance_denoise"],
+            ParamDef("enhance_steps", "Enhance steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100, good=(15, 25)),
+            ParamDef("enhance_denoise", "Enhance redraw amount", ParamType.FLOAT, defaults["enhance_denoise"],
                      min_val=0.0, max_val=1.0, step=0.05, good=(0.1, 0.2)),
         ]
 

@@ -220,7 +220,7 @@ def test_the_block_stacks_shield_all_over_cancel_all_at_the_right_end_of_its_top
     assert abs(above - below) <= 1
     assert image.getpixel((all_x - 1, frame_y + 1))[3] == 0, (
         "its bar stopping short of them")
-    assert (shield_all.icon, cancel_all.icon) == ("All", "Cancel All")
+    assert (shield_all.icon, cancel_all.icon) == ("All", "Cancel all")
 
 
 def test_a_usual_line_reads_in_full_across_the_portrait_satellites_hud(monkeypatch):

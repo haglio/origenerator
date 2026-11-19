@@ -74,14 +74,14 @@ PARAM_HELP: dict[str, str] = {
     "voice": (
         "Whose voice speaks the lines: one of the speech model's preset speakers, "
         "the same voice every run, or Custom voice, a recording of your own named "
-        "in the Voice Sample field that appears."
+        "in the Voice sample field that appears."
     ),
     "voice_sample": (
         "A recording, five to fifteen seconds of one clean voice, for the lines to "
         "be spoken in a copy of that voice. Browse to the file."
     ),
     "voice_sample_text": (
-        "The words the Voice Sample says, exactly. With them the copy carries the "
+        "The words the Voice sample says, exactly. With them the copy carries the "
         "recording's manner as well as its timbre; without them only the timbre."
     ),
     "unet_s2v": (
@@ -157,24 +157,24 @@ PARAM_HELP: dict[str, str] = {
     "cfg": (
         "How strictly the model obeys the prompt (the CFG scale underneath). Too low "
         "drifts off it; too high burns contrast and flattens detail. At 1 the Negative "
-        "Prompt is ignored; any lower and it works backwards."
+        "prompt is ignored; any lower and it works backwards."
     ),
     "cfg_high": (
         "Prompt strength for the first pass (high noise; the CFG scale underneath), "
         "where the motion is settled. A LoRA's author often publishes a different "
         "number for each pass; where they publish one, put it in both. At 1 this pass "
-        "ignores the Negative Prompt; any lower and it works backwards."
+        "ignores the Negative prompt; any lower and it works backwards."
     ),
     "cfg_low": (
         "Prompt strength for the second pass (low noise; the CFG scale underneath), "
-        "where the texture is settled. At 1 this pass ignores the Negative Prompt; "
+        "where the texture is settled. At 1 this pass ignores the Negative prompt; "
         "any lower and it works backwards."
     ),
     "split_step": (
         "The step where the first pass (high noise) hands over to the second (low "
         "noise; the split step). The first pass settles the layout and the motion and "
         "the second refines the detail; the two models are built to switch at one "
-        "noise level, and Composition Focus decides which step reaches it, a lower "
+        "noise level, and Composition focus decides which step reaches it, a lower "
         "focus sooner and a higher one later. Hand over later (a bigger number) when "
         "the motion comes out weak or the layout wanders, and earlier when the detail "
         "comes out soft or smeared."
@@ -273,14 +273,14 @@ RECOMMENDED: dict[str, str] = {
     ),
     "split_step": (
         "Leave it at 0, which hands over halfway through the steps and suits a "
-        "Composition Focus of 8; set by hand, between 40% and 60% of Steps is usual."
+        "Composition focus of 8; set by hand, between 40% and 60% of Steps is usual."
     ),
     "guidance": (
         "3.5 is the usual start."
     ),
     "sampler_name": (
         "Good choices: euler_ancestral (Euler a on model pages), dpmpp_2m with Step "
-        "Spacing karras (DPM++ 2M Karras) or dpmpp_sde with karras (DPM++ SDE "
+        "spacing karras (DPM++ 2M Karras) or dpmpp_sde with karras (DPM++ SDE "
         "Karras), the ones model pages recommend most."
     ),
     "scheduler": (
@@ -344,11 +344,11 @@ OPTION_HELP: dict[str, dict[str, str]] = {
         ),
         "dpm_fast": (
             "A quick solver that spends exactly Steps model runs and ignores Step "
-            "Spacing. About one model run per step, as fast as euler."
+            "spacing. About one model run per step, as fast as euler."
         ),
         "dpm_adaptive": (
             "Keeps going until the result stops changing, choosing its own number of "
-            "steps and ignoring Steps and Step Spacing. One model run per step or more, "
+            "steps and ignoring Steps and Step spacing. One model run per step or more, "
             "and the whole run often takes several times as long as euler's."
         ),
         "dpmpp_2s_ancestral": (

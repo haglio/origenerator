@@ -67,7 +67,7 @@ def test_help_speaks_the_forms_words_outside_its_parentheses():
 
 @pytest.mark.parametrize("workflow_name", list(WORKFLOW_REGISTRY))
 def test_a_field_for_one_pass_says_which_noise_that_pass_works_on(workflow_name):
-    halves = {"(First Pass)": "high noise", "(Second Pass)": "low noise"}
+    halves = {"(first pass)": "high noise", "(second pass)": "low noise"}
     unsaid = [pd.key for pd in WORKFLOW_REGISTRY[workflow_name].param_definitions()
               for suffix, half in halves.items()
               if pd.label.endswith(suffix) and half not in param_help(pd.key).replace("-", " ")]
@@ -90,9 +90,9 @@ def test_the_handoff_says_when_to_move_it_off_halfway():
 
 
 def test_the_prompt_strength_help_says_what_one_and_below_do_to_the_negative_prompt():
-    assert "At 1 the Negative Prompt is ignored; any lower and it works backwards." in PARAM_HELP["cfg"]
+    assert "At 1 the Negative prompt is ignored; any lower and it works backwards." in PARAM_HELP["cfg"]
     for key in ("cfg_high", "cfg_low"):
-        assert "At 1 this pass ignores the Negative Prompt; any lower and it works backwards." in PARAM_HELP[key]
+        assert "At 1 this pass ignores the Negative prompt; any lower and it works backwards." in PARAM_HELP[key]
 
 
 def test_help_calls_a_lora_a_lora():
@@ -175,7 +175,7 @@ def test_the_one_composition_focus_says_nothing_about_passes():
 
 
 def test_a_pages_recommendation_stands_in_for_the_forms_own_advice():
-    focus = ParamDef("shift_high", "Composition Focus", ParamType.FLOAT, 8.0, good=(5, 12))
+    focus = ParamDef("shift_high", "Composition focus", ParamType.FLOAT, 8.0, good=(5, 12))
     page = "With the Example Speed LoRA, its page recommends 5."
     assert definition_help(focus, page) == f"{PARAM_HELP['shift_high']} {page}"
 

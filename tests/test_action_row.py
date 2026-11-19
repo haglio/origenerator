@@ -337,7 +337,7 @@ def test_an_images_row_is_actions_and_a_videos_rows_are_image_actions_and_video_
     action.show_row(_video())
 
     assert (on_an_image, _named(action, MediaType.IMAGE), _named(action, MediaType.VIDEO)) == (
-        "Actions", "Image Actions", "Video Actions")
+        "Actions", "Image actions", "Video actions")
 
 
 def test_the_pills_wrap_onto_more_lines_rather_than_being_cut_short(action, qtbot):

@@ -169,20 +169,20 @@ def test_a_number_outside_its_definitions_good_range_is_advised_against():
 
 
 def test_a_prompt_strength_below_one_is_warned_about_before_its_good_range():
-    cfg = ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, 7.5, good=(3, 8))
+    cfg = ParamDef("cfg", "Prompt strength", ParamType.FLOAT, 7.5, good=(3, 8))
     found = setting_advice({"cfg": 0.5}, [cfg])["cfg"]
     assert (found.text, found.fix) == (f"{STRENGTH_BELOW_ONE} Good range: 3\u20138.", 3)
 
 
 def test_a_prompt_strength_of_exactly_one_gets_no_warning():
-    cfg = ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, 1.0, good=(1.0, 3.5))
+    cfg = ParamDef("cfg", "Prompt strength", ParamType.FLOAT, 1.0, good=(1.0, 3.5))
     assert setting_advice({"cfg": 1.0}, [cfg]) == {}
 
 
 def test_only_the_pass_whose_strength_is_below_one_is_warned_about():
     passes = [
-        ParamDef("cfg_high", "Prompt Strength (First Pass)", ParamType.FLOAT, 3.5, good=(3, 4)),
-        ParamDef("cfg_low", "Prompt Strength (Second Pass)", ParamType.FLOAT, 3.5, good=(3, 4)),
+        ParamDef("cfg_high", "Prompt strength (first pass)", ParamType.FLOAT, 3.5, good=(3, 4)),
+        ParamDef("cfg_low", "Prompt strength (second pass)", ParamType.FLOAT, 3.5, good=(3, 4)),
     ]
     advice = setting_advice({"cfg_high": 0.5, "cfg_low": 3.0}, passes)
     assert {key: (found.text, found.fix) for key, found in advice.items()} == {
@@ -195,7 +195,7 @@ def test_a_prompt_strength_below_one_is_warned_about_even_with_no_range_to_hold_
 
 
 def test_a_number_its_models_page_judges_is_not_held_to_its_definitions_range():
-    cfg = ParamDef("cfg", "Prompt Strength", ParamType.FLOAT, 4.0, good=(3, 4))
+    cfg = ParamDef("cfg", "Prompt strength", ParamType.FLOAT, 4.0, good=(3, 4))
     assert setting_advice(_image(cfg=5.5), [cfg]) == {}
     assert setting_advice(_image(cfg=7.5), [cfg])["cfg"].text == (
         "Example Model's page recommends 3\u20136.")
@@ -400,7 +400,7 @@ def test_a_loras_page_holds_its_strength_in_any_row_even_while_loras_share_its_p
 
 
 _STYLE = "example_style.safetensors"
-_STYLE_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive Prompt. "
+_STYLE_SAID = ("Example Style 1.0's trigger word, exmplstyle, isn't in the Positive prompt. "
                "Click to add it.")
 
 
@@ -455,7 +455,7 @@ def test_a_lora_with_several_trigger_words_names_them_all_and_its_click_adds_the
                                  "lora": "example_actions.safetensors"}, ("lora",))["lora"]
 
     assert found.said == ("Example Actions 1.0's trigger words, alpha, beta, gamma and delta, "
-                          "aren't in the Positive Prompt. Click to add alpha.")
+                          "aren't in the Positive prompt. Click to add alpha.")
     assert found.fixed("a portrait") == "alpha, a portrait"
 
 
@@ -477,7 +477,7 @@ def test_an_entry_longer_than_five_words_is_never_warned_about(worded_loras, tit
 
     assert list(found) == ["lora_low"]
     assert found["lora_low"].said == ("Example Mixed 1.0's trigger word, alpha, isn't in the "
-                                      "Positive Prompt. Click to add it.")
+                                      "Positive prompt. Click to add it.")
 
 
 def test_a_trigger_word_of_five_words_is_still_one_to_warn_about(worded_loras):

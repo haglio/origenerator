@@ -61,17 +61,17 @@ class ImageEnhanceWorkflow(WorkflowTemplate):
         defaults = self.default_params()
         return [
             ParamDef("input_image", "Image", ParamType.IMAGE, defaults["input_image"]),
-            ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
-            ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
+            ParamDef("positive_prompt", "Positive prompt", ParamType.STR, defaults["positive_prompt"], multiline=True),
+            ParamDef("negative_prompt", "Negative prompt", ParamType.STR, defaults["negative_prompt"], multiline=True),
             model_dropdown("checkpoint", "Model", defaults["checkpoint"], "checkpoints",
                          accepts=ENHANCE_MODEL_FAMILIES),
             ParamDef("seed", "Seed", ParamType.SEED, defaults["seed"]),
             model_dropdown("upscale_model", "Upscaler", defaults["upscale_model"],
                          "upscale_models", accepts=WORKS_ON_PIXELS),
-            ParamDef("enhance_scale", "Upscale Factor", ParamType.FLOAT, defaults["enhance_scale"],
+            ParamDef("enhance_scale", "Upscale factor", ParamType.FLOAT, defaults["enhance_scale"],
                      min_val=1.0, max_val=4.0, step=0.25, good=(1.5, 2.0)),
-            ParamDef("enhance_steps", "Enhance Steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100, good=(15, 25)),
-            ParamDef("enhance_denoise", "Enhance Redraw Amount", ParamType.FLOAT, defaults["enhance_denoise"],
+            ParamDef("enhance_steps", "Enhance steps", ParamType.INT, defaults["enhance_steps"], min_val=1, max_val=100, good=(15, 25)),
+            ParamDef("enhance_denoise", "Enhance redraw amount", ParamType.FLOAT, defaults["enhance_denoise"],
                      min_val=0.0, max_val=1.0, step=0.05, good=(0.1, 0.2)),
             # ComfyUI's detailer node rejects a zero denoise, so a named part's floor sits above zero.
             ParamDef("enhance_detail_fixes", "Fixes", ParamType.FIXES, defaults["enhance_detail_fixes"],

@@ -89,9 +89,9 @@ def ensure_speech_files(params: dict, *, input_dir: Path, python: Path | None,
             "Python of the environment Qwen3-TTS is installed in.")
     voice = voice_request(params)
     if voice["mode"] == "clone" and not voice["sample"]:
-        raise SpeechError("The Voice is a custom recording, but Voice Sample names no file.")
+        raise SpeechError("The Voice is a custom recording, but Voice sample names no file.")
     if voice["mode"] == "clone" and not Path(voice["sample"]).is_file():
-        raise SpeechError(f"The Voice Sample is not a file: {voice['sample']}")
+        raise SpeechError(f"The Voice sample is not a file: {voice['sample']}")
     speech_dir = input_dir / SPEECH_DIR
     speech_dir.mkdir(parents=True, exist_ok=True)
     job = {

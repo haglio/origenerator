@@ -46,13 +46,13 @@ LINES_PLACEHOLDER = "What she says in this scene, spoken in the voice set under 
 SPEAKING_NOTE = " — not used while this scene speaks"
 SPEAKING_HELP = ("A scene with a line renders on the speech model, and all that "
                  "happens in it is her speaking — it will not act a prompt out. "
-                 "Clear Her Lines to write this scene instead.")
+                 "Clear Her lines to write this scene instead.")
 SPOKEN_OVER = ("positive_prompt", "negative_prompt")
 
 TEXT_CAPTIONS = {
-    "positive_prompt": "Positive Prompt",
-    "negative_prompt": "Negative Prompt",
-    "scene_lines": "Her Lines",
+    "positive_prompt": "Positive prompt",
+    "negative_prompt": "Negative prompt",
+    "scene_lines": "Her lines",
 }
 
 

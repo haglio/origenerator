@@ -118,7 +118,7 @@ def test_a_requests_change_renders_both_prompts_whole_with_what_went_struck_and_
     document = QTextDocument()
     document.setHtml(html)
     text = document.toPlainText()
-    assert text.index("Positive Prompt") < text.index("a woman") < text.index("Negative Prompt")
+    assert text.index("Positive prompt") < text.index("a woman") < text.index("Negative prompt")
     struck, lit = _struck_and_lit(html)
     assert "a hat" in struck
     assert "hat" in lit
@@ -129,7 +129,7 @@ def test_a_change_to_the_positive_prompt_alone_renders_only_that_prompt():
 
     document = QTextDocument()
     document.setHtml(html)
-    assert "Negative Prompt" not in document.toPlainText()
+    assert "Negative prompt" not in document.toPlainText()
 
 
 def test_a_requests_setting_changes_show_under_the_prompts_label_before_and_after():
@@ -139,7 +139,7 @@ def test_a_requests_setting_changes_show_under_the_prompts_label_before_and_afte
     document = QTextDocument()
     document.setHtml(html)
     text = document.toPlainText()
-    assert text.index("Positive Prompt") < text.index("Settings") < text.index("Width")
+    assert text.index("Positive prompt") < text.index("Settings") < text.index("Width")
     struck, lit = _struck_and_lit(html)
     assert struck == "1024"
     assert lit == "1216"

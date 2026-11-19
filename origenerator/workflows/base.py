@@ -206,7 +206,7 @@ def sampler_params(defaults: dict) -> list[ParamDef]:
     return [
         ParamDef("sampler_name", "Sampler", ParamType.DROPDOWN, defaults["sampler_name"],
                  options=SAMPLER_OPTIONS),
-        ParamDef("scheduler", "Step Spacing", ParamType.DROPDOWN, defaults["scheduler"],
+        ParamDef("scheduler", "Step spacing", ParamType.DROPDOWN, defaults["scheduler"],
                  options=SCHEDULER_OPTIONS),
     ]
 

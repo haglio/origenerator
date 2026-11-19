@@ -151,7 +151,7 @@ class TocEditing:
             return
         folders = gallery.child_groups(group)
         name, ok = QInputDialog.getText(
-            self._asks_over, "New Collection",
+            self._asks_over, "New collection",
             f"Name for a collection holding these {len(folders)} folders:",
         )
         if not ok or not name.strip():
@@ -196,7 +196,7 @@ class TocEditing:
         return self._tree.landing_on(self._tree.currentItem(), mime, source)
 
     def _new_collection(self, shape: str):
-        name, ok = QInputDialog.getText(self._asks_over, "New Collection", "Collection name:")
+        name, ok = QInputDialog.getText(self._asks_over, "New collection", "Collection name:")
         if ok and name.strip():
             self._open_collection_of_your_own(
                 self._edits.custom_collections.create(name.strip(), [], shape))

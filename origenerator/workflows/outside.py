@@ -77,14 +77,14 @@ class OutsideWorkflow(WorkflowTemplate):
     def param_definitions(self) -> list[ParamDef]:
         recorded = set(PLACES[self.output_type].values())
         return [pd for pd in (
-            ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, "", multiline=True),
-            ParamDef("negative_prompt", "Negative Prompt", ParamType.STR, "", multiline=True),
+            ParamDef("positive_prompt", "Positive prompt", ParamType.STR, "", multiline=True),
+            ParamDef("negative_prompt", "Negative prompt", ParamType.STR, "", multiline=True),
             ParamDef("seed", "Seed", ParamType.SEED, None),
             ParamDef("model", "Model", ParamType.STR, ""),
             ParamDef("style", "LoRA", ParamType.STR, ""),
             ParamDef("creativity", "Creativity", ParamType.STR, ""),
             ParamDef("resolution", "Resolution", ParamType.STR, ""),
-            ParamDef("aspect_ratio", "Aspect Ratio", ParamType.STR, ""),
+            ParamDef("aspect_ratio", "Aspect ratio", ParamType.STR, ""),
             ParamDef("quality", "Quality", ParamType.STR, ""),
         ) if pd.key in recorded]
 

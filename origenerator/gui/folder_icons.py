@@ -17,7 +17,7 @@ from origenerator.workflows.outside import outside_source
 
 LEVEL_LABELS = {
     "workflow": "Workflow", "site": "Site", "model": "Model", "lora": "LoRA",
-    "source_image": "Source Image",
+    "source_image": "Source image",
 }
 MARK_BESIDE_A_WORD = 15
 _SIDE_MARKS = {PORTRAIT: PORTRAIT, LANDSCAPE: LANDSCAPE, BOTH: "portrait_and_landscape"}

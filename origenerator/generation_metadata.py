@@ -105,7 +105,7 @@ def _frames_tip(workflow) -> str:
         f"so each frame it makes moves the scene 1/{workflow.native_fps:g} of a second forward: asking it "
         "for more frames would only make the motion last longer, never smoother.\n\n"
         f"Total frames: the frames in the file. Above {fps}, the frames between the model's own "
-        "are filled in afterward (interpolated), as many as the Frame Rate setting asks for.")
+        "are filled in afterward (interpolated), as many as the Frame rate setting asks for.")
 
 
 def _knows_its_frames(workflow, recorded: dict) -> bool:

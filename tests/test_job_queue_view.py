@@ -639,7 +639,7 @@ def test_shield_all_wears_the_shield_followed_by_all(queue):
     assert queue._shield_all.text() == "All"
     assert not queue._shield_all.icon().isNull()
     assert queue._shield_all.iconSize() == queue.rows()[0]._shield.iconSize()
-    assert queue._cancel_all.text() == "Cancel All"
+    assert queue._cancel_all.text() == "Cancel all"
 
 
 def _room_for_its_word(button) -> int:
@@ -655,7 +655,7 @@ def test_shield_all_and_cancel_all_leave_their_words_the_room_the_rows_cancel_do
 
     rows_cancel = _room_for_its_word(dressed.rows()[0]._cancel)
     assert _room_for_its_word(dressed._shield_all) == rows_cancel, (
-        "the user's report: the bottom rows of Cancel All's word were shaved off")
+        "the user's report: the bottom rows of Cancel all's word were shaved off")
     assert _room_for_its_word(dressed._cancel_all) == rows_cancel
 
 

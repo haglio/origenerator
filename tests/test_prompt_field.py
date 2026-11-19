@@ -171,7 +171,7 @@ def test_a_drag_is_filed_in_the_set_the_field_was_given(qtbot):
 
 
 def test_a_prompt_given_no_reason_is_never_grayed_out(qtbot):
-    field, label = PromptField("negative_prompt"), QLabel("Negative Prompt")
+    field, label = PromptField("negative_prompt"), QLabel("Negative prompt")
     for widget in (field, label):
         qtbot.addWidget(widget)
 

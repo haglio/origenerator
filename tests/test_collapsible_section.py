@@ -93,7 +93,7 @@ def test_rows_added_to_the_content_form_live_under_the_section(qtbot):
     section = CollapsibleSection("Prompts", collapsed=False)
     qtbot.addWidget(section)
     field = QLineEdit()
-    section.content_form().addRow("Positive Prompt", field)
+    section.content_form().addRow("Positive prompt", field)
 
     assert isinstance(section.content_form(), QFormLayout)
     assert section.content_form().rowCount() == 1

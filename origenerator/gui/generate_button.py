@@ -10,7 +10,7 @@ from origenerator.gui.style_property import set_style_property
 
 _GUARD_MS = 2500
 DEFAULT_CAPTION = "Generate"
-RANDOM_SEED_CAPTION = "Generate with Random seed"
+RANDOM_SEED_CAPTION = "Generate with random seed"
 UNREAD_EMPHASIS_QUESTION = ("This model reads parentheses and numbers as plain text, "
                             "so they add no strength.")
 REMOVE_EMPHASIS = "Remove emphasis"

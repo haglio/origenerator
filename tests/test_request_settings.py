@@ -4,10 +4,10 @@ from origenerator import request_settings
 from origenerator.workflows.base import ParamDef, ParamType
 
 DEFS = [
-    ParamDef("positive_prompt", "Positive Prompt", ParamType.STR, "", multiline=True),
+    ParamDef("positive_prompt", "Positive prompt", ParamType.STR, "", multiline=True),
     ParamDef("seed", "Seed", ParamType.SEED, 1),
     ParamDef("width", "Width", ParamType.INT, 1024, min_val=512, max_val=2048, step=64),
-    ParamDef("lora_strength", "LoRA Strength", ParamType.FLOAT, 0.8, min_val=0.0, max_val=2.0),
+    ParamDef("lora_strength", "LoRA strength", ParamType.FLOAT, 0.8, min_val=0.0, max_val=2.0),
     ParamDef("sampler_name", "Sampler", ParamType.DROPDOWN, "euler", options=["euler", "dpmpp_2m"]),
     ParamDef("human", "Human inspired", ParamType.BOOL, False),
     ParamDef("input_image", "Image", ParamType.IMAGE, ""),
@@ -30,7 +30,7 @@ def test_each_setting_is_told_with_its_label_range_or_choices():
     text = request_settings.as_told(_told())
 
     assert "Width [width]: 1024, a whole number from 512 to 2048" in text
-    assert "LoRA Strength [lora_strength]: 0.8, a number from 0.0 to 2.0" in text
+    assert "LoRA strength [lora_strength]: 0.8, a number from 0.0 to 2.0" in text
     assert "Sampler [sampler_name]: euler, one of euler, dpmpp_2m" in text
     assert "Human inspired [human]: off, on or off" in text
 
@@ -45,7 +45,7 @@ def test_the_answers_changes_are_taken_in_each_settings_own_kind():
 
 
 def test_a_number_past_its_range_stops_at_the_edge_and_a_setting_may_be_named_by_its_label():
-    changes = request_settings.changes_asked({"Width": 9000, "LoRA Strength": -1}, _told())
+    changes = request_settings.changes_asked({"Width": 9000, "LoRA strength": -1}, _told())
 
     assert changes == {"width": 2048, "lora_strength": 0.0}
 

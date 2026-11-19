@@ -89,15 +89,15 @@ def _pushes_the_prompt(values) -> bool:
     return not strengths or any(float(strength) != 1.0 for strength in strengths)
 
 
-STRENGTH_ONE_HELP = ("Prompt Strength is 1, so the Negative Prompt is not used. "
-                     "Raise Prompt Strength above 1 to use it.")
-BOTH_STRENGTHS_ONE_HELP = ("Both Prompt Strengths are 1, so the Negative Prompt is not used. "
+STRENGTH_ONE_HELP = ("Prompt strength is 1, so the Negative prompt is not used. "
+                     "Raise Prompt strength above 1 to use it.")
+BOTH_STRENGTHS_ONE_HELP = ("Both Prompt strengths are 1, so the Negative prompt is not used. "
                            "Raise either one above 1 to use it.")
 EVERY_SCENE_SPEAKS_HELP = ("Every scene has a line, so the audio is her speaking and this "
-                           "prompt is not used. Clear Her Lines on a scene to use it.")
+                           "prompt is not used. Clear Her lines on a scene to use it.")
 
 
-AUDIO_OFF_HELP = "Enable Audio is off, so this is not used. Turn on Enable Audio to use it."
+AUDIO_OFF_HELP = "Enable audio is off, so this is not used. Turn on Enable audio to use it."
 
 
 def _audio_on(values) -> bool:

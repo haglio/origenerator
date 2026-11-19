@@ -154,3 +154,12 @@ places = ["taskbar", "checkout"]
 [tool.setuptools.packages.find]
 include = ["origenerator*"]
 namespaces = false
+
+# The names the screen capitalizes inside sentence-case text, and the calls here
+# that take on-screen text (app_support.sentence_case).
+[tool.haglio.sentence-case]
+names = ["Origenerator", "Origenerator Radio", "Fun Time", "Genau", "Funestra", "Funestras", "Satellite",
+         "Satellites", "Kino", "Evolver", "Trash", "Windows", "Explorer", "ComfyUI", "Impact Subpack",
+         "Core", "Standalone", "Populate", "Request", "Combine", "Generate", "Enhance", "Audio",
+         "Portrait", "Landscape", "Robot Hand", "Qt", "Action"]
+calls = ["ParamDef", "model_dropdown", "ReferenceGroup", "_tool_button", "ElidingButton", "sure"]

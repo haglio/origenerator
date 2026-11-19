@@ -53,8 +53,8 @@ def _side_by_side(*widgets) -> QWidget:
 
 def prompts_side_by_side(prompt_warning, positive, negative) -> QHBoxLayout:
     columns = QHBoxLayout()
-    for caption, field in (((prompt_warning, QLabel("Positive Prompt")), positive),
-                           ((QLabel("Negative Prompt"),), negative)):
+    for caption, field in (((prompt_warning, QLabel("Positive prompt")), positive),
+                           ((QLabel("Negative prompt"),), negative)):
         column = QVBoxLayout()
         column.addWidget(_side_by_side(*caption), 0, Qt.AlignmentFlag.AlignLeft)
         column.addWidget(field, 1)
@@ -89,7 +89,7 @@ def strength_box(current) -> NoWheelDoubleSpinBox:
 
 def foot_row(lora_warning, lora, strength, training, buttons) -> FlowLayout:
     foot = FlowLayout(spacing=GAP_SMALL)
-    for together in ((lora_warning, QLabel("LoRA"), lora), (QLabel("LoRA Strength"), strength)):
+    for together in ((lora_warning, QLabel("LoRA"), lora), (QLabel("LoRA strength"), strength)):
         foot.addWidget(_side_by_side(*together))
     foot.addWidget(training)
     foot.add_trailing(buttons)

@@ -55,7 +55,7 @@ REQUEST_SYSTEM_PROMPT = (
     "- \"three dogs\": {\"positive\": \"a dog running, park\", \"negative\": "
     "\"blurry\"} -> {\"positive\": \"three dogs running, park\", \"negative\": "
     "\"blurry\", \"answer\": \"Three dogs now, all running.\"}\n"
-    "- \"lora strength up\", with LoRA Strength [lora_strength]: 0.8 listed: "
+    "- \"lora strength up\", with LoRA strength [lora_strength]: 0.8 listed: "
     "{\"positive\": \"a woman\", \"negative\": \"blurry\"} -> {\"positive\": \"a woman\", "
     "\"negative\": \"blurry\", \"answer\": \"Turned the LoRA up to 1.1.\", \"settings\": "
     "{\"lora_strength\": 1.1}}\n"

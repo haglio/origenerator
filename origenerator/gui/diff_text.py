@@ -46,8 +46,8 @@ def write_request_change(cursor: QTextCursor, old_positive: str, old_negative: s
         cursor.insertText(label, heading)
         cursor.insertBlock()
 
-    for label, before, after in (("Positive Prompt", old_positive, new_positive),
-                                 ("Negative Prompt", old_negative, new_negative)):
+    for label, before, after in (("Positive prompt", old_positive, new_positive),
+                                 ("Negative prompt", old_negative, new_negative)):
         if not (before or after):
             continue
         head(label)

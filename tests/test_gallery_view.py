@@ -229,7 +229,7 @@ def test_tree_rows_carry_a_toc_initial(qtbot):
     assert not lora.icon(0).isNull()
     assert lora.toolTip(0).endswith("· LoRA")
     assert not source.icon(0).isNull()
-    assert "Source Image" in source.toolTip(0)
+    assert "Source image" in source.toolTip(0)
     assert settings.toolTip(0).startswith(settings.text(0))
     assert "dance" not in settings.toolTip(0)
 

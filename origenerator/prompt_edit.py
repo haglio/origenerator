@@ -296,9 +296,9 @@ def _negative_story(negative: str, before: list[str], after: list[str]) -> str:
 
 _SAID_BY_THE_RULES = {
     DROPPED: "Took out {term}.",
-    PUSHED: "Made {term} stronger in the Negative Prompt.",
-    EXCLUDED: "Added {term} to the Negative Prompt.",
-    ALLOWED: "Took {term} out of the Negative Prompt.",
+    PUSHED: "Made {term} stronger in the Negative prompt.",
+    EXCLUDED: "Added {term} to the Negative prompt.",
+    ALLOWED: "Took {term} out of the Negative prompt.",
     RAISED: "Made {term} stronger.",
     ADDED: "Added {term}.",
 }

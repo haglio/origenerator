@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import PureWindowsPath
 
 from origenerator.content import load_content
+from origenerator.one_look import once_a_look
 from origenerator.voice.text import sounds_like, words
 from origenerator.workflows.model_files import (
     is_no_lora,
@@ -86,7 +87,14 @@ def _text(value) -> str:
 
 
 def part_table(content: dict | None = None) -> tuple:
+    if content is None:
+        return _the_librarys_table_this_look()
     return _ANATOMY_ANY_IMAGE_HAS + _library_only_parts(content)
+
+
+@once_a_look
+def _the_librarys_table_this_look() -> tuple:
+    return _ANATOMY_ANY_IMAGE_HAS + _library_only_parts()
 
 
 def part_named(name: str) -> DetailPart:

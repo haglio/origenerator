@@ -978,6 +978,7 @@ class GalleryPane(QObject):
     def _enhance_state(self, row) -> str | None:
         return enhance_state(row, self._host.enhancing().settings)
 
+    @looking_once
     def refresh_corners(self):
         rows = self._db.get_generations(self._thumb_widgets)
         for prompt_id, tile in self._thumb_widgets.items():

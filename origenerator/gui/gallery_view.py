@@ -2153,7 +2153,7 @@ class GalleryView(QWidget):
             lambda: trash_collection.restore_from_trash(self._db, self._jobs, prompt_ids,
                                                         self._edits.restore_deleted,
                                                         self.image_config_index()),
-            lambda restored: restored and self._go_to_generation(restored),
+            lambda restored: restored and self.go_to_generation(restored),
             failed="Restore failed", could_not="Could not restore the selected item(s)",
             logged=f"Failed to restore {len(prompt_ids)} deleted item(s)")
 
@@ -2206,7 +2206,7 @@ class GalleryView(QWidget):
         self._gallery_pane.clear_selection()
         self.refresh()
         if focus:
-            self._go_to_generation(focus)
+            self.go_to_generation(focus)
         self._re_aim_every_button()
 
     def _redo(self):
@@ -2248,7 +2248,7 @@ class GalleryView(QWidget):
     @looking_once
     def follow_link(self, prompt_id: str):
         self._search.leave()
-        self._go_to_generation(prompt_id)
+        self.go_to_generation(prompt_id)
 
     def go_to_file(self, path: str):
         prompt_id = self._db.generation_of_file(path)
@@ -2260,7 +2260,7 @@ class GalleryView(QWidget):
             ask_for_origenerator_mode(self._fun_time.dashboard_cmd_file)
         self.follow_link(prompt_id)
 
-    def _go_to_generation(self, prompt_id: str):
+    def go_to_generation(self, prompt_id: str):
         prompt_id = gallery.landing_for(prompt_id, self.library.reading.rows, self.image_config_index())
         item = self._folder_row_for(prompt_id)
         if item is not None:

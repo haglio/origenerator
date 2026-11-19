@@ -34,6 +34,7 @@ from origenerator.gui.recent_videos import RecentVideo
 from origenerator.gui.zone_items import FilesOnly
 from origenerator.item_actions import actions_of
 from origenerator.item_names import ItemNames
+from origenerator.library_views import KeptUntilTheLibraryChanges
 from origenerator.media import MediaType, media_type_from_filename
 from origenerator.video_history import video_history
 
@@ -63,6 +64,8 @@ class CombineController(QObject):
         self._host = host
         self._db = db
         self._library = library
+        self._rebuildable_videos = KeptUntilTheLibraryChanges(
+            db, lambda: combine_runs.rebuildable_videos(db.list_generations()))
         self._jobs = parts.jobs
         self._starting = parts.starting
         self._names = parts.names or ItemNames(db)
@@ -149,8 +152,7 @@ class CombineController(QObject):
         return (row.get("thumbnail_path"), self._host.animated_preview(row))
 
     def _video_history(self, intent: str) -> list[RecentVideo]:
-        videos = [row for row in combine_runs.rebuildable_videos(self._db.list_generations())
-                  if gallery.produced_output(row)]
+        videos = [row for row in self._rebuildable_videos() if gallery.produced_output(row)]
         return [RecentVideo(row["prompt_id"], row.get("thumbnail_path"))
                 for row in video_history(videos, intent, self._db.custom_combinations(),
                                          self._db.list_combine_video_uses())]
@@ -186,9 +188,14 @@ class CombineController(QObject):
         self.widget.set_category(saved.get("category") or "")
 
     def offer_the_actions(self, rows: list[dict]) -> None:
+        self._offer_the_actions_of(combine_runs.rebuildable_videos(rows))
+
+    def _offer_the_actions_again(self) -> None:
+        self._offer_the_actions_of(self._rebuildable_videos())
+
+    def _offer_the_actions_of(self, videos: list[dict]) -> None:
         self.widget.set_available_categories(combine_runs.offered_actions(
-            combine_runs.rebuildable_videos(rows), self.widget.selected_intent(),
-            tuple(self.widget.checked_boxes()),
+            videos, self.widget.selected_intent(), tuple(self.widget.checked_boxes()),
             self._state_of(self.widget.image_zone.current_id())))
 
     def _state_of(self, image_id: str | None) -> str:
@@ -201,15 +208,15 @@ class CombineController(QObject):
                            actions_of(image, MediaType.IMAGE).actions if image else ())
 
     def image_dropped(self) -> None:
-        self.offer_the_actions(self._db.list_generations())
+        self._offer_the_actions_again()
         self.reconcile_generating()
 
     def _on_intent_changed(self, _intent: str) -> None:
-        self.offer_the_actions(self._db.list_generations())
+        self._offer_the_actions_again()
         self.reconcile_generating()
 
     def _on_checked_changed(self) -> None:
-        self.offer_the_actions(self._db.list_generations())
+        self._offer_the_actions_again()
 
     def reconcile_generating(self) -> None:
         image_id = self.widget.image_zone.current_id()
@@ -348,9 +355,6 @@ class CombineController(QObject):
         self._host.reveal_launch(key)
         return True
 
-    def _category_candidates(self) -> list:
-        return combine_runs.rebuildable_videos(self._db.list_generations())
-
     def _say_no_past_video(self, category: str, intent: str) -> None:
         said = action_settings.no_past_video(category, intent)
         if self._slideshows.showing is not None:
@@ -385,7 +389,7 @@ class CombineController(QObject):
         if reference is None:
             return
         run = combine_runs.as_action(reference, category, intent, self._state_of(image_id),
-                                     self._category_candidates())
+                                     self._rebuildable_videos())
         if run is None:
             self._say_no_past_video(category, intent)
             return
@@ -438,7 +442,7 @@ class CombineController(QObject):
         action = answer.action
         animation = named(action)
         available = action_settings.available_categories(
-            self._category_candidates(), asked.lane, animation.checked)
+            self._rebuildable_videos(), asked.lane, animation.checked)
         if animation.action not in available:
             return None, action_settings.no_past_video(action, asked.lane), WARNING
         logger.info("animate as: image=%s lane=%s -> action=%s", image_id, asked.lane, action)

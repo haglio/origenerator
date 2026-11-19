@@ -179,6 +179,11 @@ class SpiedDB(Database):
         self.exported = []
         self.uses = []
         self.actions_by_id = {}
+        self.listings = 0
+
+    def list_generations(self):
+        self.listings += 1
+        return super().list_generations()
 
     def set_many_actions(self, side, actions_by_id):
         self.actions_by_id.update({prompt_id: (side, item_actions)
@@ -1060,6 +1065,23 @@ def test_switching_lanes_re_asks_which_actions_are_answerable(combine, monkeypat
     controller.widget.intent_changed.emit(action_settings.GENAU)
 
     assert seen == [action_settings.GENAU]
+
+
+def test_ticks_lane_switches_and_drops_read_the_gallery_once_until_it_changes(
+        combine, stored):
+    db = stored([_video("clip"), _image("img")])
+    controller, _host = combine(db=db)
+    listed_before = db.listings
+
+    for _ in range(3):
+        controller.widget.checked_changed.emit()
+        controller.widget.intent_changed.emit(action_settings.GENAU)
+        controller.image_dropped()
+    read_while_unchanged = db.listings - listed_before
+    put_rows(db, [_video("made since")])
+    controller.widget.checked_changed.emit()
+
+    assert (read_while_unchanged, db.listings - listed_before) == (1, 2)
 
 
 def test_a_spoken_action_whose_folder_is_already_making_one_joins_that_run(combine, monkeypatch, stored):

@@ -24,7 +24,8 @@ _VERSIONED = re.compile(r"^(?P<base>.+?) (?P<major>\d+)\.(?P<minor>\d+)$")
 _FOLDERS_SHOWN_BY_TITLE = ("diffusion_models", "checkpoints", "loras")
 _NOTES = re.compile(r"\s*\((?P<notes>[^()]*)\)$")
 _PASSES = ("high", "low")
-_read: dict[str, tuple[tuple[int, int], object]] = {}
+_read: dict[str, tuple[tuple[int, int] | None, object]] = {}
+_trained: dict[str, tuple[tuple[int, int] | None, datetime | None]] = {}
 _TITLES_OF_THE_PASS_UNDER_WAY: list[dict[str, str]] = []
 
 
@@ -182,16 +183,21 @@ def _dated_fix_rank(part: str, stem: str) -> int:
 
 
 def kept_by_stem(path) -> dict:
-    stamp = _written(str(path))
-    if stamp is None:
+    if _written(str(path)) is None:
         return {}
     try:
-        kept = _read.get(str(path))
-        if kept is None or kept[0] != stamp:
-            kept = _read[str(path)] = (stamp, json.loads(path.read_text(encoding="utf-8")))
+        kept = _until_it_changes(_read, path, lambda read: json.loads(read.read_text(encoding="utf-8")))
     except (OSError, ValueError):
         return {}
-    return kept[1] if isinstance(kept[1], dict) else {}
+    return kept if isinstance(kept, dict) else {}
+
+
+def _until_it_changes(kept: dict, path, work_out):
+    stamp = _written(str(path))
+    remembered = kept.get(str(path))
+    if remembered is None or remembered[0] != stamp:
+        remembered = kept[str(path)] = (stamp, work_out(path))
+    return remembered[1]
 
 
 @once_a_look
@@ -213,6 +219,10 @@ def write_title(stem: str, title: str) -> None:
 
 
 def trained_when(path) -> datetime | None:
+    return _until_it_changes(_trained, path, _read_trained_when)
+
+
+def _read_trained_when(path) -> datetime | None:
     metadata = safetensors_metadata(path)
     for key in _TRAINED_AT:
         try:

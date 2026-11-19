@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from origenerator.model_titles import model_help, model_title, trained_sentence
+from origenerator.one_look import looking_once
 from origenerator.setting_advice import good_range_text
 from origenerator.workflows.base import ParamDef
 from origenerator.workflows.lora_rows import LORA_KEYS, strength_key_of
@@ -426,6 +427,7 @@ def option_help(key: str, option: str) -> str:
     return OPTION_HELP.get(key, {}).get(option, "")
 
 
+@looking_once
 def with_the_picked_lora(tip: str, lora) -> str:
     about = " ".join(filter(None, (model_help(lora), trained_sentence(lora))))
     if not tip or not about:

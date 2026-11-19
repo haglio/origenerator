@@ -4,6 +4,7 @@ import re
 
 import pytest
 
+from origenerator import model_titles
 from origenerator.gallery import ENHANCE_SETTING_KEYS
 from origenerator.gui.param_help import (
     PARAM_HELP,
@@ -11,6 +12,7 @@ from origenerator.gui.param_help import (
     definition_help,
     option_help,
     param_help,
+    with_the_picked_lora,
 )
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import SAMPLER_OPTIONS, ParamDef, ParamType
@@ -194,3 +196,21 @@ def test_a_durations_good_range_is_said_in_seconds():
     pd = ParamDef("frame_count", "Duration", ParamType.INT, 81, min_val=5, max_val=161, step=4,
                   unit="s", shown_in_seconds_at=16, good=(81, 161))
     assert " Good range: 5\u201310 s. " in definition_help(pd)
+
+
+def test_explaining_a_picked_lora_works_out_its_title_once(installed_models, titled_models,
+                                                           monkeypatch):
+    titled_models({"example_look": "Example Look 1.0"})
+    installed_models.add("loras", "example_look.safetensors", arch="krea2", lora=True,
+                         metadata={"ss_training_finished_at": "1792851468.891"})
+    worked_out = []
+    real = model_titles._kept_title
+
+    def counted(value):
+        worked_out.append(value)
+        return real(value)
+    monkeypatch.setattr(model_titles, "_kept_title", counted)
+
+    with_the_picked_lora("Pick a look.", "example_look.safetensors")
+
+    assert worked_out == ["example_look.safetensors"]

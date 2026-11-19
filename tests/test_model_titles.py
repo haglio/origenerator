@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from origenerator import title_words
+from origenerator import model_titles, title_words
 from origenerator.model_titles import (
     Version,
     model_help,
@@ -88,6 +88,28 @@ def test_when_a_lora_was_trained_is_read_from_its_own_header(installed_models):
     assert trained_when(started) == datetime.fromtimestamp(1792851228.2).astimezone()
     assert trained_when(undated) is None
     assert trained_when(installed_models.root / "missing.safetensors") is None
+
+
+def test_a_loras_header_is_read_once_until_the_file_changes(installed_models, monkeypatch):
+    lora = installed_models.add("loras", "example_look.safetensors", lora=True,
+                                metadata={"ss_training_finished_at": "1792851468.891"})
+    read = []
+    real = model_titles.safetensors_metadata
+
+    def counted(path):
+        read.append(path)
+        return real(path)
+    monkeypatch.setattr(model_titles, "safetensors_metadata", counted)
+
+    first, again = trained_when(lora), trained_when(lora)
+    retrained = installed_models.add("loras", "example_look.safetensors", lora=True,
+                                     metadata={"ss_training_finished_at": "1792937868.8915"})
+
+    assert (first, again, trained_when(retrained)) == (
+        datetime.fromtimestamp(1792851468.891).astimezone(),
+        datetime.fromtimestamp(1792851468.891).astimezone(),
+        datetime.fromtimestamp(1792937868.8915).astimezone())
+    assert read == [lora, lora]
 
 
 def test_a_versioned_loras_training_date_reads_as_a_sentence_of_its_own(

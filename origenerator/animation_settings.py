@@ -33,8 +33,8 @@ def _write(held: dict, path: Path | None = None) -> None:
     beside.replace(path)
 
 
-def every_accepted(path: Path | None = None) -> dict:
-    return _read(path)
+def every_accepted() -> dict:
+    return _read()
 
 
 def settings_for(lane: str, action: str, state: str, *, path: Path | None = None

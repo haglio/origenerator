@@ -13,6 +13,7 @@ from origenerator.workflows.detail_parts import detector_folder, detector_for_pa
 TRAINER = lora_training.TRAINERS / "fix_lora_trainer.py"
 FIRST_STATE = "cropping"
 SAVE_EVERY = 100
+_bases_trained_on: dict[Path, dict[str, Path]] = {}
 
 
 def images_folder(part) -> Path:
@@ -94,8 +95,11 @@ def comfyui_python() -> Path:
 
 
 def start(job: dict) -> lora_training.Trainer:
-    return lora_training.start(job, config.LORA_TRAINING_PYTHON, TRAINER,
-                               comfyui_python=str(comfyui_python()))
+    try:
+        return lora_training.start(job, config.LORA_TRAINING_PYTHON, TRAINER,
+                                   comfyui_python=str(comfyui_python()))
+    finally:
+        _bases_trained_on.clear()
 
 
 def trainings() -> list[dict]:
@@ -103,13 +107,21 @@ def trainings() -> list[dict]:
 
 
 def trained_on(lora) -> str | None:
+    base = _bases_trained_on_in(config.FIX_TRAINING_DIR).get(model_stem(lora))
+    if base is None:
+        return None
     checkpoints = config.COMFYUI_DIR / "models" / "checkpoints"
-    for job in trainings():
-        if job.get("output_name") == model_stem(lora) and job.get("base_model"):
-            base = Path(job["base_model"])
-            return str(base.relative_to(checkpoints)) if base.is_relative_to(checkpoints) else (
-                base.name)
-    return None
+    return str(base.relative_to(checkpoints)) if base.is_relative_to(checkpoints) else base.name
+
+
+def _bases_trained_on_in(folder: Path) -> dict[str, Path]:
+    if folder not in _bases_trained_on:
+        bases: dict[str, Path] = {}
+        for job in lora_training.trainings(folder):
+            if job.get("base_model"):
+                bases.setdefault(job.get("output_name"), Path(job["base_model"]))
+        _bases_trained_on[folder] = bases
+    return _bases_trained_on[folder]
 
 
 def running_trainings() -> list[dict]:

@@ -177,6 +177,31 @@ def test_a_fixs_lora_was_trained_on_the_model_its_training_names(monkeypatch, tm
         str(Path("styles") / "base.safetensors"))
 
 
+def test_what_fix_loras_were_trained_on_is_read_once_until_a_training_starts(
+        monkeypatch, tmp_path):
+    checkpoints = config.COMFYUI_DIR / "models" / "checkpoints"
+    _training_of(monkeypatch, tmp_path, output_name="hands 1.1",
+                 base_model=str(checkpoints / "base.safetensors"))
+    read = []
+    real = lora_training.trainings
+
+    def counted(folder):
+        read.append(folder)
+        return real(folder)
+    monkeypatch.setattr(lora_training, "trainings", counted)
+    _started(monkeypatch)
+
+    asked = [fix_training.trained_on(str(Path("fixes") / "hands 1.1.safetensors"))
+             for _ in range(3)]
+    fix_training.start({"part": "hands", **lora_training.work_files(tmp_path / "hands"),
+                        "output_name": "hands 1.2",
+                        "base_model": str(checkpoints / "other.safetensors")})
+    after_it_started = fix_training.trained_on(str(Path("fixes") / "hands 1.2.safetensors"))
+
+    assert (asked, after_it_started) == (["base.safetensors"] * 3, "other.safetensors")
+    assert read == [tmp_path, tmp_path]
+
+
 def test_a_lora_no_training_names_was_trained_on_no_model_anyone_knows(monkeypatch, tmp_path):
     _training_of(monkeypatch, tmp_path)
 

@@ -4,11 +4,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from math import ceil
 
-from PySide6.QtCore import QEvent, QPoint, QPointF, QSize, Qt, Signal
+from PySide6.QtCore import QEvent, QPoint, QSize, Qt, Signal
 from PySide6.QtGui import (
+    QPixmap,
     QTextBlockFormat,
     QTextCharFormat,
     QTextCursor,
+    QTextImageFormat,
 )
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -108,6 +110,38 @@ class _Made:
     generate: bool = False
 
 
+class _Thumbnail(QLabel):
+    clicked = Signal()
+
+    def __init__(self, parent: QWidget, item: str, image: QPixmap, *, opens: bool, tip: str):
+        super().__init__(parent)
+        self.item = item
+        self._opens = opens
+        self.setPixmap(image)
+        self.setToolTip(tip)
+        if opens:
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def mousePressEvent(self, event) -> None:
+        if self._opens and event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+
+    def mouseDoubleClickEvent(self, event) -> None:
+        event.accept()
+
+    def mouseMoveEvent(self, event) -> None:
+        event.accept()
+
+    def mouseReleaseEvent(self, event) -> None:
+        event.accept()
+
+
+def _scaled_to(image_format: QTextImageFormat) -> QPixmap:
+    return QPixmap(image_format.name()).scaled(
+        round(image_format.width()), round(image_format.height()),
+        Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
+
+
 class _Conversation(QTextEdit):
     generate_asked = Signal(int)
     item_activated = Signal(str)
@@ -117,8 +151,7 @@ class _Conversation(QTextEdit):
         self.setReadOnly(True)
         self.setFrameShape(QTextEdit.Shape.NoFrame)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse
-                                     | Qt.TextInteractionFlag.TextSelectableByKeyboard)
+        self.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.setStyleSheet("QTextEdit { background: transparent; }")
         page = self.document()
         page.setDocumentMargin(0)
@@ -126,18 +159,13 @@ class _Conversation(QTextEdit):
         self.verticalScrollBar().valueChanged.connect(lambda _value: self._place())
         self._tips: list[str] = []
         self._placed: list[tuple[QWidget, int]] = []
-        self._items: dict[int, str] = {}
-        self._showing: str | None = None
-        self.viewport().setMouseTracking(True)
         self.hide()
 
     def show_entries(self, entries: list[_Entry], made: list[_Made], showing: str | None) -> None:
-        self._showing = showing
         for widget, _block_number in self._placed:
             widget.hide()
             widget.deleteLater()
         self._placed = []
-        self._items = {}
         self.clear()
         cursor = self.textCursor()
         self._tips = []
@@ -147,12 +175,12 @@ class _Conversation(QTextEdit):
             if entry.answered:
                 _paragraph(cursor, entry.answered, TEXT_PRIMARY, indent=MARGIN_STANDARD)
                 self._tips.append(entry.tip)
-            self._show_what_was_made(cursor, index, entry, made[index])
+            self._show_what_was_made(cursor, index, entry, made[index], showing)
         self.setVisible(bool(entries))
         self._fit()
 
     def _show_what_was_made(self, cursor: QTextCursor, index: int, entry: _Entry,
-                            made: _Made) -> None:
+                            made: _Made, showing: str | None) -> None:
         if made.reading is not None:
             bar = ProgressBar(self.viewport())
             bar.setFixedSize(self._generate_button_size())
@@ -161,10 +189,10 @@ class _Conversation(QTextEdit):
         elif made.item:
             image_format = fitted(made.thumbnail, self._thumbnail_box())
             if image_format is not None:
-                _block(cursor, indent=MARGIN_STANDARD, above=GAP_SMALL)
-                cursor.insertImage(image_format)
-                self._tips.append(entry.tip)
-                self._items[cursor.blockNumber()] = made.item
+                thumbnail = _Thumbnail(self.viewport(), made.item, _scaled_to(image_format),
+                                       opens=made.item != showing, tip=entry.tip)
+                thumbnail.clicked.connect(lambda item=made.item: self.item_activated.emit(item))
+                self._reserve(cursor, thumbnail, entry)
         elif made.generate:
             button = GenerateButton(self.viewport())
             button.clicked.connect(lambda _checked=False, at=index: self.generate_asked.emit(at))
@@ -210,41 +238,6 @@ class _Conversation(QTextEdit):
         bar = self.verticalScrollBar()
         bar.setValue(bar.maximum())
         self._place()
-
-    def _item_at(self, place: QPoint) -> str | None:
-        on_the_page = QPointF(place.x(), place.y() + self.verticalScrollBar().value())
-        position = self.document().documentLayout().hitTest(
-            on_the_page, Qt.HitTestAccuracy.ExactHit)
-        if position < 0:
-            return None
-        return self._items.get(self.document().findBlock(position).blockNumber())
-
-    def _link_at(self, place: QPoint) -> str | None:
-        item = self._item_at(place)
-        return None if item == self._showing else item
-
-    def _caught_on_a_thumbnail(self, event) -> bool:
-        if (event.button() != Qt.MouseButton.LeftButton
-                or self._item_at(event.position().toPoint()) is None):
-            return False
-        self.clearFocus()
-        return True
-
-    def mousePressEvent(self, event) -> None:
-        if not self._caught_on_a_thumbnail(event):
-            super().mousePressEvent(event)
-        elif (link := self._link_at(event.position().toPoint())) is not None:
-            self.item_activated.emit(link)
-
-    def mouseDoubleClickEvent(self, event) -> None:
-        if not self._caught_on_a_thumbnail(event):
-            super().mouseDoubleClickEvent(event)
-
-    def mouseMoveEvent(self, event) -> None:
-        super().mouseMoveEvent(event)
-        over_a_link = self._link_at(event.position().toPoint()) is not None
-        self.viewport().setCursor(Qt.CursorShape.PointingHandCursor if over_a_link
-                                  else Qt.CursorShape.IBeamCursor)
 
     def tip_at(self, place: QPoint) -> str:
         block = self.cursorForPosition(place).blockNumber()

@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from PySide6.QtCore import QPoint, Qt
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QApplication, QInputDialog, QLabel, QMenu, QTabBar
 from shared_ui.testing import appending_to
 
@@ -13,6 +14,7 @@ from origenerator.db import Database, NewGeneration
 from origenerator.gallery.keys import folder_id
 from origenerator.gallery.tree import settings_folder_key
 from origenerator.gui.combination import Combination
+from origenerator.gui import generate_pane
 from origenerator.gui.eliding_tab_bar import ElidingTabBar
 from origenerator.gui.generate_pane import GeneratePane, parse_tabs_state
 from origenerator.gui.generate_tab import GenerateTab
@@ -1298,3 +1300,22 @@ def test_only_the_tab_in_front_lets_its_video_play(tabs):
     assert (told[first][-1], told[second][-1]) == (False, True)
     tabs.setCurrentWidget(second)
     assert (told[first][-1], told[second][-1]) == (True, False)
+
+
+def test_a_tab_redrawn_on_the_same_item_decodes_its_thumbnail_once(tabs, tmp_path, monkeypatch):
+    thumb = tmp_path / "thumb.png"
+    pixmap = QPixmap(8, 8)
+    pixmap.fill(Qt.GlobalColor.red)
+    pixmap.save(str(thumb))
+    row = dict(_complete_gen(tabs._db, "g1", _sdxl_full(positive_prompt="a heron", seed=4),
+                             "sdxl_g1.png"), thumbnail_path=str(thumb))
+    tab = tabs.currentWidget()
+    tab._viewport.show_media = MagicMock()
+    tabs.load_selection(row, [row])
+    decoded = []
+    monkeypatch.setattr(generate_pane, "tab_mark", lambda icon: decoded.append(icon) or icon)
+
+    for _ in range(3):
+        tab.title_changed.emit(tab.title())
+
+    assert decoded == []

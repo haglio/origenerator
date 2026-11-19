@@ -1060,13 +1060,21 @@ class GenerateTab(DropZones):
     def reaches(self) -> tuple[DropZone, ...]:
         return () if self._param_form is None else self._param_form.drop_zones()
 
-    def tab_icon(self) -> QIcon:
+    def tab_mark_source(self) -> tuple:
         row = self._shown_row()
         thumb = (row or {}).get("thumbnail_path")
-        if thumb and Path(thumb).exists():
-            return QIcon(QPixmap(str(thumb)))
+        if thumb:
+            try:
+                seen = Path(thumb).stat()
+            except OSError:
+                seen = None
+            if seen is not None:
+                return str(thumb), seen.st_mtime_ns, seen.st_size
         media = media_type_of_row(row) if row is not None else self._makes()
-        return icons.media_type_icon(media) if media else QIcon()
+        return (media,) if media else ()
+
+    def tab_icon(self) -> QIcon:
+        return icon_of_mark_source(self.tab_mark_source())
 
     def prefill(self, workflow_name: str, params: dict):
         with self._loading():
@@ -1685,6 +1693,12 @@ class GenerateTab(DropZones):
     def video_on_screen(self) -> str | None:
         return self._viewport.video_on_screen()
 
+
+
+def icon_of_mark_source(source: tuple) -> QIcon:
+    if len(source) == 3:
+        return QIcon(QPixmap(source[0]))
+    return icons.media_type_icon(source[0]) if source else QIcon()
 
 
 def _scrolling_column() -> tuple[QScrollArea, QVBoxLayout]:

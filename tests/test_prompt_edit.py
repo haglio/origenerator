@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
+from urllib.error import HTTPError
 
 import pytest
-from urllib.error import HTTPError
 
 from origenerator import config, request_settings
 from origenerator.box_breaks import BOX_BREAK

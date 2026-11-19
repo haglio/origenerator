@@ -96,6 +96,9 @@ class Database:
     def set_watch_counts(self, prompt_id: str, counts: dict):
         return self.generations.set_watch_counts(prompt_id, counts)
 
+    def set_many_watch_counts(self, counts_by_id: dict[str, dict]):
+        return self.generations.set_many_watch_counts(counts_by_id)
+
     def set_library_record(self, prompt_id: str, **fields):
         return self.generations.set_library_record(prompt_id, **fields)
 

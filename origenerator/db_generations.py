@@ -28,6 +28,10 @@ LIFECYCLE_COLUMNS = frozenset({
 SENT_COLUMNS = ("evolver_exported_at", "genau_exported_at")
 
 WATCH_COLUMNS = tuple((field, f"watch_{field}") for field in COUNT_FIELDS)
+def watch_columns_of(counts: dict) -> dict[str, int]:
+    return {column: int(counts.get(field) or 0) for field, column in WATCH_COLUMNS}
+
+
 LIBRARY_RECORD_COLUMNS = frozenset({"web_url", "library_id", "upscale_provenance",
                                     "video_seconds", "genau_flipped", "video_resolution",
                                     "video_aspect_ratio"})
@@ -232,8 +236,18 @@ class GenerationStore(Store):
             )
 
     def set_watch_counts(self, prompt_id: str, counts: dict):
-        self._set_columns(prompt_id, {column: int(counts.get(field) or 0)
-                                      for field, column in WATCH_COLUMNS})
+        self._set_columns(prompt_id, watch_columns_of(counts))
+
+    def set_many_watch_counts(self, counts_by_id: dict[str, dict]):
+        if not counts_by_id:
+            return
+        columns = [column for _field, column in WATCH_COLUMNS]
+        with self._connect() as conn:
+            conn.executemany(
+                f"UPDATE generations SET {', '.join(f'{c} = ?' for c in columns)}"
+                " WHERE prompt_id = ?",
+                [(*watch_columns_of(counts).values(), prompt_id)
+                 for prompt_id, counts in counts_by_id.items()])
 
     def set_library_record(self, prompt_id: str, **fields):
         refused = set(fields) - LIBRARY_RECORD_COLUMNS

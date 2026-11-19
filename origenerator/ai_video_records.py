@@ -12,6 +12,7 @@ from app_support.logging_utils import configure_logging, install_exception_loggi
 
 from origenerator import config
 from origenerator.db import Database
+from origenerator.db_generations import watch_columns_of
 from origenerator.outside_videos import Places, places_here, take_record
 from origenerator.thumbnail import first_frame_of
 from origenerator.warm_gun_records import PhoneRecords
@@ -40,6 +41,9 @@ def _parser() -> argparse.ArgumentParser:
     upscaled = verbs.add_parser("upscaled")
     upscaled.add_argument("--video", type=Path, required=True)
     upscaled.add_argument("--provenance", type=Path, required=True)
+    verbs.add_parser("phones_file").set_defaults(leave_the_phones_file=False)
+    for verb in (record, watched, favorite, flipped, upscaled):
+        verb.add_argument("--leave-the-phones-file", action="store_true")
     return parser
 
 
@@ -55,17 +59,23 @@ def main(argv: list[str] | None = None, *, db_path: Path | None = None,
     log_to("", config.STATE_DIR / "origenerator.log")
     install_exception_logging(logger)
     db = Database(config.DB_PATH if db_path is None else db_path)
-    if args.verb == "record":
+    if args.verb == "phones_file":
+        found = []
+    elif args.verb == "record":
         found = [take_record(db, args.video, read_json(args.record), places=places(), grab=grab)]
     else:
         found = _written_on_their_rows(db, args)
-    phone_records(db).write()
+    if not args.leave_the_phones_file:
+        phone_records(db).write()
     print(json.dumps({"done": sum(found), "no_row": len(found) - sum(found)}))
     return 0
 
 
 def _written_on_their_rows(db, args) -> list[bool]:
-    row_of = VideoRows(db.list_generations())
+    rows = db.list_generations()
+    row_of = VideoRows(rows)
+    if args.verb == "watched":
+        return _watch_totals_written(db, rows, row_of, read_json(args.totals))
 
     def on_its_row(video: Path, write: str, *values, **fields) -> bool:
         prompt_id = row_of(video)
@@ -73,15 +83,27 @@ def _written_on_their_rows(db, args) -> list[bool]:
             getattr(db, write)(prompt_id, *values, **fields)
         return prompt_id is not None
 
-    if args.verb == "watched":
-        return [on_its_row(Path(video), "set_watch_counts", counts)
-                for video, counts in read_json(args.totals).items()]
     if args.verb == "favorite":
         return [on_its_row(args.video, "set_generation_favorite", args.starred)]
     if args.verb == "flipped":
         return [on_its_row(args.video, "set_library_record", genau_flipped=int(args.flipped))]
     return [on_its_row(args.video, "set_library_record",
                        upscale_provenance=json.dumps(read_json(args.provenance)))]
+
+
+def _watch_totals_written(db, rows, row_of, totals: dict) -> list[bool]:
+    by_id = {row["prompt_id"]: row for row in rows}
+    found, moved = [], {}
+    for video, counts in totals.items():
+        prompt_id = row_of(Path(video))
+        found.append(prompt_id is not None)
+        if prompt_id is None:
+            continue
+        wanted = watch_columns_of(counts)
+        if any(by_id.get(prompt_id, {}).get(column) != value for column, value in wanted.items()):
+            moved[prompt_id] = counts
+    db.set_many_watch_counts(moved)
+    return found
 
 
 if __name__ == "__main__":

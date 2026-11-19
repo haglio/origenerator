@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from types import SimpleNamespace
 from typing import NamedTuple
 
 import pytest
@@ -20,6 +21,7 @@ class _Scope(NamedTuple):
 
 
 _ALL = _Scope("All", None)
+_A_LIBRARY_OF_NO_IMAGES = SimpleNamespace(live_ids=None, reading=SimpleNamespace(image_index={}))
 
 
 def _row(prompt_id: str, prompt: str, seed: int = 1) -> dict:
@@ -49,12 +51,6 @@ class FakeHost:
     def search_scope(self):
         return self.scope
 
-    def everything_scope(self):
-        return _ALL
-
-    def image_config_index(self) -> dict:
-        return {}
-
     def group_for_key(self, key: str):
         return self.groups.get(key)
 
@@ -83,7 +79,9 @@ def controller(qtbot):
     def build(rows=(), host=None, expander=None):
         parent = QWidget()
         qtbot.addWidget(parent)
-        found = GallerySearchController(host or FakeHost(), parent=parent, expander=expander)
+        host = host or FakeHost()
+        found = GallerySearchController(host, parent=parent, expander=expander, toc=host,
+                                        pane=host, library=_A_LIBRARY_OF_NO_IMAGES)
         found.index.update(list(rows))
         # A QObject whose parent is collected takes its timers down with it, so each parent is kept.
         built.append((parent, found))

@@ -34,6 +34,10 @@ def estimate_seconds(durations: list[float]) -> float | None:
     return statistics.median(durations)
 
 
+def typical_run_seconds(db, job) -> float | None:
+    return estimate_seconds(db.recent_durations(job.workflow.name))
+
+
 def average_seconds(durations: list[float]) -> float | None:
     if not durations:
         return None

@@ -285,7 +285,7 @@ def _a_gallery_with_another_sites_picture(qtbot, monkeypatch):
 
 
 def _stand_on_the_folder_of(view, prompt_id) -> None:
-    folder = view.folder_key_of(view._db.get_generation(prompt_id))
+    folder = view.library.folder_key_of(view._db.get_generation(prompt_id))
     view._tree.setCurrentItem(view.toc.item_for(shaped_key(folder, LANDSCAPE)))
 
 
@@ -956,7 +956,7 @@ def _folder_squares(view):
 
 def _folder_square_holding(view, prompt_id: str) -> str:
     folder = gallery.settings_folder_key(view._db.get_generation(prompt_id),
-                                         view.image_config_index())
+                                         view.library.reading.image_index)
     for tile in _folder_squares(view):
         if key_holds(tile.key, folder):
             return tile.key
@@ -1215,7 +1215,7 @@ def test_leaving_a_slideshow_on_a_slide_from_another_folder_opens_that_folder_on
         qtbot, monkeypatch):
     view, slideshow = _looping_actions_on_a_video(qtbot, monkeypatch)
     folder_of_the_video = shaped_key(gallery.settings_folder_key(
-        view._db.get_generation("v1"), view.image_config_index()), LANDSCAPE)
+        view._db.get_generation("v1"), view.library.reading.image_index), LANDSCAPE)
 
     _press_enter(slideshow)
 
@@ -1454,11 +1454,11 @@ def test_locking_a_slide_enhances_it_unless_one_is_already_in_flight(qtbot, tmp_
     qtbot.addWidget(view)
     view.refresh()
 
-    assert view.enhance_from_slideshow("g0") is True
+    assert view._enhance.enhance_from_slideshow("g0") is True
     (job,) = view._live_jobs.values()
     assert job.workflow.name == "image_enhance"
 
-    assert view.enhance_from_slideshow("g0") is False
+    assert view._enhance.enhance_from_slideshow("g0") is False
 
 
 def test_locking_a_slide_leaves_an_already_enhanced_image_alone(qtbot, tmp_path):
@@ -1473,7 +1473,7 @@ def test_locking_a_slide_leaves_an_already_enhanced_image_alone(qtbot, tmp_path)
     view.refresh()
     _set_enhance(view, params={"enhance_steps": 41})
 
-    assert view.enhance_from_slideshow("g0") is False, (
+    assert view._enhance.enhance_from_slideshow("g0") is False, (
         "a lock is made with no view of the Enhance pane; enhancing again is the thumbnail menu's "
         "job, pressed while looking at the settings it uses")
     assert view._live_jobs == {}
@@ -1507,7 +1507,7 @@ def test_a_slideshow_lock_on_a_video_asks_for_nothing(qtbot, tmp_path):
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    assert view.enhance_from_slideshow("g0") is False
+    assert view._enhance.enhance_from_slideshow("g0") is False
 
 
 def test_a_slideshow_is_armed_with_each_images_versions(qtbot, tmp_path):
@@ -1531,7 +1531,7 @@ def test_a_slideshow_is_armed_with_each_images_versions(qtbot, tmp_path):
     assert [version.path.name for version in versions] == \
         ["image_enhance_1.png", "sdxl_t2i_g0.png"]
     assert [version.label for version in versions] == ["Enhancement 1/1", "Original"]
-    assert slideshow._actions.enhance == view.enhance_from_slideshow
+    assert slideshow._actions.enhance == view._enhance.enhance_from_slideshow
     slideshow.close()
 
 

@@ -315,6 +315,13 @@ class GalleryTree:
         here = shaped_key(folder, self.shape_in_view())
         return self.item_by_key[here if here in drawn else drawn[0]]
 
+    def stand_in_collection(self, key: str, shape: str | None) -> bool:
+        item = self.item_for(shaped_key(key, shape) if shape else key)
+        if item is None:
+            return False
+        self._tree.setCurrentItem(item)
+        return True
+
     def group_for_key(self, key: str):
         item = self.item_for(key)
         return item.data(0, GROUP_ROLE) if item is not None else None

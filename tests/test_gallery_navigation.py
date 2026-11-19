@@ -42,8 +42,8 @@ class FakeHost:
     def selected_prompt_id(self):
         return self.item
 
-    def pane_holds(self, prompt_id):
-        return prompt_id in self.visible
+    def listed_prompt_ids(self):
+        return self.visible
 
     def show_folder(self, key):
         self.shown.append(key)
@@ -73,7 +73,7 @@ def trail():
     def build(host=None, search=None):
         host, search = host or FakeHost(), search or FakeSearch()
         search.pane = host.pane
-        return NavigationController(host, search=search), host
+        return NavigationController(host, search=search, toc=host, pane=host), host
     return build
 
 

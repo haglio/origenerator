@@ -887,7 +887,7 @@ def test_a_spoken_fix_names_which_region_it_means(qtbot, tmp_path, monkeypatch):
         qtbot.addWidget(slideshow.shown)
     fixed = []
     monkeypatch.setattr(
-        view, "fix_parts",
+        view._enhance, "fix_parts",
         lambda prompt_id, parts: (prompt_id,
                                   "fixing " + " ".join(p.name for p in parts),
                                   INFO))

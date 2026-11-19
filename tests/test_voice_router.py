@@ -224,9 +224,6 @@ class FakeHost:
         self.animated = []
         self.queued = []
 
-    def collection_label(self, key):
-        return "Latest" if key == LATEST_KEY else key.strip("_").title()
-
     def stand_in_collection(self, key, shape):
         self.stood_in.append((key, shape))
         return key in self.collections
@@ -298,7 +295,8 @@ def router(qtbot, monkeypatch, starting, tmp_path):
             host, VoiceSources(db=database_in(tmp_path, rows), slideshows=slideshows,
                                client=parts.get("client", _A_CLIENT), starting=starting,
                                requests=parts.get("requests") or AnswererThatAsksNoLocalModel(),
-                               setters=setters),
+                               setters=setters, toc=host, pane=host, enhance=host,
+                               combine=host),
             parent=parent, motion=parts.get("motion"))
         built.append((parent, router))
         buttons = dict(buttons or {})

@@ -128,8 +128,6 @@ class SlideshowHost(Protocol):
 
     def favorite_generation(self, prompt_id: str, favorite: bool = True) -> None: ...
 
-    def enhance_from_slideshow(self, prompt_id: str) -> bool: ...
-
     def set_room_paused(self, paused: bool) -> None: ...
 
 
@@ -200,6 +198,7 @@ class SlideshowDirector:
         self._host = host
         self._radio = surroundings.radio
         self._buttons_of = surroundings.buttons_of
+        self._enhancing_of = surroundings.enhancing_of
         self._volume_left_at: VolumeHud | None = None
         self._db = sources.db
         self._names = sources.names
@@ -482,7 +481,7 @@ class SlideshowDirector:
         return SlideshowActions(
             queue_now=self._job_queue.now,
             delete=self._host.trash_generation,
-            enhance=self._host.enhance_from_slideshow,
+            enhance=self._enhancing_of().enhance_from_slideshow,
             favorite=self._host.favorite_generation,
             unfavorite=partial(self._host.favorite_generation, favorite=False),
             lock=(partial(lock_held, LockedOn(self._row_for, self._host.show_generation,

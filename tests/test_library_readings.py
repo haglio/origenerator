@@ -102,3 +102,13 @@ def test_an_enhance_still_being_made_is_no_news_and_the_finished_one_is(tmp_path
     assert [readings.is_news(read, readings.drawn_version)
             for read in (waiting, running, finished)] == [False, False, True], (
         "an Enhance being made has no place in the gallery, so nothing is drawn again for it")
+
+
+def test_the_leaf_folders_are_those_of_the_sides_the_last_read_was_taken_for(tmp_path):
+    readings, _db, _published = _readings(tmp_path, _image("a"), _image("b"))
+    assert readings.leaf_folders() == {}
+
+    readings.take(*readings.read(), _SHAPES)
+
+    [in_the_one_leaf] = readings.leaf_folders().values()
+    assert sorted(row["prompt_id"] for row in in_the_one_leaf) == ["a", "b"]

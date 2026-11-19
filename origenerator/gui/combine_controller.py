@@ -48,14 +48,7 @@ NO_PAST_VIDEO = "No past video yet"
 
 
 class CombineHost(Protocol):
-    def image_config_index(self) -> dict: ...
-
     def animated_preview(self, row: dict) -> str | None: ...
-
-    def folder_key_of(self, row: dict) -> str: ...
-
-    def folder_key_for(self, workflow_name: str, params: dict,
-                       workflow_version: str | None = None) -> str: ...
 
     def reveal_launch(self, key: str) -> None: ...
 
@@ -65,10 +58,11 @@ class CombineHost(Protocol):
 
 
 class CombineController(QObject):
-    def __init__(self, host: CombineHost, parts: CombineParts, *, parent: QObject, db):
+    def __init__(self, host: CombineHost, parts: CombineParts, *, parent: QObject, db, library):
         super().__init__(parent)
         self._host = host
         self._db = db
+        self._library = library
         self._jobs = parts.jobs
         self._starting = parts.starting
         self._names = parts.names or ItemNames(db)
@@ -139,7 +133,7 @@ class CombineController(QObject):
 
     def _image_lent_by(self, prompt_id: str) -> str | None:
         lent = gallery.image_lent_by(prompt_id, self._db.get_generation,
-                                     self._host.image_config_index())
+                                     self._library.reading.image_index)
         return lent["prompt_id"] if lent is not None else None
 
     def _accepts_video(self, prompt_id: str) -> bool:
@@ -340,8 +334,8 @@ class CombineController(QObject):
 
     def _folder_of(self, run: CombineRun) -> str:
         if run.video_id is None:
-            return self._host.folder_key_for(run.workflow.name, run.params, run.workflow.version)
-        return self._host.folder_key_of(_the_row_this_run_will_make(
+            return self._library.folder_key_for(run.workflow.name, run.params, run.workflow.version)
+        return self._library.folder_key_of(_the_row_this_run_will_make(
             self._db.get_generation(run.video_id), run.params, run.workflow))
 
     def _already_making_one(self, key: str, send: bool) -> bool:

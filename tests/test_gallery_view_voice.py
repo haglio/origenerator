@@ -742,7 +742,7 @@ def test_a_spoken_loop_takes_the_one_action_the_sorted_image_leaves(qtbot, tmp_p
                                                                  monkeypatch):
     view = _genau_view(qtbot, tmp_path)
 
-    prompt_id, message, kind = view.animate_it("img_action", _SPOKEN_LOOP)
+    prompt_id, message, kind = view._combine.animate_it("img_action", _SPOKEN_LOOP)
 
     assert prompt_id == "img_action"
     assert "alpha" in message
@@ -758,7 +758,7 @@ def test_a_spoken_loop_over_an_unsorted_image_asks_for_its_action(qtbot, tmp_pat
                                                                   monkeypatch):
     view = _genau_view(qtbot, tmp_path)
 
-    prompt_id, message, kind = view.animate_it("img", _SPOKEN_LOOP)
+    prompt_id, message, kind = view._combine.animate_it("img", _SPOKEN_LOOP)
 
     assert prompt_id is None
     assert "hasn't been sorted" in message
@@ -785,7 +785,7 @@ def test_a_spoken_loop_says_so_when_the_action_has_no_loop_behind_it(qtbot, tmp_
     qtbot.addWidget(view)
     view.refresh()
 
-    prompt_id, message, kind = view.animate_it("img_delta", _SPOKEN_LOOP)
+    prompt_id, message, kind = view._combine.animate_it("img_delta", _SPOKEN_LOOP)
 
     assert prompt_id is None
     assert "to take settings from yet" in message
@@ -797,7 +797,7 @@ def test_a_spoken_loop_says_so_when_the_action_has_no_loop_behind_it(qtbot, tmp_
 def test_a_spoken_loop_declines_a_video(qtbot, tmp_path, monkeypatch):
     view = _genau_view(qtbot, tmp_path)
 
-    prompt_id, message, kind = view.animate_it("loop", _SPOKEN_LOOP)
+    prompt_id, message, kind = view._combine.animate_it("loop", _SPOKEN_LOOP)
 
     assert prompt_id is None
     assert "image" in message
@@ -1258,9 +1258,9 @@ def test_the_tiles_picked_are_told_to_the_voice_and_can_be_picked_again(qtbot, t
     [tile] = view._gallery_pane._thumb_widgets
 
     view._gallery_pane.apply_selection(tile, Qt.KeyboardModifier.NoModifier)
-    picked = view.picks()
+    picked = view._gallery_pane.picks()
     view._gallery_pane.clear_thumbnail_selection()
-    view.pick_again(picked)
+    view._gallery_pane.pick_again(picked)
 
     assert told[0] == picked
     assert told[-1] == picked

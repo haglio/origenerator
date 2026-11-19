@@ -46,6 +46,7 @@ from origenerator.gallery.collection import (
     FAVORITES_KEY,
     LATEST_KEY,
     TRASH_KEY,
+    collection,
 )
 from origenerator.gallery.labels import workflow_label
 from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT, SHAPE_LABELS, TOGETHER
@@ -939,7 +940,8 @@ def test_a_collection_is_called_back_by_its_plain_name_whatever_work_waits_in_it
     qtbot.addWidget(view)
     view.refresh()
 
-    assert view.collection_label(EXPERIMENTS_KEY) == "Experiments"
+    assert _shown(_alls(view._tree)["Experiments"]) == "(2) Experiments"
+    assert collection(EXPERIMENTS_KEY).label == "Experiments"
 
 
 def test_experiments_collection_offers_keep_and_reject_on_each_tile(qtbot):
@@ -1658,8 +1660,7 @@ def test_folder_keys_are_derived_against_the_index_the_rebuild_already_built(
     view.refresh()
     indexed = len(built)
 
-    view.image_config_index()
-    view.folder_key_of(view.row_for("v1"))
+    view.library.folder_key_of(view.row_for("v1"))
 
     assert len(built) == indexed, (
         "the index changes only on a rebuild, and is asked for at several places on a click's path, "
@@ -2485,8 +2486,8 @@ def test_naming_a_workflow_version_is_what_puts_it_in_the_folder_key(qtbot):
     params = json.loads(row["params_json"])
     version = row["workflow_version"]
 
-    assert view.folder_key_for(row["workflow_name"], params, version)         == view.folder_key_of(row)
-    assert view.folder_key_for(row["workflow_name"], params)         != view.folder_key_of(row)
+    assert view.library.folder_key_for(row["workflow_name"], params, version)         == view.library.folder_key_of(row)
+    assert view.library.folder_key_for(row["workflow_name"], params)         != view.library.folder_key_of(row)
 
 
 def test_the_folder_key_index_is_rebuilt_when_the_image_rows_are(qtbot):
@@ -2494,18 +2495,18 @@ def test_the_folder_key_index_is_rebuilt_when_the_image_rows_are(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    first = view.image_config_index()
-    assert view.image_config_index() is first, (
+    first = view.library.reading.image_index
+    assert view.library.reading.image_index is first, (
         "the index is kept between uses, since it was built again at every site that asked, "
         "several of them on a click's path")
 
     put_rows(db, [_image("i2", "a dog", 50, 2)])
     view.refresh()
 
-    assert view.image_config_index() is not first, (
+    assert view.library.reading.image_index is not first, (
         "an image-to-video run's folder key is derived against this index, so a stale one would "
         "file a run under the start frame the gallery used to hold")
-    assert len(view.image_config_index()) > len(first)
+    assert len(view.library.reading.image_index) > len(first)
 
 
 def test_select_folder_restores_choice_in_a_fresh_view(qtbot):

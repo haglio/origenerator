@@ -47,13 +47,19 @@ def is_file(path) -> bool:
     return entry is not None and entry.is_file()
 
 
-def written_at(path) -> int | None:
+def stat_of(path) -> os.stat_result:
     path = Path(path)
+    if _ANSWERS.get() is None:
+        return path.stat()
+    entry = entries_in(path.parent).get(os.path.normcase(path.name))
+    if entry is None:
+        raise FileNotFoundError(path)
+    return entry.stat()
+
+
+def written_at(path) -> int | None:
     try:
-        if _ANSWERS.get() is None:
-            return path.stat().st_mtime_ns
-        entry = entries_in(path.parent).get(os.path.normcase(path.name))
-        return None if entry is None else entry.stat().st_mtime_ns
+        return stat_of(path).st_mtime_ns
     except OSError:
         return None
 

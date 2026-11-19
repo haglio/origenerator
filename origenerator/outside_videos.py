@@ -29,6 +29,7 @@ from origenerator.gallery.tree import settings_folder_key, start_frame_index
 from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.media import MediaType, media_type_from_filename
 from origenerator.one_at_a_time import WAIT_S, Turn
+from origenerator.one_look import looking_once, stat_of
 from origenerator.thumbnail import (
     first_frame_of,
     generate_animated_thumbnail,
@@ -241,6 +242,7 @@ def _frames_by_file(rows: list[dict]) -> dict[str, dict]:
             for file in parse_file_list(row.get("output_files")) if file.get("path")}
 
 
+@looking_once
 def _bring_up_to_records(db, rows: list[dict],
                          kinds: dict[str, set[VideoKind]]) -> dict[tuple, dict]:
     frames = _frames_by_file(rows)
@@ -301,7 +303,7 @@ def _outside_videos_oldest_first(rows: list[dict]) -> list[dict]:
 
 def _filed_at(video: Path) -> datetime | None:
     try:
-        return datetime.fromtimestamp(video.stat().st_mtime, tz=UTC)
+        return datetime.fromtimestamp(stat_of(video).st_mtime, tz=UTC)
     except OSError:
         return None
 

@@ -25,11 +25,11 @@ from origenerator.db import Database, NewGeneration
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.core import Core
 from origenerator.gui.gallery_view import GalleryView
-from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.job_queue import JobQueue
 from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.test_core import _window
+from tests.unsent_jobs import leave_every_job_unsent
 from tools import backfill_base_renders as backfill_tool
 
 _SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
@@ -360,7 +360,7 @@ def test_typical_seconds_is_the_median_of_what_was_recorded(tmp_path):
 
 
 def test_the_work_left_for_while_closed_reaches_the_queue(qtbot, tmp_path, monkeypatch):
-    monkeypatch.setattr(GenerationJob, "start", lambda self, submit=None: None)
+    leave_every_job_unsent(monkeypatch)
     db = Database(tmp_path / "t.db")
     for i in range(3):
         _baked(db, f"baked{i}", seed=i)

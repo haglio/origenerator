@@ -4,6 +4,7 @@ import logging
 import threading
 import time
 import uuid
+import weakref
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -59,6 +60,17 @@ logger = logging.getLogger(__name__)
 # ComfyUI ends an interrupted prompt exactly as it ends a successful one, with no outputs in its history.
 _NO_OUTPUT_MESSAGE = "The run ended without producing an output file (interrupted)"
 
+_stops_on_their_way: weakref.WeakSet[Errand] = weakref.WeakSet()
+
+
+def _nobody_waits(_answer) -> None:
+    pass
+
+
+def wait_for_the_stops_on_their_way() -> None:
+    for stop in list(_stops_on_their_way):
+        stop.wait()
+
 
 class GenerationJob(QObject):
     started = Signal()
@@ -90,6 +102,7 @@ class GenerationJob(QObject):
         self._state = JobState.IDLE
         self._stages = stage_names(self.payload)
         self._filing: Errand | None = None
+        self._stopping: Errand | None = None
         self._filing_canceled = threading.Event()
         self._forget_the_run()
 
@@ -187,39 +200,54 @@ class GenerationJob(QObject):
         job._state = JobState.QUEUED if job.started_at is None else JobState.RUNNING
         return job
 
-    def start(self, submit=None):
+    def start(self, send=None, answered=_nobody_waits):
         if self._state != JobState.IDLE:
+            answered(None)
             return
         if not self.speaks_first:
-            self._submit(submit)
-        elif submit is None:
+            self._submit(send, answered)
+        elif send is None:
             self._speaker.speak_here(self.params)
             self._submit(None)
         else:
             self._state = JobState.SPEAKING
-            self._speaker.speak(self.params, lambda: self._spoken(submit), self._unspoken)
+            self._speaker.speak(self.params, lambda: self._spoken(send), self._unspoken)
+            answered(None)
 
-    def _submit(self, submit):
+    def _submit(self, send, answered=_nobody_waits):
         self._attach()
         landed: list[dict] = []
+        stopping = self._stopping
 
         def post():
+            if stopping is not None:
+                stopping.wait()
             history = self._stopped_run_landed()
             if history is not None:
                 landed.append(history)
                 return
             self._client.submit_job(self.payload, self.prompt_id)
 
+        if send is not None:
+            send(post, lambda error: self._posted(landed, error, answered))
+            return
         try:
-            post() if submit is None else submit(post)
+            post()
         except Exception:
             self._detach()
             raise
-        if landed:
+        self._posted(landed)
+
+    def _posted(self, landed: list[dict], error: Exception | None = None,
+                answered=_nobody_waits) -> None:
+        if error is not None:
+            self._detach()
+        elif landed:
             self._finish(landed[0])
-            return
-        self._state = JobState.QUEUED
-        self.sent.emit()
+        else:
+            self._state = JobState.QUEUED
+            self.sent.emit()
+        answered(error)
 
     def _stopped_run_landed(self) -> dict | None:
         try:
@@ -232,18 +260,20 @@ class GenerationJob(QObject):
             logger.warning("Could not ask after the stopped run of %s: %s", self.prompt_id, e)
         return None
 
-    def _spoken(self, submit):
+    def _spoken(self, send):
         if self._state != JobState.SPEAKING:
             return
         self._state = JobState.IDLE
-        try:
-            self._submit(submit)
-        except Exception as e:
-            if comfyui_api.unreachable(e):
-                self.unreachable.emit(str(e))
-                return
-            self._state = JobState.FAILED
-            self.failed.emit(str(e))
+        self._submit(send, self._sent_after_speaking)
+
+    def _sent_after_speaking(self, error: Exception | None) -> None:
+        if error is None:
+            return
+        if comfyui_api.unreachable(error):
+            self.unreachable.emit(str(error))
+            return
+        self._state = JobState.FAILED
+        self.failed.emit(str(error))
 
     def _unspoken(self, message: str):
         if self._state != JobState.SPEAKING:
@@ -280,11 +310,17 @@ class GenerationJob(QObject):
         """ComfyUI skips a named stop for a prompt it is not executing, so both calls are safe whatever state this job last heard."""
         if self._state not in (JobState.QUEUED, JobState.RUNNING):
             return
-        try:
-            self._client.cancel_prompt(self.prompt_id)
-            self._client.interrupt(self.prompt_id)
-        except Exception as e:
-            logger.warning("Failed to stop job %s: %s", self.prompt_id, e)
+        client, prompt_id = self._client, self.prompt_id
+
+        def stop():
+            try:
+                client.cancel_prompt(prompt_id)
+                client.interrupt(prompt_id)
+            except Exception as e:
+                logger.warning("Failed to stop job %s: %s", prompt_id, e)
+
+        self._stopping = Errand(stop, _nobody_waits).send(owner=self, run=self._run)
+        _stops_on_their_way.add(self._stopping)
 
     def reconcile_with(self, history) -> None:
         if history is None or self._state not in (JobState.QUEUED, JobState.RUNNING):
@@ -386,6 +422,7 @@ class GenerationJob(QObject):
         if self._state == JobState.CANCELED:
             return
         if filing.error is not None:
+            logger.error("Filing what %s made failed", self.prompt_id, exc_info=filing.error)
             if self.media_type != MediaType.VIDEO:
                 self._state = (JobState.QUEUED if held_before == JobState.IDLE
                                else held_before)

@@ -33,6 +33,7 @@ from origenerator import (
 from origenerator.gui import (
     gallery_view,
     generation_job,
+    job_queue,
     off_the_machine,
     omnipause,
     viewport,
@@ -288,6 +289,8 @@ def keep_off_the_device(setattr) -> None:
 
 def finish_every_job_on_the_tests_own_thread(setattr) -> None:
     setattr(generation_job, "run_off_thread", lambda work, done, *, owner: done(work()))
+    setattr(job_queue, "hand_over_off_the_window_thread",
+            lambda work, done, *, owner: done(work()))
 
 
 @pytest.fixture(autouse=True)

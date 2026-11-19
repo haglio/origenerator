@@ -9,18 +9,18 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.db_generations import NewGeneration
 from origenerator.gallery import input_image_reference
-from origenerator.gui.generation_job import GenerationJob
 from origenerator.gui.job_queue import JobQueue
 from origenerator.item_actions import ItemActions, actions_of
 from origenerator.media import MediaType
 from origenerator.workflows.frame_rate import NATIVE_FPS
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.test_inflight_drop import FakeComfy
+from tests.unsent_jobs import leave_every_job_unsent
 
 
 @pytest.fixture
 def library(qtbot, tmp_path, monkeypatch):
-    monkeypatch.setattr(GenerationJob, "start", lambda self, submit=None: None)
+    leave_every_job_unsent(monkeypatch)
     db = Database(tmp_path / "t.db")
     return db, JobQueue(db, ComfyUIClient(folders=SUITE_FOLDERS))
 

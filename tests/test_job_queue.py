@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
-from PySide6.QtCore import QObject, QTimer, Signal
+from PySide6.QtCore import QObject, Signal
 from shared_ui.testing import appending_to
 
 from origenerator import config, gallery
@@ -1242,78 +1242,73 @@ def test_parse_progress_state_tolerates_absent_or_corrupt():
     assert _parse_progress_state('{"total": 20}') == {"total": 20}
 
 
-def _gated_client():
+class _HandedOverLater:
+    def __init__(self):
+        self.waiting = []
+
+    def __call__(self, work, done, *, owner):
+        self.waiting.append((work, done))
+
+    def answer(self):
+        work, done = self.waiting.pop(0)
+        done(work())
+
+
+@pytest.fixture
+def sending(monkeypatch):
+    later = _HandedOverLater()
+    monkeypatch.setattr(job_queue_module, "hand_over_off_the_window_thread", later)
+    return later
+
+
+def test_the_window_stays_alive_while_comfyui_takes_its_time_to_answer(
+        qtbot, tmp_path, sending):
     client = _client()
-    gate = threading.Event()
-    client.submit_job = MagicMock(side_effect=lambda payload, pid: gate.wait(5) and "comfy-X")
-    return client, gate
-
-
-def test_the_window_stays_alive_while_comfyui_takes_its_time_to_answer(qtbot, tmp_path):
-    client, gate = _gated_client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
     announced = []
     queue.changed.connect(lambda: announced.append(True))
-    seen = {}
 
-    def while_the_submit_is_out():
-        seen["rows"] = [r["status"] for r in db.list_generations()]
-        seen["in_line"] = queue.has("video/wf/deadbeef")
-        seen["announced"] = len(announced)
-        gate.set()
-
-    QTimer.singleShot(0, while_the_submit_is_out)
     queue.start_prepared("video/wf/deadbeef", _I2V, _params())
 
-    assert seen == {"rows": ["pending"], "in_line": True, "announced": 1}, (
-        "a launch is in the line the moment its row is written, so it is announced then and its tile "
-        "appears at once, not a minute later when ComfyUI answers")
+    assert [r["status"] for r in db.list_generations()] == ["pending"]
+    assert queue.has("video/wf/deadbeef")
+    assert announced, (
+        "a launch is in the line the moment its row is written, so it is announced then and its "
+        "tile appears at once, not a minute later when ComfyUI answers")
+    sending.answer()
     assert db.list_generations()[0]["status"] == "running"
 
 
-def test_a_launch_canceled_while_its_submit_is_out_is_dequeued_when_it_lands(qtbot, tmp_path):
-    client, gate = _gated_client()
+def test_a_launch_canceled_while_its_submit_is_out_is_dequeued_when_it_lands(
+        qtbot, tmp_path, sending):
+    client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
-    seen = {}
-
-    def while_the_submit_is_out():
-        seen["pid"] = queue.jobs["video/wf/deadbeef"].prompt_id
-        queue.cancel_job(seen["pid"])
-        gate.set()
-
-    QTimer.singleShot(0, while_the_submit_is_out)
     queue.start_prepared("video/wf/deadbeef", _I2V, _params())
+    canceled = queue.jobs["video/wf/deadbeef"].prompt_id
+
+    queue.cancel_job(canceled)
+    sending.answer()
 
     assert not queue.has("video/wf/deadbeef")
     assert queue.queue_order == []
-    client.cancel_prompt.assert_called_once_with(seen["pid"])
+    client.cancel_prompt.assert_called_once_with(canceled)
     assert db.list_generations() == []
 
 
-def test_a_launch_made_while_another_submit_is_out_waits_its_turn(qtbot, tmp_path):
-    client, gate = _gated_client()
+def test_a_launch_made_while_another_submit_is_out_waits_its_turn(qtbot, tmp_path, sending):
+    client = _client()
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, client)
-    seen = {}
-
-    def while_the_submit_is_out():
-        queue.start_prepared("video/wf/second", _I2V, _params(seed=2))
-        seen["submits"] = client.submit_job.call_count
-        gate.set()
-
-    QTimer.singleShot(0, while_the_submit_is_out)
     queue.start_prepared("video/wf/first", _I2V, _params(seed=1))
-    assert seen, (
-        "the wait stays on the calling thread's stack, so everything around it stays in order "
-        "and every caller stays synchronous")
 
+    queue.start_prepared("video/wf/second", _I2V, _params(seed=2))
+
+    assert len(sending.waiting) == 1, "the queue starts no second hand-over while one is out"
+    sending.answer()
     first = queue.jobs["video/wf/first"].prompt_id
     second = queue.jobs["video/wf/second"].prompt_id
-    assert seen["submits"] == 1, (
-        "what the pumping lets in is handled where it arrives: the queue starts no second "
-        "hand-over while one is out")
     assert queue.queue_order == [first, second]
     assert client.submit_job.call_count == 1
 
@@ -1760,23 +1755,20 @@ def test_a_video_set_aside_that_had_finished_after_all_lands_instead_of_running_
 
 
 def test_an_image_asked_for_while_a_videos_hand_over_is_out_takes_the_machine_when_it_lands(
-        qtbot, tmp_path):
-    client, gate = _gated_client()
+        qtbot, tmp_path, sending):
+    client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
-    seen = {}
-
-    def while_the_submit_is_out():
-        seen["image"] = _launch_image(queue, "i")
-        gate.set()
-
-    QTimer.singleShot(0, while_the_submit_is_out)
     video = _launch_video(queue, "v", seed=1)
+    image = _launch_image(queue, "i")
+
+    while sending.waiting:
+        sending.answer()
 
     client.interrupt.assert_called_once_with(video.prompt_id)
     assert [c.args[1] for c in client.submit_job.call_args_list] == [
-        video.prompt_id, seen["image"].prompt_id
+        video.prompt_id, image.prompt_id
     ]
-    assert queue.queue_order == [seen["image"].prompt_id, video.prompt_id]
+    assert queue.queue_order == [image.prompt_id, video.prompt_id]
 
 
 def test_a_job_put_first_leads_the_line_and_takes_the_machine(qtbot, tmp_path):
@@ -1867,21 +1859,20 @@ def test_the_image_set_aside_for_a_job_put_first_goes_back_behind_all_of_them(
 
 
 def test_a_job_put_first_while_a_hand_over_is_out_takes_the_machine_when_it_lands(
-        qtbot, tmp_path):
-    client, gate = _gated_client()
-    gate.set()
+        qtbot, tmp_path, sending):
+    client = _client()
     queue = JobQueue(Database(tmp_path / "test.db"), client)
-    locked = _launch_image(queue, "i1", seed=1)
-    handed_over_next = _launch_image(queue, "i2", seed=2)
-    rendering = _launch_image(queue, "i3", seed=3)
-    gate.clear()
+    launched = []
+    for key, seed in (("i1", 1), ("i2", 2), ("i3", 3)):
+        launched.append(_launch_image(queue, key, seed=seed))
+        while sending.waiting:
+            sending.answer()
+    locked, handed_over_next, rendering = launched
 
-    def while_the_submit_is_out():
-        queue.put_first({locked.prompt_id})
-        gate.set()
-
-    QTimer.singleShot(0, while_the_submit_is_out)
     rendering.finished.emit([{"filename": "out.png"}], None, 1.0)
+    queue.put_first({locked.prompt_id})
+    while sending.waiting:
+        sending.answer()
 
     client.interrupt.assert_called_with(handed_over_next.prompt_id)
     assert client.submit_job.call_args_list[-1].args[1] == locked.prompt_id
@@ -2456,3 +2447,56 @@ def test_a_job_still_being_filed_as_the_app_closes_is_recorded_once_by_the_flush
     assert db.get_generation(image.prompt_id)["status"] == "completed"
     run.answer_late()
     assert len(finished) == 1
+
+
+def test_a_canceled_job_leaves_the_job_queue_before_comfyui_hears_it_stopped(
+        qtbot, tmp_path, monkeypatch):
+    run = NeverAnswered()
+    monkeypatch.setattr(generation_job_module, "run_off_thread", lambda work, done, *, owner:
+                        run.answers.append(work))
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    job = _launch_video(queue, "k1", seed=1)
+
+    queue.cancel_job(job.prompt_id)
+
+    assert queue.all_jobs == []
+    assert db.get_generation(job.prompt_id) is None
+    client.cancel_prompt.assert_not_called()
+    client.interrupt.assert_not_called()
+
+
+def test_the_flush_as_the_app_closes_waits_for_every_stop_still_on_its_way(
+        qtbot, tmp_path, monkeypatch):
+    run = NeverAnswered()
+    monkeypatch.setattr(generation_job_module, "run_off_thread", run)
+    gate = threading.Event()
+    client = _client()
+    client.cancel_prompt = MagicMock(side_effect=lambda _id: gate.wait())
+    queue = JobQueue(Database(tmp_path / "test.db"), client)
+    job = _launch_video(queue, "k1", seed=1)
+    queue.cancel_job(job.prompt_id)
+    closing = queue.close
+    monkeypatch.setattr(queue, "close", lambda: (gate.set(), closing()))
+
+    queue.flush_to_server()
+
+    client.interrupt.assert_called_once_with(job.prompt_id)
+
+
+def test_a_job_is_handed_to_comfyui_while_the_window_thread_goes_on(qtbot, tmp_path, sending):
+    client = _client()
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+
+    job = _launch_video(queue, "k1", seed=1)
+    second = _launch_video(queue, "k2", seed=2)
+
+    client.submit_job.assert_not_called()
+    assert queue.making_something()
+    sending.answer()
+    client.submit_job.assert_called_once_with(job.payload, job.prompt_id)
+    assert db.get_generation(job.prompt_id)["status"] == "running"
+    assert db.get_generation(second.prompt_id)["status"] == "pending"
+    assert sending.waiting == []

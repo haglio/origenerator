@@ -8,13 +8,16 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from app_support.threading_utils import wait_until
 from PIL import Image
+from PySide6.QtWidgets import QApplication
 from shared_ui.testing import appending_to
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.generation_state import GenerationStatus
 from origenerator.gui import generation_job as generation_job_module
+from origenerator.gui.errand import Errand
 from origenerator.gui.generation_job import (
     GenerationJob,
     JobFolders,
@@ -22,7 +25,7 @@ from origenerator.gui.generation_job import (
     JobState,
     display_status,
 )
-from origenerator.gui.job_queue import _off_the_gui_thread
+from origenerator.gui.job_queue import hand_over_off_the_window_thread
 from origenerator.gui.job_records import insert_generation_row
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.output_places import OutputPlaces
@@ -98,7 +101,9 @@ def test_a_submit_run_off_the_window_touches_nothing_of_the_jobs_there(
     job.sent.connect(lambda: touched_on.append(threading.get_ident()))
     job.finished.connect(lambda *told: touched_on.append(threading.get_ident()))
 
-    job.start(_off_the_gui_thread)
+    job.start(lambda post, posted: Errand(post, lambda sent: posted(sent.error)).send(
+        owner=job, run=hand_over_off_the_window_thread), lambda _error: None)
+    wait_until(lambda: job.state != JobState.IDLE, pump=QApplication.processEvents)
 
     assert len(touched_on) >= 4
     assert set(touched_on) == {threading.get_ident()}, (
@@ -518,6 +523,44 @@ def test_cancel_dequeues_and_stops_the_prompt_by_name(qtbot, tmp_path):
     client.cancel_prompt.assert_called_once_with("comfy-A")
     client.interrupt.assert_called_once_with("comfy-A")
     assert job.state == "canceled"
+
+
+def test_a_cancel_tells_comfyui_off_the_window_thread_and_is_canceled_at_once(qtbot, tmp_path):
+    later = _Later()
+    client = _client()
+    job = GenerationJob(client, JobSpec(SDXL, SDXL.default_params(), prompt_id="comfy-A"),
+                        run=later)
+    job.start()
+
+    job.cancel()
+
+    assert job.state == JobState.CANCELED
+    client.cancel_prompt.assert_not_called()
+    client.interrupt.assert_not_called()
+    later.finish_next()
+    client.cancel_prompt.assert_called_once_with("comfy-A")
+    client.interrupt.assert_called_once_with("comfy-A")
+
+
+def test_a_job_set_aside_asks_after_its_stopped_run_only_once_comfyui_was_told_to_stop_it(
+        qtbot, tmp_path):
+    told = []
+    client = _client()
+    client.cancel_prompt = MagicMock(side_effect=lambda _id: told.append("stop"))
+    client.fetch_history = MagicMock(side_effect=lambda _id: told.append("ask") or {})
+
+    def stopped_on_a_thread_of_its_own(work, done, *, owner):
+        threading.Thread(target=lambda: done(work())).start()
+
+    job = GenerationJob(client, JobSpec(SDXL, SDXL.default_params(), prompt_id="comfy-A"),
+                        run=stopped_on_a_thread_of_its_own)
+    job.start()
+    told.clear()
+    job.defer()
+
+    job.start()
+
+    assert told[:2] == ["stop", "ask"]
 
 
 def test_cancel_detaches_from_client(qtbot, tmp_path):

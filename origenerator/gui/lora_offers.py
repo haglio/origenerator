@@ -2,18 +2,16 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from PySide6.QtWidgets import QMessageBox
-
-from origenerator import look_training
+from origenerator import alert, look_training
 from origenerator.lora_versions import trash_old_version
 from origenerator.workflows.model_files import NO_LORA
 
 
-def trashed(lora: str, parent, *, trash=trash_old_version) -> bool:
+def trashed(lora: str, *, trash=trash_old_version) -> bool:
     try:
         trash(lora)
     except OSError as refused:
-        QMessageBox.warning(parent, "Trash", str(refused))
+        alert.warning("Trash", str(refused))
         return False
     return True
 

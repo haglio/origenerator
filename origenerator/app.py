@@ -13,6 +13,7 @@ from app_support import origenerator_handoff
 from app_support.process_identity import ProcessNamer
 from shared_ui.preview import Preview, taskbar_identity, window_title
 
+from origenerator import alert
 from origenerator.boot_passes import MAINTENANCE, Library, run_maintenance, without_comfyui
 from origenerator.branch_session import LAUNCHER, shown_as
 
@@ -234,8 +235,7 @@ def _refuse_an_incomplete_overlay(missing: tuple[str, ...], fun_time) -> int:
     )
     print(f"Origenerator: {message}", file=sys.stderr)
     if fun_time is None:
-        from PySide6.QtWidgets import QMessageBox
-        QMessageBox.critical(None, "Origenerator: incomplete content overlay", message)
+        alert.error("Origenerator: incomplete content overlay", message)
     return 1
 
 
@@ -248,8 +248,7 @@ def _refuse_a_library_of_its_own(checkout: Path, fun_time) -> int:
     )
     print(f"Origenerator: {message}", file=sys.stderr)
     if fun_time is None:
-        from PySide6.QtWidgets import QMessageBox
-        QMessageBox.critical(None, "Origenerator: not the production copy", message)
+        alert.error("Origenerator: not the production copy", message)
     return 1
 
 
@@ -265,8 +264,7 @@ def _say_what_evolver_no_longer_agrees_with(fun_time) -> None:
                + "\n".join(f"    {line}" for line in said))
     print(f"Origenerator: {message}", file=sys.stderr)
     if fun_time is None:
-        from PySide6.QtWidgets import QMessageBox
-        QMessageBox.warning(None, "Origenerator: Evolver has moved", message)
+        alert.warning("Origenerator: Evolver has moved", message)
 
 
 @dataclass

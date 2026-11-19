@@ -31,6 +31,7 @@ from app_support.win32 import TaskbarApp
 from PIL import Image
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QWidget
+from shared_ui.alert import Level
 from shared_ui.colors import BLUE
 from shared_ui.preview import Preview
 from shared_ui.testing import brought_to_front
@@ -1592,7 +1593,7 @@ class TestAnOverlayShortOfAKey:
         with _a_faked_boot([], **{
             "origenerator.gui.core.Core": MagicMock(return_value=window),
             "origenerator.content.missing_overlay_keys": MagicMock(return_value=self.SHORT),
-            "PySide6.QtWidgets.QMessageBox.critical": MagicMock(),
+            "shared_ui.alert.show_alert": MagicMock(),
         }):
             code = main([])
 
@@ -1607,7 +1608,7 @@ class TestAnOverlayShortOfAKey:
 
         with _a_faked_boot([], **{
             "origenerator.content.missing_overlay_keys": MagicMock(return_value=self.SHORT),
-            "PySide6.QtWidgets.QMessageBox.critical": told,
+            "shared_ui.alert.show_alert": told,
         }):
             main([])
 
@@ -1625,7 +1626,7 @@ class TestAnOverlayShortOfAKey:
 
         with _a_faked_boot([], **{
             "origenerator.content.missing_overlay_keys": MagicMock(return_value=self.SHORT),
-            "PySide6.QtWidgets.QMessageBox.critical": told,
+            "shared_ui.alert.show_alert": told,
         }):
             code = main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"}))
 
@@ -1645,7 +1646,7 @@ class TestAnOverlayShortOfAKey:
 
         with _a_faked_boot([], **{
             "origenerator.gui.core.Core": MagicMock(return_value=window),
-            "PySide6.QtWidgets.QMessageBox.critical": told,
+            "shared_ui.alert.show_alert": told,
         }):
             assert main([]) == 0
 
@@ -1660,7 +1661,7 @@ class TestACopyThatWouldStartALibraryOfItsOwn:
 
         with _a_faked_boot([], **{
             "origenerator.db.Database": opened,
-            "PySide6.QtWidgets.QMessageBox.critical": MagicMock(),
+            "shared_ui.alert.show_alert": MagicMock(),
         }):
             code = main([])
 
@@ -1673,7 +1674,7 @@ class TestACopyThatWouldStartALibraryOfItsOwn:
         monkeypatch.setattr(config, "STARTS_A_LIBRARY_OF_ITS_OWN", True)
         told = MagicMock()
 
-        with _a_faked_boot([], **{"PySide6.QtWidgets.QMessageBox.critical": told}):
+        with _a_faked_boot([], **{"shared_ui.alert.show_alert": told}):
             main([])
 
         said = " ".join(str(arg) for arg in told.call_args.args)
@@ -1691,7 +1692,7 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
         with _a_faked_boot([], **{
             "origenerator.gui.core.Core": MagicMock(return_value=window),
             "origenerator.evolver_agreement.disagreements": MagicMock(return_value=self.SAID),
-            "PySide6.QtWidgets.QMessageBox.warning": told,
+            "shared_ui.alert.show_alert": told,
         }):
             assert main([]) == 0, (
                 "said, not refused: nothing else about this app is wrong, and a launch declined "
@@ -1710,7 +1711,7 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
 
         with _a_faked_boot([], **{
             "origenerator.evolver_agreement.disagreements": MagicMock(return_value=self.SAID),
-            "PySide6.QtWidgets.QMessageBox.warning": told,
+            "shared_ui.alert.show_alert": told,
         }):
             main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"}))
 
@@ -1726,7 +1727,7 @@ class TestWhenEvolverHasBeenRenamedUnderUs:
 
         with _a_faked_boot([], **{
             "origenerator.gui.core.Core": MagicMock(),
-            "PySide6.QtWidgets.QMessageBox.warning": told,
+            "shared_ui.alert.show_alert": told,
         }):
             assert main([]) == 0
 
@@ -1745,15 +1746,16 @@ class TestASecondCopy:
         window = MagicMock()
 
         with _a_faked_boot([], **{
-            "PySide6.QtWidgets.QMessageBox.information": told,
+            "shared_ui.alert.show_alert": told,
             "origenerator.comfyui_launcher.ensure_comfyui_server": comfyui,
             "origenerator.gui.core.Core": window,
         }):
             code = main([])
 
         assert code == 1
-        told.assert_called_once_with(
-            None, "Origenerator", "Another copy of Origenerator is already running.")
+        assert told.call_args.args == (
+            "Origenerator", "Another copy of Origenerator is already running.")
+        assert told.call_args.kwargs["level"] is Level.INFO
         comfyui.assert_not_called()
         window.assert_not_called()
 
@@ -1764,7 +1766,7 @@ class TestASecondCopy:
         window = MagicMock()
 
         with _a_faked_boot([], **{
-            "PySide6.QtWidgets.QMessageBox.information": told,
+            "shared_ui.alert.show_alert": told,
             "origenerator.gui.core.Core": window,
         }):
             code = main([])
@@ -1778,7 +1780,7 @@ class TestASecondCopy:
         window = MagicMock()
 
         with _a_faked_boot([], **{
-            "PySide6.QtWidgets.QMessageBox.information": told,
+            "shared_ui.alert.show_alert": told,
             "origenerator.gui.core.Core": window,
         }):
             code = main(hosted_launch(**{"--x": "5", "--y": "6", "--width": "700", "--height": "900"}))
@@ -1847,11 +1849,11 @@ def test_a_launch_that_waited_in_vain_takes_its_loading_screen_down_before_sayin
     seen = []
     copies = _the_copies(monkeypatch, None, closing=True)
     copies.claim_the_library_once_the_closing_one_lets_go.return_value = None
-    told = MagicMock(side_effect=lambda *a: seen.append(
+    told = MagicMock(side_effect=lambda *a, **_how: seen.append(
         "screen up" if screens[0].isVisible() else "screen down"))
 
     with _a_faked_boot([], **_real_loading_screens(screens), **{
-        "PySide6.QtWidgets.QMessageBox.information": told,
+        "shared_ui.alert.show_alert": told,
     }):
         assert main([]) == 1
 
@@ -1865,7 +1867,7 @@ def test_a_click_that_waited_in_vain_for_a_closing_copy_is_told_why_nothing_open
     copies.claim_the_library_once_the_closing_one_lets_go.return_value = None
     told = MagicMock()
 
-    with _a_faked_boot([], **{"PySide6.QtWidgets.QMessageBox.information": told}):
+    with _a_faked_boot([], **{"shared_ui.alert.show_alert": told}):
         assert main([]) == 1
 
     told.assert_called_once()
@@ -1964,9 +1966,9 @@ with patch.object(app, "MAINTENANCE", ()), \\
         patch("origenerator.gui.core.Core", built), \\
         patch("origenerator.freeze_watch.watch_the_window",
               lambda app, crash_log: QTimer.singleShot(0, app.quit)), \\
-        patch("PySide6.QtWidgets.QMessageBox.information",
-              lambda *said: print("MARK refused", flush=True)), \\
-        patch("PySide6.QtWidgets.QMessageBox.warning"):
+        patch("shared_ui.alert.show_alert",
+              lambda title, message, **_how: print("MARK refused", flush=True)
+              if "already running" in message else None):
     app.main([])
 print("MARK main returned", flush=True)
 sys.stdin.readline()

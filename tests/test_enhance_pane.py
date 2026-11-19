@@ -2601,7 +2601,7 @@ def test_a_fixs_old_version_offers_the_trash_where_its_newest_offers_retrain(
 def test_a_fixs_trash_moves_the_window_and_what_is_kept_to_the_newest_version_and_its_word(
         qtbot, fix_in_two_versions):
     pane, window = _fix_window_on_the_old_version(
-        qtbot, trash=lambda _lora, _parent: fix_in_two_versions.unlink() or True)
+        qtbot, trash=lambda _lora: fix_in_two_versions.unlink() or True)
 
     window.training.trash.click()
 
@@ -2613,7 +2613,7 @@ def test_a_fixs_trash_moves_the_window_and_what_is_kept_to_the_newest_version_an
 
 
 def test_a_fix_trash_windows_refuses_stays_on_that_version(qtbot, fix_in_two_versions):
-    _pane, window = _fix_window_on_the_old_version(qtbot, trash=lambda _lora, _parent: False)
+    _pane, window = _fix_window_on_the_old_version(qtbot, trash=lambda _lora: False)
 
     window.training.trash.click()
 

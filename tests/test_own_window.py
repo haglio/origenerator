@@ -5,7 +5,6 @@ import shiboken6
 from PySide6.QtWidgets import (
     QApplication,
     QLabel,
-    QMessageBox,
     QPlainTextEdit,
     QWidget,
 )
@@ -26,16 +25,7 @@ from origenerator.gui.default_animation_settings_window import (
     POSITIVE,
     DefaultAnimationSettingsWindow,
 )
-
-
-@pytest.fixture
-def said(monkeypatch):
-    spoken: list[str] = []
-    monkeypatch.setattr(QMessageBox, "information",
-                        lambda parent, title, text: spoken.append(text))
-    monkeypatch.setattr(QMessageBox, "critical",
-                        lambda parent, title, text: spoken.append(text))
-    return spoken
+from tests.alert_windows import messages
 
 
 @pytest.fixture
@@ -52,10 +42,10 @@ _WHY_THE_LAUNCH_IS_RUN = (
 
 
 def test_the_action_setter_tools_own_launch_says_so_when_every_image_already_has_its_actions(
-        qapp, a_library_of_its_own, said):
+        qapp, a_library_of_its_own, alerts):
     assert action_setter_tool.main() == 0, _WHY_THE_LAUNCH_IS_RUN
 
-    assert said == ["Every image already has its actions."]
+    assert messages(alerts) == ["Every image already has its actions."]
 
 
 def test_checking_animations_own_launch_opens_a_window_on_the_first_of_them(
@@ -122,7 +112,7 @@ def test_the_production_apps_own_windows_wear_its_own_icon():
 
 
 def test_what_the_window_is_dressed_as_is_what_this_copy_is(
-        a_library_of_its_own, said, monkeypatch):
+        a_library_of_its_own, alerts, monkeypatch):
     dressed = []
     monkeypatch.setattr(branch_session, "shown_as",
                         lambda checkout: Preview(feature="a branch"))
@@ -135,7 +125,7 @@ def test_what_the_window_is_dressed_as_is_what_this_copy_is(
 
 
 def test_opening_the_action_setter_tool_claims_that_name(
-        a_library_of_its_own, said, monkeypatch):
+        a_library_of_its_own, alerts, monkeypatch):
     claimed = []
     monkeypatch.setattr(own_window, "_claim_the_taskbar", claimed.append)
 
@@ -153,7 +143,7 @@ def test_the_taskbar_is_told_the_apps_icon_and_how_to_reopen_the_window():
 
 
 def test_opening_the_action_setter_tool_dresses_its_taskbar_button(
-        a_library_of_its_own, said, monkeypatch):
+        a_library_of_its_own, alerts, monkeypatch):
     dressed = []
     monkeypatch.setattr(
         own_window, "_dress_the_taskbar_button",
@@ -164,7 +154,7 @@ def test_opening_the_action_setter_tool_dresses_its_taskbar_button(
     assert dressed == [("Action setter tool", "sort_images.vbs")]
 
 
-def test_a_window_is_not_opened_when_the_content_overlay_lacks_a_key(qapp, said):
+def test_a_window_is_not_opened_when_the_content_overlay_lacks_a_key(qapp, alerts):
 
     def build():
         raise AssertionError("built a window over a missing overlay")
@@ -172,7 +162,7 @@ def test_a_window_is_not_opened_when_the_content_overlay_lacks_a_key(qapp, said)
     opened = own_window.open_on_its_own(
         "Check", build, launcher="x", find_missing_overlay_keys=lambda: ["alpha", "beta"])
     assert opened == 1
-    assert said == ["The content overlay is missing: alpha, beta"]
+    assert messages(alerts) == ["The content overlay is missing: alpha, beta"]
 
 
 def test_a_window_shown_on_its_own_is_deleted_once_closed_and_no_longer_open(qtbot, monkeypatch):

@@ -13,7 +13,6 @@ from PySide6.QtGui import QAction, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
-    QMessageBox,
     QPushButton,
     QScrollArea,
     QVBoxLayout,
@@ -26,6 +25,7 @@ from shared_ui.orientation import orientation_of_size as shape_of_size
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ROW_GAP, GAP_MEDIUM, MARGIN_STANDARD
 
 from origenerator import (
+    alert,
     evolver_export,
     gallery,
     request_settings,
@@ -1649,8 +1649,7 @@ class GenerateTab(DropZones):
                       inbox=self._inbox, places=OUTPUT_PLACES)
         except Exception as e:
             logger.exception("Failed to send %s to %s", path, lane.name)
-            QMessageBox.warning(self._viewport, lane.failure_title,
-                                lane.failure_body(e))
+            alert.warning(lane.failure_title, lane.failure_body(e))
             return
         self._redraw_lane_button()
 

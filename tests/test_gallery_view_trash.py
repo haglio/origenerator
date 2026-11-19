@@ -255,12 +255,9 @@ class _FailingActions(FakeActions):
         raise OSError("the trash folder is gone")
 
 
-def _warnings_shown(monkeypatch):
+def _warnings_shown(answered_by):
     said = []
-    monkeypatch.setattr(
-        QMessageBox, "warning",
-        staticmethod(lambda parent, title, text, *a, **kw: said.append((title, text))),
-    )
+    answered_by(lambda title, text, **_how: said.append((title, text)))
     return said
 
 
@@ -329,9 +326,9 @@ def test_right_clicking_an_unpicked_trash_tile_narrows_to_that_one(qtbot, monkey
 
 
 def test_a_restore_that_cannot_finish_says_why_and_keeps_the_item_picked(
-        qtbot, monkeypatch):
+        qtbot, alerts_answered_by):
     view = _trash_collection_view(qtbot, _FailingActions())
-    said = _warnings_shown(monkeypatch)
+    said = _warnings_shown(alerts_answered_by)
 
     view.restore_from_trash(["d1"])
 
@@ -341,10 +338,10 @@ def test_a_restore_that_cannot_finish_says_why_and_keeps_the_item_picked(
 
 
 def test_a_purge_that_cannot_finish_says_why_and_keeps_the_item_picked(
-        qtbot, monkeypatch):
+        qtbot, monkeypatch, alerts_answered_by):
     view = _trash_collection_view(qtbot, _FailingActions())
     _answer_confirmation(monkeypatch, QMessageBox.StandardButton.Yes)
-    said = _warnings_shown(monkeypatch)
+    said = _warnings_shown(alerts_answered_by)
 
     view.purge_from_trash(["d1"])
 
@@ -852,7 +849,7 @@ def test_delete_key_on_a_workflow_folder_does_nothing(qtbot):
     assert actions.deleted == []
 
 
-def test_a_failed_delete_is_surfaced_not_swallowed(qtbot, monkeypatch):
+def test_a_failed_delete_is_surfaced_not_swallowed(qtbot, alerts_answered_by):
     class BoomActions(FakeActions):
         def delete_rows(self, rows):
             raise OSError("the file is held by another process")
@@ -863,10 +860,7 @@ def test_a_failed_delete_is_surfaced_not_swallowed(qtbot, monkeypatch):
     _open_leaf(view)
     view._gallery_pane.apply_selection("i1", _NO_MOD)
     warned = []
-    monkeypatch.setattr(
-        "origenerator.gui.gallery_view.QMessageBox.warning",
-        lambda *a, **k: warned.append(a),
-    )
+    alerts_answered_by(lambda *a, **k: warned.append(a))
 
     view._delete_selection()
 

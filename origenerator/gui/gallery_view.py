@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMenu,
-    QMessageBox,
     QPlainTextEdit,
     QScrollArea,
     QVBoxLayout,
@@ -23,6 +22,7 @@ from shared_ui.spacing import GAP_MEDIUM
 from shared_ui.tick_control import TickControl
 
 from origenerator import (
+    alert,
     evolver_export,
     gallery,
     outside_videos,
@@ -1717,7 +1717,7 @@ class GalleryView(QWidget):
         self._enhance.enhance_items(prompt_ids)
 
     def tell(self, title: str, message: str) -> None:
-        QMessageBox.information(self, title, message)
+        alert.information(title, message)
 
     def combine_selection(self) -> dict:
         return self._combine.selection()
@@ -2096,7 +2096,7 @@ class GalleryView(QWidget):
                 self.refresh()
                 then(outcome)
         if error is not None:
-            QMessageBox.warning(self, failed, f"{could_not}:\n\n{error}")
+            alert.warning(failed, f"{could_not}:\n\n{error}")
 
     def purge_from_trash(self, prompt_ids):
         if not prompt_ids:

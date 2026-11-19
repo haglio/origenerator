@@ -4229,18 +4229,18 @@ def test_a_lane_refuses_a_send_the_row_records_even_with_its_button_still_live(
 
 
 @pytest.mark.parametrize("lane", _lanes(), ids=lambda lane: lane.name)
-def test_a_lane_says_so_loudly_when_the_copy_fails(saved_panel, monkeypatch, lane, kept):
+def test_a_lane_says_so_loudly_when_the_copy_fails(saved_panel, monkeypatch, lane, kept, alerts_answered_by):
     tab, db = saved_panel
     monkeypatch.setattr(evolver_export, "export_video",
                         MagicMock(side_effect=OSError("inbox unreachable")))
     warn = MagicMock()
-    monkeypatch.setattr(generate_tab_module.QMessageBox, "warning", warn)
+    alerts_answered_by(warn)
 
     tab.show_saved_generation(kept(db, _lane_video(db, lane)), [])
     _press(tab, lane.send_caption)
 
     warn.assert_called_once()
-    assert warn.call_args.args[1] == f"Send to {lane.name} failed"
+    assert warn.call_args.args[0] == f"Send to {lane.name} failed"
     assert not tab._displayed_row[lane.flag]
 
 
@@ -4900,7 +4900,7 @@ def test_the_trash_moves_the_tab_to_the_newest_version_and_its_trigger_word(
     form = blank_panel._param_form
     form.set_values({"lora": "look_one.safetensors", "positive_prompt": "zzold, scene one"})
     LookTrainingController(None, info_tabs_of=lambda: _OneTab(blank_panel), parent=None,
-                           trash=lambda _lora, _parent: look_in_two_versions.unlink() or True
+                           trash=lambda _lora: look_in_two_versions.unlink() or True
                            ).wire(blank_panel)
 
     form.training.controls["lora"].trash.click()

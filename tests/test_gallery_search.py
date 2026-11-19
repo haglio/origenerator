@@ -315,7 +315,7 @@ def test_leaving_a_search_that_was_never_running_does_nothing(controller):
     assert (host.handed_back, host.history_held) == (0, 0)
 
 
-def test_several_hits_in_one_folder_come_back_as_that_folder(controller):
+def test_several_hits_in_one_folder_come_back_as_the_items(controller):
     rows = [_row("g1", "a tabby on a wall", seed=1),
             _row("g2", "a tabby on a wall", seed=2)]
     host = FakeHost()
@@ -326,40 +326,11 @@ def test_several_hits_in_one_folder_come_back_as_that_folder(controller):
     _type(found, "tabby")
 
     tiles, _ = host.shown[-1]
-    assert len(tiles) == 1, (
-        "every row in a settings folder shares a prompt and settings and differs only by seed, "
-        "so a prompt match hits all of them, and drawing near-copies of one item buries the "
-        "other places the query reached: the folder stands for them instead")
-    assert tiles[0].group is host.groups[key]
-    assert {tile["prompt_id"] for tile in tiles[0].rows} == {"g1", "g2"}
+    assert [tile.group for tile in tiles] == [None, None], (
+        "a folder shows only when the search is its whole name; every other match is itself")
+    assert sorted(row["prompt_id"] for tile in tiles for row in tile.rows) == ["g1", "g2"]
 
 
-def test_a_folder_of_hits_stands_where_its_first_hit_was(controller):
-    rows = [_row("g1", "a tabby on a wall", seed=1),
-            _row("g2", "a tabby asleep", seed=1),
-            _row("g3", "a tabby on a wall", seed=2)]
-    host = FakeHost()
-    found = controller(rows, host=host)
-    host.groups[_folder_key(rows[0])] = object()
-
-    _type(found, "tabby")
-
-    tiles, _ = host.shown[-1]
-    assert [[row["prompt_id"] for row in tile.rows] for tile in tiles] == [["g1", "g3"], ["g2"]], (
-        "order is by first hit, so the newest thing found still leads")
-
-
-def test_a_folder_the_tree_has_no_row_for_falls_back_to_its_own_items(controller):
-    rows = [_row("g1", "a tabby on a wall", seed=1),
-            _row("g2", "a tabby on a wall", seed=2)]
-    host = FakeHost()
-    found = controller(rows, host=host)
-
-    _type(found, "tabby")
-
-    tiles, _ = host.shown[-1]
-    assert {tile.row["prompt_id"] for tile in tiles} == {"g1", "g2"}
-    assert all(tile.group is None for tile in tiles)
 
 
 def test_a_widening_that_lands_for_the_running_query_re_runs_it(controller, qtbot):
@@ -549,7 +520,7 @@ def _folder_key(row: dict) -> str:
     return gallery.settings_folder_key(row, {})
 
 
-def test_a_folder_whose_name_matches_is_the_first_tile_and_its_items_follow(controller):
+def test_a_folder_the_search_names_whole_shows_without_its_items(controller):
     rows = [_row("g1", "a tabby on a wall"), _row("g2", "a tabby in a box")]
     workflow = gallery.WorkflowGroup("wf", "wan22_i2v", "I2V WAN 2.2", [
         gallery.SettingsGroup("leaf", "3FA9C0D2", rows[:1])])
@@ -560,13 +531,11 @@ def test_a_folder_whose_name_matches_is_the_first_tile_and_its_items_follow(cont
     _type(found, "I2V WAN 2.2")
 
     tiles, _terms = host.shown[-1]
-    assert [tile.group for tile in tiles] == [workflow, None]
-    assert [row["prompt_id"] for tile in tiles for row in tile.rows] == ["g1"], (
-        "the folder's tile only leads to its items, which follow it, so a slideshow of the "
-        "results plays each item once")
+    assert [(tile.group, tile.rows) for tile in tiles] == [(workflow, [])], (
+        "the folder stands for what it holds, so none of its items is shown beside it")
 
 
-def test_a_matched_settings_folder_shows_once_with_its_items_inside(controller):
+def test_a_settings_folder_the_search_names_whole_shows_once(controller):
     rows = [_row("g1", "a tabby on a wall"), _row("g2", "a tabby on a wall")]
     key = gallery.settings_folder_key(rows[0], {})
     leaf = gallery.SettingsGroup(key, "3FA9C0D2", rows)
@@ -577,5 +546,4 @@ def test_a_matched_settings_folder_shows_once_with_its_items_inside(controller):
     _type(found, "3FA9C0D2")
 
     tiles, _terms = host.shown[-1]
-    assert [(tile.group, [row["prompt_id"] for row in tile.rows]) for tile in tiles] == [
-        (leaf, ["g1", "g2"])]
+    assert [(tile.group, tile.rows) for tile in tiles] == [(leaf, [])]

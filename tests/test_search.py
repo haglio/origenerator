@@ -344,7 +344,7 @@ def test_what_made_an_item_ranks_below_what_it_shows_and_a_folders_name_ranks_wi
     made_with = _row("g2", "a quiet street", params={"checkpoint": "harbor_xl.safetensors"})
     filed = _row("g3", "a quiet street")
     by_id = {result.row["prompt_id"]: result.score for result in _index(
-        [shown, made_with, filed], {"g3": ("Harbor",)}).search("harbor").results}
+        [shown, made_with, filed], {"g3": ("Harbor views",)}).search("harbor").results}
     assert by_id["g1"] > by_id["g2"], \
         "a model's or a LoRA's name answers what made the item, a different question"
     assert by_id["g3"] == by_id["g1"], (
@@ -441,16 +441,17 @@ def test_renaming_a_folder_is_searchable_at_once():
     rows = [_row("a", "a cat")]
     index = search.GallerySearch()
     index.update(rows, _folders_holding({"a": ["Rejects"]}))
-    assert _hits(index, "rejects") == ["a"]
+    assert index.search("rejects").folders == ("a Rejects",)
 
     index.update(rows, _folders_holding({"a": ["Keepers"]}))
 
-    assert _hits(index, "keepers") == ["a"]
-    assert _hits(index, "rejects") == []
+    assert index.search("keepers").folders == ("a Keepers",)
+    assert (index.search("rejects").folders, _hits(index, "rejects")) == ((), [])
 
 
-@pytest.mark.parametrize("query", ["I2V WAN 2.2", "wan_high", "styleA_low"])
-def test_a_workflow_model_or_lora_folder_is_found_by_the_name_the_toc_shows(query):
+@pytest.mark.parametrize(("query", "is_a_whole_name"), [
+    ("I2V WAN 2.2", True), ("wan_high", False), ("styleA_low", False)])
+def test_a_workflow_model_or_lora_folder_is_found_by_the_name_the_toc_shows(query, is_a_whole_name):
     rows = [_row("v1", "a dance", workflow="wan22_i2v", params={
         "unet_high": "wan_high.safetensors", "unet_low": "wan_low.safetensors",
         "lora_high": "styleA_high.safetensors", "lora_low": "styleA_low.safetensors",
@@ -460,7 +461,8 @@ def test_a_workflow_model_or_lora_folder_is_found_by_the_name_the_toc_shows(quer
     index = search.GallerySearch()
     index.update(rows, folders=gallery.named_folders(gallery.build_gallery_tree(rows), {}))
 
-    assert _hits(index, query) == ["v1"]
+    assert (len(index.search(query).folders), _hits(index, query)) == (
+        (1, []) if is_a_whole_name else (0, ["v1"]))
 
 
 def _folders_index(rows, *folders):
@@ -469,16 +471,16 @@ def _folders_index(rows, *folders):
     return index
 
 
-def test_a_folder_whose_own_name_answers_every_word_is_matched_itself():
+def test_a_search_that_is_a_folders_whole_name_finds_the_folder_and_not_what_it_holds():
     rows = [_row("v1", "a dance"), _row("v2", "a walk"), _row("i1", "a dance")]
     index = _folders_index(rows, ("wan", "I2V WAN 2.2", ("v1", "v2")),
                            ("sdxl", "T2I SDXL", ("i1",)))
 
     assert index.search("I2V WAN 2.2").folders == ("wan",)
-    assert _hits(index, "I2V WAN 2.2") == ["v1", "v2"]
+    assert _hits(index, "I2V WAN 2.2") == [], "the folder stands for what it holds"
 
 
-def test_a_folder_whose_name_answers_only_some_words_is_not_matched_itself():
+def test_a_search_that_is_only_part_of_a_folders_name_finds_its_items():
     rows = [_row("v1", "a dance"), _row("v2", "a walk")]
     index = _folders_index(rows, ("wan", "I2V WAN 2.2", ("v1", "v2")))
 
@@ -495,8 +497,7 @@ def test_a_folder_outside_the_searched_folder_is_not_matched():
 
 def test_matched_folders_come_in_the_order_the_toc_lists_them():
     rows = [_row("v1", "a dance")]
-    index = _folders_index(rows, ("wan", "I2V WAN 2.2", ("v1",)),
-                           ("high", "WAN high", ("v1",)))
+    index = _folders_index(rows, ("wan", "WAN", ("v1",)), ("high", "wan", ("v1",)))
 
     assert index.search("wan").folders == ("wan", "high")
 

@@ -13,7 +13,7 @@ from PySide6.QtCore import (
     QUrl,
     Signal,
 )
-from PySide6.QtGui import QImageReader, QMovie, QPixmap
+from PySide6.QtGui import QImage, QImageReader, QMovie, QPixmap
 from PySide6.QtMultimedia import QMediaMetaData, QMediaPlayer
 from PySide6.QtWidgets import (
     QApplication,
@@ -39,6 +39,7 @@ from origenerator.gui.drag_thumbnail import (
     label_thumbnail,
 )
 from origenerator.gui.generation_drag import generation_mime
+from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.scrubber import Scrubber
 from origenerator.gui.video_surface import VideoSurface
 from origenerator.media import MediaType
@@ -69,6 +70,7 @@ class Viewport(QWidget):
                  show_scrubber: bool = False):
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
+        self._image_size: QSize | None = None
         self._movie: QMovie | None = None
         self._movie_native = None
         self._media: tuple | None = None
@@ -152,7 +154,7 @@ class Viewport(QWidget):
                        stop_player: bool = True, enhancing: bool = False,
                        live: bool = False) -> None:
         self._set_movie(None)
-        self._pixmap = None
+        self._pixmap = self._image_size = None
         self._hide_scrubber()
         if stop_player:
             self._stop_playback()
@@ -169,13 +171,36 @@ class Viewport(QWidget):
             self.show_image(path, generation)
 
     def show_image(self, path, generation: str | None = None) -> None:
+        last_frame = self._video_still() if self.is_showing_video() else None
         self._take_the_pane((path, MediaType.IMAGE), generation=generation)
         reader = QImageReader(str(path))
         if reader.supportsAnimation() and reader.imageCount() > 1:
             self._set_movie(QMovie(str(path)), reader.size())
             self._stack.setCurrentWidget(self._image_label)
-        else:
-            self._show_image(QPixmap(str(path)))
+            return
+        self._image_size = reader.size()
+        if last_frame is not None:
+            self._image_label.setPixmap(last_frame)
+            self._stack.setCurrentWidget(self._image_label)
+        asked = self._media
+        run_off_thread(lambda: QImage(str(path)),
+                       lambda image: self._decoded(asked, image), owner=self)
+
+    def _video_still(self) -> QPixmap | None:
+        frame = self._video.current_frame()
+        if frame.isNull():
+            return None
+        return QPixmap.fromImage(frame).scaled(
+            self._image_label.size(), Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation)
+
+    def _decoded(self, asked, image: QImage) -> None:
+        if self._media is not asked:
+            return
+        self._show_image(QPixmap.fromImage(image))
+        self._place_controls()
+        if image.size() != self._image_size:
+            self.media_resized.emit()
 
     def _show_image(self, pixmap: QPixmap) -> None:
         self._pixmap = pixmap
@@ -318,6 +343,8 @@ class Viewport(QWidget):
                 return frame.width(), frame.height()
         if self._pixmap is not None and not self._pixmap.isNull():
             return self._pixmap.width(), self._pixmap.height()
+        if self._image_size is not None and self._image_size.isValid():
+            return self._image_size.width(), self._image_size.height()
         video = getattr(self, "_video_size", None)
         return tuple(video) if video else None
 

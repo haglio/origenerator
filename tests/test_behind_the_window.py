@@ -10,7 +10,11 @@ from PySide6.QtWidgets import QApplication
 from origenerator.boot_passes import BootPass, Library
 from origenerator.db import Database, NewGeneration
 from origenerator.gui import behind_the_window, job_queue
-from origenerator.gui.behind_the_window import DID_NOT_COME_UP, finish_core_behind_the_window
+from origenerator.gui.behind_the_window import (
+    DID_NOT_COME_UP,
+    WorkBehindTheWindow,
+    finish_core_behind_the_window,
+)
 from origenerator.inflight import in_flight_at
 from origenerator.output_places import OutputPlaces
 
@@ -138,3 +142,30 @@ def test_a_copy_with_no_way_to_start_comfyui_says_so_once_its_library_is_tidied(
     assert caplog.messages == [DID_NOT_COME_UP]
     assert _statuses(db) == {"from-before": "running", "this-session": "running"}
     assert ready == []
+
+
+def test_the_tidying_behind_the_window_can_be_waited_for_to_its_last_pass(
+        qtbot, tmp_path, monkeypatch):
+    _db, library = _a_launch_with_a_run_in_flight(tmp_path)
+    started, let_go, ran = threading.Event(), threading.Event(), []
+
+    def a_pass_in_flight(_library):
+        started.set()
+        let_go.wait()
+        ran.append("the pass in flight finished")
+
+    monkeypatch.setattr(behind_the_window, "MAINTENANCE", (
+        BootPass(None, a_pass_in_flight, failure="%s"),
+        BootPass(None, lambda _library: ran.append("the pass after it ran"), failure="%s"),
+    ))
+    monkeypatch.setattr(job_queue, "BRING_UP_COMFYUI", None)
+    behind = WorkBehindTheWindow()
+    finish_core_behind_the_window(library, logger, owner=QObject(), behind=behind,
+                                  tidied=lambda: None, then=lambda: None)
+    started.wait()
+
+    let_go.set()
+    behind.wait_for_the_tidying()
+
+    assert ran == ["the pass in flight finished", "the pass after it ran"], (
+        "a pass still in the database while the app exits takes the app down with it")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable
 
 from origenerator.boot_passes import (
@@ -16,9 +17,24 @@ DID_NOT_COME_UP = ("ComfyUI did not come up behind the window; the runs in fligh
                    "are left for the next launch to reconnect")
 
 
+class WorkBehindTheWindow:
+    def __init__(self) -> None:
+        self._tidying: threading.Thread | None = None
+
+    def tidy(self, work, done, *, owner) -> None:
+        self._tidying = run_off_thread(work, done, owner=owner, waits_long=True)
+
+    def wait_for_the_tidying(self) -> None:
+        if self._tidying is not None:
+            self._tidying.join()
+
+
 def finish_core_behind_the_window(library: Library, logger, *, owner,
                                   tidied: Callable[[], None],
-                                  then: Callable[[], None]) -> None:
+                                  then: Callable[[], None],
+                                  behind: WorkBehindTheWindow | None = None) -> None:
+    behind = behind or WorkBehindTheWindow()
+
     def came_up(up) -> None:
         if not up:
             logger.warning(DID_NOT_COME_UP)
@@ -34,6 +50,6 @@ def finish_core_behind_the_window(library: Library, logger, *, owner,
         tidied()
         run_off_thread(bring_comfyui_up, came_up, owner=owner, waits_long=True)
 
-    run_off_thread(
+    behind.tidy(
         lambda: run_maintenance(library, without_comfyui(MAINTENANCE), logger.info, logger),
-        the_library_is_tidy, owner=owner, waits_long=True)
+        the_library_is_tidy, owner=owner)

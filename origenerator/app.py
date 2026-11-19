@@ -309,6 +309,7 @@ class Boot:
     clicked_toasts: object = None
     watch: object = None
     freeze_watch: object = None
+    behind: object = None
 
     @property
     def waits_for_comfyui(self) -> bool:
@@ -332,10 +333,14 @@ class Boot:
     def finish_core_behind(self, library: Library, window) -> None:
         if self.waits_for_comfyui:
             return
-        from origenerator.gui.behind_the_window import finish_core_behind_the_window
+        from origenerator.gui.behind_the_window import (
+            WorkBehindTheWindow,
+            finish_core_behind_the_window,
+        )
 
+        self.behind = WorkBehindTheWindow()
         window.once_the_satellites_are_served(partial(
-            finish_core_behind_the_window, library, self.logger, owner=self.app,
+            finish_core_behind_the_window, library, self.logger, owner=self.app, behind=self.behind,
             tidied=window.restore_what_only_core_shows, then=window.core_is_ready))
 
     def say(self, step: str) -> None:
@@ -418,6 +423,8 @@ class Boot:
         return 0
 
     def close(self, window, client) -> None:
+        if self.behind is not None:
+            self.behind.wait_for_the_tidying()
         if self.watch is not None:
             self.watch.withdraw()
         _hand_comfyui_what_runs_while_closed(window, self.freeze_watch)

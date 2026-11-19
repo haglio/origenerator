@@ -49,6 +49,7 @@ class Collection:
     empty: str = ""
     voice: Voice | None = None
     slideshow_filter: str | None = None
+    of_what_was_generated: bool = False
 
 
 ALL_COLLECTIONS: tuple[Collection, ...] = (
@@ -77,7 +78,8 @@ ALL_COLLECTIONS: tuple[Collection, ...] = (
     Collection(
         EXPERIMENTS_KEY, EXPERIMENTS_LABEL, "Background experiments awaiting your review",
         Glyph("flask"), rows=lambda library: library.experiment_rows,
-        voice=Voice(("experiments", "experiment"), answered_when_hosted=False)),
+        voice=Voice(("experiments", "experiment"), answered_when_hosted=False),
+        of_what_was_generated=True),
     Collection(
         TRASH_KEY, TRASH_LABEL,
         "Deleted items — after a day only their thumbnails are kept, "

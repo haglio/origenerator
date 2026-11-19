@@ -18,6 +18,7 @@ from origenerator.gui import folder_icons, icons
 from origenerator.gui.folder_tree import COUNT_ROLE, DROP_KEY_ROLE, RECENT_ROLE, TREE_KEY_ROLE
 from origenerator.gui.split_folder_tree import SplitFolderTree
 from origenerator.item_shape import base_of, shape_of, shaped_key, split_key
+from origenerator.workflows.non_ai import folder_kind
 
 GROUP_ROLE = Qt.ItemDataRole.UserRole
 _RECENT_TIP = " · worked in recently"
@@ -61,8 +62,10 @@ def _inside(group, inside: tuple) -> tuple:
     return (*inside, group.key) if inside else ()
 
 
-def _shown_collections(shape) -> list:
-    return [shown for shown in all_collections() if shown.shown_in(shape)]
+def _shown_collections(shape, group) -> list:
+    nothing_generated = folder_kind(getattr(group, "workflow_name", None)) == "non_ai"
+    return [shown for shown in all_collections() if shown.shown_in(shape)
+            and not (shown.of_what_was_generated and nothing_generated)]
 
 
 @dataclass
@@ -132,8 +135,9 @@ class GalleryTree:
         for custom, row in customs:
             self._add_children(custom, row, shape, (custom.key,))
 
-    def _add_collections(self, folder_item, shape, folder_key: str, inside=()) -> None:
-        for shown in _shown_collections(shape):
+    def _add_collections(self, folder_item, shape, group, inside=()) -> None:
+        folder_key = group.key
+        for shown in _shown_collections(shape, group):
             key = FolderCollection(shown.key, folder_key).key
             item = QTreeWidgetItem([shown.label])
             item.setData(0, COUNT_ROLE, shape.collection_counts.get(key, 0))
@@ -234,7 +238,7 @@ class GalleryTree:
         self._register(item, shaped_key(group.key, shape.shape, inside), parent_item,
                        folder_key=group.key)
         if not isinstance(group, gallery.SettingsGroup):
-            self._add_collections(item, shape, group.key, _inside(group, inside))
+            self._add_collections(item, shape, group, _inside(group, inside))
         return item
 
     def _add_children(self, group, item, shape, inside) -> None:

@@ -12,7 +12,6 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
 from origenerator.gallery.keys import folder_id
 from origenerator.gallery.tree import settings_folder_key
-from origenerator.gui import generate_tab as generate_tab_module
 from origenerator.gui.combination import Combination
 from origenerator.gui.eliding_tab_bar import ElidingTabBar
 from origenerator.gui.generate_pane import GeneratePane, parse_tabs_state
@@ -1252,9 +1251,8 @@ def test_a_refreshed_row_reaches_a_tab_that_is_not_in_front(tabs):
         "and would show it stale the next time it came forward")
 
 
-def test_a_tab_following_a_run_shows_the_whole_item_that_landed(tabs, monkeypatch):
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
-    cat, _dog = _two_generations(tabs)
+def test_a_tab_following_a_run_shows_the_whole_item_that_landed(tabs, tmp_path):
+    cat, _dog = _two_kept_generations(tabs, tmp_path)
     following = tabs.currentWidget()
     following.watch_folder("k", None)
 
@@ -1264,9 +1262,8 @@ def test_a_tab_following_a_run_shows_the_whole_item_that_landed(tabs, monkeypatc
 
 
 def test_a_tab_showing_a_finished_item_takes_no_frames_from_its_folders_next_run(
-        tabs, monkeypatch):
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", lambda row, out: ("cat.png", "image"))
-    cat, _dog = _two_generations(tabs)
+        tabs, tmp_path):
+    cat, _dog = _two_kept_generations(tabs, tmp_path)
     tab = tabs.currentWidget()
     tab._viewport.show_frame = MagicMock()
     tab.watch_folder("k", None)

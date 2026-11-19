@@ -16,7 +16,6 @@ from funestra.satellite_hud import parse_hud
 from PIL import Image
 
 from origenerator import fun_time_mode as contract
-from origenerator import gallery
 from origenerator.fun_time_bridge import (
     ORIGENERATOR_MODE,
     FunTimeBridge,
@@ -26,7 +25,6 @@ from origenerator.fun_time_bridge import (
 from origenerator.fun_time_mode import FunestraChannel, FunTimeSession, Rect
 from origenerator.gallery.collection import FAVORITES_KEY
 from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
-from origenerator.gui import generate_tab as generate_tab_module
 from origenerator.gui import omnipause, slideshow_director
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.hud_queue import CANCEL
@@ -34,8 +32,8 @@ from origenerator.gui.slideshow_pace import DEFAULT_S
 from origenerator.slideshow_buttons import answer
 from tests.closed_windows import is_closed
 from tests.gallery_view_support import (
-    _REROLL_HISTORY,
     FakeActions,
+    _comfyui_finishes,
     _generating_tile,
     _image,
     _png_bytes,
@@ -46,7 +44,7 @@ from tests.gallery_view_support import (
     _viewport_of,
     _will_move_on,
 )
-from tests.real_db import database_of
+from tests.real_db import database_of, keep_on_disk
 from tests.slideshow_hud_support import funestra_of
 from tests.test_slideshow_hud import _inflight
 
@@ -764,16 +762,9 @@ def test_a_double_click_over_frames_of_no_run_in_flight_leaves_the_funestras_alo
     assert _told(tmp_path, "portrait") == []
 
 
-def _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch, *, alone_in_its_folder=False,
-                                 tall=False):
-    def by_id(row, places):
-        if row.get("status") != "completed":
-            return None
-        return str(tmp_path / f"{row['prompt_id']}.png"), "image"
-
-    monkeypatch.setattr(gallery, "resolve_preview", by_id)
-    monkeypatch.setattr(generate_tab_module, "resolve_preview", by_id)
+def _a_run_watched_on_a_funestra(qtbot, tmp_path, *, alone_in_its_folder=False, tall=False):
     db = _seeded_db(tmp_path)
+    keep_on_disk(db)
     if tall:
         params = json.loads(db.get_generation("orig")["params_json"])
         db.set_params_json("orig", json.dumps({**params, "width": 720, "height": 1280}))
@@ -795,9 +786,8 @@ def _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch, *, alone_in_its_f
 
 
 def test_a_run_alone_in_its_folder_double_clicked_goes_to_the_funestra_of_its_shape(
-        qtbot, tmp_path, monkeypatch):
-    _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch, alone_in_its_folder=True,
-                                 tall=True)
+        qtbot, tmp_path):
+    _a_run_watched_on_a_funestra(qtbot, tmp_path, alone_in_its_folder=True, tall=True)
 
     shown = read_playlist(tmp_path / "portrait.tsv")[0].path
     assert shown.is_file()
@@ -805,8 +795,8 @@ def test_a_run_alone_in_its_folder_double_clicked_goes_to_the_funestra_of_its_sh
 
 
 def test_a_run_watched_on_a_funestra_is_held_there_while_it_is_made_still_moving(
-        qtbot, tmp_path, monkeypatch):
-    _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch)
+        qtbot, tmp_path):
+    _a_run_watched_on_a_funestra(qtbot, tmp_path)
 
     told = _told(tmp_path, "landscape")
     locks = [verb for verb in told if verb.startswith("LOCK_")]
@@ -814,22 +804,21 @@ def test_a_run_watched_on_a_funestra_is_held_there_while_it_is_made_still_moving
 
 
 def test_a_run_watched_on_a_funestra_lands_there_as_its_finished_item(
-        qtbot, tmp_path, monkeypatch):
-    client, job = _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch)
+        qtbot, tmp_path):
+    client, job = _a_run_watched_on_a_funestra(qtbot, tmp_path)
     _told(tmp_path, "landscape")
 
-    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
+    finished = PlaylistItem(_comfyui_finishes(client, job))
 
-    finished = PlaylistItem(tmp_path / f"{job.prompt_id}.png")
     assert play_file(finished) in _told(tmp_path, "landscape")
     assert read_playlist(tmp_path / "landscape.tsv")[0].path == finished.path
 
 
-def test_a_run_watched_on_a_funestra_lands_at_the_clip_seconds(qtbot, tmp_path, monkeypatch):
-    client, job = _a_run_watched_on_a_funestra(qtbot, tmp_path, monkeypatch)
+def test_a_run_watched_on_a_funestra_lands_at_the_clip_seconds(qtbot, tmp_path):
+    client, job = _a_run_watched_on_a_funestra(qtbot, tmp_path)
     _told(tmp_path, "landscape")
 
-    client.job_completed.emit(job.prompt_id, _REROLL_HISTORY)
+    _comfyui_finishes(client, job)
 
     paces = [verb for verb in _told(tmp_path, "landscape") if verb.startswith("SET_PACE")]
     assert paces[-1] == f"SET_PACE {DEFAULT_S}"

@@ -55,6 +55,7 @@ from tests.gallery_view_support import (
     _REROLL_HISTORY,
     _SDXL,
     _click_off,
+    _comfyui_finishes,
     _double_click_slideshow,
     _enhanceable_db,
     _finish_reroll,
@@ -682,10 +683,9 @@ def test_a_request_landing_takes_the_place_of_its_image_on_a_slideshow_locked_on
     slideshow = view._slideshows.showing
     slideshow.show_item(kept_file("sdxl_t2i_orig.png"), lock=True)
     (job,) = view._live_jobs.values()
-    monkeypatch.setattr(gallery, "resolve_preview",
-                        lambda row, output_dir: (f"{row['prompt_id']}.png", "image"))
 
-    _finish_reroll(view, job)
+    _comfyui_finishes(view._client, job)
+    view.refresh()
 
     assert (slideshow.voice_target(), slideshow.locked) == (job.prompt_id, True)
 

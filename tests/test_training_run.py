@@ -238,3 +238,20 @@ def test_a_looks_training_reads_its_own_stages_from_its_first(
     _say(tmp_path, state="training", done=150, total=1500)
     qtbot.waitUntil(lambda: run.reading().progress == (150, 1500))
     assert words[-1] == "Training 10%"
+
+
+def test_a_status_unchanged_since_the_last_look_is_not_read_again(qtbot, monkeypatch, tmp_path):
+    run, _queue, _started = _run(qtbot, monkeypatch, tmp_path)
+    _say(tmp_path, state="training", done=30, total=2000)
+    run.begin()
+    reads = []
+    reading = training_run.lora_training.read_status
+    monkeypatch.setattr(training_run.lora_training, "read_status",
+                        lambda job: reads.append(job) or reading(job))
+
+    run._look()
+    run._look()
+    _say(tmp_path, state="training", done=31, total=2000)
+    run._look()
+
+    assert (len(reads), run.reading().progress) == (2, (31, 2000))

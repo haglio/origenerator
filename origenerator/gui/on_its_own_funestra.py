@@ -15,6 +15,7 @@ from funestra.status import parse_status
 from funestra.volume import VolumeHud
 from PySide6.QtCore import QObject, QRect, Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut
+from PySide6.QtWidgets import QWidget
 from shared_ui.message_shape import HEARD_MARK, INFO, time_to_read_ms
 
 from origenerator.fun_time_mode import Rect
@@ -123,6 +124,14 @@ class _FollowedChannel:
         return fields
 
 
+class _WhereTheFunestraIs(QWidget):
+    # Qt asks a question or opens a menu over a QWidget, and the Funestra is another program's
+    # window; this one is never shown and only stands where the Funestra is.
+    def __init__(self) -> None:
+        super().__init__(None, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
+        self.setGeometry(QRect())
+
+
 class OnItsOwnFunestra(QObject):
     def __init__(self, program, shape: str, actions, wiring: OwnWiring = USUAL_WIRING, *,
                  asks=None, message=None, parent=None) -> None:
@@ -138,7 +147,8 @@ class OnItsOwnFunestra(QObject):
         self._paused = False
         self._up = True
         self._over: QRect | None = None
-        self.queue_foot = QueueFoot(actions, beside=lambda: self)
+        self.over_the_funestra = _WhereTheFunestraIs()
+        self.queue_foot = QueueFoot(actions, beside=lambda: self.over_the_funestra)
         self._hud = HudOnFile(program.channel.hud_file, shape, self.queue_foot)
         self.player = PlayerOnItsOwnFunestra(wiring.clock)
         self.channel = _FollowedChannel(program.channel, self._heard_from_the_funestra)
@@ -169,11 +179,9 @@ class OnItsOwnFunestra(QObject):
         if place == self._program.place and not self._program.minimized:
             return
         self._over = QRect(screen.geometry())
+        self.over_the_funestra.setGeometry(self._over)
         self._program.show_on(place)
         self._note.reposition_over(self._over)
-
-    def frameGeometry(self) -> QRect:
-        return QRect() if self._over is None else QRect(self._over)
 
     def wear_the_hud(self, shape: str, wear: HudWear = NO_WEAR) -> None:
         self._hud_shape = shape
@@ -400,10 +408,10 @@ class OnItsOwnFunestra(QObject):
         self._answered()
         return True
 
-    def _on_the_slide_it_was_pressed_over(self, act, said_at: float | None) -> None:
+    def _on_the_slide_it_was_pressed_over(self, answer_it, said_at: float | None) -> None:
         if said_at is not None:
             self._slideshow.back_to_what_was_said_over(said_at)
-        act()
+        answer_it()
 
     def _answered(self) -> None:
         if self._up:
@@ -416,6 +424,7 @@ class OnItsOwnFunestra(QObject):
         self._up = False
         self._note_timer.stop()
         self._note.shutdown()
+        self.over_the_funestra.deleteLater()
         if self._tuner is not None:
             self._tuner.close()
         if self._asks is not None:

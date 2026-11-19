@@ -447,7 +447,7 @@ def _core_as(*, over: bool, minimized: bool = False, **dressed):
     place = QRect(0, 0, *VIEWPORT)
     core = _Core(place if over else place.translated(place.width() + 50, 0), minimized=minimized)
     window = _dressed(actions=SlideshowActions(core_window=lambda: core), **dressed)
-    assert window.frameGeometry() == place
+    assert window.over_the_funestra.frameGeometry() == place
     window.set_queue([_inflight("j1", job_kind="Image", typical_seconds=30)], 0)
     return window
 

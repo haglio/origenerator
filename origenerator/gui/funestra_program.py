@@ -42,10 +42,10 @@ def _let_a_program_take_the_keyboard() -> None:
         ctypes.WinDLL("user32").AllowSetForegroundWindow(_ANY_PROGRAM)
 
 
-def _the_interpreter_with_a_console_nobody_sees() -> Path:
+def _the_interpreter_that_is_not_pythonw() -> Path:
     here = Path(sys.executable)
-    console = here.with_name("python.exe")
-    return console if console.exists() else here
+    plain = here.with_name("python.exe")
+    return plain if plain.exists() else here
 
 
 @dataclass(frozen=True)
@@ -85,7 +85,7 @@ class FunestraProgram:
         offer_the_copy_beside_the_checkouts()
         channel = self.channel
         command = launch_command(
-            self._python_exe or _the_interpreter_with_a_console_nobody_sees(),
+            self._python_exe or _the_interpreter_that_is_not_pythonw(),
             Channels(playlist=channel.playlist, command=channel.command_file,
                      status=channel.status_file, hud=channel.hud_file,
                      dashboard_cmd=self.asks_file, paused=self.paused_file),

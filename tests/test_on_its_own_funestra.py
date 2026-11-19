@@ -1230,7 +1230,7 @@ def test_cancel_all_goes_back_to_the_gallery_which_asks_over_this_slideshow(qtbo
 
     view.queue_foot.cancel_all()
 
-    assert asked_over == [view]
+    assert asked_over == [view.over_the_funestra]
 
 
 def test_start_now_goes_back_to_the_gallery(qtbot):

@@ -755,6 +755,23 @@ over the Gallery pane and the spoken "switch".
   title bar and its saved place, and a slideshow opens and closes on demand.
 - A Fun Time session places Core and its slideshows itself and has no switch.
 
+## A slideshow's Funestra is a program of its own, never a window of this app's
+
+A Funestra is a window, so this app never runs one inside a window or a
+process of its own (`tests/test_funestra_engine_reach.py` holds it to that).
+A session hands this app its Satellites' files; Standalone starts the same
+program itself, funestra's `python -m funestra.program`
+(`gui/funestra_program.py`), and reaches it the same way: the list, the verbs
+and the pause flag go out through files under `state/funestras/`, and the
+status, the HUD's presses, the keys pressed on the window and its close come
+back through them (`gui/on_its_own_funestra.py`). One program is kept started
+and waiting for its list from launch, so a slideshow opens at once, and a
+closed slideshow ends its program so no file stays held open. The HUD and its
+Job Queue reach every Funestra as files (`HudOnFile`, `JobQueueFile`). No test
+starts a program: `tests/conftest.py` swaps in `tests/own_funestra_support.py`'s
+stand-in, a real Funestra on a fake engine, and a check of the real one runs
+silent on a hidden desktop, never on his screen.
+
 ## Judging a branch before it lands
 
 Every worktree carries `launch_preview_branch.vbs` (tracked). Double-clicking it

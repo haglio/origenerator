@@ -2573,7 +2573,6 @@ def test_the_huds_cancel_all_below_asks_over_the_slideshow_never_raising_core(
     _select_first_leaf(view)
     view.slideshows.start()
     shown = view.slideshows.showing.shown
-    qtbot.addWidget(shown)
     jobs = [_cancelable(key, []) for key in ("a", "b", "c")]
     monkeypatch.setattr(view.job_queue, "items", lambda rows=None, requests=None: jobs)
     shown.queue_foot.set(jobs)
@@ -2586,7 +2585,7 @@ def test_the_huds_cancel_all_below_asks_over_the_slideshow_never_raising_core(
     shown.queue_foot.menu_for("a")
     shown.queue_foot.cancel_all()
 
-    assert asked_over == [shown, shown], (
+    assert asked_over == [shown.over_the_funestra, shown.over_the_funestra], (
         "a question asked over Core brings Core up over the slideshow it was asked from")
 
 

@@ -216,9 +216,7 @@ class QueueSection:
     def paint(self, image, x: int, y: int, width: int,
               pointer: tuple[int, int] | None) -> list[tuple[tuple, Button]]:
         targets: list[tuple[tuple, Button]] = []
-        layer = Image.new("RGBA", image.size, (0, 0, 0, 0))
-        self._paint_whats_in_flight(_Canvas(layer, ImageDraw.Draw(layer), pointer, targets), x, y, width)
-        image.alpha_composite(layer)
+        self._paint_whats_in_flight(_Canvas(image, ImageDraw.Draw(image), pointer, targets), x, y, width)
         if self.pointer is not None:
             self.pointer.painted(targets, (x, y))
         return targets

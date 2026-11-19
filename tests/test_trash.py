@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from app_support.testing import no_wait_for_a_held_file
 
@@ -196,3 +197,47 @@ def test_an_empty_batch_re_makes_into_one_that_moves_nothing(tmp_path):
     batch.restore()
     batch.purge()
     assert batch.moves == []
+
+
+def _asked_of_each(monkeypatch, name: str, under: Path) -> list[str]:
+    asked = []
+    real = getattr(Path, name)
+
+    def asking(path, *args, **kwargs):
+        if under in path.parents:
+            asked.append(path.name)
+        return real(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, name, asking)
+    return asked
+
+
+def test_tending_many_batches_compares_their_names_without_resolving_each(tmp_path, monkeypatch):
+    trash = Trash(tmp_path / "trash")
+    held = [trash.store([_file(tmp_path / "out" / f"held {n}.png")]) for n in range(4)]
+    trash.store([_file(tmp_path / "out" / "orphan.png")])
+    resolved = _asked_of_each(monkeypatch, "resolve", tmp_path / "trash")
+    asked_dir = _asked_of_each(monkeypatch, "is_dir", tmp_path / "trash")
+
+    assert trash.purge_orphans([batch.subdir for batch in held]) == 1
+    assert (resolved, asked_dir) == ([], [])
+
+
+def test_the_names_the_trash_holds_are_read_from_its_listing(tmp_path, monkeypatch):
+    trash = Trash(tmp_path / "trash")
+    for n in range(4):
+        trash.store([_file(tmp_path / "out" / f"alpha_0000{n}_.png")])
+    asked_dir = _asked_of_each(monkeypatch, "is_dir", tmp_path / "trash")
+
+    assert trash.held_names() == {f"alpha_0000{n}_.png" for n in range(4)}
+    assert asked_dir == []
+
+
+def test_genaus_videos_are_read_from_its_folders_listing(tmp_path, monkeypatch):
+    genau = trash_mod.Genau(tmp_path / "flicks")
+    for n in range(4):
+        _file(tmp_path / "flicks" / "loops" / f"clip {n}.mp4")
+    asked = _asked_of_each(monkeypatch, "is_file", tmp_path / "flicks")
+
+    assert len(genau.videos()) == 4
+    assert asked == []

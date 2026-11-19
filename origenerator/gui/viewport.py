@@ -345,8 +345,7 @@ class Viewport(QWidget):
             return self._pixmap.width(), self._pixmap.height()
         if self._image_size is not None and self._image_size.isValid():
             return self._image_size.width(), self._image_size.height()
-        video = getattr(self, "_video_size", None)
-        return tuple(video) if video else None
+        return None
 
     def set_actions(self, prompt_id: str | None, *, favorite: bool = False,
                     enhance: str | None = None) -> None:

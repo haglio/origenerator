@@ -5,6 +5,7 @@ from dataclasses import replace
 from typing import NamedTuple
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QTabWidget
 
 from origenerator.comfyui_client import ComfyUIClient
@@ -18,12 +19,15 @@ from origenerator.gallery import (
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui.copy_names import offer_copy_names
 from origenerator.gui.eliding_tab_bar import MARK_CANVAS, ElidingTabBar, tab_mark
-from origenerator.gui.generate_tab import GenerateTab
+from origenerator.gui.generate_tab import GenerateTab, icon_of_mark_source
 from origenerator.gui.how_many import HOW_MANY
 from origenerator.item_names import ItemNames
 from origenerator.library_views import NO_VIEWS, LibraryViews, TabViews
 from origenerator.media import MediaType
 from origenerator.workflows import workflow_named
+
+
+_MARKS_KEPT = 64
 
 
 class SavedTab(NamedTuple):
@@ -88,6 +92,7 @@ class GeneratePane(QTabWidget):
         self._last_close_at = float("-inf")
         self._how_many = HOW_MANY[0]
         self._request_auto_generate = False
+        self._marks: dict[tuple, QIcon] = {}
         self._add_subtab()
 
     def _front_tab_relayout(self, _index: int = -1) -> None:
@@ -148,8 +153,8 @@ class GeneratePane(QTabWidget):
     def _add_subtab(self, *, preview: bool = False) -> GenerateTab:
         tab = GenerateTab(self._client, self._db, fun_time=self._fun_time, inbox=self._inbox,
                           views=self._views)
-        index = self.addTab(tab, tab_mark(tab.tab_icon()), tab.title())
-        tab.title_changed.connect(lambda _text, p=tab: self._update_tab(p))
+        index = self.addTab(tab, self._mark_of(tab), tab.title())
+        tab.title_changed.connect(lambda title, p=tab: self._update_tab(p, title))
         tab.displayed_changed.connect(lambda p=tab: self._close_if_a_second_copy(p))
         tab.user_edited.connect(lambda p=tab: self._pin_tab(p))
         tab.set_how_many(self._how_many)
@@ -170,11 +175,22 @@ class GeneratePane(QTabWidget):
         self.tab_added.emit(tab)
         return tab
 
-    def _update_tab(self, tab: GenerateTab):
+    def _mark_of(self, tab: GenerateTab) -> QIcon:
+        source = tab.tab_mark_source()
+        if source not in self._marks:
+            if len(self._marks) >= _MARKS_KEPT:
+                self._marks.clear()
+            self._marks[source] = tab_mark(icon_of_mark_source(source))
+        return self._marks[source]
+
+    def _update_tab(self, tab: GenerateTab, title: str):
         index = self.indexOf(tab)
         if index >= 0:
-            self.setTabText(index, tab.title())
-            self.setTabIcon(index, tab_mark(tab.tab_icon()))
+            if self.tabText(index) != title:
+                self.setTabText(index, title)
+            mark = self._mark_of(tab)
+            if self.tabIcon(index).cacheKey() != mark.cacheKey():
+                self.setTabIcon(index, mark)
         self._sync_preview_tab()
 
     def _closed_within_double_click(self) -> bool:

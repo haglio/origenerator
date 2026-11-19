@@ -263,12 +263,17 @@ class TestTheOneHudASlideshowWears:
 
 class TestTheTrashOverAFavorite:
     @staticmethod
-    def _window(qtbot, tmp_path, *, hosted: bool, favorite_ids=frozenset({"id-one"})):
-        unfavorited, deleted = [], []
+    def _window(qtbot, tmp_path, *, hosted: bool, favorites=frozenset({"id-one"})):
+        library_favorites, unfavorited, deleted = set(favorites), [], []
+
+        def unfavorite(prompt_id):
+            unfavorited.append(prompt_id)
+            library_favorites.discard(prompt_id)
+
         window = _dressed(qtbot, [("scene one.png", "image", "id-one"),
                                   ("scene two.png", "image", "id-two")],
-                          hud=HudFacts(favorite_ids=set(favorite_ids)),
-                          actions=SlideshowActions(unfavorite=unfavorited.append,
+                          actions=SlideshowActions(is_favorite=library_favorites.__contains__,
+                                                   unfavorite=unfavorite,
                                                    delete=deleted.append),
                           dashboard_cmd_file=tmp_path / "dashboard_cmd.txt" if hosted else None)
         return window, unfavorited, deleted
@@ -291,7 +296,7 @@ class TestTheTrashOverAFavorite:
     @pytest.mark.parametrize("hosted", [True, False])
     def test_an_item_that_is_no_favorite_keeps_the_trash(self, qtbot, tmp_path, hosted):
         window, _unfavorited, _deleted = self._window(qtbot, tmp_path, hosted=hosted,
-                                                      favorite_ids=frozenset())
+                                                      favorites=frozenset())
 
         model = window._hud_model()
 

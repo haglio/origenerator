@@ -32,10 +32,32 @@ def _set(items=_ITEMS, *, hud=None, start=None, shuffle=in_order, **asked_of_the
     return slideshow_set, dealt
 
 
+def test_the_favorites_filter_asks_the_library_which_items_are_favorites_when_pressed():
+    favorites = {"id-2"}
+    slideshow_set, _dealt = _set(is_favorite=favorites.__contains__)
+    favorites.add("id-3")
+
+    slideshow_set.set_filters(SlideshowFilters(favorites=True))
+
+    assert [slide.prompt_id for slide in slideshow_set.playlist.in_play_order()] == [
+        "id-2", "id-3"], "an item favorited in the gallery after the slideshow opened counts too"
+
+
+def test_the_enhanced_filter_asks_the_library_which_items_are_enhanced_when_pressed():
+    enhanced = {"id-1"}
+    slideshow_set, _dealt = _set(is_enhanced=enhanced.__contains__)
+    enhanced.add("id-3")
+
+    slideshow_set.set_filters(SlideshowFilters(enhanced=True))
+
+    assert [slide.prompt_id for slide in slideshow_set.playlist.in_play_order()] == [
+        "id-1", "id-3"], "an item whose enhancement landed after the slideshow opened counts too"
+
+
 def test_a_filter_over_a_slideshow_played_in_order_keeps_that_order():
     listed = [(f"{n}.png", "image", f"id-{n}") for n in range(8)]
     kept = {f"id-{n}" for n in range(1, 8)}
-    slideshow_set, _dealt = _set(listed, hud=HudFacts(favorite_ids=kept))
+    slideshow_set, _dealt = _set(listed, is_favorite=kept.__contains__)
 
     slideshow_set.set_filters(SlideshowFilters(favorites=True))
 
@@ -46,7 +68,7 @@ def test_a_filter_over_a_slideshow_played_in_order_keeps_that_order():
 
 
 def test_narrowing_says_the_slide_on_screen_survived_into_the_new_pass():
-    slideshow_set, dealt = _set(hud=HudFacts(favorite_ids={"id-2", "id-3"}))
+    slideshow_set, dealt = _set(is_favorite={"id-2", "id-3"}.__contains__)
     slideshow_set.playlist.jump_to(1)
 
     assert slideshow_set.set_filters(SlideshowFilters(favorites=True)) is True
@@ -57,7 +79,7 @@ def test_narrowing_says_the_slide_on_screen_survived_into_the_new_pass():
 
 
 def test_narrowing_past_the_slide_on_screen_stands_another_pass_up():
-    slideshow_set, dealt = _set(hud=HudFacts(favorite_ids={"id-3"}))
+    slideshow_set, dealt = _set(is_favorite={"id-3"}.__contains__)
 
     assert slideshow_set.set_filters(SlideshowFilters(favorites=True)) is True
     assert dealt == [False]
@@ -66,7 +88,7 @@ def test_narrowing_past_the_slide_on_screen_stands_another_pass_up():
 
 def test_a_filter_pressed_is_told_of_and_one_taken_up_is_not():
     told = []
-    slideshow_set, _dealt = _set(hud=HudFacts(favorite_ids={"id-1"}), filters_changed=told.append)
+    slideshow_set, _dealt = _set(is_favorite={"id-1"}.__contains__, filters_changed=told.append)
 
     slideshow_set.take_up(SlideshowFilters(favorites=True))
     slideshow_set.set_filters(SlideshowFilters())
@@ -93,7 +115,7 @@ def test_a_switch_that_would_leave_nothing_is_refused():
 
 
 def test_a_reset_widens_only_where_something_was_narrowed():
-    slideshow_set, dealt = _set(hud=HudFacts(favorite_ids={"id-1"}))
+    slideshow_set, dealt = _set(is_favorite={"id-1"}.__contains__)
 
     assert slideshow_set.drop_the_filters() is False
     assert dealt == []
@@ -107,7 +129,7 @@ def test_a_reset_widens_only_where_something_was_narrowed():
 
 
 def test_the_whole_set_keeps_what_a_switch_left_out():
-    slideshow_set, _dealt = _set(hud=HudFacts(favorite_ids={"id-1"}))
+    slideshow_set, _dealt = _set(is_favorite={"id-1"}.__contains__)
     slideshow_set.set_filters(SlideshowFilters(favorites=True))
 
     slideshow_set.forget_id("id-2")
@@ -122,7 +144,7 @@ def _pass(slideshow_set) -> list[str]:
 
 
 def test_latest_plays_the_new_set_as_listed_from_the_top_still_narrowed():
-    slideshow_set, dealt = _set(hud=HudFacts(favorite_ids={"id-1", "id-5"}))
+    slideshow_set, dealt = _set(is_favorite={"id-1", "id-5"}.__contains__)
     slideshow_set.set_filters(SlideshowFilters(favorites=True))
     dealt.clear()
     newest_first = [("five.png", "image", "id-5"), ("four.png", "image", "id-4"),
@@ -160,7 +182,7 @@ def test_shuffle_plays_the_new_set_in_a_random_order(seeded):
 
 
 def test_a_new_set_the_switches_would_empty_plays_whole_with_them_off():
-    slideshow_set, _dealt = _set(hud=HudFacts(favorite_ids={"id-1"}))
+    slideshow_set, _dealt = _set(is_favorite={"id-1"}.__contains__)
     slideshow_set.set_filters(SlideshowFilters(favorites=True))
 
     slideshow_set.reorder([("nine.png", "image", "id-9")], latest=True)
@@ -170,7 +192,7 @@ def test_a_new_set_the_switches_would_empty_plays_whole_with_them_off():
 
 
 def test_a_reset_after_latest_deals_a_shuffled_pass_with_the_switches_off(seeded):
-    slideshow_set, _dealt = _set(hud=HudFacts(favorite_ids={"id-1", "id-2"}))
+    slideshow_set, _dealt = _set(is_favorite={"id-1", "id-2"}.__contains__)
     slideshow_set.reorder(_TWELVE, latest=True)
     slideshow_set.set_filters(SlideshowFilters(favorites=True))
 
@@ -498,7 +520,7 @@ def test_a_map_press_on_a_slide_the_shuffled_pass_holds_lands_on_that_slide():
 
 
 def test_a_slide_the_set_took_in_past_its_switches_is_still_found_by_its_file():
-    slideshow_set, _dealt = _set(hud=HudFacts(favorite_ids={"id-1", "id-2", "id-3"}))
+    slideshow_set, _dealt = _set(is_favorite={"id-1", "id-2", "id-3"}.__contains__)
     slideshow_set.set_filters(SlideshowFilters(favorites=True))
     slideshow_set.remember(Slide("four.png", "image", "id-4"))
 
@@ -541,7 +563,7 @@ def test_navigation_off_a_lit_seed_dives_into_that_seeds_own_column():
 
 
 def test_a_switch_ends_a_loop_and_deals_the_browse():
-    slideshow_set, _dealt = _mapped(hud=HudFacts(favorite_ids={"id-2"}))
+    slideshow_set, _dealt = _mapped(is_favorite={"id-2"}.__contains__)
     slideshow_set.start_loop("seed")
 
     slideshow_set.set_filters(SlideshowFilters(favorites=True))
@@ -923,7 +945,7 @@ def test_a_set_that_is_one_row_loops_all_of_it_though_he_always_skips_one_of_its
 
 
 def test_a_set_picked_back_up_never_lands_on_a_slide_its_filters_leave_out():
-    slideshow_set, _dealt = _set(hud=HudFacts(favorite_ids={"id-2", "id-3"}))
+    slideshow_set, _dealt = _set(is_favorite={"id-2", "id-3"}.__contains__)
     slideshow_set.set_filters(SlideshowFilters(favorites=True))
 
     assert not slideshow_set.resume(SlideshowState(order=("id-1",), current="id-1"))

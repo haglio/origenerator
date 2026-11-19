@@ -37,6 +37,10 @@ _ENHANCEMENT_WORDS = {ENHANCEMENT_RUNNING: "Enhancing…",
 GENERATING = "Generating…"
 
 
+def _nothing_is(_prompt_id: str) -> bool:
+    return False
+
+
 class SlideshowSet:
     def __init__(self, items, *, actions: SlideshowActions, deal: SetDeal = NO_DEAL,
                  hud: HudFacts | None = None,
@@ -52,6 +56,8 @@ class SlideshowSet:
         self._named: dict[str, str] = {}
         self._slides_of = actions.slides
         self._on_filters_change = actions.filters_changed
+        self._is_favorite = actions.is_favorite or _nothing_is
+        self._is_enhanced = actions.is_enhanced or _nothing_is
         self.loop: Loop | None = None
         self.filters = SlideshowFilters()
         self._enhancements_asked: set[str] = set()
@@ -152,21 +158,19 @@ class SlideshowSet:
         self._tell_of_the_filters()
         return True
 
-    def retune(self, items, *, enhanced_ids=()) -> None:
+    def retune(self, items) -> None:
         dropped = self.filters != SlideshowFilters()
         self.filters = SlideshowFilters()
-        self.reorder(items, latest=False, enhanced_ids=enhanced_ids)
+        self.reorder(items, latest=False)
         if dropped:
             self._tell_of_the_filters()
 
-    def reorder(self, items, *, latest: bool, enhanced_ids=(),
-                keep_slide: bool = False) -> None:
+    def reorder(self, items, *, latest: bool, keep_slide: bool = False) -> None:
         self._shuffle = in_order if latest else None
         self.loop = None
         self.library_moved()
         self.all_items = [Slide.of(item) for item in items]
         self.wear(HudFacts(order_label=LATEST_LABEL if latest else SHUFFLE_LABEL,
-                           favorite_ids=self.favorite_ids, enhanced_ids=enhanced_ids,
                            enhancing=self.enhance_status))
         kept = [item for item in self.all_items if self.passes(item)]
         if not kept:
@@ -178,9 +182,9 @@ class SlideshowSet:
     def passes(self, item, filters: SlideshowFilters | None = None) -> bool:
         filters = self.filters if filters is None else filters
         prompt_id = item.prompt_id
-        if filters.favorites and prompt_id not in self.favorite_ids:
+        if filters.favorites and not self._is_favorite(prompt_id):
             return False
-        if filters.enhanced and prompt_id not in self.enhanced_ids:
+        if filters.enhanced and not self._is_enhanced(prompt_id):
             return False
         if not filters.images and item.media_type == MediaType.IMAGE:
             return False
@@ -403,8 +407,6 @@ class SlideshowSet:
 
     def wear(self, hud: HudFacts) -> None:
         self.order_label = hud.order_label
-        self.favorite_ids = set(hud.favorite_ids or ())
-        self.enhanced_ids = set(hud.enhanced_ids or ())
         self.enhance_status = dict(hud.enhancing or {})
 
     def note_enhancing(self, statuses, frames=None) -> None:
@@ -425,7 +427,6 @@ class SlideshowSet:
         self._enhancements_asked.discard(prompt_id)
         self.enhance_status.pop(prompt_id, None)
         self._enhance_frames.pop(prompt_id, None)
-        self.enhanced_ids.add(prompt_id)
 
     def enhancement_of(self, prompt_id) -> str:
         if prompt_id in self.enhance_status:
@@ -456,14 +457,14 @@ class SlideshowSet:
 
     @property
     def is_favorite(self) -> bool:
-        return self.current_prompt_id() in self.favorite_ids
+        prompt_id = self.current_prompt_id()
+        return prompt_id is not None and self._is_favorite(prompt_id)
 
     def unfavorite_current(self, unfavorite) -> bool:
         prompt_id = self.current_prompt_id()
-        if unfavorite is None or prompt_id is None or prompt_id not in self.favorite_ids:
+        if unfavorite is None or prompt_id is None or not self._is_favorite(prompt_id):
             return False
         unfavorite(prompt_id)
-        self.favorite_ids.discard(prompt_id)
         return True
 
 

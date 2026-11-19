@@ -812,7 +812,7 @@ def test_a_file_the_funestra_will_not_let_go_of_is_said_rather_than_raised(qtbot
 
 
 def test_narrowing_hands_the_funestra_what_is_left(qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(favorite_ids={"id-3"}))
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(is_favorite={"id-3"}.__contains__))
     _sent(slideshow)
 
     assert slideshow.toggle_favorites_filter() is True
@@ -822,20 +822,21 @@ def test_narrowing_hands_the_funestra_what_is_left(qtbot, tmp_path):
     assert "RELOAD_PLAYLIST" in _sent(slideshow)
 
 
-def test_an_item_favorited_from_the_slideshow_is_one_f_mode_keeps(qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path,
-                           actions=SlideshowActions(favorite=lambda prompt_id: None))
+def test_an_item_favorited_from_the_slideshow_is_one_the_favorites_filter_keeps(qtbot, tmp_path):
+    library_favorites = set()
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(
+        favorite=library_favorites.add, is_favorite=library_favorites.__contains__))
     on_screen = slideshow._set.current_prompt_id()
 
     assert slideshow.favorite() is True
     slideshow.toggle_favorites_filter()
 
     assert [slide.prompt_id for slide in slideshow._set.playlist.items] == [on_screen], (
-        "the star readout and F-mode follow a favorite made here")
+        "the star readout and the Favorites filter follow a favorite made here")
 
 
 def test_narrowing_reaches_a_funestra_partway_through_reading_the_last_list(qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(favorite_ids={"id-3"}))
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(is_favorite={"id-3"}.__contains__))
 
     with _held_open_for(slideshow.channel.playlist, 0.1):
         assert slideshow.toggle_favorites_filter() is True
@@ -1236,7 +1237,7 @@ def test_the_funestra_reaching_the_slide_a_slideshow_resumed_on_keeps_its_versio
 
 
 def test_a_slideshow_on_a_funestra_hands_it_the_filters_it_takes_up(qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(enhanced_ids={"id-2", "id-3"}))
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(is_enhanced={"id-2", "id-3"}.__contains__))
 
     slideshow.take_up(SlideshowFilters(enhanced=True))
 
@@ -1247,7 +1248,7 @@ def test_a_slideshow_on_a_funestra_hands_it_the_filters_it_takes_up(qtbot, tmp_p
 
 def test_enhanceds_plays_the_enhanced_items_alone_and_a_second_press_plays_them_all(
         qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(enhanced_ids={"id-2", "id-3"}))
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(is_enhanced={"id-2", "id-3"}.__contains__))
 
     assert answer(slideshow, "enhanced")
 
@@ -1291,7 +1292,7 @@ def test_turning_off_the_one_kind_still_included_holds_the_slide_on_screen_and_s
 def test_each_press_of_the_media_pair_says_what_is_now_included(qtbot, tmp_path):
     said = []
     slideshow = _slideshow(qtbot, tmp_path, _IMAGES_AND_A_VIDEO, say=_into(said),
-                           hud=HudFacts(enhanced_ids={"id-2"}))
+                           actions=SlideshowActions(is_enhanced={"id-2"}.__contains__))
 
     answer(slideshow, "media_images")
     answer(slideshow, "media_both")
@@ -1668,7 +1669,7 @@ def test_the_cull_that_ends_a_loop_of_one_hands_the_funestra_its_list_once(
 
 def test_a_reset_that_drops_a_switch_hands_the_funestra_its_list_once(
         qtbot, tmp_path, monkeypatch):
-    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(favorite_ids={"id-1", "id-2"}))
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(is_favorite={"id-1", "id-2"}.__contains__))
     slideshow.set_favorites_filter(True)
     written = _lists_handed_to_a_funestra(monkeypatch)
 
@@ -1869,8 +1870,8 @@ def test_an_action_nothing_here_shows_says_so_and_moves_nothing(qtbot, tmp_path)
 
 def test_no_filter_lifts_the_action_filter_and_leaves_f_mode_on(qtbot, tmp_path):
     said = []
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of),
-                           hud=HudFacts(favorite_ids={"id-1", "id-2"}), say=_into(said))
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(
+        actions_of=_actions_of, is_favorite={"id-1", "id-2"}.__contains__), say=_into(said))
     slideshow.set_favorites_filter(True)
     slideshow.action_presses.filter("beta")
     said.clear()
@@ -1882,8 +1883,8 @@ def test_no_filter_lifts_the_action_filter_and_leaves_f_mode_on(qtbot, tmp_path)
 
 
 def test_no_filter_lifts_the_action_filter_and_leaves_the_enhanced_filter_on(qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of),
-                           hud=HudFacts(enhanced_ids={"id-2", "id-3"}))
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(
+        actions_of=_actions_of, is_enhanced={"id-2", "id-3"}.__contains__))
     slideshow.set_enhanced_filter(True)
     slideshow.action_presses.filter("beta")
 
@@ -1894,8 +1895,8 @@ def test_no_filter_lifts_the_action_filter_and_leaves_the_enhanced_filter_on(qtb
 
 
 def test_no_filter_with_no_action_filter_on_changes_nothing(qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(actions_of=_actions_of),
-                           hud=HudFacts(favorite_ids={"id-1", "id-2"}))
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(
+        actions_of=_actions_of, is_favorite={"id-1", "id-2"}.__contains__))
     slideshow.set_favorites_filter(True)
     _sent(slideshow)
 
@@ -2112,8 +2113,8 @@ def test_a_cycle_with_nothing_else_on_its_row_says_so_and_stays(qtbot, tmp_path,
 
 def test_trash_over_a_favorite_takes_its_star_and_moves_on(qtbot, tmp_path):
     unfavorited, deleted = [], []
-    slideshow = _slideshow(qtbot, tmp_path, hud=HudFacts(favorite_ids={"id-1"}),
-                           actions=SlideshowActions(unfavorite=unfavorited.append, delete=deleted.append))
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(
+        is_favorite={"id-1"}.__contains__, unfavorite=unfavorited.append, delete=deleted.append))
     _sent(slideshow)
 
     slideshow.slideshow_cull()
@@ -2664,7 +2665,7 @@ def test_an_older_version_stepped_to_goes_with_its_own_places(qtbot, tmp_path):
 
 
 def _ready_opening(items, *, scripts=None, lead=0, lead_neighbors=None) -> RegionOpening:
-    return RegionOpening(rows=[], items=items, versions={}, enhanced_ids=set(),
+    return RegionOpening(rows=[], items=items, versions={},
                          scripts=scripts or {}, lead=lead, lead_neighbors=lead_neighbors)
 
 

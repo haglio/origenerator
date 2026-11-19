@@ -122,11 +122,15 @@ def _will_move_on(view) -> bool:
 
 
 def _wired(kw: dict) -> dict:
-    facts = {k: kw.pop(k) for k in ("order_label", "favorite_ids", "enhanced_ids", "enhancing")
+    facts = {k: kw.pop(k) for k in ("order_label", "enhancing")
              if k in kw}
     if facts:
         kw["hud"] = HudFacts(**facts)
     acts = {k[3:]: kw.pop(k) for k in list(kw) if k.startswith("on_")}
+    if "library_favorites" in kw:
+        acts["is_favorite"] = set(kw.pop("library_favorites")).__contains__
+    if "library_enhanced" in kw:
+        acts["is_enhanced"] = kw.pop("library_enhanced").__contains__
     if acts:
         kw["actions"] = SlideshowActions(**acts)
     return kw
@@ -137,7 +141,7 @@ def _named(tmp_path, *names):
 
 
 def test_the_enhanced_switch_narrows_the_pass_and_keeps_the_slide_showing(qtbot, tmp_path):
-    view = _view(qtbot, _named(tmp_path, "a", "b", "c"), enhanced_ids={"b", "c"})
+    view = _view(qtbot, _named(tmp_path, "a", "b", "c"), library_enhanced={"b", "c"})
     view.slideshow.slideshow_step(1)
     _settle(view)
     assert view.slideshow._set.playlist.current()[2] == "b"
@@ -157,7 +161,7 @@ def test_the_enhanced_switch_narrows_the_pass_and_keeps_the_slide_showing(qtbot,
 
 
 def test_a_switch_that_takes_the_slide_away_moves_to_what_is_left(qtbot, tmp_path):
-    view = _view(qtbot, _named(tmp_path, "a", "b", "c"), enhanced_ids={"b", "c"})
+    view = _view(qtbot, _named(tmp_path, "a", "b", "c"), library_enhanced={"b", "c"})
     assert view.slideshow._set.playlist.current()[2] == "a"
 
     view.slideshow.set_enhanced_filter(True)
@@ -178,7 +182,7 @@ def test_a_switch_that_would_leave_nothing_is_refused(qtbot, tmp_path):
 def test_both_switches_together_keep_what_answers_both_and_enhanced_and_original_lifts_one(
         qtbot, tmp_path):
     view = _view(qtbot, _named(tmp_path, "a", "b", "c"),
-                 favorite_ids={"a", "b"}, enhanced_ids={"b", "c"})
+                 library_favorites={"a", "b"}, library_enhanced={"b", "c"})
 
     view.slideshow.toggle_favorites_filter()
     _settle(view)
@@ -192,13 +196,15 @@ def test_both_switches_together_keep_what_answers_both_and_enhanced_and_original
 
 
 def test_a_narrowed_slideshow_takes_in_only_what_passes_its_switches(qtbot, tmp_path):
-    view = _view(qtbot, _named(tmp_path, "a", "b"), enhanced_ids={"a"})
+    library_enhanced = {"a"}
+    view = _view(qtbot, _named(tmp_path, "a", "b"), library_enhanced=library_enhanced)
     view.slideshow.set_enhanced_filter(True)
     _settle(view)
 
     view.slideshow.note_added(Slide(_png(tmp_path / "c.png"), "image", "c", None))
     _settle(view)
-    view.slideshow.note_added(Slide(_png(tmp_path / "d.png"), "image", "d", None), enhanced=True)
+    library_enhanced.add("d")
+    view.slideshow.note_added(Slide(_png(tmp_path / "d.png"), "image", "d", None))
     _settle(view)
 
     assert sorted(item[2] for item in view.slideshow._set.playlist._items) == ["a", "d"]
@@ -208,11 +214,13 @@ def test_a_narrowed_slideshow_takes_in_only_what_passes_its_switches(qtbot, tmp_
 
 
 def test_an_enhancement_landing_brings_its_item_into_an_enhanced_only_pass(qtbot, tmp_path):
-    view = _view(qtbot, _named(tmp_path, "a", "b"), enhanced_ids={"a"})
+    library_enhanced = {"a"}
+    view = _view(qtbot, _named(tmp_path, "a", "b"), library_enhanced=library_enhanced)
     view.slideshow.set_enhanced_filter(True)
     _settle(view)
     assert [item[2] for item in view.slideshow._set.playlist._items] == ["a"]
 
+    library_enhanced.add("b")
     better = _png(tmp_path / "b_enhanced.png")
     view.slideshow.note_enhanced("b", better, "image")
     _settle(view)
@@ -225,7 +233,7 @@ def test_an_enhancement_landing_brings_its_item_into_an_enhanced_only_pass(qtbot
 
 
 def test_a_culled_slide_stays_gone_when_a_switch_comes_off(qtbot, tmp_path):
-    view = _view(qtbot, _named(tmp_path, "a", "b", "c"), enhanced_ids={"a", "b"})
+    view = _view(qtbot, _named(tmp_path, "a", "b", "c"), library_enhanced={"a", "b"})
     view.slideshow.set_enhanced_filter(True)
     _settle(view)
     assert view.slideshow._set.playlist.current()[2] == "a"
@@ -240,7 +248,8 @@ def test_a_culled_slide_stays_gone_when_a_switch_comes_off(qtbot, tmp_path):
 
 def test_locking_a_slide_makes_it_a_favorite_the_switch_can_see(qtbot, tmp_path):
     favorite = []
-    view = _view(qtbot, _named(tmp_path, "a", "b"), on_favorite=favorite.append)
+    view = _view(qtbot, _named(tmp_path, "a", "b"), on_favorite=favorite.append,
+                 on_is_favorite=favorite.__contains__)
     assert view.slideshow.hud_is_favorite is False
 
     view.slideshow.slideshow_toggle_lock()
@@ -254,7 +263,7 @@ def test_locking_a_slide_makes_it_a_favorite_the_switch_can_see(qtbot, tmp_path)
 
 def test_reset_drops_both_switches(qtbot, tmp_path):
     view = _view(qtbot, _named(tmp_path, "a", "b", "c"),
-                 favorite_ids={"a"}, enhanced_ids={"a"})
+                 library_favorites={"a"}, library_enhanced={"a"})
     view.slideshow.toggle_favorites_filter()
     _settle(view)
     view.slideshow.set_enhanced_filter(True)
@@ -386,7 +395,7 @@ def test_a_new_set_played_into_an_open_slideshow_starts_it_over_on_that_set(qtbo
 
 
 def test_a_new_set_played_in_drops_the_switches_the_last_one_left_on(qtbot):
-    view = _view(qtbot, [("a.png", "image", "id-a")], favorite_ids={"id-a"})
+    view = _view(qtbot, [("a.png", "image", "id-a")], library_favorites={"id-a"})
     view.slideshow.toggle_favorites_filter()
     _settle(view)
     assert view.slideshow.hud_favorites_filter
@@ -996,9 +1005,14 @@ def test_the_loop_key_off_a_folder_slideshow_leaves_the_folder_in_one_press(qtbo
 
 
 def test_up_over_a_favorite_takes_the_star_back_rather_than_the_image(qtbot):
-    unfavorited, deleted = [], []
-    view = _view(qtbot, _KEYED, favorite_ids={"id-a"},
-                 actions=SlideshowActions(unfavorite=unfavorited.append, delete=deleted.append))
+    library_favorites, unfavorited, deleted = {"id-a"}, [], []
+
+    def unfavorite(prompt_id):
+        unfavorited.append(prompt_id)
+        library_favorites.discard(prompt_id)
+
+    view = _view(qtbot, _KEYED, actions=SlideshowActions(
+        is_favorite=library_favorites.__contains__, unfavorite=unfavorite, delete=deleted.append))
 
     _press(view, Qt.Key.Key_Up)
 
@@ -2259,7 +2273,7 @@ def test_a_slide_closed_under_a_lock_reopens_locked(qtbot):
 
 
 def test_a_slideshow_takes_up_each_filter_that_leaves_it_something(qtbot):
-    view = _view(qtbot, _THREE, favorite_ids={"id-a"}, enhanced_ids={"id-b", "id-c"})
+    view = _view(qtbot, _THREE, library_favorites={"id-a"}, library_enhanced={"id-b", "id-c"})
 
     view.slideshow.take_up(SlideshowFilters(favorites=True, enhanced=True))
     _settle(view)
@@ -2269,7 +2283,7 @@ def test_a_slideshow_takes_up_each_filter_that_leaves_it_something(qtbot):
 
 
 def test_a_slideshow_opened_on_an_image_keeps_it_up_under_filters_that_leave_it_out(qtbot):
-    view = _view(qtbot, _THREE, start=0, enhanced_ids={"id-b", "id-c"})
+    view = _view(qtbot, _THREE, start=0, library_enhanced={"id-b", "id-c"})
 
     view.slideshow.take_up(SlideshowFilters(enhanced=True), keep_the_slide=True)
     _settle(view)

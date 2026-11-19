@@ -16,7 +16,6 @@ class RegionOpening:
     rows: list[dict]
     items: list
     versions: dict
-    enhanced_ids: set[str]
     scripts: dict[str, Path | None]
     lead: int = 0
     lead_neighbors: NavMapNeighbors | None = None

@@ -632,7 +632,7 @@ def _press(bridge, tmp_path, line: str) -> None:
 
 def test_a_funestras_filter_presses_reach_the_slideshow_on_that_side(qtbot, tmp_path, monkeypatch):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
-    monkeypatch.setattr(view.slideshows, "_favorite_prompt_ids", lambda: {"id1"})
+    monkeypatch.setattr(view.slideshows, "_is_favorite", lambda prompt_id: prompt_id == "id1")
     slideshow = _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
 
     _press(bridge, tmp_path, "portrait_favorites")

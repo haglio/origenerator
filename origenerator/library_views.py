@@ -119,9 +119,9 @@ class LibrarySnapshot:
     def highest_id(self) -> int:
         return max((row["id"] for row in self.rows), default=0)
 
-    @property
-    def favorite_ids(self) -> set[str]:
-        return {row["prompt_id"] for row in self.rows if row.get("starred")}
+    def is_favorite(self, prompt_id: str) -> bool:
+        row = self.row_for(prompt_id)
+        return row is not None and bool(row.get("starred"))
 
     @cached_property
     def image_rows(self) -> list[dict]:
@@ -218,9 +218,10 @@ class LibrarySnapshot:
             slides = [self._once(self._slides, row, self._slide_of) for row in rows]
         return [slide for slide in slides if slide is not None]
 
-    def enhanced_ids_of(self, rows) -> set[str]:
-        with one_look():
-            return {row["prompt_id"] for row in rows if self.is_enhanced(row)}
+    def is_enhanced_id(self, prompt_id: str) -> bool:
+        row = self.row_for(prompt_id)
+        return row is not None and self.readings.of(
+            "enhanced", self.is_enhanced, depends_on=self.upscales)(row)
 
     def is_enhanced(self, row: dict) -> bool:
         if gallery.is_enhanced_row(row):

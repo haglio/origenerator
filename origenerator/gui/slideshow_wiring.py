@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Collection, Hashable, Mapping
+from collections.abc import Callable, Hashable, Mapping
 from dataclasses import dataclass, field
 
 from funestra.hud_title import SHUFFLE_LABEL
@@ -15,6 +15,8 @@ class SlideshowActions:
     delete: Callable[[str], None] | None = None
     enhance: Callable[[str], bool] | None = None
     favorite: Callable[[str], None] | None = None
+    is_favorite: Callable[[str], bool] | None = None
+    is_enhanced: Callable[[str], bool] | None = None
     unfavorite: Callable[[str], None] | None = None
     lock: Callable[[str], None] | None = None
     reset: Callable[[object], None] | None = None
@@ -47,8 +49,6 @@ class SlideshowActions:
 @dataclass(frozen=True)
 class HudFacts:
     order_label: str = SHUFFLE_LABEL
-    favorite_ids: Collection[str] = field(default_factory=frozenset)
-    enhanced_ids: Collection[str] = field(default_factory=frozenset)
     enhancing: Mapping[str, str] = field(default_factory=dict)
 
 

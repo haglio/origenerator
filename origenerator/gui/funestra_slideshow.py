@@ -489,7 +489,6 @@ class FunestraSlideshow(QObject):
         if self._actions.favorite is None or prompt_id is None:
             return False
         self._actions.favorite(prompt_id)
-        self._set.favorite_ids.add(prompt_id)
         return True
 
     def slideshow_reset(self) -> None:
@@ -509,15 +508,13 @@ class FunestraSlideshow(QObject):
         self._set.playlist.restart()
         self._hand_over(land=True)
 
-    def retune(self, items, *, enhanced_ids=None) -> None:
+    def retune(self, items) -> None:
         self._unlock()
-        self._set.retune(items, enhanced_ids=enhanced_ids)
+        self._set.retune(items)
 
-    def reorder(self, items, *, latest: bool, enhanced_ids=(),
-                keep_slide: bool = False) -> None:
+    def reorder(self, items, *, latest: bool, keep_slide: bool = False) -> None:
         self._unlock()
-        self._set.reorder(items, latest=latest, enhanced_ids=enhanced_ids,
-                          keep_slide=keep_slide)
+        self._set.reorder(items, latest=latest, keep_slide=keep_slide)
 
     def show_item(self, path, *, lock: bool = False) -> bool:
         slide = self._set.slide_for_path(path)
@@ -706,12 +703,8 @@ class FunestraSlideshow(QObject):
     def holds(self, prompt_id: str) -> bool:
         return self._set.playlist.holds(prompt_id)
 
-    def note_added(self, slide: Slide, *, favorite: bool = False, enhanced: bool = False) -> None:
+    def note_added(self, slide: Slide) -> None:
         prompt_id = slide.prompt_id
-        if favorite:
-            self._set.favorite_ids.add(prompt_id)
-        if enhanced:
-            self._set.enhanced_ids.add(prompt_id)
         self._set.remember(slide)
         if self._set.playlist.replace_live(prompt_id, slide.path, slide.media_type, slide.still):
             self._hand_over(land=True)

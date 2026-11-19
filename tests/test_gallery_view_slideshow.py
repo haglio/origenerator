@@ -665,6 +665,7 @@ def test_a_generation_that_lands_unenhanced_stays_out_of_a_narrowed_slideshow(qt
     qtbot.addWidget(slideshow.shown)
     slideshow.set_enhanced_filter(True)
     put_rows(view._db, [_image("i3", "a cat", 50, 3), _enhanced_image("i4", "a cat", 50, 4)])
+    view.refresh()
     plain, better = view._db.get_generation("i3"), view._db.get_generation("i4")
     monkeypatch.setattr(view.slideshows, "rows_at", lambda location: [plain, better])
 

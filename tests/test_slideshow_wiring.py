@@ -69,7 +69,9 @@ def test_a_slideshow_handed_no_acts_at_all_just_does_less(qtbot):
 
 def test_the_hud_facts_travel_as_one_record(qtbot):
     view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None,
-                         hud=HudFacts(order_label="Latest", favorite_ids={"id-b"})), ViewWiring(engine=FakeEngine()))
+                         hud=HudFacts(order_label="Latest"),
+                         actions=SlideshowActions(is_favorite={"id-b"}.__contains__)),
+                         ViewWiring(engine=FakeEngine()))
     qtbot.addWidget(view)
 
     assert view.slideshow.hud_order_label == "Latest"
@@ -94,7 +96,9 @@ def test_the_hud_facts_default_to_a_shuffled_set_of_nothing_favorite(qtbot):
 
 def test_retuning_a_slideshow_dresses_it_as_a_base_state(qtbot):
     view = SlideshowView(_ITEMS, ViewShow(shuffle=lambda order: None,
-                         hud=HudFacts(order_label="Latest", favorite_ids={"id-c"})), ViewWiring(engine=FakeEngine()))
+                         hud=HudFacts(order_label="Latest"),
+                         actions=SlideshowActions(is_favorite={"id-c"}.__contains__)),
+                         ViewWiring(engine=FakeEngine()))
     qtbot.addWidget(view)
 
     view.slideshow.retune([("c.png", "image", "id-c", None)])

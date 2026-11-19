@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from app_support import origenerator_handoff as handoff
+from shared_ui.testing import alert_shown
 
 from origenerator import app_link
 from origenerator.app import WAITING_FOR_THE_OTHER_COPY, Boot
@@ -80,33 +81,26 @@ def test_a_launch_while_another_copy_closes_waits_for_it_on_its_loading_screen(b
 def test_a_launch_that_finds_the_library_held_says_so_once_its_screen_is_down_and_stops(boot):
     events = []
     _a_loading_screen_saying_when_it_goes_down(boot, events)
-    told = MagicMock(side_effect=lambda *said: events.append(said[-1]))
-
-    with patch("PySide6.QtWidgets.QMessageBox.information", told):
+    with alert_shown(side_effect=lambda *said, **_how: events.append(said[-1])):
         assert boot.claim_the_library(_copies(None)) == 1
 
     assert events == ["loading screen down", "Another copy of Origenerator is already running."]
 
 
 def test_a_click_on_a_toast_while_another_copy_runs_is_left_to_that_copy_without_a_word(
-        boot, monkeypatch):
+        boot, monkeypatch, alerts):
     monkeypatch.setenv(app_link.CARRIED_IN, "alpha-1")
-    told = MagicMock()
 
-    with patch("PySide6.QtWidgets.QMessageBox.information", told):
-        assert boot.claim_the_library(_copies(None)) == 0
+    assert boot.claim_the_library(_copies(None)) == 0
 
-    told.assert_not_called()
+    assert alerts == []
 
 
-def test_the_copy_fun_time_opens_goes_on_without_the_library(hosted):
-    told = MagicMock()
-
-    with patch("PySide6.QtWidgets.QMessageBox.information", told):
-        assert hosted.claim_the_library(_copies(None)) is None
+def test_the_copy_fun_time_opens_goes_on_without_the_library(hosted, alerts):
+    assert hosted.claim_the_library(_copies(None)) is None
 
     assert hosted.claim is None
-    told.assert_not_called()
+    assert alerts == []
 
 
 

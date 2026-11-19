@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from PySide6.QtWidgets import QMessageBox
-
-from origenerator import config, look_training, lora_training
+from origenerator import alert, config, look_training, lora_training
 from origenerator.gui.lora_offers import trashed
 from origenerator.gui.training_run import TrainingRun
 
@@ -23,7 +21,7 @@ class LookTrainingController:
 
     def _trash(self, tab, key: str) -> None:
         lora = tab.lora_value(key)
-        if not self._trash_version(lora, self._parent):
+        if not self._trash_version(lora):
             return
         for each in self._info_tabs_of().generate_tabs():
             each.lora_offers.stop_offering(lora)
@@ -39,7 +37,7 @@ class LookTrainingController:
             ("krea2_training_python", "krea2_training_scripts"), base,
             folder, bool(lora_training.image_files(folder)))
         if refusal is not None:
-            QMessageBox.information(self._parent, "Train", refusal)
+            alert.information("Train", refusal)
             return
         self._watch(look_training.training_job(base), tab, key).begin()
 
@@ -71,7 +69,7 @@ class LookTrainingController:
         if lora:
             self._take(job, lora, tab, key)
         elif why:
-            QMessageBox.warning(self._parent, "Train", why)
+            alert.warning("Train", why)
 
     def _take(self, job: dict, lora: str, tab=None, key: str | None = None) -> None:
         look_training.take(job)

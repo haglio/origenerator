@@ -9,7 +9,6 @@ from PySide6.QtWidgets import (
     QAbstractButton,
     QComboBox,
     QLabel,
-    QMessageBox,
     QPushButton,
     QToolButton,
     QWidget,
@@ -32,6 +31,7 @@ from origenerator.gui.pills import Pill, pill_look
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.item_actions import ItemActions, stored
 from origenerator.media import MediaType
+from tests.alert_windows import messages
 
 _BOXES = {MediaType.IMAGE: ("first box", "second box"), MediaType.VIDEO: ("third box",)}
 _ACTIONS = {MediaType.IMAGE: ("alpha", "beta", "gamma"), MediaType.VIDEO: ("alpha", "delta")}
@@ -222,9 +222,7 @@ def test_pressing_it_again_brings_the_window_it_opened_back_rather_than_a_second
     assert len(opened) == 1
 
 
-def test_a_setter_tool_with_nothing_to_set_says_so(qtbot, monkeypatch):
-    said = []
-    monkeypatch.setattr(QMessageBox, "information", lambda parent, title, text: said.append(text))
+def test_a_setter_tool_with_nothing_to_set_says_so(qtbot, alerts):
     host = QWidget()
     qtbot.addWidget(host)
     action = ActionRow(LabelForm(host), checkboxes=_BOXES,
@@ -233,7 +231,7 @@ def test_a_setter_tool_with_nothing_to_set_says_so(qtbot, monkeypatch):
 
     _setter(action, MediaType.IMAGE).click()
 
-    assert said == ["nothing waiting"]
+    assert messages(alerts) == ["nothing waiting"]
 
 
 def test_an_answer_the_setter_tool_gives_for_the_item_on_the_tab_shows_at_once(action):

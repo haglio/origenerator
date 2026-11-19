@@ -215,5 +215,5 @@ class ActionRow(QWidget):
             open_now.activateWindow()
             return
         built = self._open_setter(side, prompt_id, heard=self.heard, host=self._setter_host)
-        if not show_or_say("Action setter tool", built, parent=self):
+        if not show_or_say("Action setter tool", built):
             self._windows[side] = built

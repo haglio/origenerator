@@ -13,11 +13,14 @@ from pathlib import Path
 
 import pytest
 import shiboken6
+from app_support import win32 as windows_api
 from PySide6.QtCore import QCoreApplication, QEvent, QObject, Qt, Signal, qInstallMessageHandler
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QWidget
 from pytestqt.qtbot import QtBot
+from shared_ui import alert as shared_alert
 from shared_ui.gui_thread_collection import collect_cycles_on_the_gui_thread
+from shared_ui.testing import alert_shown
 
 from origenerator import (
     card_claim,
@@ -45,6 +48,7 @@ from origenerator.gui.off_the_machine import (
 )
 from origenerator.workflows import detail_parts
 from tests import real_db
+from tests.alert_windows import alerts_kept
 from tests.real_db import database_in
 
 pytest_plugins = ("shared_ui.testing",)
@@ -353,9 +357,34 @@ def _never_raise_the_runs_priority(monkeypatch):
     keep_the_run_at_its_own_priority(monkeypatch.setattr)
 
 
+def refuse_past_the_fallback(name):
+    def blocked(*_args, **_kwargs):
+        pytest.fail(f"{name} was raised with nothing to answer it. If the window is the "
+                    "behavior under test, patch it in the test (shared_ui.testing.alert_shown).")
+    return blocked
+
+
+@pytest.fixture(autouse=True)
+def _no_alert_nobody_can_answer(monkeypatch):
+    for owner, name in ((shared_alert, "show_alert"), (windows_api, "show_error_popup")):
+        monkeypatch.setattr(owner, name, refuse_past_the_fallback(f"{owner.__name__}.{name}"))
+
+
 @pytest.fixture(autouse=True)
 def _no_dialog_nobody_can_answer(monkeypatch):
     refuse_the_dialogs_nobody_can_answer(monkeypatch.setattr)
+
+
+@pytest.fixture
+def alerts():
+    with alerts_kept() as kept:
+        yield kept
+
+
+@pytest.fixture
+def alerts_answered_by():
+    with contextlib.ExitStack() as answering:
+        yield lambda answer: answering.enter_context(alert_shown(side_effect=answer))
 
 
 @pytest.fixture(autouse=True)

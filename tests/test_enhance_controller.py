@@ -1031,10 +1031,9 @@ def images(monkeypatch, tmp_path):
 
 
 def test_train_with_no_images_makes_the_fixs_folder_and_says_to_put_them_there(
-        enhance, images, monkeypatch):
+        enhance, images, alerts_answered_by):
     told = []
-    monkeypatch.setattr(module.QMessageBox, "information",
-                        lambda parent, title, text: told.append(text))
+    alerts_answered_by(lambda title, text, **_how: told.append(text))
     controller, _host = enhance()
 
     controller.pane.fix_training_requested.emit("hands")
@@ -1045,11 +1044,10 @@ def test_train_with_no_images_makes_the_fixs_folder_and_says_to_put_them_there(
 
 
 def test_train_with_no_training_program_says_so_first_as_a_generating_loras_train_does(
-        enhance, images, monkeypatch):
+        enhance, images, monkeypatch, alerts_answered_by):
     monkeypatch.setattr(config, "LORA_TRAINING_PYTHON", None)
     told = []
-    monkeypatch.setattr(module.QMessageBox, "information",
-                        lambda parent, title, text: told.append(text))
+    alerts_answered_by(lambda title, text, **_how: told.append(text))
     controller, _host = enhance()
 
     controller.pane.fix_training_requested.emit("hands")
@@ -1104,9 +1102,9 @@ def test_a_finished_training_puts_its_lora_on_that_fix(enhance, images):
 
 
 def test_a_canceled_training_puts_train_back_says_nothing_and_lets_another_start(
-        enhance, images, monkeypatch):
+        enhance, images, alerts_answered_by):
     told = []
-    monkeypatch.setattr(module.QMessageBox, "warning", lambda *args: told.append(args))
+    alerts_answered_by(lambda *args, **_how: told.append(args))
     (images / "hands").mkdir()
     (images / "hands" / "one.jpg").write_bytes(b"")
     controller, _host = enhance()

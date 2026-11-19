@@ -208,7 +208,7 @@ def test_open_combination_takes_over_the_blank_tab_and_marks_it_italic(qtbot, tm
 
 
 def test_edit_individual_in_the_genau_lane_opens_the_looping_workflow_as_it_starts(
-        qtbot, tmp_path, monkeypatch):
+        qtbot, tmp_path, alerts_answered_by):
     db = _combine_db(tmp_path)
     looping = _looping_video(db)
     db.set_settings_source("loop", category="alpha")
@@ -217,8 +217,7 @@ def test_edit_individual_in_the_genau_lane_opens_the_looping_workflow_as_it_star
     qtbot.addWidget(view)
     view.refresh()
     shown = []
-    monkeypatch.setattr(gallery_view_module.QMessageBox, "information",
-                        lambda *a, **k: shown.append(a[1:]))
+    alerts_answered_by(lambda *a, **k: shown.append(a))
 
     view.combine._open_category("img", "alpha", action_settings.GENAU)
 
@@ -432,7 +431,7 @@ def test_recent_under_genau_leaves_out_a_full_length_video_used_under_genau(qtbo
     assert _listed_under_recent(combine) == ["looping"]
 
 
-def test_a_picked_action_is_recorded_with_the_video_it_resolved_to(qtbot, tmp_path, monkeypatch):
+def test_a_picked_action_is_recorded_with_the_video_it_resolved_to(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -781,14 +780,13 @@ def test_open_category_prefers_the_pinned_settings_too(qtbot, tmp_path, monkeypa
     assert params["lora_high"] == "example-action-high.safetensors"
 
 
-def test_category_noop_and_hints_when_the_action_has_no_video(qtbot, tmp_path, monkeypatch):
+def test_category_noop_and_hints_when_the_action_has_no_video(qtbot, tmp_path, alerts_answered_by):
     db = _combine_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
     shown = []
-    monkeypatch.setattr(gallery_view_module.QMessageBox, "information",
-                        lambda *a, **k: shown.append(a))
+    alerts_answered_by(lambda *a, **k: shown.append(a))
 
     view.combine.generate_category("img", "beta")
 

@@ -6,8 +6,9 @@ from dataclasses import replace
 
 from PySide6.QtCore import QObject, QPoint, Signal
 from PySide6.QtGui import QCursor
-from PySide6.QtWidgets import QMessageBox, QWidget
+from PySide6.QtWidgets import QWidget
 
+from origenerator import alert
 from origenerator.comfyui_api import ForeignQueue
 from origenerator.gui.asked_at_the_cursor import asked_at
 from origenerator.gui.inflight import (
@@ -103,8 +104,8 @@ class ShownJobQueue(QObject):
             dropped = self._client.clear_foreign_queue()
         except Exception as e:
             logger.exception("Failed to clear ComfyUI's queue")
-            QMessageBox.warning(
-                self._asks_over, "Could not clear the queue",
+            alert.warning(
+                "Could not clear the queue",
                 f"ComfyUI would not drop the other app's jobs:\n\n{e}",
             )
             return

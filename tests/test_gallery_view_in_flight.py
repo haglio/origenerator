@@ -32,7 +32,6 @@ from origenerator.gallery.collection import (
 )
 from origenerator.gallery_edits import GalleryEdits
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import gallery_view as gallery_view_module
 from origenerator.gui.combine import CombineRequest
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.hud_queue import queue_section
@@ -41,6 +40,7 @@ from origenerator.item_shape import base_of
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.trash import Trash
+from tests.alert_windows import message_of, open_alerts
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.gallery_view_support import (
     _NO_MOD,
@@ -256,10 +256,10 @@ def test_failed_reroll_marks_its_running_row_error(qtbot, tmp_path):
     assert key not in view._live_jobs
 
 
-def _generation_failed_dialog(view):
-    (dialog,) = view.findChildren(gallery_view_module.QMessageBox)
+def _generation_failed_message(view):
+    (dialog,) = open_alerts(view)
     assert dialog.windowTitle() == "Generation failed"
-    return dialog
+    return message_of(dialog)
 
 
 def test_a_failed_run_says_so_instead_of_vanishing(qtbot, tmp_path):
@@ -275,7 +275,7 @@ def test_a_failed_run_says_so_instead_of_vanishing(qtbot, tmp_path):
          "exception_message": "Tried all base urls but no success"
          + chr(10) * 2 + "long log"}))
 
-    assert _generation_failed_dialog(view).text() == (
+    assert _generation_failed_message(view) == (
         "RIFE VFI failed: Tried all base urls but no success")
 
 
@@ -294,7 +294,7 @@ def test_a_generate_comfyui_refuses_to_start_says_so_too(qtbot, tmp_path):
         "positive_prompt": "a lighthouse", "width": 1088, "height": 1920,
         "unet_high": "example_high.safetensors", "unet_low": "example_low.safetensors"}])
 
-    assert "example_high.safetensors" in _generation_failed_dialog(view).text()
+    assert "example_high.safetensors" in _generation_failed_message(view)
 
 
 def test_a_burst_of_refused_generations_is_one_dialog_saying_the_reason_once(
@@ -307,7 +307,7 @@ def test_a_burst_of_refused_generations_is_one_dialog_saying_the_reason_once(
         view._on_generate_requested("wan22_t2i", [{"positive_prompt": "a lighthouse",
                                                    "noise_seed": seed, "seed": seed}])
 
-    said = _generation_failed_dialog(view).text()
+    said = _generation_failed_message(view)
     assert said.count("example_high.safetensors") == 1
     assert "3 generations" in said
 
@@ -321,7 +321,7 @@ def test_a_press_for_several_that_comfyui_refuses_is_one_dialog(qtbot, tmp_path)
         {"positive_prompt": "a lighthouse", "noise_seed": seed, "seed": seed}
         for seed in (1, 2, 3)])
 
-    said = _generation_failed_dialog(view).text()
+    said = _generation_failed_message(view)
     assert said.count("example_high.safetensors") == 1
     assert "3 generations" in said
 
@@ -2274,12 +2274,12 @@ def test_the_stand_in_row_shows_the_dropped_video(qtbot, tmp_path, monkeypatch):
     assert item.action == ""
 
 
-def test_the_stand_in_row_goes_when_the_action_has_no_past_video(qtbot, tmp_path, monkeypatch):
+def test_the_stand_in_row_goes_when_the_action_has_no_past_video(qtbot, tmp_path, alerts_answered_by):
     db = _combine_db(tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    monkeypatch.setattr(gallery_view_module.QMessageBox, "information", lambda *a, **k: None)
+    alerts_answered_by(lambda *a, **k: None)
 
     view.combine._on_generate_category("img", "epsilon", action_settings.VIDEO)
 
@@ -2287,7 +2287,7 @@ def test_the_stand_in_row_goes_when_the_action_has_no_past_video(qtbot, tmp_path
     assert view._live_jobs == {}
 
 
-def test_the_stand_in_row_goes_when_the_dropped_image_is_gone(qtbot, tmp_path, monkeypatch):
+def test_the_stand_in_row_goes_when_the_dropped_image_is_gone(qtbot, tmp_path):
     view = GalleryView(_combine_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
@@ -2432,17 +2432,14 @@ def test_the_prompt_says_what_the_user_queued_is_left_alone(qtbot, monkeypatch):
         "question says the user's own jobs are not among those it drops")
 
 
-def test_a_failed_clear_is_surfaced_not_swallowed(qtbot, monkeypatch):
+def test_a_failed_clear_is_surfaced_not_swallowed(qtbot, alerts_answered_by):
     client = _QueueClient(ForeignQueue(running=[], pending=["a"]),
                           fail=OSError("ComfyUI is not responding"))
     view = _queue_view(qtbot, client)
     view._poll()
     view.job_queue.confirm_clear = lambda total: True
     warned = []
-    monkeypatch.setattr(
-        "origenerator.gui.gallery_view.QMessageBox.warning",
-        lambda *a, **k: warned.append(a),
-    )
+    alerts_answered_by(lambda *a, **k: warned.append(a))
 
     view.job_queue.view._clear.click()
 

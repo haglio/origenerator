@@ -99,7 +99,7 @@ class CombineController(QObject):
             self._animation_settings.activateWindow()
             return
         built = the_default_animation_settings_window()
-        if not show_or_say("Default animation settings", built, parent=self.widget):
+        if not show_or_say("Default animation settings", built):
             self._animation_settings = built
 
     def _accepts_image(self, image_id: str) -> bool:

@@ -52,7 +52,7 @@ def _dress_the_taskbar_button(app, title: str, launcher: str, preview) -> None:
 
 
 def open_on_its_own(title: str, build, *, launcher: str, find_missing_overlay_keys=None) -> int:
-    from PySide6.QtWidgets import QApplication, QMessageBox
+    from PySide6.QtWidgets import QApplication
     from shared_ui.gui_thread_collection import the_application
 
     app = the_application(QApplication, sys.argv[:1])
@@ -61,8 +61,8 @@ def open_on_its_own(title: str, build, *, launcher: str, find_missing_overlay_ke
         from origenerator.content import missing_overlay_keys as find_missing_overlay_keys
     missing = find_missing_overlay_keys()
     if missing:
-        QMessageBox.critical(None, title,
-                             "The content overlay is missing: " + ", ".join(missing))
+        from origenerator import alert
+        alert.error(title, "The content overlay is missing: " + ", ".join(missing))
         return 1
 
     from origenerator.branch_session import shown_as
@@ -79,12 +79,13 @@ def open_on_its_own(title: str, build, *, launcher: str, find_missing_overlay_ke
     return 0 if show_or_say(title, built) else app.exec()
 
 
-def show_or_say(title: str, built, *, parent=None) -> bool:
+def show_or_say(title: str, built) -> bool:
     from PySide6.QtCore import Qt
-    from PySide6.QtWidgets import QMessageBox
+
+    from origenerator import alert
 
     if isinstance(built, str):
-        QMessageBox.information(parent, title, built)
+        alert.information(title, built)
         return True
     built.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
     built.showMaximized()

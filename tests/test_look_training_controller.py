@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from shared_ui.alert import Level
 
 from origenerator import config, look_training, lora_training
 from origenerator.gui import look_training_controller as module
@@ -88,15 +89,15 @@ def _controller(tabs, shown=None):
     return LookTrainingController(SimpleNamespace(), info_tabs_of=lambda: info_tabs, parent=None)
 
 
-def _told(monkeypatch, kind="information") -> list:
+def _told(answered_by, level=Level.INFO) -> list:
     told = []
-    monkeypatch.setattr(module.QMessageBox, kind, lambda parent, title, text: told.append(text))
+    answered_by(lambda title, text, **how: told.append(text) if how["level"] is level else None)
     return told
 
 
-def test_train_with_no_training_program_set_up_says_so(look, monkeypatch):
+def test_train_with_no_training_program_set_up_says_so(look, monkeypatch, alerts_answered_by):
     monkeypatch.setattr(config, "KREA2_TRAINING_PYTHON", None)
-    told = _told(monkeypatch)
+    told = _told(alerts_answered_by)
     tab = FakeGenerateTab()
     controller = _controller([tab])
     controller.wire(tab)
@@ -108,8 +109,8 @@ def test_train_with_no_training_program_set_up_says_so(look, monkeypatch):
     assert _runs == []
 
 
-def test_train_with_no_images_makes_the_folder_and_says_to_put_them_there(look, monkeypatch):
-    told = _told(monkeypatch)
+def test_train_with_no_images_makes_the_folder_and_says_to_put_them_there(look, alerts_answered_by):
+    told = _told(alerts_answered_by)
     tab = FakeGenerateTab()
     controller = _controller([tab])
     controller.wire(tab)
@@ -122,7 +123,7 @@ def test_train_with_no_images_makes_the_folder_and_says_to_put_them_there(look, 
     assert _runs == []
 
 
-def test_train_trains_the_next_version_of_the_picked_lora_and_one_at_a_time(look, monkeypatch):
+def test_train_trains_the_next_version_of_the_picked_lora_and_one_at_a_time(look):
     (look / "one.jpg").write_bytes(b"")
     tab, other = FakeGenerateTab(), FakeGenerateTab(lora="None")
     controller = _controller([tab, other])
@@ -143,7 +144,7 @@ def test_train_trains_the_next_version_of_the_picked_lora_and_one_at_a_time(look
 
 
 def test_a_finished_training_gives_the_version_its_title_and_word_and_picks_it_in_the_tab(
-        look, monkeypatch):
+        look):
     (look / "one.jpg").write_bytes(b"")
     tab = FakeGenerateTab()
     controller = _controller([tab])
@@ -165,8 +166,8 @@ def test_a_finished_training_gives_the_version_its_title_and_word_and_picks_it_i
     assert len(_runs) == 2
 
 
-def test_a_failed_training_says_why_and_lets_another_start(look, monkeypatch):
-    warned = _told(monkeypatch, "warning")
+def test_a_failed_training_says_why_and_lets_another_start(look, alerts_answered_by):
+    warned = _told(alerts_answered_by, Level.WARNING)
     (look / "one.jpg").write_bytes(b"")
     tab = FakeGenerateTab()
     controller = _controller([tab])
@@ -235,27 +236,27 @@ def test_a_version_finished_while_the_app_was_closed_gets_its_title_once(look, t
     assert _runs == []
 
 
-def test_a_version_windows_will_not_recycle_says_why(monkeypatch):
+def test_a_version_windows_will_not_recycle_says_why(alerts_answered_by):
     def refuse(_lora):
         raise OSError("Windows would not move it.")
 
-    told = _told(monkeypatch, "warning")
+    told = _told(alerts_answered_by, Level.WARNING)
 
-    assert trashed("example_look.safetensors", None, trash=refuse) is False
+    assert trashed("example_look.safetensors", trash=refuse) is False
     assert told == ["Windows would not move it."]
 
 
-def test_a_version_windows_recycled_is_gone_without_a_word(monkeypatch):
-    told = _told(monkeypatch, "warning")
+def test_a_version_windows_recycled_is_gone_without_a_word(alerts_answered_by):
+    told = _told(alerts_answered_by, Level.WARNING)
 
-    assert trashed("example_look.safetensors", None, trash=lambda _lora: None) is True
+    assert trashed("example_look.safetensors", trash=lambda _lora: None) is True
     assert told == []
 
 
 def test_a_version_that_stays_leaves_the_tab_as_it_was(look):
     tab = FakeGenerateTab()
     LookTrainingController(None, info_tabs_of=lambda: _InfoTabs([tab], []), parent=None,
-                           trash=lambda _lora, _parent: False).wire(tab)
+                           trash=lambda _lora: False).wire(tab)
 
     tab.trash_requested.emit("lora")
 

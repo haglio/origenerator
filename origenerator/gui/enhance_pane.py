@@ -425,7 +425,7 @@ class EnhancePane(QWidget):
 
     def _trash_fix_lora(self, part, window) -> None:
         lora = window.picked_lora()
-        if not self._trash(lora, window):
+        if not self._trash(lora):
             return
         in_its_place = window.stop_offering(lora)
         kept = fix_prompts_of(part, self._fix_prompts.get(part.name))

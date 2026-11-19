@@ -6,10 +6,9 @@ from collections import namedtuple
 from typing import NamedTuple, Protocol
 
 from app_support.comfy_file_refs import frame_name
-from PySide6.QtWidgets import QMessageBox
 from shared_ui.message_shape import ERROR, INFO, WARNING
 
-from origenerator import config, enhance_presets, fix_training, gallery, lora_training
+from origenerator import alert, config, enhance_presets, fix_training, gallery, lora_training
 from origenerator.gallery.enhance_settings import basic_enhance_settings
 from origenerator.generation_config import randomize_seeds
 from origenerator.generation_state import GenerationSource
@@ -120,7 +119,7 @@ class EnhanceController:
             ("lora_training_python", "lora_training_scripts"), name,
             fix_training.images_folder(part), bool(fix_training.training_images(part)))
         if refusal is not None:
-            QMessageBox.information(self.pane, "Train", refusal)
+            alert.information("Train", refusal)
             return
         job = fix_training.training_job(part,
                                         fix_training.model_to_train_for(self._settings.params))
@@ -150,7 +149,7 @@ class EnhanceController:
         if lora:
             self._take(job, lora)
         elif why:
-            QMessageBox.warning(self.pane, "Train", why)
+            alert.warning("Train", why)
 
     def _take(self, job: dict, lora: str) -> None:
         self.pane.use_fix_lora(job["part"], lora)

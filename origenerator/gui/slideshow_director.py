@@ -18,6 +18,7 @@ from shared_ui.foreground import bring_to_front
 from shared_ui.message_shape import FAVORITE, INFO, WARNING
 
 from origenerator import gallery
+from origenerator.action_settings import loops
 from origenerator.config import FRAMES_BEING_MADE_DIR, OUTPUT_PLACES
 from origenerator.fun_time_bridge import (
     ask_for_omnipause,
@@ -376,12 +377,19 @@ class SlideshowDirector:
         return self.open_in_its_folder(items[0][:2], generation)
 
     def _plays_on_the_main_funestra(self, row: dict | None) -> bool:
-        kinos = video_kino_plays(row) if row is not None else None
-        return kinos is not None and (
+        video = self._video_the_main_funestra_plays(row)
+        return video is not None and (
             ask_the_main_funestra_to_play(
-                self._session_channel, kinos,
-                in_genau=self._genau is not None and self._genau.holds(Path(kinos)))
+                self._session_channel, video,
+                in_genau=loops(row) or (self._genau is not None and self._genau.holds(Path(video))))
             or self._fun_time is not None)
+
+    def _video_the_main_funestra_plays(self, row: dict | None) -> str | None:
+        if row is None:
+            return None
+        if not loops(row):
+            return video_kino_plays(row)
+        return next((str(item[0]) for item in self.items_of([row])), None)
 
     @looking_once
     def open_in_its_folder(self, media, generation):

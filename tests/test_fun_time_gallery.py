@@ -613,6 +613,55 @@ def test_a_double_click_on_one_of_genaus_videos_in_a_session_plays_it_in_genau(q
         f"genau_play|{video}"]
 
 
+def _a_session_showing_a_video_made_by(workflow_name: str, qtbot, tmp_path, monkeypatch):
+    video = tmp_path / "output" / f"{workflow_name}_v1.mp4"
+    row = _row("v1", workflow_name, {"positive_prompt": "the fox runs", "noise_seed": 5},
+               video.name)
+    view = GalleryView(database_of([row]), fun_time=_session_with_dashboard(tmp_path))
+    qtbot.addWidget(view)
+    view.refresh()
+    monkeypatch.setattr(view._slideshows, "items_of",
+                        lambda rows: [(video, "video", r["prompt_id"], None) for r in rows])
+    return view, video
+
+
+def test_a_double_click_on_a_looping_ai_video_in_a_session_plays_it_in_genau(
+        qtbot, tmp_path, monkeypatch):
+    view, video = _a_session_showing_a_video_made_by(
+        "wan22_flf2v_loop", qtbot, tmp_path, monkeypatch)
+
+    view._gallery_pane.slideshow_requested.emit("v1")
+
+    assert (tmp_path / "dashboard_cmd.txt").read_text(encoding="utf-8").splitlines() == [
+        f"genau_play|{video}"]
+    assert not any(view._slideshows._region_slideshows.values())
+
+
+def test_a_double_click_on_a_looping_ai_videos_preview_in_a_session_plays_it_in_genau(
+        qtbot, tmp_path, monkeypatch):
+    view, video = _a_session_showing_a_video_made_by(
+        "wan22_flf2v_loop", qtbot, tmp_path, monkeypatch)
+
+    opened = view._slideshows.open_on_preview((video, "video"), "v1")
+
+    assert opened is None
+    assert (tmp_path / "dashboard_cmd.txt").read_text(encoding="utf-8").splitlines() == [
+        f"genau_play|{video}"]
+
+
+def test_a_double_click_on_an_ai_video_that_does_not_loop_opens_its_slideshow(
+        qtbot, tmp_path, monkeypatch):
+    view, _video = _a_session_showing_a_video_made_by("wan22_i2v", qtbot, tmp_path, monkeypatch)
+    opened = []
+    monkeypatch.setattr(view._slideshows, "open_in_its_folder",
+                        lambda media, generation: opened.append(generation))
+
+    view._gallery_pane.slideshow_requested.emit("v1")
+
+    assert not (tmp_path / "dashboard_cmd.txt").exists()
+    assert opened == ["v1"]
+
+
 def _fox_library(tmp_path):
     tall = tmp_path / "tall.png"
     Image.new("RGB", (100, 200)).save(tall)

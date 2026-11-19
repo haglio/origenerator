@@ -39,13 +39,15 @@ def _settings_naming_this_checkout_the_production_one(tmp_path: Path) -> Path:
     roots.mkdir()
     _winapi.CreateJunction(str(config.PROJECT_DIR), str(roots / "origenerator"))
     settings = tmp_path / "settings.json"
-    settings.write_text(json.dumps({**haglio_settings.EXAMPLE, "project_roots": [str(roots)]}),
-                        encoding="utf-8")
+    settings.write_text(
+        json.dumps({**haglio_settings.example_inside(tmp_path), "project_roots": [str(roots)]}),
+        encoding="utf-8")
     return settings
 
 
 def test_the_production_app_keeps_its_state_in_its_checkout_and_its_items_files_in_the_library(
         tmp_path):
+    library = Path(haglio_settings.example_inside(tmp_path)["library_root"])
     state, db, thumbs, ui, project, trash, _primary, records, production = _paths(
         None, settings=_settings_naming_this_checkout_the_production_one(tmp_path))
     assert state == project / "state"
@@ -54,7 +56,7 @@ def test_the_production_app_keeps_its_state_in_its_checkout_and_its_items_files_
     assert thumbs == records / "thumbnails"
     assert trash == records / "trash"
     assert ui == state / "ui_state.json"
-    assert records == config.LIBRARY_ROOT / "app_data" / "origenerator"
+    assert records == library / "app_data" / "origenerator"
 
 
 def test_another_checkout_started_without_the_preview_flag_keeps_its_trash_beside_its_own_database():

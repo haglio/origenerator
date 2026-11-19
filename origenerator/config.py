@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -103,10 +104,11 @@ KINO_TRASH_DIR = kino_folder.trash_folder_in(KINO_DIR)
 GENAU_SOURCE = haglio_settings.value("genau_source")
 GENAU_DIR = Path(haglio_settings.value("genau_dir"))
 
-OUTPUT_PLACES = OutputPlaces.from_settings(haglio_settings.load(), comfyui_dir=COMFYUI_DIR,
-                                           trash=TRASH_DIR,
-                                           down_the_lanes=(EVOLVER_AI_DIR, KINO_DIR, GENAU_DIR),
-                                           library=LIBRARY_VIDEOS_DIR)
+OUTPUT_PLACES = replace(
+    OutputPlaces.from_settings(haglio_settings.load(), comfyui_dir=COMFYUI_DIR, trash=TRASH_DIR,
+                               down_the_lanes=(EVOLVER_AI_DIR, KINO_DIR, GENAU_DIR),
+                               library=LIBRARY_VIDEOS_DIR),
+    numbers_given=LIBRARY_STATE_DIR / "numbers_given.json")
 COMFYUI_INPUT_DIR = COMFYUI_DIR / "input"
 COMFYUI_TEMP_DIR = COMFYUI_DIR / "temp"
 # ComfyUI writes its console log here (rotated as comfyui.log, .prev.log, …);

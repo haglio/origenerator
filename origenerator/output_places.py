@@ -30,6 +30,7 @@ class OutputPlaces:
     trash: Path | None = None
     down_the_lanes: tuple[Path, ...] = ()
     library: Path | None = None
+    numbers_given: Path | None = None
 
     @classmethod
     def in_one_folder(cls, folder: Path, *, trash: Path | None = None,

@@ -327,3 +327,42 @@ def test_a_run_of_many_images_lists_the_images_folder_once(tmp_path, monkeypatch
 
     assert [f["filename"] for f in filed] == [f"alpha_t2i_0000{n}_.png" for n in range(1, 5)]
     assert len(listed) == 1
+
+
+def _remembering(tmp_path) -> OutputPlaces:
+    return replace(_places(tmp_path), down_the_lanes=(tmp_path / "genau",),
+                   numbers_given=tmp_path / "numbers_given.json")
+
+
+def test_after_the_first_filing_the_lanes_are_never_read_again(tmp_path, monkeypatch):
+    places = _remembering(tmp_path)
+    copy = tmp_path / "genau" / "flicks" / "beta_i2v_00008__topaz.mp4"
+    copy.parent.mkdir(parents=True)
+    copy.write_bytes(b"a sent video's copy")
+    _saved_by_comfyui(places, "run-one", "video", "beta_i2v_00001_.mp4")
+    file_into_library([_listed("run-one", "video", "beta_i2v_00001_.mp4")], places, "run-one")
+    walked = []
+    rglob = Path.rglob
+    monkeypatch.setattr(Path, "rglob", lambda path, *a, **k: walked.append(path) or rglob(path, *a, **k))
+    _saved_by_comfyui(places, "run-two", "video", "beta_i2v_00001_.mp4")
+
+    filed = file_into_library([_listed("run-two", "video", "beta_i2v_00001_.mp4")],
+                              places, "run-two")
+
+    assert filed[0]["filename"] == "beta_i2v_00010_.mp4"
+    assert walked == []
+
+
+def test_a_number_once_given_is_never_given_again_after_every_copy_of_it_is_gone(tmp_path):
+    places = _remembering(tmp_path)
+    _saved_by_comfyui(places, "run-one", "video", "beta_i2v_00001_.mp4")
+    first = file_into_library([_listed("run-one", "video", "beta_i2v_00001_.mp4")],
+                              places, "run-one")
+    (places.folder("video") / first[0]["filename"]).unlink()
+    _saved_by_comfyui(places, "run-two", "video", "beta_i2v_00001_.mp4")
+
+    again = file_into_library([_listed("run-two", "video", "beta_i2v_00001_.mp4")],
+                              places, "run-two")
+
+    assert (first[0]["filename"], again[0]["filename"]) == (
+        "beta_i2v_00001_.mp4", "beta_i2v_00002_.mp4")

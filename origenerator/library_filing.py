@@ -8,6 +8,7 @@ from app_support.video_names import stem_as_made
 
 from origenerator.file_numbers import NUMBERED, next_number, numbered
 from origenerator.media import MediaType, media_type_from_filename
+from origenerator.numbers_given import NumbersGiven
 from origenerator.output_places import OutputPlaces, files_under, folders_in
 from origenerator.trash import Trash
 from origenerator.workflows.base import silent_copies_of
@@ -56,7 +57,7 @@ def _videos_comfyui_reports(names: list[str]) -> list[str]:
 
 def file_into_library(files: list[dict], places: OutputPlaces, prompt_id: str) -> list[dict]:
     run = _run_subfolder(places, prompt_id)
-    held = _names_taken(places)
+    held = _numbers_given(places)
     homes = _Homes()
     filed: dict[tuple[str, str], tuple[str, str]] = {}
     for record in files:
@@ -74,13 +75,14 @@ def file_into_library(files: list[dict], places: OutputPlaces, prompt_id: str) -
 def file_what_comfyui_left(places: OutputPlaces) -> int:
     if places.keeps_outputs_in_comfyuis_folder():
         return 0
-    held, homes = _names_taken(places), _Homes()
+    held, homes = _numbers_given(places), _Homes()
     return sum(_file_everything_under(top, places, held, homes) for top in folders_in(places.comfyui)
                if top != places.working and top.name not in ADD_ON_SCRATCH)
 
 
-def _names_taken(places: OutputPlaces) -> set[str]:
-    return _held_in_trash(places) | _names_down_the_lanes(places)
+def _numbers_given(places: OutputPlaces) -> NumbersGiven:
+    return NumbersGiven(places.numbers_given,
+                        lambda: _held_in_trash(places) | _names_down_the_lanes(places))
 
 
 def _held_in_trash(places: OutputPlaces) -> set[str]:
@@ -92,7 +94,8 @@ def _names_down_the_lanes(places: OutputPlaces) -> set[str]:
             for path in Path(lane).rglob("*")}
 
 
-def _file_everything_under(top: Path, places: OutputPlaces, held: set[str], homes: _Homes) -> int:
+def _file_everything_under(top: Path, places: OutputPlaces, held: NumbersGiven,
+                           homes: _Homes) -> int:
     filed = 0
     for folder, names in files_under(top):
         home = places.folder(folder.relative_to(places.comfyui).as_posix())
@@ -124,21 +127,23 @@ class _Homes:
 
 
 def _file_into_its_home(waiting: Path, name: str, home: Path,
-                        held: set[str], homes: _Homes) -> dict[str, str]:
+                        held: NumbersGiven, homes: _Homes) -> dict[str, str]:
     home.mkdir(parents=True, exist_ok=True)
     filed_as = _names_in_its_home(waiting, name, home, held, homes)
     for was, now in filed_as.items():
         os.rename(waiting / was, home / now)
         homes.names_in(home).add(now)
+    held.gave(filed_as.values())
     return filed_as
 
 
 def _names_in_its_home(waiting: Path, name: str, home: Path,
-                       held: set[str], homes: _Homes) -> dict[str, str]:
+                       held: NumbersGiven, homes: _Homes) -> dict[str, str]:
     match = NUMBERED.match(name)
     if match is None:
         return {} if os.path.lexists(home / name) else {name: name}
-    number = next_number(match["stem"], (), held | homes.names_in(home))
+    number = max(next_number(match["stem"], (), homes.names_in(home)),
+                 held.highest(match["stem"]) + 1)
     return {sibling: numbered(sibling, match["stem"], number)
             for sibling in os.listdir(waiting)
             if (other := NUMBERED.match(sibling))

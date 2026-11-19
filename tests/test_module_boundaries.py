@@ -159,7 +159,7 @@ def test_only_the_slideshows_fill_the_screen():
 
 
 OPENS_WINDOWS = {"action_setter_tool.py", "app.py", "default_animation_settings.py", "downtime.py",
-                 "own_window.py"}
+                 "hosted_rehearsal.py", "own_window.py"}
 
 
 def test_only_what_opens_a_window_imports_the_widget_package():

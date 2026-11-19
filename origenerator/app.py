@@ -411,7 +411,12 @@ def _check_the_launch(logger) -> int:
 def main(argv: list[str] | None = None) -> int:
     from origenerator.fun_time_mode import parse_app_args
 
-    app_args = parse_app_args(sys.argv[1:] if argv is None else argv)
+    words = sys.argv[1:] if argv is None else argv
+    app_args = parse_app_args(words)
+    if app_args.rehearse:
+        from origenerator.fun_time_mode import REHEARSE_FLAG
+        from origenerator.hosted_rehearsal import rehearse
+        return rehearse([word for word in words if word != REHEARSE_FLAG])
     fun_time = app_args.fun_time
     if fun_time is not None:
         from origenerator.ui_scale import apply_room_scale

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import contextlib
-import errno
 import functools
 import gc
 import itertools
@@ -10,18 +9,13 @@ import os
 import struct
 import subprocess
 import sys
-import urllib.error
-import urllib.parse
-import urllib.request
-import winsound
 from pathlib import Path
 
 import pytest
 import shiboken6
-from app_support import win32 as windows_api
 from PySide6.QtCore import QCoreApplication, QEvent, QObject, Qt, Signal, qInstallMessageHandler
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QInputDialog, QMessageBox, QWidget
+from PySide6.QtWidgets import QApplication, QWidget
 from pytestqt.qtbot import QtBot
 from shared_ui.gui_thread_collection import collect_cycles_on_the_gui_thread
 
@@ -30,22 +24,25 @@ from origenerator import (
     config,
     enhance_presets,
     graphics_card,
-    osr2_driver,
     osr2_motion_driver,
     running_ahead,
-    toast_raising,
 )
 from origenerator.gui import (
     gallery_view,
     generation_job,
-    job_queue,
+    off_the_machine,
     omnipause,
-    osr2_controls,
-    toasts,
     voice_router,
 )
 from origenerator.gui.combine_controller import CombineController
 from origenerator.gui.gallery_view import GalleryView
+from origenerator.gui.off_the_machine import (
+    keep_out_of_windows,
+    keep_silent,
+    refuse_the_comfyui_on_this_machine,
+    refuse_the_dialogs_nobody_can_answer,
+    start_no_comfyui_on_this_machine,
+)
 from origenerator.workflows import detail_parts
 from tests import real_db
 from tests.real_db import database_in
@@ -260,30 +257,11 @@ def _no_real_mic(monkeypatch):
     keep_the_microphone_shut(monkeypatch.setattr)
 
 
-def refuse_the_comfyui_on_this_machine(setattr) -> None:
-    real_urlopen = urllib.request.urlopen
-    llm = urllib.parse.urlsplit(config.LOCAL_LLM_BASE_URL)
-    refused = {(config.COMFYUI_HOST, config.COMFYUI_PORT), (llm.hostname, llm.port)}
-
-    def urlopen(url, *args, **kwargs):
-        target = urllib.parse.urlsplit(getattr(url, "full_url", url))
-        if (target.hostname, target.port) in refused:
-            raise urllib.error.URLError(ConnectionRefusedError(
-                errno.ECONNREFUSED, "the suite never reaches a service on this machine"))
-        return real_urlopen(url, *args, **kwargs)
-
-    setattr(urllib.request, "urlopen", urlopen)
-
-
 @pytest.fixture(autouse=True, scope="session")
 def _never_reach_the_comfyui_on_this_machine():
     with pytest.MonkeyPatch.context() as patch:
         refuse_the_comfyui_on_this_machine(patch.setattr)
         yield
-
-
-def start_no_comfyui_on_this_machine(setattr) -> None:
-    setattr(job_queue, "BRING_UP_COMFYUI", None)
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -294,25 +272,13 @@ def _never_start_the_comfyui_on_this_machine():
 
 
 def keep_off_the_device(setattr) -> None:
-    class _NoDevice:
-        def want(self, wanted): pass
-        def ask(self, verb): pass
-        def send_position(self, pos, interval_ms): pass
-        def close(self): pass
-
     class _NoTicker:
         def __init__(self, tick, interval_s, **_kw): pass
         def start(self): pass
         def stop(self): pass
 
-    setattr(osr2_driver, "Osr2Broker", lambda *a, **k: _NoDevice())
-    setattr(osr2_motion_driver, "Osr2Broker", lambda *a, **k: _NoDevice())
+    off_the_machine.keep_off_the_device(setattr)
     setattr(osr2_motion_driver, "_TickThread", _NoTicker)
-    the_device_is_there = osr2_controls.osr2.osr2_device.Osr2Mode.CONTROLLED
-    setattr(osr2_controls.osr2, "device_mode", lambda **_kw: the_device_is_there)
-    setattr(osr2_controls.osr2, "device_trouble", lambda **_kw: None)
-    setattr(osr2_controls.osr2, "broker_running", lambda **_kw: True)
-    setattr(osr2_controls.osr2, "press_the_broker", lambda **_kw: None)
 
 
 def finish_every_video_on_the_tests_own_thread(setattr) -> None:
@@ -323,14 +289,6 @@ def finish_every_video_on_the_tests_own_thread(setattr) -> None:
 def _never_take_the_real_device(monkeypatch):
     keep_off_the_device(monkeypatch.setattr)
     finish_every_video_on_the_tests_own_thread(monkeypatch.setattr)
-
-
-def keep_out_of_windows(setattr) -> None:
-    setattr(windows_api, "dress_window", lambda *_a, **_kw: None)
-    setattr(toasts, "register_toast_identity", lambda *_a, **_kw: None)
-    setattr(toasts, "register_link_handler", lambda *_a, **_kw: None)
-    setattr(toast_raising, "show", lambda *_a, **_kw: None)
-    setattr(toast_raising, "take_back", lambda *_a, **_kw: None)
 
 
 @pytest.fixture(scope="session")
@@ -381,15 +339,6 @@ def _never_bring_a_real_record_into_a_tests_gallery(monkeypatch):
     monkeypatch.setattr(gallery_view.outside_videos, "bring_in_one", lambda *_args, **_kw: False)
 
 
-
-
-
-def keep_silent(setattr) -> list:
-    sounded = []
-    setattr(winsound, "MessageBeep", sounded.append)
-    return sounded
-
-
 @pytest.fixture(autouse=True)
 def alert_sounds(monkeypatch):
     return keep_silent(monkeypatch.setattr)
@@ -402,22 +351,6 @@ def keep_the_run_at_its_own_priority(setattr) -> None:
 @pytest.fixture(autouse=True)
 def _never_raise_the_runs_priority(monkeypatch):
     keep_the_run_at_its_own_priority(monkeypatch.setattr)
-
-
-def refuse_the_dialogs_nobody_can_answer(setattr) -> None:
-    """A Qt offscreen modal dialog spins a nested event loop nobody can end, so the run would hang instead of failing."""
-    def refuse(name):
-        def blocked(*_args, **_kwargs):
-            raise AssertionError(
-                f"{name} was raised with nothing to answer it. If the dialog is "
-                "the behaviour under test, monkeypatch it in the test."
-            )
-        return staticmethod(blocked)
-
-    for name in ("question", "warning", "information", "critical", "about"):
-        setattr(QMessageBox, name, refuse(f"QMessageBox.{name}"))
-    for name in ("getText", "getInt", "getDouble", "getItem", "getMultiLineText"):
-        setattr(QInputDialog, name, refuse(f"QInputDialog.{name}"))
 
 
 @pytest.fixture(autouse=True)

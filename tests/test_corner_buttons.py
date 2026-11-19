@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from PySide6.QtCore import QEvent, QPointF, QRect
 from PySide6.QtGui import QEnterEvent
 from PySide6.QtWidgets import QWidget
@@ -17,6 +18,7 @@ from origenerator.gui.corner_buttons import (
     CornerButtons,
     enhance_state,
 )
+from origenerator.media import MediaType
 
 
 def _image_row(**extra):
@@ -144,6 +146,15 @@ def test_the_star_says_which_way_it_would_go(qtbot):
         "the mark is the state and the button at once: a filled star is the favorite and "
         "pressing it takes the favorite away, so an item cannot carry a sign saying one thing "
         "beside a control doing another")
+
+
+@pytest.mark.parametrize("kind", [MediaType.IMAGE, MediaType.VIDEO])
+def test_the_star_and_the_trash_say_whether_they_act_on_an_image_or_a_video(qtbot, kind):
+    _host, controls = _controls(qtbot)
+    controls.show_for(favorite=False, enhance=None, kind=kind)
+    star, trash = controls.buttons()[:2]
+
+    assert (star.toolTip(), trash.toolTip()) == (f"Favorite this {kind}", f"Delete this {kind}")
 
 
 def test_a_corner_button_under_the_pointer_wears_its_armed_icon(qtbot):

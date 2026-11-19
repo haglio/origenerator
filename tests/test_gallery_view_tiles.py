@@ -973,7 +973,7 @@ def test_pressing_a_tabs_preview_star_turns_that_star_on(qtbot, tmp_path):
 
     star.click()
 
-    assert star.toolTip() == "Unfavorite this item"
+    assert star.toolTip() == "Unfavorite this image"
 
 
 def test_a_tabs_preview_plus_stops_offering_once_its_enhancement_lands(qtbot, tmp_path):

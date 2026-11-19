@@ -348,12 +348,12 @@ class Viewport(QWidget):
         return None
 
     def set_actions(self, prompt_id: str | None, *, favorite: bool = False,
-                    enhance: str | None = None) -> None:
+                    enhance: str | None = None, kind: str | None = None) -> None:
         self._actions_id = prompt_id
         if prompt_id is None:
             self._controls.hide_all()
             return
-        self._controls.show_for(favorite=favorite, enhance=enhance)
+        self._controls.show_for(favorite=favorite, enhance=enhance, kind=kind)
         self._place_controls()
 
     def actions_id(self) -> str | None:

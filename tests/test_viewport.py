@@ -1479,44 +1479,17 @@ def test_a_video_stepped_off_stays_on_screen_until_the_image_after_it_is_decoded
     assert shown.pixelColor(shown.width() // 2, shown.height() // 2) == QColor(10, 120, 200)
 
 
-def _in_a_window(qtbot, now):
+def test_a_hidden_window_holds_its_video_and_plays_it_on_when_shown_again(qtbot, tmp_path):
     window = QWidget()
     qtbot.addWidget(window)
     player = MagicMock()
-    player.position.return_value = 1000
-    player.duration.return_value = 4000
-    w = Viewport(window, player=player, clock=lambda: now[0])
+    w = Viewport(window, player=player)
     window.show()
-    return window, w, player
-
-
-def test_a_hidden_window_holds_its_video_while_the_osr2_follows_where_it_would_be(
-        qtbot, tmp_path):
-    now = [100.0]
-    window, w, player = _in_a_window(qtbot, now)
     w.show_video(tmp_path / "clip.mp4")
 
     QApplication.sendEvent(window, QHideEvent())
     assert _told_last(player) == "pause", (
-        "a video nobody can see is decoded for nothing, beside the Funestras' own")
-    now[0] += 3.5
-    assert w.playhead().position() == 500, (
-        "in Standalone the OSR2 follows the video in front, so it goes on as if it played")
-    player.reset_mock()
-
+        "a video nobody can see is decoded for nothing, beside the Funestras' own; Core is "
+        "hidden while a Fun Time session shows the Random Faves Browser")
     QApplication.sendEvent(window, QShowEvent())
-    assert player.setPosition.call_args_list == [call(500)]
     assert _told_last(player) == "play"
-
-
-def test_a_tab_behind_another_comes_back_where_its_video_would_have_got_to(make_preview, tmp_path):
-    w = make_preview()
-    w._player.position.return_value = 1000
-    w._player.duration.return_value = 4000
-    w.show_video(tmp_path / "clip.mp4")
-    w.set_behind(True)
-    w._player.reset_mock()
-
-    w.set_behind(False)
-
-    assert w._player.setPosition.call_args_list == [call(w.playhead().position())]

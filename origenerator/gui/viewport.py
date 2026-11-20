@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import time
 from pathlib import Path
 
 from app_support.funscript import read_actions
@@ -41,7 +40,6 @@ from origenerator.gui.drag_thumbnail import (
 )
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.off_thread import run_off_thread
-from origenerator.gui.playhead import Playhead
 from origenerator.gui.scrubber import Scrubber
 from origenerator.gui.video_surface import VideoSurface
 from origenerator.media import MediaType
@@ -84,7 +82,7 @@ class Viewport(QWidget):
     context_requested = Signal(str, QPoint)
 
     def __init__(self, parent=None, *, player: QMediaPlayer | None = None,
-                 show_scrubber: bool = False, clock=time.monotonic):
+                 show_scrubber: bool = False):
         super().__init__(parent)
         self._pixmap: QPixmap | None = None
         self._image_size: QSize | None = None
@@ -105,7 +103,6 @@ class Viewport(QWidget):
         self.customContextMenuRequested.connect(self._on_context_menu)
 
         self._player = player if player is not None else QMediaPlayer(self)
-        self._playhead = Playhead(self._player, clock=clock)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -231,7 +228,6 @@ class Viewport(QWidget):
                          else "a viewer shows a video that is no item")
         self._image_label.clear()
         self._player.setSource(QUrl.fromLocalFile(str(Path(path))))
-        self._playhead.forget()
         self._stack.setCurrentWidget(self._video)
         self._play_where_it_is_seen()
         self._show_scrubber(path)
@@ -337,9 +333,6 @@ class Viewport(QWidget):
     def player(self) -> QMediaPlayer:
         return self._player
 
-    def playhead(self) -> Playhead:
-        return self._playhead
-
     def set_frozen(self, frozen: bool) -> None:
         if self._movie is not None:
             self._movie.setPaused(frozen)
@@ -353,11 +346,6 @@ class Viewport(QWidget):
 
     def _play_where_it_is_seen(self) -> None:
         seen = not (self._behind or self._window_hidden)
-        if not seen and not self._playhead.held:
-            self._playhead.hold()
-        self._playhead.run(not omnipause.frozen())
-        if seen and self._playhead.held:
-            self._player.setPosition(self._playhead.release())
         if seen and not omnipause.frozen():
             self._player.play()
         else:
@@ -463,7 +451,6 @@ class Viewport(QWidget):
         return self._fullscreen
 
     def _stop_playback(self) -> None:
-        self._playhead.forget()
         self._player.stop()
         self._player.setSource(QUrl())
 

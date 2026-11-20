@@ -53,7 +53,7 @@ from origenerator.gui.slideshow_wiring import SlideshowActions
 from origenerator.library_views import Version
 from origenerator.media import MediaType
 from origenerator.one_look import looking_once
-from origenerator.osr2_driver import drive_target_for
+from origenerator.osr2_driver import drive_target_for, read_the_script_ahead
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
 
 logger = logging.getLogger(__name__)
@@ -837,7 +837,18 @@ class FunestraSlideshow(QObject):
 
     def osr2_drive_target(self):
         player = self.shown.player
-        return None if player is None else drive_target_for(self._video_on_screen(), player)
+        if player is None:
+            return None
+        target = drive_target_for(self._video_on_screen(), player)
+        self._read_the_next_script_ahead()
+        return target
+
+    def _read_the_next_script_ahead(self) -> None:
+        in_play = rotated_onto(self._set.playlist.in_play_order(), self._set.playlist.current())
+        following = in_play[1] if len(in_play) > 1 else None
+        if (following is not None and not following.is_live
+                and following.media_type == MediaType.VIDEO):
+            read_the_script_ahead(str(following.path), self._off_the_window, owner=self)
 
     def video_on_screen(self) -> str | None:
         if self.shown.player is None or self._video_on_screen() is None:

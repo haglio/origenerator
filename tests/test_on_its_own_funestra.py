@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
+from app_support.funscript import read_actions
 from funestra.program.asks import FOCUSED
 from funestra.session_quit import SESSION_QUIT
 from funestra.volume import VolumeHud
@@ -24,6 +25,7 @@ from shared_ui.message_shape import (
 )
 from shared_ui.testing import appending_to
 
+from origenerator import osr2_driver
 from origenerator.funscript import (
     synthesize_actions,
     write_funscript,
@@ -34,6 +36,7 @@ from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.message_over_a_funestra import MessageOverAFunestra
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
+from origenerator.osr2_driver import DriveScripts
 from origenerator.slideshow import LIVE, Slide, SlideshowFilters, in_order
 from tests.marked_words import words
 from tests.motion_doubles import FakeMotion
@@ -2056,6 +2059,28 @@ def test_osr2_drive_target_bundles_the_scripted_video(qtbot, tmp_path):
     assert tgt_player is view.player, (
         "what the drive follows is what knows where the video on the Funestra has got to")
     assert actions
+
+
+def test_the_next_video_s_funscript_is_read_before_it_comes_on(qtbot, tmp_path, monkeypatch):
+    first, following = tmp_path / "c.mp4", tmp_path / "d.mp4"
+    for video in (first, following):
+        write_funscript(video.with_suffix(".funscript"), synthesize_actions(2.0, hz=1.0))
+    read = []
+
+    def reading(path):
+        read.append(path.name)
+        return read_actions(path)
+
+    monkeypatch.setattr(osr2_driver, "SCRIPTS", DriveScripts(read=reading))
+    view = _standalone([(str(first), "video"), (str(following), "video")],
+                       shuffle=lambda order: None)
+
+    view.slideshow.osr2_drive_target()
+    view.slideshow.osr2_drive_target()
+
+    assert read == ["c.funscript", "d.funscript"], (
+        "the video on the Funestra is read once, and the one after it is read before it comes on,"
+        " so neither is read on the window's thread at the moment it starts")
 
 
 def test_osr2_drive_target_is_none_for_an_image(qtbot, tmp_path):

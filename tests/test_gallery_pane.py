@@ -1157,9 +1157,8 @@ def test_scroll_steps_that_draw_no_page_measure_nothing_and_tell_only_the_tiles_
 
 
 def _in_sight_at(tiles, top, scroll):
-    foot = top + scroll.viewport().height() + gallery_pane._REACH
-    return {tile: tile.y() < foot and tile.y() + tile.height() > top - gallery_pane._REACH
-            for tile in tiles}
+    foot = top + scroll.viewport().height()
+    return {tile: tile.y() < foot and tile.y() + tile.height() > top for tile in tiles}
 
 
 def _grid_places(count, width, tile, spacing):
@@ -1190,3 +1189,23 @@ def test_every_tile_of_a_folder_sits_on_the_grid_at_every_width(qtbot, db, count
     assert drawn.height() == max(scroll.viewport().height(),
                                  places[-1][1] + tiles[-1].height())
 
+
+def test_a_video_just_below_the_view_holds_still_until_it_scrolls_into_it(qtbot, db, tmp_path):
+    video = looping_video(tmp_path)
+    rows = [_row(f"g{n}", n) for n in range(200)]
+    pane, scroll = _pane(qtbot, db, rows, host=_pane_host(animated_preview=lambda row: video))
+    scroll.setWidgetResizable(True)
+    scroll.resize(800, 600)
+    scroll.show()
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+    QApplication.processEvents()
+    foot = scroll.viewport().height()
+    below = next(tile for tile in _drawn(scroll) if foot < tile.y() < foot + gallery_pane._REACH)
+    held = below._image_label.movie().state()
+
+    scroll.verticalScrollBar().setValue(below.y())
+
+    assert (held, below._image_label.movie().state()) == (
+        QMovie.MovieState.Paused, QMovie.MovieState.Running), (
+        "only what is on screen plays: each loop playing out of sight costs the window "
+        "a decode for every frame")

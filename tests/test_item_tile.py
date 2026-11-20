@@ -5,10 +5,11 @@ from dataclasses import fields, replace
 from io import BytesIO
 
 import pytest
+from app_support.threading_utils import wait_until
 from PIL import Image
 from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
 from PySide6.QtGui import QEnterEvent, QIcon, QMovie
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QApplication, QWidget
 from shared_ui.colors import BLUE, TEXT_PRIMARY
 from shared_ui.spacing import GAP_SMALL
 from shared_ui.testing import appending_to
@@ -719,3 +720,47 @@ def test_a_tiles_look_holds_the_fields_a_built_tile_has_no_setter_for(qtbot, fie
         "a redraw keeps a tile whose look is unchanged and sets what changed on it, so a field"
         " goes into the look exactly when a built tile has no setter for it")
 
+
+def _a_looping_tile_in_a_window(qtbot, tmp_path):
+    webp = _write_looping_webp(tmp_path / "v1_anim.webp")
+    window = QWidget()
+    qtbot.addWidget(window)
+    tile = ItemTile("v1", None, "label", TileAppearance(movie_path=str(webp)), parent=window)
+    window.show()
+    return window, tile, tile._image_label.movie()
+
+
+def test_a_looping_tile_holds_still_while_the_gallery_is_hidden(qtbot, tmp_path):
+    window, _tile, movie = _a_looping_tile_in_a_window(qtbot, tmp_path)
+
+    window.hide()
+    hidden = movie.state()
+    window.show()
+
+    assert (hidden, movie.state()) == (QMovie.MovieState.Paused, QMovie.MovieState.Running), (
+        "Core hidden behind the RFB went on decoding every thumbnail in its gallery")
+
+
+def test_a_looping_tile_holds_still_while_its_window_is_minimized(qtbot, tmp_path):
+    window, _tile, movie = _a_looping_tile_in_a_window(qtbot, tmp_path)
+
+    window.showMinimized()
+    wait_until(window.isMinimized, pump=QApplication.processEvents)
+    minimized = movie.state()
+    window.showNormal()
+    wait_until(lambda: not window.isMinimized(), pump=QApplication.processEvents)
+
+    assert (minimized, movie.state()) == (QMovie.MovieState.Paused, QMovie.MovieState.Running)
+
+
+def test_a_looping_tile_keeps_its_frames_while_in_sight_and_none_once_out_of_it(qtbot, tmp_path):
+    _window, tile, movie = _a_looping_tile_in_a_window(qtbot, tmp_path)
+    for _frame in range(movie.frameCount()):
+        movie.jumpToNextFrame()
+
+    kept_in_sight = movie.cacheMode()
+    tile.set_in_sight(False)
+
+    assert (kept_in_sight, movie.currentFrameNumber()) == (QMovie.CacheMode.CacheAll, -1), (
+        "a loop decoded afresh on every pass costs the window a decode per frame, and "
+        "frames kept for every tile ever scrolled past fill memory")

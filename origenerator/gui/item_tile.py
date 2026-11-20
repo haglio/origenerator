@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QCursor, QIcon, QPixmap
+from PySide6.QtGui import QCursor, QIcon, QMovie, QPixmap
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 from shared_ui.palette import BLUE, as_rgba
 from shared_ui.spacing import BUTTON_RADIUS
@@ -23,7 +23,7 @@ from origenerator.gui.drag_thumbnail import DragOut, label_thumbnail
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.inflight import TICK_MS, RunReading
 from origenerator.gui.item_type_icon import ItemTypeIcon, VideoLength
-from origenerator.gui.looping_preview import play_in
+from origenerator.gui.looping_preview import play_in, what_plays_in
 from origenerator.gui.looping_preview import set_in_sight as video_in_sight
 from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
 from origenerator.gui.style_property import set_style_property
@@ -78,6 +78,12 @@ def restore_offer_of(item: dict) -> RestoreOffer:
                         else "Restore — put it and its files back where they were")
 
 
+def _let_go_of_its_frames(movie: QMovie | None) -> None:
+    if movie is not None:
+        # Qt: a QMovie empties its frame cache only when it is given its file again.
+        movie.setFileName(movie.fileName())
+
+
 class ItemTile(QWidget):
     pressed = Signal(str, Qt.KeyboardModifier)
     clicked = Signal(str)
@@ -92,6 +98,8 @@ class ItemTile(QWidget):
         self.prompt_id = prompt_id
         self.look = self.look_of(prompt_id, thumb_path, label_text, appearance)
         self._selected = False
+        self._in_sight = True
+        self._hidden = False
         self._favorite = appearance.favorite
         self._enhance = appearance.enhance
         self._enhancing = appearance.enhancing
@@ -114,17 +122,7 @@ class ItemTile(QWidget):
         self._image_label = QLabel()
         self._image_label.setFixedSize(_IMAGE_SIZE)
         self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        if appearance.movie_path and Path(appearance.movie_path).exists():
-            play_in(self._image_label, appearance.movie_path, _IMAGE_SIZE)
-        elif thumb_path and Path(thumb_path).exists():
-            pm = QPixmap(str(thumb_path))
-            self._image_label.setPixmap(
-                pm.scaled(_IMAGE_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
-                          Qt.TransformationMode.SmoothTransformation)
-            )
-        else:
-            self._image_label.setText("No preview")
+        self._fill_the_thumbnail(thumb_path, appearance.movie_path)
 
         self._text_label = QLabel(label_text)
         self._text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -155,6 +153,19 @@ class ItemTile(QWidget):
         self._build_the_enhancing_bar()
 
         self._build_corner_buttons(appearance.corner_buttons or [])
+
+    def _fill_the_thumbnail(self, thumb_path: str | None, movie_path: str | None) -> None:
+        if movie_path and Path(movie_path).exists():
+            play_in(self._image_label, movie_path, _IMAGE_SIZE).setCacheMode(
+                QMovie.CacheMode.CacheAll)
+        elif thumb_path and Path(thumb_path).exists():
+            pm = QPixmap(str(thumb_path))
+            self._image_label.setPixmap(
+                pm.scaled(_IMAGE_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
+                          Qt.TransformationMode.SmoothTransformation)
+            )
+        else:
+            self._image_label.setText("No preview")
 
     def _mark_its_kind(self, appearance: TileAppearance) -> None:
         if not appearance.media_type:
@@ -198,7 +209,25 @@ class ItemTile(QWidget):
         self._sync_controls()
 
     def set_in_sight(self, in_sight: bool) -> None:
-        video_in_sight(self._image_label, in_sight)
+        if in_sight == self._in_sight:
+            return
+        self._in_sight = in_sight
+        self._play_while_seen()
+        if not in_sight:
+            _let_go_of_its_frames(what_plays_in(self._image_label))
+
+    def hideEvent(self, event):
+        self._hidden = True
+        self._play_while_seen()
+        super().hideEvent(event)
+
+    def showEvent(self, event):
+        self._hidden = False
+        self._play_while_seen()
+        super().showEvent(event)
+
+    def _play_while_seen(self) -> None:
+        video_in_sight(self._image_label, self._in_sight and not self._hidden)
 
     def set_favorite(self, favorite: bool):
         self._favorite = favorite

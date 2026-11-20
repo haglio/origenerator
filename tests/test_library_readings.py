@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from origenerator import library_readings
 from origenerator.item_names import ItemNames
 from origenerator.library_readings import LibraryReadings, read_whole
 from tests.real_db import database_in, put_rows
@@ -164,3 +165,33 @@ def test_a_poll_after_any_write_reads_the_library_again(tmp_path):
     db.set_generation_favorite("a", True)
 
     assert read_whole(db, last).rows[0]["starred"]
+
+
+def _counting_fingerprints(monkeypatch) -> list[int]:
+    counted: list[int] = []
+    real = library_readings._rows_fingerprint
+    monkeypatch.setattr(library_readings, "_rows_fingerprint",
+                        lambda rows: counted.append(len(rows)) or real(rows))
+    return counted
+
+
+def test_rows_read_and_found_moved_are_not_fingerprinted_again_when_taken(tmp_path, monkeypatch):
+    readings, _db, _published = _readings(tmp_path, _image("a"), _image("b"))
+    counted = _counting_fingerprints(monkeypatch)
+    rows, meta = readings.read()
+
+    readings.moved_to(rows, meta)
+    readings.take(rows, meta, _SHAPES)
+
+    assert counted == [2], "the fingerprint walks every row, so a rebuild works it out once"
+
+
+def test_rows_the_poll_fingerprinted_are_not_fingerprinted_again_when_taken(tmp_path, monkeypatch):
+    readings, db, _published = _readings(tmp_path, _image("a"))
+    read = read_whole(db)
+    counted = _counting_fingerprints(monkeypatch)
+
+    assert readings.is_news(read, readings.drawn_version) is True
+    readings.take(read.rows, read.meta, _SHAPES)
+
+    assert counted == []

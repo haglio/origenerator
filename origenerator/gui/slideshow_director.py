@@ -201,6 +201,7 @@ class SlideshowDirector:
         self._enhancing_of = surroundings.enhancing_of
         self._volume_left_at: VolumeHud | None = None
         self._db = sources.db
+        self._runs_being_made: dict[str, dict] = {}
         self._names = sources.names
         self._listing = sources.listing
         self._weight_of = sources.weight_of
@@ -1075,7 +1076,7 @@ class SlideshowDirector:
                 slideshow.note_generating(prompt_id, frame)
 
     def _would_play(self, prompt_id: str, location=None) -> bool:
-        row = self._db.get_generation(prompt_id)
+        row = self._run_being_made(prompt_id)
         if row is None or row.get("workflow_name") == gallery.ENHANCE_WORKFLOW:
             return False
         held = (self._library().ids_at(location) if location
@@ -1095,10 +1096,19 @@ class SlideshowDirector:
                     and (latest is None or latest.folder in gallery.folder_chain(
                         row, self._library().image_index)))
 
+    def _run_being_made(self, prompt_id: str) -> dict | None:
+        row = self._runs_being_made.get(prompt_id) or self._db.get_generation(prompt_id)
+        if row is not None:
+            self._runs_being_made[prompt_id] = row
+        return row
+
     def note_in_flight(self, items):
+        in_flight = {item.key for item in items}
+        self._runs_being_made = {prompt_id: row for prompt_id, row in self._runs_being_made.items()
+                                 if prompt_id in in_flight}
         for slideshow, location in self._live_slideshows:
             self._offer_the_frames(slideshow, location, items)
-            slideshow.note_in_flight({item.key for item in items})
+            slideshow.note_in_flight(in_flight)
 
     def _offer_the_frames(self, slideshow, location, items) -> None:
         for item in self._runs_shown_at(location, items, slideshow):

@@ -133,3 +133,16 @@ def test_left_to_itself_it_listens_the_way_this_app_needs(qtbot, monkeypatch):
     assert set(engines.verifying_listener_in) == {"de"}
     assert isinstance(engines.verifying_listener_in["de"], WhisperReader)
     assert isinstance(engines.hears_speech, HearsSpeech)
+    assert not settings.listens_alone, "a running Fun Time or Action Setter Tool may still be heard"
+
+
+def test_a_hearing_told_to_listen_alone_has_every_other_listener_muted_while_it_runs(qtbot, monkeypatch):
+    built = Mock()
+    monkeypatch.setattr("origenerator.voice.hearing.CommandListener", built)
+
+    hearing = Hearing({"undo"}, listens_alone=True)
+    hearing.start()
+    hearing.close()
+
+    _rules, settings, _events, _engines = built.call_args.args
+    assert settings.listens_alone

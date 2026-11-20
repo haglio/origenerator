@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
 from app_support import wrong_actions
 
 from origenerator import gallery
 from origenerator.action_setter_tool import (
+    ON_ITS_OWN,
     AnswersTold,
     ThrownInto,
     asks_to_keep_going,
@@ -194,3 +196,26 @@ def test_a_trashed_item_goes_the_way_the_gallery_deletes_and_comes_back_as_it_re
     rubbish.back("gen-one")
 
     assert ([row["prompt_id"] for row in deleted], restored) == (["gen-one"], ["gen-one"])
+
+
+def test_while_the_tool_is_open_its_listener_is_the_only_one_on_the_computer_that_hears(monkeypatch):
+    made = []
+
+    class _Hearing:
+        def __init__(self, phrases, **kwargs):
+            made.append(kwargs)
+            self.said = SimpleNamespace(connect=lambda slot: None)
+
+        def start(self):
+            pass
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("origenerator.voice.hearing.Hearing", _Hearing)
+    window = SimpleNamespace(words={"alpha"}, hear=lambda said: None,
+                             closed=SimpleNamespace(connect=lambda slot: None))
+
+    ON_ITS_OWN.listen(window)
+
+    assert [kwargs.get("listens_alone") for kwargs in made] == [True]

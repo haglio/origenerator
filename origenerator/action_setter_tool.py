@@ -165,7 +165,7 @@ def _its_own_trash(db) -> ThrownInto:
 def _listening_while_open(window) -> None:
     from origenerator.voice.hearing import Hearing
 
-    hearing = Hearing(window.words, parent=window)
+    hearing = Hearing(window.words, listens_alone=True, parent=window)
     hearing.said.connect(lambda said, _spoken_at: window.hear(said))
     window.closed.connect(hearing.close)
     hearing.start()

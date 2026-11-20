@@ -23,6 +23,9 @@ class RequestAim:
         made = [index for index, turn in enumerate(self.every_turn()[:before]) if turn.made]
         return made[-1] if made else -1
 
+    def is_nearest_the_end_of_the_made(self, index: int) -> bool:
+        return not any(turn.made for turn in self.every_turn()[index + 1:])
+
     def made_before(self, index: int) -> str | None:
         last = self.last_made(index)
         return self.every_turn()[last].made if last >= 0 else self.started_on

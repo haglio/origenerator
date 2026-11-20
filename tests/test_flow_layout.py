@@ -253,3 +253,58 @@ def test_a_group_wider_than_the_whole_row_wraps_inside_itself(qtbot):
     flow.setGeometry(QRect(0, 0, 90, 200))
 
     assert [(square.x(), square.y()) for square in group] == [(0, 0), (44, 0), (0, 44)]
+
+
+def _tiles_in(host, count: int, size=(180, 200)) -> FlowLayout:
+    layout = FlowLayout(host, spacing=8)
+    for _ in range(count):
+        tile = QWidget()
+        tile.setFixedSize(*size)
+        layout.addWidget(tile)
+    return layout
+
+
+def test_a_height_asked_for_again_at_the_same_width_is_not_worked_out_again(qtbot):
+    host = QWidget()
+    qtbot.addWidget(host)
+    layout = _tiles_in(host, 40)
+    worked_out = []
+    rows = layout._rows
+    layout._rows = lambda area: worked_out.append(area.width()) or rows(area)
+
+    heights = {layout.heightForWidth(900) for _scroll_step in range(5)}
+
+    assert (len(heights), worked_out) == (1, [900]), (
+        "the gallery asks for its height on every scroll step, and working it out walks "
+        "every tile drawn")
+
+
+def _changes(layout):
+    caption = QLabel("a caption")
+    caption.setWordWrap(True)
+    tile = QWidget()
+    tile.setFixedSize(180, 200)
+    first = layout.itemAt(0).widget()
+    return [
+        ("a tile added", lambda: layout.addWidget(tile)),
+        ("a wrapping caption added", lambda: layout.add_full_row(caption)),
+        ("the caption grown to several lines", lambda: caption.setText("words " * 200)),
+        ("a tile hidden", first.hide),
+        ("the tile shown again", first.show),
+        ("a tile grown", lambda: tile.setFixedSize(180, 420)),
+        ("the rows set further apart", lambda: layout.set_row_spacing(30)),
+        ("an item taken out", lambda: layout.takeAt(1)),
+    ]
+
+
+def test_the_height_kept_for_a_width_is_the_height_worked_out_afresh_after_any_change(qtbot):
+    host = QWidget()
+    qtbot.addWidget(host)
+    host.show()
+    layout = _tiles_in(host, 9)
+
+    for change, make in _changes(layout):
+        layout.heightForWidth(600)
+        make()
+        fresh = layout._do_layout(QRect(0, 0, 600, 0), place=False)
+        assert layout.heightForWidth(600) == fresh, change

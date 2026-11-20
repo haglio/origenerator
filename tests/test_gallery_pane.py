@@ -10,7 +10,7 @@ import pytest
 import shiboken6
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QMovie
-from PySide6.QtWidgets import QLabel, QWidget
+from PySide6.QtWidgets import QApplication, QLabel, QWidget
 
 from origenerator import gallery, search
 from origenerator.gallery.collection import (
@@ -24,6 +24,7 @@ from origenerator.gallery.collection import (
 )
 from origenerator.gallery.shapes import LANDSCAPE, SHAPES_AND_BOTH
 from origenerator.gui import gallery_pane
+from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.gallery_pane import (
     GalleryPane,
@@ -1115,3 +1116,77 @@ def test_a_folder_s_preview_lists_its_thumbnails_folder_rather_than_asking_after
 
     assert gallery_pane._thumbnails_of(rows) == []
     assert asked == []
+
+
+def _a_big_folder_scrolled_to_rest(qtbot, db, count=300):
+    rows = [_row(f"g{n}", n) for n in range(count)]
+    pane, scroll = _pane(qtbot, db, rows)
+    scroll.setWidgetResizable(True)
+    scroll.resize(1100, 1000)
+    scroll.show()
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+    QApplication.processEvents()
+    return pane, scroll
+
+
+def test_scroll_steps_that_draw_no_page_measure_nothing_and_tell_only_the_tiles_that_cross(
+        qtbot, db, monkeypatch):
+    pane, scroll = _a_big_folder_scrolled_to_rest(qtbot, db)
+    bar = scroll.verticalScrollBar()
+    drawn = len(pane._thumb_widgets)
+    told = []
+    monkeypatch.setattr(ItemTile, "set_in_sight",
+                        lambda tile, in_sight: told.append((tile.prompt_id, in_sight)))
+    worked_out = []
+    rows = FlowLayout._rows
+    monkeypatch.setattr(FlowLayout, "_rows",
+                        lambda layout, area: worked_out.append(1) or rows(layout, area))
+
+    tiles = list(pane._thumb_widgets.values())
+    crossing = []
+    for _step in range(3):
+        before = _in_sight_at(tiles, bar.value(), scroll)
+        bar.setValue(bar.value() + 1)
+        after = _in_sight_at(tiles, bar.value(), scroll)
+        crossing += [(tile.prompt_id, after[tile]) for tile in tiles if after[tile] != before[tile]]
+
+    assert len(pane._thumb_widgets) == drawn, "the steps were meant to draw nothing"
+    assert (worked_out, told) == ([], crossing), (
+        "every tile drawn was measured and told again on each step, where only the ones "
+        "that came into sight or went out of it needed telling")
+
+
+def _in_sight_at(tiles, top, scroll):
+    foot = top + scroll.viewport().height() + gallery_pane._REACH
+    return {tile: tile.y() < foot and tile.y() + tile.height() > top - gallery_pane._REACH
+            for tile in tiles}
+
+
+def _grid_places(count, width, tile, spacing):
+    across = max(1, (width + spacing) // (tile.width() + spacing))
+    return [((n % across) * (tile.width() + spacing), (n // across) * (tile.height() + spacing))
+            for n in range(count)]
+
+
+@pytest.mark.parametrize("count", [7, 60, 130])
+@pytest.mark.parametrize("width", [700, 1100, 1900])
+def test_every_tile_of_a_folder_sits_on_the_grid_at_every_width(qtbot, db, count, width):
+    rows = [_row(f"g{n}", n) for n in range(count)]
+    pane, scroll = _pane(qtbot, db, rows)
+    scroll.setWidgetResizable(True)
+    scroll.resize(width, 900)
+    scroll.show()
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+    bar = scroll.verticalScrollBar()
+    while len(pane._thumb_widgets) < count:
+        bar.setValue(bar.maximum())
+        QApplication.processEvents()
+    QApplication.processEvents()
+
+    tiles = [pane._thumb_widgets[row["prompt_id"]] for row in rows]
+    drawn = scroll.widget()
+    places = _grid_places(count, drawn.width(), tiles[0].size(), gallery_pane._TILE_SPACING)
+    assert [(tile.x(), tile.y()) for tile in tiles] == places
+    assert drawn.height() == max(scroll.viewport().height(),
+                                 places[-1][1] + tiles[-1].height())
+

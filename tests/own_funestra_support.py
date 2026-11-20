@@ -42,9 +42,9 @@ class _Window:
     def __init__(self) -> None:
         self.shown = False
         self.minimized = False
+        self.on_top = False
         self.position = (0, 0)
         self.size = VIEWPORT
-        self.lifted = 0
 
     def show(self) -> None:
         self.shown = True
@@ -155,8 +155,8 @@ class FakeProgram:
         self.minimized = True
         self.window.minimize()
 
-    def come_forward(self) -> None:
-        self.window.lifted += 1
+    def stand_on_top(self, on: bool) -> None:
+        self.window.on_top = on
 
     def set_paused(self, paused: bool) -> None:
         self._paused = paused

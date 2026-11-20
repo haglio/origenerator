@@ -8,9 +8,10 @@ from app_support.win32 import TaskbarApp
 from funestra.funestra_verbs import QUIT
 from funestra.program.cli import build_parser
 from funestra.program.window_verbs import (
-    WINDOW_FRONT,
     WINDOW_HIDE,
     WINDOW_MINIMIZE,
+    WINDOW_NOT_ON_TOP,
+    WINDOW_ON_TOP,
     WINDOW_SHOW,
     window_place,
 )
@@ -100,15 +101,16 @@ def test_shown_on_a_place_it_is_put_there_then_shown(tmp_path):
     assert program.place == Rect(-1440, 0, 1440, 2560)
 
 
-def test_hidden_minimized_and_brought_forward_are_the_windows_own_verbs(tmp_path):
+def test_hidden_minimized_and_put_on_top_are_the_windows_own_verbs(tmp_path):
     program, _started = _program(tmp_path)
     program.start()
 
     program.hide()
     program.minimize()
-    program.come_forward()
+    program.stand_on_top(True)
+    program.stand_on_top(False)
 
-    assert _sent(program) == [WINDOW_HIDE, WINDOW_MINIMIZE, WINDOW_FRONT]
+    assert _sent(program) == [WINDOW_HIDE, WINDOW_MINIMIZE, WINDOW_ON_TOP, WINDOW_NOT_ON_TOP]
 
 
 def test_the_pause_is_a_flag_the_program_reads_each_pass(tmp_path):

@@ -1709,6 +1709,7 @@ class GalleryView(QWidget):
         if paused != omnipause.frozen():
             logger.info("The room is %s", "paused" if paused else "playing")
         self.slideshows.set_room_paused(paused)
+        self._two_screens.on_top.room_paused(paused)
         omnipause.freeze(paused)
 
     def hud_place(self, shape: str) -> tuple:

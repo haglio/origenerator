@@ -313,6 +313,7 @@ class Core(QMainWindow):
         if self._device_rect is not None:
             place_window_in_device_pixels(int(self.winId()), *self._device_rect)
         if self._fun_time is None:
+            self._sides.on_top.stand_alone(True)
             self._sides.core_is_up.emit()
 
     def go_to_generation(self, prompt_id: str) -> None:
@@ -338,6 +339,7 @@ class Core(QMainWindow):
         self._persist_session()
         self._found = (self.saveGeometry(), ui_scale.active_scale(), self.isMinimized())
         self._fun_time = session
+        self._sides.on_top.stand_alone(False)
         if self._taskbar is not None and session.taskbar_identity:
             self._taskbar.join(session.taskbar_identity)
         self._title.hide()

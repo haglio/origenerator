@@ -602,6 +602,7 @@ class SlideshowDirector:
     def _a_funestra_of_the_apps_own(self, items, shape: str, showing: Showing, **kwargs):
         program = self._own_funestras.take()
         asks = AsksFromTheFunestra(program.asks_file)
+        self.two_screens.on_top.keep_on_top_too(program)
         shown = OnItsOwnFunestra(
             program, shape, showing.actions,
             OwnWiring(motion=self._motion, **self._the_audio_standing_on_its_own()), asks=asks)

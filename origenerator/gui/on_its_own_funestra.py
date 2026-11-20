@@ -14,7 +14,7 @@ from funestra.session_quit import SESSION_QUIT
 from funestra.status import parse_status
 from funestra.volume import VolumeHud
 from PySide6.QtCore import QObject, QRect, Qt, QTimer, Signal
-from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QWidget
 from shared_ui.message_shape import HEARD_MARK, INFO, time_to_read_ms
 
@@ -171,9 +171,6 @@ class OnItsOwnFunestra(QObject):
         self._asks = asks
         if asks is not None:
             asks.asked.connect(self.asked)
-        application = QGuiApplication.instance()
-        if application is not None:
-            application.applicationStateChanged.connect(self._come_forward_beside_core)
 
     def shown_for(self, slideshow) -> OnItsOwnFunestra:
         self._slideshow = slideshow
@@ -224,9 +221,7 @@ class OnItsOwnFunestra(QObject):
             self._slideshow.close()
         elif command == PRESSED_AGAIN:
             self._leave()
-        elif command == FOCUSED:
-            self._bring_core_forward_too()
-        elif not done:
+        elif command != FOCUSED and not done:
             self.press(command, at)
 
     def press(self, command: str, said_at: float | None = None) -> bool:
@@ -311,23 +306,6 @@ class OnItsOwnFunestra(QObject):
         if leave_for_core is None or not leave_for_core(self._slideshow.hud_prompt_id):
             self._slideshow.close()
 
-    def _core(self):
-        return self._actions.core_window() if self._actions.core_window is not None else None
-
-    def _core_is_on_another_screen(self) -> bool:
-        core = self._core()
-        return (core is not None and self._over is not None
-                and not self._over.contains(core.frameGeometry().center()))
-
-    def _come_forward_beside_core(self, state) -> None:
-        if (state == Qt.ApplicationState.ApplicationActive and self._up
-                and self._core_is_on_another_screen()):
-            self._program.come_forward()
-
-    def _bring_core_forward_too(self) -> None:
-        if self._core_is_on_another_screen():
-            self._core().raise_()
-
     def flash(self, text: str, *, kind: str = INFO, mark: str = "") -> None:
         self._say(text, kind=kind, mark=mark)
         self._note_timer.start(time_to_read_ms(text))
@@ -371,7 +349,7 @@ class OnItsOwnFunestra(QObject):
             self._press_the_apps_own_shortcut(name, held)
 
     def _press_the_apps_own_shortcut(self, name: str, held: list[str]) -> None:
-        core = self._core()
+        core = self._actions.core_window() if self._actions.core_window is not None else None
         if core is None:
             return
         pressed = QKeySequence("+".join([*(part for part in held if part), name]))

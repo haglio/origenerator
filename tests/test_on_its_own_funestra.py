@@ -7,12 +7,11 @@ from typing import NamedTuple
 
 import pytest
 from app_support.funscript import read_actions
-from funestra.program.asks import FOCUSED
 from funestra.session_quit import SESSION_QUIT
 from funestra.volume import VolumeHud
 from PIL import Image
-from PySide6.QtCore import QCoreApplication, QRect, Qt
-from PySide6.QtGui import QGuiApplication, QKeyEvent
+from PySide6.QtCore import QCoreApplication, Qt
+from PySide6.QtGui import QKeyEvent
 from shared_ui.colors import GREEN, RED, TEXT_PRIMARY, YELLOW
 from shared_ui.icons import icon_then_text
 from shared_ui.message_shape import (
@@ -509,55 +508,6 @@ def test_a_slideshow_core_will_not_take_from_closes_as_it_always_did(qtbot):
     _press(view, Qt.Key.Key_Return)
 
     assert not view.is_up()
-
-
-class _CoreAt:
-    def __init__(self, x: int, y: int):
-        self._area = QRect(x, y, 400, 300)
-        self.raised = 0
-
-    def frameGeometry(self):
-        return QRect(self._area)
-
-    def isVisible(self):
-        return True
-
-    def isMinimized(self):
-        return False
-
-    def raise_(self):
-        self.raised += 1
-
-
-def _app_comes_to_the_front():
-    QGuiApplication.instance().applicationStateChanged.emit(Qt.ApplicationState.ApplicationActive)
-
-
-def test_coming_back_to_the_app_brings_the_slideshow_forward_on_the_other_monitor_too(qtbot):
-    core = _CoreAt(5000, 100)
-    view = _view(qtbot, on_core_window=lambda: core)
-
-    _app_comes_to_the_front()
-
-    assert view.program.window.lifted == 1
-
-
-def test_a_slideshow_sharing_cores_monitor_is_not_lifted_over_core(qtbot):
-    core = _CoreAt(100, 100)
-    view = _view(qtbot, on_core_window=lambda: core)
-
-    _app_comes_to_the_front()
-
-    assert view.program.window.lifted == 0
-
-
-def test_bringing_the_slideshow_forward_brings_core_forward_on_the_other_monitor_too(qtbot):
-    core = _CoreAt(5000, 100)
-    view = _view(qtbot, on_core_window=lambda: core)
-
-    view.asked(FOCUSED, 0.0)
-
-    assert core.raised == 1
 
 
 def _collection_view(qtbot):

@@ -7,6 +7,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
+from typing import ClassVar
 
 from app_support import origenerator_handoff as handoff
 from app_support.file_channel import read_key_values
@@ -208,6 +209,7 @@ class Rect:
 
 @dataclass(frozen=True)
 class FunestraChannel:
+    waits_on_the_disk: ClassVar[bool] = True
     playlist: Path
     command_file: Path
     status_file: Path
@@ -219,6 +221,9 @@ class FunestraChannel:
 
     def send(self, verb: str) -> bool:
         return append_command(self.command_file, verb)
+
+    def send_all(self, verbs: list[str]) -> bool:
+        return self.send("\n".join(verbs))
 
     def status(self) -> dict[str, str]:
         try:

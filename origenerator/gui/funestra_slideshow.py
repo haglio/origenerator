@@ -36,7 +36,9 @@ from PySide6.QtCore import QObject, QTimer, Signal
 from shared_ui.message_shape import HEARD_MARK, INFO, WARNING, mark_of_a_message_said_now
 
 from origenerator.gui.action_presses import ActionPresses
+from origenerator.gui.funestra_outbox import FunestraOutbox
 from origenerator.gui.funestra_transport import FunestraTransport
+from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.on_a_sessions_funestra import OnASessionsFunestra
 from origenerator.gui.slideshow_pace import STEP_S as PACE_STEP_S
 from origenerator.gui.slideshow_pace import SlideshowPace
@@ -86,6 +88,8 @@ class FunestraSlideshow(QObject):
         self._clock = hosting.clock or time.monotonic
         self._on_screen = OnScreenHistory()
         self._shape, self._frames, self.channel = seat.shape, seat.frames, seat.channel
+        self._outbox = FunestraOutbox(seat.channel, run=self._off_the_window,
+                                      lost=self._dropped)
         self._actions = playing.actions if playing.actions is not None else SlideshowActions()
         self.shown = hosting.shown if hosting.shown is not None else OnASessionsFunestra(
             self, seat.shape, seat.channel, hosting.messages, actions=self._actions)
@@ -97,6 +101,7 @@ class FunestraSlideshow(QObject):
         self._pace.changed.connect(self._on_pace_changed)
         self._take_set(playing)
         self._open = True
+        self._reading_the_status = False
         self._on_funestra = OnTheFunestra()
         self._asked_load_heard: object = _NOT_HEARD_YET
         def at_defaults() -> bool:
@@ -154,9 +159,13 @@ class FunestraSlideshow(QObject):
 
     @looking_once
     def _hand_over(self, *, land: bool = False) -> None:
+        with self._outbox.gathered():
+            self._hand_over_gathered(land=land)
+
+    def _hand_over_gathered(self, *, land: bool) -> None:
         current = self._set.playlist.current()
         rotated = rotated_onto(self._set.playlist.in_play_order(), current)
-        self.channel.write_playlist([self._funestra_item(item) for item in rotated])
+        self._outbox.write_playlist([self._funestra_item(item) for item in rotated])
         lands = land and current is not None and self._file_of(current) != self._on_funestra.item
         if lands and self._comparing:
             self._comparing = False
@@ -206,10 +215,17 @@ class FunestraSlideshow(QObject):
         return slide_item(slide, self._places_of(self._file_of(slide)),
                           scripts=self._scripts_on_opening)
 
+    def _off_the_window(self, work, done, *, owner) -> None:
+        if self.channel.waits_on_the_disk:
+            run_off_thread(work, done, owner=owner)
+        else:
+            done(work())
+
     def _send(self, verb: str) -> None:
-        if not self.channel.send(verb):
-            logger.warning("Dropped %s for the %s Funestra (command file locked)",
-                           verb, self._shape)
+        self._outbox.send(verb)
+
+    def _dropped(self, verb: str) -> None:
+        logger.warning("Dropped %s for the %s Funestra (command file locked)", verb, self._shape)
 
     @property
     def dwell_s(self) -> int:
@@ -234,7 +250,16 @@ class FunestraSlideshow(QObject):
     def tick(self) -> None:
         if not self._open:
             return
-        fields = self.channel.status()
+        if self._reading_the_status:
+            self._publish()
+            return
+        self._reading_the_status = True
+        self._off_the_window(self.channel.status, self._heard_the_funestra, owner=self)
+
+    def _heard_the_funestra(self, fields: dict | None) -> None:
+        self._reading_the_status = False
+        if not self._open:
+            return
         if fields:
             self._follow_the_funestra(fields)
         self._publish()

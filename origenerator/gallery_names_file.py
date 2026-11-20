@@ -11,14 +11,26 @@ GALLERY_NAMES_FILE = "gallery_names.json"
 GALLERY_NAMES_PATH = LIBRARY_STATE_DIR / GALLERY_NAMES_FILE
 
 
-def publish(names_by_file: dict[str, str], *, path: Path = GALLERY_NAMES_PATH) -> None:
-    text = json.dumps(names_by_file, sort_keys=True)
-    if _published(path) != text:
-        write_whole(path, text)
+class NamesFile:
+    def __init__(self, path: Path = GALLERY_NAMES_PATH, *, read=read_whole,
+                 write=write_whole) -> None:
+        self._path = path
+        self._read = read
+        self._write = write
+        self._written: str | None = None
+        self._looked = False
 
+    def publish(self, names_by_file: dict[str, str]) -> None:
+        text = json.dumps(names_by_file, sort_keys=True)
+        if not self._looked:
+            self._written = self._published()
+            self._looked = True
+        if text != self._written:
+            self._write(self._path, text)
+            self._written = text
 
-def _published(path: Path) -> str | None:
-    try:
-        return read_whole(path)
-    except FileNotFoundError:
-        return None
+    def _published(self) -> str | None:
+        try:
+            return self._read(self._path)
+        except FileNotFoundError:
+            return None

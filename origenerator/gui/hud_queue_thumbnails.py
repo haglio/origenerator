@@ -23,6 +23,10 @@ def _written(path) -> int | None:
         return None
 
 
+def thumbnail_dates(paths) -> tuple[int | None, ...]:
+    return tuple(_written(path) for path in paths if path)
+
+
 def fitted_thumbnail(path, side: int, gray: bool = False) -> Image.Image | None:
     if not path:
         return None

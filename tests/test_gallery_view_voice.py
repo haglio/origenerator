@@ -530,7 +530,7 @@ def test_a_request_the_model_answered_says_only_that_it_was_submitted_and_keeps_
     assert job.params["positive_prompt"] == "a woman, soft light"
     (turn,) = view._db.requests.exchange_of(job.prompt_id)
     assert (turn.said, turn.answered) == (
-        "no hat", 'Removed "a hat" from the Positive Prompt.')
+        "no hat", 'Removed "a hat" from the Positive prompt.')
     assert (turn.old_positive, turn.new_positive) == ("a woman, a hat, soft light", "a woman, soft light")
 
 

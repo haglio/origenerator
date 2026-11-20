@@ -3303,7 +3303,7 @@ def _replacing(old, new, *, for_):
 
 
 _TWO_WOMEN = _replacing("a woman", "two women", for_="two women")
-_TWO_WOMEN_SAID = 'Replaced "a woman" with "two women" in the Positive Prompt.'
+_TWO_WOMEN_SAID = 'Replaced "a woman" with "two women" in the Positive prompt.'
 
 
 def _rewriting(monkeypatch, answer=_TWO_WOMEN):
@@ -3633,7 +3633,7 @@ def test_a_request_for_the_newer_lora_picks_it_on_the_form_and_swaps_its_trigger
     until(lambda: bool(exchange.turns()) and bool(exchange.turns()[-1][1]))
     assert exchange.turns()[-1][1].endswith(
         "to Example Style 1.1 (was Example Style 1.0), and swapped its trigger word exmplstyle "
-        "for exmplnew in the Positive Prompt.")
+        "for exmplnew in the Positive prompt.")
     assert tab.current_config().params["lora"] == "example_style_11.safetensors"
     assert _positive(tab) == "a woman, (exmplnew:1.1), soft light"
 
@@ -3657,7 +3657,7 @@ def test_a_second_request_builds_on_the_first_and_generate_records_every_turn(
     asked = tab.asked()
     assert [(turn.said, turn.answered) for turn in asked["turns"]] == [
         ("two women", _TWO_WOMEN_SAID),
-        ("on a beach", 'Replaced "on a couch" with "on a beach" in the Positive Prompt.')]
+        ("on a beach", 'Replaced "on a couch" with "on a beach" in the Positive prompt.')]
     assert asked["turns"][1].old_positive == "two women on a couch"
     assert (asked["asked"], asked["source_prompt_id"], asked["old_positive"]) == (
         "on a beach", "img1", "a woman on a couch")
@@ -3677,7 +3677,7 @@ def test_a_second_request_typed_before_generating_is_worked_out_knowing_the_firs
     exchange = _ask(tab, qtbot, "that is the wrong place for it, please fix")
 
     until(lambda: _positive(tab) == "a woman on a couch")
-    assert exchange.turns()[-1][1] == 'Removed "a red scarf" from the Positive Prompt.'
+    assert exchange.turns()[-1][1] == 'Removed "a red scarf" from the Positive prompt.'
 
 
 def test_a_typed_request_tells_the_model_whether_the_tabs_prompts_take_weights(
@@ -3731,7 +3731,7 @@ def test_a_request_typed_while_generating_follows_the_result_that_lands_with_its
     exchange = tab._param_form.request_exchange()
     assert exchange.turns() == [
         ("two women", _TWO_WOMEN_SAID),
-        ("on a beach", 'Replaced "on a couch" with "on a beach" in the Positive Prompt.')]
+        ("on a beach", 'Replaced "on a couch" with "on a beach" in the Positive prompt.')]
     assert _positive(tab) == "two women on a beach"
     asked = tab.asked()
     assert [turn.said for turn in asked["turns"]] == ["on a beach"]

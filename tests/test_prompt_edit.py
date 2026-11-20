@@ -59,8 +59,8 @@ def test_the_term_keeps_its_own_casing():
 
 NOTES = CollectionNotes(prompt_count=5, batches=1, batch_notes=["one note"],
                         patterns="comma-separated parts, a subject first")
-EXCHANGE = [("a hat", 'Added "a straw hat" to the Positive Prompt.'),
-            ("make it red", 'Replaced "a straw hat" with "a red straw hat" in the Positive Prompt.')]
+EXCHANGE = [("a hat", 'Added "a straw hat" to the Positive prompt.'),
+            ("make it red", 'Replaced "a straw hat" with "a red straw hat" in the Positive prompt.')]
 
 
 def _replace(old: str, new: str, *, for_: str, prompt: str = "positive") -> dict:
@@ -102,7 +102,7 @@ def test_the_model_is_asked_first_with_the_prompts_the_exchange_and_the_notes():
 
     assert model.asked == [("a woman on a couch", "blurry", "two women", EXCHANGE, NOTES)]
     assert (revision.positive, revision.negative) == ("two women on a couch", "blurry")
-    assert revision.answer == 'Replaced "a woman" with "two women" in the Positive Prompt.'
+    assert revision.answer == 'Replaced "a woman" with "two women" in the Positive prompt.'
     assert revision.action == REWRITTEN
     assert revision.changed
 
@@ -122,8 +122,8 @@ def test_a_term_the_rules_are_sure_of_still_goes_to_the_model_which_knows_the_co
 
     assert len(model.asked) == 1
     assert (revision.positive, revision.negative) == ("a woman, soft light", "blurry, hat")
-    assert revision.answer == ('Removed "a hat" from the Positive Prompt. Added "hat" to the '
-                               "Negative Prompt.")
+    assert revision.answer == ('Removed "a hat" from the Positive prompt. Added "hat" to the '
+                               "Negative prompt.")
 
 
 def test_a_model_that_cannot_be_asked_changes_nothing_and_says_the_model_did_not_answer(caplog):
@@ -178,8 +178,8 @@ def test_a_model_that_finds_nothing_more_to_do_says_what_the_prompts_already_had
                         ask=_Model(nothing_more))
 
     assert not revision.changed
-    assert revision.answer == ('"freckles" was already in the Positive Prompt, and its opposite already '
-                               "in the Negative Prompt, so I couldn't figure out anything else to do.")
+    assert revision.answer == ('"freckles" was already in the Positive prompt, and its opposite already '
+                               "in the Negative prompt, so I couldn't figure out anything else to do.")
 
 
 def test_a_change_answering_none_of_his_words_is_left_out_without_a_word():
@@ -189,7 +189,7 @@ def test_a_change_answering_none_of_his_words_is_left_out_without_a_word():
     revision = work_out("a woman, natural makeup, beach", "blurry", "more light", ask=model)
 
     assert revision.positive == "a woman, natural makeup, beach, soft light"
-    assert revision.answer == 'Added "soft light" to the Positive Prompt.'
+    assert revision.answer == 'Added "soft light" to the Positive prompt.'
 
 
 def test_his_earlier_requests_count_as_his_words_too():
@@ -237,7 +237,7 @@ def test_the_model_rewrites_each_scene_from_that_scenes_own_prompts():
     assert [(positive, negative, request) for positive, negative, request, *_ in model.asked] == [
         ("a man reading", "blurry", "two men"), ("a man asleep", "blurry", "two men")]
     assert revision.positive == story_of(["two men reading", "two men asleep"])
-    assert revision.answer == 'Replaced "a man" with "two men" in the Positive Prompt.'
+    assert revision.answer == 'Replaced "a man" with "two men" in the Positive prompt.'
 
 
 def test_a_storys_scenes_answered_differently_are_answered_scene_by_scene():
@@ -247,8 +247,8 @@ def test_a_storys_scenes_answered_differently_are_answered_scene_by_scene():
     revision = work_out(story_of(["a dog", "a cat"]), "blurry", "grass", in_scenes=True, ask=model)
 
     assert revision.positive == story_of(["a dog, grass", "a cat, green grass"])
-    assert revision.answer == ('Added "grass" to the Positive Prompt. Added "green grass" to the '
-                               "Positive Prompt.")
+    assert revision.answer == ('Added "grass" to the Positive prompt. Added "green grass" to the '
+                               "Positive prompt.")
 
 
 def test_a_story_the_model_answered_only_in_part_changes_nothing_and_says_so():
@@ -320,10 +320,10 @@ def test_the_request_messages_carry_the_notes_the_exchange_as_turns_the_prompts_
     assert messages[0] == {"role": "system", "content": "SYSTEM"}
     assert messages[1:5] == [
         {"role": "user", "content": "a hat"},
-        {"role": "assistant", "content": 'Added "a straw hat" to the Positive Prompt.'},
+        {"role": "assistant", "content": 'Added "a straw hat" to the Positive prompt.'},
         {"role": "user", "content": "make it red"},
         {"role": "assistant",
-         "content": 'Replaced "a straw hat" with "a red straw hat" in the Positive Prompt.'}]
+         "content": 'Replaced "a straw hat" with "a red straw hat" in the Positive prompt.'}]
     content = messages[5]["content"]
     assert content.index("comma-separated parts") < content.index("a woman, tan") < content.index(
         "blurry") < content.index("no tan lines")
@@ -581,7 +581,7 @@ def test_a_request_may_change_a_setting_and_the_prompts_in_one_turn():
     assert revision.settings == (("steps", 30),)
     assert revision.negative == "blurry, hat"
     assert revision.answer == ('Set Steps to 30 (was 50). Couldn\'t find "hat" in the Positive '
-                               'Prompt. Added "hat" to the Negative Prompt.')
+                               'prompt. Added "hat" to the Negative prompt.')
 
 
 def test_the_model_is_told_when_the_prompts_take_no_weights():

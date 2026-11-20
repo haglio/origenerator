@@ -1071,7 +1071,7 @@ def test_a_tabs_go_to_folder_puts_a_running_search_away(qtbot, tmp_path):
     assert view.search.field.text() == ""
 
 
-_TWO_CATS_SAID = 'Replaced "a cat" with "two cats" in the Positive Prompt.'
+_TWO_CATS_SAID = 'Replaced "a cat" with "two cats" in the Positive prompt.'
 
 
 def test_a_run_generated_with_a_request_typed_on_its_tab_is_recorded_as_one(qtbot, tmp_path):

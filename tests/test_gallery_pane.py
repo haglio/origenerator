@@ -23,7 +23,7 @@ from origenerator.gallery.collection import (
     collection_keys,
 )
 from origenerator.gallery.shapes import LANDSCAPE, SHAPES_AND_BOTH
-from origenerator.gui import gallery_pane
+from origenerator.gui import gallery_pane, pane_place
 from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.gallery_pane import (
@@ -442,6 +442,52 @@ def test_scrolling_to_the_foot_of_a_pane_draws_on_by_a_page_not_to_the_end(qtbot
     scroll.verticalScrollBar().setValue(scroll.verticalScrollBar().maximum())
 
     assert opened_on < len(_drawn(scroll)) < len(rows)
+
+
+def test_a_page_drawn_on_a_scroll_walks_the_grid_once_not_once_a_tile(qtbot, db, monkeypatch):
+    rows = [_row(f"g{n}", n) for n in range(300)]
+    pane, scroll = _pane(qtbot, db, rows)
+    scroll.setWidgetResizable(True)
+    scroll.resize(1900, 1000)
+    scroll.show()
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+    QApplication.processEvents()
+    drawn = len(_drawn(scroll))
+    walked = []
+    walk = FlowLayout._rows
+    monkeypatch.setattr(FlowLayout, "_rows",
+                        lambda layout, area: walked.append(1) or walk(layout, area))
+
+    scroll.verticalScrollBar().setValue(scroll.verticalScrollBar().maximum())
+
+    pages = (len(_drawn(scroll)) - drawn) // gallery_pane._PAGE
+    assert pages >= 1
+    assert len(walked) == pages, (
+        "each walk of the grid takes longer the further down the folder it is, and the window "
+        "waits on every one")
+
+
+def test_a_page_drawn_on_a_scroll_shows_only_its_own_tiles(qtbot, db, monkeypatch):
+    rows = [_row(f"g{n}", n) for n in range(300)]
+    pane, scroll = _pane(qtbot, db, rows)
+    scroll.setWidgetResizable(True)
+    scroll.resize(1900, 1000)
+    scroll.show()
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+    QApplication.processEvents()
+    already = set(_drawn(scroll))
+    asked = []
+
+    class _Spy:
+        @staticmethod
+        def sendPostedEvents(receiver, kind):
+            asked.append(receiver)
+            QApplication.sendPostedEvents(receiver, kind)
+    monkeypatch.setattr(pane_place, "QCoreApplication", _Spy)
+
+    scroll.verticalScrollBar().setValue(scroll.verticalScrollBar().maximum())
+
+    assert asked == [tile for tile in _drawn(scroll) if tile not in already]
 
 
 def _tile_at(scroll, y):

@@ -9,7 +9,6 @@ from funestra.funestra_verbs import (
     CLEAR_FRAME,
     FORGET_VERSIONS,
     HOLD_PICTURE,
-    LET_GO,
     LOCK_OFF,
     LOCK_ON,
     NEXT,
@@ -475,24 +474,28 @@ class FunestraSlideshow(QObject):
         if item is None:
             return
         self._leave_the_versions()
-        self._lock(False)
         if self._set.unfavorite_current(self._actions.unfavorite):
+            self._lock(False)
             self._flash("Unfavorited")
             self._send(NEXT)
-            return
+        elif item.prompt_id is not None and not item.is_live and self._actions.delete is not None:
+            self._condemn(item.prompt_id)
+        else:
+            self._the_item_on_screen_left(item)
+
+    def _the_item_on_screen_left(self, item) -> None:
+        self._lock(False)
         self._send(f"{TRASH} {self._file_of(item)}")
         self._on_funestra = OnTheFunestra()
         self._set.forget(item)
         self._set.playlist.remove_current()
         self._frames.forget(item.prompt_id)
         if self._set.playlist.is_empty():
-            self.close()
+            self._nothing_is_left()
         elif self._set.end_a_loop_of_one():
             self._lock_what_the_cull_left()
         else:
             self._hand_over()
-        if item.prompt_id is not None and not item.is_live and self._actions.delete is not None:
-            self._condemn(item.prompt_id)
 
     def _lock_what_the_cull_left(self) -> None:
         self._lock(True)
@@ -528,7 +531,7 @@ class FunestraSlideshow(QObject):
 
     def reset_in_place(self) -> None:
         self._lock(False)
-        if self._set.drop_the_filters():
+        if self._set.drop_the_filters() or self._set.playlist.is_empty():
             return
         self._set.playlist.restart()
         self._hand_over(land=True)
@@ -865,19 +868,26 @@ class FunestraSlideshow(QObject):
 
     def release_media(self, paths, *, the_item_stays: bool = False) -> None:
         doomed = {str(path) for path in paths}
+        current = self._set.playlist.current()
         showing = self._on_funestra.file or self._on_funestra.item
-        if not showing or not doomed & {showing, self._on_funestra.item}:
+        on_screen = {showing, self._on_funestra.item,
+                     None if current is None else self._file_of(current)}
+        if not doomed & on_screen:
             return
-        step = self._step_off_a_doomed_version(showing, doomed) if the_item_stays else None
+        step = (self._step_off_a_doomed_version(showing, doomed)
+                if the_item_stays and showing else None)
         if step is not None:
             self._send(step_version(1, [self._version_item(version) for version in step]))
             return
         self._leave_the_versions()
-        if len(self._set.playlist) > 1:
-            self._send(NEXT)
-            return
-        self._refusal_checked = True
-        self._send(LET_GO)
+        if current is not None:
+            self._the_item_on_screen_left(current)
+
+    def _nothing_is_left(self) -> None:
+        if self._actions.reset is not None:
+            self._actions.reset(self)
+        if self._set.playlist.is_empty():
+            self.close()
 
     def state(self) -> SlideshowState:
         return self._set.state(locked=self.locked, version_index=self._version_index())

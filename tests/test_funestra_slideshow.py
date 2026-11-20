@@ -45,7 +45,11 @@ from origenerator.one_look import one_look
 from origenerator.output_places import OutputPlaces
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState, in_order
 from origenerator.slideshow_buttons import LOCK_ON_LED_BY_THE_SESSION, answer
-from tests.slideshow_support import slides_named, stop_the_poll_to_tick_by_hand
+from tests.slideshow_support import (
+    deleting_through_the_gallery,
+    slides_named,
+    stop_the_poll_to_tick_by_hand,
+)
 from tests.test_slideshow_hud import _inflight
 
 _ITEMS = [("one.png", "image", "id-1"), ("two.png", "image", "id-2"),
@@ -653,10 +657,13 @@ def test_culling_tells_the_funestra_to_drop_it_before_deleting_it(qtbot, tmp_pat
     queued_at_delete, deleted = [], []
 
     def delete(prompt_id):
+        slideshow.release_media(["one.png"])
         queued_at_delete.extend(_sent(slideshow))
         deleted.append(prompt_id)
 
     slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(delete=delete))
+    _says(slideshow, video="one.png")
+    slideshow.tick()
     _sent(slideshow)
 
     slideshow.slideshow_cull()
@@ -1317,28 +1324,52 @@ def test_a_slideshow_opened_on_a_slide_lands_the_funestra_on_it(qtbot, tmp_path)
     assert slideshow.hud_prompt_id == "id-3"
 
 
-def test_a_file_about_to_be_deleted_is_let_go_of(qtbot, tmp_path):
+_DELETING = {
+    "in_core": lambda slideshow: slideshow.release_media(["one.png"]),
+    "with_its_trash": lambda slideshow: slideshow.slideshow_cull(),
+}
+
+
+@pytest.mark.parametrize("deleting", list(_DELETING.values()), ids=list(_DELETING))
+def test_an_item_deleted_anywhere_leaves_the_slideshow_the_one_way(qtbot, tmp_path, deleting):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
 
-    slideshow.release_media(["one.png"])
+    deleting(slideshow)
 
-    assert _sent(slideshow) == ["NEXT"]
+    assert _sent(slideshow)[0] == "TRASH one.png"
+    assert [str(slide.path) for slide in slideshow.whole_set()] == ["two.png", "three.png"]
 
 
-def test_a_file_let_go_is_not_taken_for_one_that_would_not_open(qtbot, tmp_path):
-    slideshow = _slideshow(qtbot, tmp_path, items=_ITEMS[:1])
+def test_trash_only_asks_the_gallery_to_delete_the_item(qtbot, tmp_path):
+    asked = []
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(delete=asked.append))
     _says(slideshow, video="one.png")
     slideshow.tick()
     _sent(slideshow)
-    slideshow.release_media(["one.png"])
-    let_go = _sent(slideshow)
 
-    _says(slideshow, video="one.png", idle=True)
+    slideshow.slideshow_cull()
+
+    assert (asked, _sent(slideshow)) == (["id-1"], []), (
+        "a delete in Core is that same delete, and the gallery lets every slideshow go of the "
+        "file, so Trash and Core leave the item the one way")
+
+
+@pytest.fixture(params=list(_DELETING))
+def deleting(request):
+    return _DELETING[request.param]
+
+
+def test_a_slideshow_whose_last_item_is_deleted_is_reset(qtbot, tmp_path, deleting):
+    reset = []
+    slideshow = _slideshow(qtbot, tmp_path, items=_ITEMS[:1],
+                           actions=SlideshowActions(reset=reset.append))
+    _says(slideshow, video="one.png")
     slideshow.tick()
+    _sent(slideshow)
 
-    assert (let_go, _sent(slideshow)) == (["LET_GO"], []), (
-        "nothing is up because the file was let go, not because it would not open, so the "
-        "slideshow does not step past it")
+    deleting(slideshow)
+
+    assert reset == [slideshow], "nothing is left, so it goes as a press of Reset does"
 
 
 def test_the_order_pair_asks_the_gallery_for_the_side_in_that_order(qtbot, tmp_path):
@@ -1424,7 +1455,7 @@ class TestVersions:
         (lambda slideshow: slideshow.show_item("three.png"), "PLAY_FILE three.png"),
         (lambda slideshow: slideshow.reorder([("five.png", "image", "id-5")], latest=True),
          "PLAY_FILE five.png"),
-        (lambda slideshow: slideshow.release_media(["one.png"]), "NEXT"),
+        (lambda slideshow: slideshow.release_media(["one.png"]), "TRASH one.png"),
     ], ids=["next", "previous", "a cull", "a click on the map", "a new order",
             "letting go of the file"])
     def test_leaving_the_versions_forgets_them_and_hands_the_funestra_its_pace_before_the_next(
@@ -1635,7 +1666,7 @@ def test_a_slideshow_closed_looping_actions_reopens_looping_them_where_it_stood(
 def test_a_cull_that_leaves_one_image_in_the_row_locks_it(qtbot, tmp_path):
     asked, starred, opened = [], [], []
     slideshow = _slideshow(qtbot, tmp_path,
-                           actions=SlideshowActions(neighbors=_around, delete=lambda prompt_id: None,
+                           actions=SlideshowActions(neighbors=_around, delete=deleting_through_the_gallery(lambda: slideshow),
                                                     favorite=starred.append, lock=opened.append,
                                                     enhance=lambda prompt_id: asked.append(prompt_id) or True))
     slideshow.slideshow_loop("seed")
@@ -1656,7 +1687,7 @@ def test_a_cull_that_leaves_one_image_in_the_row_locks_it(qtbot, tmp_path):
 def test_the_cull_that_ends_a_loop_of_one_hands_the_funestra_its_list_once(
         qtbot, tmp_path, monkeypatch):
     slideshow = _slideshow(qtbot, tmp_path,
-                           actions=SlideshowActions(neighbors=_around, delete=lambda prompt_id: None))
+                           actions=SlideshowActions(neighbors=_around, delete=deleting_through_the_gallery(lambda: slideshow)))
     slideshow.slideshow_loop("seed")
     written = _lists_handed_to_a_funestra(monkeypatch)
 
@@ -2742,7 +2773,7 @@ def test_a_press_on_the_job_queue_on_a_sessions_funestra_reaches_its_foot(qtbot,
     assert pressed == [("a press", "1|2")]
 
 
-def test_a_slideshow_culled_empty_is_over(qtbot, tmp_path):
+def test_a_slideshow_with_no_reset_is_over(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path, items=[("one.png", "image", "id-1")])
 
     slideshow.slideshow_cull()

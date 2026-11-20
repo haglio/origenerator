@@ -2,17 +2,14 @@ from __future__ import annotations
 
 import logging
 import struct
-from unittest.mock import MagicMock
 
 import shiboken6
 from app_support.frame_channel import LOOK_AGAIN_AFTER_S
 from app_support.threading_utils import wait_until
 from PySide6.QtCore import QEvent, QPoint, Qt
 from PySide6.QtGui import QColor, QImage
-from PySide6.QtMultimedia import QVideoFrame
 from PySide6.QtWidgets import QApplication, QComboBox, QDialog, QLabel, QMenu, QWidget
 
-from origenerator.fun_time_mode import parse_app_args
 from origenerator.gui import headset_window
 from origenerator.gui.drag_thumbnail import DragOut
 from origenerator.gui.headset_window import (
@@ -22,25 +19,8 @@ from origenerator.gui.headset_window import (
     windows_opened_over,
     within_the_cap,
 )
-from origenerator.gui.viewport import Viewport
-from tests.hosted_launch import hosted_launch
-
-
-def _hosted(tmp_path):
-    return parse_app_args(hosted_launch(headset=True, **{
-        "--frames-file": str(tmp_path / "frame.bin"),
-        "--input-file": str(tmp_path / "input.txt"),
-        "--width": "200",
-        "--height": "100",
-    })).fun_time
-
-
-def _published_color(tmp_path, at: QPoint) -> QColor:
-    published = (tmp_path / "frame.bin").read_bytes()
-    _sequence, _token, width, _height = struct.unpack("<QIII", published[:20])
-    pixel = 20 + (at.y() * width + at.x()) * 4
-    red, green, blue = published[pixel:pixel + 3]
-    return QColor(red, green, blue)
+from tests.drawn_on_the_graphics_card import drawn_on_the_graphics_card
+from tests.hosted_launch import a_headset_session_publishing_into
 
 
 def test_the_poll_says_how_much_it_has_handled_while_the_room_has_it(
@@ -49,7 +29,7 @@ def test_the_poll_says_how_much_it_has_handled_while_the_room_has_it(
     window.resize(200, 100)
     qtbot.addWidget(window)
     window.show()
-    headset = HeadsetWindow(window, _hosted(tmp_path))
+    headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
     try:
         with caplog.at_level(logging.INFO):
             headset.publish(now=1.0)
@@ -71,7 +51,7 @@ def test_presses_the_channel_cannot_read_name_themselves(tmp_path, qtbot, caplog
     window.resize(200, 100)
     qtbot.addWidget(window)
     window.show()
-    headset = HeadsetWindow(window, _hosted(tmp_path))
+    headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
     (tmp_path / "input.txt").write_bytes(b"\xff\xfe press 1 1")
     try:
         with caplog.at_level(logging.WARNING):
@@ -83,24 +63,9 @@ def test_presses_the_channel_cannot_read_name_themselves(tmp_path, qtbot, caplog
         "a room whose presses go nowhere looks exactly like one whose screen is dead")
 
 
-def test_the_frame_a_preview_is_playing_is_in_the_frame_the_room_gets(tmp_path, qtbot):
-    viewport = Viewport(player=MagicMock())
-    qtbot.addWidget(viewport)
-    viewport.resize(200, 100)
-    viewport.show()
-    viewport.show_video(tmp_path / "clip.mp4")
-    red = QImage(64, 36, QImage.Format.Format_RGB32)
-    red.fill(QColor("red"))
-    viewport._video.video_sink().setVideoFrame(QVideoFrame(red))
-
-    headset = HeadsetWindow(viewport, _hosted(tmp_path))
-    try:
-        headset.publish(now=1.0)
-    finally:
-        headset.close()
-
-    middle = viewport._video.mapTo(viewport, viewport._video.rect().center())
-    assert _published_color(tmp_path, middle) == QColor("red")
+def test_the_frame_a_preview_is_playing_is_in_the_frame_the_room_gets(tmp_path):
+    assert drawn_on_the_graphics_card(
+        "the_middle_of_the_frame_the_room_gets", tmp_path) == QColor("red")
 
 
 class TestHowBigAPublishedFrameMayBe:
@@ -149,7 +114,7 @@ class TestTheRoomsPressesReachTheWindow:
     def test_a_press_lands_on_the_widget_under_that_pixel(self, tmp_path, qtbot):
         window = self._window(qtbot)
         pressed = _presses_on(window.findChild(QLabel, "target"))
-        headset = HeadsetWindow(window, _hosted(tmp_path))
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset._heard("press 25 35")
         finally:
@@ -163,7 +128,7 @@ class TestTheRoomsPressesReachTheWindow:
         window = self._window(qtbot)
         opened: list[str] = []
         window.contextMenuEvent = lambda event: opened.append("menu")
-        headset = HeadsetWindow(window, _hosted(tmp_path))
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset.publish(now=1.0)
             headset._heard("rightclick 20 15")
@@ -183,7 +148,7 @@ class TestTheRoomsPressesReachTheWindow:
         asked: list[str] = []
         target.customContextMenuRequested.connect(
             lambda at: asked.append(f"{at.x()},{at.y()}"))
-        headset = HeadsetWindow(window, _hosted(tmp_path))
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset._heard("rightclick 25 35")
             QApplication.processEvents()
@@ -202,7 +167,7 @@ class TestTheRoomsPressesReachTheWindow:
         label.setGeometry(CAP_PX, 200, 400, 200)
         window.show()
         pressed = _presses_on(label)
-        headset = HeadsetWindow(window, _hosted(tmp_path))
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset.publish(now=1.0)
             headset._heard(f"press {CAP_PX // 2 + 50} 150")
@@ -219,7 +184,7 @@ class TestTheRoomsPressesReachTheWindow:
         dragged: list[bool] = []
         label.mousePressEvent = gesture.note_press
         label.mouseMoveEvent = lambda event: dragged.append(gesture.should_start(event))
-        headset = HeadsetWindow(window, _hosted(tmp_path))
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset._heard("press 25 35")
             headset._heard("drag 75 45")
@@ -231,7 +196,7 @@ class TestTheRoomsPressesReachTheWindow:
 
     def test_the_rest_of_the_app_drags_as_it_did_before(self, tmp_path, qtbot):
         before = QApplication.startDragDistance()
-        headset = HeadsetWindow(self._window(qtbot), _hosted(tmp_path))
+        headset = HeadsetWindow(self._window(qtbot), a_headset_session_publishing_into(tmp_path))
         try:
             headset._heard("press 25 35")
             headset._heard("drag 75 45")
@@ -245,7 +210,7 @@ class TestTheRoomsPressesReachTheWindow:
         window = self._window(qtbot)
         label = window.findChild(QLabel, "target")
         label.mousePressEvent = lambda event: label.deleteLater()
-        headset = HeadsetWindow(window, _hosted(tmp_path))
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset._heard("press 25 35")
             QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
@@ -259,7 +224,7 @@ class TestTheRoomsPressesReachTheWindow:
     def test_a_press_with_no_pixel_is_dropped_rather_than_guessed(self, tmp_path, qtbot, caplog):
         window = self._window(qtbot)
         pressed = _presses_on(window.findChild(QLabel, "target"))
-        headset = HeadsetWindow(window, _hosted(tmp_path))
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset._heard("press 25 35")
             headset._heard("release")
@@ -281,7 +246,7 @@ class TestTheRoomsPressesReachTheWindow:
 
         window = self._window(qtbot)
         window.show()
-        headset = HeadsetWindow(window, _hosted(tmp_path))
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset.publish(now=1.0)
             first = published()
@@ -298,7 +263,7 @@ class TestTheRoomsPressesReachTheWindow:
     def test_a_hover_alone_does_not_grab_the_window_again(self, tmp_path, qtbot):
         window = self._window(qtbot)
         window.show()
-        headset = HeadsetWindow(window, _hosted(tmp_path))
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset.publish(now=1.0)
             grabbed = _counting_grabs(window)
@@ -321,7 +286,7 @@ class TestTheRoomsPressesReachTheWindow:
         window.show()
         label = window.findChild(QLabel, "target")
         label.mousePressEvent = lambda event: label.setText("pressed")
-        headset = HeadsetWindow(window, _hosted(tmp_path))
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset.publish(now=1.0)
             grabbed = _counting_grabs(window)
@@ -340,7 +305,7 @@ class TestTheRoomsPressesReachTheWindow:
         window = self._window(qtbot)
         window.show()
         QApplication.processEvents()
-        headset = HeadsetWindow(window, _hosted(tmp_path))
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset.publish(now=1.0)
             grabbed = _counting_grabs(window)
@@ -360,7 +325,7 @@ class TestTheRoomsPressesReachTheWindow:
     def test_a_change_on_the_window_is_grabbed_once(self, tmp_path, qtbot):
         window = self._window(qtbot)
         window.show()
-        headset = HeadsetWindow(window, _hosted(tmp_path))
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset.publish(now=1.0)
             grabbed = _counting_grabs(window)
@@ -389,7 +354,7 @@ class TestWhatOpensOverTheWindow:
         dropdown.addItems(["alpha", "beta", "gamma"])
         dropdown.setGeometry(20, 20, 120, 24)
         dropdown.show()
-        headset = HeadsetWindow(window, _hosted(tmp_path))
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset.publish(now=1.0)
             headset._heard("press 30 30")
@@ -426,7 +391,7 @@ class TestWhatOpensOverTheWindow:
     def test_a_menu_that_opens_over_a_published_window_is_grabbed_into_it(
             self, tmp_path, qtbot):
         window = self._window(qtbot)
-        headset = HeadsetWindow(window, _hosted(tmp_path))
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         menu = QMenu(window)
         menu.addAction("one")
         try:
@@ -457,7 +422,7 @@ class TestWhatOpensOverTheWindow:
         its_window = int(menu.winId())
         hidden = []
         monkeypatch.setattr(headset_window, "keep_out_of_sight", hidden.append)
-        headset = HeadsetWindow(window, _hosted(tmp_path))
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset.publish(now=1.0)
         finally:
@@ -472,7 +437,7 @@ class TestWhatOpensOverTheWindow:
         menu.addAction("one")
         menu.popup(window.mapToGlobal(QPoint(150, 150)))
         qtbot.waitUntil(menu.isVisible)
-        headset = HeadsetWindow(window, _hosted(tmp_path))
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset.publish(now=1.0)
             headset._heard("press 10 10")
@@ -495,7 +460,7 @@ class TestWhatOpensOverTheWindow:
         dialog.resize(60, 60)
         dialog.show()
         qtbot.waitUntil(dialog.isVisible)
-        headset = HeadsetWindow(window, _hosted(tmp_path))
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset.publish(now=1.0)
             headset._heard("press 20 15")

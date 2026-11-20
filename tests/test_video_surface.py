@@ -25,7 +25,7 @@ def _count_conversions(monkeypatch) -> list:
     return converted
 
 
-def test_a_burst_of_frames_costs_one_conversion_and_shows_the_newest(qtbot, monkeypatch):
+def test_frames_drawn_cost_the_window_thread_no_conversion(qtbot, monkeypatch):
     surface = VideoSurface()
     qtbot.addWidget(surface)
     surface.resize(64, 36)
@@ -35,7 +35,17 @@ def test_a_burst_of_frames_costs_one_conversion_and_shows_the_newest(qtbot, monk
 
     for color in ("red", "green", "blue", "yellow", "white"):
         surface.video_sink().setVideoFrame(_frame(color))
-    QApplication.processEvents()
+        surface.grab()
+        QApplication.processEvents()
 
-    assert len(converted) == 1
+    assert converted == []
+
+
+def test_the_frame_on_screen_is_the_newest_one_handed_over(qtbot):
+    surface = VideoSurface()
+    qtbot.addWidget(surface)
+
+    for color in ("red", "green", "white"):
+        surface.video_sink().setVideoFrame(_frame(color))
+
     assert surface.current_frame().pixelColor(32, 18) == QColor("white")

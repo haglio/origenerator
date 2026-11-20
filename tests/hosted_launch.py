@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from origenerator.fun_time_mode import (
     MODE_FLAG,
     SHAPES,
+    FunTimeSession,
     funestra_flags,
     headset_flags,
+    parse_app_args,
     required_flags,
 )
 
@@ -26,3 +30,12 @@ def hosted_launch(
         for flag in headset_flags():
             argv += [flag, named.get(flag, _ANYTHING)]
     return argv
+
+
+def a_headset_session_publishing_into(folder: Path) -> FunTimeSession:
+    return parse_app_args(hosted_launch(headset=True, **{
+        "--frames-file": str(folder / "frame.bin"),
+        "--input-file": str(folder / "input.txt"),
+        "--width": "200",
+        "--height": "100",
+    })).fun_time

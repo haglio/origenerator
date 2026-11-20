@@ -25,6 +25,7 @@ from origenerator.gui.funestra_slideshow import FunestraSlideshow, Playing, Seat
 from origenerator.gui.generation_drag import GENERATION_MIME
 from origenerator.gui.viewport import Viewport
 from origenerator.output_places import OutputPlaces
+from tests.drawn_on_the_graphics_card import drawn_on_the_graphics_card
 from tests.heard_drags import HeardDrags
 from tests.slideshow_support import stop_the_poll_to_tick_by_hand
 
@@ -864,47 +865,26 @@ def test_a_small_move_is_a_click_not_a_drag(make_preview, tmp_path, drags):
     assert drags == []
 
 
-def _video_frame(color: str) -> QVideoFrame:
-    pixels = QImage(64, 36, QImage.Format.Format_RGB32)
-    pixels.fill(QColor(color))
-    return QVideoFrame(pixels)
+def test_a_playing_video_is_drawn_in_the_preview_itself(tmp_path):
+    assert drawn_on_the_graphics_card("the_middle_of_a_playing_video", tmp_path) == QColor("red")
 
 
-def _middle_of_the_media(w) -> QColor:
-    shot = w._media_host.grab().toImage()
-    return shot.pixelColor(shot.width() // 2, shot.height() // 2)
+def test_a_message_leaves_the_video_under_it_as_it_was(tmp_path):
+    assert drawn_on_the_graphics_card(
+        "the_middle_of_a_video_under_a_message", tmp_path) == QColor("red")
 
 
-def _show_a_red_video(w, tmp_path):
-    w.show_video(tmp_path / "clip.mp4")
-    w._video.video_sink().setVideoFrame(_video_frame("red"))
-
-
-def _show_a_red_still(w, tmp_path):
+def test_a_message_leaves_the_image_under_it_as_it_was(make_preview, tmp_path):
+    w = make_preview()
+    w.resize(320, 240)
     path = tmp_path / "red.png"
     Image.new("RGB", (64, 36), (255, 0, 0)).save(path, "PNG")
     w.show_image(path)
 
-
-def test_a_playing_video_is_drawn_in_the_preview_itself(make_preview, tmp_path):
-    w = make_preview()
-    w.resize(320, 240)
-
-    _show_a_red_video(w, tmp_path)
-
-    assert _middle_of_the_media(w) == QColor("red")
-
-
-@pytest.mark.parametrize("show_red", [_show_a_red_video, _show_a_red_still],
-                         ids=["video", "still"])
-def test_a_message_leaves_the_item_under_it_as_it_was(make_preview, tmp_path, show_red):
-    w = make_preview()
-    w.resize(320, 240)
-    show_red(w, tmp_path)
-
     w.set_message("(not yet generated with modifications)")
 
-    assert _middle_of_the_media(w) == QColor("red")
+    shot = w._media_host.grab().toImage()
+    assert shot.pixelColor(shot.width() // 2, shot.height() // 2) == QColor("red")
 
 
 def test_a_preview_starts_with_no_message(make_preview):

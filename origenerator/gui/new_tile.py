@@ -4,7 +4,6 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 
 from origenerator.gui import tile_shape
-from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP
 
 _MARK_PX = 56
 
@@ -12,7 +11,7 @@ _MARK_PX = 56
 class NewTile(QFrame):
     add_requested = Signal()
 
-    def __init__(self, parent=None, *, making_one=False):
+    def __init__(self, parent=None, *, grayed_because: str | None = None):
         super().__init__(parent)
         self.setObjectName("newTile")
         self.setFixedSize(*tile_shape.tile_size())
@@ -32,9 +31,9 @@ class NewTile(QFrame):
         tile_shape.style_caption(self._caption)
         layout.addWidget(self._caption)
 
-        if making_one:
+        if grayed_because is not None:
             self.setEnabled(False)
-            self.setToolTip(ALREADY_MAKING_ONE_TIP)
+            self.setToolTip(grayed_because)
             self.setAttribute(Qt.WidgetAttribute.WA_NoMousePropagation, True)
 
     def mousePressEvent(self, event):

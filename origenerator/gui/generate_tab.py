@@ -121,6 +121,7 @@ from origenerator.regeneration import (
 from origenerator.seed_history import SeedHistory, SeedUse, SeedUseKind, seed_history
 from origenerator.setting_advice import (
     fresh_settings,
+    made_with_files_not_installed,
     named_models,
     not_installed,
     not_installed_advice,
@@ -214,15 +215,6 @@ def _lost_workflow_note(workflow_name: str) -> str:
 
 def _select_a_workflow_first(workflow_name: str) -> str:
     return f"{workflow_gone(workflow_name)} — select a workflow first"
-
-
-def _not_installed_note(names: list[str]) -> str:
-    shown = named_models(names)
-    if len(names) == 1:
-        return (f"This was made with {shown}, which isn't installed anymore, so no new ones "
-                "can be made with it until an installed one is picked in its place.")
-    return (f"This was made with {shown}, which aren't installed anymore, so no new ones "
-            "can be made with them until installed ones are picked in their place.")
 
 
 def _pick_installed_ones_first(names: list[str]) -> str:
@@ -545,7 +537,7 @@ class GenerateTab(DropZones):
         if shown is None or shown.get("workflow_name") != self._workflow_dropdown.currentData():
             return None
         models = list(self._models_not_installed().values())
-        return _not_installed_note(models) if models else None
+        return made_with_files_not_installed(models) if models else None
 
     def _lost_workflow(self) -> str | None:
         shown = self._displayed_row

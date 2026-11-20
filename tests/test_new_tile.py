@@ -27,7 +27,7 @@ def test_a_click_asks_for_a_new_seed(qtbot):
 
 
 def test_a_folder_already_making_one_grays_its_plus_out_and_says_why(qtbot):
-    tile = NewTile(making_one=True)
+    tile = NewTile(grayed_because="This folder is already making one")
     qtbot.addWidget(tile)
 
     assert not tile.isEnabled()
@@ -35,7 +35,7 @@ def test_a_folder_already_making_one_grays_its_plus_out_and_says_why(qtbot):
 
 
 def test_a_grayed_plus_starts_nothing_on_a_click(qtbot):
-    tile = NewTile(making_one=True)
+    tile = NewTile(grayed_because="This folder is already making one")
     qtbot.addWidget(tile)
     clicks = []
     tile.add_requested.connect(lambda: clicks.append(True))
@@ -48,7 +48,7 @@ def test_a_grayed_plus_starts_nothing_on_a_click(qtbot):
 def test_a_press_on_a_grayed_plus_does_not_put_the_picked_items_down(qtbot):
     pane = GalleryPaneScrollArea()
     qtbot.addWidget(pane)
-    tile = NewTile(making_one=True)
+    tile = NewTile(grayed_because="This folder is already making one")
     pane.setWidget(tile)
     let_go = []
     pane.background_clicked.connect(lambda: let_go.append(True))
@@ -68,7 +68,7 @@ def test_a_grayed_plus_is_painted_darker_than_a_live_one(qtbot):
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())
     try:
-        live, grayed = NewTile(), NewTile(making_one=True)
+        live, grayed = NewTile(), NewTile(grayed_because="This folder is already making one")
         for tile in (live, grayed):
             qtbot.addWidget(tile)
             tile.ensurePolished()

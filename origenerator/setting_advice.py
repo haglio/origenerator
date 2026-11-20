@@ -240,6 +240,20 @@ def not_installed(params: dict, definitions, keys) -> dict[str, str]:
             if not is_installed(pd.folder, params[pd.key])}
 
 
+def files_not_installed(params: dict, workflow) -> list[str]:
+    return list(not_installed(params, workflow.param_definitions(),
+                              (*workflow.model_keys, *workflow.lora_keys)).values())
+
+
+def made_with_files_not_installed(names: list[str]) -> str:
+    shown = named_models(names)
+    if len(names) == 1:
+        return (f"This was made with {shown}, which isn't installed anymore, so no new ones "
+                "can be made with it until an installed one is picked in its place.")
+    return (f"This was made with {shown}, which aren't installed anymore, so no new ones "
+            "can be made with them until installed ones are picked in their place.")
+
+
 def not_installed_advice(missing: dict[str, str], definitions, defaults: dict, *,
                          in_scenes: bool = False) -> dict[str, Advice]:
     offered = {pd.key: pd.options for pd in definitions}

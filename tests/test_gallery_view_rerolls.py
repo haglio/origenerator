@@ -195,6 +195,36 @@ def test_starting_a_reroll_grays_the_plus_and_gives_the_run_a_tile_after_the_req
     assert kinds.index(GeneratingTile) == kinds.index(ModifyBatchTile) + 1
 
 
+def test_a_change_of_the_job_queue_that_leaves_the_folders_jobs_as_they_were_draws_no_tile_again(
+        qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    _new_tile(view).add_requested.emit()
+    drawn, generating = view._scroll.widget(), _generating_tile(view)
+
+    view._jobs.changed.emit()
+
+    assert view._scroll.widget() is drawn, (
+        "the Job Queue says it changed twice for each job it takes in, and more often besides; "
+        "the open folder's tiles are drawn again only when its own jobs change")
+    assert _generating_tile(view) is generating
+
+
+def test_a_job_of_the_open_folder_ending_draws_its_tiles_again(qtbot, tmp_path):
+    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    _new_tile(view).add_requested.emit()
+
+    view._cancel_reroll(key)
+
+    assert _generating_tile(view) is None
+    assert _new_tile(view).isEnabled()
+
+
 def _press_at(qtbot, view, spot):
     container = view._scroll.widget()
     target = container.childAt(spot) or container

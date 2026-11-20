@@ -403,6 +403,7 @@ class GalleryView(QWidget):
         self._populate_origins: set[str] = set()
         self._selected_reroll_key: str | None = None
         self._generating_tile: GeneratingTile | None = None
+        self._lead_drawn_for: tuple | None = None
 
     def _build_the_panes(self, db, client):
         self._selected_row: dict | None = None
@@ -1281,6 +1282,7 @@ class GalleryView(QWidget):
         return item.data(0, _GROUP_ROLE) if item else None
 
     def _lead_tiles(self, group) -> LeadTiles:
+        self._lead_drawn_for = self._lead_state(group)
         if not self._can_reroll(group):
             return LeadTiles()
         job = self._jobs.job_for(group.key)
@@ -1295,6 +1297,16 @@ class GalleryView(QWidget):
 
     def _forget_generating_tile(self):
         self._generating_tile = None
+        self._lead_drawn_for = None
+
+    def _lead_state(self, group) -> tuple:
+        leading = self._jobs.job_for(group.key)
+        place = {pid: at for at, pid in enumerate(self._jobs.queue_order)}
+        behind = sorted((job.prompt_id for job in self._jobs.jobs_by_folder.get(group.key, ())
+                         if job is not leading),
+                        key=lambda pid: (place.get(pid, len(place)), pid))
+        return (group.key, leading.prompt_id if leading is not None else None, tuple(behind),
+                self._populate.is_active(group.key))
 
     def _generating_tile_for(self, key: str, job) -> GeneratingTile:
         row = self._db.get_generation(job.prompt_id) or {}
@@ -1931,9 +1943,12 @@ class GalleryView(QWidget):
             self.refresh()
             return
         if isinstance(group, gallery.SettingsGroup):
-            place = self._gallery_pane.place()
-            self._gallery_pane.show_thumbnails(group)
-            self._gallery_pane.return_to(place)
+            if self._lead_drawn_for != self._lead_state(group):
+                place = self._gallery_pane.place()
+                self._gallery_pane.show_thumbnails(group)
+                self._gallery_pane.return_to(place)
+            else:
+                self._re_aim_every_button()
             self._folder_actions.show_folder(group)
 
     def listed_prompt_ids(self) -> list[str]:

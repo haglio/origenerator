@@ -7,15 +7,12 @@ from typing import NamedTuple
 from PySide6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QCursor, QIcon, QMovie, QPixmap
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
-from shared_ui.palette import BLUE, as_rgba
-from shared_ui.spacing import BUTTON_RADIUS
 
-from origenerator.gui import icons, palette, tile_shape
+from origenerator.gui import icons, tile_shape
 from origenerator.gui.corner_buttons import (
     CORNER_GAP,
     CORNER_INSET,
     CORNER_SIZE,
-    GROUND_CSS,
     CornerButtons,
     RestoreOffer,
     bar_between_the_bottom_corners,
@@ -29,25 +26,13 @@ from origenerator.gui.looping_preview import play_in, what_plays_in
 from origenerator.gui.looping_preview import set_in_sight as video_in_sight
 from origenerator.gui.progress_bar import ProgressBar
 from origenerator.gui.style_property import set_style_property
+from origenerator.gui.tile_rules import CAPTION, ITEM_TILE, SEED_BUTTON, SELECTED, THUMBNAIL
 from origenerator.gui.tile_status_scrim import TileStatusScrim
 from origenerator.media import MediaType
 from origenerator.trash_collection import why_it_cannot_be_restored
 
 _IMAGE_SIZE = tile_shape.thumbnail_size()
 _BORDER_PX = 2
-_CORNER_BUTTON_CSS = (
-    GROUND_CSS + f"QPushButton:hover {{ background: {as_rgba(BLUE, 0.9)}; }}"
-)
-
-_SELECTED = "selected"
-# A plain QWidget subclass paints no stylesheet background without WA_StyledBackground, and the app's global QWidget background paints child labels opaque unless they are transparent.
-_TILE_CSS = (
-    f'#thumbnailTile[{_SELECTED}="true"] {{ background-color: {palette.SELECTED_FILL}; '
-    f"border-radius: {BUTTON_RADIUS}px; }}")
-_THUMBNAIL_CSS = (
-    f"QLabel {{ background-color: transparent; border: 2px solid {palette.TILE_BORDER}; "
-    f"border-radius: {BUTTON_RADIUS}px; }}"
-    f'QLabel[{_SELECTED}="true"] {{ border-color: {palette.SELECTED_BORDER}; }}')
 
 
 class CornerButton(NamedTuple):
@@ -108,7 +93,8 @@ class ItemTile(QWidget):
         self._resting_pixmap: QPixmap | None = None
         self._corner_buttons: list[QPushButton] = []
         self.drag_out = DragOut()
-        self.setObjectName("thumbnailTile")
+        self.setObjectName(ITEM_TILE)
+        # A plain QWidget subclass paints no stylesheet background without WA_StyledBackground.
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -122,6 +108,7 @@ class ItemTile(QWidget):
         layout.setSpacing(tile_shape.TILE_SPACING)
 
         self._image_label = QLabel()
+        self._image_label.setObjectName(THUMBNAIL)
         self._image_label.setFixedSize(_IMAGE_SIZE)
         self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._fill_the_thumbnail(thumb_path, appearance.movie_path)
@@ -130,7 +117,7 @@ class ItemTile(QWidget):
         self._text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._text_label.setWordWrap(True)
         tile_shape.style_caption(self._text_label)
-        self._text_label.setStyleSheet("background-color: transparent;")
+        self._text_label.setObjectName(CAPTION)
 
         # Qt: without it enter/leave flicker as the cursor crosses a child.
         self._image_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -297,13 +284,12 @@ class ItemTile(QWidget):
             bar_between_the_bottom_corners(self._image_label.geometry(), _BORDER_PX))
 
     def _style_by_selection(self):
-        for widget, sheet in ((self, _TILE_CSS), (self._image_label, _THUMBNAIL_CSS)):
-            widget.setProperty(_SELECTED, False)
-            widget.setStyleSheet(sheet)
+        for widget in (self, self._image_label):
+            widget.setProperty(SELECTED, False)
 
     def _apply_styles(self):
-        set_style_property(self, _SELECTED, self._selected)
-        set_style_property(self._image_label, _SELECTED, self._selected)
+        set_style_property(self, SELECTED, self._selected)
+        set_style_property(self._image_label, SELECTED, self._selected)
 
     def _build_corner_buttons(self, actions: list[CornerButton]):
         for i, action in enumerate(actions):
@@ -313,7 +299,7 @@ class ItemTile(QWidget):
             button.setToolTip(action.tooltip)
             button.setFixedSize(CORNER_SIZE, CORNER_SIZE)
             button.setCursor(Qt.CursorShape.PointingHandCursor)
-            button.setStyleSheet(_CORNER_BUTTON_CSS)
+            button.setObjectName(SEED_BUTTON)
             button.move(self._image_label.x() + CORNER_INSET + i * (CORNER_SIZE + CORNER_GAP),
                         self._image_label.y() + CORNER_INSET)
             button.setVisible(False)

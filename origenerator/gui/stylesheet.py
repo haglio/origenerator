@@ -31,6 +31,7 @@ from origenerator.config import PROJECT_DIR
 from origenerator.gui import drop_style
 from origenerator.gui.eliding_tab_bar import EDGE
 from origenerator.gui.panes import BORDERED_SET
+from origenerator.gui.tile_rules import tile_rules
 from origenerator.spin_arrows import arrow_paths
 
 CHOSEN = "chosen"
@@ -412,7 +413,7 @@ def build_stylesheet() -> str:
     QWidget#enhancePane .QWidget, QWidget#enhancePane QLabel,
     QScrollArea#enhanceSettings {{
         background-color: transparent;
-    }}{drop_style.ground_rules()}
+    }}{drop_style.ground_rules()}{tile_rules()}
     """
 
 

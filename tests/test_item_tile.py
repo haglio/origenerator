@@ -446,6 +446,20 @@ def _tile_drawn_under_the_app_stylesheet(qtbot, *picks):
     return drawn_under_the_app_stylesheet(qtbot, build)
 
 
+def test_a_tile_sets_no_style_sheet_of_its_own_as_it_is_built(qtbot, monkeypatch):
+    set_on = []
+    monkeypatch.setattr(QWidget, "setStyleSheet",
+                        lambda widget, _sheet: set_on.append(type(widget).__name__))
+    seeds = [CornerButton("reroll_video", QIcon(), "Randomize video seed")]
+
+    tile = ItemTile("p1", None, "caption", TileAppearance(corner_buttons=seeds))
+    qtbot.addWidget(tile)
+
+    assert set_on == [], (
+        "a page draws fifty tiles at a time, and each style sheet set on a widget is parsed "
+        "and polished; the tiles' look is in the app's style sheet once")
+
+
 def test_a_tile_picked_and_unpicked_draws_as_one_never_picked(qtbot):
     _tile, never = _tile_drawn_under_the_app_stylesheet(qtbot)
     _tile, unpicked = _tile_drawn_under_the_app_stylesheet(qtbot, True, False)

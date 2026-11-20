@@ -41,6 +41,7 @@ from origenerator.gui.panes import RememberedBorders
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
 from origenerator.gui.satellites_first import SatellitesFirst
 from origenerator.gui.slideshow_director import SlideshowDirector
+from origenerator.gui.sort_by import SortBy
 from origenerator.gui.taskbar_identity import TaskbarIdentity
 from origenerator.gui.toasts import Toasts
 from origenerator.gui.two_screens import TwoScreens
@@ -89,11 +90,16 @@ def _search(its_own) -> OwnedBy:
     return OwnedBy(attrgetter("search"), its_own)
 
 
+def _sort_by(its_own) -> OwnedBy:
+    return OwnedBy(attrgetter("sort_by"), its_own)
+
+
 SESSION_UI_STATE = (
     ("generate_tabs", _generate_pane(GeneratePane.capture_state),
      _generate_pane(GeneratePane.restore_state)),
     ("toc_shapes", GalleryView.toc_shapes, GalleryView.set_toc_sides),
     ("open_folders", GalleryView.open_folders, GalleryView.set_open_folders),
+    ("gallery_sort", _sort_by(SortBy.chosen), _sort_by(SortBy.choose)),
     ("gallery_folder", GalleryView.selected_folder, GalleryView.select_folder),
     ("gallery_selection", GalleryView.selected_generation, GalleryView.select_generation),
     ("gallery_combine", _combine(CombineController.selection),

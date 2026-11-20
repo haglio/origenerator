@@ -185,6 +185,7 @@ from origenerator.gui.slideshow_director import (
 )
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_wiring import Listing
+from origenerator.gui.sort_by import SortBy
 from origenerator.gui.starting_rows import StartingRows
 from origenerator.gui.toc_editing import (
     AroundAnEdit,
@@ -251,16 +252,21 @@ def _why_new_is_grayed(row: dict, job) -> str | None:
 ONLY_A_LEAF_IS_DELETED = "Only a leaf folder can be deleted"
 
 
-def _top_section(folder_path: QWidget, buttons: QWidget, folder_actions: QWidget) -> QHBoxLayout:
+def _top_section(folder_path: QWidget, buttons: QWidget, folder_actions: QWidget,
+                 sort_by: QWidget) -> QVBoxLayout:
     left = QVBoxLayout()
     left.setContentsMargins(0, 0, 0, 0)
     left.addWidget(folder_path)
     left.addWidget(buttons)
-    top = QHBoxLayout()
+    beside = QHBoxLayout()
+    beside.setContentsMargins(0, 0, 0, 0)
+    beside.setSpacing(GAP_MEDIUM)
+    beside.addLayout(left, 1)
+    beside.addWidget(folder_actions, 1, Qt.AlignmentFlag.AlignTop)
+    top = QVBoxLayout()
     top.setContentsMargins(0, 0, 0, 0)
-    top.setSpacing(GAP_MEDIUM)
-    top.addLayout(left, 1)
-    top.addWidget(folder_actions, 1, Qt.AlignmentFlag.AlignTop)
+    top.addLayout(beside)
+    top.addWidget(sort_by, 0, Qt.AlignmentFlag.AlignHCenter)
     return top
 
 
@@ -458,6 +464,7 @@ class GalleryView(QWidget):
     def _build_the_panes(self, db, client):
         self._selected_row: dict | None = None
         self._scroll = GalleryPaneScrollArea()
+        self.sort_by = SortBy()
         self._gallery_pane = GalleryPane(
             self._scroll, db, self._jobs, self._populate,
             PaneHost(
@@ -472,8 +479,10 @@ class GalleryView(QWidget):
                     folder_context=self.toc.folder_context,
                     group_for_key=self.group_for_key,
                 ),
+                sort_by=self.sort_by,
             ),
         )
+        self.sort_by.changed.connect(self._gallery_pane.redraw_in_the_new_order)
         self.search = GallerySearchController(
             self, parent=self, library=self.library, toc=self.toc, pane=self._gallery_pane)
         self._gallery_pane.pane_reset.connect(self._forget_generating_tile)
@@ -621,7 +630,8 @@ class GalleryView(QWidget):
             self._buttons.enhance, self._folder_switches.enhance_params_of_the_one_enhancing,
             takes_them=self._folder_switches.the_open_folder_takes_enhance_settings,
             keep=self._folder_switches.keep_enhance_params_of_the_open_folder)
-        gallery_column.addLayout(_top_section(self._folder_path, self._buttons, self._folder_actions))
+        gallery_column.addLayout(_top_section(self._folder_path, self._buttons, self._folder_actions,
+                                              self.sort_by))
         self._experiments_cb = TickControl("Run experiments while the app is closed")
         self._experiments_cb.toggled.connect(self._on_experiments_toggled)
         self._experiments_cb.setEnabled(not is_branch_session())

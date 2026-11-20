@@ -70,6 +70,7 @@ REMEMBERED = {
     "experiments_enabled": lambda view: [view._experiments_cb],
     "enhance_settings": lambda view: _within(view.enhance.pane),
     "search_sort": lambda view: [view.search._sort_dropdown],
+    "gallery_sort": lambda view: [view.sort_by.dropdown],
     "gallery_combine": lambda view: _within(view.combine.widget),
     "audio_enabled": lambda view: [view._buttons.radio],
     "mic_enabled": lambda view: [view._buttons.mic],

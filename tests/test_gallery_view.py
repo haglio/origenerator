@@ -429,6 +429,20 @@ def test_clicking_a_folder_tile_drills_into_it(qtbot):
     assert view.listed_prompt_ids(), "a click on a folder's tile is what drills into it"
 
 
+def test_picking_oldest_first_redraws_the_open_folder_the_other_way_round(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
+    view = GalleryView(database_of(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
+    newest_first = view.listed_prompt_ids()
+
+    view.sort_by.dropdown.setCurrentIndex(view.sort_by.dropdown.findText("Date (oldest first)"))
+
+    assert view.listed_prompt_ids() == newest_first[::-1]
+    assert not view.sort_by.isHidden()
+
+
 def test_opening_a_folder_lands_on_its_first_item(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]
     view = GalleryView(database_of(rows))

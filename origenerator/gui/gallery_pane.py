@@ -5,7 +5,7 @@ from contextlib import nullcontext
 from dataclasses import dataclass, replace
 from functools import partial
 from html import escape
-from typing import NamedTuple
+from typing import NamedTuple, Protocol
 
 import shiboken6
 from PySide6.QtCore import QObject, QPoint, Qt, Signal
@@ -22,6 +22,7 @@ from shared_ui.spacing import GAP_DIALOG, GAP_MEDIUM, MARGIN_DIALOG
 
 from origenerator import gallery, search
 from origenerator.content import item_words
+from origenerator.gallery import sort_order
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     LATEST_KEY,
@@ -227,6 +228,21 @@ def _open_sections(flow, headings, *, opens_now=False, draw_leading=lambda: None
         draw_leading()
 
 
+def _with_new_work(flow, headings, entries, *, last: bool, opens_now: bool,
+                   draw_new_work) -> list[_Entry]:
+    if not last:
+        _open_sections(flow, headings, opens_now=opens_now, draw_leading=draw_new_work)
+        return entries
+
+    def draw_after_the_newest():
+        if opens_now:
+            flow.add_full_row(_time_heading(_NOW_HEADING))
+        draw_new_work()
+
+    _open_sections(flow, headings)
+    return [*entries, _Entry(draw_after_the_newest)]
+
+
 def _between_headings(flow, rows, headings, draw) -> list[_Entry]:
     def entry(index, row):
         def draw_it():
@@ -251,6 +267,12 @@ class TreeNavigation:
     group_for_key: Callable[[str], object]
 
 
+class SortChoice(Protocol):
+    def for_listing(self, rows: list[dict]) -> str: ...
+
+    def no_listing(self) -> None: ...
+
+
 @dataclass(frozen=True)
 class PaneHost:
     image_rows: Callable[[], list]
@@ -260,6 +282,7 @@ class PaneHost:
     lead_tiles: Callable[[object], LeadTiles]
     item_name: Callable[[str], str]
     tree: TreeNavigation
+    sort_by: SortChoice
 
 
 class GalleryPane(QObject):
@@ -316,6 +339,7 @@ class GalleryPane(QObject):
         self._requests: list[dict] | None = None
         self._pages = _Pages()
         self._drawing_ahead_of: QWidget | None = None
+        self._drawn_again: Callable[[], None] | None = None
         self._search_rows: list[dict] = []
         self._showing_search = False
         self._collection_shape: str | None = None
@@ -362,6 +386,8 @@ class GalleryPane(QObject):
 
     def show_empty(self):
         self._reset_pane_state()
+        self._host.sort_by.no_listing()
+        self._drawn_again = None
         self.show_widget(QWidget())
 
     def _reset_pane_state(self):
@@ -413,8 +439,14 @@ class GalleryPane(QObject):
             if tile.key == folder_key:
                 tile.set_favorite(favorite)
 
+    def _in_the_chosen_order(self, rows) -> list[dict]:
+        sort = self._host.sort_by.for_listing(rows)
+        return sort_order.in_order(rows, [None] * len(rows), sort)[0]
+
     def show_folder_tiles(self, groups, collections=()):
         container, flow = self._fresh_tile_pane()
+        self._host.sort_by.no_listing()
+        self._drawn_again = None
         for key in collections:
             self._add_collection_tile(flow, key)
         if collections and groups:
@@ -433,6 +465,7 @@ class GalleryPane(QObject):
         flow.addWidget(tile)
 
     def show_custom_collection(self, group):
+        self._drawn_again = partial(self.show_custom_collection, group)
         self._show_gathered(group.rows, gallery.child_groups(group), show_favorites=True,
                             empty=f"“{group.label}” is empty.\n\nDrag folders from the list, "
                                   "or items, onto it, or pick several folders with "
@@ -440,6 +473,7 @@ class GalleryPane(QObject):
 
     def _show_gathered(self, rows, groups, *, show_favorites: bool, empty: str):
         container, flow = self._fresh_tile_pane()
+        rows = self._in_the_chosen_order(rows)
         if not (rows or groups):
             self.show_widget(self._empty_state(empty))
             return
@@ -456,6 +490,8 @@ class GalleryPane(QObject):
 
     def show_search_results(self, tiles, terms: search.SearchTerms):
         self._reset_pane_state()
+        self._host.sort_by.no_listing()
+        self._drawn_again = None
         if not tiles:
             hint = self._empty_state(_search_empty_hint(terms.outcome, terms.query, terms.scope))
             hint.setTextFormat(Qt.TextFormat.RichText)
@@ -542,6 +578,7 @@ class GalleryPane(QObject):
             return
         self._collection_shape = shape
         self._collection_folder = in_folder.folder
+        self._drawn_again = partial(self.show_collection, key, shape)
         render = self._renders.get(in_folder.which)
         if render is not None:
             render()
@@ -569,19 +606,24 @@ class GalleryPane(QObject):
         self._inflight_tiles = {}
         self._inflight_by_key = {}
 
-        def draw_leading():
-            for item in items:
+        sort = self._host.sort_by.for_listing(rows)
+        last = sort == sort_order.OLDEST
+        opens_now = bool(items) and gallery.new_work_opens_a_section(rows)
+        rows, headings = sort_order.in_order(rows, gallery.section_headings(rows), sort)
+
+        def draw_new_work():
+            for item in reversed(items) if last else items:
                 self._add_inflight_tile(flow, item)
 
-        headings = gallery.section_headings(rows)
-        _open_sections(flow, headings,
-                       opens_now=bool(items) and gallery.new_work_opens_a_section(rows),
-                       draw_leading=draw_leading)
+        entries = _with_new_work(
+            flow, headings,
+            _between_headings(flow, rows, headings,
+                              lambda row: self._add_collection_thumbnail(flow, row)),
+            last=last, opens_now=opens_now, draw_new_work=draw_new_work)
         if not (items or rows):
             self.show_widget(self._empty_state(empty))
             return
-        self._show_paged(container, _between_headings(
-            flow, rows, headings, lambda row: self._add_collection_thumbnail(flow, row)))
+        self._show_paged(container, entries)
 
     def follow_the_scroll(self, *_):
         drawn, seen = self._scroll.widget(), self._scroll.viewport()
@@ -765,7 +807,8 @@ class GalleryPane(QObject):
         def draw(row):
             self._add_collection_thumbnail(flow, row, corner_buttons=list(actions))
 
-        headings = gallery.section_headings(rows)
+        rows, headings = sort_order.in_order(
+            rows, gallery.section_headings(rows), self._host.sort_by.for_listing(rows))
         _open_sections(flow, headings)
         self._show_paged(container, _between_headings(flow, rows, headings, draw))
 
@@ -783,7 +826,7 @@ class GalleryPane(QObject):
 
     def _render_trash(self):
         container, flow = self._fresh_tile_pane()
-        rows = self._open_collection_rows(TRASH_KEY)
+        rows = self._in_the_chosen_order(self._open_collection_rows(TRASH_KEY))
         if not rows:
             self.show_widget(self._empty_state(self._trash_empty_hint()))
             return
@@ -859,8 +902,15 @@ class GalleryPane(QObject):
             return None
         return self._model.in_collection(collection.which, shape, collection.folder)
 
+    def redraw_in_the_new_order(self) -> None:
+        if self._drawn_again is not None:
+            place = self.place()
+            self._drawn_again()
+            self.return_to(place)
+
     def show_thumbnails(self, group):
         container, flow = self._fresh_tile_pane()
+        self._drawn_again = partial(self.show_thumbnails, group)
         i2v = bool(group.rows) \
             and gallery.is_image_conditioned(group.rows[0].get("workflow_name")) \
             and gallery.media_type_of_row(group.rows[0]) == MediaType.VIDEO
@@ -887,27 +937,33 @@ class GalleryPane(QObject):
             )
 
         finished = [row for row in group.rows if gallery.produced_output(row)]
-        headings = gallery.section_headings(finished)
+        sort = self._host.sort_by.for_listing(finished)
+        finished, headings = sort_order.in_order(
+            finished, gallery.section_headings(finished), sort)
         lead = self._host.lead_tiles(group)
         tiles = self._folder_inflight_items(group)
         opens_now = ((lead.reroll is not None or bool(tiles))
                      and gallery.new_work_opens_a_section(finished))
+        last = sort == sort_order.OLDEST
         sections = opens_now + sum(1 for heading in headings if heading)
-        modify_batch_above = lead.modify_batch is not None and sections > 1
+        modify_batch_above = lead.modify_batch is not None and (last or sections > 1)
         if modify_batch_above:
             flow.addWidget(lead.modify_batch)
+        new_work = [
+            *(partial(flow.addWidget, tile) for tile in (
+                lead.reroll, None if modify_batch_above else lead.modify_batch)
+              if tile is not None),
+            *(partial(self._add_inflight_tile, flow, item) for item in tiles),
+            *(partial(flow.addWidget, tile) for tile in (lead.generating,) if tile is not None),
+        ]
 
-        def draw_leading():
-            for tile in (lead.reroll, None if modify_batch_above else lead.modify_batch):
-                if tile is not None:
-                    flow.addWidget(tile)
-            for item in tiles:
-                self._add_inflight_tile(flow, item)
-            if lead.generating is not None:
-                flow.addWidget(lead.generating)
+        def draw_new_work():
+            for draw_one in reversed(new_work) if last else new_work:
+                draw_one()
 
-        _open_sections(flow, headings, opens_now=opens_now, draw_leading=draw_leading)
-        self._show_paged(container, _between_headings(flow, finished, headings, draw))
+        self._show_paged(container, _with_new_work(
+            flow, headings, _between_headings(flow, finished, headings, draw),
+            last=last, opens_now=opens_now, draw_new_work=draw_new_work))
 
     def _folder_inflight_items(self, group) -> list[InFlightItem]:
         leading = self._jobs.job_for(group.key)

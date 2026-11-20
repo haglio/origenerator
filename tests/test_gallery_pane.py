@@ -16,6 +16,7 @@ from shared_ui.flow_layout import FlowLayout
 
 from origenerator import gallery, search
 from origenerator.db_generations import ENHANCE_WHEN_FINISHED
+from origenerator.gallery import sort_order
 from origenerator.gallery.collection import (
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
@@ -95,8 +96,22 @@ class _NothingEnhancing:
         return None
 
 
+class _SortedBy:
+    def __init__(self, sort):
+        self.sort = sort
+        self.listed = None
+
+    def for_listing(self, rows):
+        self.listed = [row["prompt_id"] for row in rows]
+        return self.sort
+
+    def no_listing(self):
+        self.listed = None
+
+
 def _pane_host(lead_tiles=lambda group: LeadTiles(), selected=None,
-               animated_preview=lambda row: None, folder_context=lambda key: ""):
+               animated_preview=lambda row: None, folder_context=lambda key: "",
+               sort=sort_order.NEWEST):
     return PaneHost(
         image_rows=list,
         animated_preview=animated_preview,
@@ -109,6 +124,7 @@ def _pane_host(lead_tiles=lambda group: LeadTiles(), selected=None,
             folder_context=folder_context,
             group_for_key=lambda key: None,
         ),
+        sort_by=sort if isinstance(sort, _SortedBy) else _SortedBy(sort),
     )
 
 
@@ -644,6 +660,90 @@ def test_latest_draws_the_back_of_the_line_first_and_the_run_being_made_last(qtb
     assert list(pane._inflight_tiles) == ["j3", "j2", "j1"]
 
 
+def test_latest_oldest_first_ends_with_the_work_still_being_made(qtbot, db):
+    finished = [_row("g1", 1, _ago(minutes=5)), _row("g2", 2, _ago(minutes=6))]
+    rows = [_running("j1", 3), _waiting("j2", 4), *finished]
+    pane, scroll = _pane(qtbot, db, rows, jobs=_StubJobQueue(order=["j1", "j2"]),
+                         host=_pane_host(sort=sort_order.OLDEST))
+
+    _open_latest(pane, finished)
+
+    [heading, _] = gallery.section_headings(finished)
+    assert _shown_in_order(scroll) == [heading, "g2", "g1", "InFlightTile", "InFlightTile"]
+    assert list(pane._inflight_tiles) == ["j1", "j2"]
+
+
+def test_latest_longest_first_orders_each_batch_by_length(qtbot, db):
+    short, long = _video("short", 1, 2.0), _video("long", 2, 9.0)
+    pane, scroll = _pane(qtbot, db, [short, long], host=_pane_host(sort=sort_order.LONGEST))
+
+    _open_latest(pane, [short, long])
+
+    [heading, _] = gallery.section_headings([short, long])
+    assert _shown_in_order(scroll) == [heading, "long", "short"]
+
+
+def _video(prompt_id, seed, seconds):
+    return {**_row(prompt_id, seed, _ago(minutes=5 + seed)), "workflow_name": "wan22_t2v",
+            "video_seconds": seconds,
+            "output_files": json.dumps([{"filename": f"{prompt_id}.mp4", "subfolder": ""}])}
+
+
+def test_a_collection_oldest_first_lists_its_items_the_other_way_round(qtbot, db):
+    rows = [_row("g1", 1, _ago(minutes=5)), _row("g2", 2, _ago(minutes=6))]
+    pane, scroll = _pane(qtbot, db, rows, host=_pane_host(sort=sort_order.OLDEST))
+
+    pane.show_custom_collection(gallery.CustomCollection(key="c1", label="mine", children=[], rows=rows))
+
+    assert _shown_in_order(scroll) == ["g2", "g1"]
+
+
+def test_the_trash_oldest_first_lists_its_items_the_other_way_round(qtbot, db):
+    rows = [_row("g1", 1, _ago(minutes=5)), _row("g2", 2, _ago(minutes=6))]
+    pane, scroll = _pane(qtbot, db, host=_pane_host(sort=sort_order.OLDEST))
+
+    _trash_of(pane, rows)
+
+    assert [name for name in _shown_in_order(scroll) if name in ("g1", "g2")] == ["g2", "g1"]
+
+
+def test_a_new_sort_redraws_the_listing_on_screen_in_its_order(qtbot, db):
+    sort_by = _SortedBy(sort_order.NEWEST)
+    rows = [_row("g1", 1, _ago(minutes=5)), _row("g2", 2, _ago(minutes=6))]
+    pane, scroll = _pane(qtbot, db, rows, host=_pane_host(sort=sort_by))
+    pane.show_custom_collection(gallery.CustomCollection(key="c1", label="mine", children=[], rows=rows))
+
+    sort_by.sort = sort_order.OLDEST
+    pane.redraw_in_the_new_order()
+
+    assert _shown_in_order(scroll) == ["g2", "g1"]
+
+
+def test_a_new_sort_keeps_the_picked_item_picked(qtbot, db):
+    sort_by = _SortedBy(sort_order.NEWEST)
+    rows = [_row("g1", 1, _ago(minutes=5)), _row("g2", 2, _ago(minutes=6))]
+    pane, _scroll = _pane(qtbot, db, rows, host=_pane_host(sort=sort_by))
+    pane.show_custom_collection(gallery.CustomCollection(key="c1", label="mine", children=[], rows=rows))
+    pane.apply_selection("g2", _NO_MOD)
+
+    sort_by.sort = sort_order.OLDEST
+    pane.redraw_in_the_new_order()
+
+    assert pane.selected_ids == {"g2"}
+
+
+def test_a_view_of_folders_or_search_results_has_no_listing_to_sort(qtbot, db):
+    sort_by = _SortedBy(sort_order.NEWEST)
+    rows = [_row("g1", 1)]
+    pane, _scroll = _pane(qtbot, db, rows, host=_pane_host(sort=sort_by))
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+    assert sort_by.listed == ["g1"]
+
+    pane.show_folder_tiles([])
+
+    assert sort_by.listed is None
+
+
 def test_latest_redraws_its_tiles_when_the_line_changes_order(qtbot, db):
     jobs = _StubJobQueue(order=["j1", "j2"])
     pane, _scroll = _pane(qtbot, db, [_waiting("j1", 1), _waiting("j2", 2)], jobs=jobs, host=_pane_host(selected=LATEST_KEY))
@@ -826,6 +926,23 @@ def test_the_run_in_front_stays_beside_the_plus_when_the_modify_batch_tile_stand
     first, second = gallery.section_headings(rows)
     assert _shown_in_order(scroll) == ["modify batch", first, "new", "generating", "g1",
                                        second, "g2"]
+
+
+def test_oldest_first_puts_a_folders_new_work_after_its_newest_item_and_the_modify_batch_tile_on_top(
+        qtbot, db):
+    finished = [_row("g1", 1, _ago(minutes=5)), _row("g2", 2, _ago(hours=5))]
+    rows = [_running("r1", 3), _waiting("r2", 4), *finished]
+    tiles = LeadTiles(reroll=QLabel("new"), modify_batch=QLabel("modify batch"),
+                      generating=QLabel("generating"))
+    pane, scroll = _pane(qtbot, db, rows,
+                         jobs=_StubJobQueue(order=["r1", "r2"], leading="r1"),
+                         host=_pane_host(lead_tiles=lambda group: tiles, sort=sort_order.OLDEST))
+
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+
+    newer, older = gallery.section_headings(finished)
+    assert _shown_in_order(scroll) == ["modify batch", older, "g2", newer, "g1",
+                                       "generating", "InFlightTile", "new"]
 
 
 def test_a_folder_draws_its_runs_back_of_the_line_first_and_the_one_in_front_last(qtbot, db):

@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import time
 from unittest.mock import MagicMock
 
 import pytest
-from app_support.file_channel import read_key_values
+from app_support.file_channel import publish_whole, read_key_values
 from funestra.file_channel import consume_command_file
 from funestra.funestra_verbs import play_file
 from funestra.hud_placement import HudCorner
@@ -1259,6 +1260,27 @@ def test_before_core_is_built_a_satellite_gets_its_list_and_what_needs_core_wait
 
     assert gallery.asked == [("fill", "portrait"), ("say", "landscape favorites"),
                              ("fill", "landscape")]
+
+
+def test_a_tick_reads_the_paused_flag_again_only_once_fun_time_has_replaced_it(qtbot, tmp_path):
+    gallery = _GalleryAsked()
+    paused_flag = tmp_path / "origenerator_paused.txt"
+    paused_flag.write_text("0", encoding="utf-8")
+    long_ago = paused_flag.stat().st_mtime_ns - 3_600_000_000_000
+    os.utime(paused_flag, ns=(long_ago, long_ago))
+    bridge = FunTimeBridge(_session(tmp_path), gallery)
+    bridge._tick()
+    with paused_flag.open("r+", encoding="utf-8") as in_place:
+        in_place.write("1")
+    os.utime(paused_flag, ns=(long_ago, long_ago))
+
+    bridge._tick()
+    bridge._tick()
+    unread = list(gallery.asked)
+    publish_whole(paused_flag, "1")
+    bridge._tick()
+
+    assert (unread, gallery.asked) == ([], [("paused", "True")])
 
 
 def test_a_bridge_whose_core_is_built_holds_nothing_back(qtbot, tmp_path):

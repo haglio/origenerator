@@ -27,12 +27,14 @@ class Hearing(QObject):
 
     def __init__(self, phrases: Collection[str], *, never_repaired: Collection[str] = (),
                  said_in: Callable[[str], str | None] | None = None,
-                 engines: Engines | None = None, parent: QObject | None = None) -> None:
+                 engines: Engines | None = None, listens_alone: bool = False,
+                 parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._rules = CommandRules(phrases=frozenset(phrases),
                                    never_repaired=frozenset(never_repaired).__contains__,
                                    said_in=said_in)
         self._engines = engines
+        self._listens_alone = listens_alone
         self._thread = ListeningThread(
             self._listener, failed=lambda exc: self.failed.emit(reason_for(exc)))
 
@@ -50,7 +52,8 @@ class Hearing(QObject):
         return CommandListener(
             self._rules,
             ListenerSettings(model_name=config.VOICE_MODEL_NAME,
-                             device_name=config.VOICE_DEVICE_NAME, speech_hint=request_bias()),
+                             device_name=config.VOICE_DEVICE_NAME, speech_hint=request_bias(),
+                             listens_alone=self._listens_alone),
             events,
             self._engines or engines_for(self._rules, events))
 

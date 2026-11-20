@@ -201,6 +201,9 @@ class FakeSlideshow(QObject):
     def lead_with_what_is_being_made(self):
         self.leads += 1
 
+    def watch(self, prompt_id):
+        self.watching = prompt_id
+
     def follow_what_is_being_made(self):
         self.follows += 1
 

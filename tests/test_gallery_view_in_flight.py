@@ -42,6 +42,7 @@ from origenerator.gui.inflight import InFlightItem, RunReading, cancel_tooltip
 from origenerator.item_shape import base_of
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
+from origenerator.slideshow import SlideshowFilters
 from origenerator.trash import Trash
 from tests.alert_windows import message_of, open_alerts
 from tests.comfyui_folders import SUITE_FOLDERS
@@ -649,6 +650,31 @@ def test_the_live_picture_says_the_item_whose_picture_it_is_when_the_folder_make
         "a tab watching a folder shows the pictures of whichever run the folder is making; a "
         "double click on one opens that run, never the run the tab first watched (his report, "
         "2026-11-19: another image from the same folder came up)")
+
+
+def test_a_run_double_clicked_is_shown_though_the_slideshow_shows_only_starred_images(
+        qtbot, tmp_path):
+    client = _reroll_client()
+    db = _seeded_db(tmp_path, seed=7)
+    view = GalleryView(db, client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key, first = _a_streaming_run_listed_in_flight(view, client)
+    _comfyui_finishes(client, first)
+    view._poll()
+    db.set_generation_favorite(first.prompt_id, True)
+    view.slideshows._filters = SlideshowFilters(favorites=True)
+    _new_tile(view).add_requested.emit()
+    second = view._live_jobs[key]
+    client.preview_image.emit(second.prompt_id, _png_bytes())
+    view._poll()
+
+    win = _viewport_of(view).open_fullscreen()
+    qtbot.addWidget(win.shown)
+
+    assert win._set.current_prompt_id() == second.prompt_id, (
+        "a double click asks to watch the image being generated, which no filter can leave out "
+        "(his report, 2026-11-20: another image of the folder came up)")
 
 
 def test_a_run_watched_fullscreen_lands_as_its_generation_among_its_folder(

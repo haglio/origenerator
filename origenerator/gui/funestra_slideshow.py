@@ -163,6 +163,8 @@ class FunestraSlideshow(QObject):
 
     def _hand_over_gathered(self, *, land: bool) -> None:
         current = self._set.playlist.current()
+        if current is None:
+            return
         rotated = rotated_onto(self._set.playlist.in_play_order(), current)
         self._outbox.write_playlist([self._funestra_item(item) for item in rotated])
         lands = land and current is not None and self._file_of(current) != self._on_funestra.item
@@ -823,6 +825,9 @@ class FunestraSlideshow(QObject):
         if not self.locked and self._set.lead_with_what_is_being_made():
             self._hand_over(land=True)
             self._publish()
+
+    def watch(self, prompt_id: str) -> None:
+        self._set.watched = prompt_id
 
     def follow_what_is_being_made(self) -> None:
         self._set.lead_with_what_is_being_made()

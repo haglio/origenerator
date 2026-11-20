@@ -63,6 +63,7 @@ class SlideshowSet:
         self._enhancements_asked: set[str] = set()
         self._enhance_frames: dict[str, bytes] = {}
         self._runs_offered: set[str] = set()
+        self.watched: str | None = None
         self.all_items = [Slide.of(item) for item in items]
         self.wear(hud if hud is not None else HudFacts())
         self.playlist = dealt(items, order=self._shuffle, start=deal.led_at,
@@ -182,6 +183,8 @@ class SlideshowSet:
     def passes(self, item, filters: SlideshowFilters | None = None) -> bool:
         filters = self.filters if filters is None else filters
         prompt_id = item.prompt_id
+        if prompt_id is not None and prompt_id == self.watched:
+            return True
         if filters.favorites and not self._is_favorite(prompt_id):
             return False
         if filters.enhanced and not self._is_enhanced(prompt_id):

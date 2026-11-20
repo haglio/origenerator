@@ -4,6 +4,7 @@ import logging
 import time
 from dataclasses import asdict, dataclass, replace
 from functools import partial
+from pathlib import Path
 from random import randrange
 from typing import Protocol
 
@@ -359,8 +360,16 @@ class SlideshowDirector:
         if media is None:
             location = self._location_of(self._row_for(generation)) if generation else None
             listed = self.rows_at(location) if location else self._listed_rows()
-            return self.open([], rows=listed, start=0, shuffle=in_order, location=location,
-                             carrying=Carrying(folder_items=self.items_of(listed)), hud=hud)
+            run = self._run_being_made_at(location)
+            slideshow = self.open([], rows=listed, start=0, shuffle=in_order, location=location,
+                                  carrying=Carrying(folder_items=self.items_of(listed)), hud=hud)
+            logger.info("Slideshow of the frame being made, run %s, at %s: %d items, "
+                        "run being made there %s, opened on %s", generation, location,
+                        len(listed), run["prompt_id"] if run else None,
+                        slideshow.hud_prompt_id if slideshow is not None else None)
+            return slideshow
+        logger.info("Slideshow of the preview's finished item, run %s, file %s",
+                    generation, Path(media[0]).name)
         rows = [row for row in [self._row_for(generation)] if row]
         items = self.items_of(rows) or [(media[0], media[1], generation, None)]
         return self.open(items[:1], rows=rows, start=0, shuffle=in_order, hud=hud,
@@ -468,11 +477,8 @@ class SlideshowDirector:
         if carrying.resume is not None:
             slideshow.resume(carrying.resume, opened_on_it=keep_the_slide)
         if not keep_the_slide:
-            self._offer_the_frames(slideshow, location, self._job_queue.now()[0])
-            if follows_a_run:
-                slideshow.follow_what_is_being_made()
-            else:
-                slideshow.lead_with_what_is_being_made()
+            self._lead_with_what_is_being_made(slideshow, location,
+                                               following=run if follows_a_run else None)
         if not already_live:
             slideshow.open_requested.connect(self._pick_where_it_played)
             slideshow.closed.connect(lambda s=slideshow: self._on_closed(s))
@@ -482,6 +488,15 @@ class SlideshowDirector:
 
     def _enhance_from_slideshow(self, prompt_id: str) -> bool:
         return self._enhancing_of().enhance_from_slideshow(prompt_id)
+
+    def _lead_with_what_is_being_made(self, slideshow, location, *, following) -> None:
+        if following is not None:
+            slideshow.watch(following["prompt_id"])
+        self._offer_the_frames(slideshow, location, self._job_queue.now()[0])
+        if following is not None:
+            slideshow.follow_what_is_being_made()
+        else:
+            slideshow.lead_with_what_is_being_made()
 
     def _slideshow_actions(self, shape: str) -> SlideshowActions:
         def at_its_regions_base(slideshow) -> bool:

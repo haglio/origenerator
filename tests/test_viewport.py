@@ -337,6 +337,19 @@ def test_show_frame_stops_any_playing_video(make_preview, tmp_path):
     w._player.stop.assert_called()
 
 
+def test_the_frames_that_follow_a_live_frame_leave_the_player_alone(make_preview, tmp_path):
+    w = make_preview()
+    w.show_video(tmp_path / "clip.mp4")
+    w.show_frame(_png_bytes())
+    w._player.reset_mock()
+
+    w.show_frame(_png_bytes())
+
+    assert w._player.method_calls == [], (
+        "the first live frame stopped the player and let go of its file; the frames after it, "
+        "several a second, find it stopped")
+
+
 def test_show_frame_ignores_undecodable_bytes(make_preview):
     w = make_preview()
     w.show_frame(b"not an image")

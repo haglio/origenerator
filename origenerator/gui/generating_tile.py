@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QPoint, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 from shared_ui.palette import TEXT_MUTED, as_hex
 from shared_ui.spacing import BUTTON_RADIUS
@@ -13,6 +12,7 @@ from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.corner_buttons import CornerButtons, bar_between_the_bottom_corners
 from origenerator.gui.generation_job import display_status
 from origenerator.gui.inflight import TICK_MS, RunReading, cancel_tooltip
+from origenerator.gui.live_frames import pixmap_of
 from origenerator.gui.tile_status_scrim import TileStatusScrim
 
 _RESTING_FRAME_CSS = tile_shape.idle_css("generatingTile")
@@ -127,8 +127,7 @@ class GeneratingTile(QFrame):
                                 *self._reading().bars())
 
     def _on_preview(self, data: bytes):
-        pixmap = QPixmap()
-        if pixmap.loadFromData(data) and not pixmap.isNull():
+        if (pixmap := pixmap_of(data)) is not None:
             self._image.setPixmap(pixmap.scaled(
                 self._image.width(), self._image.height(),
                 Qt.AspectRatioMode.KeepAspectRatio,

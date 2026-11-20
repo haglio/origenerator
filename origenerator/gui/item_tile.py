@@ -24,6 +24,7 @@ from origenerator.gui.drag_thumbnail import DragOut, label_thumbnail
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.inflight import TICK_MS, RunReading
 from origenerator.gui.item_type_icon import ItemTypeIcon, VideoLength
+from origenerator.gui.live_frames import pixmap_of
 from origenerator.gui.looping_preview import play_in, what_plays_in
 from origenerator.gui.looping_preview import set_in_sight as video_in_sight
 from origenerator.gui.progress_bar import ProgressBar
@@ -255,8 +256,7 @@ class ItemTile(QWidget):
         self._show_enhancing_run()
 
     def _paint_enhancing_frame(self, frame: bytes):
-        pixmap = QPixmap()
-        if not pixmap.loadFromData(frame) or pixmap.isNull():
+        if (pixmap := pixmap_of(frame)) is None:
             return
         if self._resting_pixmap is None:
             self._resting_pixmap = self._image_label.pixmap()

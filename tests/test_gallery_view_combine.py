@@ -1122,3 +1122,12 @@ def test_a_job_launched_as_an_action_is_made_from_no_video_though_one_gave_its_s
     db.set_settings_source(job.prompt_id, category="alpha", video_prompt_id="vid")
 
     assert view._job_made_from(job, lambda video: video["prompt_id"]).source_video is None
+
+
+def test_what_the_gallery_tells_him_offers_nothing_to_copy(monkeypatch):
+    told = MagicMock()
+    monkeypatch.setattr(gallery_view_module.alert, "information", told)
+
+    GalleryView.tell(None, "No past video yet", "Make one first.")
+
+    told.assert_called_once_with("No past video yet", "Make one first.", copyable=False)

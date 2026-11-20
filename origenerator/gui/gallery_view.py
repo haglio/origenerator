@@ -1742,7 +1742,7 @@ class GalleryView(QWidget):
         self.enhance.enhance_items(prompt_ids)
 
     def tell(self, title: str, message: str) -> None:
-        alert.information(title, message)
+        alert.information(title, message, copyable=False)
 
     def reveal_launch(self, key: str):
         if self._stand_on_the_run_in(key):

@@ -70,4 +70,4 @@ class Copies:
 def say_another_copy_is_running() -> None:
     from origenerator import alert  # noqa: PLC0415
 
-    alert.information("Origenerator", "Another copy of Origenerator is already running.")
+    alert.information("Origenerator", "Another copy of Origenerator is already running.", copyable=False)

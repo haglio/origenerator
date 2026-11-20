@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import NamedTuple
 
 import shiboken6
+from app_support.written_file import Look, ReadEachWhenChanged
 from PySide6.QtCore import QByteArray, QMimeData, QPoint, Qt, Signal
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
@@ -211,35 +211,23 @@ _THUMBNAILS_KEPT = 64
 class _VersionThumbnails:
     def __init__(self, read) -> None:
         self._read = read
-        self._kept: dict[tuple, _Thumbnails] = {}
+        self._kept: ReadEachWhenChanged[str, _Thumbnails] = ReadEachWhenChanged(
+            most=_THUMBNAILS_KEPT)
 
     def ask(self, image_path, show, *, owner) -> None:
-        key = _file_key(image_path)
-        if key is None:
+        looked = self._kept.look(str(image_path)) if image_path else None
+        if looked is None or not looked.holds_something:
             show(None)
-        elif key in self._kept:
-            show(self._kept[key])
+        elif looked.fresh:
+            show(looked.value)
         else:
             run_off_thread(lambda: _scaled(self._read(str(image_path))),
-                           lambda scaled: show(self._keep(key, _Thumbnails.from_scaled(scaled))),
+                           lambda scaled: show(_kept(looked, _Thumbnails.from_scaled(scaled))),
                            owner=owner)
 
-    def _keep(self, key: tuple, thumbnails: _Thumbnails | None) -> _Thumbnails | None:
-        if thumbnails is not None:
-            if len(self._kept) >= _THUMBNAILS_KEPT:
-                self._kept.clear()
-            self._kept[key] = thumbnails
-        return thumbnails
 
-
-def _file_key(image_path) -> tuple | None:
-    if not image_path:
-        return None
-    try:
-        seen = os.stat(image_path)
-    except OSError:
-        return None
-    return str(image_path), seen.st_mtime_ns, seen.st_size
+def _kept(looked: Look, thumbnails: _Thumbnails | None) -> _Thumbnails | None:
+    return thumbnails if thumbnails is None else looked.keep(thumbnails)
 
 
 def _fill_in(row, thumbnails: _Thumbnails | None) -> None:

@@ -2671,6 +2671,8 @@ def test_showing_the_same_versions_again_decodes_none_of_their_files_again(qtbot
     files = []
     for name in ("e1.png", "src.png"):
         Image.new("RGB", (64, 48), (10, 120, 200)).save(tmp_path / name)
+        long_ago = (tmp_path / name).stat().st_mtime_ns - 3_600_000_000_000
+        os.utime(tmp_path / name, ns=(long_ago, long_ago))
         files.append(tmp_path / name)
     items = list(zip(_versions(1), files, strict=True))
 

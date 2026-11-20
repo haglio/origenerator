@@ -26,6 +26,7 @@ from origenerator.gui.item_type_icon import ItemTypeIcon, VideoLength
 from origenerator.gui.looping_preview import play_in
 from origenerator.gui.looping_preview import set_in_sight as video_in_sight
 from origenerator.gui.progress_bar import BAR_HEIGHT, ProgressBar
+from origenerator.gui.style_property import set_style_property
 from origenerator.gui.tile_status_scrim import TileStatusScrim
 from origenerator.media import MediaType
 from origenerator.trash_collection import why_it_cannot_be_restored
@@ -36,11 +37,15 @@ _CORNER_BUTTON_CSS = (
     GROUND_CSS + f"QPushButton:hover {{ background: {as_rgba(BLUE, 0.9)}; }}"
 )
 
+_SELECTED = "selected"
 # A plain QWidget subclass paints no stylesheet background without WA_StyledBackground, and the app's global QWidget background paints child labels opaque unless they are transparent.
-_SELECTED_TILE_CSS = (
-    f"#thumbnailTile {{ background-color: {palette.SELECTED_FILL}; border-radius: {BUTTON_RADIUS}px; }}")
-_BORDER_UNSELECTED = f"2px solid {palette.TILE_BORDER}"
-_BORDER_SELECTED = f"2px solid {palette.SELECTED_BORDER}"
+_TILE_CSS = (
+    f'#thumbnailTile[{_SELECTED}="true"] {{ background-color: {palette.SELECTED_FILL}; '
+    f"border-radius: {BUTTON_RADIUS}px; }}")
+_THUMBNAIL_CSS = (
+    f"QLabel {{ background-color: transparent; border: 2px solid {palette.TILE_BORDER}; "
+    f"border-radius: {BUTTON_RADIUS}px; }}"
+    f'QLabel[{_SELECTED}="true"] {{ border-color: {palette.SELECTED_BORDER}; }}')
 
 
 class CornerButton(NamedTuple):
@@ -133,7 +138,7 @@ class ItemTile(QWidget):
 
         layout.addWidget(self._image_label)
         layout.addWidget(self._text_label)
-        self._apply_styles()
+        self._style_by_selection()
 
         self._media_type = appearance.media_type
         self._mark_its_kind(appearance)
@@ -260,16 +265,14 @@ class ItemTile(QWidget):
             BAR_HEIGHT,
         ))
 
+    def _style_by_selection(self):
+        for widget, sheet in ((self, _TILE_CSS), (self._image_label, _THUMBNAIL_CSS)):
+            widget.setProperty(_SELECTED, False)
+            widget.setStyleSheet(sheet)
+
     def _apply_styles(self):
-        if self._selected:
-            self.setStyleSheet(_SELECTED_TILE_CSS)
-            border = _BORDER_SELECTED
-        else:
-            self.setStyleSheet("")
-            border = _BORDER_UNSELECTED
-        self._image_label.setStyleSheet(
-            f"background-color: transparent; border: {border}; border-radius: {BUTTON_RADIUS}px;"
-        )
+        set_style_property(self, _SELECTED, self._selected)
+        set_style_property(self._image_label, _SELECTED, self._selected)
 
     def _build_corner_buttons(self, actions: list[CornerButton]):
         for i, action in enumerate(actions):

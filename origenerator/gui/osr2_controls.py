@@ -46,6 +46,9 @@ class Osr2Controls(PressableDrawing):
         self._sync_repaint()
         self.update()
 
+    def what_the_pointer_shows(self) -> object:
+        return self._painter.what_the_pointer_shows()
+
     def refresh(self) -> None:
         self._sync_repaint()
         self.update()

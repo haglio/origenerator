@@ -565,6 +565,19 @@ def test_the_button_goes_back_once_the_pointer_leaves(qtbot):
     assert _ground_lightness(controls, button) == at_rest
 
 
+def test_the_pointer_repaints_the_panel_only_where_the_panel_would_look_different(
+        qtbot, monkeypatch):
+    controls, _motion = _controls(qtbot)
+    controls.grab()
+    repaints = []
+    monkeypatch.setattr(controls, "update", lambda: repaints.append("repaint"))
+
+    _move_onto(controls, (0, 0, 1, 1))
+    _move_onto(controls, (1, 1, 1, 1))
+
+    assert repaints == []
+
+
 def test_no_tooltip_of_the_panels_own_comes_up_over_a_buttons_name(qtbot):
     controls, _motion = _controls(qtbot)
 

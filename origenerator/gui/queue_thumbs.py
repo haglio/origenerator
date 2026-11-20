@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-import os
-from collections import OrderedDict
+import time
+from collections.abc import Callable
+from pathlib import Path
+from typing import NamedTuple
 
+from app_support.written_file import ReadEachWhenChanged
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QColor, QPainter, QPixmap
 from PySide6.QtWidgets import QLabel
@@ -21,15 +24,25 @@ def block_width(cell: int) -> int:
     return FOLDER_CELLS * cell + (FOLDER_CELLS - 1) * _GAP
 
 
-_CELLS: OrderedDict[tuple[str, int, bool, int | None], QPixmap | None] = OrderedDict()
-_MOST_CELLS = 1024
+class _Cell(NamedTuple):
+    path: str
+    side: int
+    gray: bool
+    squared: bool
 
 
-def _written(path) -> int | None:
-    try:
-        return os.stat(path).st_mtime_ns
-    except OSError:
-        return None
+def _read_cell(cell: _Cell) -> QPixmap | None:
+    fitted = _fitted(QPixmap(cell.path), cell.side, cell.squared)
+    return grayscale_pixmap(fitted) if cell.gray and fitted is not None else fitted
+
+
+def _held_cells(most: int, *, now_ns: Callable[[], int] = time.time_ns
+                ) -> ReadEachWhenChanged[_Cell, QPixmap | None]:
+    return ReadEachWhenChanged(_read_cell, most=most, path_of=lambda cell: Path(cell.path),
+                               now_ns=now_ns)
+
+
+_CELLS = _held_cells(1024)
 
 
 def fitted_cell(path, side: int, gray: bool = False) -> QPixmap | None:
@@ -43,16 +56,7 @@ def fitted_thumbnail(path, side: int, gray: bool = False) -> QPixmap | None:
 def _held(path, side: int, gray: bool, *, squared: bool) -> QPixmap | None:
     if not path:
         return None
-    key = (str(path), side, gray, squared, _written(path))
-    if key in _CELLS:
-        _CELLS.move_to_end(key)
-    else:
-        fitted = _fitted(QPixmap(str(path)), side, squared)
-        _CELLS[key] = (grayscale_pixmap(fitted)
-                       if gray and fitted is not None else fitted)
-        if len(_CELLS) > _MOST_CELLS:
-            _CELLS.popitem(last=False)
-    return _CELLS[key]
+    return _CELLS.latest(_Cell(str(path), side, gray, squared))
 
 
 def _fitted(pixmap: QPixmap, side: int, squared: bool) -> QPixmap | None:

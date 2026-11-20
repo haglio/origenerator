@@ -27,13 +27,13 @@ from origenerator.workflows.model_files import is_no_lora
 
 _WORD = re.compile(r"[A-Za-z0-9']{2,}")
 _ALIKE_ENOUGH_TO_BE_ONE_PART = 0.5
-PROMPTS = {"positive": "Positive Prompt", "negative": "Negative Prompt"}
+PROMPTS = {"positive": "Positive prompt", "negative": "Negative prompt"}
 _NO_REASON = "The model gave no change and no reason, so nothing changed."
 _NONE_OF_IT_HIS = "None of the model's changes had to do with what you asked, so nothing changed."
 _NO_WORDS = "The model's change named no words, so nothing changed."
-_NOT_IN_THE_NEGATIVE_PROMPT = "The Negative Prompt doesn't have {}, so nothing was taken out of it."
+_NOT_IN_THE_NEGATIVE_PROMPT = "The Negative prompt doesn't have {}, so nothing was taken out of it."
 _LEFT_AS_IT_WAS = "The model's change left {} as it was in the {}, so nothing changed."
-_CALLED_FOR = "The Positive Prompt asks for {}, so it wasn't kept out of the Negative Prompt."
+_CALLED_FOR = "The Positive prompt asks for {}, so it wasn't kept out of the Negative prompt."
 _SAYING_NOTHING = frozenset({
     "the", "and", "in", "on", "of", "with", "to", "it", "at", "an", "is", "for", "or", "no", "not",
     "her", "his", "him", "she", "he", "you", "me", "my", "please", "make", "have", "only", "more",
@@ -42,9 +42,9 @@ _SAYING_NOTHING = frozenset({
     "its", "there", "from", "into", "than", "then", "also", "just", "some", "any", "all",
 })
 _UNREADABLE = "Couldn't read one of the model's changes."
-_NOTHING_ELSE_TO_DO = ("{} was already in the Positive Prompt, and its opposite already in the "
-                       "Negative Prompt, so I couldn't figure out anything else to do.")
-_NOTHING_ELSE_TO_KEEP_OUT = ("{} was already out of the Positive Prompt and in the Negative Prompt, "
+_NOTHING_ELSE_TO_DO = ("{} was already in the Positive prompt, and its opposite already in the "
+                       "Negative prompt, so I couldn't figure out anything else to do.")
+_NOTHING_ELSE_TO_KEEP_OUT = ("{} was already out of the Positive prompt and in the Negative prompt, "
                              "so I couldn't figure out anything else to do.")
 _LEFT_OUT = re.compile(r"(?:no|without)\s+(?:(?:a|an|any|the)\s+)?(\S.*)", re.IGNORECASE)
 _QUOTED = re.compile(r"""["\u201c]([^"\u201d]+)["\u201d]|(?<!\w)'([^']+)'(?!\w)|\bthe word\s+([\w-]+)""",
@@ -314,10 +314,10 @@ class _Applying:
         if self.positive == before:
             return ""
         if not new:
-            return f", and took its trigger word {old[0]} out of the Positive Prompt"
+            return f", and took its trigger word {old[0]} out of the Positive prompt"
         if held:
-            return f", and swapped its trigger word {old[0]} for {new[0]} in the Positive Prompt"
-        return f", and put its trigger word {new[0]} in the Positive Prompt"
+            return f", and swapped its trigger word {old[0]} for {new[0]} in the Positive prompt"
+        return f", and put its trigger word {new[0]} in the Positive prompt"
 
     def change(self, change) -> None:
         if not isinstance(change, dict):
@@ -367,7 +367,7 @@ class _Applying:
         if at == 0:
             return []
         self.positive = ", ".join([parts[at], *parts[:at], *parts[at + 1:]])
-        return [f"Moved {_quoted(parts[at])} earlier in the Positive Prompt."]
+        return [f"Moved {_quoted(parts[at])} earlier in the Positive prompt."]
 
     def _weighed_up(self, which: str, words: str) -> list[str]:
         text = getattr(self, which)
@@ -543,7 +543,7 @@ class _Applying:
 
     def _nothing_taken_out(self, text: str, asked: list[str]) -> None:
         missing = [part for part in asked if not _whole(text, part)]
-        for line in ([f"Couldn't find {_quoted(part)} in the Positive Prompt." for part in missing]
+        for line in ([f"Couldn't find {_quoted(part)} in the Positive prompt." for part in missing]
                      or [_NONE_OF_IT_HIS if asked else _NO_WORDS]):
             self._nothing_because(line)
 
@@ -569,7 +569,7 @@ class _Applying:
                   and self._names_what_he_asked(words)
                   and not any(word in shown for word in _naming(words))
                   and not _naming(words) & _naming(self.positive)):
-                lines.append(f"Couldn't find {_quoted(words)} in the Positive Prompt.")
+                lines.append(f"Couldn't find {_quoted(words)} in the Positive prompt.")
         return " ".join(dict.fromkeys(lines))
 
     def _line(self) -> str:

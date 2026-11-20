@@ -13,7 +13,7 @@ _SIZE = request_settings.settings_to_tell(
     {"width": 1280, "height": 720})
 
 
-_NO_HAT = 'Couldn\'t find "hat" in the Positive Prompt. Added "hat" to the Negative Prompt.'
+_NO_HAT = 'Couldn\'t find "hat" in the Positive prompt. Added "hat" to the Negative prompt.'
 _NONE_OF_IT_HIS = "None of the model's changes had to do with what you asked, so nothing changed."
 
 
@@ -60,8 +60,8 @@ def test_words_of_a_prompt_are_replaced_where_they_stand_whatever_their_case():
 
     assert (outcome.positive, outcome.negative) == ("two women on a couch", "(blurry:1.2)")
     assert outcome.line == (
-        'Replaced "A Woman" with "two women" in the Positive Prompt. Replaced "blurry" with '
-        '"(blurry:1.2)" in the Negative Prompt. Couldn\'t find "a cat" in the Positive Prompt.')
+        'Replaced "A Woman" with "two women" in the Positive prompt. Replaced "blurry" with '
+        '"(blurry:1.2)" in the Negative prompt. Couldn\'t find "a cat" in the Positive prompt.')
 
 
 def test_words_are_added_after_the_part_they_belong_with_or_at_the_end_and_never_twice():
@@ -75,10 +75,10 @@ def test_words_are_added_after_the_part_they_belong_with_or_at_the_end_and_never
     assert (outcome.positive, outcome.negative) == (
         "a woman on a couch, freckles, (smiling:1.2), soft light", "(blurry:1.1), hat")
     assert outcome.line == (
-        'Added "freckles" to the Positive Prompt. Added "soft light" to the Positive Prompt. '
-        'Couldn\'t find "Blurry" in the Positive Prompt. '
-        'Replaced "blurry" with "(blurry:1.1)" in the Negative Prompt. '
-        'Couldn\'t find "hat" in the Positive Prompt. Added "hat" to the Negative Prompt.')
+        'Added "freckles" to the Positive prompt. Added "soft light" to the Positive prompt. '
+        'Couldn\'t find "Blurry" in the Positive prompt. '
+        'Replaced "blurry" with "(blurry:1.1)" in the Negative prompt. '
+        'Couldn\'t find "hat" in the Positive prompt. Added "hat" to the Negative prompt.')
 
 
 def test_words_are_taken_out_of_a_prompt_and_the_commas_close_over_them():
@@ -89,8 +89,8 @@ def test_words_are_taken_out_of_a_prompt_and_the_commas_close_over_them():
 
     assert (outcome.positive, outcome.negative) == ("a woman", "")
     assert outcome.line == (
-        'Removed "on a couch" from the Positive Prompt. Removed "blurry" from the Negative Prompt. '
-        'The Negative Prompt doesn\'t have "grain", so nothing was taken out of it.')
+        'Removed "on a couch" from the Positive prompt. Removed "blurry" from the Negative prompt. '
+        'The Negative prompt doesn\'t have "grain", so nothing was taken out of it.')
 
 
 def test_a_prompt_change_answering_nothing_he_asked_for_is_left_out_and_says_so():
@@ -120,7 +120,7 @@ def test_a_replacement_that_changes_nothing_says_it_left_the_words_as_they_were(
             "for": "no hat"}
 
     assert _applied([same], asked=("no hat",)).line == (
-        'The model\'s change left "a woman on a couch" as it was in the Positive Prompt, so '
+        'The model\'s change left "a woman on a couch" as it was in the Positive prompt, so '
         "nothing changed.")
     assert _applied([same, {"prompt": "negative", "add": "hat", "for": "no hat"}],
                     asked=("no hat",)).line == _NO_HAT
@@ -134,7 +134,7 @@ def test_words_for_the_positive_prompt_that_say_what_to_leave_out_go_to_the_nega
     assert outcome.positive == "a woman on a couch"
     assert outcome.negative in ("blurry, hat", "blurry, hats")
     assert outcome.line.startswith('Couldn\'t find "hat')
-    assert outcome.line.endswith(' to the Negative Prompt.')
+    assert outcome.line.endswith(' to the Negative prompt.')
 
 
 def test_a_replacement_that_tacks_on_what_to_leave_out_sends_it_to_the_negative_prompt():
@@ -153,7 +153,7 @@ def test_a_replacement_keeps_what_it_changed_beside_what_it_sends_to_the_negativ
 
     assert (outcome.positive, outcome.negative) == ("two women on a couch", "blurry, hat")
     assert outcome.line == ('Replaced "a woman on a couch" with "two women on a couch" in the '
-                            f"Positive Prompt. {_NO_HAT}")
+                            f"Positive prompt. {_NO_HAT}")
 
 
 def test_a_part_already_saying_no_in_the_positive_prompt_stays_where_he_wrote_it():
@@ -170,11 +170,11 @@ def test_something_unwanted_the_negative_prompt_already_has_is_made_to_weigh_mor
     twice = _applied(again, pair=(once.positive, once.negative), asked=("they still have hats",))
 
     assert once.negative == "blurry, (straw hats:1.1)"
-    assert once.line == ('Couldn\'t find "hats" in the Positive Prompt. '
-                         'Replaced "straw hats" with "(straw hats:1.1)" in the Negative Prompt.')
+    assert once.line == ('Couldn\'t find "hats" in the Positive prompt. '
+                         'Replaced "straw hats" with "(straw hats:1.1)" in the Negative prompt.')
     assert twice.negative == "blurry, (straw hats:1.2)"
     assert twice.line.endswith('Replaced "(straw hats:1.1)" with "(straw hats:1.2)" in the Negative '
-                               'Prompt.')
+                               'prompt.')
 
 
 def test_something_wanted_the_positive_prompt_already_has_is_said_to_be_there():
@@ -182,7 +182,7 @@ def test_something_wanted_the_positive_prompt_already_has_is_said_to_be_there():
                        asked=("a woman",))
 
     assert outcome.positive == "a woman on a couch"
-    assert outcome.line == 'The Positive Prompt already has "a woman".'
+    assert outcome.line == 'The Positive prompt already has "a woman".'
 
 
 def test_a_change_the_app_cannot_read_is_said_so():
@@ -218,7 +218,7 @@ def test_switching_a_lora_swaps_its_trigger_word_where_it_stands_as_the_warnings
     assert outcome.positive == "a woman, (exmplnew:1.1), soft light, exmplnew"
     assert outcome.positive == with_trigger_words_swapped(prompt, ("exmplstyle",), ("exmplnew",))
     assert outcome.line == ("Set LoRA 1 to Example Style 1.1 (was Example Style 1.0), and swapped "
-                            "its trigger word exmplstyle for exmplnew in the Positive Prompt.")
+                            "its trigger word exmplstyle for exmplnew in the Positive prompt.")
 
 
 def test_picking_a_lora_puts_its_trigger_word_in_and_dropping_one_takes_its_word_out(
@@ -228,10 +228,10 @@ def test_picking_a_lora_puts_its_trigger_word_in_and_dropping_one_takes_its_word
 
     assert picked.positive == "exmplstyle, a woman"
     assert picked.line == ("Set LoRA 1 to Example Style 1.0 (was None), and put its trigger word "
-                           "exmplstyle in the Positive Prompt.")
+                           "exmplstyle in the Positive prompt.")
     assert dropped.positive == "a woman"
     assert dropped.line == ("Set LoRA 1 to None (was Example Style 1.1), and took its trigger "
-                            "word exmplnew out of the Positive Prompt.")
+                            "word exmplnew out of the Positive prompt.")
 
 
 def test_a_trigger_word_already_where_it_belongs_is_left_as_it_is_and_unmentioned(versioned_style):
@@ -257,8 +257,8 @@ def test_an_edit_riding_inside_a_replacement_he_asked_for_is_left_out_and_a_part
         asked=("please make it portrait and have only one woman",))
 
     assert outcome.positive == "exmplstyle, one woman on a couch, soft light, natural lighting"
-    assert outcome.line == ('Replaced "two women" with "one woman" in the Positive Prompt. '
-                            'Added "natural lighting" to the Positive Prompt.')
+    assert outcome.line == ('Replaced "two women" with "one woman" in the Positive prompt. '
+                            'Added "natural lighting" to the Positive prompt.')
 
 
 @pytest.mark.parametrize(("change", "made"), [
@@ -295,7 +295,7 @@ def test_a_replacement_in_words_that_are_not_his_at_all_is_the_models_to_make_wh
 
     assert outcome.positive == "a woman, bare ears, a bare neck"
     assert outcome.line == ('Replaced "silver ear studs, a necklace" with "bare ears, a bare neck" '
-                            "in the Positive Prompt.")
+                            "in the Positive prompt.")
 
 
 def test_several_parts_he_never_named_are_not_taken_out_together():
@@ -307,7 +307,7 @@ def test_several_parts_he_never_named_are_not_taken_out_together():
                        pair=(whole, "blurry"), asked=("no hat please",))
 
     assert outcome.positive == "a woman on a sofa, soft light, a window"
-    assert outcome.line == 'Replaced "couch" with "sofa" in the Positive Prompt.'
+    assert outcome.line == 'Replaced "couch" with "sofa" in the Positive prompt.'
 
 
 def test_of_several_parts_taken_out_together_only_the_ones_he_named_go():
@@ -315,7 +315,7 @@ def test_of_several_parts_taken_out_together_only_the_ones_he_named_go():
                        pair=("a woman, a straw hat, soft light", "blurry"), asked=("no hat please",))
 
     assert outcome.positive == "a woman, soft light"
-    assert outcome.line == 'Removed "a straw hat" from the Positive Prompt.'
+    assert outcome.line == 'Removed "a straw hat" from the Positive prompt.'
 
 
 def test_words_to_add_that_carry_what_to_leave_out_send_only_that_part_to_the_negative_prompt():
@@ -323,7 +323,7 @@ def test_words_to_add_that_carry_what_to_leave_out_send_only_that_part_to_the_ne
                          "for": "freckles and no hat"}], asked=("freckles and no hat",))
 
     assert (outcome.positive, outcome.negative) == ("a woman on a couch, freckles", "blurry, hat")
-    assert outcome.line == f'{_NO_HAT} Added "freckles" to the Positive Prompt.'
+    assert outcome.line == f'{_NO_HAT} Added "freckles" to the Positive prompt.'
 
 
 def test_a_part_the_replacement_drops_without_his_asking_stays_without_a_word():
@@ -332,7 +332,7 @@ def test_a_part_the_replacement_drops_without_his_asking_stays_without_a_word():
                        pair=("a woman, a hat, soft light", "blurry"), asked=("two women",))
 
     assert outcome.positive == "two women, a hat, soft light"
-    assert outcome.line == 'Replaced "a woman" with "two women" in the Positive Prompt.'
+    assert outcome.line == 'Replaced "a woman" with "two women" in the Positive prompt.'
 
 
 def test_each_part_of_a_replacement_he_asked_for_is_said_as_what_it_was():
@@ -343,8 +343,8 @@ def test_each_part_of_a_replacement_he_asked_for_is_said_as_what_it_was():
 
     assert outcome.positive == "a blue hat, grass, a cat"
     assert outcome.line == (
-        'Replaced "red" with "blue" in the Positive Prompt. Removed "a dog" from the Positive '
-        'Prompt. Added "a cat" to the Positive Prompt.')
+        'Replaced "red" with "blue" in the Positive prompt. Removed "a dog" from the Positive '
+        'prompt. Added "a cat" to the Positive prompt.')
 
 
 def test_a_switch_away_from_a_lora_the_row_no_longer_offers_still_swaps_its_word(versioned_style):
@@ -360,7 +360,7 @@ def test_a_switch_away_from_a_lora_the_row_no_longer_offers_still_swaps_its_word
     assert outcome.settings == {"lora": "example_style_11.safetensors"}
     assert outcome.positive == "(exmplnew:1.2), a woman"
     assert outcome.line == ("Set LoRA 1 to Example Style 1.1 (was Example Style 1.0), and swapped "
-                            "its trigger word exmplstyle for exmplnew in the Positive Prompt.")
+                            "its trigger word exmplstyle for exmplnew in the Positive prompt.")
 
 
 def test_a_long_prompt_rewritten_whole_is_answered_with_what_changed_and_nothing_else():
@@ -371,8 +371,8 @@ def test_a_long_prompt_rewritten_whole_is_answered_with_what_changed_and_nothing
                        pair=(prompt, "blurry"), asked=("two women, waving at each other",))
 
     assert outcome.positive == ", ".join(["two women on a couch", "waving", *kept])
-    assert outcome.line == ('Replaced "one woman" with "two women" in the Positive Prompt. Added '
-                            '"waving" to the Positive Prompt.')
+    assert outcome.line == ('Replaced "one woman" with "two women" in the Positive prompt. Added '
+                            '"waving" to the Positive prompt.')
 
 
 def test_one_part_replaced_by_words_quite_unlike_it_is_still_one_replacement():
@@ -382,7 +382,7 @@ def test_one_part_replaced_by_words_quite_unlike_it_is_still_one_replacement():
 
     assert outcome.positive == "a street, at night, cars"
     assert outcome.line == ('Replaced "a street, sunny afternoon, cars" with "a street, at night, cars" '
-                            "in the Positive Prompt.")
+                            "in the Positive prompt.")
 
 
 @pytest.mark.parametrize("reason", [
@@ -399,8 +399,8 @@ def test_a_reworded_reason_for_something_already_kept_out_makes_it_weigh_more():
     outcome = _applied([{"prompt": "negative", "add": "hat", "for": "she should not have a hat"}],
                        pair=("a woman", "blurry, hat"), asked=("she shouldn't have a hat",))
 
-    assert outcome.line == ('Couldn\'t find "hat" in the Positive Prompt. '
-                            'Replaced "hat" with "(hat:1.1)" in the Negative Prompt.')
+    assert outcome.line == ('Couldn\'t find "hat" in the Positive prompt. '
+                            'Replaced "hat" with "(hat:1.1)" in the Negative prompt.')
 
 
 @pytest.mark.parametrize("reason", ["natural lighting", "", "please", "it should be"])
@@ -418,7 +418,7 @@ def test_what_is_already_so_is_said_only_when_it_is_the_whole_answer():
               {"setting": "height", "to": 1280, "for": "square"}]
 
     assert _applied([freckles, freckles], asked=("freckles",)).line == (
-        'Added "freckles" to the Positive Prompt.')
+        'Added "freckles" to the Positive prompt.')
     assert _applied(square, asked=("square",)).line == "Set Height to 1280 (was 720)."
     assert _applied(square[:1], asked=("square",)).line == "Width is already 1280."
 
@@ -437,9 +437,9 @@ def test_leaving_out_something_the_positive_prompt_names_says_only_what_changed(
     taken_out = {"prompt": "positive", "remove": "a straw hat", "for": "no hats"}
 
     assert _applied([kept_out], pair=pair, asked=("no hats",)).line == (
-        'Added "hats" to the Negative Prompt.')
+        'Added "hats" to the Negative prompt.')
     assert _applied([taken_out, kept_out], pair=pair, asked=("no hats",)).line == (
-        'Removed "a straw hat" from the Positive Prompt. Added "hats" to the Negative Prompt.')
+        'Removed "a straw hat" from the Positive prompt. Added "hats" to the Negative prompt.')
 
 
 def test_looking_in_the_negative_prompt_for_something_wanted_that_is_not_there_says_so_once():
@@ -448,21 +448,21 @@ def test_looking_in_the_negative_prompt_for_something_wanted_that_is_not_there_s
                         {"prompt": "negative", "replace": "freckles", "with": "", "for": "freckles"}],
                        asked=("freckles",))
 
-    assert outcome.line == ('Added "freckles" to the Positive Prompt. '
-                            'The Negative Prompt doesn\'t have "freckles", so nothing was taken out of it.')
+    assert outcome.line == ('Added "freckles" to the Positive prompt. '
+                            'The Negative prompt doesn\'t have "freckles", so nothing was taken out of it.')
 
 
 @pytest.mark.parametrize(("change", "made", "said"), [
     ({"prompt": "positive", "replace": "kneeling", "with": "lying prone",
       "for": "lying instead of kneeling"},
-     "a woman lying on a rug", 'Replaced "kneeling" with "lying" in the Positive Prompt.'),
+     "a woman lying on a rug", 'Replaced "kneeling" with "lying" in the Positive prompt.'),
     ({"prompt": "positive", "replace": "kneeling on a rug", "with": "lying on her back on a rug",
       "for": "lying instead of kneeling"},
-     "a woman lying on a rug", 'Replaced "kneeling on a rug" with "lying on a rug" in the Positive Prompt.'),
+     "a woman lying on a rug", 'Replaced "kneeling on a rug" with "lying on a rug" in the Positive prompt.'),
     ({"prompt": "positive", "replace": "kneeling", "with": "lying, face down, relaxed",
       "for": "lying instead of kneeling"},
-     "a woman lying, relaxed on a rug", 'Replaced "kneeling" with "lying" in the Positive Prompt. '
-     'Added "relaxed" to the Positive Prompt.')])
+     "a woman lying, relaxed on a rug", 'Replaced "kneeling" with "lying" in the Positive prompt. '
+     'Added "relaxed" to the Positive prompt.')])
 def test_which_way_a_body_lies_stays_open_when_he_did_not_say(change, made, said):
     outcome = _applied([change], pair=("a woman kneeling on a rug", "blurry"),
                        asked=("lying instead of kneeling",))
@@ -475,8 +475,8 @@ def test_what_is_kept_out_beside_an_added_thing_is_not_looked_for_in_the_positiv
                         {"prompt": "negative", "add": "plastic cap, baseball cap", "for": "give him a cap"}],
                        pair=("a sailor on a pier", "blurry"), asked=("give him a cap",))
 
-    assert outcome.line == ('Added "a navy wool cap" to the Positive Prompt. '
-                            'Added "plastic cap, baseball cap" to the Negative Prompt.')
+    assert outcome.line == ('Added "a navy wool cap" to the Positive prompt. '
+                            'Added "plastic cap, baseball cap" to the Negative prompt.')
 
 
 def test_which_way_a_body_lies_is_written_when_he_says_it():
@@ -514,8 +514,8 @@ def test_prompts_that_take_no_weights_get_none_from_a_request():
         prompts=Prompts(take_weights=False))
 
     assert (outcome.positive, outcome.negative) == ("a tall woman on a couch, freckles", "blurry")
-    assert outcome.line == ('Replaced "a woman" with "a tall woman" in the Positive Prompt. '
-                            'Added "freckles" to the Positive Prompt.')
+    assert outcome.line == ('Replaced "a woman" with "a tall woman" in the Positive prompt. '
+                            'Added "freckles" to the Positive prompt.')
 
 
 def test_where_prompts_take_no_weights_something_already_kept_out_is_said_to_be_there():
@@ -524,8 +524,8 @@ def test_where_prompts_take_no_weights_something_already_kept_out_is_said_to_be_
                             prompts=Prompts(take_weights=False))
 
     assert outcome.negative == "blurry, hat"
-    assert outcome.line == ("Couldn't find \"hat\" in the Positive Prompt. "
-                            'The Negative Prompt already has "hat".')
+    assert outcome.line == ("Couldn't find \"hat\" in the Positive prompt. "
+                            'The Negative prompt already has "hat".')
 
 
 def test_a_change_to_something_he_named_answers_him_whatever_reason_it_gives():
@@ -543,7 +543,7 @@ def test_words_to_add_that_come_wrapped_in_commas_go_in_without_them():
                        asked=("freckles",))
 
     assert outcome.positive == "a woman on a couch, freckles, soft light"
-    assert outcome.line == 'Added "freckles, soft light" to the Positive Prompt.'
+    assert outcome.line == 'Added "freckles, soft light" to the Positive prompt.'
 
 
 def test_words_quoted_with_a_space_missing_or_added_are_still_found_where_they_stand():
@@ -575,7 +575,7 @@ def test_a_word_he_quoted_is_taken_out_alone_whatever_else_the_model_takes_with_
                        pair=_A_VINTAGE_PHOTO, asked=_THE_WORD_VINTAGE)
 
     assert outcome.positive == "photo of a woman on a couch, soft light"
-    assert outcome.line == 'Removed "vintage" from the Positive Prompt.'
+    assert outcome.line == 'Removed "vintage" from the Positive prompt.'
 
 
 def test_new_words_put_where_the_word_he_quoted_stood_are_the_models_to_write():
@@ -611,12 +611,12 @@ def test_a_replacement_that_only_takes_words_out_takes_out_the_one_he_quoted():
                        pair=_A_VINTAGE_PHOTO, asked=_THE_WORD_VINTAGE)
 
     assert outcome.positive == "photo of a woman on a couch, soft light"
-    assert outcome.line == 'Removed "vintage" from the Positive Prompt.'
+    assert outcome.line == 'Removed "vintage" from the Positive prompt.'
 
 
 _MORE_COUCH = ("a woman on a velvet couch, soft light", "blurry, bare floor")
-_NOTHING_ELSE_TO_DO = ('"a velvet couch" was already in the Positive Prompt, and its opposite already '
-                       "in the Negative Prompt, so I couldn't figure out anything else to do.")
+_NOTHING_ELSE_TO_DO = ('"a velvet couch" was already in the Positive prompt, and its opposite already '
+                       "in the Negative prompt, so I couldn't figure out anything else to do.")
 
 
 _NO_WEIGHTS = Prompts(take_weights=False)
@@ -635,9 +635,9 @@ def test_more_of_something_puts_his_stronger_words_in_moves_it_first_and_keeps_i
     assert outcome.positive == "a large pendant necklace, a woman on a couch, soft light"
     assert outcome.negative == "blurry, bare neck"
     assert outcome.line == (
-        'Replaced "a small necklace" with "a large pendant necklace" in the Positive Prompt. '
-        'Moved "a large pendant necklace" earlier in the Positive Prompt. '
-        'Added "bare neck" to the Negative Prompt.')
+        'Replaced "a small necklace" with "a large pendant necklace" in the Positive prompt. '
+        'Moved "a large pendant necklace" earlier in the Positive prompt. '
+        'Added "bare neck" to the Negative prompt.')
 
 
 def test_stronger_words_that_his_prompts_never_use_leave_the_part_as_it_is():
@@ -650,8 +650,8 @@ def test_stronger_words_that_his_prompts_never_use_leave_the_part_as_it_is():
                          "opposite": "bare head", "for": "bigger hat"}, pair, ("bigger hat",), prompts=his)
 
     assert invented.positive == "a small straw hat, photo of a woman, beach"
-    assert invented.line == ('Moved "a small straw hat" earlier in the Positive Prompt. '
-                             'Added "bare head" to the Negative Prompt.')
+    assert invented.line == ('Moved "a small straw hat" earlier in the Positive prompt. '
+                             'Added "bare head" to the Negative prompt.')
     assert in_his_words.positive == "a wide brimmed straw hat, photo of a woman, beach"
 
 
@@ -663,7 +663,7 @@ def test_more_of_something_where_the_prompts_take_weights_weighs_it_and_its_oppo
     assert outcome.negative == "blurry, (bare floor:1.1)"
     assert outcome.line == (
         'Replaced "a woman on a velvet couch" with "(a woman on a velvet couch:1.1)" in the Positive '
-        'Prompt. Replaced "bare floor" with "(bare floor:1.1)" in the Negative Prompt.')
+        'prompt. Replaced "bare floor" with "(bare floor:1.1)" in the Negative prompt.')
 
 
 def test_more_of_something_already_first_in_his_words_with_its_opposite_kept_out_says_so():
@@ -679,8 +679,8 @@ def test_more_of_something_the_positive_prompt_lacks_puts_it_first_with_its_oppo
                    ("a woman on a couch", "blurry"), ("more freckles",))
 
     assert (outcome.positive, outcome.negative) == ("freckles, a woman on a couch", "blurry, clear skin")
-    assert outcome.line == ('Added "freckles" to the Positive Prompt. '
-                            'Added "clear skin" to the Negative Prompt.')
+    assert outcome.line == ('Added "freckles" to the Positive prompt. '
+                            'Added "clear skin" to the Negative prompt.')
 
 
 def test_more_of_something_he_never_asked_about_is_left_out_and_says_so():
@@ -699,7 +699,7 @@ def test_something_gone_gives_its_place_to_what_shows_instead_and_is_kept_out():
     assert (outcome.positive, outcome.negative) == ("a woman in a sundress, a pier at noon",
                                                     "blurry, raincoat")
     assert outcome.line == ('Replaced "a woman in a yellow raincoat" with "a woman in a sundress" in '
-                            'the Positive Prompt. Added "raincoat" to the Negative Prompt.')
+                            'the Positive prompt. Added "raincoat" to the Negative prompt.')
 
 
 def test_something_gone_in_several_kinds_takes_every_kind_out():
@@ -707,8 +707,8 @@ def test_something_gone_in_several_kinds_takes_every_kind_out():
                    ("a woman, a straw hat, a cap, a beach", "blurry"), ("no hats",))
 
     assert (outcome.positive, outcome.negative) == ("a woman, a beach", "blurry, hat")
-    assert outcome.line == ('Removed "a straw hat" from the Positive Prompt. '
-                            'Removed "a cap" from the Positive Prompt. Added "hat" to the Negative Prompt.')
+    assert outcome.line == ('Removed "a straw hat" from the Positive prompt. '
+                            'Removed "a cap" from the Positive prompt. Added "hat" to the Negative prompt.')
 
 
 def test_something_gone_that_is_already_out_and_kept_out_says_so():
@@ -717,8 +717,8 @@ def test_something_gone_that_is_already_out_and_kept_out_says_so():
                    ("a woman on a pier", "blurry, raincoat"), ("try harder to get rid of the raincoat",))
 
     assert (outcome.positive, outcome.negative) == ("a woman on a pier", "blurry, raincoat")
-    assert outcome.line == ('"raincoat" was already out of the Positive Prompt and in the Negative '
-                            "Prompt, so I couldn't figure out anything else to do.")
+    assert outcome.line == ('"raincoat" was already out of the Positive prompt and in the Negative '
+                            "prompt, so I couldn't figure out anything else to do.")
 
 
 def test_something_gone_that_is_already_kept_out_where_the_prompts_take_weights_is_kept_out_harder():
@@ -726,14 +726,14 @@ def test_something_gone_that_is_already_kept_out_where_the_prompts_take_weights_
                    ("a woman on a pier", "blurry, raincoat"), ("no raincoat",), prompts=Prompts())
 
     assert outcome.negative == "blurry, (raincoat:1.1)"
-    assert outcome.line == 'Replaced "raincoat" with "(raincoat:1.1)" in the Negative Prompt.'
+    assert outcome.line == 'Replaced "raincoat" with "(raincoat:1.1)" in the Negative prompt.'
 
 
 def test_what_the_positive_prompt_never_had_is_not_said_missing_when_he_names_the_negative_prompt():
     outcome = _applied([{"prompt": "negative", "add": "hat", "for": "put hat back"}],
-                       asked=("put hat back into the Negative Prompt",))
+                       asked=("put hat back into the Negative prompt",))
 
-    assert outcome.line == 'Added "hat" to the Negative Prompt.'
+    assert outcome.line == 'Added "hat" to the Negative prompt.'
 
 
 def test_an_opposite_kept_out_to_bring_out_what_he_asked_for_is_said_only_as_added():
@@ -741,7 +741,7 @@ def test_an_opposite_kept_out_to_bring_out_what_he_asked_for_is_said_only_as_add
                        asked=("more of the couch",))
 
     assert outcome.negative == "blurry, bare floor"
-    assert outcome.line == 'Added "bare floor" to the Negative Prompt.'
+    assert outcome.line == 'Added "bare floor" to the Negative prompt.'
 
 
 def test_a_weight_raised_on_several_words_is_said_with_its_parentheses_whole():
@@ -750,7 +750,7 @@ def test_a_weight_raised_on_several_words_is_said_with_its_parentheses_whole():
                        pair=("a woman, (a velvet couch:1.3)", "blurry"), asked=("more couch",))
 
     assert outcome.line == ('Replaced "(a velvet couch:1.3)" with "(a velvet couch:1.5)" '
-                            'in the Positive Prompt. Added "couch cushions" to the Positive Prompt.')
+                            'in the Positive prompt. Added "couch cushions" to the Positive prompt.')
 
 
 _COUCH_LAST = ("a woman, soft light, a velvet couch", "blurry")
@@ -765,15 +765,15 @@ def test_a_part_a_replacement_puts_earlier_is_said_as_moved():
     outcome = _moved_by_one_replacement("a velvet couch, a woman, soft light")
 
     assert outcome.positive == "a velvet couch, a woman, soft light"
-    assert outcome.line == 'Moved "a velvet couch" earlier in the Positive Prompt.'
+    assert outcome.line == 'Moved "a velvet couch" earlier in the Positive prompt.'
 
 
 def test_a_part_reworded_as_it_is_moved_is_said_as_replaced_and_then_moved():
     outcome = _moved_by_one_replacement("a wide velvet couch, a woman, soft light")
 
     assert outcome.positive == "a wide velvet couch, a woman, soft light"
-    assert outcome.line == ('Replaced "a velvet couch" with "a wide velvet couch" in the Positive Prompt. '
-                            'Moved "a wide velvet couch" earlier in the Positive Prompt.')
+    assert outcome.line == ('Replaced "a velvet couch" with "a wide velvet couch" in the Positive prompt. '
+                            'Moved "a wide velvet couch" earlier in the Positive prompt.')
 
 
 def test_a_part_put_later_is_said_as_moved_later():
@@ -781,7 +781,7 @@ def test_a_part_put_later_is_said_as_moved_later():
                          "with": "a woman, soft light, a velvet couch", "for": "less couch"}],
                        pair=("a velvet couch, a woman, soft light", "blurry"), asked=("less couch",))
 
-    assert outcome.line == 'Moved "a velvet couch" later in the Positive Prompt.'
+    assert outcome.line == 'Moved "a velvet couch" later in the Positive prompt.'
 
 
 def test_a_change_quoting_the_prompt_as_it_stood_before_the_change_ahead_of_it_is_still_found():
@@ -792,8 +792,8 @@ def test_a_change_quoting_the_prompt_as_it_stood_before_the_change_ahead_of_it_i
                        pair=_COUCH_LAST, asked=("more couch",))
 
     assert outcome.positive == "a wide velvet couch, a woman, soft light"
-    assert outcome.line == ('Replaced "a velvet couch" with "a wide velvet couch" in the Positive Prompt. '
-                            'Moved "a wide velvet couch" earlier in the Positive Prompt.')
+    assert outcome.line == ('Replaced "a velvet couch" with "a wide velvet couch" in the Positive prompt. '
+                            'Moved "a wide velvet couch" earlier in the Positive prompt.')
 
 
 def test_what_the_positive_prompt_calls_for_is_never_kept_out_as_no_of_it():
@@ -802,7 +802,7 @@ def test_what_the_positive_prompt_calls_for_is_never_kept_out_as_no_of_it():
                        pair=_COUCH_LAST, asked=("more couch",))
 
     assert outcome.negative == "blurry, bare floor"
-    assert outcome.line == 'Added "bare floor" to the Negative Prompt.'
+    assert outcome.line == 'Added "bare floor" to the Negative prompt.'
 
 
 def test_something_to_leave_out_written_into_the_negative_prompt_as_no_of_it_goes_in_bare():
@@ -820,7 +820,7 @@ def test_words_a_part_already_had_stay_when_its_rewording_puts_a_comma_before_th
 
     assert outcome.positive == "a woman, a velvet couch with a huge, carved frame"
     assert outcome.line == ('Replaced "a velvet couch with a wide carved frame" with "a velvet couch '
-                            'with a huge, carved frame" in the Positive Prompt.')
+                            'with a huge, carved frame" in the Positive prompt.')
 
 
 @pytest.mark.parametrize(("change", "line"), [
@@ -831,9 +831,9 @@ def test_words_a_part_already_had_stay_when_its_rewording_puts_a_comma_before_th
     ({"prompt": "positive", "add": " , ", "for": "a hat"},
      "The model's change named no words, so nothing changed."),
     ({"prompt": "positive", "remove": "a straw hat", "for": "no hat"},
-     'Couldn\'t find "a straw hat" in the Positive Prompt.'),
+     'Couldn\'t find "a straw hat" in the Positive prompt.'),
     ({"prompt": "negative", "add": "no couch", "for": "no hat"},
-     'The Positive Prompt asks for "no couch", so it wasn\'t kept out of the Negative Prompt.')])
+     'The Positive prompt asks for "no couch", so it wasn\'t kept out of the Negative prompt.')])
 def test_a_change_that_comes_to_nothing_says_why(change, line):
     assert _applied([change], asked=("no hat, a hat",)).line == line
 
@@ -862,4 +862,4 @@ def test_a_second_man_the_positive_prompt_never_described_is_kept_out_through_th
                          "for": asked}], pair=("a man on a pier, fog", "blurry"), asked=(asked,))
 
     assert (outcome.positive, outcome.negative) == ("a man on a pier, fog", "blurry, second man, umbrella")
-    assert outcome.line == 'Added "second man, umbrella" to the Negative Prompt.'
+    assert outcome.line == 'Added "second man, umbrella" to the Negative prompt.'

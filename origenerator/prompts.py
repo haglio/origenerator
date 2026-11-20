@@ -36,7 +36,7 @@ REQUEST_SYSTEM_PROMPT = (
     "lake\" becomes \"print of a lake\", never \"a lake\".\n"
     "- A LoRA is picked by its title as listed. Each LoRA's trigger words are listed beside "
     "it, and the newest version of each is marked; the newer version of a LoRA is that one. "
-    "When you switch a LoRA, the app swaps its trigger words in the Positive Prompt itself, "
+    "When you switch a LoRA, the app swaps its trigger words in the Positive prompt itself, "
     "so never edit trigger words.\n"
     "- A request that points back (\"a bit less\", \"no, the other one\", \"as it was\") "
     "means the earlier turns of the exchange.\n"

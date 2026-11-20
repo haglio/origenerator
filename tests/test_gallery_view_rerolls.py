@@ -1124,7 +1124,7 @@ def test_a_batch_generated_with_a_request_pending_makes_the_one_image_it_asks_fo
 def test_generate_under_a_turn_asked_with_random_ticked_keeps_the_seed_of_the_item_asked_of(
         qtbot, tmp_path):
     view = _tab_asked_for_two_cats(qtbot, tmp_path, random_seed=True)
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
 
     tab._param_form.request_exchange().generate_asked.emit(0)
 
@@ -1136,7 +1136,7 @@ def test_generate_under_a_turn_asked_with_random_ticked_keeps_the_seed_of_the_it
 def test_the_tabs_own_generate_pressed_with_random_ticked_runs_a_request_on_the_asked_seed(
         qtbot, tmp_path):
     view = _tab_asked_for_two_cats(qtbot, tmp_path, random_seed=True)
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
 
     qtbot.mouseClick(tab._generate_btn, Qt.MouseButton.LeftButton)
 
@@ -1146,7 +1146,7 @@ def test_the_tabs_own_generate_pressed_with_random_ticked_runs_a_request_on_the_
 
 def test_auto_generate_with_random_ticked_runs_a_request_on_the_asked_seed(qtbot, tmp_path):
     view = _tab_asked_for_two_cats(qtbot, tmp_path, random_seed=True, auto_generate=True)
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
 
     (job,) = view._live_jobs.values()
     assert (job.params["seed"], tab._param_form.seed_is_random()) == (7, True)
@@ -1190,7 +1190,7 @@ def _asking_for_two_cats(qtbot, tmp_path, answer_once=None, *, unanswered=False,
 
 def test_generate_under_a_turn_runs_it_and_records_its_request(qtbot, tmp_path):
     view = _tab_asked_for_two_cats(qtbot, tmp_path)
-    exchange = view._generate_pane.current_generate_tab()._param_form.request_exchange()
+    exchange = view.generate_pane.current_generate_tab()._param_form.request_exchange()
 
     exchange.generate_asked.emit(0)
 
@@ -1211,8 +1211,8 @@ def test_generate_under_a_turn_shows_the_tab_generating_as_the_tabs_own_generate
         qtbot, tmp_path):
     by_the_turn = _tab_asked_for_two_cats(qtbot, tmp_path / "turn")
     by_the_tab = _tab_asked_for_two_cats(qtbot, tmp_path / "tab")
-    turns_tab = by_the_turn._generate_pane.current_generate_tab()
-    tabs_tab = by_the_tab._generate_pane.current_generate_tab()
+    turns_tab = by_the_turn.generate_pane.current_generate_tab()
+    tabs_tab = by_the_tab.generate_pane.current_generate_tab()
 
     turns_tab._param_form.request_exchange().generate_asked.emit(0)
     qtbot.mouseClick(tabs_tab._generate_btn, Qt.MouseButton.LeftButton)
@@ -1237,7 +1237,7 @@ def test_generate_pressed_under_a_turn_leaves_the_request_section_on_the_tab(qtb
     view = _tab_asked_for_two_cats(qtbot, tmp_path)
     view.resize(1400, 700)
     view.show()
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
 
     qtbot.mouseClick(_the_turns_generate(tab), Qt.MouseButton.LeftButton)
 
@@ -1254,7 +1254,7 @@ def test_generate_pressed_under_a_turn_gives_way_to_its_progress_bar_with_nothin
     view = _tab_asked_for_two_cats(qtbot, tmp_path)
     view.resize(1400, 500)
     view.show()
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     pressed = _the_turns_generate(tab)
     tab._settings_scroll.ensureWidgetVisible(pressed)
     QApplication.processEvents()
@@ -1270,7 +1270,7 @@ def test_generate_pressed_under_a_turn_gives_way_to_its_progress_bar_with_nothin
 
 
 def _shown_by_the_tab(view) -> tuple[str, list, tuple[str, str]]:
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     return (tab.displayed_row()["prompt_id"], tab._param_form.request_exchange().turns(),
             _struck_and_lit(tab._param_form._widgets["positive_prompt"].boxes()[0]))
 
@@ -1278,7 +1278,7 @@ def _shown_by_the_tab(view) -> tuple[str, list, tuple[str, str]]:
 def test_the_image_a_turns_generate_made_becomes_the_tab_when_it_lands_with_nothing_marked(
         qtbot, tmp_path):
     view = _tab_asked_for_two_cats(qtbot, tmp_path)
-    view._generate_pane.current_generate_tab()._param_form.request_exchange().generate_asked.emit(0)
+    view.generate_pane.current_generate_tab()._param_form.request_exchange().generate_asked.emit(0)
     (job,) = view._live_jobs.values()
     until(lambda: _every_job_is_with_comfyui(view))
 
@@ -1303,7 +1303,7 @@ def _press_the_tabs_own_generate(qtbot, tab) -> None:
 def test_the_conversation_shows_on_the_tab_the_moment_its_image_lands(
         qtbot, tmp_path, auto_generate, press):
     view = _tab_asked_for_two_cats(qtbot, tmp_path, auto_generate=auto_generate)
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     if press is not None:
         press(qtbot, tab)
     (job,) = view._live_jobs.values()
@@ -1339,7 +1339,7 @@ def test_a_turns_image_that_fails_leaves_the_tab_on_the_image_asked_of(qtbot, tm
 
 
 def _generate_under_the_turn_then(qtbot, view, end):
-    exchange = view._generate_pane.current_generate_tab()._param_form.request_exchange()
+    exchange = view.generate_pane.current_generate_tab()._param_form.request_exchange()
     exchange.generate_asked.emit(0)
     (job,) = view._live_jobs.values()
     until(lambda: _every_job_is_with_comfyui(view))
@@ -1390,7 +1390,7 @@ def _ask_for_a_hat(qtbot, view, answer_once=None):
              "for": "a hat"}]})
 
     view._voice.requests._work_out = a_hat
-    exchange = view._generate_pane.current_generate_tab()._param_form.request_exchange()
+    exchange = view.generate_pane.current_generate_tab()._param_form.request_exchange()
     qtbot.keyClicks(exchange._line, "a hat")
     qtbot.keyClick(exchange._line, Qt.Key.Key_Return)
     if answer_once is None:
@@ -1400,7 +1400,7 @@ def _ask_for_a_hat(qtbot, view, answer_once=None):
 def test_a_request_answered_while_the_last_ones_image_is_made_comes_along_to_that_image(
         qtbot, tmp_path):
     view = _tab_asked_for_two_cats(qtbot, tmp_path)
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     answer_now = threading.Event()
     _ask_for_a_hat(qtbot, view, answer_once=answer_now)
     tab._param_form.request_exchange().generate_asked.emit(0)
@@ -1425,7 +1425,7 @@ def _what_the_tab_shows(tab) -> tuple:
 def _generate_under_the_earlier_turn(qtbot, tmp_path):
     view = _tab_asked_for_two_cats(qtbot, tmp_path)
     _ask_for_a_hat(qtbot, view)
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     before = _what_the_tab_shows(tab)
     earlier, _last = _placed_in_the_conversation(tab, GenerateButton)
     qtbot.mouseClick(earlier, Qt.MouseButton.LeftButton)
@@ -1506,11 +1506,11 @@ def test_a_thumbnail_in_the_request_conversation_opens_its_item_as_a_link_tile_d
     view = _tab_asked_for_two_cats(qtbot, tmp_path)
     _completed_image(view._db, "child", "two cats", 8)
     view.refresh()
-    exchange = view._generate_pane.current_generate_tab()._param_form.request_exchange()
+    exchange = view.generate_pane.current_generate_tab()._param_form.request_exchange()
 
     exchange.item_activated.emit("child")
 
-    assert view._generate_pane.current_generate_tab().displayed_row()["prompt_id"] == "child"
+    assert view.generate_pane.current_generate_tab().displayed_row()["prompt_id"] == "child"
 
 
 def test_the_conversation_knows_which_item_the_tab_shows_so_its_thumbnail_links_nowhere(
@@ -1525,7 +1525,7 @@ def test_the_conversation_knows_which_item_the_tab_shows_so_its_thumbnail_links_
 
     view.follow_link("child")
 
-    exchange = view._generate_pane.current_generate_tab()._param_form.request_exchange()
+    exchange = view.generate_pane.current_generate_tab()._param_form.request_exchange()
     assert exchange._showing == "child"
 
 
@@ -1534,7 +1534,7 @@ def test_generate_under_a_turn_that_would_make_an_image_already_made_makes_no_se
     view = _tab_asked_for_two_cats(qtbot, tmp_path)
     _completed_image(view._db, "already", "two cats", 7)
     view.refresh()
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
 
     tab._param_form.request_exchange().generate_asked.emit(0)
 
@@ -1562,12 +1562,12 @@ def test_a_turn_whose_change_would_make_an_image_already_made_shows_that_image_f
 def test_a_turn_whose_change_would_make_a_new_image_offers_generate(qtbot, tmp_path):
     view = _tab_asked_for_two_cats(qtbot, tmp_path)
 
-    exchange = view._generate_pane.current_generate_tab()._param_form.request_exchange()
+    exchange = view.generate_pane.current_generate_tab()._param_form.request_exchange()
     assert _generate_offered(exchange)
 
 
 def _request_turns_shown(view):
-    tab = view._generate_pane.current_generate_tab()
+    tab = view.generate_pane.current_generate_tab()
     return tab._param_form.request_exchange().turns(), tab._param_form._widgets["positive_prompt"].value()
 
 
@@ -1600,7 +1600,7 @@ def test_what_was_asked_of_an_image_stays_when_a_slideshow_exits_onto_an_image_m
 def test_a_requests_answer_reaches_its_image_after_the_tab_that_asked_is_closed(qtbot, tmp_path):
     answer_now = threading.Event()
     view, _exchange = _asking_for_two_cats(qtbot, tmp_path, answer_once=answer_now)
-    pane = view._generate_pane
+    pane = view.generate_pane
     pane._close_subtab(pane.indexOf(pane.current_generate_tab()))
     aims = pane.current_generate_tab()._request_aims
 
@@ -1614,7 +1614,7 @@ def test_a_requests_answer_reaches_its_image_after_the_tab_that_asked_is_closed(
 def _reopened_while_asking(qtbot, tmp_path, answer_now, *, unanswered=False):
     view, _exchange = _asking_for_two_cats(qtbot, tmp_path, answer_once=answer_now,
                                            unanswered=unanswered)
-    pane = view._generate_pane
+    pane = view.generate_pane
     pane._close_subtab(pane.indexOf(pane.current_generate_tab()))
     view._on_thumbnail_clicked("orig")
     exchange = pane.current_generate_tab()._param_form.request_exchange()

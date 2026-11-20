@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
-import os
+from pathlib import Path
 
+from app_support.written_file import ReadWhenChanged
 from PySide6.QtCore import QObject, QTimer, Signal
 
 from origenerator import lora_training
@@ -40,7 +41,8 @@ class TrainingRun(QObject):
         self._trainer = None
         self._status: dict = {"state": kind.FIRST_STATE}
         self._typical = None
-        self._status_seen: tuple[int, int] | None = None
+        self._status_file = ReadWhenChanged(Path(job["status"]),
+                                            lambda _path: lora_training.read_status(self._job))
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._look)
 
@@ -82,7 +84,7 @@ class TrainingRun(QObject):
 
     def _look(self) -> None:
         alive = self._trainer.running()
-        status = self._status = self._status_if_it_changed() or self._status
+        status = self._status = self._status_file.latest() or self._status
         if not alive:
             logger.info("Training %s: its program ended, saying %s", self.caption, status)
         if status.get("state") == "done":
@@ -98,17 +100,6 @@ class TrainingRun(QObject):
             if status.get("total"):
                 word = f"{word} {round(100 * status['done'] / status['total'])}%"
             self.progress.emit(word)
-
-    def _status_if_it_changed(self) -> dict | None:
-        try:
-            found = os.stat(self._job["status"])
-        except OSError:
-            return None
-        seen = (found.st_mtime_ns, found.st_size)
-        if seen == self._status_seen:
-            return None
-        self._status_seen = seen
-        return lora_training.read_status(self._job)
 
     def _start(self) -> None:
         try:

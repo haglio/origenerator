@@ -126,6 +126,60 @@ def test_the_records_take_up_at_every_start_follows_an_enhanced_copy_too(tmp_pat
     assert json.loads(row["output_files"])[0]["library_path"] == str(enhanced)
 
 
+def _move_with_its_record(places: NonAiPlaces, video: Path, to: Path) -> Path:
+    record = places.records / video.relative_to(places.videos.parent).with_suffix(".json")
+    moved_record = places.records / to.relative_to(places.videos.parent).with_suffix(".json")
+    to.parent.mkdir(parents=True, exist_ok=True)
+    moved_record.parent.mkdir(parents=True, exist_ok=True)
+    record.replace(moved_record)
+    return video.replace(to)
+
+
+def test_a_video_moved_to_another_folder_keeps_its_item_which_then_names_it_there(
+        db, tmp_path):
+    places = _library(tmp_path)
+    video = write_mp4(places.videos / "sample" / "full" / "set" / "video one.mp4")
+    _record(places, video, {"id": "video-one-id"})
+    scan(db, places)
+    [before] = _videos(db)
+    moved = _move_with_its_record(places, video, places.videos / "sample" / "clips" / "video one.mp4")
+
+    assert scan(db, places) == 0, "the moved video is the same video, never one more item"
+    [row] = _videos(db)
+    assert (row["prompt_id"], json.loads(row["output_files"])) == (
+        before["prompt_id"], [{"filename": moved.name, "library_path": str(moved)}])
+
+
+def test_a_moved_video_shows_under_the_folder_it_was_moved_to(db, tmp_path):
+    places = _library(tmp_path)
+    video = write_mp4(places.videos / "sample" / "full" / "set" / "video one.mp4")
+    _record(places, video, {"id": "video-one-id"})
+    scan(db, places)
+    _move_with_its_record(places, video, places.videos / "sample" / "clips" / "video one.mp4")
+
+    scan(db, places)
+
+    [row] = _videos(db)
+    assert (workflow_named(row["workflow_name"]).display_name,
+            json.loads(row["params_json"])["folder"]) == ("Sample clips", "sample/clips")
+
+
+def test_a_moved_full_video_keeps_its_star_and_the_clips_cut_from_it(db, tmp_path):
+    places = _library(tmp_path)
+    full = write_mp4(places.videos / "sample" / "full" / "set" / "video one.mp4")
+    clip = write_mp4(places.videos / "sample" / "clips" / "first.mp4")
+    _record(places, full, {"id": "video-one-id", "favorite": True})
+    _record(places, clip, {"clip": {"full_video_id": "video-one-id"}})
+    scan(db, places)
+    _move_with_its_record(places, full, places.videos / "sample" / "full" / "kept" / "video one.mp4")
+
+    scan(db, places)
+
+    rows = {json.loads(row["output_files"])[0]["filename"]: row for row in _videos(db)}
+    assert (rows["video one.mp4"]["starred"], rows["first.mp4"]["trimmed_from"]) == (
+        1, rows["video one.mp4"]["prompt_id"])
+
+
 def test_a_non_ai_video_is_named_as_fun_time_names_it(db, tmp_path):
     places = _library(tmp_path)
     named = write_mp4(places.videos / "sample" / "full" / "set" / "video one.mp4")

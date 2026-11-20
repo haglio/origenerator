@@ -9,6 +9,7 @@ _PREFIX = "non-ai:"
 FOLDER_KEY = "folder"
 TITLE_KEY = "title"
 VERSION_GROUP_KEY = "version_group"
+VIDEO_ID_KEY = "video_id"
 FOLDER_PARTS_IN_A_NAME = 2
 OTHER = "other"
 

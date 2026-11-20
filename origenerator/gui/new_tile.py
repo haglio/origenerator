@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
+from PySide6.QtWidgets import QFrame, QGraphicsOpacityEffect, QLabel, QVBoxLayout
 
 from origenerator.gui import tile_shape
 
 _MARK_PX = 56
+_GRAYED_OPACITY = 1 / 3
 
 
 class NewTile(QFrame):
@@ -35,6 +36,10 @@ class NewTile(QFrame):
             self.setEnabled(False)
             self.setToolTip(grayed_because)
             self.setAttribute(Qt.WidgetAttribute.WA_NoMousePropagation, True)
+            self._glyph.struck_out = True
+            faded = QGraphicsOpacityEffect(self)
+            faded.setOpacity(_GRAYED_OPACITY)
+            self.setGraphicsEffect(faded)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:

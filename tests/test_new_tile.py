@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import QApplication
@@ -56,6 +57,29 @@ def test_a_press_on_a_grayed_plus_does_not_put_the_picked_items_down(qtbot):
     qtbot.mouseClick(tile, Qt.MouseButton.LeftButton)
 
     assert let_go == []
+
+
+def _red_pixels(widget) -> int:
+    image = widget.grab().toImage()
+    return sum(1 for y in range(image.height()) for x in range(image.width())
+               if (color := image.pixelColor(x, y)).red() - color.green() > 40)
+
+
+def test_a_grayed_plus_wears_a_red_circle_slash_and_a_lit_one_does_not(qtbot):
+    live, grayed = NewTile(), NewTile(grayed_because="This folder is already making one")
+    for tile in (live, grayed):
+        qtbot.addWidget(tile)
+
+    assert (_red_pixels(live._glyph), _red_pixels(grayed._glyph) > 0) == (0, True)
+
+
+def test_a_grayed_tile_fades_to_a_third_and_a_lit_one_does_not(qtbot):
+    live, grayed = NewTile(), NewTile(grayed_because="This folder is already making one")
+    for tile in (live, grayed):
+        qtbot.addWidget(tile)
+
+    assert live.graphicsEffect() is None
+    assert grayed.graphicsEffect().opacity() == pytest.approx(1 / 3)
 
 
 def _ink(label):

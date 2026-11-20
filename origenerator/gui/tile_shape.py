@@ -81,6 +81,7 @@ class MarkPlate(QLabel):
     def __init__(self, mark: str, *, side: int):
         super().__init__()
         self.mark = mark
+        self.struck_out = False
         self._side = side
         self.setFixedSize(*THUMBNAIL_SIZE)
         self.setStyleSheet(_PLATE_CSS)
@@ -88,6 +89,9 @@ class MarkPlate(QLabel):
     def paintEvent(self, event):
         super().paintEvent(event)
         painter = QPainter(self)
-        draw_icon(painter, self.mark, colors.TEXT_MUTED if self.isEnabled() else colors.BORDER_SUBTLE,
-                  size=self._side, x=(self.width() - self._side) / 2,
-                  y=(self.height() - self._side) / 2)
+        centered = {"size": self._side, "x": (self.width() - self._side) / 2,
+                    "y": (self.height() - self._side) / 2}
+        draw_icon(painter, self.mark,
+                  colors.TEXT_MUTED if self.isEnabled() else colors.BORDER_SUBTLE, **centered)
+        if self.struck_out:
+            draw_icon(painter, "circle_slash", colors.RED, **centered)

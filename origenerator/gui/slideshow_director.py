@@ -198,6 +198,13 @@ def _shape_it_opens_on(shape: str, rows, items, opened_on: str | None) -> str:
     return _shape_of_the_set(rows, items)
 
 
+def _every(interval_ms: int, then) -> QTimer:
+    timer = QTimer()
+    timer.setInterval(interval_ms)
+    timer.timeout.connect(then)
+    return timer
+
+
 class SlideshowDirector:
     def __init__(self, host: SlideshowHost, sources: DirectorSources,
                  surroundings: DirectorSurroundings):
@@ -237,9 +244,7 @@ class SlideshowDirector:
         self._regions_wanted: set[str] = set()
         self._openings = RegionOpenings(self._rows_of_the_base_state, self._opening_of,
                                         self._with_its_lead_on_the_map)
-        self._openings_kept_fresh = QTimer()
-        self._openings_kept_fresh.setInterval(_OPENINGS_KEPT_FRESH_MS)
-        self._openings_kept_fresh.timeout.connect(self.make_the_openings_ready)
+        self._openings_kept_fresh = _every(_OPENINGS_KEPT_FRESH_MS, self.make_the_openings_ready)
         self._asked_for: dict[str, partial] = {}
         self._region_slideshows: dict[str, QWidget | None] = (
             dict.fromkeys(_SHAPES) if fun_time is not None else {}

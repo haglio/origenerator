@@ -22,6 +22,13 @@ def test_each_window_is_the_familys_alert_at_its_own_level(qapp, alerts, say, le
     assert alerts == [Alert("Sample title", "Something made up went wrong.", level)]
 
 
+def test_an_information_window_can_leave_out_copy_error_message(qapp):
+    with alert_shown() as shown:
+        alert.information("Sample title", "Open a made-up window first.", copyable=False)
+
+    assert shown.call_args.kwargs["copyable"] is False
+
+
 def test_the_alert_wears_the_apps_icon(qapp):
     icon = MagicMock()
 

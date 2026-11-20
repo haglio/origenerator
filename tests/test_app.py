@@ -1876,6 +1876,7 @@ class TestASecondCopy:
         assert told.call_args.args == (
             "Origenerator", "Another copy of Origenerator is already running.")
         assert told.call_args.kwargs["level"] is Level.INFO
+        assert told.call_args.kwargs["copyable"] is False
         comfyui.assert_not_called()
         window.assert_not_called()
 

@@ -4,6 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
     QApplication,
@@ -16,6 +17,18 @@ from PySide6.QtWidgets import (
 _TEXT_FIELDS = (QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox)
 _THE_SLIDESHOWS_KEYS = frozenset({Qt.Key.Key_Up, Qt.Key.Key_Down, Qt.Key.Key_Left, Qt.Key.Key_Right,
                                   Qt.Key.Key_W, Qt.Key.Key_A, Qt.Key.Key_S, Qt.Key.Key_D, Qt.Key.Key_E})
+
+
+def typing_in_a_box() -> bool:
+    return isinstance(QApplication.focusWidget(), _TEXT_FIELDS)
+
+
+def esc_pauses_or_plays(window: QWidget, pause_or_play: Callable[[], None]) -> None:
+    def pressed() -> None:
+        if not typing_in_a_box():
+            pause_or_play()
+
+    QShortcut(QKeySequence(Qt.Key.Key_Escape), window, pressed)
 
 
 @dataclass(frozen=True)
@@ -79,7 +92,7 @@ class AppKeys(QObject):
     def _hands_the_slideshow_its_key(self, event) -> bool:
         return (event.key() in _THE_SLIDESHOWS_KEYS and self._screen.isVisible()
                 and not self.other_window_owns_keys()
-                and not isinstance(QApplication.focusWidget(), _TEXT_FIELDS)
+                and not typing_in_a_box()
                 and self._presses.slideshows_key(event))
 
     def _press_for_the_gallery(self, event):
@@ -106,7 +119,7 @@ class AppKeys(QObject):
     def _escape_cancels_something(self) -> bool:
         if self._find_bar.isVisible():
             return True
-        return isinstance(QApplication.focusWidget(), _TEXT_FIELDS)
+        return typing_in_a_box()
 
     def other_window_owns_keys(self) -> bool:
         if QApplication.activeModalWidget() or QApplication.activePopupWidget():
@@ -117,8 +130,8 @@ class AppKeys(QObject):
     def gallery_owns_keys(self, *, even_from_the_generate_pane: bool = False) -> bool:
         if not self._screen.isVisible() or self.other_window_owns_keys():
             return False
-        focus = QApplication.focusWidget()
-        if isinstance(focus, _TEXT_FIELDS):
+        if typing_in_a_box():
             return False
+        focus = QApplication.focusWidget()
         return even_from_the_generate_pane or not (
             focus is not None and self._generate_pane.isAncestorOf(focus))

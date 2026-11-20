@@ -137,6 +137,7 @@ class ThrownInto(NamedTuple):
 class SetterHost(NamedTuple):
     rubbish: Callable[[object], ThrownInto]
     listen: Callable[[object], None]
+    pause_or_play: Callable[[], None]
 
 
 def the_setter_tool(side: str = MediaType.IMAGE, first: str = "", heard=_nobody_listening, *,
@@ -159,7 +160,8 @@ def the_setter_tool(side: str = MediaType.IMAGE, first: str = "", heard=_nobody_
         SetterSession(waiting, AnswersTold(db, heard), side,
                       host.rubbish(db) if host is not None else None),
         named, drawings, Locks(STATE_DIR / LOCKS_FILE),
-        keep_going=asks_to_keep_going(first))
+        keep_going=asks_to_keep_going(first),
+        pause_or_play=(host or ON_ITS_OWN).pause_or_play)
     if host is not None:
         host.listen(window)
     return window
@@ -183,7 +185,13 @@ def _listening_while_open(window) -> None:
     hearing.start()
 
 
-ON_ITS_OWN = SetterHost(_its_own_trash, _listening_while_open)
+def _pausing_its_own_videos() -> None:
+    from origenerator.gui import omnipause
+
+    omnipause.pause_or_play()
+
+
+ON_ITS_OWN = SetterHost(_its_own_trash, _listening_while_open, _pausing_its_own_videos)
 
 
 def main() -> int:

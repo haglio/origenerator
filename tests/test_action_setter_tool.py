@@ -6,13 +6,17 @@ from types import SimpleNamespace
 
 from app_support import wrong_actions
 from PIL import Image
+from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
 
-from origenerator import gallery
+from origenerator import config, gallery
 from origenerator.action_setter_tool import (
     ON_ITS_OWN,
     AnswersTold,
+    SetterHost,
     ThrownInto,
     asks_to_keep_going,
+    the_setter_tool,
     waiting_folders,
 )
 from origenerator.db import Database, NewGeneration
@@ -21,6 +25,7 @@ from origenerator.item_actions import ItemActions, actions_of
 from origenerator.media import MediaType, ShownFile
 from origenerator.output_places import OutputPlaces
 from origenerator.sent_back import Returned, SentBack
+from tests import gestures
 from tests.media_files import write_mp4
 
 
@@ -243,3 +248,20 @@ def test_a_video_waiting_is_shown_by_its_own_file_playing_rather_than_its_thumbn
 
     assert folder["shown"] == [
         ShownFile(str(tmp_path / "vid.mp4"), MediaType.VIDEO, "vid_thumb.jpg")]
+
+
+def test_esc_in_the_tool_asks_whatever_opened_it_to_pause_or_play_everything(
+        tmp_path, monkeypatch, qtbot):
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "gallery.db")
+    _a_finished_image(Database(config.DB_PATH), "gen-one", 1)
+    asked = []
+    window = the_setter_tool(host=SetterHost(lambda _db: None, lambda _window: None,
+                                             lambda: asked.append("pause or play")))
+    qtbot.addWidget(window)
+    window.show()
+    window.activateWindow()
+    QTest.qWaitForWindowActive(window)
+
+    gestures.press_key(window, Qt.Key.Key_Escape)
+
+    assert asked == ["pause or play"]

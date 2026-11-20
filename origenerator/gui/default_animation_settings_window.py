@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QSize, Qt
-from PySide6.QtGui import QKeySequence, QPixmap, QShortcut
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -15,6 +15,8 @@ from shared_ui.spacing import GAP_MEDIUM, MARGIN_STANDARD
 
 from origenerator.animate_command import lane_said_as
 from origenerator.branch_session import titled
+from origenerator.gui import omnipause
+from origenerator.gui.app_keys import esc_pauses_or_plays
 from origenerator.gui.looping_preview import play_in, stop_what_plays_in
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.stylesheet import COMMITS
@@ -45,7 +47,7 @@ MAKING_THE_THUMBNAIL = "(making this video's thumbnail…)"
 
 class DefaultAnimationSettingsWindow(QWidget):
     def __init__(self, session, look, submit, *, make_loop, off_thread=run_off_thread,
-                 parent=None):
+                 pause_or_play=omnipause.pause_or_play, parent=None):
         super().__init__(parent)
         self._session = session
         self._look = look
@@ -102,7 +104,7 @@ class DefaultAnimationSettingsWindow(QWidget):
         layout.addWidget(self._said)
         layout.addLayout(self._build_answers())
 
-        QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.close)
+        esc_pauses_or_plays(self, pause_or_play)
         self._show_current()
 
     def _build_where_it_is(self) -> QHBoxLayout:

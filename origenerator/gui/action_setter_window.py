@@ -6,10 +6,8 @@ from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import (
     QFontMetrics,
     QIcon,
-    QKeySequence,
     QPainter,
     QPixmap,
-    QShortcut,
 )
 from PySide6.QtWidgets import (
     QFrame,
@@ -32,6 +30,8 @@ from shared_ui.tick_control import TickControl
 
 from origenerator.branch_session import titled
 from origenerator.gallery import counted_of
+from origenerator.gui import omnipause
+from origenerator.gui.app_keys import esc_pauses_or_plays
 from origenerator.gui.deleting import asked_to_delete, deleting_a_folder
 from origenerator.gui.style_property import set_style_property
 from origenerator.gui.text_color import color_text
@@ -133,7 +133,8 @@ class ActionSetterWindow(QWidget):
     NOTHING_LEFT = "Nothing left to set."
 
     def __init__(self, session, vocabulary, drawings: dict[str, str], locks, *,
-                 stage=None, keep_going=None, confirm=asked_to_delete, parent=None):
+                 stage=None, keep_going=None, confirm=asked_to_delete,
+                 pause_or_play=omnipause.pause_or_play, parent=None):
         super().__init__(parent)
         self._confirm = confirm
         self._keep_going = keep_going
@@ -176,7 +177,7 @@ class ActionSetterWindow(QWidget):
         layout.addLayout(shown, 1)
         layout.addWidget(self._build_buttons(vocabulary.tiles))
 
-        QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.close)
+        esc_pauses_or_plays(self, pause_or_play)
         self._show_current()
 
     def _build_buttons(self, tiles) -> QWidget:

@@ -52,7 +52,7 @@ def _launcher(db, client):
     return submit
 
 
-def the_default_animation_settings_window():
+def the_default_animation_settings_window(*, pause_or_play=None):
     from origenerator import action_settings, animation_samples, gallery
     from origenerator.animation_settings import AcceptedSettings
     from origenerator.comfyui_client import ComfyUIClient
@@ -67,6 +67,7 @@ def the_default_animation_settings_window():
     from origenerator.content import load_content
     from origenerator.db import Database
     from origenerator.default_animation_settings_session import DefaultAnimationSettingsSession
+    from origenerator.gui import omnipause
     from origenerator.gui.default_animation_settings_window import DefaultAnimationSettingsWindow
     from origenerator.media import MediaType
 
@@ -93,6 +94,7 @@ def the_default_animation_settings_window():
         look,
         _launcher(db, ComfyUIClient(host=COMFYUI_HOST, port=COMFYUI_PORT, folders=COMFYUI_FOLDERS)),
         make_loop=lambda sample: gallery.make_animated_preview(sample, OUTPUT_PLACES, THUMB_DIR),
+        pause_or_play=pause_or_play or omnipause.pause_or_play,
     )
 
 

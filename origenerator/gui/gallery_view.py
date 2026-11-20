@@ -448,7 +448,7 @@ class GalleryView(QWidget):
         open_setters = OpenSetters()
         self._setter_host = SetterHost(
             lambda library: ThrownInto(library, self._delete_rows, self.restore_from_trash),
-            open_setters.hold)
+            open_setters.hold, self.slideshows.pause_or_play_the_room)
         self._voice = VoiceRouter(
             self, VoiceSources(db=db, slideshows=self.slideshows, client=client,
                                starting=self._starting, jobs=self._jobs, setters=open_setters,

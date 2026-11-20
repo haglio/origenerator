@@ -19,6 +19,7 @@ STAGES = {
     "describing": ("Describing", "Describing images"),
     "caching": ("Preparing", "Preparing"),
     "waiting": ("Waiting", "Waiting for the graphics card"),
+    "waiting_for_a_funestra": ("Waiting", "Waiting: a Funestra is playing"),
     "training": ("Training", "Training"),
 }
 

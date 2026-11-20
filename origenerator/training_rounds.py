@@ -14,7 +14,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from origenerator import card_claim
+from origenerator import card_claim, live_session_mark
 
 IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif", ".bmp", ".tif", ".tiff"})
 IDLE_CHECKS = 6
@@ -67,6 +67,9 @@ class Machine:
     def release_graphics_card(self) -> None:
         let_go_of_the_graphics_card()
 
+    def session_is_live(self) -> bool:
+        return live_session_mark.is_live()
+
     def jobs_waiting(self) -> int | None:
         try:
             with urllib.request.urlopen(f"{self._comfyui}/prompt", timeout=5) as answer:
@@ -103,12 +106,22 @@ def machine_of(job: dict) -> Machine:
     return Machine(job["comfyui"], f"{job['display_name']} training")
 
 
+def _gives_way(machine) -> bool:
+    return machine.jobs_waiting() not in (0, None) or machine.session_is_live()
+
+
 def wait_for_idle(job: dict, machine) -> None:
-    status(job, state="waiting")
+    said = "waiting"
+    status(job, state=said)
     while True:
         quiet = 0
         while quiet < IDLE_CHECKS:
-            free = machine.jobs_waiting() in (0, None) and not machine.graphics_card_held_by_another()
+            live = machine.session_is_live()
+            if (state := "waiting_for_a_funestra" if live else "waiting") != said:
+                status(job, state=state)
+                said = state
+            free = (not live and machine.jobs_waiting() in (0, None)
+                    and not machine.graphics_card_held_by_another())
             quiet = quiet + 1 if free else 0
             machine.sleep(IDLE_CHECK_SECONDS)
         memory = machine.graphics_card_memory_mib()
@@ -202,17 +215,17 @@ def train(job: dict, machine, rounds: Rounds, popen=subprocess.Popen, kill=end_p
                         stderr=subprocess.STDOUT, creationflags=IN_THE_BACKGROUND)
         progress = _Progress(process, job, done)
         progress.start()
-        stopped_for_comfyui = False
+        gave_way = False
         while process.poll() is None:
             machine.sleep(POLL_SECONDS)
-            if machine.jobs_waiting() not in (0, None):
-                print("== ComfyUI has a job; stopping the trainer until the graphics card is idle again",
-                      flush=True)
+            if _gives_way(machine):
+                print("== ComfyUI has a job or a Funestra is playing; stopping the trainer until the "
+                      "graphics card is idle again", flush=True)
                 kill(process)
-                stopped_for_comfyui = True
+                gave_way = True
                 process.wait()
         progress.join()
-        if process.returncode == 0 and not stopped_for_comfyui:
+        if process.returncode == 0 and not gave_way:
             tally.write_text(str(job["steps"]), encoding="utf-8")
             return
         newest = _newest_state(output)
@@ -222,7 +235,7 @@ def train(job: dict, machine, rounds: Rounds, popen=subprocess.Popen, kill=end_p
             tally.write_text(str(done), encoding="utf-8")
             print(f"== progress kept: {done} of {job['steps']} steps saved", flush=True)
         machine.release_graphics_card()
-        if stopped_for_comfyui:
+        if gave_way:
             machine.sleep(10)
             continue
         if ran_out_of_memory(progress.tail):

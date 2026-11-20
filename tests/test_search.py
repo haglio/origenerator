@@ -514,3 +514,47 @@ def test_a_model_several_generations_share_is_looked_for_on_the_disk_once(monkey
     assert looked_for.count("example_model.safetensors") <= 1, (
         "a library's first draw looked for each row's model file on the disk again, "
         "which was most of the seconds a hosted window took to show")
+
+
+def test_an_item_whose_row_folders_and_name_are_unchanged_keeps_its_entry(monkeypatch):
+    rows = [_row("a", "a red kite"), _row("b", "a blue boat")]
+    index = search.GallerySearch()
+    index.update(rows, _folders_holding({"a": ["Kites"]}), item_name=lambda pid: "k 000" if pid == "a" else "")
+    made_again = []
+    monkeypatch.setattr(search, "replace",
+                        lambda entry, **changes: made_again.append(entry.row["prompt_id"]))
+
+    index.update(rows, _folders_holding({"a": ["Kites"]}), item_name=lambda pid: "k 000" if pid == "a" else "")
+
+    assert made_again == [], (
+        "a job queued or landing updates the search, and only its own item's entry changes")
+
+
+def test_an_item_moved_into_a_folder_is_found_by_the_folders_name():
+    rows = [_row("a", "a red kite"), _row("b", "a blue boat")]
+    index = _index(rows)
+
+    index.update(rows, _folders_holding({"b": ["Harbor"]}))
+
+    assert [hit.row["prompt_id"] for hit in index.search("harbor").results] == ["b"]
+
+
+def test_a_search_updated_change_by_change_finds_what_one_built_afresh_finds():
+    scenes = ("a red kite", "a blue boat", "a green hill", "a red boat")
+    rows = [_row(f"g{n}", scenes[n % 4], seed=n) for n in range(40)]
+    folders = {"g1": ["Harbor"], "g2": ["Kites", "Favorites of mine"]}
+    changes = (
+        lambda rows, folders: ([_row("new", "a red kite at dusk"), *rows], folders),
+        lambda rows, folders: ([r for r in rows if r["prompt_id"] != "g4"], folders),
+        lambda rows, folders: (rows, {**folders, "g5": ["Harbor"]}),
+        lambda rows, folders: ([{**r, "starred": 1} if r["prompt_id"] == "g6" else r
+                                for r in rows], folders),
+    )
+    index = _index(rows, folders)
+    for change in changes:
+        rows, folders = change(rows, folders)
+        index.update(rows, _folders_holding(folders))
+        afresh = _index([dict(r) for r in rows], folders)
+        for query in ("red", "boat", "harbor", "kite dusk", "kites"):
+            assert [hit.row["prompt_id"] for hit in index.search(query).results] == \
+                [hit.row["prompt_id"] for hit in afresh.search(query).results], query

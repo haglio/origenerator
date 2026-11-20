@@ -177,6 +177,7 @@ class _Entry:
     tags: tuple[tuple[str, ...], ...] = ()
     folder_tags: tuple[tuple[str, ...], ...] = ()
     files: frozenset[str] = frozenset()
+    folder_names: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -258,6 +259,11 @@ def _made_with_stems(row: dict, params: dict) -> set[str]:
             if not stem.replace(".", "").isdigit()}
 
 
+def _as_it_was(entry: _Entry | None, row: dict, named: tuple[str, ...], name: str) -> bool:
+    return (entry is not None and entry.row is row and entry.folder_names == named
+            and entry.name == name)
+
+
 def _folder_stems(names) -> frozenset[str]:
     return frozenset().union(*(_stems(name) for name in names))
 
@@ -321,14 +327,14 @@ class GallerySearch:
             if not prompt_id or prompt_id in entries \
                     or not gallery.produced_output(row) or not in_sight(row):
                 continue
-            named = folder_names.get(prompt_id, ())
+            named = tuple(folder_names.get(prompt_id, ()))
             name = (item_name(prompt_id) if item_name else "").lower()
             known = self._entries.get(prompt_id)
-            entries[prompt_id] = replace(
+            entries[prompt_id] = (known if _as_it_was(known, row, named, name) else replace(
                 known if known is not None else _build_entry(row),
-                row=row, folders=_folder_stems(named), name=name,
+                row=row, folders=_folder_stems(named), name=name, folder_names=named,
                 folder_tags=tuple(tag for folder in named for tag in _tags(folder)),
-            )
+            ))
             order.append(prompt_id)
         self._entries = entries
         self._order = order

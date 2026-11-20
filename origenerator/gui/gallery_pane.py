@@ -59,6 +59,7 @@ from origenerator.gui.pane_place import (
     stand_at,
 )
 from origenerator.gui.picking import Picking, Picks
+from origenerator.gui.tiles_in_sight import TilesInSight
 from origenerator.item_shape import base_of, filter_rows, key_holds, split_key
 from origenerator.library_views import LibrarySnapshot
 from origenerator.media import MediaType
@@ -180,12 +181,6 @@ def _drawn_height(drawn: QWidget, width: int) -> int:
     return height if height >= 0 else drawn.sizeHint().height()
 
 
-def _play_only_what_is_in_sight(drawn: QWidget, tiles, top: int, foot: int) -> None:
-    for tile in tiles:
-        at = tile.mapTo(drawn, QPoint(0, 0)).y()
-        tile.set_in_sight(at < foot and at + tile.height() > top)
-
-
 _COLLECTION_TILE = "collection"
 _REVIEW_TILE = "collection with a verdict"
 _FOLDER_TILE = "folder"
@@ -302,6 +297,7 @@ class GalleryPane(QObject):
         self._thumb_widgets: dict[str, ItemTile] = {}
         self._wired: dict[str, str] = {}
         self._kept = _KeptTiles()
+        self._in_sight = TilesInSight()
         self._inflight_tiles: dict[str, InFlightTile] = {}
         self._inflight_by_key: dict[str, InFlightItem] = {}
         self._inflight_signature: tuple = ()
@@ -567,8 +563,8 @@ class GalleryPane(QObject):
             self._pages.draw(_PAGE)
             # Qt only queues the show of a tile added to a page on screen; until it runs the page measures as nothing.
             show_the_tiles_qt_queued_to_show(drawn)
-        _play_only_what_is_in_sight(drawn, self._thumb_widgets.values(),
-                                    top - _REACH, top + seen.height() + _REACH)
+        self._in_sight.follow(drawn, self._thumb_widgets.values(),
+                              top - _REACH, top + seen.height() + _REACH)
 
     def _scroll_bar(self):
         return self._scroll.verticalScrollBar()

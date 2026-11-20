@@ -31,8 +31,14 @@ class FlowLayout(QLayout):
         self._row_spacing = spacing if row_spacing is None else row_spacing
         self._group_spacing = spacing if group_spacing is None else group_spacing
         self._align_right = align_right
+        self._height_at: dict[int, int] = {}
+        self.times_placed = 0
         self.setContentsMargins(margin, margin, margin, margin)
         self.setSpacing(spacing)
+
+    def invalidate(self):
+        self._height_at.clear()
+        super().invalidate()
 
     def row_spacing(self) -> int:
         return self._row_spacing
@@ -43,6 +49,7 @@ class FlowLayout(QLayout):
 
     def addItem(self, item):
         self._items.append(item)
+        self.invalidate()
 
     def group_spacing(self) -> int:
         return self._group_spacing
@@ -75,6 +82,7 @@ class FlowLayout(QLayout):
 
     def takeAt(self, index):
         if 0 <= index < len(self._items):
+            self.invalidate()
             return self._items.pop(index)
         return None
 
@@ -85,11 +93,14 @@ class FlowLayout(QLayout):
         return True
 
     def heightForWidth(self, width):
-        return self._do_layout(QRect(0, 0, width, 0), place=False)
+        if width not in self._height_at:
+            self._height_at[width] = self._do_layout(QRect(0, 0, width, 0), place=False)
+        return self._height_at[width]
 
     def setGeometry(self, rect):
         super().setGeometry(rect)
         self._do_layout(rect, place=True)
+        self.times_placed += 1
 
     def sizeHint(self):
         return self.minimumSize()

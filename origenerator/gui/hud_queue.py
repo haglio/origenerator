@@ -53,6 +53,7 @@ from origenerator.gui.hud_queue_thumbnails import (
     empty_thumbnail,
     fitted_frame,
     fitted_thumbnail,
+    thumbnail_dates,
 )
 from origenerator.gui.inflight import (
     CANCEL_ALL_TEXT,
@@ -204,6 +205,10 @@ class QueueSection:
     @property
     def drawn(self) -> tuple[JobLine, ...]:
         return self.lines[self.first:self.first + ROWS]
+
+    def thumbnails(self) -> tuple[str | None, ...]:
+        heads = self.leader.source if self.leader is not None else ()
+        return (*heads, *(path for line in self.drawn for path in (*line.source, *line.folder)))
 
     def size(self) -> tuple[int, int]:
         return 0, _HEIGHT
@@ -551,11 +556,23 @@ class JobQueueFile:
         self._hud_file = Path(hud_file)
         self._width = map_block_width(side)
         self._written: list[Path] = []
+        self._kept: tuple[tuple, PaintedFoot] | None = None
 
     def of(self, section: QueueSection | None) -> PaintedFoot | None:
         if section is None:
             self.forget()
             return None
+        drawn_from = (section, thumbnail_dates(section.thumbnails()))
+        if self._kept is not None and self._kept[0] == drawn_from:
+            foot = self._kept[1]
+            if section.pointer is not None:
+                section.pointer.painted(foot.targets, (0, 0))
+            return foot
+        foot = self._painted(section)
+        self._kept = (drawn_from, foot)
+        return foot
+
+    def _painted(self, section: QueueSection) -> PaintedFoot:
         height = section.size()[1]
         image = Image.new("RGBA", (self._width, height), (0, 0, 0, 0))
         targets = section.paint(image, 0, 0, self._width, None)
@@ -574,6 +591,7 @@ class JobQueueFile:
                            targets=tuple(targets))
 
     def forget(self) -> None:
+        self._kept = None
         self._sweep(keeping=None)
 
     def _sweep(self, *, keeping: Path | None) -> None:

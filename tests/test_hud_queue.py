@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import time
+from pathlib import Path
 
 import numpy as np
 from funestra.hud import HUD_ALPHA, Hud, load_font, text_width
@@ -23,6 +25,7 @@ from origenerator.gui.hud_queue import (
     SHIELD_ALL,
     START_NOW,
     UP,
+    JobQueueFile,
     QueuePointer,
     queue_section,
 )
@@ -699,3 +702,78 @@ def test_nothing_the_job_queue_draws_lets_the_slideshow_show_through_the_hud(tmp
     assert inside.min() >= HUD_ALPHA, (
         "the empty thumbnails and the progress bar are laid over the HUD, never cut into it, "
         "so the slideshow's item never shows through them")
+
+
+def _paints_counted(monkeypatch) -> list:
+    paints = []
+    paint = hud_queue.QueueSection.paint
+    monkeypatch.setattr(hud_queue.QueueSection, "paint",
+                        lambda section, *args: paints.append(section) or paint(section, *args))
+    return paints
+
+
+def _published_queue(tmp_path) -> JobQueueFile:
+    return JobQueueFile(tmp_path / "origenerator_portrait_hud.json", "portrait")
+
+
+def test_an_unchanged_job_queue_is_painted_and_saved_once_however_often_the_hud_asks(
+        tmp_path, monkeypatch):
+    paints = _paints_counted(monkeypatch)
+    published = _published_queue(tmp_path)
+    items = [_item("j1", status="running", progress=(1, 4), frame=b"a made-up frame"),
+             _item("j2", folder_thumbnails=[tmp_path / "made-up.png"])]
+
+    feet = [published.of(queue_section(items)) for _tick in range(5)]
+
+    assert len(paints) == 1
+    assert len({foot.file for foot in feet}) == 1
+
+
+def test_a_job_queue_that_moved_on_is_painted_again(tmp_path, monkeypatch):
+    paints = _paints_counted(monkeypatch)
+    published = _published_queue(tmp_path)
+
+    first = published.of(queue_section([_item("j1", status="running", progress=(1, 4))]))
+    second = published.of(queue_section([_item("j1", status="running", progress=(2, 4))]))
+
+    assert len(paints) == 2
+    assert first.file != second.file
+
+
+def test_a_thumbnail_written_again_under_its_name_paints_the_job_queue_again(
+        tmp_path, monkeypatch):
+    paints = _paints_counted(monkeypatch)
+    published = _published_queue(tmp_path)
+    thumbnail = tmp_path / "made-up.png"
+    _png(thumbnail, (200, 0, 0))
+    items = [_item("j1", folder_thumbnails=[thumbnail])]
+    published.of(queue_section(items))
+
+    _png(thumbnail, (0, 200, 0))
+    os.utime(thumbnail, ns=(thumbnail.stat().st_atime_ns, thumbnail.stat().st_mtime_ns + 10**9))
+    published.of(queue_section(items))
+
+    assert len(paints) == 2
+
+
+def test_a_job_queue_kept_from_the_last_pass_still_tells_the_pointer_where_its_buttons_are(
+        tmp_path):
+    items = [_item("j1", cancel=lambda: None)]
+    published = _published_queue(tmp_path)
+    published.of(queue_section(items))
+    pointer = QueuePointer(_Host(items))
+
+    published.of(queue_section(items, pointer=pointer))
+
+    assert pointer.where(f"{CANCEL}|j1") is not None
+
+
+def test_a_job_queue_taken_off_the_hud_and_brought_back_is_saved_again(tmp_path):
+    published = _published_queue(tmp_path)
+    items = [_item("j1")]
+    published.of(queue_section(items))
+    published.of(None)
+
+    foot = published.of(queue_section(items))
+
+    assert Path(foot.file).exists()

@@ -2346,6 +2346,36 @@ def test_a_slide_a_request_is_spoken_over_stays_held_through_a_new_list(qtbot, t
     assert "LOCK_OFF" not in _sent(slideshow)
 
 
+def test_a_set_with_only_a_run_still_to_come_hands_the_funestra_no_empty_list(
+        qtbot, tmp_path, monkeypatch):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path)
+    written = _lists_handed_to_a_funestra(monkeypatch)
+
+    slideshow.play(Playing([], shuffle=in_order))
+    slideshow.note_generating("id-run", FRAME)
+    slideshow.follow_what_is_being_made()
+
+    assert 0 not in written, (
+        "a Funestra refuses an empty list, and the slideshow it shows goes on showing what it "
+        "showed (his report, 2026-11-19: a double click on the first image of a new folder, as it "
+        "was made, had no effect on the slideshow at all)")
+    assert slideshow.hud_prompt_id == "id-run"
+
+
+def test_the_run_he_asked_to_watch_is_shown_whatever_the_filters_leave_out(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(is_enhanced={"id-2"}.__contains__))
+    slideshow.set_enhanced_filter(True)
+
+    slideshow.watch("id-run")
+    slideshow.note_generating("id-run", FRAME)
+    slideshow.follow_what_is_being_made()
+
+    assert slideshow.hud_prompt_id == "id-run", (
+        "a double click on an image as it is generated asks to watch that image, and no image "
+        "being generated is enhanced, starred or sorted yet (his report, 2026-11-20: the "
+        "slideshow showed another image of the folder instead)")
+
+
 def _following_a_run(qtbot, tmp_path) -> FunestraSlideshow:
     slideshow = _slideshow(qtbot, tmp_path)
     slideshow.note_generating("id-run", FRAME)

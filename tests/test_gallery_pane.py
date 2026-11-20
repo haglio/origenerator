@@ -14,6 +14,7 @@ from PySide6.QtGui import QMovie
 from PySide6.QtWidgets import QApplication, QLabel, QWidget
 
 from origenerator import gallery, search
+from origenerator.db_generations import ENHANCE_WHEN_FINISHED
 from origenerator.gallery.collection import (
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
@@ -644,6 +645,38 @@ def test_a_pane_with_no_live_tiles_off_latest_asks_the_database_nothing(qtbot, d
     pane.refresh_inflight()
 
     assert asked == [], "a pane holding no live tiles has nothing to bring up to date"
+
+
+def _a_folder_with_jobs_waiting(qtbot, db):
+    rows = [_waiting("j1", 2), _waiting("j2", 3), _row("g1", 1)]
+    pane, _scroll = _pane(qtbot, db, rows)
+    pane.set_model(LibrarySnapshot(rows), requests=[])
+    return pane, gallery.SettingsGroup(key="k1", label="scene one", rows=rows)
+
+
+def test_drawing_a_settings_folder_with_jobs_waiting_copies_no_row_of_the_library(qtbot, db):
+    pane, folder = _a_folder_with_jobs_waiting(qtbot, db)
+    asked = []
+    pane._db.list_generations = lambda: asked.append("rows") or []
+    pane._db.list_requests = lambda: asked.append("requests") or []
+
+    pane.show_thumbnails(folder)
+
+    assert asked == [], (
+        "the folder is drawn twice for each Generate press and at every rebuild, and the "
+        "library's rows and requests are already in memory")
+    assert sorted(pane._inflight_tiles) == ["j1", "j2"]
+
+
+def test_a_waiting_job_asked_to_be_enhanced_says_so_when_its_folder_is_drawn_again(qtbot, db):
+    pane, folder = _a_folder_with_jobs_waiting(qtbot, db)
+    db.ask_when_finished("j1", ENHANCE_WHEN_FINISHED)
+
+    pane.show_thumbnails(folder)
+
+    assert pane._inflight_by_key["j1"].enhance_queued is True, (
+        "what is asked of a job in flight is written to its row at once, before the library "
+        "is read again")
 
 
 def test_latest_puts_work_started_long_after_the_newest_item_in_a_now_section(qtbot, db):

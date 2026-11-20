@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QLabel
 
@@ -106,6 +108,8 @@ def test_a_folder_drawn_again_decodes_none_of_its_pictures_again(qtbot, tmp_path
         picture.fill()
         path = tmp_path / f"thumb {n}.png"
         picture.save(str(path))
+        long_ago = path.stat().st_mtime_ns - 3_600_000_000_000
+        os.utime(path, ns=(long_ago, long_ago))
         previews.append(str(path))
     decoded = []
     monkeypatch.setattr(folder_tile, "QPixmap", lambda path: decoded.append(path) or QPixmap(path))

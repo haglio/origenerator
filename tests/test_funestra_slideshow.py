@@ -1043,6 +1043,17 @@ def test_a_double_click_on_the_map_gives_that_item_the_lock_buttons_whole_lock(q
     assert asked == _the_whole_lock_on("id-3")
 
 
+def test_a_second_click_on_the_map_locks_the_item_the_first_click_played_without_playing_it_again(
+        qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path)
+    slideshow.switch_to("three.png")
+    _sent(slideshow)
+
+    slideshow.show_item("three.png", lock=True)
+
+    assert _sent(slideshow) == ["LOCK_ON three.png"]
+
+
 def test_a_double_click_on_the_map_moves_a_lock_held_on_another_item_onto_that_one(
         qtbot, tmp_path):
     asked = []

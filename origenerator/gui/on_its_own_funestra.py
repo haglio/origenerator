@@ -13,7 +13,7 @@ from funestra.program.asks import FOCUSED, KEY
 from funestra.session_quit import SESSION_QUIT
 from funestra.status import parse_status
 from funestra.volume import VolumeHud
-from PySide6.QtCore import QObject, QRect, Qt, QTimer
+from PySide6.QtCore import QObject, QRect, Qt, QTimer, Signal
 from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import QWidget
 from shared_ui.message_shape import HEARD_MARK, INFO, time_to_read_ms
@@ -111,16 +111,20 @@ class PlayerOnItsOwnFunestra:
         return self._plays.at(self._clock())
 
 
-class _FollowedChannel:
-    def __init__(self, channel, heard: Callable[[dict], None]) -> None:
+class _FollowedChannel(QObject):
+    heard = Signal(dict)
+
+    def __init__(self, channel, parent: QObject) -> None:
+        super().__init__(parent)
         self._channel = channel
-        self._heard = heard
+        self.waits_on_the_disk = channel.waits_on_the_disk
         self.write_playlist = channel.write_playlist
         self.send = channel.send
+        self.send_all = channel.send_all
 
     def status(self) -> dict[str, str]:
         fields = self._channel.status()
-        self._heard(fields)
+        self.heard.emit(fields)
         return fields
 
 
@@ -151,7 +155,8 @@ class OnItsOwnFunestra(QObject):
         self.queue_foot = QueueFoot(actions, beside=lambda: self.over_the_funestra)
         self._hud = HudOnFile(program.channel.hud_file, shape, self.queue_foot)
         self.player = PlayerOnItsOwnFunestra(wiring.clock)
-        self.channel = _FollowedChannel(program.channel, self._heard_from_the_funestra)
+        self.channel = _FollowedChannel(program.channel, self)
+        self.channel.heard.connect(self._heard_from_the_funestra)
         self._tuner = None if wiring.radio is None else wiring.radio.held_by_a_slideshow()
         opens_at = wiring.volume if wiring.volume is not None else VolumeHud()
         self._volume_told: VolumeHud | None = opens_at

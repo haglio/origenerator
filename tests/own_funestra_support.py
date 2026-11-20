@@ -60,6 +60,8 @@ class _Window:
 
 
 class _HandedStraightAcross:
+    waits_on_the_disk = False
+
     def __init__(self, program: FakeProgram, folder: Path) -> None:
         self._program = program
         self.playlist = folder / "playlist.tsv"
@@ -75,6 +77,11 @@ class _HandedStraightAcross:
     def send(self, verb: str) -> bool:
         self._program.sent.append(verb)
         self._program.apply(verb)
+        return True
+
+    def send_all(self, verbs: list[str]) -> bool:
+        for verb in verbs:
+            self.send(verb)
         return True
 
     def status(self) -> dict[str, str]:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from io import BytesIO
 from pathlib import Path
 from typing import NamedTuple
@@ -9,7 +10,7 @@ from funestra.program.asks import FOCUSED
 from funestra.session_quit import SESSION_QUIT
 from funestra.volume import VolumeHud
 from PIL import Image
-from PySide6.QtCore import QRect, Qt
+from PySide6.QtCore import QCoreApplication, QRect, Qt
 from PySide6.QtGui import QGuiApplication, QKeyEvent
 from shared_ui.colors import GREEN, RED, TEXT_PRIMARY, YELLOW
 from shared_ui.icons import icon_then_text
@@ -3006,6 +3007,21 @@ def test_the_radio_its_slideshow_holds_plays_over_an_image_at_the_funestras_own_
     _the_slideshow_follows_the_funestra(view)
 
     assert radio.held.ticked == (True, 40, False)
+
+
+def test_a_status_read_off_the_window_thread_reaches_the_radio_on_the_window_thread(qtbot):
+    radio, told_on = _ARadio(), []
+    radio.held.tick = lambda **_said: told_on.append(threading.current_thread())
+    view = _view(qtbot, _KEYED, radio=radio)
+    told_on.clear()
+
+    reader = threading.Thread(target=view.slideshow.channel.status)
+    reader.start()
+    reader.join()
+    on_the_readers_thread = list(told_on)
+    QCoreApplication.processEvents()
+
+    assert (on_the_readers_thread, told_on) == ([], [threading.main_thread()])
 
 
 def test_the_radio_gives_way_to_a_video_and_stops_with_the_pause(qtbot):

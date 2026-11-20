@@ -780,6 +780,27 @@ def test_the_tick_that_finds_a_job_running_draws_no_folder_again(qtbot):
     assert [item.reading.rendering for item in view.job_queue.items()] == [True]
 
 
+def test_an_item_landing_leaves_the_toc_scrolled_where_he_left_it(qtbot):
+    view = GalleryView(database_of(
+        [_image(f"i{n}", f"made up scene {n}", 50, 1) for n in range(60)]))
+    qtbot.addWidget(view)
+    view.resize(900, 400)
+    view.show()
+    view.refresh()
+    for item in view.toc.item_by_key.values():
+        item.setExpanded(True)
+    lora = _at(_image_workflow(view._tree), 0, 0)
+    view._tree.setCurrentItem(_at(lora, 40))
+    bar = _at(lora, 40).treeWidget().verticalScrollBar()
+    bar.setValue(3)
+    put_rows(view._db, [_image("landed", "made up scene 7", 50, 2)])
+
+    view._poll()
+
+    assert bar.value() == 3, (
+        "the TOC stays where he scrolled it, away from the folder he has open, while items land")
+
+
 def test_each_tick_puts_what_a_slideshow_is_locked_on_first(qtbot, monkeypatch):
     view, _cat, _dog = _two_leaf_view(qtbot)
     ticks = []

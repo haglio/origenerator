@@ -263,6 +263,14 @@ class SplitFolderTree(QWidget):
         self._active = shape
         self._trees[shape].setCurrentItem(item, column, command)
 
+    def scroll_places(self) -> dict[str, int]:
+        return {shape: tree.verticalScrollBar().value() for shape, tree in self._trees.items()}
+
+    def scroll_back_to(self, places: dict[str, int]) -> None:
+        for shape, value in places.items():
+            if shape in self._trees:
+                self._trees[shape].verticalScrollBar().setValue(value)
+
     def selected_folder_keys(self) -> list[str]:
         return [key for tree in self._trees.values() for key in tree.selected_folder_keys()]
 

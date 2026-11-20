@@ -227,3 +227,70 @@ def test_the_app_runs_ahead_of_background_work_while_a_video_drives(qapp, monkey
 
     driver.stop()
     assert raised == ["ahead", "back"]
+
+
+class _Tickers:
+    def __init__(self):
+        self.made = []
+
+    def __call__(self, tick, interval_s):
+        ticker = _Ticker(tick, interval_s)
+        self.made.append(ticker)
+        return ticker
+
+
+class _Ticker:
+    def __init__(self, tick, interval_s):
+        self.tick, self.interval_s = tick, interval_s
+        self.running = False
+
+    def start(self):
+        self.running = True
+
+    def stop(self):
+        self.running = False
+
+
+def test_a_script_is_streamed_from_a_clock_of_its_own_every_50_ms(qapp):
+    broker, tickers = FakeBroker(), _Tickers()
+    driver = Osr2Driver(broker=broker, ticker_factory=tickers)
+    driver.start(FakePlayer(pos=100), ACTIONS)
+
+    [ticker] = tickers.made
+    ticker.tick()
+
+    assert (ticker.running, ticker.interval_s, broker.positions) == (True, 0.05, [(100, 400)]), (
+        "the device's timing rides on a thread of its own, so a busy window cannot stall it")
+
+
+def test_letting_go_of_a_script_stops_its_clock(qapp):
+    tickers = _Tickers()
+    driver = Osr2Driver(broker=FakeBroker(), ticker_factory=tickers)
+    driver.start(FakePlayer(pos=100), ACTIONS)
+
+    driver.stop()
+
+    assert [ticker.running for ticker in tickers.made] == [False]
+
+
+def test_a_frozen_room_stops_the_clock_and_playing_again_starts_one(qapp):
+    tickers = _Tickers()
+    driver = Osr2Driver(broker=FakeBroker(), ticker_factory=tickers)
+    driver.start(FakePlayer(pos=100), ACTIONS)
+
+    driver.set_frozen(True)
+    stopped = [ticker.running for ticker in tickers.made]
+    driver.set_frozen(False)
+
+    assert (stopped, [ticker.running for ticker in tickers.made]) == ([False], [False, True])
+
+
+def test_a_script_started_in_a_frozen_room_starts_no_clock_until_it_plays(qapp):
+    tickers = _Tickers()
+    driver = Osr2Driver(broker=FakeBroker(), ticker_factory=tickers)
+    driver.set_frozen(True)
+
+    driver.start(FakePlayer(pos=100), ACTIONS)
+
+    assert tickers.made == []
+

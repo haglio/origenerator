@@ -30,6 +30,7 @@ from origenerator import crash_notes
 from origenerator.config import OUTPUT_PLACES
 from origenerator.funscript import funscript_of
 from origenerator.gui import omnipause
+from origenerator.gui.announced_position import AnnouncedPosition
 from origenerator.gui.combination_view import CombinationView
 from origenerator.gui.contact_sheet import ContactSheet
 from origenerator.gui.corner_buttons import CornerButtons
@@ -107,6 +108,7 @@ class Viewport(QWidget):
         self.customContextMenuRequested.connect(self._on_context_menu)
 
         self._player = player if player is not None else make_player(self)
+        self._playhead = AnnouncedPosition(self._player)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -337,6 +339,9 @@ class Viewport(QWidget):
 
     def player(self) -> QMediaPlayer:
         return self._player
+
+    def playhead(self) -> AnnouncedPosition:
+        return self._playhead
 
     def set_frozen(self, frozen: bool) -> None:
         if self._movie is not None:

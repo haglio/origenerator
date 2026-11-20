@@ -43,7 +43,12 @@ from tests.slideshow_hud_support import (
     speaker_on_screen,
     thumbnail_on_screen,
 )
-from tests.slideshow_support import ahead, slides_named, stop_the_poll_to_tick_by_hand
+from tests.slideshow_support import (
+    ahead,
+    deleting_through_the_gallery,
+    slides_named,
+    stop_the_poll_to_tick_by_hand,
+)
 
 _ITEMS = [("a.png", "image"), ("b.mp4", "video"), ("c.png", "image")]
 
@@ -417,7 +422,7 @@ def test_a_new_set_played_in_drops_the_switches_the_last_one_left_on(qtbot):
 def test_culling_releases_the_lock(qtbot):
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b")]
     view = _standalone(items, shuffle=lambda order: None,
-                         actions=SlideshowActions(delete=lambda prompt_id: None))
+                         actions=SlideshowActions(delete=deleting_through_the_gallery(lambda: view.slideshow)))
     _press(view, Qt.Key.Key_Down)
     _press(view, Qt.Key.Key_Up)
     assert not view.slideshow.locked
@@ -453,7 +458,7 @@ def test_up_deletes_the_current_item_and_advances(qtbot, arrows):
     items = [("a.png", "image", "id-a"), ("b.png", "image", "id-b"),
              ("c.png", "image", "id-c")]
     view = _standalone(items, shuffle=lambda order: None,
-                         actions=SlideshowActions(delete=deleted.append))
+                         actions=SlideshowActions(delete=deleting_through_the_gallery(lambda: view.slideshow, deleted)))
     assert view.slideshow._set.playlist.current()[2] == "id-a"
 
     _press(view, arrows.up)
@@ -728,7 +733,7 @@ def _around(prompt_id):
 def test_a_cull_that_leaves_one_image_in_the_row_locks_it(qtbot):
     asked, starred, opened = [], [], []
     view = _view(qtbot, _KEYED,
-                 actions=SlideshowActions(neighbors=_around, delete=lambda prompt_id: None,
+                 actions=SlideshowActions(neighbors=_around, delete=deleting_through_the_gallery(lambda: view.slideshow),
                                           favorite=starred.append, lock=opened.append,
                                           enhance=lambda prompt_id: asked.append(prompt_id) or True))
     _press(view, Qt.Key.Key_E)
@@ -744,7 +749,7 @@ def test_a_cull_that_leaves_one_image_in_the_row_locks_it(qtbot):
 def test_an_image_taken_away_leaves_the_map_of_the_row_it_was_playing(qtbot):
     deleted = []
     view = _view(qtbot, _KEYED,
-                 actions=SlideshowActions(neighbors=_around, delete=deleted.append))
+                 actions=SlideshowActions(neighbors=_around, delete=deleting_through_the_gallery(lambda: view.slideshow, deleted)))
     _press(view, Qt.Key.Key_E)
 
     view.slideshow.cull()
@@ -1346,7 +1351,7 @@ def test_stepping_and_culling_are_the_arrows_own_moves(qtbot):
     culled = []
     items = [("a.png", "image", "gen-a", None), ("b.png", "image", "gen-b", None),
              ("c.png", "image", "gen-c", None)]
-    view = _view(qtbot, items=items, actions=SlideshowActions(delete=culled.append))
+    view = _view(qtbot, items=items, actions=SlideshowActions(delete=deleting_through_the_gallery(lambda: view.slideshow, culled)))
 
     view.slideshow.slideshow_step(1)
     _settle(view)
@@ -2017,15 +2022,14 @@ def test_a_scripted_clip_hands_its_motion_to_the_hud(qtbot, tmp_path):
     assert view.funestra.playback.has_funscript
 
 
-def test_releasing_a_condemned_file_lets_go_of_it(qtbot, tmp_path):
+def test_releasing_the_only_file_ends_a_slideshow_with_nothing_to_reset_to(qtbot, tmp_path):
     video = str(tmp_path / "c.mp4")
     view = _view(qtbot, [(video, "video")])
 
     view.slideshow.release_media([video])
     _settle(view)
 
-    assert _media_on_screen(view) == ""
-    assert _engine(view).stopped is True
+    assert view.slideshow.is_showing() is False
 
 
 def test_releasing_another_file_leaves_the_slideshow_alone(qtbot, tmp_path):

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import time
 from dataclasses import replace
+from pathlib import Path
 from typing import NamedTuple
 
+from app_support.written_file import ReadEachWhenChanged
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QTabWidget
 
 from origenerator.comfyui_client import ComfyUIClient
@@ -17,9 +19,10 @@ from origenerator.gallery import (
     settings_signature,
 )
 from origenerator.generation_config import ConfigSnapshot
+from origenerator.gui import icons
 from origenerator.gui.copy_names import offer_copy_names
 from origenerator.gui.eliding_tab_bar import MARK_CANVAS, ElidingTabBar, tab_mark
-from origenerator.gui.generate_tab import GenerateTab, icon_of_mark_source
+from origenerator.gui.generate_tab import GenerateTab
 from origenerator.gui.how_many import HOW_MANY
 from origenerator.item_names import ItemNames
 from origenerator.library_views import NO_VIEWS, LibraryViews, TabViews
@@ -27,6 +30,12 @@ from origenerator.media import MediaType
 from origenerator.workflows import workflow_named
 
 _MARKS_KEPT = 64
+
+
+def _thumbnail_mark(thumbnail: str) -> QIcon | None:
+    if not Path(thumbnail).is_file():
+        return None
+    return tab_mark(QIcon(QPixmap(thumbnail)))
 
 
 class SavedTab(NamedTuple):
@@ -91,7 +100,8 @@ class GeneratePane(QTabWidget):
         self._last_close_at = float("-inf")
         self._how_many = HOW_MANY[0]
         self._request_auto_generate = False
-        self._marks: dict[tuple, QIcon] = {}
+        self._thumbnail_marks = ReadEachWhenChanged(_thumbnail_mark, most=_MARKS_KEPT)
+        self._media_marks: dict[MediaType | None, QIcon] = {}
         self._add_subtab()
 
     def _front_tab_relayout(self, _index: int = -1) -> None:
@@ -175,12 +185,13 @@ class GeneratePane(QTabWidget):
         return tab
 
     def _mark_of(self, tab: GenerateTab) -> QIcon:
-        source = tab.tab_mark_source()
-        if source not in self._marks:
-            if len(self._marks) >= _MARKS_KEPT:
-                self._marks.clear()
-            self._marks[source] = tab_mark(icon_of_mark_source(source))
-        return self._marks[source]
+        thumbnail, media = tab.tab_mark_source()
+        if thumbnail and (mark := self._thumbnail_marks.latest(thumbnail)) is not None:
+            return mark
+        if media not in self._media_marks:
+            self._media_marks[media] = tab_mark(
+                icons.media_type_icon(media) if media else QIcon())
+        return self._media_marks[media]
 
     def _update_tab(self, tab: GenerateTab, title: str):
         index = self.indexOf(tab)

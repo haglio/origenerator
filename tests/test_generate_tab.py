@@ -13,7 +13,7 @@ import pytest
 import shiboken6
 from app_support.kino_folder import upscale_in, upscales_in
 from PIL import Image
-from PySide6.QtCore import QPoint, QPointF, QSize, Qt
+from PySide6.QtCore import QPoint, QPointF, Qt
 from PySide6.QtGui import (
     QColor,
     QDropEvent,
@@ -83,7 +83,7 @@ from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.enhance_versions import RunningEnhancement, _AddRow, _PendingRow, _VersionRow
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.gallery_view_parts import Shared
-from origenerator.gui.generate_tab import TYPICAL_TIME, GenerateTab, icon_of_mark_source
+from origenerator.gui.generate_tab import TYPICAL_TIME, GenerateTab
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.label_cells import LabelCell
 from origenerator.gui.look_training_controller import LookTrainingController
@@ -1645,15 +1645,15 @@ def test_the_mark_is_the_shown_items_own_thumbnail(tab, tmp_path):
 
     tab.show_saved_generation(row, [row])
 
-    assert icon_of_mark_source(tab.tab_mark_source()).availableSizes() == [QSize(4, 4)]
+    assert tab.tab_mark_source()[0] == str(thumb)
 
 
 def test_the_mark_falls_back_to_what_the_config_makes(tab):
-    assert icon_of_mark_source(tab.tab_mark_source()).cacheKey() == icons.media_type_icon(MediaType.IMAGE).cacheKey()
+    assert tab.tab_mark_source() == (None, MediaType.IMAGE)
 
 
 def test_a_tab_with_no_workflow_yet_wears_no_mark(blank_panel):
-    assert icon_of_mark_source(blank_panel.tab_mark_source()).isNull(), (
+    assert blank_panel.tab_mark_source() == (None, None), (
         "nothing is known yet, and a mark guessing at a workflow would be the tab's most confident claim")
 
 

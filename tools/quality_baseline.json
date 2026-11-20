@@ -65,7 +65,7 @@
     "tests/test_gallery_view_rerolls.py": 2,
     "tests/test_gallery_view_room.py": 1,
     "tests/test_gallery_view_search.py": 2,
-    "tests/test_gallery_view_slideshow.py": 12,
+    "tests/test_gallery_view_slideshow.py": 11,
     "tests/test_gallery_view_tiles.py": 1,
     "tests/test_gallery_view_trash.py": 2,
     "tests/test_gallery_view_voice.py": 2,

@@ -955,8 +955,11 @@ def test_the_image_a_locked_slideshow_ends_on_stays_picked_and_in_view_as_the_li
     keep_rows_on_disk(monkeypatch)
     view, db = _laid_out_folder(qtbot)
     far = view.listed_prompt_ids()[-3]
-    _scroll_bar(view).setValue(_scroll_bar(view).maximum())
-    qtbot.wait(1)
+
+    def scroll_to_the_foot():
+        QApplication.processEvents()
+        _scroll_bar(view).setValue(_scroll_bar(view).maximum())
+    wait_until(lambda: far in view._gallery_pane._thumb_widgets, pump=scroll_to_the_foot)
     _pick_by_clicking(view, far)
     _scroll_bar(view).setValue(0)
     slideshow = _double_click_slideshow(view, qtbot)

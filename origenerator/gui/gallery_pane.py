@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextlib import nullcontext
 from dataclasses import dataclass, replace
 from functools import partial
 from typing import NamedTuple
@@ -76,6 +77,7 @@ _MOST_TILES_ACROSS = 4
 _NEIGHBORS_PAST_A_REVEAL = _ROWS_PAST_A_REVEAL * _MOST_TILES_ACROSS
 _MOST_TILES_DRAWN_FOR_A_REVEAL = 4 * _PAGE
 _REACH = 600
+_TILES_A_TURN = 6
 _ROOM_ABOVE_A_SECTIONS_HEADING = GAP_DIALOG
 SEARCH_DRAW_LIMIT = 200
 
@@ -303,6 +305,7 @@ class GalleryPane(QObject):
         self._inflight_signature: tuple = ()
         self._model = LibrarySnapshot([])
         self._pages = _Pages()
+        self._drawing_ahead_of: QWidget | None = None
         self._search_rows: list[dict] = []
         self._showing_search = False
         self._collection_shape: str | None = None
@@ -558,13 +561,36 @@ class GalleryPane(QObject):
         if drawn is None:
             return
         top = self._scroll_bar().value()
-        while self._pages.more() and (_drawn_height(drawn, seen.width())
-                                      - top - seen.height() < _REACH):
-            added_since = drawn.layout().count()
-            self._pages.draw(_PAGE)
+        while self._pages.more() and self._drawn_below(drawn, top) < 0:
+            self._draw_more(drawn)
+        if self._pages.more() and self._drawn_below(drawn, top) < _REACH:
+            self._draw_ahead_soon(drawn)
+        self._in_sight.follow(drawn, self._thumb_widgets.values(), top, top + seen.height())
+
+    def _drawn_below(self, drawn: QWidget, top: int) -> int:
+        seen = self._scroll.viewport()
+        return _drawn_height(drawn, seen.width()) - top - seen.height()
+
+    def _draw_more(self, drawn: QWidget) -> None:
+        grid = drawn.layout()
+        added_since = grid.count()
+        with grid.appending() if isinstance(grid, FlowLayout) else nullcontext():
+            self._pages.draw(_TILES_A_TURN)
             # Qt only queues the show of a tile added to a page on screen; until it runs the page measures as nothing.
             show_the_tiles_qt_queued_to_show(drawn, added_since)
-        self._in_sight.follow(drawn, self._thumb_widgets.values(), top, top + seen.height())
+
+    def _draw_ahead_soon(self, drawn: QWidget) -> None:
+        if self._drawing_ahead_of is drawn:
+            return
+        self._drawing_ahead_of = drawn
+        defer(drawn, partial(self._draw_ahead, drawn))
+
+    def _draw_ahead(self, drawn: QWidget) -> None:
+        self._drawing_ahead_of = None
+        if self._scroll.widget() is not drawn:
+            return
+        self._draw_more(drawn)
+        self.follow_the_scroll()
 
     def _scroll_bar(self):
         return self._scroll.verticalScrollBar()

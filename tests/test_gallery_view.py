@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 import shiboken6
+from app_support.threading_utils import wait_until
 from PySide6.QtCore import (
     QEvent,
     QMargins,
@@ -1341,10 +1342,7 @@ def test_scrolling_to_the_end_of_latest_draws_the_next_page(qtbot):
     opened_on = len(_drawn(view))
     assert opened_on < 120
 
-    _scroll_to_the_end(view)
-    assert len(_drawn(view)) > opened_on
-    for _ in range(120 // opened_on):
-        _scroll_to_the_end(view)
+    wait_until(lambda: len(_drawn(view)) == 120, pump=lambda: _scroll_to_the_end(view))
 
     assert _drawn(view) == [f"i{n}" for n in reversed(range(120))]
 
@@ -1453,8 +1451,7 @@ def test_another_latest_opens_on_its_first_page(qtbot):
     _on_screen(qtbot, view, 1800, 1300)
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     opened_on = _drawn(view)
-    _scroll_to_the_end(view)
-    assert len(_drawn(view)) > len(opened_on)
+    wait_until(lambda: len(_drawn(view)) > len(opened_on), pump=lambda: _scroll_to_the_end(view))
 
     view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Images"], "Latest"))
 

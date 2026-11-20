@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import QRect
 from PySide6.QtWidgets import QLabel, QPushButton, QWidget
 
+from origenerator.gui import flow_layout
 from origenerator.gui.flow_layout import FlowLayout
 
 
@@ -270,7 +271,7 @@ def test_a_height_asked_for_again_at_the_same_width_is_not_worked_out_again(qtbo
     layout = _tiles_in(host, 40)
     worked_out = []
     rows = layout._rows
-    layout._rows = lambda area: worked_out.append(area.width()) or rows(area)
+    layout._rows = lambda area, *rest: worked_out.append(area.width()) or rows(area, *rest)
 
     heights = {layout.heightForWidth(900) for _scroll_step in range(5)}
 
@@ -308,3 +309,59 @@ def test_the_height_kept_for_a_width_is_the_height_worked_out_afresh_after_any_c
         make()
         fresh = layout._do_layout(QRect(0, 0, 600, 0), place=False)
         assert layout.heightForWidth(600) == fresh, change
+
+
+def _placed(layout) -> list[QRect]:
+    return [layout.itemAt(at).geometry() for at in range(layout.count())]
+
+
+def _laid_out_afresh(layout, width: int) -> list[QRect]:
+    layout.invalidate()
+    layout.setGeometry(QRect(0, 0, width, 0))
+    return _placed(layout)
+
+
+def _tiles_sized_to_place_seven_more_after(qtbot, monkeypatch, drawn: int):
+    host = QWidget()
+    qtbot.addWidget(host)
+    host.resize(900, 6000)
+    layout = _tiles_in(host, drawn)
+    host.show()
+    layout.activate()
+    sized = []
+    size_within = flow_layout._hint_within
+    monkeypatch.setattr(flow_layout, "_hint_within",
+                        lambda item, width: sized.append(item) or size_within(item, width))
+    with layout.appending():
+        for _ in range(7):
+            tile = QWidget(host)
+            tile.setFixedSize(180, 200)
+            layout.addWidget(tile)
+            tile.show()
+    layout.activate()
+    monkeypatch.undo()
+    assert _placed(layout) == _laid_out_afresh(layout, 900)
+    return len(sized)
+
+
+def test_tiles_added_at_the_end_are_placed_without_placing_the_grid_again(qtbot, monkeypatch):
+    after_a_few = _tiles_sized_to_place_seven_more_after(qtbot, monkeypatch, 40)
+    after_many = _tiles_sized_to_place_seven_more_after(qtbot, monkeypatch, 400)
+
+    assert after_many == after_a_few, (
+        "placing the whole grid again for each few tiles drawn takes longer the further down "
+        "the gallery is")
+
+
+def test_a_change_made_while_nothing_is_being_added_places_the_whole_grid_again(qtbot):
+    host = QWidget()
+    qtbot.addWidget(host)
+    host.show()
+    layout = _tiles_in(host, 9)
+
+    for change, make in _changes(layout):
+        layout.setGeometry(QRect(0, 0, 600, 0))
+        make()
+        layout.setGeometry(QRect(0, 0, 600, 0))
+        placed = _placed(layout)
+        assert placed == _laid_out_afresh(layout, 600), change

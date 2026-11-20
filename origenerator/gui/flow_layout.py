@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from collections import deque
+from contextlib import contextmanager
+from typing import NamedTuple
+
 from PySide6.QtCore import QPoint, QRect, QSize, Qt
 from PySide6.QtWidgets import QGridLayout, QLabel, QLayout, QWidget, QWidgetItem
 from shared_ui.spacing import GAP_SMALL
@@ -22,6 +26,18 @@ class _Grouped(QWidgetItem):
         self.group = group
 
 
+class _Resume(NamedTuple):
+    area: tuple[int, int, int]
+    at: int
+    top: int
+
+
+class _Row(NamedTuple):
+    first: int
+    begins_a_unit: bool
+    entries: list
+
+
 class FlowLayout(QLayout):
     def __init__(self, parent=None, *, margin=0, spacing=6, row_spacing=None,
                  group_spacing=None, align_right=False):
@@ -32,13 +48,27 @@ class FlowLayout(QLayout):
         self._group_spacing = spacing if group_spacing is None else group_spacing
         self._align_right = align_right
         self._height_at: dict[int, int] = {}
+        self._resume: _Resume | None = None
+        self._adding = False
+        self._placed_from = _Resume((0, 0, 0), 0, 0)
+        self._recent_starts: deque[tuple[int, _Resume]] = deque(maxlen=32)
         self.times_placed = 0
         self.setContentsMargins(margin, margin, margin, margin)
         self.setSpacing(spacing)
 
     def invalidate(self):
         self._height_at.clear()
+        if not self._adding:
+            self._resume = None
         super().invalidate()
+
+    @contextmanager
+    def appending(self):
+        self._adding = True
+        try:
+            yield
+        finally:
+            self._adding = False
 
     def row_spacing(self) -> int:
         return self._row_spacing
@@ -82,6 +112,7 @@ class FlowLayout(QLayout):
 
     def takeAt(self, index):
         if 0 <= index < len(self._items):
+            self._resume = None
             self.invalidate()
             return self._items.pop(index)
         return None
@@ -101,6 +132,13 @@ class FlowLayout(QLayout):
         super().setGeometry(rect)
         self._height_at[rect.width()] = self._do_layout(rect, place=True)
         self.times_placed += 1
+        self._recent_starts.append((self.times_placed, self._placed_from))
+
+    def placed_from_since(self, times_placed: int) -> int:
+        starts = [start.at for when, start in self._recent_starts if when > times_placed]
+        if len(starts) != self.times_placed - times_placed:
+            return 0
+        return min(starts, default=self.count())
 
     def sizeHint(self):
         return self.minimumSize()
@@ -116,9 +154,17 @@ class FlowLayout(QLayout):
     def _do_layout(self, rect, place):
         area = rect.marginsRemoved(self.contentsMargins())
         margin_height = rect.height() - area.height()
-        rows = self._rows(area)
-        y = area.y()
-        for placed in rows:
+        resume = self._resume
+        if resume is None or resume.area != (area.x(), area.y(), area.width()):
+            resume = _Resume((area.x(), area.y(), area.width()), 0, area.y())
+        rows = self._rows(area, resume.at)
+        if not rows and resume.at:
+            self._resume = None
+            return self._do_layout(rect, place)
+        y, last = resume.top, resume
+        for first, begins_a_unit, placed in rows:
+            if begins_a_unit:
+                last = resume._replace(at=first, top=y)
             leading = _closed_up([entry for entry in placed if not isinstance(entry[0], _Trailing)])
             trailing = _closed_up([entry for entry in placed if isinstance(entry[0], _Trailing)])
             x = area.x()
@@ -133,43 +179,50 @@ class FlowLayout(QLayout):
                         item.setGeometry(QRect(QPoint(start, y), hint))
                     start += hint.width()
             y += max(hint.height() for _item, hint, _gap in placed) + self._row_spacing
+        if place:
+            self._resume, self._placed_from = last, resume
         if not rows:
             return margin_height
         return y - self._row_spacing - area.y() + margin_height
 
-    def _rows(self, area):
+    def _rows(self, area, start: int = 0) -> list[_Row]:
         right = area.x() + area.width()
-        rows, row, x = [], [], area.x()
-        for unit, gap in self._units(area.width()):
+        rows, row, x = [], None, area.x()
+        for unit, gap in self._units(area.width(), start):
+            first = unit[0][2]
             if isinstance(unit[0][0], _FullRow):
                 if row:
                     rows.append(row)
                 item = unit[0][0]
-                rows.append([(item, QSize(area.width(), item.sizeHint().height()), 0)])
-                row, x = [], area.x()
+                rows.append(_Row(first, True, [
+                    (item, QSize(area.width(), item.sizeHint().height()), 0)]))
+                row, x = None, area.x()
                 continue
             width = _span_of(unit, self.spacing())
             if row and x + gap + width > right:
                 rows.append(row)
-                row, x = [], area.x()
-            for index, (item, hint) in enumerate(unit):
+                row, x = None, area.x()
+            for index, (item, hint, at) in enumerate(unit):
                 before = (gap if index == 0 else self.spacing()) if row else 0
                 if row and x + before + hint.width() > right:
                     rows.append(row)
-                    row, x, before = [], area.x(), 0
-                row.append((item, hint, before))
+                    row, x, before = None, area.x(), 0
+                if row is None:
+                    row = _Row(at, index == 0, [])
+                row.entries.append((item, hint, before))
                 x += before + hint.width()
         if row:
             rows.append(row)
         return rows
 
-    def _units(self, width: int):
+    def _units(self, width: int, start: int = 0):
         units, previous_group = [], None
-        for item in self._items:
+        for at in range(start, len(self._items)):
+            item = self._items[at]
             if item.isEmpty():
                 continue
             group = item.group if isinstance(item, _Grouped) else None
-            entry = (item, _hint_within(item, width))
+            entry = (item, _hint_within(item, width), at)
             if group is not None and group == previous_group:
                 units[-1][0].append(entry)
             else:
@@ -188,7 +241,7 @@ def _hint_within(item, width: int) -> QSize:
 
 
 def _span_of(unit, spacing) -> int:
-    return sum(hint.width() for _item, hint in unit) + spacing * max(0, len(unit) - 1)
+    return sum(hint.width() for _item, hint, _at in unit) + spacing * max(0, len(unit) - 1)
 
 
 def _closed_up(run):

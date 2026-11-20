@@ -545,10 +545,15 @@ class FunestraSlideshow(QObject):
         slide = self._set.slide_for_path(path)
         if slide is None:
             return False
-        self._jump_to(slide)
+        if not (lock and self._is_the_slide_on_show(slide)):
+            self._jump_to(slide)
         if lock:
             self.set_locked(True)
         return True
+
+    def _is_the_slide_on_show(self, slide) -> bool:
+        current = self._set.playlist.current()
+        return current is not None and str(current.path) == str(slide.path)
 
     def switch_to(self, path) -> None:
         if self.show_item(path):

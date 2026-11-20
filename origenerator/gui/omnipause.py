@@ -23,6 +23,10 @@ def holds(thing) -> None:
     _tell(thing, _TheRoom.frozen)
 
 
+def pause_or_play() -> None:
+    freeze(not _TheRoom.frozen)
+
+
 def freeze(on: bool) -> None:
     _TheRoom.frozen = on
     for thing in list(_held):

@@ -101,7 +101,8 @@ class CombineController(QObject):
             self._animation_settings.raise_()
             self._animation_settings.activateWindow()
             return
-        built = the_default_animation_settings_window()
+        built = the_default_animation_settings_window(
+            pause_or_play=self._slideshows.pause_or_play_the_room)
         if not show_or_say("Default animation settings", built):
             self._animation_settings = built
 

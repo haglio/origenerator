@@ -6,6 +6,7 @@ import pytest
 from PIL import Image
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QMovie
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (
     QLabel,
     QPlainTextEdit,
@@ -37,6 +38,7 @@ from origenerator.gui.default_animation_settings_window import (
     DefaultAnimationSettingsWindow,
 )
 from origenerator.gui.stylesheet import COMMITS, build_stylesheet
+from tests import gestures
 
 _ORDER = [(VIDEO, "alpha", "state one"), (VIDEO, "beta", "state two")]
 
@@ -102,7 +104,7 @@ def window(qtbot, tmp_path):
     submitted = []
 
     def build(samples=None, store=None, look=None, pinned=None, make_loop=None,
-              off_thread=None):
+              off_thread=None, pause_or_play=lambda: None):
         store = store or _Store()
         session = DefaultAnimationSettingsSession(_ORDER, samples or {}, store, pinned=pinned)
         made = DefaultAnimationSettingsWindow(
@@ -110,7 +112,7 @@ def window(qtbot, tmp_path):
             lambda row, positive, negative: submitted.append(
                 (row["prompt_id"], positive, negative)) or "Queued it.",
             make_loop=make_loop or (lambda row: None),
-            off_thread=off_thread or _AtOnce())
+            off_thread=off_thread or _AtOnce(), pause_or_play=pause_or_play)
         qtbot.addWidget(made)
         return made, store, submitted
 
@@ -381,3 +383,31 @@ def test_the_default_animation_settings_opened_in_a_preview_names_the_preview(wi
     made, _store, _sent = window()
 
     assert made.windowTitle() == "Origenerator — default animation settings — preview of Example scene pausing"
+
+
+def _active(made):
+    made.show()
+    made.activateWindow()
+    QTest.qWaitForWindowActive(made)
+
+
+def test_esc_pauses_or_plays_everything_and_leaves_the_window_open(window):
+    asked = []
+    made, _store, _submitted = window(pause_or_play=lambda: asked.append("pause or play"))
+    _active(made)
+    made.findChild(QPushButton, ACCEPT).setFocus()
+
+    gestures.press_key(made, Qt.Key.Key_Escape)
+
+    assert (asked, made.isVisible()) == (["pause or play"], True)
+
+
+def test_esc_while_typing_a_prompt_pauses_nothing(window):
+    asked = []
+    made, _store, _submitted = window(pause_or_play=lambda: asked.append("pause or play"))
+    _active(made)
+    made.findChild(QPlainTextEdit, POSITIVE).setFocus()
+
+    gestures.press_key(made, Qt.Key.Key_Escape)
+
+    assert asked == []

@@ -6,6 +6,7 @@ import pytest
 from PIL import Image
 from PySide6.QtCore import QPoint, QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QPalette, QPixmap
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (
     QApplication,
     QGridLayout,
@@ -24,6 +25,7 @@ from shared_ui.tick_control import TickControl
 from origenerator.action_setter import Locks, SetterSession
 from origenerator.action_vocabulary import Tile, Vocabulary, vocabulary
 from origenerator.content import EXAMPLE_CONTENT
+from origenerator.gui import omnipause
 from origenerator.gui.action_setter_window import (
     KEEP_GOING,
     KEEP_GOING_QUESTION,
@@ -49,6 +51,7 @@ from origenerator.gui.action_setter_window import (
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.item_actions import ItemActions
 from origenerator.media import MediaType
+from tests import gestures
 from tests.action_store import ActionStore
 from tests.real_db import database_in
 
@@ -105,7 +108,7 @@ def _a_folder_of(item: dict) -> dict:
 def window(qtbot, tmp_path):
     def build(*prompt_ids, items=None, drawings=None, tiles=None, checkboxes=(),
               side=MediaType.IMAGE, locks=None, keep_going=None, rubbish=None, folders=None,
-              confirm=lambda _parent, _text: True):
+              confirm=lambda _parent, _text: True, pause_or_play=omnipause.pause_or_play):
         listed = folders or [_a_folder_of(item) for item in items or [
             {"prompt_id": p, "name": "3FA9C0D2 000"} for p in prompt_ids]]
         store = ActionStore(database_in(tmp_path), side, items=[
@@ -115,7 +118,7 @@ def window(qtbot, tmp_path):
             SetterSession(listed, store, side, rubbish),
             Vocabulary(_BUTTONS, tiles or _TILES, tuple(checkboxes), {}, {}, {}, {}),
             drawings or {}, locks or Locks(tmp_path / "locks.json"), stage=stage,
-            keep_going=keep_going, confirm=confirm)
+            keep_going=keep_going, confirm=confirm, pause_or_play=pause_or_play)
         qtbot.addWidget(made)
         return made, store, stage
 
@@ -826,3 +829,28 @@ def test_a_press_restyles_no_button_whose_yellow_box_stays_as_it_was(window, mon
 
     assert counting.polished == [], (
         "each press restyled every button and its face twice, though no yellow box moved")
+
+
+def test_esc_pauses_or_plays_everything_and_leaves_the_tool_open(window):
+    asked = []
+    made, _store, _stage = window("first", pause_or_play=lambda: asked.append("pause or play"))
+    made.show()
+    made.activateWindow()
+    QTest.qWaitForWindowActive(made)
+
+    gestures.press_key(made, Qt.Key.Key_Escape)
+
+    assert (asked, made.isVisible()) == (["pause or play"], True)
+
+
+def test_esc_in_the_tool_opened_on_its_own_pauses_and_plays_its_own_videos(window):
+    made, _store, _stage = window("first")
+    made.show()
+    made.activateWindow()
+    QTest.qWaitForWindowActive(made)
+
+    gestures.press_key(made, Qt.Key.Key_Escape)
+    paused = omnipause.frozen()
+    gestures.press_key(made, Qt.Key.Key_Escape)
+
+    assert (paused, omnipause.frozen()) == (True, False)

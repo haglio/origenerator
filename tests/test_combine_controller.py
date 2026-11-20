@@ -218,6 +218,9 @@ class FakeSlideshows:
     def note_voice_run(self, prompt_id, message, *, kind):
         self.runs_said.append((prompt_id, message, kind))
 
+    def pause_or_play_the_room(self):
+        self.runs_said.append("pause or play")
+
 
 class FakeTabs:
     def __init__(self, tab=None):
@@ -1334,18 +1337,37 @@ def test_edit_default_opens_the_window_that_settles_each_animation(combine, monk
     controller, _host = combine()
     made = QWidget()
     qtbot.addWidget(made)
-    monkeypatch.setattr(module, "the_default_animation_settings_window", lambda: made)
+    monkeypatch.setattr(module, "the_default_animation_settings_window", lambda **_: made)
 
     controller.widget.animation_settings_requested.emit()
 
     assert made.isVisible()
 
 
+def test_esc_in_the_window_it_opens_pauses_or_plays_the_whole_room(combine, monkeypatch, qtbot):
+    slideshows = FakeSlideshows()
+    controller, _host = combine(slideshows=slideshows)
+    handed = []
+
+    def made(*, pause_or_play):
+        handed.append(pause_or_play)
+        opened = QWidget()
+        qtbot.addWidget(opened)
+        return opened
+
+    monkeypatch.setattr(module, "the_default_animation_settings_window", made)
+    controller.widget.animation_settings_requested.emit()
+
+    handed[0]()
+
+    assert slideshows.runs_said == ["pause or play"]
+
+
 def test_a_second_press_brings_that_window_back_rather_than_another(combine, monkeypatch, qtbot):
     controller, _host = combine()
     built = []
 
-    def one_more():
+    def one_more(**_):
         made = QWidget()
         qtbot.addWidget(made)
         built.append(made)
@@ -1362,7 +1384,7 @@ def test_a_second_press_brings_that_window_back_rather_than_another(combine, mon
 def test_the_button_on_the_real_panel_reaches_the_controller(qtbot, monkeypatch, stored):
     made = QWidget()
     qtbot.addWidget(made)
-    monkeypatch.setattr(module, "the_default_animation_settings_window", lambda: made)
+    monkeypatch.setattr(module, "the_default_animation_settings_window", lambda **_: made)
     controller = _on_the_real_panel(qtbot, stored())
 
     controller.widget._defaults_btn.click()

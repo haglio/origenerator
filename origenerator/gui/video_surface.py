@@ -1,37 +1,33 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QRect, Qt
-from PySide6.QtGui import QImage, QPainter
-from PySide6.QtMultimedia import QVideoFrame, QVideoSink
-from PySide6.QtWidgets import QWidget
+from functools import cache
+
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QImage
+from PySide6.QtMultimedia import QVideoSink
+from PySide6.QtQml import QQmlEngine
+from PySide6.QtQuickWidgets import QQuickWidget
+from PySide6.QtWidgets import QApplication
 from shared_ui.colors import BLACK
 
 
-class VideoSurface(QWidget):
+@cache
+def _one_engine_for_every_surface() -> QQmlEngine:
+    return QQmlEngine(QApplication.instance())
+
+
+class VideoSurface(QQuickWidget):
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self._sink = QVideoSink(self)
-        self._frame = QVideoFrame()
-        self._sink.videoFrameChanged.connect(self._take)
+        super().__init__(_one_engine_for_every_surface(), parent)
+        self.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
+        self.setClearColor(BLACK)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.loadFromModule("QtMultimedia", "VideoOutput")
+        self._sink: QVideoSink = self.rootObject().property("videoSink")
 
     def video_sink(self) -> QVideoSink:
         return self._sink
 
     def current_frame(self) -> QImage:
-        return self._frame.toImage() if self._frame.isValid() else QImage()
-
-    def _take(self, frame: QVideoFrame) -> None:
-        self._frame = QVideoFrame(frame)
-        self.update()
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.fillRect(self.rect(), BLACK)
-        frame = self.current_frame()
-        if frame.isNull():
-            return
-        shown = QRect(0, 0, 0, 0)
-        shown.setSize(frame.size().scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio))
-        shown.moveCenter(self.rect().center())
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        painter.drawImage(shown, frame)
+        frame = self._sink.videoFrame()
+        return frame.toImage() if frame.isValid() else QImage()

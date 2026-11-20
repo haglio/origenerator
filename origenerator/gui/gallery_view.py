@@ -130,6 +130,7 @@ from origenerator.gui.generate_pane import GeneratePane, TabViews
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.generation_failed import GenerationFailed
 from origenerator.gui.inflight import (
+    ALREADY_MAKING_ONE_TIP,
     CANCEL_TEXT,
     cancel_tooltip,
     queue_wait_text,
@@ -192,6 +193,7 @@ from origenerator.one_look import looking_once
 from origenerator.prompt_tokens import boxed_as_typed
 from origenerator.published_actions import give_the_launch_its_actions
 from origenerator.radio import OrigeneratorRadio
+from origenerator.setting_advice import files_not_installed, made_with_files_not_installed
 from origenerator.trash import Genau, Kino, Trash
 from origenerator.voice.app_commands import AppCommand
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -209,6 +211,14 @@ def _row_under(row, folder_key: str):
         return None
     return next((child for child in (row.child(i) for i in range(row.childCount()))
                  if _base_of(child.data(0, _TREE_KEY_ROLE)) == folder_key), None)
+
+
+def _why_new_is_grayed(row: dict, job) -> str | None:
+    workflow = WORKFLOW_REGISTRY[row["workflow_name"]]
+    missing = files_not_installed(filled_params(row, workflow), workflow)
+    if missing:
+        return made_with_files_not_installed(missing)
+    return None if job is None else ALREADY_MAKING_ONE_TIP
 
 
 ONLY_A_LEAF_IS_DELETED = "Only a leaf folder can be deleted"
@@ -1259,7 +1269,7 @@ class GalleryView(QWidget):
         if not self._can_reroll(group):
             return LeadTiles()
         job = self._jobs.job_for(group.key)
-        plus = NewTile(making_one=job is not None)
+        plus = NewTile(grayed_because=_why_new_is_grayed(group.rows[0], job))
         plus.add_requested.connect(lambda: self._start_reroll(group.key))
         return LeadTiles(
             reroll=plus,

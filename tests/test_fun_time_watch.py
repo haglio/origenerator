@@ -281,3 +281,73 @@ def test_a_preview_marks_its_slideshow_in_the_everyday_copy_s_state_too(tmp_path
     assert _marked(everyday) == _marked(preview) == [
         str(os.getpid()), str(handoff.this_process().created_at), "landscape"]
     watch.withdraw()
+
+
+def _aged(path):
+    long_ago = path.stat().st_mtime_ns - 3_600_000_000_000
+    os.utime(path, ns=(long_ago, long_ago))
+    return long_ago
+
+
+def _overwritten_in_place_unseen(path, long_ago):
+    unchanged_length = "x" * path.stat().st_size
+    with path.open("r+", encoding="utf-8") as in_place:
+        in_place.write(unchanged_length)
+    os.utime(path, ns=(long_ago, long_ago))
+    return unchanged_length
+
+
+def test_a_pass_finding_the_offer_as_it_left_it_reads_it_no_more(tmp_path):
+    watch = FunTimeWatch(tmp_path, take_over=lambda session: None)
+    offer = tmp_path / handoff.OFFER
+    long_ago = _aged(offer)
+    watch._answer_the_session()
+    unread = _overwritten_in_place_unseen(offer, long_ago)
+
+    watch._answer_the_session()
+
+    assert offer.read_text(encoding="utf-8") == unread
+    watch.withdraw()
+
+
+def test_a_window_showing_no_slideshow_takes_a_mark_down_once_and_then_leaves_the_place_alone(
+        tmp_path):
+    mark = tmp_path / handoff.SHOWING
+    mark.write_text("1 2 portrait", encoding="utf-8")
+    watch = FunTimeWatch(tmp_path, take_over=lambda session: None)
+    taken_down = not mark.exists()
+    mark.write_text("3 4 landscape", encoding="utf-8")
+
+    watch._answer_the_session()
+
+    assert (taken_down, mark.read_text(encoding="utf-8")) == (True, "3 4 landscape")
+    watch.withdraw()
+
+
+def test_a_pass_finding_the_slideshow_mark_as_it_left_it_reads_it_no_more(tmp_path):
+    watch = FunTimeWatch(tmp_path, take_over=lambda session: None, showing_on=lambda: "portrait")
+    mark = tmp_path / handoff.SHOWING
+    long_ago = _aged(mark)
+    watch._answer_the_session()
+    unread = _overwritten_in_place_unseen(mark, long_ago)
+
+    watch._answer_the_session()
+
+    assert mark.read_text(encoding="utf-8") == unread
+    watch.withdraw()
+
+
+def test_a_sessions_claim_is_read_again_only_once_it_is_written_again(tmp_path):
+    _claim(tmp_path, pid=os.getpid())
+    claim = tmp_path / handoff.SESSION
+    long_ago = _aged(claim)
+    said = []
+    watch = FunTimeWatch(tmp_path, take_over=lambda session: None, device_claimed=said.append)
+    _overwritten_in_place_unseen(claim, long_ago)
+
+    watch._answer_the_session()
+    claim.unlink()
+    watch._answer_the_session()
+
+    assert said == [True, True, False]
+    watch.withdraw()

@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 import shiboken6
+from app_support.threading_utils import wait_until
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QMovie
 from PySide6.QtWidgets import QApplication, QLabel, QWidget
@@ -405,9 +406,14 @@ def test_a_page_too_short_to_fill_the_pane_draws_on_until_the_pane_is_full(qtbot
 
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
 
-    drawn_to = scroll.widget().heightForWidth(scroll.viewport().width())
-    assert drawn_to >= scroll.viewport().height() + gallery_pane._REACH
+    assert _drawn_to(scroll) >= scroll.viewport().height(), "a tile in view is never missing"
+    wait_until(lambda: _drawn_to(scroll) >= scroll.viewport().height() + gallery_pane._REACH,
+               pump=QApplication.processEvents)
     assert len(_drawn(scroll)) < len(rows)
+
+
+def _drawn_to(scroll) -> int:
+    return scroll.widget().heightForWidth(scroll.viewport().width())
 
 
 def test_a_pane_made_taller_after_it_was_drawn_draws_on_without_a_scroll(qtbot, db):
@@ -422,10 +428,8 @@ def test_a_pane_made_taller_after_it_was_drawn_draws_on_without_a_scroll(qtbot, 
     scroll.resize(1900, 2400)
     qtbot.waitUntil(lambda: scroll.viewport().height() > 2000)
 
-    drawn_to = scroll.widget().heightForWidth(scroll.viewport().width())
-    assert drawn_to >= scroll.viewport().height() + gallery_pane._REACH, (
-        "a pane can grow with no scroll at all, so the drawing follows the scroll bar's "
-        "range as well as its value")
+    wait_until(lambda: _drawn_to(scroll) >= scroll.viewport().height() + gallery_pane._REACH,
+               pump=QApplication.processEvents)
 
 
 def test_scrolling_to_the_foot_of_a_pane_draws_on_by_a_page_not_to_the_end(qtbot, db):
@@ -444,7 +448,8 @@ def test_scrolling_to_the_foot_of_a_pane_draws_on_by_a_page_not_to_the_end(qtbot
     assert opened_on < len(_drawn(scroll)) < len(rows)
 
 
-def test_a_page_drawn_on_a_scroll_walks_the_grid_once_not_once_a_tile(qtbot, db, monkeypatch):
+def test_a_scroll_to_the_foot_draws_what_comes_into_view_now_and_the_rest_a_few_tiles_a_turn(
+        qtbot, db, monkeypatch):
     rows = [_row(f"g{n}", n) for n in range(300)]
     pane, scroll = _pane(qtbot, db, rows)
     scroll.setWidgetResizable(True)
@@ -452,19 +457,20 @@ def test_a_page_drawn_on_a_scroll_walks_the_grid_once_not_once_a_tile(qtbot, db,
     scroll.show()
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
     QApplication.processEvents()
-    drawn = len(_drawn(scroll))
-    walked = []
-    walk = FlowLayout._rows
-    monkeypatch.setattr(FlowLayout, "_rows",
-                        lambda layout, area: walked.append(1) or walk(layout, area))
+    drawn_at_a_time = []
+    draw = gallery_pane._Pages.draw
+    monkeypatch.setattr(gallery_pane._Pages, "draw",
+                        lambda pages, count: drawn_at_a_time.append(count) or draw(pages, count))
+    bar = scroll.verticalScrollBar()
 
-    scroll.verticalScrollBar().setValue(scroll.verticalScrollBar().maximum())
+    bar.setValue(bar.maximum())
 
-    pages = (len(_drawn(scroll)) - drawn) // gallery_pane._PAGE
-    assert pages >= 1
-    assert len(walked) == pages, (
-        "each walk of the grid takes longer the further down the folder it is, and the window "
-        "waits on every one")
+    assert _drawn_to(scroll) >= bar.value() + scroll.viewport().height(), (
+        "a tile in view is never missing")
+    wait_until(lambda: _drawn_to(scroll) >= bar.value() + scroll.viewport().height()
+               + gallery_pane._REACH, pump=QApplication.processEvents)
+    assert set(drawn_at_a_time) == {gallery_pane._TILES_A_TURN}, (
+        "fifty tiles built in one turn hold the window still for a tenth of a second")
 
 
 def test_a_page_drawn_on_a_scroll_shows_only_its_own_tiles(qtbot, db, monkeypatch):
@@ -1186,7 +1192,7 @@ def test_scroll_steps_that_draw_no_page_measure_nothing_and_tell_only_the_tiles_
     worked_out = []
     rows = FlowLayout._rows
     monkeypatch.setattr(FlowLayout, "_rows",
-                        lambda layout, area: worked_out.append(1) or rows(layout, area))
+                        lambda layout, area, *rest: worked_out.append(1) or rows(layout, area, *rest))
 
     tiles = list(pane._thumb_widgets.values())
     crossing = []

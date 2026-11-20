@@ -17,10 +17,12 @@ from origenerator.prompt_edit import (
     WhatIsKnown,
     ask_the_model,
     build_request_messages,
+    company_of,
     parse_request,
     prompts_touching,
     work_out,
 )
+from origenerator.usual_company import UsualCompany
 from origenerator.workflows.base import ParamDef, ParamType, story_of
 
 
@@ -602,3 +604,68 @@ def test_a_weight_the_model_writes_is_left_out_where_the_prompts_take_none():
                         ask=model)
 
     assert revision.positive == "a woman, freckles, a red scarf"
+
+
+_HAT_COMPANY = UsualCompany(positive=("a wide straw hat", "frayed brim"),
+                            negative=("bare head", "paper hat"))
+
+
+def test_what_his_prompts_usually_have_with_the_thing_is_told_to_the_model():
+    messages = build_request_messages("a man", "blurry", "add a hat",
+                                      WhatIsKnown(company=_HAT_COMPANY), "system")
+
+    assert ("USUALLY HAVE WITH IT (parts most of them have and his other prompts seldom do):\n"
+            "positive: a wide straw hat, frayed brim\n"
+            "negative (the app adds these itself): bare head, paper hat") in messages[-1]["content"]
+
+
+def test_with_no_usual_company_the_messages_say_none():
+    messages = build_request_messages("a man", "blurry", "add a hat", WhatIsKnown(), "system")
+
+    assert "USUALLY HAVE WITH IT" not in messages[-1]["content"]
+
+
+def test_adding_a_thing_keeps_out_what_his_negative_prompts_usually_keep_out_with_it():
+    model = _Model(_answer(_add("a wide straw hat", for_="add a hat", after="a man")))
+
+    revision = work_out("a man", "blurry, Paper Hat", "add a hat", company=_HAT_COMPANY, ask=model)
+
+    assert (revision.positive, revision.negative) == (
+        "a man, a wide straw hat", "blurry, Paper Hat, bare head")
+    assert revision.answer == ('Added "a wide straw hat" to the Positive prompt. Added "bare head" '
+                               "to the Negative prompt.")
+
+
+def test_what_he_usually_keeps_out_joins_what_the_model_keeps_out_in_one_change():
+    model = _Model(_answer(_add("a wide straw hat", for_="add a hat"),
+                           _add("bare head, cap", for_="add a hat", prompt="negative")))
+
+    revision = work_out("a man", "blurry", "add a hat", company=_HAT_COMPANY, ask=model)
+
+    assert revision.negative == "blurry, bare head, cap, paper hat"
+
+
+def test_a_request_that_adds_nothing_to_the_positive_prompt_keeps_out_none_of_his_usual_company():
+    model = _Model(_answer({"gone": "hat", "in_positive": "a hat", "instead": "", "for": "no hat"}))
+
+    revision = work_out("a man, a hat", "blurry", "no hat", company=_HAT_COMPANY, ask=model)
+
+    assert revision.negative == "blurry, hat"
+
+
+def test_a_part_his_prompts_usually_have_with_the_thing_is_never_taken_back_as_left_open():
+    ask, _asked = _answers_in_turn(
+        '{"changes": [{"prompt": "positive", "add": "a wide straw hat, frayed brim, beside her", '
+        '"for": "add a hat"}]}', '{"left_open": ["frayed brim", "beside her"]}')
+
+    answered = ask_the_model("a woman", "", "add a hat", WhatIsKnown(company=_HAT_COMPANY), llm=ask)
+
+    assert answered["changes"][0]["add"] == "a wide straw hat, frayed brim"
+
+
+def test_the_company_of_a_request_is_read_from_his_prompts_that_have_every_thing_it_names():
+    prompts = [("a red hat, frayed brim", "bare head")] * 3 + [("a hat", ""), ("a red car", "")]
+
+    assert company_of("add a red hat", prompts) == UsualCompany(
+        positive=("a red hat", "frayed brim"), negative=("bare head",))
+    assert company_of("please", prompts) == UsualCompany()

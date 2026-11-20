@@ -635,6 +635,22 @@ def test_the_live_picture_of_a_run_says_which_item_it_is(qtbot, tmp_path):
         "a double click hands the slideshow the item the picture belongs to")
 
 
+def test_the_live_picture_says_the_item_whose_picture_it_is_when_the_folder_makes_another(
+        qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key, _job = _a_streaming_run_listed_in_flight(view, client)
+
+    view._on_reroll_preview(key, "the-next-run", _png_bytes())
+
+    assert _viewport_of(view)._generation == "the-next-run", (
+        "a tab watching a folder shows the pictures of whichever run the folder is making; a "
+        "double click on one opens that run, never the run the tab first watched (his report, "
+        "2026-11-19: another image from the same folder came up)")
+
+
 def test_a_run_watched_fullscreen_lands_as_its_generation_among_its_folder(
         qtbot, tmp_path):
     client = _reroll_client()

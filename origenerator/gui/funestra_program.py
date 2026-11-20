@@ -16,9 +16,10 @@ from funestra.funestra_verbs import QUIT
 from funestra.program.launch import Asked, launch_command
 from funestra.program.placement import WindowPlacement
 from funestra.program.window_verbs import (
-    WINDOW_FRONT,
     WINDOW_HIDE,
     WINDOW_MINIMIZE,
+    WINDOW_NOT_ON_TOP,
+    WINDOW_ON_TOP,
     WINDOW_SHOW,
     window_place,
 )
@@ -111,8 +112,8 @@ class FunestraProgram:
         self.minimized = True
         self.channel.send(WINDOW_MINIMIZE)
 
-    def come_forward(self) -> None:
-        self.channel.send(WINDOW_FRONT)
+    def stand_on_top(self, on: bool) -> None:
+        self.channel.send(WINDOW_ON_TOP if on else WINDOW_NOT_ON_TOP)
 
     def set_paused(self, paused: bool) -> None:
         publish_whole(self.paused_file, "1" if paused else "0")

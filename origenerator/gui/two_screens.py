@@ -5,6 +5,8 @@ from PySide6.QtGui import QGuiApplication
 from shared_ui.orientation import LANDSCAPE, PORTRAIT
 from shared_ui.orientation import orientation_of_size as shape_of_size
 
+from origenerator.gui.on_top import OnTop
+
 _THE_OTHER = {PORTRAIT: LANDSCAPE, LANDSCAPE: PORTRAIT}
 LEFT = "left"
 RIGHT = "right"
@@ -38,6 +40,7 @@ class TwoScreens(QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._core_on = LANDSCAPE
+        self.on_top = OnTop(self, self)
 
     def core_on(self) -> str:
         return self._core_on

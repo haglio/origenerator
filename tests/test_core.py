@@ -2456,6 +2456,27 @@ def test_on_its_own_core_fills_the_landscape_monitor_above_the_taskbar_with_no_t
             bool(win.windowFlags() & Qt.WindowType.FramelessWindowHint)) == (True, True)
 
 
+def test_core_on_its_own_stays_on_top_until_an_omnipause(qtbot, tmp_path, his_two_monitors):
+    win = _window(qtbot, tmp_path)
+    win.show()
+    on_top = bool(win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
+
+    win._gallery_view.set_room_paused(True)
+
+    assert (on_top, bool(win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)) == (True, False)
+
+
+def test_core_in_a_session_leaves_its_place_on_top_to_the_session_through_an_omnipause(
+        qtbot, tmp_path, his_two_monitors):
+    win = _window(qtbot, tmp_path)
+    win.show()
+    win.become_hosted(_fun_time_session())
+
+    win._gallery_view.set_room_paused(True)
+
+    assert win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint
+
+
 def test_a_switch_sends_core_to_the_portrait_monitor_and_keeps_it_showing(
         qtbot, tmp_path, his_two_monitors):
     win = _window(qtbot, tmp_path)
@@ -2484,7 +2505,7 @@ def test_core_handed_back_from_a_session_fills_its_monitor_again(
     win.become_standalone()
 
     assert (_fills(win, LANDSCAPE_MONITOR), win.isVisible(),
-            bool(win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)) == (True, True, False)
+            bool(win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)) == (True, True, True)
 
 
 def test_core_in_a_session_stays_at_the_sessions_rect_through_a_switch(

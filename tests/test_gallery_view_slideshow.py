@@ -1598,6 +1598,24 @@ def test_once_core_is_up_on_two_monitors_the_folder_it_shows_plays_full_screen_o
     slideshow.close()
 
 
+def test_a_slideshow_on_its_own_monitor_stays_on_top_until_an_omnipause(qtbot, monkeypatch):
+    monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)
+    keep_rows_on_disk(monkeypatch)
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    view._two_screens.on_top.stand_alone(True)
+    view._two_screens.core_is_up.emit()
+    window = program_of(view.slideshows.showing).window
+    on_top = window.on_top
+
+    view.set_room_paused(True)
+
+    assert (on_top, window.on_top) == (True, False)
+    view.slideshows.showing.close()
+
+
 def test_enter_in_a_slideshow_on_its_own_monitor_picks_its_item_in_core_and_plays_on(
         qtbot, monkeypatch):
     monkeypatch.setattr(two_screens, "screens", lambda: HIS_TWO_MONITORS)

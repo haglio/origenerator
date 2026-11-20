@@ -35,6 +35,7 @@ from origenerator.workflows.non_ai import (
     FOLDER_PARTS_IN_A_NAME,
     TITLE_KEY,
     VERSION_GROUP_KEY,
+    VIDEO_ID_KEY,
     NonAiWorkflow,
     non_ai_workflow,
 )
@@ -84,8 +85,9 @@ def scan_in_turn(db, places: NonAiPlaces, *, wait_s: float = WAIT_S) -> int:
 def scan(db, places: NonAiPlaces, *, videos_per_write: int = VIDEOS_PER_WRITE) -> int:
     follow_enhanced_copies(db)
     held = db.library_paths() | db.trashed_library_paths()
-    new = ((video, kept) for kept in places.kept for video in non_ai_videos(kept.folder)
-           if str(video) not in held)
+    new = _follow_moved_videos(db, places, ((video, kept) for kept in places.kept
+                                            for video in non_ai_videos(kept.folder)
+                                            if str(video) not in held))
     brought_in = 0
     for batch in itertools.batched((row_bringing_in(video, kept, places.thumb_dir)
                                     for video, kept in new),
@@ -111,6 +113,37 @@ def follow_enhanced_copies(db) -> int:
             db.update_generation(row["prompt_id"], output_files=json.dumps(now))
             followed += 1
     return followed
+
+
+def _follow_moved_videos(db, places: NonAiPlaces, new):
+    gone = _items_whose_videos_are_gone(db)
+    for video, kept in new:
+        row = gone.pop(video_ids.recorded_id(places.record_of(video)), None)
+        if row is None:
+            yield video, kept
+        else:
+            _move(db, row, video, kept)
+
+
+def _items_whose_videos_are_gone(db) -> dict[str, dict]:
+    return {given: row for row in db.list_generations()
+            if row["source"] == GenerationSource.NON_AI
+            and (given := json.loads(row["params_json"]).get(VIDEO_ID_KEY))
+            and not any(Path(video).exists() for video in library_paths_in(row["output_files"]))}
+
+
+def _move(db, row: dict, video: Path, kept: Kept) -> None:
+    workflow_name, folder, output_files = _where_it_is(video, kept)
+    db.update_generation(row["prompt_id"], output_files=output_files)
+    db.set_workflow_name(row["prompt_id"], workflow_name)
+    db.set_params_json(row["prompt_id"], json.dumps(
+        {**json.loads(row["params_json"]), FOLDER_KEY: folder}))
+
+
+def _where_it_is(video: Path, kept: Kept) -> tuple[str, str, str]:
+    return (non_ai_workflow(named_folder(video, kept.named_from)),
+            video.parent.relative_to(kept.named_from).as_posix(),
+            json.dumps([{"filename": video.name, "library_path": str(video)}]))
 
 
 def _the_copy_that_is_there(entry: dict) -> dict:
@@ -140,8 +173,10 @@ def _take_up(db, row: dict, video: Path, record: dict, item_of: dict[str, str]) 
 
 def _take_up_its_name_and_star(db, row: dict, video: Path, record: dict) -> bool:
     params = json.loads(row["params_json"])
+    given = video_ids.recorded_id(record)
     recorded = {**params, TITLE_KEY: title_while_playing(record, video),
-                VERSION_GROUP_KEY: version_group_of(record)}
+                VERSION_GROUP_KEY: version_group_of(record),
+                **({VIDEO_ID_KEY: given} if given is not None else {})}
     renamed = recorded != params
     if renamed:
         db.set_params_json(row["prompt_id"], json.dumps(recorded))
@@ -173,16 +208,15 @@ def named_folder(video: Path, named_from: Path) -> str:
 
 def row_bringing_in(video: Path, kept: Kept, thumb_dir: Path) -> dict:
     filed = datetime.fromtimestamp(video.stat().st_mtime, tz=UTC)
-    video_id = str(uuid.uuid4())
-    generate_animated_thumbnail(video, thumb_dir, name=video_id)
+    prompt_id = str(uuid.uuid4())
+    generate_animated_thumbnail(video, thumb_dir, name=prompt_id)
+    workflow_name, folder, output_files = _where_it_is(video, kept)
     return {
-        **recorded_fields(GenerationSource.NON_AI,
-                          non_ai_workflow(named_folder(video, kept.named_from)),
-                          {FOLDER_KEY: video.parent.relative_to(kept.named_from).as_posix()},
+        **recorded_fields(GenerationSource.NON_AI, workflow_name, {FOLDER_KEY: folder},
                           (made_at(Made(), filed), filed), action=None),
         "workflow_version": NonAiWorkflow.version, "status": GenerationStatus.COMPLETED,
-        "workflow_json": "{}", "prompt_id": video_id,
-        "output_files": json.dumps([{"filename": video.name, "library_path": str(video)}]),
+        "workflow_json": "{}", "prompt_id": prompt_id,
+        "output_files": output_files,
         "thumbnail_path": str(generate_thumbnail(video, MediaType.VIDEO, thumb_dir,
-                                                 name=video_id)),
+                                                 name=prompt_id)),
     }

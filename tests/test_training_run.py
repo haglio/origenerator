@@ -57,6 +57,7 @@ def _run(qtbot, monkeypatch, tmp_path):
 
 
 _EACH_WRITE_ITS_OWN_TIME = itertools.count()
+_AN_HOUR_NS = 3_600_000_000_000
 
 
 def _say(tmp_path, **status) -> None:
@@ -251,6 +252,8 @@ def test_a_looks_training_reads_its_own_stages_from_its_first(
 def test_a_status_unchanged_since_the_last_look_is_not_read_again(qtbot, monkeypatch, tmp_path):
     run, _queue, _started = _run(qtbot, monkeypatch, tmp_path)
     _say(tmp_path, state="training", done=30, total=2000)
+    long_ago = (tmp_path / "status.json").stat().st_mtime_ns - _AN_HOUR_NS
+    os.utime(tmp_path / "status.json", ns=(long_ago, long_ago))
     run.begin()
     reads = []
     reading = training_run.lora_training.read_status

@@ -26,9 +26,9 @@ from origenerator.db_requests import NewRequest
 from origenerator.fun_time_mode import Rect
 from origenerator.gallery import output as gallery_output
 from origenerator.gallery.collection import (
+    ALL_ITEMS_KEY,
     ENHANCED_KEY,
     FAVORITES_KEY,
-    LATEST_KEY,
     FolderCollection,
 )
 from origenerator.gallery.shapes import BOTH
@@ -70,8 +70,8 @@ LANDSCAPE = "landscape"
 ALL_PORTRAIT = shaped_key(gallery.ALL_KEY, PORTRAIT)
 _HELD_ON_G1 = SlideshowState(order=("g2", "g1"), current="g1", locked=True)
 ALL_LANDSCAPE = shaped_key(gallery.ALL_KEY, LANDSCAPE)
-LATEST_PORTRAIT = shaped_key(LATEST_KEY, PORTRAIT)
-LATEST_LANDSCAPE = shaped_key(LATEST_KEY, LANDSCAPE)
+LATEST_PORTRAIT = shaped_key(ALL_ITEMS_KEY, PORTRAIT)
+LATEST_LANDSCAPE = shaped_key(ALL_ITEMS_KEY, LANDSCAPE)
 TALL = {"width": 832, "height": 1216}
 WIDE = {"width": 1216, "height": 832}
 
@@ -2182,7 +2182,7 @@ def test_the_spoken_favorites_turns_favorites_on_rather_than_opening_a_collectio
 
 def test_a_spoken_collection_with_nothing_in_it_opens_nothing(slideshows):
     class Spoken:
-        collection_key = LATEST_KEY
+        collection_key = ALL_ITEMS_KEY
         shape = None
 
     director, _host, made = slideshows(gallery_pane=FakeGalleryPane(collections={}))
@@ -2932,7 +2932,7 @@ def test_a_slideshow_of_latest_plays_one_of_each_run_of_a_folders_generations(sl
 
 
 def test_a_slideshow_of_a_folders_latest_plays_one_of_each_run_newest_first(slideshows):
-    location = shaped_key(FolderCollection(LATEST_KEY, "workflow/a").key, PORTRAIT)
+    location = shaped_key(FolderCollection(ALL_ITEMS_KEY, "workflow/a").key, PORTRAIT)
     director, _host, made = slideshows(FakeHost(location=location, rows=_a_sitting()))
 
     director.start()
@@ -3283,7 +3283,7 @@ def test_a_latest_slideshow_takes_a_new_run_after_the_gallery_pane_has_moved_on(
 
 
 def test_a_slideshow_of_one_kinds_latest_takes_a_new_run_of_that_kind_alone(slideshows):
-    videos_latest = shaped_key(FolderCollection(LATEST_KEY, "video").key, LANDSCAPE)
+    videos_latest = shaped_key(FolderCollection(ALL_ITEMS_KEY, "video").key, LANDSCAPE)
     video_run = _row("v-run", workflow_name="wan22_i2v", files=("v-run.mp4",))
     gallery_pane = FakeGalleryPane(collections={videos_latest: [_row("v1", files=("v1.mp4",))]})
     director, _host, made = slideshows(gallery_pane=gallery_pane, db=_db_of([video_run, _row("i-run")]),
@@ -3314,7 +3314,7 @@ def test_a_latest_slideshow_on_together_takes_a_new_run_of_either_shape(slidesho
     tall, wide = _row("tall-run"), _row("wide-run")
     tall["params_json"] = json.dumps({"width": 768, "height": 1024})
     wide["params_json"] = json.dumps({"width": 1024, "height": 768})
-    latest_together = shaped_key(LATEST_KEY, BOTH)
+    latest_together = shaped_key(ALL_ITEMS_KEY, BOTH)
     gallery_pane = FakeGalleryPane(collections={latest_together: [_row("g1")]})
     director, _host, made = slideshows(gallery_pane=gallery_pane, db=_db_of([tall, wide]))
     director.open([("a.png", "image", "g1", None)], location=latest_together, shape=BOTH)

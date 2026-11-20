@@ -24,8 +24,8 @@ from origenerator import gallery, search
 from origenerator.content import item_words
 from origenerator.gallery import sort_order
 from origenerator.gallery.collection import (
+    ALL_ITEMS_KEY,
     EXPERIMENTS_KEY,
-    LATEST_KEY,
     POPULATING_KEY,
     TRASH_KEY,
     collection,
@@ -321,7 +321,7 @@ class GalleryPane(QObject):
                 shield=jobs.shield),
         )
         self._renders = {
-            LATEST_KEY: self._render_latest,
+            ALL_ITEMS_KEY: self._render_all_items,
             POPULATING_KEY: self._render_populating,
             EXPERIMENTS_KEY: self._render_experiments,
             TRASH_KEY: self._render_trash,
@@ -445,8 +445,8 @@ class GalleryPane(QObject):
 
     def show_folder_tiles(self, groups, collections=()):
         container, flow = self._fresh_tile_pane()
-        self._host.sort_by.no_listing()
-        self._drawn_again = None
+        self._drawn_again = partial(self.show_folder_tiles, groups, collections)
+        groups = sort_order.folders_in_order(groups, self._host.sort_by.for_listing([]))
         for key in collections:
             self._add_collection_tile(flow, key)
         if collections and groups:
@@ -473,7 +473,9 @@ class GalleryPane(QObject):
 
     def _show_gathered(self, rows, groups, *, show_favorites: bool, empty: str):
         container, flow = self._fresh_tile_pane()
-        rows = self._in_the_chosen_order(rows)
+        sort = self._host.sort_by.for_listing(rows)
+        rows = sort_order.in_order(rows, [None] * len(rows), sort)[0]
+        groups = sort_order.folders_in_order(list(groups), sort)
         if not (rows or groups):
             self.show_widget(self._empty_state(empty))
             return
@@ -592,8 +594,8 @@ class GalleryPane(QObject):
         self._show_gathered(self._open_collection_rows(which), folders,
                             show_favorites=False, empty=gathered.empty)
 
-    def _render_latest(self):
-        self._render_newest_first(LATEST_KEY, self._latest_empty_hint())
+    def _render_all_items(self):
+        self._render_newest_first(ALL_ITEMS_KEY, self._all_items_empty_hint())
 
     def _render_populating(self):
         self._render_newest_first(POPULATING_KEY, collection(POPULATING_KEY).empty)
@@ -608,7 +610,8 @@ class GalleryPane(QObject):
 
         sort = self._host.sort_by.for_listing(rows)
         last = sort == sort_order.OLDEST
-        opens_now = bool(items) and gallery.new_work_opens_a_section(rows)
+        opens_now = (bool(items) and sort_order.by_date(sort)
+                     and gallery.new_work_opens_a_section(rows))
         rows, headings = sort_order.in_order(rows, gallery.section_headings(rows), sort)
 
         def draw_new_work():
@@ -712,7 +715,7 @@ class GalleryPane(QObject):
                 for item in self.inflight_items(rows, requests)
                 if item.job_kind != gallery.JobKind.ENHANCE and not item.going_to_trash]
 
-    def _latest_inflight_items(self, rows=None, requests=None) -> list[InFlightItem]:
+    def _all_items_inflight_items(self, rows=None, requests=None) -> list[InFlightItem]:
         if rows is None:
             rows = self._db.list_generations()
         in_progress = filter_rows([row for row in rows if gallery.is_in_progress(row)],
@@ -722,20 +725,20 @@ class GalleryPane(QObject):
         return _back_of_the_line_first(self._tile_items(rows, requests), held)
 
     def _newest_first_items(self, which: str, rows=None, requests=None) -> list[InFlightItem]:
-        items = self._latest_inflight_items(rows, requests)
+        items = self._all_items_inflight_items(rows, requests)
         if which != POPULATING_KEY:
             return items
         populating = self._model.populating()
         return [item for item in items if item.key in populating]
 
-    def _latest_empty_hint(self) -> str:
+    def _all_items_empty_hint(self) -> str:
         noun = next((label.lower() for kind, label in gallery.item_type_labels().items()
                      if key_holds(kind, self._collection_folder)), "generations")
-        return (f"No recent {noun} yet.\n\nItems you make — from a Generate tab or a "
-                "gallery re-roll — collect here, newest first.")
+        return (f"No {noun} yet.\n\nItems you make — from a Generate tab or a "
+                "gallery re-roll — collect here.")
 
-    def showing_latest(self) -> bool:
-        return base_of(self._tree.selected_folder_key()) == LATEST_KEY
+    def showing_all_items(self) -> bool:
+        return base_of(self._tree.selected_folder_key()) == ALL_ITEMS_KEY
 
     def _newest_first_shown(self) -> str | None:
         shown = folder_collection(base_of(self._tree.selected_folder_key()))
@@ -904,9 +907,11 @@ class GalleryPane(QObject):
 
     def redraw_in_the_new_order(self) -> None:
         if self._drawn_again is not None:
-            place = self.place()
+            picks = self._selection.picks()
+            self._pages = _Pages()
             self._drawn_again()
-            self.return_to(place)
+            self._selection.pick_again(picks)
+            self._refresh_selection_highlights()
 
     def show_thumbnails(self, group):
         container, flow = self._fresh_tile_pane()
@@ -942,7 +947,7 @@ class GalleryPane(QObject):
             finished, gallery.section_headings(finished), sort)
         lead = self._host.lead_tiles(group)
         tiles = self._folder_inflight_items(group)
-        opens_now = ((lead.reroll is not None or bool(tiles))
+        opens_now = ((lead.reroll is not None or bool(tiles)) and sort_order.by_date(sort)
                      and gallery.new_work_opens_a_section(finished))
         last = sort == sort_order.OLDEST
         sections = opens_now + sum(1 for heading in headings if heading)

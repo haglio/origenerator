@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 
 from origenerator.gallery.collection import (
+    ALL_ITEMS_KEY,
     FAVORITES_KEY,
-    LATEST_KEY,
 )
 from origenerator.gallery.voice_commands import ENHANCE_COMMAND
 from origenerator.voice.app_commands import AppCommand, BarSetting
@@ -35,7 +35,7 @@ def test_a_fix_can_name_the_side_it_means(text, shape):
 @pytest.mark.parametrize(("text", "key", "shape"), [
     ("favorites", FAVORITES_KEY, None),
     ("landscape favorites", FAVORITES_KEY, "landscape"),
-    ("portrait latest", LATEST_KEY, "portrait"),
+    ("portrait all", ALL_ITEMS_KEY, "portrait"),
 ])
 def test_a_collection_name_is_an_order_to_play_it(text, key, shape):
     command = match_voice_command(text)
@@ -66,7 +66,7 @@ def test_the_recognizer_is_asked_to_hear_the_whole_vocabulary():
     heard = spoken_phrases()
 
     for phrase in ("fix teeth", "animate as alpha", "enhance", "start slideshow",
-                   "favorites", "latest", "undo", "amp fifty", "mic off"):
+                   "favorites", "all", "undo", "amp fifty", "mic off"):
         assert phrase in heard
 
 

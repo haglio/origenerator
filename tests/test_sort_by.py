@@ -21,8 +21,8 @@ def _offered(sort_by) -> list[str]:
 
 def test_a_listing_with_videos_offers_both_dates_and_both_durations(qapp):
     sort_by = SortBy()
-    assert sort_by.for_listing(_VIDEOS) == sort_order.NEWEST
-    assert _offered(sort_by) == ["Date (newest first)", "Date (oldest first)",
+    assert sort_by.for_listing(_VIDEOS) == sort_order.LATEST
+    assert _offered(sort_by) == ["Date (latest first)", "Date (oldest first)",
                                  "Duration (longest first)", "Duration (shortest first)"]
 
 
@@ -40,8 +40,8 @@ def test_a_pick_is_announced_and_kept_for_the_next_listing(qapp):
 def test_an_images_listing_offers_only_the_dates_and_keeps_a_duration_pick_for_videos(qapp):
     sort_by = SortBy()
     sort_by.choose(sort_order.SHORTEST)
-    assert sort_by.for_listing(_IMAGES) == sort_order.NEWEST
-    assert _offered(sort_by) == ["Date (newest first)", "Date (oldest first)"]
+    assert sort_by.for_listing(_IMAGES) == sort_order.LATEST
+    assert _offered(sort_by) == ["Date (latest first)", "Date (oldest first)"]
     assert sort_by.chosen() == sort_order.SHORTEST
     assert sort_by.for_listing(_VIDEOS) == sort_order.SHORTEST
 
@@ -59,7 +59,7 @@ def test_filling_the_dropdown_for_a_listing_announces_nothing(qapp):
 def test_a_saved_choice_nobody_offers_any_more_reads_as_newest_first(qapp):
     sort_by = SortBy()
     sort_by.choose("by color")
-    assert sort_by.chosen() == sort_order.NEWEST
+    assert sort_by.chosen() == sort_order.LATEST
 
 
 def test_it_shows_for_a_listing_of_items_and_hides_where_there_is_none(qapp):

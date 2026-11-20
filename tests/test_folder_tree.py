@@ -33,7 +33,7 @@ from PySide6.QtWidgets import (
 from shared_ui.colors import BLUE, BORDER_SUBTLE, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.testing import appending_to
 
-from origenerator.gallery.collection import FAVORITES_KEY, LATEST_KEY, collection
+from origenerator.gallery.collection import ALL_ITEMS_KEY, FAVORITES_KEY, collection
 from origenerator.gallery.shapes import LANDSCAPE
 from origenerator.gallery.tree import ALL_KEY
 from origenerator.gui import folder_icons, folder_tree, icons
@@ -941,7 +941,7 @@ def _laid_out(tree, item, element) -> QRect:
     return tree.style().subElementRect(element, option, tree)
 
 
-def _tree_with_a_collection(qtbot, which=LATEST_KEY):
+def _tree_with_a_collection(qtbot, which=ALL_ITEMS_KEY):
     tree = FolderTree(_ROLE, all_key=ALL_KEY)
     qtbot.addWidget(tree)
     top = _folder_row("All", "all")

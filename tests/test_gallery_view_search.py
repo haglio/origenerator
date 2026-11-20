@@ -24,8 +24,8 @@ from origenerator import (
     search,
 )
 from origenerator.gallery.collection import (
+    ALL_ITEMS_KEY,
     FAVORITES_KEY,
-    LATEST_KEY,
     TRASH_KEY,
 )
 from origenerator.gallery.shapes import LANDSCAPE, SHAPE_LABELS
@@ -329,7 +329,7 @@ def test_a_folders_collection_scopes_the_search_and_names_its_path(qtbot):
 
     assert view.listed_prompt_ids() == ["i1"]
     assert view.search.field.placeholderText() == (
-        f"Search {SHAPE_LABELS[LANDSCAPE]}  \u203a  All  \u203a  Images  \u203a  {workflow.text(0)}  \u203a  Latest…")
+        f"Search {SHAPE_LABELS[LANDSCAPE]}  \u203a  All  \u203a  Images  \u203a  {workflow.text(0)}  \u203a  All…")
 
 
 def test_the_trash_collection_searches_what_it_is_holding(qtbot):
@@ -390,8 +390,8 @@ def test_the_field_says_what_it_would_search(qtbot):
     assert leaf.text(0) in placeholder
     assert videos.text(0) in placeholder
 
-    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
-    assert view.search.field.placeholderText() == "Search Landscape  \u203a  All  \u203a  Latest…"
+    view._tree.setCurrentItem(_collection(view, ALL_ITEMS_KEY))
+    assert view.search.field.placeholderText() == "Search Landscape  \u203a  All  \u203a  All…"
 
 
 def test_the_field_shows_the_tail_of_a_path_too_long_for_it(qtbot):

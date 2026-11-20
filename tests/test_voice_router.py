@@ -9,7 +9,7 @@ from shared_ui.message_shape import ERROR, INFO, WARNING
 from origenerator import gallery
 from origenerator.action_settings import GENAU, VIDEO
 from origenerator.animate_command import AnimateRequest
-from origenerator.gallery.collection import LATEST_KEY
+from origenerator.gallery.collection import ALL_ITEMS_KEY
 from origenerator.gallery.voice_commands import said_in
 from origenerator.gui import voice_router as module
 from origenerator.gui.gallery_pane_buttons import GROUP_TIP
@@ -360,8 +360,8 @@ def test_a_word_the_setter_tool_in_front_knows_goes_to_it_before_any_command(rou
 def test_a_word_the_setter_tool_does_not_know_is_matched_as_before(router):
     voice, _host, _slideshows = router(setters=FakeSetters())
 
-    assert voice.listener.built_with["bare_matcher"]("go to recents") == shaped_app_command(
-        "go to recents")
+    assert voice.listener.built_with["bare_matcher"]("go to all") == shaped_app_command(
+        "go to all")
 
 
 def test_words_from_the_session_reach_the_setter_tool_in_front_first(router):
@@ -437,27 +437,27 @@ def test_a_transcription_with_no_letters_in_it_says_nothing(router):
 def test_a_collection_name_stands_you_in_that_collection(router):
     voice, host, slideshows = router()
 
-    voice.on_command(GoToCollection(LATEST_KEY))
+    voice.on_command(GoToCollection(ALL_ITEMS_KEY))
 
-    assert host.stood_in == [(LATEST_KEY, None)]
-    assert slideshows.said == ["Latest"]
+    assert host.stood_in == [(ALL_ITEMS_KEY, None)]
+    assert slideshows.said == ["All"]
 
 
 def test_a_collection_the_tree_has_not_got_says_so_rather_than_doing_nothing(router):
     voice, _host, slideshows = router(FakeHost(collections=()))
 
-    voice.on_command(GoToCollection(LATEST_KEY))
+    voice.on_command(GoToCollection(ALL_ITEMS_KEY))
 
-    assert slideshows.said == ["no Latest collection yet"]
+    assert slideshows.said == ["no All collection yet"]
     assert slideshows.kinds == [WARNING]
 
 
 def test_a_named_side_picks_that_sides_copy_of_the_collection(router):
     voice, host, _slideshows = router()
 
-    voice.on_command(SurfaceCommand(GoToCollection(LATEST_KEY), "portrait"))
+    voice.on_command(SurfaceCommand(GoToCollection(ALL_ITEMS_KEY), "portrait"))
 
-    assert host.stood_in == [(LATEST_KEY, "portrait")]
+    assert host.stood_in == [(ALL_ITEMS_KEY, "portrait")]
 
 
 def test_a_spoken_switch_flips_the_bank_switch_itself(router):
@@ -643,7 +643,7 @@ def test_undo_stays_the_gallerys_even_under_a_slideshow(router):
 def test_a_collection_to_play_and_a_slideshow_command_go_to_the_slideshows(router):
     voice, _host, slideshows = router()
 
-    voice.on_command(CollectionCommand(LATEST_KEY, "portrait"))
+    voice.on_command(CollectionCommand(ALL_ITEMS_KEY, "portrait"))
     voice.on_command(SlideshowControl(SlideshowCommand.STOP, "landscape"))
 
     assert len(slideshows.collections_played) == 1
@@ -1018,20 +1018,20 @@ def test_what_the_listener_answers_with_is_left_to_the_listener_to_log(router, c
 
 def test_a_whole_utterance_command_from_the_session_outranks_the_rest(router):
     voice, _host, slideshows = router()
-    voice.listener.bare = GoToCollection(LATEST_KEY)
+    voice.listener.bare = GoToCollection(ALL_ITEMS_KEY)
 
-    assert voice.run_spoken_command("recents") is True
-    assert slideshows.said == ["Latest"]
+    assert voice.run_spoken_command("all") is True
+    assert slideshows.said == ["All"]
 
 
 def test_the_sessions_words_go_to_an_open_request_before_any_command(router):
     voice, _host, slideshows = router()
-    voice.listener.bare = GoToCollection(LATEST_KEY)
-    voice.listener.dictated = Spoken("recents", listening=True)
+    voice.listener.bare = GoToCollection(ALL_ITEMS_KEY)
+    voice.listener.dictated = Spoken("all", listening=True)
 
-    assert voice.run_spoken_command("portrait recents") is True
+    assert voice.run_spoken_command("portrait all") is True
     assert slideshows.said == []
-    assert [text for text, _said_at in voice.listener.dictation_fed] == ["recents"]
+    assert [text for text, _said_at in voice.listener.dictation_fed] == ["all"]
 
 
 def test_a_requests_own_words_from_the_session_go_to_the_dictation(router):

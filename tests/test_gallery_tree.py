@@ -177,7 +177,7 @@ def test_all_wears_the_database_and_its_latest_the_calendar(qtbot):
     (all_row,) = [half.topLevelItem(i) for i in range(half.topLevelItemCount())]
     latest = all_row.child(0)
 
-    assert (all_row.text(0), latest.text(0)) == ("All", "Latest")
+    assert (all_row.text(0), latest.text(0)) == ("All", "All")
     assert _wears(all_row, "database")
     assert _wears(latest, "latest")
 
@@ -186,7 +186,7 @@ def _children(item):
     return [item.child(i) for i in range(item.childCount())]
 
 
-_COLLECTIONS = ["Latest", "Favorites", "Enhanced", "Populating", "Experiments", "Trash"]
+_COLLECTIONS = ["All", "Favorites", "Enhanced", "Populating", "Experiments", "Trash"]
 _A_FOLDERS_COLLECTIONS = [name for name in _COLLECTIONS if name != "Populating"]
 
 

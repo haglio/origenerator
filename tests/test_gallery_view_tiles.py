@@ -35,7 +35,7 @@ from origenerator.config import (
     THUMB_DIR,
 )
 from origenerator.gallery.collection import (
-    LATEST_KEY,
+    ALL_ITEMS_KEY,
 )
 from origenerator.gui import (
     corner_buttons,
@@ -94,8 +94,8 @@ from tests.test_folder_tree import _shown
 
 def _two_images_on_screen(qtbot):
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 1)]))
-    _on_screen(qtbot, view, 1400, 900)
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    _on_screen(qtbot, view, 1800, 1300)
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     return view, view._gallery_pane._thumb_widgets["i2"]
 
 
@@ -145,7 +145,7 @@ def test_right_clicking_a_recent_item_offers_its_folder_generate_its_name_favori
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     labels = []
     _menu_labels(monkeypatch, labels)
 
@@ -164,7 +164,7 @@ def test_generating_picked_images_with_random_seeds_makes_one_job_each_and_leave
     view = GalleryView(database_of(rows), actions=FakeActions(), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    latest = _alls(view._tree)["Latest"]
+    latest = _alls(view._tree)["All"]
     view._tree.setCurrentItem(latest)
     for prompt_id in ("i1", "i2", "i3"):
         view._gallery_pane.apply_selection(prompt_id, _CTRL)
@@ -185,7 +185,7 @@ def test_generate_with_random_seed_from_a_collections_menu_leaves_the_collection
     view = GalleryView(database_of(rows), actions=FakeActions(), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    latest = _alls(view._tree)["Latest"]
+    latest = _alls(view._tree)["All"]
     view._tree.setCurrentItem(latest)
     _answer_menu(monkeypatch, "Generate with random seed")
 
@@ -201,7 +201,7 @@ def test_generate_is_left_off_for_an_item_that_cannot_be_made_again(qtbot, monke
     view = GalleryView(database_of(rows), actions=FakeActions(), client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     monkeypatch.setattr("origenerator.gui.gallery_view.gallery.rerollable", lambda row: False)
     labels = []
     _menu_labels(monkeypatch, labels)
@@ -251,7 +251,7 @@ def test_go_to_folder_from_a_collection_opens_the_folder_and_lands_on_the_item(
     view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     _answer_menu(monkeypatch, "Go to folder")
 
     _right_click(view, "i2")
@@ -383,7 +383,7 @@ def test_the_go_to_folder_button_takes_a_collection_item_home_without_a_right_cl
     view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     _pick_by_clicking(view, "i2")
     (button,) = _folder_buttons(view)
     # Qt gives an unshown button no rect for a press to land in.
@@ -417,7 +417,7 @@ def test_a_video_goes_to_its_folder_from_the_same_button(qtbot):
     view = GalleryView(database_of([_i2v_video("v1", "smooth")]), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     _pick_by_clicking(view, "v1")
 
     (button,) = _folder_buttons(view)
@@ -431,11 +431,11 @@ def test_a_kind_left_off_a_collection_still_has_its_folder_to_go_to(qtbot):
     view = GalleryView(database_of(rows), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     _pick_by_clicking(view, "i1")
     assert _folder_buttons(view)
 
-    view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Videos"], "Latest"))
+    view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Videos"], "All"))
 
     (button,) = _folder_buttons(view)
     button.click()
@@ -449,7 +449,7 @@ def test_leaving_the_items_folder_puts_the_go_to_folder_back_on_what_it_shows(qt
     view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
     assert _folder_buttons(view) == []
 
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
 
     (button,) = _folder_buttons(view)
     assert button.toolTip() == "Go to the folder this item is in"
@@ -462,7 +462,7 @@ def test_right_click_delete_on_the_latest_collection_removes_the_item(qtbot, mon
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     faking_exec(monkeypatch, QMenu,
         lambda menu, *a: menu.actions()[-1]
     )
@@ -478,13 +478,13 @@ def test_right_click_favorite_on_the_latest_collection_favorites_the_item(qtbot,
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     _answer_menu(monkeypatch, "Favorite 1 image")
 
     _right_click(view, "i1")
 
     assert db.get_generation("i1")["starred"]
-    assert view._gallery_pane.showing_latest()
+    assert view._gallery_pane.showing_all_items()
     assert view._gallery_pane._thumb_widgets["i1"]._favorite is True
 
 
@@ -493,7 +493,7 @@ def test_right_click_enhance_on_the_latest_collection_queues_the_image(qtbot, tm
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     _answer_menu(monkeypatch, "Enhance 1 image")
 
     _right_click(view, "g0")
@@ -518,7 +518,7 @@ def test_latest_video_tiles_animate_while_images_stay_still(qtbot, tmp_path, mon
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
 
     assert view._gallery_pane._thumb_widgets["v1"].findChildren(QMovie)
     assert view._gallery_pane._thumb_widgets["i1"].findChildren(QMovie) == []
@@ -549,7 +549,7 @@ def test_latest_tiles_wear_an_image_or_video_item_type_icon(qtbot):
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
 
     def icon_type(pid):
         icons_found = view._gallery_pane._thumb_widgets[pid].findChildren(ItemTypeIcon)
@@ -686,7 +686,7 @@ def test_the_star_enhance_and_trash_at_the_top_are_grayed_out_where_no_leaf_fold
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    for place in (_collection(view, LATEST_KEY), _image_workflow(view._tree)):
+    for place in (_collection(view, ALL_ITEMS_KEY), _image_workflow(view._tree)):
         view._tree.setCurrentItem(place)
         assert not view._buttons.favorite.isEnabled()
         assert view._buttons.favorite.toolTip() == "Only a leaf folder can be favorited"
@@ -855,7 +855,7 @@ def test_a_star_pressed_on_one_tile_favorites_it_at_once_and_leaves_the_rest(qtb
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
 
     view._gallery_pane._thumb_widgets["i2"]._controls.triggered.emit(corner_buttons.STAR)
 
@@ -929,7 +929,7 @@ def test_a_tiles_trash_corner_deletes_that_tile(qtbot):
     view = GalleryView(db, actions=actions)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
 
     view._gallery_pane._thumb_widgets["i2"]._controls.triggered.emit(corner_buttons.TRASH)
 
@@ -941,7 +941,7 @@ def test_a_corner_control_acts_on_its_own_tile_not_the_selection(qtbot):
     view = GalleryView(db, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     _pick_by_clicking(view, "i1")
     view._gallery_pane.selected_ids.add("i2")
 
@@ -1004,7 +1004,7 @@ def test_a_video_tile_has_no_enhance_corner_to_offer(qtbot):
     view = GalleryView(database_of([_i2v_video("v1", "styleA")]), actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
 
     assert view._gallery_pane._thumb_widgets["v1"].enhance_state() is None
 

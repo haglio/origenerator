@@ -39,7 +39,7 @@ def test_words_it_does_not_know_are_left_for_the_rest_of_the_app():
     setters, front = OpenSetters(), _Window(in_front=True)
     setters.hold(front)
 
-    assert (setters.knows("go to recents"), setters.hear("go to recents"), front.heard) == (
+    assert (setters.knows("go to all"), setters.hear("go to all"), front.heard) == (
         False, False, [])
 
 

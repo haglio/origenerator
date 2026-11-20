@@ -395,7 +395,7 @@ def test_the_words_under_the_buttons_said_do_what_the_buttons_do(window):
 def test_words_the_setter_tool_does_not_know_are_left_for_the_rest_of_the_app(window):
     made, store, _stage = window("first")
 
-    assert (made.hear("go to recents"), store.item_actions) == (False, {})
+    assert (made.hear("go to all"), store.item_actions) == (False, {})
 
 
 def test_the_folder_on_screen_shows_all_its_items_at_once_under_its_name(window):

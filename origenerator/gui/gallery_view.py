@@ -14,7 +14,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QMenu,
     QPlainTextEdit,
-    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -56,13 +55,13 @@ from origenerator.fixes_being_chosen import FixesBeingChosen
 from origenerator.fun_time_bridge import ask_for_origenerator_mode
 from origenerator.fun_time_mode import FunTimeSession
 from origenerator.gallery.collection import (
+    ALL_ITEMS_KEY as _ALL_ITEMS_KEY,
+)
+from origenerator.gallery.collection import (
     EXPERIMENTS_KEY as _EXPERIMENTS_KEY,
 )
 from origenerator.gallery.collection import (
     FAVORITES_KEY as _FAVORITES_KEY,
-)
-from origenerator.gallery.collection import (
-    LATEST_KEY as _LATEST_KEY,
 )
 from origenerator.gallery.collection import (
     POPULATING_KEY as _POPULATING_KEY,
@@ -91,7 +90,7 @@ from origenerator.generation_config import (
     would_reproduce_a_completed_run,
 )
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import corner_buttons, icons, omnipause, square_buttons
+from origenerator.gui import corner_buttons, icons, omnipause, square_buttons, thin_divider
 from origenerator.gui.action_row import sides_under
 from origenerator.gui.app_keys import AppKeys, Presses
 from origenerator.gui.app_title import under
@@ -109,6 +108,7 @@ from origenerator.gui.enhance_controller import (
     EnhanceParts,
 )
 from origenerator.gui.enhance_settings_drags import EnhanceSettingsDrag, SettingsDropOnTheButton
+from origenerator.gui.fitting_scroll import FittingScroll
 from origenerator.gui.folder_actions import FolderActions
 from origenerator.gui.folder_icons import collection_mark
 from origenerator.gui.folder_path import FolderPath
@@ -252,21 +252,28 @@ def _why_new_is_grayed(row: dict, job) -> str | None:
 ONLY_A_LEAF_IS_DELETED = "Only a leaf folder can be deleted"
 
 
-def _top_section(folder_path: QWidget, buttons: QWidget, folder_actions: QWidget,
-                 sort_by: QWidget) -> QVBoxLayout:
+def _stacked(*widgets: QWidget) -> QWidget:
+    stacked = QWidget()
+    column = QVBoxLayout(stacked)
+    column.setContentsMargins(0, 0, 0, 0)
+    column.setSpacing(0)
+    for widget in widgets:
+        column.addWidget(widget, 1 if widget is widgets[-1] else 0)
+    return stacked
+
+
+def _top_section(folder_path: QWidget, buttons: QWidget, folder_actions: QWidget) -> QHBoxLayout:
     left = QVBoxLayout()
     left.setContentsMargins(0, 0, 0, 0)
     left.addWidget(folder_path)
+    left.addWidget(thin_divider.across())
     left.addWidget(buttons)
-    beside = QHBoxLayout()
-    beside.setContentsMargins(0, 0, 0, 0)
-    beside.setSpacing(GAP_MEDIUM)
-    beside.addLayout(left, 1)
-    beside.addWidget(folder_actions, 1, Qt.AlignmentFlag.AlignTop)
-    top = QVBoxLayout()
+    top = QHBoxLayout()
     top.setContentsMargins(0, 0, 0, 0)
-    top.addLayout(beside)
-    top.addWidget(sort_by, 0, Qt.AlignmentFlag.AlignHCenter)
+    top.setSpacing(GAP_MEDIUM)
+    top.addLayout(left, 1)
+    top.addWidget(thin_divider.upright().shown_with(folder_actions))
+    top.addWidget(folder_actions, 1, Qt.AlignmentFlag.AlignTop)
     return top
 
 
@@ -575,6 +582,7 @@ class GalleryView(QWidget):
         self._tree.itemSelectionChanged.connect(self._on_tree_selection_changed)
         finding, toc_column = pane()
         toc_column.addWidget(self.search.row)
+        toc_column.addWidget(thin_divider.across())
         toc_column.addWidget(self._tree, 1)
         combining, combining_column = pane()
         combining_column.addWidget(self.combine.widget)
@@ -585,16 +593,14 @@ class GalleryView(QWidget):
         self._motion_pane = None
         if self.osr2.motion is not None:
             self._osr2_controls = Osr2Controls(self.osr2.motion, control=self.osr2.control)
-            hud_scroll = QScrollArea()
-            hud_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-            hud_scroll.setWidget(self._osr2_controls)
+            hud_scroll = FittingScroll(self._osr2_controls)
             self._motion_pane, hud_column = pane()
             hud_column.addWidget(hud_scroll)
-            sections.insert(0, self._motion_pane)
+            sections[0] = _stacked(self._motion_pane, thin_divider.across(), finding)
         toc = PaneSplitter(Qt.Orientation.Vertical, "left_pane_sections")
         for section in sections:
             toc.addWidget(section)
-        toc.setStretchFactor(sections.index(finding), 1)
+        toc.setStretchFactor(0, 1)
         return toc if self._app_title is None else under(self._app_title, toc)
 
     def _build_gallery_pane(self):
@@ -622,6 +628,7 @@ class GalleryView(QWidget):
                 quit=self.quit_asked.emit,
             ),
             hosted=self._fun_time is not None, two_screens=self._two_screens,
+            trailing=self.sort_by,
         )
         EnhanceSettingsDrag(self._buttons.enhance,
                             self._folder_switches.enhance_params_of_the_open_folder)
@@ -630,8 +637,7 @@ class GalleryView(QWidget):
             self._buttons.enhance, self._folder_switches.enhance_params_of_the_one_enhancing,
             takes_them=self._folder_switches.the_open_folder_takes_enhance_settings,
             keep=self._folder_switches.keep_enhance_params_of_the_open_folder)
-        gallery_column.addLayout(_top_section(self._folder_path, self._buttons, self._folder_actions,
-                                              self.sort_by))
+        gallery_column.addLayout(_top_section(self._folder_path, self._buttons, self._folder_actions))
         self._experiments_cb = TickControl("Run experiments while the app is closed")
         self._experiments_cb.toggled.connect(self._on_experiments_toggled)
         self._experiments_cb.setEnabled(not is_branch_session())
@@ -651,6 +657,7 @@ class GalleryView(QWidget):
         self._avg_label.setObjectName("mutedLabel")
         self._avg_label.setWordWrap(True)
         gallery_column.addWidget(self._avg_label)
+        gallery_column.addWidget(thin_divider.across())
         self._scroll.setWidgetResizable(True)
         self._scroll.background_clicked.connect(
             self._gallery_pane.clear_thumbnail_selection)
@@ -831,13 +838,13 @@ class GalleryView(QWidget):
 
     def _sync_experiments_bar(self):
         if is_branch_session():
-            self._experiments_status.setText(
-                "Off — a branch preview never queues experiments; "
-                "that's the production app's")
+            self._experiments_status.setText("")
+            self._experiments_cb.setToolTip(
+                "A branch preview never queues experiments; only production does")
             return
         self._experiments_status.setText(
-            "On — variations run after you close the app and land here for review"
-            if self.experiments_enabled() else "Off — the GPU stays all yours"
+            "Variations run after you close the app and land here for review"
+            if self.experiments_enabled() else "The graphics card stays all yours"
         )
 
     def _on_experiment_verdict(self, prompt_id: str, action_id: str):
@@ -1691,7 +1698,7 @@ class GalleryView(QWidget):
                        shown=tuple(self.listed_prompt_ids()),
                        picked=tuple(self.selected_prompt_ids()),
                        subject=self.slideshow_subject(), shape=self.toc.shape_in_view(),
-                       latest=pane.showing_latest() and not pane.showing_search())
+                       latest=pane.showing_all_items() and not pane.showing_search())
 
     def slideshow_subject(self) -> str:
         if self._showing_search():
@@ -1982,7 +1989,7 @@ class GalleryView(QWidget):
     def reveal_launch(self, key: str):
         if self._stand_on_the_run_in(key):
             return
-        if (latest := self.toc.collection_item(_LATEST_KEY, self._launched_side(key))) is not None:
+        if (latest := self.toc.collection_item(_ALL_ITEMS_KEY, self._launched_side(key))) is not None:
             self._pending_combine_key = key
             self._tree.setCurrentItem(latest)
 

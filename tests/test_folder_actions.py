@@ -7,7 +7,8 @@ from PySide6.QtWidgets import QToolButton, QWidget
 
 from origenerator import gallery
 from origenerator.db import Database, NewGeneration
-from origenerator.gui.action_row import action_pills
+from origenerator.gui.action_row import ACTIONS_LABEL, action_pills
+from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.folder_actions import FolderActions
 from origenerator.gui.pills import Pill
 from origenerator.item_actions import ItemActions, actions_of
@@ -91,3 +92,15 @@ def test_actions_set_on_the_folder_are_saved_on_every_item_and_announced(folder_
     assert [actions_of(library.get_generation(prompt_id), MediaType.IMAGE).actions
             for prompt_id in ("one", "two")] == [(), ("beta",)]
     assert caught.args[0] == MediaType.IMAGE
+
+
+def test_squeezing_the_header_never_elides_the_actions_name(folder_actions, library):
+    rows = [_image(library, "one", 1)]
+    folder_actions.show_folder(gallery.SettingsGroup("k", "S", rows))
+    name = next(label for label in folder_actions.findChildren(ElidingLabel)
+                if label.text() == ACTIONS_LABEL)
+
+    folder_actions.resize(1, folder_actions.height())
+    folder_actions.layout().activate()
+
+    assert name.width() >= name.fontMetrics().horizontalAdvance(ACTIONS_LABEL)

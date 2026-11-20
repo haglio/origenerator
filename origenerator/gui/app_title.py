@@ -8,6 +8,8 @@ from shared_ui.preview import Preview, window_title
 from shared_ui.spacing import BUTTON_GAP, BUTTON_SIZE, MARGIN_STANDARD
 from shared_ui.wordmark import wordmark_ink
 
+from origenerator.gui import thin_divider
+
 
 class AppTitle(QWidget):
     def __init__(self, name: str, icon: QIcon, preview: Preview | None, parent=None):
@@ -33,5 +35,6 @@ def under(title: AppTitle, content: QWidget) -> QWidget:
     column.setContentsMargins(0, 0, 0, 0)
     column.setSpacing(0)
     column.addWidget(title)
+    column.addWidget(thin_divider.across())
     column.addWidget(content, 1)
     return stacked

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from PySide6.QtGui import QColor, QIcon, QPixmap
+from PySide6.QtWidgets import QWidget
 from shared_ui.palette import LOADING_ACCENT, PREVIEW_INK, as_hex
 from shared_ui.preview import Preview
 from shared_ui.spacing import BUTTON_SIZE
 
-from origenerator.gui.app_title import AppTitle
+from origenerator.gui.app_title import AppTitle, under
+from origenerator.gui.thin_divider import ThinDivider
 
 
 def _an_icon() -> QIcon:
@@ -39,3 +41,14 @@ def test_production_has_nothing_to_say_on_a_hover(qtbot):
     qtbot.addWidget(title)
 
     assert title.toolTip() == ""
+
+
+def test_a_thin_divider_parts_the_title_from_what_sits_under_it(qtbot):
+    title = AppTitle("Origenerator", QIcon(), None)
+    content = QWidget()
+    stacked = under(title, content)
+    qtbot.addWidget(stacked)
+    column = stacked.layout()
+
+    assert [type(column.itemAt(n).widget()) for n in range(column.count())] == [
+        AppTitle, ThinDivider, QWidget]

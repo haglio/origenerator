@@ -21,10 +21,10 @@ from origenerator import (
 )
 from origenerator.fun_time_mode import Rect
 from origenerator.gallery.collection import (
+    ALL_ITEMS_KEY,
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
-    LATEST_KEY,
 )
 from origenerator.gallery.shapes import LANDSCAPE
 from origenerator.gui import slideshow_director, two_screens
@@ -60,7 +60,7 @@ from tests.gallery_view_support import (
     _key,
     _keys_are_the_gallerys,
     _on_screen,
-    _open_latest,
+    _open_all_items,
     _open_leaf,
     _pick_by_clicking,
     _press_enter,
@@ -312,7 +312,7 @@ def test_a_standalone_huds_order_pair_leaves_out_what_other_sites_made(qtbot, mo
 
 def test_a_slideshow_started_on_latest_leaves_out_what_other_sites_made(qtbot, monkeypatch):
     view = _a_gallery_with_another_sites_picture(qtbot, monkeypatch)
-    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
+    view._tree.setCurrentItem(_collection(view, ALL_ITEMS_KEY))
 
     view.slideshows.start()
     slideshow = view.slideshows.showing
@@ -464,9 +464,9 @@ def test_slideshow_button_follows_what_is_on_screen(qtbot, monkeypatch):
     assert not view._buttons.slideshow.isHidden()
     assert "this folder" in view._buttons.slideshow.toolTip()
 
-    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
+    view._tree.setCurrentItem(_collection(view, ALL_ITEMS_KEY))
     assert not view._buttons.slideshow.isHidden()
-    assert "Latest" in view._buttons.slideshow.toolTip()
+    assert "All" in view._buttons.slideshow.toolTip()
     view._tree.setCurrentItem(_collection(view, FAVORITES_KEY))
     assert not view._buttons.slideshow.isHidden()
     assert "Favorites" in view._buttons.slideshow.toolTip()
@@ -547,7 +547,7 @@ def test_slideshow_plays_the_latest_collection(qtbot, monkeypatch):
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
+    view._tree.setCurrentItem(_collection(view, ALL_ITEMS_KEY))
 
     view.slideshows.start()
 
@@ -560,7 +560,7 @@ def test_a_slideshow_of_one_kinds_latest_plays_that_kind_alone(qtbot, monkeypatc
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Images"], "Latest"))
+    view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Images"], "All"))
 
     view.slideshows.start()
 
@@ -573,7 +573,7 @@ def test_latest_begins_on_its_newest_whatever_is_picked_there(qtbot, monkeypatch
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_latest(view)
+    _open_all_items(view)
     newest, older = view.listed_prompt_ids()
     view._gallery_pane.apply_selection(older, _NO_MOD)
 
@@ -590,7 +590,7 @@ def test_the_enhanced_switch_narrows_a_slideshow_to_the_images_made_better(qtbot
                                _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_latest(view)
+    _open_all_items(view)
     view.slideshows.start()
     slideshow = view.slideshows.showing
     assert len(slideshow._set.playlist) == 2
@@ -610,7 +610,7 @@ def test_a_standalone_huds_enhanceds_button_narrows_the_slideshow_to_the_enhance
                                _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_latest(view)
+    _open_all_items(view)
     view.slideshows.start()
     slideshow = view.slideshows.showing
     slideshow.shown.press(f"{slideshow.shown.hud_shape}_enhanced")
@@ -630,7 +630,7 @@ def test_an_item_another_process_files_plays_next_on_a_slideshow_in_latest(qtbot
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    _open_latest(view)
+    _open_all_items(view)
     view.slideshows.start()
     slideshow = view.slideshows.showing
     filed = _image("i3", "a bird", 50, 3)
@@ -654,7 +654,7 @@ def test_an_item_evolver_upscales_plays_next_as_its_upscale_on_a_slideshow_in_la
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    _open_latest(view)
+    _open_all_items(view)
     view.slideshows.start()
     slideshow = view.slideshows.showing
     playlist = slideshow._set.playlist
@@ -674,7 +674,7 @@ def test_a_generation_that_lands_unenhanced_stays_out_of_a_narrowed_slideshow(qt
     view = GalleryView(database_of([_enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_latest(view)
+    _open_all_items(view)
     view.slideshows.start()
     slideshow = view.slideshows.showing
     slideshow.set_enhanced_filter(True)
@@ -701,7 +701,7 @@ def test_clear_filter_leaves_f_mode_and_the_enhanced_filter_on(qtbot, monkeypatc
                                     "sdxl_t2i_i2.png", starred=1)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_latest(view)
+    _open_all_items(view)
     view.slideshows.start()
     slideshow = view.slideshows.showing
     slideshow.toggle_favorites_filter()
@@ -722,7 +722,7 @@ def test_filter_enhanced_turns_the_slideshows_switch_on_and_says_what_is_left(qt
                                _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_latest(view)
+    _open_all_items(view)
     view.slideshows.start()
     slideshow = view.slideshows.showing
 
@@ -741,7 +741,7 @@ def test_clear_filter_said_over_the_enhanced_filter_says_the_action_filter_is_cl
                                _enhanced_image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_latest(view)
+    _open_all_items(view)
     view.slideshows.start()
     slideshow = view.slideshows.showing
     view._voice._run_app_command(AppCommand.ENHANCED_ON)
@@ -758,7 +758,7 @@ def test_filter_enhanced_says_so_where_nothing_here_is_enhanced(qtbot, monkeypat
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_latest(view)
+    _open_all_items(view)
     view.slideshows.start()
     slideshow = view.slideshows.showing
 
@@ -774,7 +774,7 @@ def test_filter_enhanced_with_no_slideshow_up_opens_none(qtbot, monkeypatch):
     view = GalleryView(database_of([_enhanced_image("i2", "a cat", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    _open_latest(view)
+    _open_all_items(view)
 
     view._voice._run_app_command(AppCommand.ENHANCED_ON)
 
@@ -873,7 +873,7 @@ def test_enter_in_a_collection_slideshow_picks_the_slide_on_that_collection(qtbo
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
+    view._tree.setCurrentItem(_collection(view, ALL_ITEMS_KEY))
     view.slideshows.start()
     slideshow = view.slideshows.showing
     shown = slideshow._set.playlist.current()[2]
@@ -881,7 +881,7 @@ def test_enter_in_a_collection_slideshow_picks_the_slide_on_that_collection(qtbo
     press_key_on(slideshow, Qt.Key.Key_Return)
 
     assert view.slideshows.showing is None
-    assert view._tree.currentItem() is _collection(view, LATEST_KEY)
+    assert view._tree.currentItem() is _collection(view, ALL_ITEMS_KEY)
     assert view._gallery_pane.selected_ids == {shown}
     assert view.generate_pane.current_generate_tab().displayed_row()["prompt_id"] == shown, (
         "leaving a slideshow for an item is a decision to work on it")
@@ -893,7 +893,7 @@ def test_a_slideshow_ended_on_a_locked_slide_picks_that_slide_where_it_played(qt
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     view.slideshows.start()
     slideshow = view.slideshows.showing
     held = slideshow._set.playlist.current()[2]
@@ -913,14 +913,14 @@ def test_a_slideshow_ended_on_an_unlocked_slide_picks_that_slide_where_it_played
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     view.slideshows.start()
     slideshow = view.slideshows.showing
     shown = slideshow._set.playlist.current()[2]
 
     slideshow.close()
 
-    assert view._tree.currentItem() is _alls(view._tree)["Latest"]
+    assert view._tree.currentItem() is _alls(view._tree)["All"]
     assert view._gallery_pane.selected_ids == {shown}
 
 
@@ -938,7 +938,7 @@ def test_a_slide_pages_down_latest_is_drawn_and_picked_on_leaving(qtbot, monkeyp
     view = GalleryView(database_of([_image(f"i{n}", f"scene {n}", 50, n)
                                for n in reversed(range(120))]))
     _on_screen(qtbot, view, 1800, 1300)
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     view.slideshows.start()
     slideshow = view.slideshows.showing
     funestra_of(slideshow.shown)
@@ -1394,7 +1394,7 @@ def test_a_run_being_made_joins_a_latest_slideshow_too(qtbot, monkeypatch):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     view.slideshows.start()
 
     view._on_reroll_preview("some-key", "i2", b"a-frame")
@@ -1411,7 +1411,7 @@ def test_an_enhancement_being_made_is_nobody_slide(qtbot, monkeypatch):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     view.slideshows.start()
 
     view._on_reroll_preview("some-key", "e1", b"a-frame")

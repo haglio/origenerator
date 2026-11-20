@@ -34,7 +34,7 @@ def test_the_words_under_the_buttons_say_what_they_do():
 
 
 def test_what_the_setter_tool_does_not_know_it_does_not_hear():
-    assert _words().heard("go to recents") is None
+    assert _words().heard("go to all") is None
 
 
 def test_the_words_it_listens_for_are_every_one_it_knows():

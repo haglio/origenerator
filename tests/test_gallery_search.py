@@ -310,12 +310,12 @@ def test_a_remembered_order_this_version_does_not_offer_is_ignored(controller):
 
 
 def test_the_field_says_what_a_query_typed_in_it_would_search(controller):
-    host = FakeHost(scope=_Scope("Landscape  \u203a  Latest", set()))
+    host = FakeHost(scope=_Scope("Landscape  \u203a  All", set()))
     found = controller(host=host)
 
     found.sync_placeholder()
 
-    assert found.field.placeholderText() == "Search Landscape  \u203a  Latest…"
+    assert found.field.placeholderText() == "Search Landscape  \u203a  All…"
 
 
 def test_the_sort_menu_names_the_model_lora_order_the_way_the_forms_do(controller):

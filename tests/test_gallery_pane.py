@@ -18,10 +18,10 @@ from origenerator import gallery, search
 from origenerator.db_generations import ENHANCE_WHEN_FINISHED
 from origenerator.gallery import sort_order
 from origenerator.gallery.collection import (
+    ALL_ITEMS_KEY,
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
-    LATEST_KEY,
     TRASH_KEY,
     FolderCollection,
     collection_keys,
@@ -111,7 +111,7 @@ class _SortedBy:
 
 def _pane_host(lead_tiles=lambda group: LeadTiles(), selected=None,
                animated_preview=lambda row: None, folder_context=lambda key: "",
-               sort=sort_order.NEWEST):
+               sort=sort_order.LATEST):
     return PaneHost(
         image_rows=list,
         animated_preview=animated_preview,
@@ -138,9 +138,9 @@ def _pane(qtbot, db, rows=(), *, scroll=None, jobs=None, host=None):
     return pane, scroll
 
 
-def _open_latest(pane, rows):
+def _open_all_items(pane, rows):
     pane.set_model(LibrarySnapshot(rows))
-    pane.show_collection(LATEST_KEY)
+    pane.show_collection(ALL_ITEMS_KEY)
 
 
 def _shown_in_order(scroll):
@@ -166,7 +166,7 @@ def test_the_pane_stands_alone_on_six_stubs(qtbot, db):
 def test_a_tile_is_captioned_with_the_name_the_gallery_gives_its_item(qtbot, db):
     pane, _scroll = _pane(qtbot, db)
 
-    _open_latest(pane, [_row("g1", 1)])
+    _open_all_items(pane, [_row("g1", 1)])
 
     assert pane._thumb_widgets["g1"]._text_label.text() == "item g1"
 
@@ -186,7 +186,7 @@ def test_the_second_look_for_a_place_goes_with_the_canvas_it_was_for(qtbot, db):
 def test_a_plain_click_picks_one_tile_and_ctrl_toggles_another(qtbot, db):
     rows = [_row("g1", 1), _row("g2", 2), _row("g3", 3)]
     pane, _scroll = _pane(qtbot, db, rows)
-    _open_latest(pane, rows)
+    _open_all_items(pane, rows)
 
     pane.apply_selection("g1", _NO_MOD)
     assert pane.selected_prompt_ids() == ["g1"]
@@ -202,7 +202,7 @@ def test_a_plain_click_picks_one_tile_and_ctrl_toggles_another(qtbot, db):
 def test_tiles_picked_before_can_be_picked_again_and_say_so(qtbot, db):
     rows = [_row("g1", 1), _row("g2", 2), _row("g3", 3)]
     pane, _scroll = _pane(qtbot, db, rows)
-    _open_latest(pane, rows)
+    _open_all_items(pane, rows)
     pane.apply_selection("g1", _NO_MOD)
     pane.apply_selection("g3", _CTRL)
     before = pane.picks()
@@ -217,7 +217,7 @@ def test_tiles_picked_before_can_be_picked_again_and_say_so(qtbot, db):
 def test_a_tile_click_picks_by_the_keys_held_during_that_click(qtbot, db):
     rows = [_row("g1", 1), _row("g2", 2)]
     pane, _scroll = _pane(qtbot, db, rows)
-    _open_latest(pane, rows)
+    _open_all_items(pane, rows)
     elsewhere = QWidget()
     qtbot.addWidget(elsewhere)
     # Qt Test leaves Ctrl down app-wide after this.
@@ -232,7 +232,7 @@ def test_a_tile_click_picks_by_the_keys_held_during_that_click(qtbot, db):
 def test_clicking_the_one_selected_tile_unselects_it(qtbot, db):
     rows = [_row("g1", 1), _row("g2", 2)]
     pane, _scroll = _pane(qtbot, db, rows)
-    _open_latest(pane, rows)
+    _open_all_items(pane, rows)
     qtbot.mouseClick(pane._thumb_widgets["g1"], Qt.MouseButton.LeftButton, _NO_MOD)
 
     qtbot.mouseClick(pane._thumb_widgets["g1"], Qt.MouseButton.LeftButton, _NO_MOD)
@@ -243,7 +243,7 @@ def test_clicking_the_one_selected_tile_unselects_it(qtbot, db):
 def test_double_clicking_the_one_selected_tile_leaves_it_selected(qtbot, db):
     rows = [_row("g1", 1)]
     pane, _scroll = _pane(qtbot, db, rows)
-    _open_latest(pane, rows)
+    _open_all_items(pane, rows)
     tile = pane._thumb_widgets["g1"]
     qtbot.mouseClick(tile, Qt.MouseButton.LeftButton, _NO_MOD)
 
@@ -256,7 +256,7 @@ def test_double_clicking_the_one_selected_tile_leaves_it_selected(qtbot, db):
 def test_shift_extends_a_contiguous_run_from_the_anchor(qtbot, db):
     rows = [_row(f"g{n}", n) for n in range(1, 6)]
     pane, _scroll = _pane(qtbot, db, rows)
-    _open_latest(pane, rows)
+    _open_all_items(pane, rows)
 
     pane.apply_selection("g2", _NO_MOD)
     pane.apply_selection("g4", _SHIFT)
@@ -267,7 +267,7 @@ def test_shift_extends_a_contiguous_run_from_the_anchor(qtbot, db):
 def test_clearing_the_thumbnail_selection_announces_it(qtbot, db):
     rows = [_row("g1", 1)]
     pane, _scroll = _pane(qtbot, db, rows)
-    _open_latest(pane, rows)
+    _open_all_items(pane, rows)
     pane.apply_selection("g1", _NO_MOD)
     heard = []
     pane.selection_changed.connect(lambda: heard.append(True))
@@ -357,7 +357,7 @@ def test_every_collection_is_both_gathered_and_drawn_on_every_shape(qtbot, db):
 
 
 def _latest_of(pane, rows):
-    _open_latest(pane, rows)
+    _open_all_items(pane, rows)
 
 
 def _settings_folder_of(pane, rows):
@@ -626,7 +626,7 @@ def test_latest_heads_each_batch_with_when_it_was_made(qtbot, db):
     rows = [_row("g1", 1, "2026-09-12 23:00:00"), _row("g2", 2, "2026-09-12 22:50:00"),
             _row("g3", 3, "2026-09-12 19:00:00")]
     pane, scroll = _pane(qtbot, db, rows)
-    _open_latest(pane, rows)
+    _open_all_items(pane, rows)
 
     first, _, second = gallery.section_headings(rows)
     assert _shown_in_order(scroll) == [first, "g1", "g2", second, "g3"]
@@ -640,7 +640,7 @@ def _running(prompt_id, seed, created_at=None):
 def test_latest_opens_on_its_first_heading_with_the_work_still_running_beneath_it(qtbot, db):
     finished = [_row("g1", 1, _ago(minutes=5))]
     pane, scroll = _pane(qtbot, db, [_running("j1", 2), *finished])
-    _open_latest(pane, finished)
+    _open_all_items(pane, finished)
 
     [heading] = gallery.section_headings(finished)
     assert _shown_in_order(scroll) == [heading, "InFlightTile", "g1"]
@@ -655,7 +655,7 @@ def test_latest_draws_the_back_of_the_line_first_and_the_run_being_made_last(qtb
     rows = [_running("j1", 2), _waiting("j2", 3), _waiting("j3", 4), *finished]
     pane, _scroll = _pane(qtbot, db, rows, jobs=_StubJobQueue(order=["j1", "j2", "j3"]))
 
-    _open_latest(pane, finished)
+    _open_all_items(pane, finished)
 
     assert list(pane._inflight_tiles) == ["j3", "j2", "j1"]
 
@@ -666,21 +666,30 @@ def test_latest_oldest_first_ends_with_the_work_still_being_made(qtbot, db):
     pane, scroll = _pane(qtbot, db, rows, jobs=_StubJobQueue(order=["j1", "j2"]),
                          host=_pane_host(sort=sort_order.OLDEST))
 
-    _open_latest(pane, finished)
+    _open_all_items(pane, finished)
 
     [heading, _] = gallery.section_headings(finished)
     assert _shown_in_order(scroll) == [heading, "g2", "g1", "InFlightTile", "InFlightTile"]
     assert list(pane._inflight_tiles) == ["j1", "j2"]
 
 
-def test_latest_longest_first_orders_each_batch_by_length(qtbot, db):
+def test_latest_longest_first_lists_every_item_by_length_with_no_headings(qtbot, db):
     short, long = _video("short", 1, 2.0), _video("long", 2, 9.0)
     pane, scroll = _pane(qtbot, db, [short, long], host=_pane_host(sort=sort_order.LONGEST))
 
-    _open_latest(pane, [short, long])
+    _open_all_items(pane, [short, long])
 
-    [heading, _] = gallery.section_headings([short, long])
-    assert _shown_in_order(scroll) == [heading, "long", "short"]
+    assert _shown_in_order(scroll) == ["long", "short"]
+
+
+def test_a_duration_sort_gives_a_folders_new_work_no_now_heading(qtbot, db):
+    rows = [_row("g1", 1, _ago(hours=5))]
+    pane, scroll = _pane(qtbot, db, rows, host=_pane_host(
+        lead_tiles=lambda group: LeadTiles(reroll=QLabel("new")), sort=sort_order.SHORTEST))
+
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
+
+    assert _shown_in_order(scroll) == ["new", "g1"]
 
 
 def _video(prompt_id, seed, seconds):
@@ -708,7 +717,7 @@ def test_the_trash_oldest_first_lists_its_items_the_other_way_round(qtbot, db):
 
 
 def test_a_new_sort_redraws_the_listing_on_screen_in_its_order(qtbot, db):
-    sort_by = _SortedBy(sort_order.NEWEST)
+    sort_by = _SortedBy(sort_order.LATEST)
     rows = [_row("g1", 1, _ago(minutes=5)), _row("g2", 2, _ago(minutes=6))]
     pane, scroll = _pane(qtbot, db, rows, host=_pane_host(sort=sort_by))
     pane.show_custom_collection(gallery.CustomCollection(key="c1", label="mine", children=[], rows=rows))
@@ -719,8 +728,23 @@ def test_a_new_sort_redraws_the_listing_on_screen_in_its_order(qtbot, db):
     assert _shown_in_order(scroll) == ["g2", "g1"]
 
 
+def test_a_new_sort_draws_only_the_top_of_the_new_order(qtbot, db):
+    sort_by = _SortedBy(sort_order.LATEST)
+    rows = [_row(f"g{n}", n, _ago(minutes=n)) for n in range(200)]
+    pane, scroll = _pane(qtbot, db, rows, host=_pane_host(sort=sort_by))
+    scroll.setWidgetResizable(True)
+    scroll.resize(900, 400)
+    pane.show_custom_collection(gallery.CustomCollection(key="c1", label="mine", children=[], rows=rows))
+    pane._pages.draw(150 - pane._pages.drawn)
+
+    sort_by.sort = sort_order.OLDEST
+    pane.redraw_in_the_new_order()
+
+    assert pane._pages.drawn <= _filling(scroll) + gallery_pane._TILES_A_TURN
+
+
 def test_a_new_sort_keeps_the_picked_item_picked(qtbot, db):
-    sort_by = _SortedBy(sort_order.NEWEST)
+    sort_by = _SortedBy(sort_order.LATEST)
     rows = [_row("g1", 1, _ago(minutes=5)), _row("g2", 2, _ago(minutes=6))]
     pane, _scroll = _pane(qtbot, db, rows, host=_pane_host(sort=sort_by))
     pane.show_custom_collection(gallery.CustomCollection(key="c1", label="mine", children=[], rows=rows))
@@ -732,22 +756,35 @@ def test_a_new_sort_keeps_the_picked_item_picked(qtbot, db):
     assert pane.selected_ids == {"g2"}
 
 
-def test_a_view_of_folders_or_search_results_has_no_listing_to_sort(qtbot, db):
-    sort_by = _SortedBy(sort_order.NEWEST)
+def test_search_results_have_no_listing_to_sort(qtbot, db):
+    sort_by = _SortedBy(sort_order.LATEST)
     rows = [_row("g1", 1)]
     pane, _scroll = _pane(qtbot, db, rows, host=_pane_host(sort=sort_by))
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
     assert sort_by.listed == ["g1"]
 
-    pane.show_folder_tiles([])
+    pane.show_search_results([search.SearchTile(row=rows[0], group=gallery.SettingsGroup(
+        key="k1", label="scene one", rows=rows))], search.SearchTerms(
+        sort_mode=search.SORT_RECENT, query="scene", outcome=None, collapsed=set()))
 
     assert sort_by.listed is None
 
 
+def test_a_folder_of_folders_lists_them_oldest_first_by_the_newest_item_in_each(qtbot, db):
+    older = gallery.SettingsGroup(key="k1", label="older", rows=[_row("g1", 1, _ago(hours=5))])
+    newer = gallery.SettingsGroup(key="k2", label="newer", rows=[_row("g2", 2, _ago(hours=1))])
+    pane, _scroll = _pane(qtbot, db, [*older.rows, *newer.rows],
+                          host=_pane_host(sort=sort_order.OLDEST))
+
+    pane.show_folder_tiles([newer, older])
+
+    assert pane._listed_folders == ["k1", "k2"]
+
+
 def test_latest_redraws_its_tiles_when_the_line_changes_order(qtbot, db):
     jobs = _StubJobQueue(order=["j1", "j2"])
-    pane, _scroll = _pane(qtbot, db, [_waiting("j1", 1), _waiting("j2", 2)], jobs=jobs, host=_pane_host(selected=LATEST_KEY))
-    _open_latest(pane, [])
+    pane, _scroll = _pane(qtbot, db, [_waiting("j1", 1), _waiting("j2", 2)], jobs=jobs, host=_pane_host(selected=ALL_ITEMS_KEY))
+    _open_all_items(pane, [])
     jobs.queue_order = ["j2", "j1"]
 
     pane.refresh_inflight()
@@ -804,7 +841,7 @@ def test_a_waiting_job_asked_to_be_enhanced_says_so_when_its_folder_is_drawn_aga
 def test_latest_puts_work_started_long_after_the_newest_item_in_a_now_section(qtbot, db):
     finished = [_row("g1", 1, _ago(hours=5))]
     pane, scroll = _pane(qtbot, db, [_running("j1", 2), *finished])
-    _open_latest(pane, finished)
+    _open_all_items(pane, finished)
 
     [heading] = gallery.section_headings(finished)
     assert _shown_in_order(scroll) == ["Now", "InFlightTile", heading, "g1"]
@@ -815,7 +852,7 @@ def test_a_later_page_of_latest_heads_only_the_batches_that_begin_on_it(qtbot, d
     earlier = [_row(f"b{n}", n, f"2026-09-12 18:{59 - n:02d}:00") for n in range(5)]
     rows = later + earlier
     pane, scroll = _pane(qtbot, db, rows)
-    _open_latest(pane, rows)
+    _open_all_items(pane, rows)
 
     pane._pages.draw(50)
 
@@ -1004,7 +1041,7 @@ def test_rows_for_collection_answers_by_name_not_by_what_is_on_screen(qtbot, db)
     held = [_row("d1", 9)]
     pane, _scroll = _pane(qtbot, db, latest)
     pane.set_model(LibrarySnapshot(latest, held))
-    pane.show_collection(LATEST_KEY)
+    pane.show_collection(ALL_ITEMS_KEY)
 
     assert [r["prompt_id"] for r in pane.rows_for_collection(TRASH_KEY)] == ["d1"], (
         "a slideshow hosted by Fun Time outlives the selection that opened it, and a spoken "
@@ -1017,9 +1054,9 @@ def test_an_empty_latest_names_the_kind_its_folder_holds(qtbot, db, folder, kind
     pane, scroll = _pane(qtbot, db)
     pane.set_model(LibrarySnapshot([]))
 
-    pane.show_collection(FolderCollection(LATEST_KEY, folder).key, LANDSCAPE)
+    pane.show_collection(FolderCollection(ALL_ITEMS_KEY, folder).key, LANDSCAPE)
 
-    assert scroll.widget().text().startswith(f"No recent {kind} yet.")
+    assert scroll.widget().text().startswith(f"No {kind} yet.")
 
 
 def test_the_empty_trash_hint_says_what_a_day_there_leaves(qtbot, db):
@@ -1049,7 +1086,7 @@ def test_a_folders_latest_lists_only_what_that_folder_holds(qtbot, db):
     pane, _scroll = _pane(qtbot, db, rows)
     pane.set_model(LibrarySnapshot(rows))
 
-    pane.show_collection(FolderCollection(LATEST_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
+    pane.show_collection(FolderCollection(ALL_ITEMS_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
 
     assert pane.listed_prompt_ids() == ["a1"]
 
@@ -1079,7 +1116,7 @@ def test_a_folders_latest_leads_with_only_its_own_work_in_flight(qtbot, db):
     pane, _scroll = _pane(qtbot, db, rows)
     pane.set_model(LibrarySnapshot(rows))
 
-    pane.show_collection(FolderCollection(LATEST_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
+    pane.show_collection(FolderCollection(ALL_ITEMS_KEY, _models(tree)["alpha"].key).key, LANDSCAPE)
 
     assert list(pane._inflight_tiles) == ["a2"]
 
@@ -1161,10 +1198,10 @@ def _folders_of_folders(tree):
 def test_a_redraw_of_the_latest_collection_keeps_the_tiles_it_already_drew(qtbot, db):
     rows = [_row("a", 1), _row("b", 2)]
     pane, _scroll = _pane(qtbot, db, rows)
-    _open_latest(pane, rows)
+    _open_all_items(pane, rows)
     drawn = dict(pane._thumb_widgets)
 
-    _open_latest(pane, [dict(row) for row in rows])
+    _open_all_items(pane, [dict(row) for row in rows])
 
     assert pane._thumb_widgets == drawn
     assert all(shiboken6.isValid(tile) and tile.parent() is not None for tile in drawn.values())
@@ -1173,10 +1210,10 @@ def test_a_redraw_of_the_latest_collection_keeps_the_tiles_it_already_drew(qtbot
 def test_a_kept_tile_takes_the_star_its_row_now_wears(qtbot, db):
     rows = [_row("a", 1)]
     pane, _scroll = _pane(qtbot, db, rows)
-    _open_latest(pane, rows)
+    _open_all_items(pane, rows)
     tile = pane._thumb_widgets["a"]
 
-    _open_latest(pane, [{**rows[0], "starred": 1}])
+    _open_all_items(pane, [{**rows[0], "starred": 1}])
 
     assert pane._thumb_widgets["a"] is tile
     assert tile._favorite is True
@@ -1185,10 +1222,10 @@ def test_a_kept_tile_takes_the_star_its_row_now_wears(qtbot, db):
 def test_a_tile_whose_thumbnail_changed_is_drawn_afresh(qtbot, db):
     rows = [_row("a", 1)]
     pane, _scroll = _pane(qtbot, db, rows)
-    _open_latest(pane, rows)
+    _open_all_items(pane, rows)
     tile = pane._thumb_widgets["a"]
 
-    _open_latest(pane, [{**rows[0], "thumbnail_path": "elsewhere.jpg"}])
+    _open_all_items(pane, [{**rows[0], "thumbnail_path": "elsewhere.jpg"}])
 
     assert pane._thumb_widgets["a"] is not tile
 
@@ -1203,7 +1240,7 @@ def test_a_tile_drawn_for_a_folder_is_not_taken_for_a_collection(qtbot, db):
     pane.show_thumbnails(leaf)
     in_folder = pane._thumb_widgets["a1"]
 
-    pane.show_collection(LATEST_KEY, LANDSCAPE)
+    pane.show_collection(ALL_ITEMS_KEY, LANDSCAPE)
 
     assert pane._thumb_widgets["a1"] is not in_folder, (
         "a folder's tile and a collection's answer a double-click differently, so one is never "
@@ -1254,7 +1291,7 @@ def test_a_folders_collection_squares_stand_apart_from_its_folders_behind_a_head
     pane, scroll = _pane(qtbot, db, rows)
     pane.set_model(LibrarySnapshot(rows))
 
-    pane.show_folder_tiles(tree, collections=[shaped_key(LATEST_KEY, LANDSCAPE),
+    pane.show_folder_tiles(tree, collections=[shaped_key(ALL_ITEMS_KEY, LANDSCAPE),
                                               shaped_key(TRASH_KEY, LANDSCAPE)])
 
     layout = scroll.widget().layout()
@@ -1301,7 +1338,7 @@ def _asked_by_the_mouse(qtbot, pane, scroll, prompt_id):
 def test_a_search_hit_answers_the_mouse_as_it_does_in_latest(qtbot, db):
     rows = [_row("a", 1)]
     in_latest, latest_scroll = _pane(qtbot, db, rows)
-    _open_latest(in_latest, rows)
+    _open_all_items(in_latest, rows)
     found, found_scroll = _pane(qtbot, db)
     found.show_search_results([search.SearchTile(row=rows[0])], search.SearchTerms(
         sort_mode=search.SORT_MODEL_LORA, query="scene", outcome=None, collapsed=set()))
@@ -1346,7 +1383,7 @@ def test_a_page_of_tiles_lists_each_folder_its_tiles_look_in_once(tmp_path, monk
 def test_restarring_many_drawn_tiles_reads_their_rows_in_one_query(qtbot, db, monkeypatch):
     rows = [_row(f"g{n}", n) for n in range(4)]
     pane, _scroll = _pane(qtbot, db, rows)
-    _open_latest(pane, rows)
+    _open_all_items(pane, rows)
     asked_one_by_one = []
     monkeypatch.setattr(db, "get_generation", asked_one_by_one.append)
 

@@ -21,7 +21,7 @@ from origenerator import (
 )
 from origenerator.db import Database, NewGeneration
 from origenerator.gallery.collection import (
-    LATEST_KEY,
+    ALL_ITEMS_KEY,
 )
 from origenerator.generation_state import GenerationStatus
 from origenerator.gui import (
@@ -805,7 +805,7 @@ def test_combine_new_folder_lands_on_latest_then_reveals_on_finish(qtbot, tmp_pa
 
     view.combine._generate_combination("img", "vid")
 
-    assert view._gallery_pane.showing_latest(), (
+    assert view._gallery_pane.showing_all_items(), (
         "the fixture video was made from no image, so a combination, filed by the image dropped "
         "on it, opens a folder of its own rather than joining the video's, and waits on Latest "
         "until it lands")
@@ -813,7 +813,7 @@ def test_combine_new_folder_lands_on_latest_then_reveals_on_finish(qtbot, tmp_pa
 
     client.job_completed.emit(prompt_id, _VID_REROLL_HISTORY)
 
-    assert not view._gallery_pane.showing_latest()
+    assert not view._gallery_pane.showing_all_items()
     new_row = db.get_generation(prompt_id)
     image_rows = [r for r in db.list_generations() if gallery.media_type_of_row(r) == "image"]
     expected = gallery.settings_folder_key(new_row, gallery.build_image_config_index(image_rows))
@@ -832,7 +832,7 @@ def test_combine_existing_folder_is_opened_with_the_live_tile(qtbot, tmp_path):
     view.combine._generate_combination("img", "vid")
 
     expected = view.toc.leaf_by_id["vsib"].data(0, _GROUP_ROLE).key
-    assert not view._gallery_pane.showing_latest()
+    assert not view._gallery_pane.showing_all_items()
     assert _selected_folder(view) == expected
     assert view._selected_reroll_key == expected
 
@@ -1089,7 +1089,7 @@ def test_dragging_the_generate_preview_lights_its_combine_slot(qtbot, tmp_path, 
 def test_a_thumbnail_redrawn_away_mid_drag_still_puts_its_combine_slot_out(
         qtbot, tmp_path, monkeypatch):
     view = _combine_view(qtbot, tmp_path)
-    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
+    view._tree.setCurrentItem(_collection(view, ALL_ITEMS_KEY))
     tile = view._gallery_pane._thumb_widgets["vid"]
     zone = view.combine.widget.video_zone._label
     in_flight = {}

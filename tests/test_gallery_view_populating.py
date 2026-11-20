@@ -7,10 +7,10 @@ from PySide6.QtCore import QObject, Signal, Slot
 
 from origenerator.db import NewGeneration
 from origenerator.gallery.collection import (
+    ALL_ITEMS_KEY,
     ENHANCED_KEY,
     ENHANCED_LABEL,
     EXPERIMENTS_LABEL,
-    LATEST_KEY,
     POPULATING_KEY,
     POPULATING_LABEL,
 )
@@ -190,9 +190,9 @@ def test_in_the_populating_folder_the_switch_stops_populate_everywhere_then_gray
     assert (switch.isChecked(), switch.isEnabled()) == (False, False)
 
 
-def test_a_slideshow_of_populating_plays_newest_first_as_one_of_latest_does():
+def test_a_slideshow_of_populating_plays_in_order_as_one_of_an_all_folder_does():
     played_newest_first = [_plays_newest_first(shaped_key(key, LANDSCAPE))
-                           for key in (LATEST_KEY, POPULATING_KEY, ENHANCED_KEY)]
+                           for key in (ALL_ITEMS_KEY, POPULATING_KEY, ENHANCED_KEY)]
 
     assert played_newest_first == [True, True, False]
 

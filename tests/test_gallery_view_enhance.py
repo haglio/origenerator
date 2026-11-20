@@ -16,9 +16,9 @@ from origenerator import (
 )
 from origenerator.db import Database, NewGeneration
 from origenerator.gallery.collection import (
+    ALL_ITEMS_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
-    LATEST_KEY,
     TRASH_KEY,
 )
 from origenerator.gui import gallery_view as gallery_view_module
@@ -37,7 +37,7 @@ from tests.gallery_view_support import (
     _enhanced_in_place,
     _image_workflow,
     _menu_offering,
-    _open_latest,
+    _open_all_items,
     _png_bytes,
     _reroll_client,
     _select_first_leaf,
@@ -382,7 +382,7 @@ def test_enhance_pane_stays_up_wherever_you_are(qtbot, tmp_path):
     _select_first_leaf(view)
     assert not view.enhance.pane.isHidden()
 
-    for item in (_image_workflow(view._tree), _collection(view, LATEST_KEY),
+    for item in (_image_workflow(view._tree), _collection(view, ALL_ITEMS_KEY),
                  _collection(view, FAVORITES_KEY), _collection(view, EXPERIMENTS_KEY),
                  _collection(view, TRASH_KEY)):
         view._tree.setCurrentItem(item)
@@ -396,7 +396,7 @@ def test_the_enhance_panel_shows_in_the_collections_what_it_shows_on_a_folder(qt
     _select_first_leaf(view)
     view.enhance.pane._steps.setValue(33)
 
-    for which in (LATEST_KEY, FAVORITES_KEY, EXPERIMENTS_KEY):
+    for which in (ALL_ITEMS_KEY, FAVORITES_KEY, EXPERIMENTS_KEY):
         view._tree.setCurrentItem(_collection(view, which))
         assert view.enhance.pane.settings().params["enhance_steps"] == 33, (
             "the enhancement settings are the app's, not a folder's, so they follow the user into "
@@ -633,7 +633,7 @@ def test_a_running_enhance_gets_no_tile_of_its_own_on_latest(qtbot, tmp_path):
     view.enhance_items(["g0"])
     (job,) = view._jobs.all_jobs
     view.refresh()
-    _open_latest(view)
+    _open_all_items(view)
 
     assert job.prompt_id not in view._gallery_pane._inflight_tiles
     assert view._gallery_pane._thumb_widgets["g0"]._enhancing is not None
@@ -645,7 +645,7 @@ def test_enhancing_an_image_lifts_its_tile_to_the_top_of_latest(qtbot, tmp_path)
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    _open_latest(view)
+    _open_all_items(view)
     assert view.listed_prompt_ids() == ["g2", "g1", "g0"]
 
     view.enhance_items(["g0"])

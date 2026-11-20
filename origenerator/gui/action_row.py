@@ -176,6 +176,10 @@ class ActionRow(QWidget):
             form.addRow(LabelCell(WarningMark(), self._names[side], form.label_column), shown)
             form.setRowVisible(shown, False)
 
+    def keep_names_whole(self) -> None:
+        for name in self._names.values():
+            name.keep_whole()
+
     def show_row(self, row: dict, start_image: dict | None = None) -> None:
         if media_type_of_row(row) != MediaType.VIDEO or started_from_no_image(row):
             self.show_folder([row])

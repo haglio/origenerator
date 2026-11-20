@@ -38,7 +38,7 @@ def test_a_hosting_session_hears_the_word_that_opens_a_request():
 
 
 @pytest.mark.parametrize("phrase", [
-    "favorites", "recents", "fix hands", "enhance", "undo", "lock",
+    "favorites", "all", "fix hands", "enhance", "undo", "lock",
     "enhanced", "enhanced only", "enhanced off", "favorites off",
     "clear filter", "populate on",
 ])

@@ -27,9 +27,9 @@ from origenerator.config import (
 )
 from origenerator.db import NewGeneration
 from origenerator.gallery.collection import (
+    ALL_ITEMS_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
-    LATEST_KEY,
 )
 from origenerator.gui import (
     combine_controller,
@@ -136,9 +136,9 @@ def test_cores_left_pane_holds_its_osr2_controls_the_toc_and_the_combine_and_not
 
     held = [sections.widget(index) for index in range(sections.count())]
 
-    assert held == [section for section in (view._motion_pane, view._tree.parentWidget(),
-                                            view.combine.widget.parentWidget())
-                    if section is not None], (
+    top = (view._tree.parentWidget() if view._motion_pane is None
+           else view._motion_pane.parentWidget())
+    assert held == [top, view.combine.widget.parentWidget()], (
         "a slideshow shows what was heard at its top center, so Core keeps no line of its own "
         "for it")
 
@@ -1049,7 +1049,7 @@ def _listening(qtbot, tmp_path, db=None):
 
 @pytest.mark.parametrize(("said", "key"), [
     ("experiments", EXPERIMENTS_KEY),
-    ("recents", LATEST_KEY),
+    ("all", ALL_ITEMS_KEY),
     ("go to favorites", FAVORITES_KEY),
     ("go to experiments", EXPERIMENTS_KEY),
 ])

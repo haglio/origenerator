@@ -31,6 +31,7 @@ from origenerator.config import PROJECT_DIR
 from origenerator.gui import drop_style
 from origenerator.gui.eliding_tab_bar import EDGE
 from origenerator.gui.panes import BORDERED_SET
+from origenerator.gui.thin_divider import THIN_DIVIDER
 from origenerator.gui.tile_rules import tile_rules
 from origenerator.spin_arrows import arrow_paths
 
@@ -291,6 +292,9 @@ def build_stylesheet() -> str:
         border: none;
     }}
     QSplitter::handle {{
+        background-color: {_h(BG_SECONDARY)};
+    }}
+    #{THIN_DIVIDER} {{
         background-color: {_h(BG_SECONDARY)};
     }}
     QSplitter::handle:hover {{

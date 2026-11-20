@@ -24,10 +24,10 @@ from shared_ui.spacing import BUTTON_FILLING_ICON
 import origenerator
 from origenerator import content, gallery
 from origenerator.gallery.collection import (
+    ALL_ITEMS_KEY,
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
-    LATEST_KEY,
     TRASH_KEY,
 )
 from origenerator.gallery.shapes import BOTH, LANDSCAPE, PORTRAIT
@@ -256,7 +256,7 @@ def test_the_tocs_favorites_enhanced_and_trash_wear_their_colors(qtbot):
 
 
 def test_a_collection_mark_is_drawn_once():
-    assert folder_icons.collection_icon(LATEST_KEY) is folder_icons.collection_icon(LATEST_KEY), (
+    assert folder_icons.collection_icon(ALL_ITEMS_KEY) is folder_icons.collection_icon(ALL_ITEMS_KEY), (
         "one redraw of the TOC asked for these 1,280 times")
 
 
@@ -466,7 +466,7 @@ def test_every_gallery_pane_button_mark_is_the_familys_shared_glyph(qtbot):
         (icons.delete_icon(), "trash", RED),
         (icons.star_icon(filled=True), "star", GREEN),
         (icons.star_icon(filled=False), "star_outline", TEXT_PRIMARY),
-        (folder_icons.collection_icon(LATEST_KEY), "latest", TEXT_PRIMARY),
+        (folder_icons.collection_icon(ALL_ITEMS_KEY), "latest", TEXT_PRIMARY),
         (folder_icons.collection_icon(EXPERIMENTS_KEY), "flask", TEXT_PRIMARY),
         (icons.custom_collection_icon(), "folder", TEXT_PRIMARY),
         (icons.all_icon(), "database", TEXT_PRIMARY),

@@ -11,7 +11,7 @@ from shared_ui.orientation import orientation_of_size as shape_of_size
 
 from origenerator import gallery
 from origenerator.config import OUTPUT_PLACES
-from origenerator.gallery.collection import LATEST_KEY, folder_collection
+from origenerator.gallery.collection import ALL_ITEMS_KEY, folder_collection
 from origenerator.gallery.shapes import LANDSCAPE, SHAPES_AND_BOTH, on_shape
 from origenerator.gallery.signatures import canonical_settings
 from origenerator.generation_state import GenerationStatus
@@ -51,7 +51,7 @@ def what_plays_at(key: str | None, rows: list[dict]) -> list[dict]:
     base = base_of(key)
     collection = folder_collection(base)
     whole_library = base == gallery.ALL_KEY or (
-        collection is not None and collection.which == LATEST_KEY
+        collection is not None and collection.which == ALL_ITEMS_KEY
         and collection.folder == gallery.ALL_KEY)
     return [row for row in plays_in_a_slideshow(rows) if not whole_library or made_here(row)]
 

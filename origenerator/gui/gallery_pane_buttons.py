@@ -139,7 +139,7 @@ def _reference_button() -> QToolButton:
 
 class GalleryPaneButtons(QWidget):
     def __init__(self, handlers: ButtonHandlers, *, hosted: bool,
-                 two_screens: TwoScreens | None = None):
+                 two_screens: TwoScreens | None = None, trailing: QWidget | None = None):
         super().__init__()
         self._two_screens = two_screens or TwoScreens(self)
         policy = self.sizePolicy()
@@ -209,6 +209,8 @@ class GalleryPaneButtons(QWidget):
             buttons = tuple(b for b in listed if b is not None)
             layout.add_group(buttons)
             self._groups.append(buttons)
+        if trailing is not None:
+            layout.add_trailing(trailing)
         self._point_the_switch_where_core_would_move()
         self._draw_at_the_huds_scale(hosted=hosted)
 

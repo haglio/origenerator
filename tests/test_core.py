@@ -44,7 +44,7 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import CORE_READY, FunestraChannel, FunTimeSession, Rect
-from origenerator.gallery.collection import LATEST_KEY, FolderCollection
+from origenerator.gallery.collection import ALL_ITEMS_KEY, FolderCollection
 from origenerator.gallery.shapes import BOTH, SEPARATE, TOGETHER
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import core, toasts, two_screens
@@ -998,7 +998,7 @@ def test_opening_keeps_the_saved_folder_even_with_experiments_waiting(qtbot, tmp
 
     view = win._gallery_view
     view.refresh()
-    assert view._tree.currentItem() is _collection(view, LATEST_KEY), (
+    assert view._tree.currentItem() is _collection(view, ALL_ITEMS_KEY), (
         "where the user left off is where the app reopens: the count on the collection's row "
         "already says experiments are waiting")
 
@@ -1322,7 +1322,7 @@ def test_generate_inflight_shows_on_latest_and_reveals_its_folder(qtbot, tmp_pat
     (folder_key,) = list(gv._live_jobs)
     pid = gv._live_jobs[folder_key].prompt_id
 
-    gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
+    gv._tree.setCurrentItem(_collection(gv, ALL_ITEMS_KEY))
     assert pid in gv._gallery_pane._inflight_tiles
 
     gv._gallery_pane._on_inflight_clicked(pid)
@@ -1348,7 +1348,7 @@ def test_running_generate_job_shows_on_latest_after_restart(qtbot, tmp_path):
 
     gv = win._gallery_view
     gv.refresh()
-    gv._tree.setCurrentItem(_collection(gv, LATEST_KEY))
+    gv._tree.setCurrentItem(_collection(gv, ALL_ITEMS_KEY))
     assert "vid_run" in gv._gallery_pane._inflight_tiles
 
 
@@ -1547,7 +1547,7 @@ def test_the_videos_latest_left_open_is_open_on_its_videos_after_a_restart(qtbot
     first = _window(qtbot, tmp_path, AppState(path))
     view = first._gallery_view
     view.refresh()
-    latest = shaped_key(FolderCollection(LATEST_KEY, MediaType.VIDEO).key, SEPARATE[1])
+    latest = shaped_key(FolderCollection(ALL_ITEMS_KEY, MediaType.VIDEO).key, SEPARATE[1])
     view._tree.setCurrentItem(view.toc.item_for(latest))
     first.close()
 

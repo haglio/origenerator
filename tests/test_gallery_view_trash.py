@@ -31,7 +31,7 @@ from origenerator import (
 from origenerator.branch_session import ENV_FLAG
 from origenerator.db import Database, NewGeneration
 from origenerator.gallery.collection import (
-    LATEST_KEY,
+    ALL_ITEMS_KEY,
     TRASH_KEY,
 )
 from origenerator.gallery.output import resolve_preview as real_resolve_preview
@@ -424,7 +424,7 @@ def test_the_trash_collection_is_a_place_back_returns_to(qtbot):
     view.refresh()
 
     view._tree.setCurrentItem(_collection(view, TRASH_KEY))
-    view._tree.setCurrentItem(_collection(view, LATEST_KEY))
+    view._tree.setCurrentItem(_collection(view, ALL_ITEMS_KEY))
     view._navigation.go_back()
 
     assert view._tree.currentItem() is _collection(view, TRASH_KEY)

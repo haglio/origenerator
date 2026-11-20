@@ -8,7 +8,7 @@ from app_support import haglio_settings
 
 from origenerator import gallery, library_views
 from origenerator.db import Database, NewGeneration
-from origenerator.gallery.collection import FAVORITES_KEY, LATEST_KEY, TRASH_KEY
+from origenerator.gallery.collection import ALL_ITEMS_KEY, FAVORITES_KEY, TRASH_KEY
 from origenerator.gallery.custom import custom_collection_key
 from origenerator.gallery.tree import ALL_KEY
 from origenerator.item_shape import filter_rows, shaped_key
@@ -212,11 +212,11 @@ def test_a_folders_latest_is_what_that_folder_holds_of_the_shape_newest_first():
             _made_with("trial", "alpha.safetensors", source="experiment")]
     library = LibrarySnapshot(rows)
 
-    latest_in_alpha = library.in_collection(LATEST_KEY, "landscape",
+    latest_in_alpha = library.in_collection(ALL_ITEMS_KEY, "landscape",
                                             _models_in(library, "landscape")["alpha"])
 
     assert [row["prompt_id"] for row in latest_in_alpha] == ["a2", "a1"]
-    assert [row["prompt_id"] for row in library.in_collection(LATEST_KEY, "portrait", ALL_KEY)] == ["tall"]
+    assert [row["prompt_id"] for row in library.in_collection(ALL_ITEMS_KEY, "portrait", ALL_KEY)] == ["tall"]
 
 
 def test_favorites_are_the_items_with_their_own_star_whatever_their_folder_is():
@@ -260,7 +260,7 @@ def test_a_collection_key_with_its_shape_names_what_a_reading_lists_there():
     rows = [_made_with("a1", "alpha.safetensors"), _made_with("tall", "alpha.safetensors", shape="portrait")]
     library = LibrarySnapshot(rows)
 
-    assert [row["prompt_id"] for row in library.rows_at(shaped_key(LATEST_KEY, "portrait"))] == ["tall"]
+    assert [row["prompt_id"] for row in library.rows_at(shaped_key(ALL_ITEMS_KEY, "portrait"))] == ["tall"]
     assert library.rows_at("not/a/collection") == []
 
 
@@ -274,11 +274,11 @@ def test_a_reading_deals_its_rows_to_a_shape_once_however_often_it_is_asked(monk
 
     library.on_shape("landscape")
     library.in_collection(FAVORITES_KEY, "landscape", ALL_KEY)
-    library.in_collection(LATEST_KEY, "landscape", ALL_KEY)
+    library.in_collection(ALL_ITEMS_KEY, "landscape", ALL_KEY)
     once = len(dealt)
     library.on_shape("landscape")
     library.in_collection(FAVORITES_KEY, "landscape", ALL_KEY)
-    library.in_collection(LATEST_KEY, "landscape", ALL_KEY)
+    library.in_collection(ALL_ITEMS_KEY, "landscape", ALL_KEY)
 
     assert library.on_shape("landscape") == filter_rows(library.rows, "landscape")
     assert len(dealt) == once

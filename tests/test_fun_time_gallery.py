@@ -23,7 +23,7 @@ from shared_ui.testing import icons_drawn
 from origenerator import gallery
 from origenerator.db import Database
 from origenerator.fun_time_mode import FunestraChannel, FunTimeSession, Rect
-from origenerator.gallery.collection import LATEST_KEY
+from origenerator.gallery.collection import ALL_ITEMS_KEY
 from origenerator.gallery.shapes import TOGETHER
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.collapsible_section import FoldHeader
@@ -670,7 +670,7 @@ def test_a_hud_map_click_jumps_the_slideshow_to_that_item(qtbot, tmp_path, monke
 def test_a_latest_slideshow_plays_newest_first_not_shuffled(qtbot, tmp_path, monkeypatch):
     view = GalleryView(database_of([]), fun_time=_session_with_dashboard(tmp_path))
     qtbot.addWidget(view)
-    monkeypatch.setattr(view, "_current_collection_key", lambda: LATEST_KEY)
+    monkeypatch.setattr(view, "_current_collection_key", lambda: ALL_ITEMS_KEY)
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=3))
     slideshow = view.slideshows._region_slideshows["portrait"]
 
@@ -1110,7 +1110,7 @@ def test_a_regions_latest_leaves_out_what_other_sites_made(qtbot, tmp_path):
     view = _fun_time_view(qtbot, _mine_and_another_sites(tmp_path))
     view.refresh()
 
-    played = view.slideshows.rows_at(f"{LATEST_KEY}::portrait")
+    played = view.slideshows.rows_at(f"{ALL_ITEMS_KEY}::portrait")
 
     assert [row["prompt_id"] for row in played] == ["mine"]
 
@@ -1119,7 +1119,7 @@ def test_the_gallery_goes_on_showing_what_other_sites_made(qtbot, tmp_path):
     view = _fun_time_view(qtbot, _mine_and_another_sites(tmp_path))
     view.refresh()
 
-    latest = view._gallery_pane.rows_for_collection(f"{LATEST_KEY}::portrait")
+    latest = view._gallery_pane.rows_for_collection(f"{ALL_ITEMS_KEY}::portrait")
     everything = gallery.rows_under(view.group_for_key("__all__::portrait"))
 
     assert sorted(row["prompt_id"] for row in latest) == ["mine", "theirs"]

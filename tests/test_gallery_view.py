@@ -42,10 +42,10 @@ from origenerator.db import Database, NewGeneration
 from origenerator.gallery import output as gallery_output
 from origenerator.gallery import tree as gallery_tree_module
 from origenerator.gallery.collection import (
+    ALL_ITEMS_KEY,
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
-    LATEST_KEY,
     TRASH_KEY,
     collection,
 )
@@ -66,6 +66,7 @@ from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.folder_tree import RECENT_ROLE
 from origenerator.gui.gallery_tree import _RECENT_TIP
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView, Shared
+from origenerator.gui.thin_divider import ThinDivider
 from origenerator.item_actions import actions_of
 from origenerator.item_shape import row_shape, shaped_key
 from origenerator.media import MediaType
@@ -126,7 +127,7 @@ from tests.qt_exec import faking_exec
 from tests.real_db import database_of, keep_rows_on_disk, put_rows
 from tests.test_folder_tree import _shown
 
-_COLLECTION_NAMES = ["Latest", "Favorites", "Enhanced", "Populating", "Experiments", "Trash"]
+_COLLECTION_NAMES = ["All", "Favorites", "Enhanced", "Populating", "Experiments", "Trash"]
 _A_FOLDERS_COLLECTIONS = [name for name in _COLLECTION_NAMES if name != "Populating"]
 
 
@@ -343,11 +344,11 @@ def test_the_latest_square_wears_the_calendar_its_row_wears(qtbot):
     view._tree.setCurrentItem(_top_level(view._tree)["All"])
 
     (square,) = [tile for tile in view._scroll.widget().findChildren(FolderTile)
-                 if tile._text == "Latest"]
+                 if tile._text == "All"]
     (mark,) = [label for label in square.findChildren(QLabel)
-               if label.toolTip() == "Latest" and not label.pixmap().isNull()]
+               if label.toolTip() == "All" and not label.pixmap().isNull()]
     size = mark.pixmap().size()
-    assert mark.pixmap().toImage() == folder_icons.collection_icon(LATEST_KEY).pixmap(size).toImage()
+    assert mark.pixmap().toImage() == folder_icons.collection_icon(ALL_ITEMS_KEY).pixmap(size).toImage()
 
 
 def test_branch_shows_folder_tiles_and_leaf_shows_thumbnails(qtbot):
@@ -966,7 +967,7 @@ def test_favorite_collection_is_pinned_first_and_collects_favorite_folders(qtbot
     dog_key = _key(_at(lora, 1))
     view.toc_editing.toggle_favorite(dog_key)
 
-    assert list(_alls(view._tree))[:2] == ["Latest", "Favorites"]
+    assert list(_alls(view._tree))[:2] == ["All", "Favorites"]
     collection = _alls(view._tree)["Favorites"]
     view._tree.setCurrentItem(collection)
     assert view._gallery_pane._listed_folders == [dog_key]
@@ -989,7 +990,7 @@ def test_favorites_leads_with_its_count_and_latest_leaves_its_count_to_all(qtbot
     assert _shown(alls["Favorites"]) == "(2) Favorites", (
         "the favorited item is in the favorited folder, and is counted once")
     assert _shown(_top_level(view._tree)["All"]) == "(3) All"
-    assert _shown(alls["Latest"]) == "Latest"
+    assert _shown(alls["All"]) == "All"
 
 
 def test_experiments_collection_is_always_reachable(qtbot):
@@ -1115,7 +1116,8 @@ def test_the_experiments_switch_reports_what_each_position_means(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     assert view.experiments_enabled() is False
-    assert "Off" in view._experiments_status.text()
+    off = view._experiments_status.text()
+    assert "graphics card" in off
 
     view.set_experiments_enabled(True)
     assert view.experiments_enabled() is True
@@ -1124,7 +1126,20 @@ def test_the_experiments_switch_reports_what_each_position_means(qtbot):
 
     view._experiments_cb.setChecked(False)
     assert view.experiments_enabled() is False
-    assert "Off" in view._experiments_status.text()
+    assert view._experiments_status.text() == off
+
+
+def test_a_preview_says_only_run_experiments_and_explains_why_it_never_does_in_a_tooltip(
+        qtbot, monkeypatch):
+    monkeypatch.setattr(gallery_view_module, "is_branch_session", lambda: True)
+    view = GalleryView(database_of([]))
+    qtbot.addWidget(view)
+    view.refresh()
+
+    assert (view._experiments_cb.text(), view._experiments_status.text(),
+            view._experiments_cb.toolTip()) == (
+        "Run experiments while the app is closed", "",
+        "A branch preview never queues experiments; only production does")
 
 
 def test_an_open_app_queues_no_experiments_however_the_switch_is_set(qtbot):
@@ -1151,7 +1166,6 @@ def test_a_branch_session_schedules_no_experiments_at_all(qtbot, monkeypatch):
         "a preview's state is seeded from production's, switch included, and scheduling experiments "
         "is production's alone")
     assert not view._experiments_cb.isEnabled()
-    assert "production app" in view._experiments_status.text()
 
     view._experiments_cb.setChecked(True)
 
@@ -1301,7 +1315,7 @@ def test_favorite_collection_is_absent_until_a_folder_exists(qtbot):
     qtbot.addWidget(view)
     view.refresh()
     alls = _alls(view._tree)
-    assert "Latest" not in alls
+    assert "All" not in alls
     assert "Favorites" not in alls
 
 
@@ -1316,7 +1330,7 @@ def test_a_folders_latest_lists_what_that_folder_made_under_its_path(qtbot):
 
     assert view.listed_prompt_ids() == ["i2", "i1"]
     assert view._folder_path.display_text() == (
-        f"{SHAPE_LABELS[LANDSCAPE]}  \u203a  All  \u203a  Images  \u203a  {workflow.text(0)}  \u203a  Latest")
+        f"{SHAPE_LABELS[LANDSCAPE]}  \u203a  All  \u203a  Images  \u203a  {workflow.text(0)}  \u203a  All")
 
 
 def test_a_folders_collection_names_itself_by_its_path_to_the_slideshow_button(qtbot):
@@ -1328,7 +1342,7 @@ def test_a_folders_collection_names_itself_by_its_path_to_the_slideshow_button(q
     view._tree.setCurrentItem(workflow.child(0))
 
     assert view.slideshow_subject() == (
-        f"{SHAPE_LABELS[LANDSCAPE]}  \u203a  All  \u203a  Images  \u203a  {workflow.text(0)}  \u203a  Latest")
+        f"{SHAPE_LABELS[LANDSCAPE]}  \u203a  All  \u203a  Images  \u203a  {workflow.text(0)}  \u203a  All")
 
 
 def test_latest_collection_is_pinned_first_and_lists_recent_items(qtbot):
@@ -1337,8 +1351,8 @@ def test_latest_collection_is_pinned_first_and_lists_recent_items(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    assert next(iter(_alls(view._tree))) == "Latest"
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    assert next(iter(_alls(view._tree))) == "All"
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     assert view.listed_prompt_ids() == ["i2", "i1"]
     assert view._gallery_pane._listed_folders == []
 
@@ -1350,7 +1364,7 @@ def test_latest_collection_lists_imported_files_too(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     assert sorted(view.listed_prompt_ids()) == ["gen", "imp"], (
         "a file ComfyUI wrote on its own arrives at the launch that finds it, and Latest is "
         "where it is looked for then")
@@ -1362,10 +1376,10 @@ def test_clicking_a_recent_item_previews_it_without_leaving_the_collection(qtbot
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     _pick_by_clicking(view, "i2")
     assert view.selected_generation() == "i2"
-    assert view._gallery_pane.showing_latest()
+    assert view._gallery_pane.showing_all_items()
     assert set(view.listed_prompt_ids()) == {"i1", "i2"}
 
 
@@ -1375,10 +1389,10 @@ def test_double_clicking_a_recent_item_opens_it_selected_in_its_folder(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     view._gallery_pane._thumb_widgets["i2"].double_clicked.emit("i2")
     assert view.selected_generation() == "i2"
-    assert view._gallery_pane.showing_latest() is False
+    assert view._gallery_pane.showing_all_items() is False
     assert set(view.listed_prompt_ids()) == {"i2"}
     assert view.selected_prompt_ids() == ["i2"]
     assert view._gallery_pane._thumb_widgets["i2"]._selected
@@ -1389,7 +1403,7 @@ def test_double_clicking_a_recent_item_also_keeps_its_tab(qtbot):
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     _pick_by_clicking(view, "i2")
     assert view.generate_pane._preview_tab is not None
 
@@ -1404,7 +1418,7 @@ def test_latest_collection_shows_empty_state_when_nothing_has_a_result(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     assert view.listed_prompt_ids() == []
 
 
@@ -1412,11 +1426,11 @@ def test_latest_collection_stays_selected_across_a_refresh(qtbot):
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
 
     view.refresh()
 
-    assert view._tree.currentItem().text(0) == "Latest"
+    assert view._tree.currentItem().text(0) == "All"
 
 
 def _many_latest(count):
@@ -1428,7 +1442,7 @@ def test_latest_opens_on_one_page_however_far_back_it_goes(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     assert 0 < len(_drawn(view)) < 120
     assert _drawn(view)[0] == "i119"
 
@@ -1442,7 +1456,7 @@ def _scroll_to_the_end(view):
 def test_scrolling_to_the_end_of_latest_draws_the_next_page(qtbot):
     view = GalleryView(database_of(_many_latest(120)))
     _on_screen(qtbot, view, 1800, 1300)
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     opened_on = len(_drawn(view))
     assert opened_on < 120
 
@@ -1455,7 +1469,7 @@ def test_a_rebuild_keeps_the_pages_latest_had_been_scrolled_into(qtbot):
     db = database_of(_many_latest(120))
     view = GalleryView(db)
     _on_screen(qtbot, view, 1800, 1300)
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     _scroll_to_the_end(view)
     scrolled_into = _drawn(view)
 
@@ -1470,7 +1484,7 @@ def test_a_double_click_on_an_image_in_latest_plays_everything_latest_lists(qtbo
     view = GalleryView(database_of(_many_latest(120)))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
 
     slideshow = view.slideshows.open_in_its_folder(("i119.png", "image"), "i119")
 
@@ -1483,7 +1497,7 @@ def test_a_double_clicked_tile_plays_its_folder_from_it(qtbot, monkeypatch):
     view = GalleryView(database_of(_many_latest(120)))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
 
     view._gallery_pane._thumbnail_double_clicked("i110")
     slideshow = view.slideshows.showing
@@ -1498,7 +1512,7 @@ def test_a_double_clicked_preview_plays_its_item_alone_locked(qtbot, monkeypatch
     view = GalleryView(database_of(_many_latest(120)))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
 
     slideshow = view.slideshows.open_on_preview(("i119.png", "image"), "i119")
 
@@ -1512,7 +1526,7 @@ def test_alls_latest_lists_both_kinds(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
 
     assert set(view.listed_prompt_ids()) == {"i1", "v1"}
 
@@ -1544,7 +1558,7 @@ def test_opening_one_kinds_latest_lists_it_without_building_the_list_again(qtbot
     monkeypatch.setattr(gallery, "build_gallery_tree",
                         lambda *a, **k: built.append(1) or [])
 
-    view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Videos"], "Latest"))
+    view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Videos"], "All"))
 
     assert view.listed_prompt_ids() == ["v1"]
     assert built == [], (
@@ -1555,12 +1569,12 @@ def test_opening_one_kinds_latest_lists_it_without_building_the_list_again(qtbot
 def test_another_latest_opens_on_its_first_page(qtbot):
     view = GalleryView(database_of(_many_latest(120)))
     _on_screen(qtbot, view, 1800, 1300)
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     opened_on = _drawn(view)
     wait_until(lambda: len(_drawn(view)) > len(opened_on), pump=lambda: _scroll_to_the_end(view))
     scrolled = _drawn(view)
 
-    view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Images"], "Latest"))
+    view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Images"], "All"))
 
     now = _drawn(view)
     assert now == scrolled[:len(now)]
@@ -1573,10 +1587,10 @@ def test_one_kinds_latest_leaves_out_the_other_kinds_work_in_flight(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     assert "rr1" in view._gallery_pane._inflight_tiles
 
-    view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Images"], "Latest"))
+    view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Images"], "All"))
 
     assert "rr1" not in view._gallery_pane._inflight_tiles
 
@@ -1586,7 +1600,7 @@ def test_a_new_generation_appears_at_the_top_of_latest(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     assert view.listed_prompt_ids() == ["old"]
 
     put_rows(db, [_image("new", "a dog", 50, 2)])
@@ -1613,7 +1627,7 @@ def test_the_gallery_polls_on_a_timer_of_its_own(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
 
     assert view._poll_timer.isActive()
     assert view._poll_timer.interval() == 1500, (
@@ -2369,16 +2383,16 @@ def test_back_returns_to_the_latest_collection_then_forward_reopens_the_folder(q
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     view._gallery_pane._thumb_widgets["i2"].double_clicked.emit("i2")
-    assert view._gallery_pane.showing_latest() is False
+    assert view._gallery_pane.showing_all_items() is False
     assert view._buttons.back.isEnabled()
 
     view._navigation.go_back()
-    assert view._gallery_pane.showing_latest()
+    assert view._gallery_pane.showing_all_items()
 
     view._navigation.go_forward()
-    assert view._gallery_pane.showing_latest() is False
+    assert view._gallery_pane.showing_all_items() is False
     assert view.selected_generation() == "i2"
 
 
@@ -2387,17 +2401,17 @@ def test_back_returns_to_a_collection_left_by_opening_a_folder(qtbot):
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
 
     view._tree.setCurrentItem(
         _at(_image_workflow(view._tree), 0, 0, 0)
     )
-    assert view._gallery_pane.showing_latest() is False
+    assert view._gallery_pane.showing_all_items() is False
     assert view._buttons.back.isEnabled()
 
     view._navigation.go_back()
 
-    assert view._gallery_pane.showing_latest()
+    assert view._gallery_pane.showing_all_items()
 
 
 def test_back_walks_folders_the_way_it_walks_generations(qtbot):
@@ -2460,13 +2474,13 @@ def test_back_to_latest_restores_the_item_selected_on_the_collection(qtbot):
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     _pick_by_clicking(view, "i2")
     view._gallery_pane._thumb_widgets["i2"].double_clicked.emit("i2")
-    assert view._gallery_pane.showing_latest() is False
+    assert view._gallery_pane.showing_all_items() is False
 
     view._navigation.go_back()
-    assert view._gallery_pane.showing_latest()
+    assert view._gallery_pane.showing_all_items()
     assert view.selected_generation() == "i2"
     assert view._gallery_pane._thumb_widgets["i2"]._selected
 
@@ -2477,12 +2491,12 @@ def test_previewing_on_the_collection_is_its_own_history_step(qtbot):
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     for pid in ("i1", "i2", "i3"):
         _pick_by_clicking(view, pid)
 
     view._navigation.go_back()
-    assert view._gallery_pane.showing_latest()
+    assert view._gallery_pane.showing_all_items()
     assert view.selected_generation() == "i2"
 
     view._navigation.go_back()
@@ -2497,7 +2511,7 @@ def test_back_to_a_collection_item_re_highlights_its_tile(qtbot):
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     _pick_by_clicking(view, "i1")
     _pick_by_clicking(view, "i2")
 
@@ -2562,13 +2576,13 @@ def test_an_item_looked_at_on_a_collection_goes_back_to_that_collection(qtbot):
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     _pick_by_clicking(view, "i1")
     view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
 
     view._navigation.go_back()
 
-    assert view._gallery_pane.showing_latest()
+    assert view._gallery_pane.showing_all_items()
     assert view.selected_generation() == "i1"
 
 
@@ -2760,6 +2774,14 @@ def test_select_generation_missing_id_is_dropped(qtbot):
 
 
 
+def _margined_pane(inside):
+    pane = inside.parentWidget()
+    while pane.layout() is None or pane.layout().contentsMargins() != QMargins(
+            *[MARGIN_STANDARD] * 4):
+        pane = pane.parentWidget()
+    return pane
+
+
 def test_the_panes_keep_their_contents_the_standard_margin_off_their_edges(qtbot, tmp_path):
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
@@ -2769,7 +2791,7 @@ def test_the_panes_keep_their_contents_the_standard_margin_off_their_edges(qtbot
         QApplication.processEvents()
 
     for inside in (view._tree, view._scroll, view._osr2_controls, view.enhance.pane):
-        pane = _pane_holding(inside)
+        pane = _margined_pane(inside)
         room = pane.rect().marginsRemoved(QMargins(*[MARGIN_STANDARD] * 4))
         for child in pane.findChildren(
                 QWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
@@ -2777,18 +2799,17 @@ def test_the_panes_keep_their_contents_the_standard_margin_off_their_edges(qtbot
                 assert room.contains(child.geometry()), (type(inside).__name__, child)
 
 
-def test_the_hud_sits_top_left_over_the_search_with_a_draggable_divider_between(
-        qtbot, tmp_path):
+def test_the_hud_sits_top_left_over_the_search_with_a_thin_divider_between(qtbot, tmp_path):
     view = GalleryView(_enhanceable_db(tmp_path), client=_reroll_client())
     qtbot.addWidget(view)
-    divider = _pane_holding(view._osr2_controls).parentWidget()
+    stacked = _pane_holding(view._osr2_controls)
+    column = stacked.layout()
+    order = [column.itemAt(n).widget() for n in range(column.count())]
 
-    assert view._arrangement.folder_panes.widget(0) is divider
-    assert divider.orientation() == Qt.Orientation.Vertical
-    assert divider.widget(0).isAncestorOf(view._osr2_controls)
-    assert any(divider.widget(n).isAncestorOf(view.search.field)
-               for n in range(1, divider.count()))
-    assert divider.handleWidth() == view._arrangement.panes.handleWidth()
+    assert view._arrangement.folder_panes.widget(0) is stacked.parentWidget()
+    assert order[0].isAncestorOf(view._osr2_controls)
+    assert isinstance(order[1], ThinDivider)
+    assert order[2].isAncestorOf(view.search.field)
 
 
 def test_a_draggable_divider_parts_the_thumbnails_from_the_panels_below(qtbot, tmp_path):

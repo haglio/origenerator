@@ -76,6 +76,7 @@ class ElidingLabel(QLabel):
         super().__init__(text, parent)
         # Qt: asked through the size hint, since a minimum would refuse to give the width back.
         self._preferred_width = preferred_width
+        self._whole = False
         policy = self.sizePolicy()
         policy.setHorizontalPolicy(QSizePolicy.Policy.Preferred)
         self.setSizePolicy(policy)
@@ -85,9 +86,14 @@ class ElidingLabel(QLabel):
         hint.setWidth(max(hint.width(), self._preferred_width))
         return hint
 
+    def keep_whole(self) -> None:
+        self._whole = True
+        self.updateGeometry()
+
     def minimumSizeHint(self):
         hint = super().minimumSizeHint()
-        hint.setWidth(min(hint.width(), self.fontMetrics().horizontalAdvance(_STUB)))
+        if not self._whole:
+            hint.setWidth(min(hint.width(), self.fontMetrics().horizontalAdvance(_STUB)))
         return hint
 
     def display_text(self, width: int) -> str:

@@ -28,10 +28,10 @@ from origenerator.fun_time_bridge import (
 from origenerator.fun_time_mode import majority_shape, region_for_items
 from origenerator.funscript import funscript_of
 from origenerator.gallery.collection import (
-    FAVORITES_KEY as _FAVORITES_KEY,
+    ALL_ITEMS_KEY as _ALL_ITEMS_KEY,
 )
 from origenerator.gallery.collection import (
-    LATEST_KEY as _LATEST_KEY,
+    FAVORITES_KEY as _FAVORITES_KEY,
 )
 from origenerator.gallery.collection import collection as _collection
 from origenerator.gallery.collection import folder_collection
@@ -1158,7 +1158,7 @@ class SlideshowDirector:
 
     def _play_the_library(self, slideshow, *, latest: bool, keep_slide: bool) -> bool:
         shape = self._base_side(slideshow)
-        key = shaped_key(_LATEST_KEY, shape) if latest else self.base_location(shape)
+        key = shaped_key(_ALL_ITEMS_KEY, shape) if latest else self.base_location(shape)
         rows = self.rows_at(key)
         items = self.items_of(rows)
         if not items:
@@ -1231,7 +1231,7 @@ class SlideshowDirector:
         base, shape = _split_collection_key(location)
         latest = folder_collection(base)
         if location:
-            playing_latest = latest is not None and latest.which == _LATEST_KEY
+            playing_latest = latest is not None and latest.which == _ALL_ITEMS_KEY
         else:
             playing_latest = self._listing().latest
         return bool(playing_latest

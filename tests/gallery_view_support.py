@@ -609,8 +609,8 @@ class _FakeRerollJob:
         self.state = "canceled"
 
 
-def _open_latest(view):
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+def _open_all_items(view):
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
 
 
 def _running_row(prompt_id, prompt="a cat", workflow="sdxl_t2i"):

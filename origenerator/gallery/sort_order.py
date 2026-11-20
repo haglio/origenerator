@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+from origenerator.gallery.groups import rows_under
 from origenerator.gallery.output import media_type_of_row
 from origenerator.media import MediaType
 
-NEWEST = "newest"
+LATEST = "latest"
 OLDEST = "oldest"
 LONGEST = "longest"
 SHORTEST = "shortest"
-_BY_DATE = (NEWEST, OLDEST)
+_BY_DATE = (LATEST, OLDEST)
 _BY_DATE_OR_DURATION = (*_BY_DATE, LONGEST, SHORTEST)
 
 
@@ -19,15 +20,24 @@ def offered(rows: list[dict]) -> tuple[str, ...]:
 
 def in_order(rows: list[dict], headings: list[str | None], sort: str
              ) -> tuple[list[dict], list[str | None]]:
-    if sort == NEWEST:
+    if sort == LATEST:
         return list(rows), list(headings)
-    sections = _sections(rows, headings)
     if sort == OLDEST:
-        sections = [(heading, section[::-1]) for heading, section in reversed(sections)]
-    else:
-        sections = [(heading, sorted(section, key=_seconds, reverse=sort == LONGEST))
-                    for heading, section in sections]
-    return _flattened(sections)
+        return _flattened([(heading, section[::-1])
+                           for heading, section in reversed(_sections(rows, headings))])
+    return sorted(rows, key=_seconds, reverse=sort == LONGEST), [None] * len(rows)
+
+
+def folders_in_order(folders: list, sort: str) -> list:
+    return sorted(folders, key=_newest_made_in, reverse=sort != OLDEST)
+
+
+def _newest_made_in(folder) -> str:
+    return max((row.get("created_at") or "" for row in rows_under(folder)), default="")
+
+
+def by_date(sort: str) -> bool:
+    return sort in (LATEST, OLDEST)
 
 
 def _seconds(row: dict) -> float:

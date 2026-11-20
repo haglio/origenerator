@@ -5,10 +5,11 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
 from shared_ui.spacing import GAP_SMALL
 
 from origenerator.gallery import sort_order
+from origenerator.gui import thin_divider
 from origenerator.gui.no_wheel import NoWheelDropdown
 
 _LABELS = {
-    sort_order.NEWEST: "Date (newest first)",
+    sort_order.LATEST: "Date (latest first)",
     sort_order.OLDEST: "Date (oldest first)",
     sort_order.LONGEST: "Duration (longest first)",
     sort_order.SHORTEST: "Duration (shortest first)",
@@ -20,12 +21,13 @@ class SortBy(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._chosen = sort_order.NEWEST
+        self._chosen = sort_order.LATEST
         self.dropdown = NoWheelDropdown()
         self.dropdown.currentIndexChanged.connect(self._picked)
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(GAP_SMALL)
+        row.addWidget(thin_divider.upright())
         row.addWidget(QLabel("Sort by"))
         row.addWidget(self.dropdown)
         self.hide()
@@ -34,11 +36,11 @@ class SortBy(QWidget):
         return self._chosen
 
     def choose(self, sort: str | None) -> None:
-        self._chosen = sort if sort in _LABELS else sort_order.NEWEST
+        self._chosen = sort if sort in _LABELS else sort_order.LATEST
 
     def for_listing(self, rows: list[dict]) -> str:
         offered = sort_order.offered(rows)
-        applied = self._chosen if self._chosen in offered else sort_order.NEWEST
+        applied = self._chosen if self._chosen in offered else sort_order.LATEST
         self.dropdown.blockSignals(True)
         self.dropdown.clear()
         for sort in offered:

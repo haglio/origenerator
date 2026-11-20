@@ -20,6 +20,7 @@ class FolderActions(QWidget):
         form = LabelForm(self)
         form.setContentsMargins(0, 0, 0, 0)
         self._row = ActionRow(form, checkboxes=checkboxes, actions=actions, open_setter=open_setter)
+        self._row.keep_names_whole()
         self._row.changed.connect(self._save)
         self._row.told.connect(self.saved)
         self.hide()

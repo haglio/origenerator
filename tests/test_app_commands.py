@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from origenerator.gallery.collection import EXPERIMENTS_KEY, FAVORITES_KEY, LATEST_KEY
+from origenerator.gallery.collection import ALL_ITEMS_KEY, EXPERIMENTS_KEY, FAVORITES_KEY
 from origenerator.voice.app_commands import (
     _PHRASES,
     AppCommand,
@@ -18,7 +18,7 @@ from origenerator.voice.commands import CollectionCommand, match_voice_command
 
 @pytest.mark.parametrize(("said", "wanted"), [
     ("experiments", GoToCollection(EXPERIMENTS_KEY)),
-    ("recents", GoToCollection(LATEST_KEY)),
+    ("all", GoToCollection(ALL_ITEMS_KEY)),
 ])
 def test_a_collection_answers_to_its_own_bare_name(said, wanted):
     assert match_app_command(said) == wanted

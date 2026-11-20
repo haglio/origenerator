@@ -986,17 +986,17 @@
       ]
     },
     {
-      "id": "latest",
-      "thing": "the collection of the newest items, the first row of each TOC section",
+      "id": "all_items",
+      "thing": "the collection of every item under a folder, the first row of each TOC section, ordered by the Sort by dropdown",
       "screen": [
-        "Latest",
-        "No recent images yet."
+        "All",
+        "No images yet."
       ],
-      "his_word": "Latest (2026-10-30); Recents (2026-08)",
+      "his_word": "All (2026-11-20, in place of Latest); Latest (2026-10-30); Recents (2026-08)",
       "code_today": [
-        "latest"
+        "all_items"
       ],
-      "code_word": "latest",
+      "code_word": "all_items",
       "status": "ruled",
       "ruled": "2026-10-30, his words on the glossary's list",
       "retired": [

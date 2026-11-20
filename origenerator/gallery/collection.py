@@ -4,11 +4,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import NamedTuple
 
-from funestra.hud_title import LATEST_LABEL
-
 from origenerator.gallery.tree import ALL_KEY, favorite_generations
 
-LATEST_KEY = "__recents__"
+ALL_ITEMS_KEY = "__recents__"
+ALL_ITEMS_LABEL = "All"
 FAVORITES_KEY = "__starred__"
 FAVORITES_LABEL = "Favorites"
 ENHANCED_KEY = "__enhanced__"
@@ -58,10 +57,10 @@ class Collection:
 
 ALL_COLLECTIONS: tuple[Collection, ...] = (
     Collection(
-        LATEST_KEY, LATEST_LABEL, "Recently generated", Glyph("latest"),
+        ALL_ITEMS_KEY, ALL_ITEMS_LABEL, "Every item in this folder", Glyph("latest"),
         rows=lambda library: library.recent_rows,
         shown_in=lambda shape: shape.show_latest, counted=False,
-        voice=Voice(("recents", "recent")), newest_first=True),
+        voice=Voice(("all",)), newest_first=True),
     Collection(
         FAVORITES_KEY, FAVORITES_LABEL,
         "Your favorite folders and items — drop a folder here to add it",

@@ -2018,7 +2018,7 @@ def _a_portrait_launch_while_landscape_is_browsed(qtbot, tmp_path):
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["Latest"])
+    view._tree.setCurrentItem(_alls(view._tree)["All"])
     params = dict(_SDXL.default_params(), positive_prompt="a tall one", width=720, height=1280)
     key = view.library.folder_key_for("sdxl_t2i", params)
     view._jobs.start_prepared(key, _SDXL, params)

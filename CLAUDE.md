@@ -854,7 +854,7 @@ with the rest of the work the app leaves for ComfyUI as it closes, on the
 settings Combine would pick for that image and action
 (`combine_runs.as_action`, the one place that choice is made), and only where
 Combine would offer the action for that image. A finale lands at the top of
-Latest like a video he made. The flick's `finale_id` names its finale: a finale
+All, latest first, like a video he made. The flick's `finale_id` names its finale: a finale
 he deletes is not made again (his ruling), a failed one is, and one still being
 made when the app opens is dropped and queued again at the next closing
 (`drop_finales_in_flight`). It ships switched off (`flick_finales.SWITCHED_ON`,

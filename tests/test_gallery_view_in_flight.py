@@ -616,7 +616,6 @@ def test_a_run_double_clicked_from_another_folder_is_the_one_its_slideshow_follo
     assert job.prompt_id not in view.listed_prompt_ids()
 
     win = view.slideshows.open_on_preview(None, job.prompt_id)
-    qtbot.addWidget(win.shown)
 
     assert win._set.current_prompt_id() == job.prompt_id, (
         "a double click on the picture of an item being made opens the slideshow on that item's "
@@ -670,11 +669,11 @@ def test_a_run_double_clicked_is_shown_though_the_slideshow_shows_only_starred_i
     view._poll()
 
     win = _viewport_of(view).open_fullscreen()
-    qtbot.addWidget(win.shown)
 
     assert win._set.current_prompt_id() == second.prompt_id, (
         "a double click asks to watch the image being generated, which no filter can leave out "
         "(his report, 2026-11-20: another image of the folder came up)")
+    win.close()
 
 
 def test_a_run_watched_fullscreen_lands_as_its_generation_among_its_folder(

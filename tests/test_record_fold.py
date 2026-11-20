@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 
 from origenerator.db import Database, NewGeneration
+from origenerator.item_actions import ItemActions, actions_of
+from origenerator.media import MediaType
 from origenerator.record_fold import fold_record_into
 
 
@@ -112,3 +114,13 @@ def test_a_folder_keyed_from_the_folded_record_keeps_its_new_arrival_switches(tm
     (folder_meta,) = db.folder_meta_full()
     assert (folder_meta["favorite_after_id"], folder_meta["enhance_after_id"],
             folder_meta["enhance_settings"]) == (7, 9, "kept")
+
+
+def test_actions_set_only_on_the_folded_record_go_to_the_one_that_stays(tmp_path):
+    db = _two_records(tmp_path)
+    db.set_actions("repeat", MediaType.VIDEO, ItemActions(("alpha",), ("beta",)))
+
+    _fold_repeat_into_first(db)
+
+    assert actions_of(db.get_generation("first"), MediaType.VIDEO) == ItemActions(
+        ("alpha",), ("beta",))

@@ -25,6 +25,7 @@ from origenerator.gallery.tree import ALL_KEY, folder_chain
 from origenerator.gallery_edits import GalleryEdits, GalleryEnvironment
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.generate_tab import GenerateTab
+from origenerator.item_actions import ItemActions, actions_of
 from origenerator.item_names import ItemNames
 from origenerator.media import MediaType
 from origenerator.non_ai_videos import (
@@ -148,6 +149,51 @@ def test_a_video_moved_to_another_folder_keeps_its_item_which_then_names_it_ther
     [row] = _videos(db)
     assert (row["prompt_id"], json.loads(row["output_files"])) == (
         before["prompt_id"], [{"filename": moved.name, "library_path": str(moved)}])
+
+
+def _record_path(places: NonAiPlaces, video: Path) -> Path:
+    return places.records / video.relative_to(places.videos.parent).with_suffix(".json")
+
+
+def test_a_video_scanned_before_its_record_followed_it_is_folded_into_its_item(db, tmp_path):
+    places = _library(tmp_path)
+    video = write_mp4(places.videos / "sample" / "full" / "set" / "video one.mp4")
+    _record(places, video, {"id": "video-one-id"})
+    scan(db, places)
+    [before] = _videos(db)
+    moved = places.videos / "sample" / "clips" / "video one.mp4"
+    moved.parent.mkdir(parents=True)
+    video.replace(moved)
+    scan(db, places)
+    _record_path(places, moved).parent.mkdir(parents=True)
+    _record_path(places, video).replace(_record_path(places, moved))
+
+    scan(db, places)
+
+    [row] = _videos(db)
+    assert (row["prompt_id"], json.loads(row["output_files"])) == (
+        before["prompt_id"], [{"filename": moved.name, "library_path": str(moved)}])
+
+
+def test_actions_set_on_the_new_item_of_a_moved_video_stay_on_its_item(db, tmp_path):
+    places = _library(tmp_path)
+    video = write_mp4(places.videos / "sample" / "full" / "set" / "video one.mp4")
+    _record(places, video, {"id": "video-one-id"})
+    scan(db, places)
+    moved = places.videos / "sample" / "clips" / "video one.mp4"
+    moved.parent.mkdir(parents=True)
+    video.replace(moved)
+    scan(db, places)
+    [new] = [row for row in _videos(db) if "clips" in row["output_files"]]
+    db.set_actions(new["prompt_id"], MediaType.VIDEO, ItemActions(("alpha",)))
+    _record_path(places, moved).parent.mkdir(parents=True)
+    _record_path(places, video).replace(_record_path(places, moved))
+
+    scan(db, places)
+
+    [row] = _videos(db)
+    assert (actions_of(row, MediaType.VIDEO), json.loads(row["combined_labels"])) == (
+        ItemActions(("alpha",)), ["alpha"])
 
 
 def test_a_moved_video_shows_under_the_folder_it_was_moved_to(db, tmp_path):

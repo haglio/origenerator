@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import NamedTuple
 
 from origenerator import gallery, trash_collection
+from origenerator.gallery.output import is_in_progress
 from origenerator.gallery.tree import is_an_enhance_being_made
 from origenerator.library_views import LibrarySnapshot
 
@@ -118,12 +119,18 @@ def _fingerprint(rows, meta) -> tuple[int, int]:
 
 
 def _rows_fingerprint(rows) -> int:
-    return hash(tuple(
-        (r.get("prompt_id"), r.get("status"), r.get("thumbnail_path"),
-         r.get("workflow_name"), r.get("params_json"), r.get("output_files"),
-         r.get("evolver_upscale"), r.get("evolver_upscaled_at"))
-        for r in rows if not is_an_enhance_being_made(r)
-    ))
+    return hash(tuple(_where_it_is_drawn(r) if is_in_progress(r) else _all_it_shows(r)
+                      for r in rows if not is_an_enhance_being_made(r)))
+
+
+def _where_it_is_drawn(row) -> tuple:
+    return row.get("prompt_id"), row.get("workflow_name"), row.get("params_json")
+
+
+def _all_it_shows(row) -> tuple:
+    return (row.get("prompt_id"), row.get("status"), row.get("thumbnail_path"),
+            row.get("workflow_name"), row.get("params_json"), row.get("output_files"),
+            row.get("evolver_upscale"), row.get("evolver_upscaled_at"))
 
 
 def _folder_meta_fingerprint(meta) -> int:

@@ -28,12 +28,10 @@ class ItemNames:
     def take(self, rows: list[dict], held_rows: list[dict], image_index: dict,
              readings: RowReadings | None = None) -> None:
         readings = readings or RowReadings()
-        video_of_frame = _videos_of_starting_frames(rows, held_rows, readings.of(
-            "source image", lambda row: gallery.source_image_id_in(row, image_index),
-            depends_on=image_index))
-        folder_of = readings.of("settings folder",
-                                lambda row: gallery.settings_folder_key(row, image_index),
-                                depends_on=image_index)
+        video_of_frame = _videos_of_starting_frames(rows, held_rows, readings.looking_up(
+            "source image", gallery.source_image_id_in, image_index))
+        folder_of = readings.looking_up("settings folder", gallery.settings_folder_key,
+                                        image_index)
         folders: dict[str, list[str]] = defaultdict(list)
         for row in _items_oldest_first(rows, held_rows):
             if row["prompt_id"] not in video_of_frame:

@@ -3,9 +3,21 @@ from __future__ import annotations
 import io
 import os
 
+import pytest
 from PIL import Image, ImageDraw
 
+from origenerator.gui import hud_queue_thumbnails
 from origenerator.gui.hud_queue_thumbnails import empty_thumbnail, fitted_frame, fitted_thumbnail
+
+
+def _long_after_any_write() -> int:
+    return 2**62
+
+
+@pytest.fixture(autouse=True)
+def _thumbnails_held_afresh(monkeypatch):
+    monkeypatch.setattr(hud_queue_thumbnails, "_FITTED",
+                        hud_queue_thumbnails._held_thumbnails(1024, now_ns=_long_after_any_write))
 
 
 def _png_bytes(size=(40, 20), color=(200, 40, 40)) -> bytes:
@@ -67,6 +79,27 @@ def test_a_file_written_again_is_read_again(tmp_path):
     os.utime(path, ns=(1, 1))
 
     assert fitted_thumbnail(path, 16) is not first
+
+
+def test_the_thumbnails_held_stop_at_a_bound_letting_go_of_the_longest_unused(
+        tmp_path, monkeypatch):
+    monkeypatch.setattr(hud_queue_thumbnails, "_FITTED",
+                        hud_queue_thumbnails._held_thumbnails(2, now_ns=_long_after_any_write))
+    a, b, c = (tmp_path / f"{name}.png" for name in "abc")
+    for path in (a, b, c):
+        path.write_bytes(_png_bytes())
+    for path in (a, b, a, c):
+        fitted_thumbnail(path, 16)
+
+    reads = []
+    monkeypatch.setattr(hud_queue_thumbnails, "_opened_and_fitted",
+                        lambda *args: reads.append(args[0]))
+    for path in (a, c, b):
+        fitted_thumbnail(path, 16)
+
+    assert reads == [str(b)], (
+        "the HUD's Job Queue fits a thumbnail for every image each job makes, which over an "
+        "evening is thousands, so the ones not asked for lately are let go")
 
 
 def test_no_bytes_have_no_frame():

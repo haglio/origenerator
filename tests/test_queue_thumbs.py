@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 
+import pytest
 from PIL import Image
 from PySide6.QtCore import Qt
 from shared_ui.spacing import HAIRLINE
@@ -18,6 +19,16 @@ from origenerator.gui.queue_thumbs import (
 )
 
 CELL = 28
+
+
+def _long_after_any_write() -> int:
+    return 2**62
+
+
+@pytest.fixture(autouse=True)
+def _cells_held_afresh(monkeypatch):
+    monkeypatch.setattr(queue_thumbs, "_CELLS",
+                        queue_thumbs._held_cells(1024, now_ns=_long_after_any_write))
 
 
 def _thumbnail(path, color, size=(80, 40)):
@@ -199,7 +210,6 @@ def test_a_folder_view_takes_the_first_four_and_stops(qapp, tmp_path):
 
 def test_a_scaled_cell_is_only_ever_read_off_disk_once(qapp, tmp_path, monkeypatch):
     thumbnail = _thumbnail(tmp_path / "a.png", (255, 0, 0))
-    queue_thumbs._CELLS.clear()
     source_pixmap(Combination(thumbnail), CELL)
 
     reads = []
@@ -214,8 +224,8 @@ def test_a_scaled_cell_is_only_ever_read_off_disk_once(qapp, tmp_path, monkeypat
 
 def test_the_cells_held_stop_at_a_bound_letting_go_of_the_longest_unused(
         qapp, tmp_path, monkeypatch):
-    monkeypatch.setattr(queue_thumbs, "_MOST_CELLS", 2)
-    queue_thumbs._CELLS.clear()
+    monkeypatch.setattr(queue_thumbs, "_CELLS",
+                        queue_thumbs._held_cells(2, now_ns=_long_after_any_write))
     a, b, c = (_thumbnail(tmp_path / f"{name}.png", (255, 0, 0)) for name in "abc")
     for path in (a, b, a, c):
         fitted_cell(path, CELL)
@@ -233,7 +243,6 @@ def test_the_cells_held_stop_at_a_bound_letting_go_of_the_longest_unused(
 
 def test_a_cell_follows_a_file_re_rendered_in_place(qapp, tmp_path):
     thumbnail = _thumbnail(tmp_path / "a.png", (255, 0, 0))
-    queue_thumbs._CELLS.clear()
     assert _color_at(source_pixmap(Combination(thumbnail), CELL), CELL // 2, CELL // 2).red() > 200
 
     _thumbnail(tmp_path / "a.png", (0, 0, 255))

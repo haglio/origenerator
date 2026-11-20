@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 from app_support.comfy_file_refs import reference_basename
+from app_support.written_file import ReadWhenChanged
 
 from origenerator import config, precision, title_words
 from origenerator.one_look import is_file, once_a_look, stat_of
@@ -24,8 +25,7 @@ _VERSIONED = re.compile(r"^(?P<base>.+?) (?P<major>\d+)\.(?P<minor>\d+)$")
 _FOLDERS_SHOWN_BY_TITLE = ("diffusion_models", "checkpoints", "loras")
 _NOTES = re.compile(r"\s*\((?P<notes>[^()]*)\)$")
 _PASSES = ("high", "low")
-_read: dict[str, tuple[tuple[int, int] | None, object]] = {}
-_trained: dict[str, tuple[tuple[int, int] | None, datetime | None]] = {}
+_READERS: dict[tuple[str, object], ReadWhenChanged] = {}
 _TITLES_OF_THE_PASS_UNDER_WAY: list[dict[str, str]] = []
 
 
@@ -183,30 +183,26 @@ def _dated_fix_rank(part: str, stem: str) -> int:
 
 
 def kept_by_stem(path) -> dict:
-    if _written(str(path)) is None:
-        return {}
-    try:
-        kept = _until_it_changes(_read, path, lambda read: json.loads(read.read_text(encoding="utf-8")))
-    except (OSError, ValueError):
-        return {}
+    kept = _until_it_changes(path, _read_kept)
     return kept if isinstance(kept, dict) else {}
 
 
-def _until_it_changes(kept: dict, path, work_out):
-    stamp = _written(str(path))
-    remembered = kept.get(str(path))
-    if remembered is None or remembered[0] != stamp:
-        remembered = kept[str(path)] = (stamp, work_out(path))
-    return remembered[1]
+def _read_kept(path: Path):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    except ValueError:
+        return None
 
 
 @once_a_look
-def _written(path: str) -> tuple[int, int] | None:
-    try:
-        stat = Path(path).stat()
-    except OSError:
-        return None
-    return stat.st_mtime_ns, stat.st_size
+def _until_it_changes(path, read):
+    key = (str(path), read)
+    reader = _READERS.get(key)
+    if reader is None:
+        reader = _READERS[key] = ReadWhenChanged(Path(path), read)
+    return reader.latest()
 
 
 def write_kept(path, entries: dict) -> None:
@@ -219,7 +215,7 @@ def write_title(stem: str, title: str) -> None:
 
 
 def trained_when(path) -> datetime | None:
-    return _until_it_changes(_trained, path, _read_trained_when)
+    return _until_it_changes(path, _read_trained_when)
 
 
 def _read_trained_when(path) -> datetime | None:

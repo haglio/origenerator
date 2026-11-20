@@ -99,6 +99,7 @@ class EnhanceController:
         self._targets: dict[str, str | None] = {}
         self._by_prompt: dict[str, object] = {}
         self._signature: tuple = ()
+        self._typical_seconds: dict[str, float | None] = {}
         self.pane = EnhancePane(self._on_settings_changed)
         self.pane.enhance_requested.connect(self.enhance_the_selection)
         self.pane.fix_training_requested.connect(self._train_fix)
@@ -384,10 +385,30 @@ class EnhanceController:
             pass_progress=job.last_pass_progress,
             stage=job.last_stage,
             started_at=job.started_at,
-            typical_seconds=typical_run_seconds(self._db, job),
+            typical_seconds=self._typical_seconds_of(job),
         )
 
+    def _typical_seconds_of(self, job) -> float | None:
+        name = job.workflow.name
+        if name not in self._typical_seconds:
+            self._typical_seconds[name] = typical_run_seconds(self._db, job)
+        return self._typical_seconds[name]
+
+    def show_the_frame_of(self, prompt_id: str) -> None:
+        enhanced = {target: job for target, job in self._by_prompt.items()
+                    if job.prompt_id == prompt_id}
+        if not enhanced:
+            return
+        self._gallery_pane.show_enhancing_of(
+            {target: self._as_run(job) for target, job in enhanced.items()})
+        for pane in self._generate_pane_of().generate_tabs():
+            row = pane.displayed_row()
+            if row is not None and row["prompt_id"] in enhanced:
+                pane.set_pending_enhancement(self._pending_for(row, list(enhanced.values())))
+        self.tell_the_slideshows()
+
     def reconcile(self) -> None:
+        self._typical_seconds = {}
         running = self._enhances_in_flight()
         for pane in self._generate_pane_of().generate_tabs():
             row = pane.displayed_row()

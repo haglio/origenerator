@@ -34,6 +34,7 @@ from origenerator.gui.gallery_pane import (
     PaneHost,
     TreeNavigation,
 )
+from origenerator.gui.inflight import RunReading
 from origenerator.gui.item_tile import ItemTile
 from origenerator.gui.item_type_icon import VideoLength
 from origenerator.item_shape import shaped_key
@@ -266,6 +267,38 @@ def _sixty():
 
 def _drawn(scroll, kind=ItemTile):
     return list(scroll.widget().findChildren(kind))
+
+
+def _tiles_told_of_enhancing(scroll, monkeypatch) -> list[str]:
+    told = []
+    for tile in _drawn(scroll):
+        monkeypatch.setattr(tile, "set_enhancing",
+                            lambda run, tile=tile: told.append(tile.prompt_id))
+    return told
+
+
+def test_telling_the_tiles_what_is_being_enhanced_touches_only_the_tiles_it_changes(
+        qtbot, db, monkeypatch):
+    pane, scroll = _pane(qtbot, db)
+    _latest_of(pane, [_row("a", 1), _row("b", 2), _row("c", 3)])
+    pane.show_enhancing({"b": RunReading(status="queued")})
+    told = _tiles_told_of_enhancing(scroll, monkeypatch)
+
+    pane.show_enhancing({})
+
+    assert told == ["b"], (
+        "the run reconciled at every change of the Job Queue redraws the tiles whose "
+        "enhancement began or ended, never every tile drawn")
+
+
+def test_a_frame_of_an_enhancement_redraws_only_the_tile_of_its_image(qtbot, db, monkeypatch):
+    pane, scroll = _pane(qtbot, db)
+    _latest_of(pane, [_row("a", 1), _row("b", 2)])
+    told = _tiles_told_of_enhancing(scroll, monkeypatch)
+
+    pane.show_enhancing_of({"b": RunReading(status="running", frame=b"frame")})
+
+    assert told == ["b"]
 
 
 def test_every_collection_is_both_gathered_and_drawn_on_every_shape(qtbot, db):

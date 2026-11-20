@@ -240,6 +240,10 @@ class ItemTile(QWidget):
                                 enhance=icons.ENHANCE_QUEUED if waiting else self._enhance,
                                 kind=self._media_type)
 
+    @property
+    def enhancing(self) -> RunReading | None:
+        return self._enhancing
+
     def set_enhancing(self, run: RunReading | None):
         self._enhancing = run
         self._sync_controls()

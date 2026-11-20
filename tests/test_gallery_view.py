@@ -801,6 +801,19 @@ def test_an_item_landing_leaves_the_toc_scrolled_where_he_left_it(qtbot):
         "the TOC stays where he scrolled it, away from the folder he has open, while items land")
 
 
+def test_a_frame_of_any_job_tells_the_enhancements_only_whose_frame_it_is(qtbot, monkeypatch):
+    view, _cat, _dog = _two_leaf_view(qtbot)
+    told = []
+    monkeypatch.setattr(view.enhance, "reconcile", lambda: told.append("every enhancement"))
+    monkeypatch.setattr(view.enhance, "show_the_frame_of", told.append)
+
+    view._on_reroll_preview("some-key", "i2", b"a-frame")
+
+    assert told == ["i2"], (
+        "frames come several times a second; which images are being enhanced changes only "
+        "with the Job Queue")
+
+
 def test_each_tick_puts_what_a_slideshow_is_locked_on_first(qtbot, monkeypatch):
     view, _cat, _dog = _two_leaf_view(qtbot)
     ticks = []

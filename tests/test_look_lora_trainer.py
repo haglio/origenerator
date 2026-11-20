@@ -12,7 +12,11 @@ import pytest
 from PIL import Image
 
 from origenerator import card_claim, training_rounds
-from tests.training_machine import AComfyUIJobComesOnceAStateIsSaved, TrainingMachine
+from tests.training_machine import (
+    AComfyUIJobComesOnceAStateIsSaved,
+    AFunestraStartsPlayingOnceAStateIsSaved,
+    TrainingMachine,
+)
 from tools import look_lora_trainer
 
 
@@ -244,6 +248,20 @@ def test_the_card_is_not_idle_while_another_trainer_holds_it(tmp_path):
     assert machine.claimed == 1
 
 
+def test_the_card_is_not_idle_while_a_funestra_plays_and_the_training_says_why_it_waits(tmp_path, monkeypatch):
+    job = _job(tmp_path)
+    Path(job["work"]).mkdir()
+    machine = TrainingMachine(waiting=[0], memory=[100], live=[True, True, False])
+    said = []
+    status = training_rounds.status
+    monkeypatch.setattr(training_rounds, "status", lambda job, **fields: said.append(fields["state"]) or status(job, **fields))
+
+    training_rounds.wait_for_idle(job, machine)
+
+    assert machine.slept.count(20) == 8
+    assert said == ["waiting", "waiting_for_a_funestra", "waiting"]
+
+
 def test_a_card_another_trainer_took_first_is_waited_for_again(tmp_path):
     job = _job(tmp_path)
     Path(job["work"]).mkdir()
@@ -315,15 +333,16 @@ def test_a_training_runs_its_steps_under_accelerate_and_says_how_far_it_has_got(
     assert _status(job) == {"state": "training", "done": 25, "total": 50}
 
 
-def test_a_training_stopped_for_a_comfyui_job_resumes_from_its_newest_state_for_the_steps_left(
-        tmp_path, capsys):
+@pytest.mark.parametrize("what_comes", [AComfyUIJobComesOnceAStateIsSaved, AFunestraStartsPlayingOnceAStateIsSaved])
+def test_a_training_stopped_for_a_comfyui_job_or_a_playing_funestra_resumes_from_its_newest_state_for_the_steps_left(
+        tmp_path, capsys, what_comes):
     job = _training_job(tmp_path, _SAVES_A_STATE + '''
 if "--resume" not in args:
     time.sleep(120)
 open(os.path.join(out, 'Example Look 1.1.safetensors'), 'wb').write(b'lora')
 ''')
     state = Path(job["work"], "output", "Example Look 1.1-step00000025-state")
-    machine = AComfyUIJobComesOnceAStateIsSaved(state)
+    machine = what_comes(state)
     killed = []
 
     def kill(process):

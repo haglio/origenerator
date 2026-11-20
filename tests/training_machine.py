@@ -5,8 +5,9 @@ from pathlib import Path
 
 
 class TrainingMachine:
-    def __init__(self, waiting=(), memory=(), held=(False,), claims=(True,)):
+    def __init__(self, waiting=(), memory=(), held=(False,), claims=(True,), live=(False,)):
         self.waiting = list(waiting)
+        self.live = list(live)
         self.memory = list(memory)
         self.held = list(held)
         self.claims = list(claims)
@@ -26,6 +27,9 @@ class TrainingMachine:
     def jobs_waiting(self):
         return self.waiting.pop(0) if len(self.waiting) > 1 else self.waiting[0]
 
+    def session_is_live(self):
+        return self.live.pop(0) if len(self.live) > 1 else self.live[0]
+
     def unload_comfyui(self):
         self.unloaded += 1
 
@@ -36,17 +40,27 @@ class TrainingMachine:
         self.slept.append(seconds)
 
 
-class AComfyUIJobComesOnceAStateIsSaved(TrainingMachine):
+class _SomethingComesOnceAStateIsSaved(TrainingMachine):
     def __init__(self, state: Path):
         super().__init__(waiting=[0], memory=[100])
         self._state, self._came = state, False
 
-    def jobs_waiting(self):
+    def _comes_now(self) -> bool:
         if self._came or not self._state.is_dir():
-            return 0
+            return False
         self._came = True
-        return 2
+        return True
 
     def sleep(self, seconds):
         super().sleep(seconds)
         time.sleep(0.005)
+
+
+class AFunestraStartsPlayingOnceAStateIsSaved(_SomethingComesOnceAStateIsSaved):
+    def session_is_live(self):
+        return self._comes_now()
+
+
+class AComfyUIJobComesOnceAStateIsSaved(_SomethingComesOnceAStateIsSaved):
+    def jobs_waiting(self):
+        return 2 if self._comes_now() else 0

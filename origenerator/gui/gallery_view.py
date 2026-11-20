@@ -850,8 +850,8 @@ class GalleryView(QWidget):
                             launching.asked() if launching is not None else None)
 
     def _on_turn_generate_requested(self, tab, workflow_name: str, params: dict, asked: dict,
-                                    last: bool):
-        launched = self._generate_from(tab, workflow_name, [params], asked, the_tab_follows=last)
+                                    the_tab_follows: bool):
+        launched = self._generate_from(tab, workflow_name, [params], asked, the_tab_follows=the_tab_follows)
         if launched:
             tab.note_turn_made(launched[0])
 

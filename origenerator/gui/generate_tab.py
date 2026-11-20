@@ -1458,7 +1458,7 @@ class GenerateTab(DropZones):
             return
         self._turn_being_made = index
         self.turn_generate_requested.emit(
-            *launch, index == len(self._request_aim.every_turn()) - 1)
+            *launch, self._request_aim.is_nearest_the_end_of_the_made(index))
 
     def _still_there(self, prompt_id: str) -> bool:
         row = self._db.get_generation(prompt_id)

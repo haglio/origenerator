@@ -177,8 +177,8 @@ class GeneratePane(QTabWidget):
             lambda key, name, params, p=tab: self._on_tab_changes(p, key, name, params)
         )
         tab.turn_generate_requested.connect(
-            lambda name, params, asked, last, p=tab: self._on_turn_generate(
-                p, name, params, asked, last))
+            lambda name, params, asked, the_tab_follows, p=tab: self._on_turn_generate(
+                p, name, params, asked, the_tab_follows))
         self.setCurrentIndex(index)
         if preview:
             self._set_preview_tab(tab)
@@ -326,9 +326,9 @@ class GeneratePane(QTabWidget):
         self.generate_requested.emit(workflow_name, batch)
 
     def _on_turn_generate(self, tab, workflow_name: str, params: dict, asked: dict,
-                          last: bool):
+                          the_tab_follows: bool):
         self._pin_tab(tab)
-        self.turn_generate_requested.emit(tab, workflow_name, params, asked, last)
+        self.turn_generate_requested.emit(tab, workflow_name, params, asked, the_tab_follows)
 
     def _on_tab_changes(self, tab, folder_key: str, workflow_name: str,
                            params: dict):

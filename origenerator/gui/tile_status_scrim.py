@@ -2,13 +2,8 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel
-from shared_ui.palette import BLACK, WHITE, as_hex, as_rgba
-from shared_ui.spacing import BUTTON_RADIUS
 
-_TILE_STATUS_SCRIM_CSS = (
-    f"background-color: {as_rgba(BLACK, 0.45)}; color: {as_hex(WHITE)};"
-    f" font-weight: bold; border-radius: {BUTTON_RADIUS}px;"
-)
+from origenerator.gui.tile_rules import STATUS_SCRIM
 
 
 class TileStatusScrim(QLabel):
@@ -16,7 +11,7 @@ class TileStatusScrim(QLabel):
         super().__init__(parent)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setWordWrap(True)
-        self.setStyleSheet(_TILE_STATUS_SCRIM_CSS)
+        self.setObjectName(STATUS_SCRIM)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.hide()
 

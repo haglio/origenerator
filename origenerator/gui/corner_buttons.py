@@ -4,12 +4,12 @@ from typing import NamedTuple
 
 from PySide6.QtCore import QObject, QRect, QSize, Qt, QTimer, Signal
 from PySide6.QtWidgets import QPushButton, QWidget
-from shared_ui.palette import BLACK, as_rgba
-from shared_ui.spacing import BUTTON_GAP, BUTTON_RADIUS, BUTTON_SIZE, GAP_SMALL
+from shared_ui.spacing import BUTTON_GAP, BUTTON_SIZE, GAP_SMALL
 
 from origenerator import gallery
 from origenerator.gui import icons
 from origenerator.gui.progress_bar import BAR_HEIGHT
+from origenerator.gui.tile_rules import CORNER_FACE
 
 STAR = "star"
 TRASH = "trash"
@@ -20,10 +20,6 @@ CORNER_SIZE = BUTTON_SIZE
 CORNER_GAP = BUTTON_GAP
 CORNER_INSET = GAP_SMALL
 _GLYPH_SIZE = CORNER_SIZE - 8
-
-GROUND_CSS = (
-    f"QPushButton {{ background: {as_rgba(BLACK, 0.55)}; border: none; border-radius: {BUTTON_RADIUS}px; }}"
-)
 
 _DELETE_FOR_GOOD_TIP = "Delete permanently — remove it and its files for good"
 _TIPS = {
@@ -66,7 +62,7 @@ class _CornerButtonFace(QPushButton):
         self._armed = False
         self.setFixedSize(CORNER_SIZE, CORNER_SIZE)
         self.setIconSize(QSize(_GLYPH_SIZE, _GLYPH_SIZE))
-        self.setStyleSheet(GROUND_CSS)
+        self.setObjectName(CORNER_FACE)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.hide()

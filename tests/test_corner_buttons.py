@@ -5,7 +5,7 @@ import json
 import pytest
 from PySide6.QtCore import QEvent, QPointF, QRect
 from PySide6.QtGui import QEnterEvent
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QLabel, QWidget
 from shared_ui.testing import appending_to
 
 from origenerator import gallery
@@ -18,6 +18,7 @@ from origenerator.gui.corner_buttons import (
     CornerButtons,
     enhance_state,
 )
+from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.media import MediaType
 
 
@@ -225,10 +226,16 @@ def test_they_land_one_to_a_corner_of_the_rectangle_they_are_given(qtbot):
         "landed on it would move depending on which collection is open")
 
 
-def test_a_corner_controls_line_art_stands_out_from_its_ground_over_a_white_thumbnail(qtbot):
-    host, controls = _controls(qtbot)
-    host.setStyleSheet("background: white")
-    host.setAutoFillBackground(True)
+def test_a_corner_controls_line_art_stands_out_from_its_ground_over_a_white_thumbnail(
+        qtbot, sheet_put_back_for_later_tests):
+    sheet_put_back_for_later_tests.setStyleSheet(build_stylesheet())
+    host = QWidget()
+    host.resize(200, 200)
+    qtbot.addWidget(host)
+    thumbnail = QLabel(host)
+    thumbnail.setStyleSheet("background: white")
+    thumbnail.setGeometry(host.rect())
+    controls = CornerButtons(host)
     controls.show_for(favorite=False, enhance=icons.ENHANCE_OPEN)
     controls.place(host.rect())
     host.show()

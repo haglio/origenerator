@@ -57,13 +57,6 @@ def stat_of(path) -> os.stat_result:
     return entry.stat()
 
 
-def written_at(path) -> int | None:
-    try:
-        return stat_of(path).st_mtime_ns
-    except OSError:
-        return None
-
-
 def entries_in(folder) -> dict[str, os.DirEntry]:
     return _listing(Path(folder))
 

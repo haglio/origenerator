@@ -3482,3 +3482,26 @@ def test_a_lock_held_on_a_video_stars_it_here_as_it_is_told_to_the_session(slide
     host, told = _a_video_locked_in_a_session(slideshows, tmp_path, video)
 
     assert (told, host.favorited) == (["portrait_lock_held|v1.png"], ["v1"])
+
+
+def test_a_run_is_looked_up_in_the_gallery_once_however_many_frames_it_sends(slideshows):
+    db = _db_of([_row("g7")])
+    director, _host, _made = slideshows(FakeHost(rows=[_row("g1")]), db=db)
+    director.open([("a.png", "image", "g1", None)])
+
+    for frame in (b"frame-one", b"frame-two", b"frame-three"):
+        director.note_generating("g7", frame)
+
+    assert db.gets == 1
+
+
+def test_a_run_no_longer_in_flight_is_looked_up_afresh(slideshows):
+    db = _db_of([_row("g7")])
+    director, _host, _made = slideshows(FakeHost(rows=[_row("g1")]), db=db)
+    director.open([("a.png", "image", "g1", None)])
+    director.note_generating("g7", b"frame-one")
+
+    director.note_in_flight([])
+    director.note_generating("g7", b"frame-two")
+
+    assert db.gets == 2

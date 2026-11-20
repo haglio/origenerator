@@ -289,7 +289,7 @@ def keep_off_the_device(setattr) -> None:
         def stop(self): pass
 
     off_the_machine.keep_off_the_device(setattr)
-    setattr(osr2_motion_driver, "_TickThread", _NoTicker)
+    setattr(osr2_motion_driver, "TickThread", _NoTicker)
 
 
 def finish_every_job_on_the_tests_own_thread(setattr) -> None:

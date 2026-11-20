@@ -4,6 +4,7 @@ import logging
 import threading
 import time
 from contextlib import ExitStack
+from functools import partial
 
 from app_support.osr2_hold import PARK, RESUME
 from funestra.main_hud import HOLD_VERB
@@ -12,6 +13,7 @@ from PySide6.QtCore import QObject, Signal
 from origenerator import motion_engine
 from origenerator.motion_engine import Motion
 from origenerator.osr2 import Osr2Broker
+from origenerator.osr2_clock import TickThread
 from origenerator.running_ahead import ahead_while_playing
 
 logger = logging.getLogger(__name__)
@@ -20,40 +22,6 @@ _MOTION_CLOCK_HZ = 40
 _TICK_MS = 1000 // _MOTION_CLOCK_HZ
 _LOOKAHEAD_MS = 40
 _HANDOFF_MS = 300
-
-
-class _TickThread:
-    def __init__(self, tick, interval_s: float, *,
-                 now=time.monotonic, sleep=time.sleep):
-        self._tick = tick
-        self._interval = interval_s
-        self._now = now
-        self._sleep = sleep
-        self._stopping = threading.Event()
-        self._thread = threading.Thread(target=self._run, name="osr2-motion",
-                                        daemon=True)
-
-    def start(self) -> None:
-        self._thread.start()
-
-    def stop(self) -> None:
-        self._stopping.set()
-        if self._thread.is_alive():
-            self._thread.join(timeout=1.0)
-
-    def _run(self) -> None:
-        due = self._now()
-        while not self._stopping.is_set():
-            due += self._interval
-            now = self._now()
-            if due < now - self._interval:
-                due = now + self._interval
-            delay = due - now
-            if delay > 0:
-                self._sleep(delay)
-            if self._stopping.is_set():
-                return
-            self._tick()
 
 
 class Osr2MotionDriver(QObject):
@@ -72,7 +40,7 @@ class Osr2MotionDriver(QObject):
         # The bars are moved on Qt's GUI thread while the clock thread samples the state.
         self._lock = threading.RLock()
         self._interval_s = interval_ms / 1000.0
-        self._make_ticker = ticker_factory or _TickThread
+        self._make_ticker = ticker_factory or partial(TickThread, name="osr2-motion")
         self._ticker = None
         self._running_ahead = ExitStack()
         self._held: str | None = None

@@ -15,11 +15,11 @@ from shared_ui.testing import appending_to
 
 from origenerator import motion_engine
 from origenerator.osr2 import format_position
+from origenerator.osr2_clock import TickThread
 from origenerator.osr2_motion_driver import (
     _HANDOFF_MS,
     _LOOKAHEAD_MS,
     Osr2MotionDriver,
-    _TickThread,
 )
 from tests.osr2_fakes import FakeBroker
 from tests.running_ahead_support import record_the_app_running_ahead
@@ -174,7 +174,7 @@ def test_stopping_parks_the_device(qtbot):
 
 def test_the_clock_runs_off_the_gui_thread(qtbot):
     seen = []
-    ticker = _TickThread(lambda: seen.append(threading.current_thread()), 0.001)
+    ticker = TickThread(lambda: seen.append(threading.current_thread()), 0.001)
     ticker.start()
     deadline = time.monotonic() + 2.0
     while not seen and time.monotonic() < deadline:
@@ -205,7 +205,7 @@ def test_a_long_stall_picks_the_beat_up_from_now_instead_of_firing_a_backlog():
         if len(ticks) >= 4:
             ticker.stop()
 
-    ticker = _TickThread(tick, 0.025, now=now, sleep=sleep)
+    ticker = TickThread(tick, 0.025, now=now, sleep=sleep)
     ticker._run()
     gaps = [b - a for a, b in pairwise(ticks)]
     assert gaps

@@ -30,6 +30,8 @@ WHEEL_NOTCH = 120
 
 
 class PaneChannel:
+    waits_on_the_disk = False
+
     def __init__(self) -> None:
         self.on_a_list = lambda: None
         self._funestra: Funestra | None = None
@@ -47,6 +49,11 @@ class PaneChannel:
             self._funestra.take_the_list(self.items)
         else:
             self._funestra.apply(verb)
+        return True
+
+    def send_all(self, verbs: list[str]) -> bool:
+        for verb in verbs:
+            self.send(verb)
         return True
 
     def status(self) -> dict[str, str]:

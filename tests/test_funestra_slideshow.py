@@ -19,14 +19,14 @@ from funestra.status import FunestraStatus, status_fields
 from shared_ui.message_shape import ERROR, HEARD_MARK, WARNING, answering_what_he_said
 from shared_ui.testing import appending_to
 
-from origenerator import osr2_driver
+from origenerator import fun_time_mode, osr2_driver
 from origenerator.fun_time_mode import FunestraChannel
 from origenerator.funscript import (
     funscript_path_for,
     synthesize_actions,
     write_funscript,
 )
-from origenerator.gui import slideshow_pass
+from origenerator.gui import funestra_slideshow, slideshow_pass
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import (
     FunestraSlideshow,
@@ -2816,3 +2816,96 @@ def test_a_slideshow_of_one_item_whose_next_seed_arrives_shows_that_row_looping(
         "round and round as they were made, with no rectangle on the map and no loop in the title")
     assert [entry.path.name for entry in read_playlist(slideshow.channel.playlist)] == [
         "one.png", "one-b.png"]
+
+
+def _reads_held(monkeypatch) -> list:
+    held = []
+    monkeypatch.setattr(funestra_slideshow, "run_off_thread",
+                        lambda work, done, *, owner: held.append((work, done)))
+    return held
+
+
+def _status_read_here(monkeypatch) -> list:
+    reads = []
+    status = FunestraChannel.status
+    monkeypatch.setattr(FunestraChannel, "status",
+                        lambda channel: reads.append(channel) or status(channel))
+    return reads
+
+
+def test_a_tick_reads_the_funestras_status_off_the_window_thread_one_read_at_a_time(
+        qtbot, tmp_path, monkeypatch):
+    slideshow = _slideshow(qtbot, tmp_path)
+    held, read_here = _reads_held(monkeypatch), _status_read_here(monkeypatch)
+
+    for _tick in range(3):
+        slideshow.tick()
+
+    assert read_here == []
+    assert len(held) == 1, "a read still under way is not asked for twice"
+
+
+def test_the_item_the_funestra_moved_to_reaches_the_hud_as_soon_as_its_status_is_read(
+        qtbot, tmp_path, monkeypatch):
+    slideshow = _slideshow(qtbot, tmp_path)
+    held = _reads_held(monkeypatch)
+    slideshow.tick()
+    _says(slideshow, video="two.png")
+
+    work, done = held.pop()
+    done(work())
+
+    assert parse_hud(slideshow.channel.hud_file.read_text(encoding="utf-8")).corner.path == "two.png"
+
+
+def _appends_counted(monkeypatch) -> list:
+    appends = []
+    append = fun_time_mode.append_command
+    monkeypatch.setattr(fun_time_mode, "append_command",
+                        lambda path, line: appends.append(line) or append(path, line))
+    return appends
+
+
+def test_a_new_list_reaches_the_funestra_in_one_append_with_its_verbs_in_order(
+        qtbot, tmp_path, monkeypatch):
+    slideshow = _slideshow(qtbot, tmp_path)
+    _sent(slideshow)
+    appends = _appends_counted(monkeypatch)
+
+    slideshow.play(Playing(_ITEMS[1:], shuffle=in_order))
+
+    assert len(appends) == 1
+    assert _sent(slideshow) == [f"SET_PACE {slideshow.dwell_s}", "PLAY_FILE two.png",
+                                "RELOAD_PLAYLIST"]
+
+
+def test_nothing_is_written_to_the_funestra_on_the_window_thread(qtbot, tmp_path, monkeypatch):
+    slideshow = _slideshow(qtbot, tmp_path)
+    _sent(slideshow)
+    held, appends = _reads_held(monkeypatch), _appends_counted(monkeypatch)
+
+    slideshow.slideshow_step(1)
+    slideshow.play(Playing(_ITEMS[1:], shuffle=in_order))
+
+    assert appends == []
+    assert [str(item.path) for item in read_playlist(slideshow.channel.playlist)] == [
+        "one.png", "two.png", "three.png"], "the new list waits behind the step sent before it"
+    assert len(held) == 1, "one write at a time"
+
+
+def test_what_is_sent_while_a_write_is_under_way_follows_it_in_order(
+        qtbot, tmp_path, monkeypatch):
+    slideshow = _slideshow(qtbot, tmp_path)
+    _sent(slideshow)
+    held = _reads_held(monkeypatch)
+    slideshow.slideshow_step(1)
+    slideshow.play(Playing(_ITEMS[1:], shuffle=in_order))
+
+    while held:
+        work, done = held.pop(0)
+        done(work())
+
+    assert _sent(slideshow) == ["NEXT", f"SET_PACE {slideshow.dwell_s}", "PLAY_FILE two.png",
+                                "RELOAD_PLAYLIST"]
+    assert [str(item.path) for item in read_playlist(slideshow.channel.playlist)] == [
+        "two.png", "three.png"]

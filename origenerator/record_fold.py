@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from origenerator.folder_switch_fields import switches_of
 from origenerator.gallery_contract import LANES
+from origenerator.item_actions import actions_if_any, has_actions
+from origenerator.media import MediaType
 
 
 def file_key(entry: dict) -> tuple[str, str]:
@@ -27,6 +29,9 @@ def _carry_over_what_the_user_put_on_it(db, folded: dict, keeper: dict) -> None:
                  if folded.get(column) and not keeper.get(column)}
     if inherited:
         db.update_generation(keeper["prompt_id"], **inherited)
+    for side in (MediaType.IMAGE, MediaType.VIDEO):
+        if has_actions(folded, side) and not has_actions(keeper, side):
+            db.set_actions(keeper["prompt_id"], side, actions_if_any(folded, side))
 
 
 def _repoint_at_the_record_that_stays(db, rows, folded: dict, keeper: dict) -> None:

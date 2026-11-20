@@ -1506,8 +1506,7 @@ def _in_a_window(qtbot, now):
     player.position.return_value = 1000
     player.duration.return_value = 4000
     w = Viewport(window, player=player, clock=lambda: now[0])
-    with qtbot.waitExposed(window):
-        window.show()
+    window.show()
     return window, w, player
 
 

@@ -40,6 +40,7 @@ from origenerator.gui.drag_thumbnail import (
     label_thumbnail,
 )
 from origenerator.gui.generation_drag import generation_mime
+from origenerator.gui.live_frames import pixmap_of
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.scrubber import Scrubber
 from origenerator.gui.video_surface import (
@@ -240,10 +241,10 @@ class Viewport(QWidget):
 
     def show_frame(self, data: bytes, *, enhancing: bool = False,
                    generation: str | None = None) -> None:
-        pixmap = QPixmap()
-        if not pixmap.loadFromData(data) or pixmap.isNull():
+        if (pixmap := pixmap_of(data)) is None:
             return
-        self._take_the_pane(None, generation=generation, enhancing=enhancing, live=True)
+        self._take_the_pane(None, generation=generation, enhancing=enhancing, live=True,
+                            stop_player=not self._live)
         self._show_image(pixmap)
         self._raise_message()
 

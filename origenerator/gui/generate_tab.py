@@ -1255,12 +1255,12 @@ class GenerateTab(DropZones):
         else:
             self.show_combination(made_from)
 
-    def show_live_frame(self, frame: bytes):
+    def show_live_frame(self, frame: bytes, prompt_id: str | None = None):
         made = self._being_made
         if made is None:
             return
         self._being_made = made._replace(note=None, source=None)
-        self._viewport.show_frame(frame, generation=_prompt_id_of(made))
+        self._viewport.show_frame(frame, generation=prompt_id or _prompt_id_of(made))
 
     def show_live_wait(self, note: str | None):
         made, text = self._being_made, note or _WAITING_NOTE

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import os
 from collections.abc import Iterator
 from functools import lru_cache
 from pathlib import Path
 
 from app_support.gallery_rows import made_here
+from app_support.written_file import ReadWhenChanged
 from PIL import Image
 from shared_ui.orientation import orientation_of_size as shape_of_size
 
@@ -94,22 +94,23 @@ def _asked_shape(workflow_name: str | None, params_json: str | None) -> str | No
 
 def _measure_any(candidates) -> str | None:
     return next((shape for candidate in candidates
-                 if (shape := _measured(str(candidate), _as_it_stands(candidate))) is not None),
+                 if (shape := _measured(str(candidate))) is not None),
                 None)
 
 
-def _as_it_stands(path) -> tuple[int, int] | None:
+def _measured(path: str) -> str | None:
     try:
-        stat = os.stat(path)
-    except (OSError, ValueError):
+        return _measuring(path).latest()
+    except ValueError:
         return None
-    return stat.st_mtime_ns, stat.st_size
 
 
 @lru_cache(maxsize=READINGS_KEPT)
-def _measured(path: str, as_it_stands: tuple[int, int] | None) -> str | None:
-    if as_it_stands is None:
-        return None
+def _measuring(path: str) -> ReadWhenChanged[str | None]:
+    return ReadWhenChanged(Path(path), _shape_in)
+
+
+def _shape_in(path: Path) -> str | None:
     try:
         with Image.open(path) as image:
             return shape_of_size(*image.size)

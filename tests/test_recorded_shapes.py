@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from pathlib import Path
 
@@ -138,6 +139,8 @@ def test_a_favorite_keeps_the_recorded_shape(db, tall_image):
 
 
 def test_an_unrecorded_item_is_measured_once_however_often_the_gallery_asks(tall_image, monkeypatch):
+    long_ago = os.stat(tall_image).st_mtime_ns - 3_600_000_000_000
+    os.utime(tall_image, ns=(long_ago, long_ago))
     opened = []
     real_open = Image.open
     monkeypatch.setattr(Image, "open", lambda path, *a, **kw: opened.append(path) or real_open(path, *a, **kw))

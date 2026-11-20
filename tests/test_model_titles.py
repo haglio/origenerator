@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime
 
 import pytest
@@ -101,9 +102,12 @@ def test_a_loras_header_is_read_once_until_the_file_changes(installed_models, mo
         return real(path)
     monkeypatch.setattr(model_titles, "safetensors_metadata", counted)
 
+    long_ago = lora.stat().st_mtime_ns - 3_600_000_000_000
+    os.utime(lora, ns=(long_ago, long_ago))
     first, again = trained_when(lora), trained_when(lora)
     retrained = installed_models.add("loras", "example_look.safetensors", lora=True,
                                      metadata={"ss_training_finished_at": "1792937868.8915"})
+    os.utime(retrained, ns=(long_ago + 1_000_000_000, long_ago + 1_000_000_000))
 
     assert (first, again, trained_when(retrained)) == (
         datetime.fromtimestamp(1792851468.891).astimezone(),

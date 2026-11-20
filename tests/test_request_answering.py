@@ -13,6 +13,7 @@ from origenerator.db_requests import Turn
 from origenerator.gui.request_answering import RequestAnswerer, leave_the_graphics_card
 from origenerator.prompt_edit import NO_GRAPHICS_CARD
 from origenerator.queue_line import ModelHold
+from origenerator.usual_company import UsualCompany
 from tests.waiting import until
 
 
@@ -129,6 +130,27 @@ def test_his_own_prompts_that_touch_the_request_are_gathered_newest_first_for_th
     until(lambda: answers == ["the revision"])
     assert seen["examples"] == [("two dogs chasing a stick, wagging tails", ""),
                                 ("a dog on a park bench, wagging tail", "blurry, cats")]
+
+
+def test_what_his_prompts_usually_have_with_the_asked_thing_goes_to_the_model_too(qtbot, tmp_path):
+    seen = {}
+
+    def work_out(positive, negative, words, **known):
+        seen["company"] = known["company"]
+        return "the revision"
+
+    answerer, db, _jobs, parent = _answerer(qtbot, tmp_path, work_out=work_out)
+    for pid, prompt in (("g1", "a dog, wagging tail, a park"), ("g2", "a dog, wagging tail, a sofa"),
+                        ("g3", "a dog, wagging tail"), ("g4", "a cat on a windowsill")):
+        db.insert_generation(NewGeneration(prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v002",
+                             positive_prompt=prompt, negative_prompt="blurry, cats", params_json="{}",
+                             workflow_json="{}", source="generated"))
+    answers = []
+
+    answerer.ask("fresh", ("a woman", ""), "add a dog", owner=parent, then=answers.append)
+
+    until(lambda: answers == ["the revision"])
+    assert seen["company"] == UsualCompany(positive=("a dog", "wagging tail"), negative=())
 
 
 def test_the_line_is_let_go_even_when_the_one_who_asked_is_gone(qtbot, tmp_path):

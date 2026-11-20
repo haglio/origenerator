@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from functools import partial
 from urllib.error import HTTPError
 
@@ -15,9 +15,10 @@ from origenerator.config import (
     REQUEST_MODEL_STAYS_LOADED_S,
 )
 from origenerator.db_requests import Turn
-from origenerator.prompt_terms import without_nothing_weighted
+from origenerator.prompt_terms import bare_terms, without_nothing_weighted
 from origenerator.prompts import REQUEST_SYSTEM_PROMPT
 from origenerator.request_changes import Prompts, apply_changes, words_of_his
+from origenerator.usual_company import UsualCompany, usual_company
 from origenerator.workflows.base import scene_prompts, scene_text, story_of
 
 logger = logging.getLogger(__name__)
@@ -174,6 +175,7 @@ class WhatIsKnown:
     examples: tuple = ()
     settings: tuple = ()
     weights: bool = True
+    company: UsualCompany = field(default_factory=UsualCompany)
 
 
 def work_out(positive: str, negative: str, request: str, *, in_scenes: bool = False, ask=None,
@@ -210,12 +212,41 @@ def _answered(pair: tuple[str, str], parsed: tuple, asking, told: WhatIsKnown,
     if not isinstance(answer, dict):
         return None
     settings = told.settings
+    if polarity == ADD:
+        answer = _keeping_out_what_he_usually_does(answer, negative, told.company.negative,
+                                                   asked[0])
     outcome = apply_changes(answer, pair, asked=asked, settings=settings,
                             prompts=Prompts(take_weights=told.weights, his_words=_his_words(told)))
     return PromptRevision(positive, negative, without_nothing_weighted(outcome.positive),
                           without_nothing_weighted(outcome.negative), term, polarity, REWRITTEN,
                           outcome.line, tuple(outcome.settings.items()),
                           tuple(request_settings.described(outcome.settings, settings)))
+
+
+def _puts_into_the_positive_prompt(change) -> bool:
+    return (isinstance(change, dict) and change.get("prompt") == "positive"
+            and any(change.get(key) for key in _PUT_INTO_A_PROMPT))
+
+
+def _keeping_out_what_he_usually_does(answer: dict, negative: str, kept_out: tuple,
+                                      request: str) -> dict:
+    changes = answer.get("changes")
+    if not kept_out or not isinstance(changes, list) or not any(
+            _puts_into_the_positive_prompt(change) for change in changes):
+        return answer
+    its_own = next((change for change in changes if isinstance(change, dict)
+                    and change.get("prompt") == "negative" and change.get("add")), None)
+    kept_out_already = {part.strip().lower()
+                        for words in (negative, its_own["add"] if its_own else "")
+                        for part in bare_terms(str(words))}
+    missing = [part for part in kept_out if part.lower() not in kept_out_already]
+    if not missing:
+        return answer
+    if its_own is None:
+        return {**answer, "changes": [*changes, {"prompt": "negative", "add": ", ".join(missing),
+                                                 "for": request}]}
+    with_his = {**its_own, "add": ", ".join([str(its_own["add"]), *missing])}
+    return {**answer, "changes": [with_his if change is its_own else change for change in changes]}
 
 
 def _his_words(told: WhatIsKnown) -> frozenset:
@@ -276,6 +307,13 @@ def prompts_touching(request: str, prompts, *, limit: int = 8,
     return chosen
 
 
+def company_of(request: str, prompts) -> UsualCompany:
+    asked = _asked_about(request)
+    if not asked:
+        return UsualCompany()
+    return usual_company(prompts, lambda positive: _touches(asked, positive) == len(asked))
+
+
 def _notes_touching(request: str, notes: CollectionNotes) -> str:
     asked = _asked_about(request)
     touching = sorted((-_touches(asked, note), position, note)
@@ -321,6 +359,16 @@ _NO_WEIGHTS = (
     "For less of something, say it more mildly or remove it.")
 
 
+def _company_told(company: UsualCompany) -> str:
+    lines = ["WHAT HIS PROMPTS THAT HAVE WHAT HE ASKS FOR USUALLY HAVE WITH IT (parts most of them "
+             "have and his other prompts seldom do):"]
+    if company.positive:
+        lines.append("positive: " + ", ".join(company.positive))
+    if company.negative:
+        lines.append("negative (the app adds these itself): " + ", ".join(company.negative))
+    return "\n".join(lines)
+
+
 def build_request_messages(positive: str, negative: str, request: str, known: WhatIsKnown,
                            system_prompt: str) -> list[dict]:
     parts = []
@@ -330,6 +378,8 @@ def build_request_messages(positive: str, negative: str, request: str, known: Wh
         parts.append("PROMPTS OF HIS THAT TOUCH WHAT HE ASKS FOR (how he writes such things; "
                      "carry over the details that go with them, and what his negative prompts keep "
                      f"out):\n{_numbered(known.examples)}")
+    if known.company.positive or known.company.negative:
+        parts.append(_company_told(known.company))
     if known.settings:
         parts.append("SETTINGS HE MAY ALSO CHANGE (current values):\n"
                      + request_settings.as_told(known.settings))
@@ -352,7 +402,8 @@ _LEFT_OPEN_CHECK = (
     "List the words of yours in it that he did not say and that settle something he left open: "
     "which way a body lies or faces, a pose, a place, a person, a garment, a camera or a time that "
     "neither his words nor the prompt had. Words that only say more about the thing he asked for "
-    "(its size, color, material, look) are not such words. "
+    "(its size, color, material, look) are not such words, and nor is the person the thing is "
+    "part of when no one in the prompt can have it. "
     'Reply with only a JSON object: {{"left_open": ["<each such word or phrase, exactly as you '
     'wrote it>"]}}, an empty list when there are none.')
 _PUT_INTO_A_PROMPT = ("with", "add")
@@ -380,7 +431,7 @@ def _he_said(phrase: str, request: str) -> bool:
     return all(word in said for word, *_ in _tokens(phrase))
 
 
-def _leaving_open_what_he_did(answer: dict, request: str, ask_again) -> dict:
+def _leaving_open_what_he_did(answer: dict, request: str, ask_again, his: str = "") -> dict:
     for change in answer.get("changes") or ():
         key = next((key for key in _PUT_INTO_A_PROMPT if change.get(key)), None)
         if key is None or change.get("prompt") != "positive":
@@ -394,7 +445,8 @@ def _leaving_open_what_he_did(answer: dict, request: str, ask_again) -> dict:
             continue
         kept = str(change[key])
         for phrase in left_open if isinstance(left_open, list) else ():
-            if isinstance(phrase, str) and phrase.strip() and not _he_said(phrase, request):
+            if isinstance(phrase, str) and phrase.strip() and not _he_said(
+                    phrase, f"{request} {his}"):
                 kept = _without(kept, phrase.strip())
         if kept:
             change[key] = kept
@@ -413,4 +465,5 @@ def ask_the_model(positive: str, negative: str, request: str, known: WhatIsKnown
         return asking([*messages, {"role": "assistant", "content": local_llm.text_of(said)},
                        {"role": "user", "content": question}], temperature=0)
 
-    return _leaving_open_what_he_did(local_llm.answer_of(said), request, ask_again)
+    return _leaving_open_what_he_did(local_llm.answer_of(said), request, ask_again,
+                                     " ".join(known.company.positive))

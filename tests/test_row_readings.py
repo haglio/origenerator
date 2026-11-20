@@ -18,6 +18,16 @@ def test_a_row_read_before_is_not_worked_out_again():
     assert asked == ["pic-1"]
 
 
+def test_a_reading_one_look_at_the_library_never_asked_for_is_kept_for_the_next():
+    asked, row = [], {"prompt_id": "pic-1"}
+    first = RowReadings()
+    first.of("name", _counted(asked))(row)
+
+    RowReadings(RowReadings(first)).of("name", _counted(asked))(row)
+
+    assert asked == ["pic-1"]
+
+
 def test_an_equal_row_that_is_another_row_is_worked_out_again():
     asked = []
     before = RowReadings()

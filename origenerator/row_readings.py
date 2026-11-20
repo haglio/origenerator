@@ -9,7 +9,7 @@ class RowReadings:
         self._now: dict[str, tuple[object, dict[int, tuple[dict, object]]]] = {}
 
     def readings_now(self) -> dict[str, tuple[object, dict[int, tuple[dict, object]]]]:
-        return self._now
+        return {**self._before, **self._now}
 
     def of(self, reading: str, work_out: Callable[[dict], object], *,
            depends_on: object = None) -> Callable[[dict], object]:

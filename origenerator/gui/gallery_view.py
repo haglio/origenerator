@@ -1832,7 +1832,7 @@ class GalleryView(QWidget):
     def _on_reroll_preview(self, key: str, prompt_id: str, data: bytes):
         for tab in self.generate_pane.watchers_of(key):
             tab.show_live_frame(data, prompt_id)
-        self.enhance.reconcile()
+        self.enhance.show_the_frame_of(prompt_id)
         self.slideshows.note_generating(prompt_id, data)
 
     def _clear_reroll_selection(self):

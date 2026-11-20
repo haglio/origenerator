@@ -322,7 +322,14 @@ class GalleryPane(QObject):
 
     def show_enhancing(self, runs: dict):
         for prompt_id, tile in self._thumb_widgets.items():
-            tile.set_enhancing(runs.get(prompt_id))
+            run = runs.get(prompt_id)
+            if run is not None or tile.enhancing is not None:
+                tile.set_enhancing(run)
+
+    def show_enhancing_of(self, runs: dict):
+        for prompt_id, run in runs.items():
+            if (tile := self._thumb_widgets.get(prompt_id)) is not None:
+                tile.set_enhancing(run)
 
     def show_widget(self, widget: QWidget):
         self._kept = _KeptTiles()

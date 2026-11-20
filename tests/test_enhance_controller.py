@@ -175,6 +175,9 @@ class FakeGalleryPane:
     def show_enhancing(self, by_prompt):
         self.enhancing = dict(by_prompt)
 
+    def show_enhancing_of(self, by_prompt):
+        self.enhancing_of = dict(by_prompt)
+
     def refresh_corners(self):
         self.corner_refreshes += 1
 
@@ -783,6 +786,63 @@ def test_which_image_a_run_is_of_is_worked_out_once_while_the_runs_stay_the_same
     assert host.library.walks == 1, (
         "the match walks every image and frames come several times a second, so it is "
         "worked out again only when the set of runs changes")
+
+
+class _CountedDB(SpiedDB):
+    def __init__(self, path):
+        super().__init__(path)
+        self.durations_asked = []
+
+    def recent_durations(self, workflow_name, limit=10):
+        self.durations_asked.append(workflow_name)
+        return super().recent_durations(workflow_name, limit)
+
+
+def _enhancing_one_of_two(enhance, stored, *, kind=SpiedDB):
+    rows = [_image("i1", files=("one.png",)), _image("i2", files=("two.png",))]
+    db = stored(rows, kind=kind)
+    tab, gallery_pane, slideshows = FakeGenerateTab(rows[0]), FakeGalleryPane(), FakeSlideshows()
+    parts = EnhanceParts(jobs=FakeReroll([FakeJob("run-a", input_image="one.png")]),
+                         gallery_pane=gallery_pane, slideshows=slideshows,
+                         info_tabs_of=lambda: FakeTabs([tab]))
+    controller, _host = _assembled(FakeHost(rows=rows), parts, db)
+    controller.reconcile()
+    gallery_pane.enhancing = tab.pending = slideshows.told = "untouched"
+    return controller, db, tab, gallery_pane, slideshows
+
+
+def test_a_frame_of_a_job_that_enhances_nothing_touches_no_tile_tab_or_slideshow(
+        enhance, stored):
+    controller, _db, tab, gallery_pane, slideshows = _enhancing_one_of_two(enhance, stored)
+
+    controller.show_the_frame_of("an-image-being-made")
+
+    assert (gallery_pane.enhancing, tab.pending, slideshows.told) == ("untouched",) * 3
+    assert not hasattr(gallery_pane, "enhancing_of")
+
+
+def test_a_frame_of_an_enhancement_redraws_only_the_tile_and_tab_of_its_image(enhance, stored):
+    controller, _db, tab, gallery_pane, slideshows = _enhancing_one_of_two(enhance, stored)
+
+    controller.show_the_frame_of("run-a")
+
+    assert set(gallery_pane.enhancing_of) == {"i1"}
+    assert gallery_pane.enhancing == "untouched"
+    assert tab.pending.frame == b"frame"
+    assert slideshows.frames == {"i1": b"frame"}
+
+
+def test_the_typical_seconds_of_an_enhancement_are_asked_once_however_many_frames_stream_in(
+        enhance, stored):
+    controller, db, _tab, _pane, _slideshows = _enhancing_one_of_two(
+        enhance, stored, kind=_CountedDB)
+
+    for _frame in range(5):
+        controller.show_the_frame_of("run-a")
+
+    assert db.durations_asked == [ENHANCE], (
+        "how long an enhancement takes changes only when one finishes, which the Job Queue "
+        "says; frames come several times a second")
 
 
 def test_a_run_launched_again_on_the_same_image_is_read_afresh(enhance, stored):

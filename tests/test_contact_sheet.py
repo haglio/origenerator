@@ -207,3 +207,18 @@ def test_the_videos_on_the_sheet_pause_and_play_with_the_whole_room(qtbot, tmp_p
         omnipause.freeze(False)
 
     assert (paused, player.play.called) == ((True, False), True)
+
+
+def test_a_video_shown_while_everything_is_paused_is_held_on_its_first_frame(qtbot, tmp_path):
+    video = write_mp4(tmp_path / "wide.mp4", width=32, height=18)
+    sheet, players = _sheet_of_players(qtbot)
+
+    omnipause.freeze(True)
+    try:
+        sheet.show_files([ShownFile(str(video), MediaType.VIDEO)])
+    finally:
+        omnipause.freeze(False)
+
+    assert (players[0].pause.called, players[0].play.call_count) == (True, 1), (
+        "a player never told to pause or play decodes nothing, and its surface stays black; "
+        "paused, it shows the first frame")

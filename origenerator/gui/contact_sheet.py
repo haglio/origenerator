@@ -54,6 +54,13 @@ def _is_file(path) -> bool:
     return bool(path) and Path(path).is_file()
 
 
+def _play_unless(frozen: bool, player: QMediaPlayer) -> None:
+    if frozen:
+        player.pause()
+    else:
+        player.play()
+
+
 class _Image(NamedTuple):
     pixmap: QPixmap
 
@@ -98,8 +105,7 @@ class ContactSheet(QWidget):
         player.setVideoOutput(surface.video_sink())
         player.setLoops(QMediaPlayer.Loops.Infinite)
         player.setSource(QUrl.fromLocalFile(str(Path(file.path))))
-        if not omnipause.frozen():
-            player.play()
+        _play_unless(omnipause.frozen(), player)
         surface.show()
         shape = QImageReader(str(file.thumbnail)).size() if _is_file(file.thumbnail) else QSize()
         return _Video(player, surface, shape)
@@ -116,10 +122,7 @@ class ContactSheet(QWidget):
     def set_frozen(self, frozen: bool) -> None:
         for shown in self._shown:
             if isinstance(shown, _Video):
-                if frozen:
-                    shown.player.pause()
-                else:
-                    shown.player.play()
+                _play_unless(frozen, shown.player)
 
     def count(self) -> int:
         return len(self._shown)

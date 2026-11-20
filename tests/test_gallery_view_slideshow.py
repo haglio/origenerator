@@ -393,7 +393,6 @@ def test_a_double_click_on_a_non_ai_video_starts_a_slideshow_on_it(qtbot, monkey
 
     view._gallery_pane.slideshow_requested.emit("n1")
     slideshow = view.slideshows.showing
-    qtbot.addWidget(slideshow.shown)
     funestra_of(slideshow.shown)
 
     assert _playing(slideshow) == ["n1"]

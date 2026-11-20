@@ -560,9 +560,10 @@ class GalleryPane(QObject):
         top = self._scroll_bar().value()
         while self._pages.more() and (_drawn_height(drawn, seen.width())
                                       - top - seen.height() < _REACH):
+            added_since = drawn.layout().count()
             self._pages.draw(_PAGE)
             # Qt only queues the show of a tile added to a page on screen; until it runs the page measures as nothing.
-            show_the_tiles_qt_queued_to_show(drawn)
+            show_the_tiles_qt_queued_to_show(drawn, added_since)
         self._in_sight.follow(drawn, self._thumb_widgets.values(), top, top + seen.height())
 
     def _scroll_bar(self):

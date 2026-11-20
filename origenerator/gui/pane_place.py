@@ -66,6 +66,16 @@ def _lay_out_now(scroll) -> None:
     QCoreApplication.sendEvent(scroll, QEvent(QEvent.Type.LayoutRequest))
 
 
-def show_the_tiles_qt_queued_to_show(content) -> None:
-    for tile in content.findChildren(QWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
+def show_the_tiles_qt_queued_to_show(content, added_since: int | None = None) -> None:
+    grid = content.layout()
+    if grid is not None:
+        # Qt lays the whole grid out again for each tile it shows while its layout is on.
+        grid.setEnabled(False)
+    tiles = (content.findChildren(QWidget, options=Qt.FindChildOption.FindDirectChildrenOnly)
+             if grid is None or added_since is None
+             else [grid.itemAt(at).widget() for at in range(added_since, grid.count())])
+    for tile in tiles:
         QCoreApplication.sendPostedEvents(tile, QEvent.Type.MetaCall)
+    if grid is not None:
+        grid.setEnabled(True)
+        grid.activate()

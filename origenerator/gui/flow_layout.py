@@ -99,7 +99,7 @@ class FlowLayout(QLayout):
 
     def setGeometry(self, rect):
         super().setGeometry(rect)
-        self._do_layout(rect, place=True)
+        self._height_at[rect.width()] = self._do_layout(rect, place=True)
         self.times_placed += 1
 
     def sizeHint(self):

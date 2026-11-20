@@ -766,6 +766,20 @@ def test_the_tick_after_a_star_finds_nothing_to_redraw(qtbot):
     assert view.toc.item_for(dog) is row
 
 
+def test_the_tick_that_finds_a_job_running_draws_no_folder_again(qtbot):
+    view, _cat, _dog = _two_leaf_view(qtbot, extra=[
+        {**_running_row("j", prompt="a cat"), "status": "pending"}])
+    drawn = view.library.drawn_version
+    view._db.update_generation("j", status="running")
+
+    view._poll()
+
+    assert view.library.drawn_version == drawn, (
+        "the job's tile and its line in the Job Queue say it started; every folder, the TOC "
+        "and the search are as they were")
+    assert [item.reading.rendering for item in view.job_queue.items()] == [True]
+
+
 def test_each_tick_puts_what_a_slideshow_is_locked_on_first(qtbot, monkeypatch):
     view, _cat, _dog = _two_leaf_view(qtbot)
     ticks = []

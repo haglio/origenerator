@@ -104,6 +104,40 @@ def test_an_enhance_still_being_made_is_no_news_and_the_finished_one_is(tmp_path
         "an Enhance being made has no place in the gallery, so nothing is drawn again for it")
 
 
+def _a_job(prompt_id: str, status: str, **params) -> dict:
+    return {**_image(prompt_id), "status": status,
+            "params_json": json.dumps({"positive_prompt": "scene one", "seed": 3, **params}),
+            "output_files": "[]"}
+
+
+def test_a_job_that_starts_running_is_no_news_and_its_queuing_and_landing_are(tmp_path):
+    readings, db, _published = _readings(tmp_path, _image("a"))
+    readings.moved_to(*readings.read())
+    put_rows(db, [_a_job("j", "pending")])
+    queued = read_whole(db)
+    db.update_generation("j", status="running")
+    running = read_whole(db)
+    db.update_generation("j", status="completed",
+                         output_files=json.dumps([{"filename": "j.png", "subfolder": ""}]))
+    landed = read_whole(db)
+
+    assert [readings.is_news(read, readings.drawn_version)
+            for read in (queued, running, landed)] == [True, False, True], (
+        "a job's own tile in the gallery and its line in the Job Queue say it started; the "
+        "folders, the TOC and the search are the same before and after")
+
+
+def test_a_waiting_job_whose_settings_change_is_news(tmp_path):
+    readings, db, _published = _readings(tmp_path, _image("a"), _a_job("j", "pending"))
+    readings.moved_to(*readings.read())
+    db.set_params_and_workflow("j", params_json=json.dumps(
+        {"positive_prompt": "scene one", "seed": 3, "start_image": "a.png"}), workflow_json="{}")
+
+    assert readings.is_news(read_whole(db), readings.drawn_version) is True, (
+        "a waiting video's settings take its starting frame when it starts, and the folder "
+        "it sits in can change with them")
+
+
 def test_the_leaf_folders_are_those_of_the_sides_the_last_read_was_taken_for(tmp_path):
     readings, _db, _published = _readings(tmp_path, _image("a"), _image("b"))
     assert readings.leaf_folders() == {}

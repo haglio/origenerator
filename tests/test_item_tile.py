@@ -8,6 +8,7 @@ import pytest
 from PIL import Image
 from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
 from PySide6.QtGui import QEnterEvent, QIcon, QMovie
+from PySide6.QtWidgets import QWidget
 from shared_ui.colors import BLUE, TEXT_PRIMARY
 from shared_ui.spacing import GAP_SMALL
 from shared_ui.testing import appending_to
@@ -431,28 +432,36 @@ def test_thumbnail_starts_unselected(qtbot):
     tw = ItemTile("p1", None, "label")
     qtbot.addWidget(tw)
     assert tw._selected is False
-    assert tw.styleSheet() == ""
 
 
-def _picked_tile_drawn_under_the_app_stylesheet(qtbot):
+def _tile_drawn_under_the_app_stylesheet(qtbot, *picks):
     def build():
         tw = ItemTile("p1", None, "caption")
         tw.resize(180, 200)
-        tw.set_selected(True)
+        for selected in picks:
+            tw.set_selected(selected)
         return tw, tw
 
     return drawn_under_the_app_stylesheet(qtbot, build)
 
 
+def test_a_tile_picked_and_unpicked_draws_as_one_never_picked(qtbot):
+    _tile, never = _tile_drawn_under_the_app_stylesheet(qtbot)
+    _tile, unpicked = _tile_drawn_under_the_app_stylesheet(qtbot, True, False)
+
+    assert unpicked == never
+    assert never.pixelColor(8, 8) != BLUE
+
+
 def test_selecting_fills_the_whole_tile_with_the_familys_blue(qtbot):
-    _tile, img = _picked_tile_drawn_under_the_app_stylesheet(qtbot)
+    _tile, img = _tile_drawn_under_the_app_stylesheet(qtbot, True)
 
     assert img.pixelColor(8, 8) == BLUE
     assert img.pixelColor(8, 182) == BLUE
 
 
 def test_a_picked_tiles_thumbnail_wears_a_white_frame(qtbot):
-    tile, img = _picked_tile_drawn_under_the_app_stylesheet(qtbot)
+    tile, img = _tile_drawn_under_the_app_stylesheet(qtbot, True)
     area = tile._image_label.geometry()
 
     assert img.pixelColor(area.left(), area.center().y()) == TEXT_PRIMARY
@@ -663,6 +672,23 @@ def test_a_tile_told_the_selection_it_already_has_is_not_styled_again(qtbot):
     assert styled == [], "a click that did not move the selection restyles no thumbnail"
 
 
+def test_picking_and_unpicking_a_tile_parses_no_style_sheet(qtbot, monkeypatch):
+    tiles = [ItemTile(f"p{n}", None, "label") for n in range(3)]
+    for tile in tiles:
+        qtbot.addWidget(tile)
+    sheets_set = []
+    monkeypatch.setattr(QWidget, "setStyleSheet",
+                        lambda widget, sheet: sheets_set.append(sheet))
+
+    for selected in (True, False, True):
+        for tile in tiles:
+            tile.set_selected(selected)
+
+    assert sheets_set == [], (
+        "a Shift-click across a big folder changes hundreds of tiles, and a style sheet "
+        "set on each one is parsed again and polishes every child of the tile")
+
+
 _A_CHANGE_TO = {
     "caption": lambda: "another name",
     "media_type": lambda: MediaType.VIDEO,
@@ -692,3 +718,4 @@ def test_a_tiles_look_holds_the_fields_a_built_tile_has_no_setter_for(qtbot, fie
     assert kept == hasattr(ItemTile, f"set_{field}"), (
         "a redraw keeps a tile whose look is unchanged and sets what changed on it, so a field"
         " goes into the look exactly when a built tile has no setter for it")
+

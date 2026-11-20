@@ -304,6 +304,7 @@ class GalleryPane(QObject):
         self._inflight_by_key: dict[str, InFlightItem] = {}
         self._inflight_signature: tuple = ()
         self._model = LibrarySnapshot([])
+        self._requests: list[dict] | None = None
         self._pages = _Pages()
         self._drawing_ahead_of: QWidget | None = None
         self._search_rows: list[dict] = []
@@ -313,8 +314,9 @@ class GalleryPane(QObject):
         scroll.verticalScrollBar().valueChanged.connect(self.follow_the_scroll)
         scroll.verticalScrollBar().rangeChanged.connect(self.follow_the_scroll)
 
-    def set_model(self, model: LibrarySnapshot):
+    def set_model(self, model: LibrarySnapshot, *, requests: list[dict] | None = None):
         self._model = model
+        self._requests = requests
 
     def _open_collection_rows(self, collection: str) -> list[dict]:
         return self._model.in_collection(collection, self._collection_shape,
@@ -882,7 +884,16 @@ class GalleryPane(QObject):
         in_front = leading.prompt_id if leading is not None else None
         waiting = {row["prompt_id"] for row in group.rows
                    if not gallery.produced_output(row) and row["prompt_id"] != in_front}
-        return _back_of_the_line_first(self._tile_items(), waiting) if waiting else []
+        if not waiting:
+            return []
+        return _back_of_the_line_first(self._tile_items(self._rows_with_fresh(waiting),
+                                                        self._requests), waiting)
+
+    def _rows_with_fresh(self, prompt_ids) -> list[dict]:
+        fresh = self._db.get_generations(prompt_ids)
+        rows = [fresh.get(row["prompt_id"], row) for row in self._model.rows]
+        listed = {row["prompt_id"] for row in self._model.rows}
+        return rows + [row for prompt_id, row in fresh.items() if prompt_id not in listed]
 
     def _add_inflight_tile(self, flow, item):
         tile = InFlightTile(item)

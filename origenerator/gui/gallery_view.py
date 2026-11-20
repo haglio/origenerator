@@ -983,7 +983,7 @@ class GalleryView(QWidget):
             [folder for tree in trees.values() for folder in tree], meta,
             self.library.customs), item_name=self._item_names.of)
         requests = self.library.requests
-        self._gallery_pane.set_model(library)
+        self._gallery_pane.set_model(library, requests=requests)
         self.toc.populate(
             self._build_sides(trees), folder_meta=meta,
             recently_worked=gallery.recently_worked_folders(trees, rows, bumped=library.recency),

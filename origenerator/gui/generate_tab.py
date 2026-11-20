@@ -9,7 +9,7 @@ from typing import NamedTuple
 
 from app_support.gallery_rows import made_here
 from PySide6.QtCore import QPoint, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QIcon, QPixmap
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -61,7 +61,6 @@ from origenerator.generation_config import (
     merge_denormalized,
     would_reproduce_a_completed_run,
 )
-from origenerator.gui import icons
 from origenerator.gui.action_button import ActionButton
 from origenerator.gui.action_row import ActionRow
 from origenerator.gui.collapsible_section import line_up_the_labels
@@ -1061,18 +1060,10 @@ class GenerateTab(DropZones):
     def reaches(self) -> tuple[DropZone, ...]:
         return () if self._param_form is None else self._param_form.drop_zones()
 
-    def tab_mark_source(self) -> tuple:
+    def tab_mark_source(self) -> tuple[str | None, MediaType | None]:
         row = self._shown_row()
-        thumb = (row or {}).get("thumbnail_path")
-        if thumb:
-            try:
-                seen = Path(thumb).stat()
-            except OSError:
-                seen = None
-            if seen is not None:
-                return str(thumb), seen.st_mtime_ns, seen.st_size
         media = media_type_of_row(row) if row is not None else self._makes()
-        return (media,) if media else ()
+        return (row or {}).get("thumbnail_path"), media
 
     def prefill(self, workflow_name: str, params: dict):
         with self._loading():
@@ -1692,12 +1683,6 @@ class GenerateTab(DropZones):
     def video_on_screen(self) -> str | None:
         return self._viewport.video_on_screen()
 
-
-
-def icon_of_mark_source(source: tuple) -> QIcon:
-    if len(source) == 3:
-        return QIcon(QPixmap(source[0]))
-    return icons.media_type_icon(source[0]) if source else QIcon()
 
 
 def _scrolling_column() -> tuple[QScrollArea, QVBoxLayout]:

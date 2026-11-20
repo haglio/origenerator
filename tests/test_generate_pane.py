@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
@@ -1302,11 +1303,17 @@ def test_only_the_tab_in_front_lets_its_video_play(tabs):
     assert (told[first][-1], told[second][-1]) == (True, False)
 
 
+def _thumbnail_written_long_ago(path, color) -> None:
+    pixmap = QPixmap(8, 8)
+    pixmap.fill(color)
+    pixmap.save(str(path))
+    long_ago = path.stat().st_mtime_ns - 3_600_000_000_000
+    os.utime(path, ns=(long_ago, long_ago))
+
+
 def test_a_tab_redrawn_on_the_same_item_decodes_its_thumbnail_once(tabs, tmp_path, monkeypatch):
     thumb = tmp_path / "thumb.png"
-    pixmap = QPixmap(8, 8)
-    pixmap.fill(Qt.GlobalColor.red)
-    pixmap.save(str(thumb))
+    _thumbnail_written_long_ago(thumb, Qt.GlobalColor.red)
     row = dict(_complete_gen(tabs._db, "g1", _sdxl_full(positive_prompt="a heron", seed=4),
                              "sdxl_g1.png"), thumbnail_path=str(thumb))
     tab = tabs.currentWidget()
@@ -1319,3 +1326,20 @@ def test_a_tab_redrawn_on_the_same_item_decodes_its_thumbnail_once(tabs, tmp_pat
         tab.title_changed.emit(tab.title())
 
     assert decoded == []
+
+
+def test_a_tab_s_mark_follows_its_thumbnail_rendered_again(tabs, tmp_path):
+    thumb = tmp_path / "thumb.png"
+    _thumbnail_written_long_ago(thumb, Qt.GlobalColor.red)
+    row = dict(_complete_gen(tabs._db, "g1", _sdxl_full(positive_prompt="a heron", seed=4),
+                             "sdxl_g1.png"), thumbnail_path=str(thumb))
+    tab = tabs.currentWidget()
+    tab._viewport.show_media = MagicMock()
+    tabs.load_selection(row, [row])
+    first = tabs.tabIcon(tabs.currentIndex()).cacheKey()
+
+    thumb.unlink()
+    _thumbnail_written_long_ago(thumb, Qt.GlobalColor.blue)
+    tab.title_changed.emit(tab.title())
+
+    assert tabs.tabIcon(tabs.currentIndex()).cacheKey() != first

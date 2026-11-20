@@ -294,6 +294,12 @@ class GalleryTree:
     def widget(self):
         return self._tree
 
+    def place(self) -> dict[str, int]:
+        return self._tree.scroll_places()
+
+    def return_to(self, place: dict[str, int]) -> None:
+        self._tree.scroll_back_to(place)
+
     def selected_folder_key(self) -> str | None:
         item = self._tree.currentItem()
         return item.data(0, TREE_KEY_ROLE) if item is not None else None

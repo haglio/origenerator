@@ -965,6 +965,7 @@ class GalleryView(QWidget):
     def _rebuild(self, rows, meta):
         standing = self.toc.selected_folder_key()
         place = self._gallery_pane.place()
+        toc_place = self.toc.place()
         selected_key = standing or self._pending_key
         multi_keys = self._tree.selected_folder_keys()
         if len(multi_keys) <= 1:
@@ -1008,6 +1009,7 @@ class GalleryView(QWidget):
             self.search.run()
         if standing is not None and self.toc.selected_folder_key() == standing:
             self._gallery_pane.return_to(place)
+            self.toc.return_to(toc_place)
         self.job_queue.update(self.job_queue.items(rows=rows, requests=requests))
         self._reconcile_generating()
         for tab in self.generate_pane.generate_tabs():

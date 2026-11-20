@@ -40,6 +40,7 @@ class LibraryReadings:
         self.drawn_version = 0
         self._fingerprint: tuple = (None, None)
         self._lists_built_from = None
+        self._fingerprinted: tuple[list, int] | None = None
 
     @property
     def customs(self) -> list:
@@ -49,12 +50,13 @@ class LibraryReadings:
         return self._db.list_generations(), self._db.folder_meta_map()
 
     def moved_to(self, rows, meta) -> bool:
-        fingerprint = _fingerprint(rows, meta)
+        fingerprint = self._fingerprint_of(rows, meta)
         moved = fingerprint != self._fingerprint
         self._fingerprint = fingerprint
         return moved
 
     def is_news(self, read: Read, read_at: int) -> bool:
+        self._fingerprinted = (read.rows, read.fingerprint[0])
         if read.fingerprint == self._fingerprint or read_at != self.drawn_version:
             return False
         self._fingerprint = read.fingerprint
@@ -70,8 +72,14 @@ class LibraryReadings:
         self.requests = self._db.list_requests()
         return library
 
+    def _fingerprint_of(self, rows, meta) -> tuple[int, int]:
+        known = self._fingerprinted
+        if known is None or known[0] is not rows:
+            known = self._fingerprinted = (rows, _rows_fingerprint(rows))
+        return known[1], _folder_meta_fingerprint(meta)
+
     def _reading_of(self, rows, meta) -> LibrarySnapshot:
-        state = _fingerprint(rows, meta)
+        state = self._fingerprint_of(rows, meta)
         unmoved = state == self._lists_built_from
         library = LibrarySnapshot(rows, trash_collection.trash_items(self._db.list_trashed()),
                                   folder_meta=meta, name_of=self._item_names.of,

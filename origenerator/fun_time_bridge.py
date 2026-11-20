@@ -5,6 +5,7 @@ import time
 from contextlib import nullcontext
 from pathlib import Path
 
+from app_support.written_file import ReadWhenChanged
 from funestra.file_channel import (
     append_command,
     consume_command_file,
@@ -84,6 +85,10 @@ def _the_last_line_of(error: Exception) -> str:
     return f"{type(error).__name__}: {said}" if said else type(error).__name__
 
 
+def _the_room_paused(paused_flag: Path) -> bool:
+    return read_paused_state(paused_flag, logger=logger)
+
+
 def _read(line: str) -> tuple[str, str, str, float | None, bool]:
     keyword, marker, argument = _split_argument(line)
     said_at, heard = None, False
@@ -108,6 +113,8 @@ class FunTimeBridge(QObject):
         self._radio: list[Path] | None = None
         self._gallery = gallery
         self._paused = False
+        self._paused_flag = (None if session.paused_file is None
+                             else ReadWhenChanged(session.paused_file, _the_room_paused))
         self._core_ready = core_ready
         self._start_failed: str | None = None
         self._waiting_for_core: list[str] | None = None if core_built else []
@@ -285,10 +292,10 @@ class FunTimeBridge(QObject):
             logger.warning("Unanswered press for the %s slideshow dropped: %s", shape, line)
 
     def _apply_paused(self) -> None:
-        if self._session.paused_file is None:
+        if self._paused_flag is None:
             return
-        paused = read_paused_state(self._session.paused_file, logger=logger)
-        if paused == self._paused:
+        paused = self._paused_flag.latest()
+        if paused is None or paused == self._paused:
             return
         self._paused = paused
         self._gallery.set_room_paused(paused)

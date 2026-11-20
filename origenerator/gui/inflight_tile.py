@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QPoint, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from shared_ui.spacing import BUTTON_RADIUS
 
@@ -11,6 +10,7 @@ from origenerator.gui.cancel_bar import CancelBar
 from origenerator.gui.corner_buttons import CornerButtons, bar_between_the_bottom_corners
 from origenerator.gui.inflight import TICK_MS, InFlightItem, cancel_tooltip, queue_wait_text
 from origenerator.gui.item_type_icon import ItemTypeIcon
+from origenerator.gui.live_frames import pixmap_of
 from origenerator.gui.tile_status_scrim import TileStatusScrim
 
 _IMAGE_SIZE = tile_shape.THUMBNAIL_SIZE
@@ -33,6 +33,7 @@ class InFlightTile(QWidget):
         super().__init__(parent)
         self._key = item.key
         self._item = item
+        self._shown: tuple | None = None
         self.setObjectName("thumbnailTile")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -95,20 +96,26 @@ class InFlightTile(QWidget):
                                     kind=item.media_type)
         else:
             self._controls.hide_all()
-        pixmap = QPixmap()
-        if (item.reading.frame and pixmap.loadFromData(item.reading.frame)
-                and not pixmap.isNull()):
+        self._draw_the_thumbnail(item)
+        self._render_timing()
+        if item.reading.started_at is None and item.starts_at is None:
+            self._tick.stop()
+        else:
+            self._tick.start()
+
+    def _draw_the_thumbnail(self, item: InFlightItem):
+        shown = (item.reading.frame, item.source_file)
+        if shown == self._shown:
+            return
+        self._shown = shown
+        pixmap = pixmap_of(item.reading.frame) if item.reading.frame else None
+        if pixmap is not None:
             self._image.setPixmap(pixmap.scaled(
                 *_IMAGE_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             ))
         else:
             self._show_backdrop(item)
-        self._render_timing()
-        if item.reading.started_at is None and item.starts_at is None:
-            self._tick.stop()
-        else:
-            self._tick.start()
 
     def _show_backdrop(self, item: InFlightItem):
         backdrop = blurred_backdrop(item.source_file, QSize(*_IMAGE_SIZE))

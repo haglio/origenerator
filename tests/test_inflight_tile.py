@@ -55,6 +55,21 @@ def test_tile_shows_the_live_frame_when_one_is_present(qtbot):
     assert not tile._image.pixmap().isNull()
 
 
+def test_a_poll_that_brings_the_same_frame_draws_the_tile_no_image_again(qtbot, monkeypatch):
+    frame = _png_bytes()
+    tile = InFlightTile(_item(status="running", frame=frame))
+    qtbot.addWidget(tile)
+    drawn = []
+    monkeypatch.setattr(tile._image, "setPixmap", drawn.append)
+
+    tile.update_item(_item(status="running", frame=bytes(frame), progress=(3, 20)))
+    assert drawn == [], (
+        "the Job Queue is read every 1.5 s and a frame changes only when ComfyUI sends one")
+
+    tile.update_item(_item(status="running", frame=_png_bytes((20, 200, 40))))
+    assert len(drawn) == 1
+
+
 def test_the_stage_message_reads_over_the_frame_rather_than_replacing_it(qtbot):
     tile = InFlightTile(_item(status="running", frame=_png_bytes()))
     qtbot.addWidget(tile)

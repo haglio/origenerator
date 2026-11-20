@@ -68,7 +68,7 @@ from tests.slideshow_hud_support import (
     tick_the_funestra,
 )
 from tests.test_fun_time_gallery import _session
-from tests.test_osr2_driver import ACTIONS, FakePlayer
+from tests.test_osr2_driver import SCRIPT, FakePlayer
 
 
 class _FakeDriver:
@@ -375,7 +375,7 @@ def test_the_rooms_pause_holds_a_scripted_videos_drive_still(qtbot, monkeypatch)
     view = GalleryView(database_of([]), actions=FakeActions(), shared=Shared(osr2_motion=_SignalMotion()))
     qtbot.addWidget(view)
     tab = view.generate_pane.current_generate_tab()
-    tab.osr2_drive_target = lambda: ("A.mp4", FakePlayer(pos=100), ACTIONS)
+    tab.osr2_drive_target = lambda: ("A.mp4", FakePlayer(pos=100), SCRIPT)
     view.osr2.control.setChecked(True)
 
     view.set_room_paused(True)
@@ -996,7 +996,7 @@ def test_quitting_lets_go_of_the_script_the_motion_and_the_radio(qtbot):
     radio = _FakeRadio()
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), shared=Shared(osr2_motion=_SignalMotion(), radio=radio))
     qtbot.addWidget(view)
-    view.osr2.driver.start(FakePlayer(), ACTIONS)
+    view.osr2.driver.start(FakePlayer(), SCRIPT)
     view.osr2.motion.active = True
 
     QApplication.instance().aboutToQuit.emit()

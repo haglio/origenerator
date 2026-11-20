@@ -5,6 +5,7 @@ import logging
 from contextlib import ExitStack
 from dataclasses import dataclass, field
 from functools import partial
+from pathlib import Path
 
 from app_support.funscript import read_actions
 from app_support.osr2_hold import PARK, RESUME
@@ -23,13 +24,81 @@ logger = logging.getLogger(__name__)
 _POLL_INTERVAL_MS = 50
 
 
+def drive_script(actions) -> Funscript | None:
+    if not actions:
+        return None
+    return Funscript(sorted((int(a["at"]), int(a["pos"])) for a in actions))
+
+
+@dataclass(frozen=True)
+class ScriptRead:
+    path: Path
+    stamp: tuple[int, int]
+    script: Funscript | None
+
+
+def _stamp_of(path: Path) -> tuple[int, int] | None:
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    return stat.st_mtime_ns, stat.st_size
+
+
+class DriveScripts:
+    def __init__(self, *, read=read_actions, kept: int = 4) -> None:
+        self._read = read
+        self._most_kept = kept
+        self._kept: dict[Path, ScriptRead] = {}
+
+    def read_ahead(self, video_path) -> ScriptRead | None:
+        found = self._found(video_path)
+        if found is None or self._is_kept(*found):
+            return None
+        return self._read_at(*found)
+
+    def keep(self, read: ScriptRead | None) -> None:
+        if read is None:
+            return
+        self._kept.pop(read.path, None)
+        self._kept[read.path] = read
+        while len(self._kept) > self._most_kept:
+            del self._kept[next(iter(self._kept))]
+
+    def script_of(self, video_path) -> Funscript | None:
+        found = self._found(video_path)
+        if found is None:
+            return None
+        if not self._is_kept(*found):
+            self.keep(self._read_at(*found))
+        return self._kept[found[0]].script
+
+    def _is_kept(self, path: Path, stamp: tuple[int, int]) -> bool:
+        kept = self._kept.get(path)
+        return kept is not None and kept.stamp == stamp
+
+    def _found(self, video_path) -> tuple[Path, tuple[int, int]] | None:
+        path = funscript_of(video_path, places=OUTPUT_PLACES)
+        stamp = None if path is None else _stamp_of(path)
+        return None if stamp is None else (path, stamp)
+
+    def _read_at(self, path: Path, stamp: tuple[int, int]) -> ScriptRead:
+        return ScriptRead(path, stamp, drive_script(self._read(path)))
+
+
+SCRIPTS = DriveScripts()
+
+
 def drive_target_for(video_path, player):
     if video_path is None:
         return None
-    actions = read_actions(funscript_of(video_path, places=OUTPUT_PLACES))
-    if not actions:
-        return None
-    return video_path, player, actions
+    script = SCRIPTS.script_of(video_path)
+    return None if script is None else (video_path, player, script)
+
+
+def read_the_script_ahead(video_path, run, *, owner) -> None:
+    scripts = SCRIPTS
+    run(lambda: scripts.read_ahead(video_path), scripts.keep, owner=owner)
 
 
 @dataclass(frozen=True)
@@ -86,12 +155,9 @@ class Osr2Driver(QObject):
     def parked_by_the_pause(self) -> bool:
         return self._drive is not None and self._frozen
 
-    def start(self, player, actions: list[dict]) -> None:
+    def start(self, player, script: Funscript) -> None:
         self.stop()
-        if not actions:
-            return
-        self._drive = _Drive(player, Funscript(sorted((int(a["at"]), int(a["pos"]))
-                                                      for a in actions)))
+        self._drive = _Drive(player, script)
         self._streaming = False
         self._broker.want(not self._frozen)
         self._broker.ask(PARK if self._frozen else RESUME)

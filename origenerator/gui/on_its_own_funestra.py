@@ -274,6 +274,8 @@ class OnItsOwnFunestra(QObject):
         if not fields:
             return
         self.player.heard(fields)
+        if fields.get("window"):
+            self._note.stay_above(int(fields["window"]))
         status = parse_status(fields)
         volume = VolumeHud(volume=int(fields.get("volume") or 0), muted=fields.get("muted") == "1")
         if self._tuner is not None:

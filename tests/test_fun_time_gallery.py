@@ -29,7 +29,7 @@ from origenerator.gui.collapsible_section import FoldHeader
 from origenerator.gui.gallery_view import GalleryView, Shared
 from origenerator.gui.generate_pane import GeneratePane
 from origenerator.gui.generate_tab import GenerateTab
-from origenerator.gui.pane_arrangement import TOC_OPENING_WIDTH
+from origenerator.gui.pane_arrangement import SESSION_TOC_OPENING_WIDTH, TOC_OPENING_WIDTH
 from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.slideshow_hud import slideshow_hud_model
 from origenerator.gui.slideshow_pace import STEP_S as PACE_STEP_S
@@ -199,13 +199,14 @@ def test_fun_time_gallery_has_no_chevron_to_fold_its_toc_away(qtbot):
         " gains a column this narrow very little")
 
 
-def test_fun_time_gallery_opens_its_toc_at_the_width_a_window_of_its_own_starts_from(qtbot):
+def test_fun_time_gallery_opens_its_toc_wider_than_a_window_of_its_own_starts_it(qtbot):
     view = _fun_time_view(qtbot)
     view.resize(900, 1400)
     with qtbot.waitExposed(view):
         view.show()
 
-    assert view._arrangement.panes.widget(0).width() == TOC_OPENING_WIDTH
+    assert SESSION_TOC_OPENING_WIDTH > TOC_OPENING_WIDTH
+    assert view._arrangement.panes.widget(0).width() == SESSION_TOC_OPENING_WIDTH
 
 
 def test_fun_time_gallery_draws_neither_separate_nor_together_over_its_folder_list(qtbot):

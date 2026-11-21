@@ -569,3 +569,11 @@ def test_a_search_updated_change_by_change_finds_what_one_built_afresh_finds():
         for query in ("red", "boat", "harbor", "kite dusk", "kites"):
             assert [hit.row["prompt_id"] for hit in index.search(query).results] == \
                 [hit.row["prompt_id"] for hit in afresh.search(query).results], query
+
+
+def test_a_generation_whose_prompt_changed_is_found_by_its_new_words_alone():
+    index = _index([_row("a", "a red lantern")])
+
+    index.update([_row("a", "a blue kite")])
+
+    assert (_hits(index, "kite"), _hits(index, "lantern")) == (["a"], [])

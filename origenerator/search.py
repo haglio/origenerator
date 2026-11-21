@@ -331,7 +331,7 @@ class GallerySearch:
             name = (item_name(prompt_id) if item_name else "").lower()
             known = self._entries.get(prompt_id)
             entries[prompt_id] = (known if _as_it_was(known, row, named, name) else replace(
-                known if known is not None else _build_entry(row),
+                known if known is not None and known.row is row else _build_entry(row),
                 row=row, folders=_folder_stems(named), name=name, title=_title_stems(name),
                 folder_names=named,
                 folder_tags=tuple(tag for folder in named for tag in _tags(folder)),

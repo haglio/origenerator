@@ -4,7 +4,14 @@ import logging
 from itertools import pairwise
 from pathlib import Path
 
-from app_support.funscript import document, read_actions, script_of, scripts_tree_in, write
+from app_support.funscript import (
+    document,
+    read_actions,
+    script_of,
+    script_under_its_whole_filename,
+    scripts_tree_in,
+    write,
+)
 from funestra.funscript import Funscript
 from funestra.heatmap import build_heatmap
 
@@ -21,7 +28,8 @@ CREATOR = "origenerator"
 
 def funscript_path_for(video_path, *, places: OutputPlaces) -> Path:
     video = Path(video_path)
-    return places.scripts / (places.subfolder_of(video.parent) or "") / f"{video.name}.funscript"
+    return (script_under_its_whole_filename(video, videos=places.videos, scripts=places.scripts)
+            or places.scripts / (places.subfolder_of(video.parent) or "") / f"{video.name}.funscript")
 
 
 def _filed_under(stem: str, places: OutputPlaces) -> Path:

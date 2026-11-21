@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QBoxLayout, QSplitter, QWidget
 from origenerator.gui.panes import PaneSplitter
 
 TOC_OPENING_WIDTH = 220
+SESSION_TOC_OPENING_WIDTH = 264
 
 
 class PaneArrangement:
@@ -53,7 +54,7 @@ class PaneArrangement:
         self._generate_column.setMinimumWidth(210)
         self.panes.setStretchFactor(0, 0)
         self.panes.setStretchFactor(1, 1)
-        self.panes.setSizes([TOC_OPENING_WIDTH, 660])
+        self.panes.setSizes([SESSION_TOC_OPENING_WIDTH, 616])
         self.stack.setStretchFactor(0, 2)
         self.stack.setStretchFactor(1, 3)
         self.stack.setStretchFactor(2, 0)

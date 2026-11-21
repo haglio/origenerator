@@ -414,6 +414,9 @@ class FolderTree(QTreeWidget):
 
     def _bring_back(self, row) -> None:
         self.setCurrentItem(row)
+        self.scroll_into_view(row)
+
+    def scroll_into_view(self, row) -> None:
         self.scrollToItem(row, QAbstractItemView.ScrollHint.PositionAtTop)
         bar = self.verticalScrollBar()
         while bar.value() > bar.minimum() and row in self.frozen_rows():

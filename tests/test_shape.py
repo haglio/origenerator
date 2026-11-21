@@ -523,7 +523,7 @@ def test_together_s_line_sits_as_far_under_its_choices_as_portrait_s_under_its_w
         pane.choose_shapes(TOGETHER)
         app.processEvents()
         pane.layout().activate()
-        under_the_choices = _clear_rows_over_the_line(pane, BOTH, pane._choices)
+        under_the_choices = _clear_rows_over_the_line(pane, BOTH, pane._over_the_lists)
     finally:
         app.setStyleSheet(prior)
 

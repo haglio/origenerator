@@ -158,6 +158,20 @@ def test_a_tick_half_a_tick_late_still_finds_the_device_short_of_its_target(qtbo
         " early, stands still, then sprints for the next")
 
 
+def test_each_time_the_motion_comes_round_it_says_so(qtbot):
+    driver, _broker, clock = _driver(qtbot)
+    rounds = []
+    driver.came_round = lambda: rounds.append(clock())
+    driver.start()
+    seconds_a_loop = 60.0 / driver.state.bpm
+
+    for _tick in range(80):
+        clock.t += seconds_a_loop / 32
+        driver.poll()
+
+    assert len(rounds) == 2
+
+
 def test_stopping_parks_the_device(qtbot):
     driver, broker, _clock = _driver(qtbot)
     driver.start()

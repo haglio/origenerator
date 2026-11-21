@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections.abc import Callable
 from contextlib import ExitStack
 from functools import partial
 
@@ -46,6 +47,7 @@ class Osr2MotionDriver(QObject):
         self._held: str | None = None
         self._frozen = False
         self._asked: str | None = None
+        self.came_round: Callable[[], None] | None = None
 
     @property
     def active(self) -> bool:
@@ -128,11 +130,15 @@ class Osr2MotionDriver(QObject):
         now = self._now()
         lead_ms = self._lead_for(now)
         with self._lock:
+            before = self._state.phase
             motion_engine.advance(self._state, now - self._last_tick)
+            round_again = self._state.phase < before
             self._last_tick = now
             motion_engine.tick_learned_motion(self._state, now)
             pos = motion_engine.position_ahead(self._state, lead_ms / 1000.0)
         self._broker.send_position(pos, lead_ms)
+        if round_again and self.came_round is not None:
+            self.came_round()
         if not self._streaming:
             self._streaming = True
             logger.info("OSR2 motion streaming: first T-code pos=%.0f", pos)

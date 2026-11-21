@@ -87,6 +87,8 @@ NO_SETTING = {
     "the pause Esc and play/pause share, which a restart leaves playing":
         lambda view: [view._buttons.play_pause],
     "the reference, a window opened to look something up": lambda view: [view._buttons.reference],
+    "where the TOC is scrolled to, which a press moves once": lambda view: [
+        view._tree.current_folder_button, view._tree.top_button],
     ("the star and Enhance at the top, which show the open folder's own switches, kept with the"
      " folder in the library"): lambda view: [view._buttons.favorite, view._buttons.enhance],
 }

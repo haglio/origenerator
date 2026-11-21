@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from shared_ui.icon_button import fill_square_with_icon
+from shared_ui.icons import qt_icon
 from shared_ui.spacing import (
     BUTTON_FILLING_ICON,
     BUTTON_GAP,
@@ -46,6 +47,8 @@ _SEPARATE_TIP = ("A list for each shape — Portrait and Landscape apart, so a "
                  "slideshow started in one plays that shape alone")
 _TOGETHER_TIP = ("One list of both shapes, for a slideshow that mixes portrait and "
                  "landscape items")
+_CURRENT_FOLDER_TIP = "Scroll the current folder into view"
+_TOP_TIP = "Scroll to the top"
 
 
 class _Choice(QFrame):
@@ -65,6 +68,14 @@ class _Choice(QFrame):
 
     def mousePressEvent(self, _event) -> None:
         self.button.click()
+
+
+def _scroll_button(icon: str, tip: str, scroll) -> QPushButton:
+    button = fill_square_with_icon(QPushButton())
+    button.setIcon(qt_icon(icon))
+    button.setToolTip(tip)
+    button.clicked.connect(scroll)
+    return button
 
 
 def _heading(shape: str) -> QFrame:
@@ -126,9 +137,22 @@ class SplitFolderTree(QWidget):
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(_GAP_UNDER_THE_CHOICES)
-        column.addWidget(self._build_radio())
+        column.addWidget(self._build_the_row_over_the_lists())
         column.addWidget(self._splitter, 1)
         self._show_sections(SEPARATE)
+
+    def _build_the_row_over_the_lists(self) -> QWidget:
+        self.current_folder_button = _scroll_button(
+            "reticle", _CURRENT_FOLDER_TIP, self.scroll_the_current_folder_into_view)
+        self.top_button = _scroll_button("arrow_up", _TOP_TIP, self.scroll_to_the_top)
+        self._over_the_lists = QWidget()
+        row = QHBoxLayout(self._over_the_lists)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(BUTTON_GAP)
+        row.addWidget(self._build_radio(), 1)
+        for button in (self.current_folder_button, self.top_button):
+            row.addWidget(button, 0, Qt.AlignmentFlag.AlignTop)
+        return self._over_the_lists
 
     def _build_radio(self) -> QWidget:
         separate = _Choice(_SEPARATE_WORD, folder_icons.separate_mark(BUTTON_FILLING_ICON), _SEPARATE_TIP)
@@ -137,13 +161,13 @@ class SplitFolderTree(QWidget):
         self.together_button = together.button
         radio = QButtonGroup(self)
         radio.setExclusive(True)
-        self._choices = QWidget()
-        FlowLayout(self._choices, spacing=BUTTON_GROUP_GAP, row_spacing=BUTTON_ROW_GAP)
+        choices = QWidget()
+        FlowLayout(choices, spacing=BUTTON_GROUP_GAP, row_spacing=BUTTON_ROW_GAP)
         for choice, shapes in ((separate, SEPARATE), (together, TOGETHER)):
             choice.button.clicked.connect(lambda _checked, s=shapes: self.choose_shapes(s))
             radio.addButton(choice.button)
-            self._choices.layout().addWidget(choice)
-        return self._choices
+            choices.layout().addWidget(choice)
+        return choices
 
     @property
     def shapes(self) -> tuple[str, ...]:
@@ -159,7 +183,7 @@ class SplitFolderTree(QWidget):
 
     def offer_separate_and_together(self, offered: bool) -> None:
         self._offered = offered
-        self._choices.setVisible(offered)
+        self._over_the_lists.setVisible(offered)
         self._redraw()
 
     def _redraw(self) -> None:
@@ -262,6 +286,15 @@ class SplitFolderTree(QWidget):
         self._release_all_but(shape)
         self._active = shape
         self._trees[shape].setCurrentItem(item, column, command)
+
+    def scroll_the_current_folder_into_view(self) -> None:
+        current = self.currentItem()
+        if current is not None:
+            current.treeWidget().scroll_into_view(current)
+
+    def scroll_to_the_top(self) -> None:
+        for tree in self._trees.values():
+            tree.scrollToTop()
 
     def scroll_places(self) -> dict[str, int]:
         return {shape: tree.verticalScrollBar().value() for shape, tree in self._trees.items()}

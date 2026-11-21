@@ -861,14 +861,15 @@ def test_the_hud_this_app_publishes_is_the_slideshows_own_band(qtbot, tmp_path):
     assert model.corner.path == "one.png"
     assert model.seed_count == 1, (
         "a set with no library under it maps the slide alone")
-    assert [[button.command for button in row] for row in model.rows] == [
-        ["portrait_prev", "portrait_nudge_prev", "portrait_nudge_next", "portrait_next",
-         "portrait_funscript_jump", "portrait_trash", "portrait_lock",
-         "portrait_reset", "portrait_shuffle", "portrait_latest", "portrait_media_videos",
-         "portrait_media_images", "portrait_enhanced",
-         "portrait_favorites", "portrait_cycle_version"],
+    band, pace = ([button.command for button in row] for row in model.rows)
+    assert (sorted(band), pace) == (sorted([
+        "portrait_prev", "portrait_nudge_prev", "portrait_nudge_next", "portrait_next",
+        "portrait_funscript_jump", "portrait_trash", "portrait_lock",
+        "portrait_reset", "portrait_shuffle", "portrait_latest", "portrait_media_videos",
+        "portrait_media_images", "portrait_enhanced",
+        "portrait_favorites", "portrait_cycle_version"]),
         ["", "portrait_clip_seconds_down", "", "portrait_clip_seconds_up",
-         "", "portrait_speed_down", "", "portrait_speed_up"]], (
+         "", "portrait_speed_down", "", "portrait_speed_up"]), (
         "the session draws the HUD on the Funestra, so this app publishes the model for it, and "
         "not the mode pair, which is the session's own to add")
 

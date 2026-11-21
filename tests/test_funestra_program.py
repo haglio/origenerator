@@ -7,6 +7,7 @@ from app_support.file_channel import read_paused_state
 from app_support.win32 import TaskbarApp
 from funestra.funestra_verbs import QUIT
 from funestra.program.cli import build_parser
+from funestra.program.genau_here import genau_from_args
 from funestra.program.window_verbs import (
     WINDOW_HIDE,
     WINDOW_MINIMIZE,
@@ -78,6 +79,20 @@ def test_the_program_is_handed_the_files_the_app_reaches_it_through(tmp_path):
     assert (args.dashboard_cmd, args.paused) == (program.asks_file, program.paused_file)
     assert len({args.playlist, args.command, args.status, args.hud, args.dashboard_cmd,
                 args.paused}) == 6
+
+
+def test_the_program_carries_genau_on_files_of_its_own_and_a_beat_port_free_at_launch(tmp_path):
+    program, started = _program(tmp_path, free_port=lambda: 50777)
+
+    program.start()
+
+    launch = genau_from_args(build_parser().parse_args(started.commands[0][3:]))
+    assert launch == program.genau
+    assert launch.beat_port == 50777
+    assert {launch.command, launch.paused, launch.status, launch.drive, launch.flicks}.isdisjoint(
+        {program.channel.playlist, program.channel.command_file, program.channel.status_file,
+         program.channel.hud_file, program.asks_file, program.paused_file})
+    assert len({launch.command, launch.paused, launch.status, launch.drive, launch.flicks}) == 5
 
 
 def test_it_wears_the_title_identity_and_icon_the_app_gives_it(tmp_path):

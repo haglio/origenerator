@@ -4,15 +4,17 @@ import ctypes
 import logging
 import os
 import shutil
+import socket
 import subprocess
 import sys
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from app_support.file_channel import publish_whole
 from funestra.funestra import Channels
 from funestra.funestra_verbs import QUIT
+from funestra.program.genau_here import GenauLaunch
 from funestra.program.launch import Asked, launch_command
 from funestra.program.placement import WindowPlacement
 from funestra.program.window_verbs import (
@@ -33,6 +35,8 @@ from origenerator.gui.taskbar_identity import TaskbarIdentity
 logger = logging.getLogger(__name__)
 
 _FILES = ("playlist.tsv", "cmd.txt", "status.txt", "hud.json", "asks.txt", "paused.txt")
+_GENAUS_FILES = ("genau_cmd.txt", "genau_paused.txt", "genau_status.txt", "genau_drive.txt",
+                 "genau_flicks.tsv")
 _ANY_PROGRAM = 0xFFFFFFFF
 
 
@@ -41,6 +45,18 @@ def _let_a_program_take_the_keyboard() -> None:
     # with the window is a child of the one this app started, so its process id is not known here.
     if sys.platform == "win32":
         ctypes.WinDLL("user32").AllowSetForegroundWindow(_ANY_PROGRAM)
+
+
+def a_free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
+
+
+def genau_beside(folder: Path) -> GenauLaunch:
+    command, paused, status, drive, flicks = (folder / name for name in _GENAUS_FILES)
+    return GenauLaunch(command=command, paused=paused, status=status, drive=drive, flicks=flicks,
+                       beat_port=0)
 
 
 def _the_interpreter_that_is_not_pythonw() -> Path:
@@ -62,7 +78,8 @@ AS_IT_COMES = Wearing()
 class FunestraProgram:
     def __init__(self, folder: Path, *, wearing: Wearing = AS_IT_COMES, python_exe: Path | None = None,
                  popen=subprocess.Popen, app_pid: int | None = None,
-                 let_it_take_the_keyboard=_let_a_program_take_the_keyboard) -> None:
+                 let_it_take_the_keyboard=_let_a_program_take_the_keyboard,
+                 free_port=a_free_port) -> None:
         self._folder = Path(folder)
         self.wearing = wearing
         self._python_exe = python_exe
@@ -70,12 +87,14 @@ class FunestraProgram:
         self._app_pid = app_pid
         self._process = None
         self._let_it_take_the_keyboard = let_it_take_the_keyboard
+        self._free_port = free_port
         self.place: Rect | None = None
         self.minimized = False
         playlist, command, status, hud, asks, paused = (self._folder / name for name in _FILES)
         self.channel = FunestraChannel(playlist, command, status, hud)
         self.asks_file = asks
         self.paused_file = paused
+        self.genau = genau_beside(self._folder)
 
     @property
     def running(self) -> bool:
@@ -85,6 +104,7 @@ class FunestraProgram:
         self._folder.mkdir(parents=True, exist_ok=True)
         offer_the_copy_beside_the_checkouts()
         channel = self.channel
+        self.genau = replace(self.genau, beat_port=self._free_port())
         command = launch_command(
             self._python_exe or _the_interpreter_that_is_not_pythonw(),
             Channels(playlist=channel.playlist, command=channel.command_file,
@@ -93,7 +113,8 @@ class FunestraProgram:
             WindowPlacement(title=self.wearing.title, icon=self.wearing.icon,
                             taskbar_identity=self.wearing.taskbar_identity),
             Asked(hidden=True, keys=True,
-                  ends_with=os.getpid() if self._app_pid is None else self._app_pid))
+                  ends_with=os.getpid() if self._app_pid is None else self._app_pid),
+            genau=self.genau)
         self._process = self._popen(
             command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)

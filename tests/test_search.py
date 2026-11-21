@@ -545,7 +545,7 @@ def test_an_item_moved_into_a_folder_is_found_by_the_folders_name():
     rows = [_row("a", "a red kite"), _row("b", "a blue boat")]
     index = _index(rows)
 
-    index.update(rows, _folders_holding({"b": ["Harbor"]}))
+    index.update(rows, _folders_holding({"b": ["Harbor views"]}))
 
     assert [hit.row["prompt_id"] for hit in index.search("harbor").results] == ["b"]
 

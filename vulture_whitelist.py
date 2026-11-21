@@ -47,6 +47,3 @@ _.textVisible  # origenerator/gui/progress_bar.py:127, the QStyleOptionProgressB
 _.features  # origenerator/gui/thumbnail_dropdown.py:144, the QStyleOptionViewItem the item delegate paints from
 _.decorationSize
 _.showDecorationSelected
-
-# --- a source app_support names from its next release, used here once the gallery holds Non-AI videos ---
-_.NON_AI  # origenerator/generation_state.py, built into MADE_ELSEWHERE from app_support.gallery_rows by value

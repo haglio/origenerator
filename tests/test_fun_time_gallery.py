@@ -219,7 +219,8 @@ def test_fun_time_gallery_draws_neither_separate_nor_together_over_its_folder_li
 
     assert not view._tree.separate_button.isVisible()
     assert not view._tree.together_button.isVisible()
-    assert view._tree._splitter.mapTo(view._tree, QPoint()).y() == 0
+    assert view._tree.top_button.isVisible()
+    assert view._tree.top_button.size() == view._buttons.favorite.size()
 
 
 def test_standalone_gallery_keeps_its_panes_side_by_side(qtbot):

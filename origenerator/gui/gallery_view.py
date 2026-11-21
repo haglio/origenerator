@@ -515,7 +515,7 @@ class GalleryView(QWidget):
     def _build_the_toc(self):
         self.toc = GalleryTree()
         self._tree = self.toc.widget
-        self._tree.offer_separate_and_together(self._fun_time is None)
+        self._tree.draw_for_a_session(self._fun_time is not None)
 
     def _build_toc_pane(self):
         self._tree.shapes_changed.connect(self._on_shapes_changed)
@@ -645,7 +645,7 @@ class GalleryView(QWidget):
                 switch.setChecked(False)
         self.osr2.let_go_for_a_session()
         self._fun_time = session
-        self._tree.offer_separate_and_together(False)
+        self._tree.draw_for_a_session(True)
         self.slideshows.become_hosted(session)
         self.generate_pane.become_hosted(session)
         self._voice.become_hosted()
@@ -670,7 +670,7 @@ class GalleryView(QWidget):
         if self._motion_pane is not None:
             self._motion_pane.show()
         self._fun_time = None
-        self._tree.offer_separate_and_together(True)
+        self._tree.draw_for_a_session(False)
         self.slideshows.become_standalone(self.osr2.motion)
         self.generate_pane.become_standalone()
         self._buttons.become_standalone()

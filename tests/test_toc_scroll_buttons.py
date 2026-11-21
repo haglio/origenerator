@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import QPoint, QSize
 from PySide6.QtWidgets import QAbstractItemView, QApplication
 from shared_ui.icons import qt_icon
-from shared_ui.spacing import BUTTON_GAP, BUTTON_ICON_INSET, BUTTON_SIZE_HUD
+from shared_ui.spacing import BUTTON_GAP, BUTTON_ICON_INSET, BUTTON_SIZE, BUTTON_SIZE_HUD
 
 from origenerator import ui_scale
 from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
@@ -95,13 +95,40 @@ def test_the_up_arrow_scrolls_every_list_to_its_top(qtbot):
     assert set(toc.scroll_places().values()) == {0}
 
 
-def test_a_toc_that_offers_no_separate_and_together_offers_neither_button(qtbot):
+def test_a_sessions_toc_keeps_the_two_at_its_right_edge_without_separate_or_together(qtbot):
     toc, _rows = _toc_too_long_for_its_height(qtbot)
 
-    toc.offer_separate_and_together(False)
+    toc.draw_for_a_session(True)
+    QApplication.processEvents()
 
-    assert not toc.current_folder_button.isVisible()
-    assert not toc.top_button.isVisible()
+    assert not toc.separate_button.isVisible()
+    assert not toc.together_button.isVisible()
+    assert toc.current_folder_button.isVisible()
+    assert _right_edge(toc, toc.top_button) == toc.width()
+    assert _right_edge(toc, toc.current_folder_button) < toc.top_button.mapTo(toc, QPoint()).x()
+
+
+def test_a_sessions_two_buttons_are_the_size_a_sessions_gallery_pane_buttons_are(qtbot):
+    toc, _rows = _toc_too_long_for_its_height(qtbot)
+
+    toc.draw_for_a_session(True)
+    QApplication.processEvents()
+
+    for button in (toc.current_folder_button, toc.top_button):
+        assert button.size() == QSize(BUTTON_SIZE, BUTTON_SIZE), button.toolTip()
+    gap = toc.top_button.mapTo(toc, QPoint()).x() - _right_edge(toc, toc.current_folder_button)
+    assert gap == BUTTON_GAP
+
+
+def test_a_toc_handed_back_from_a_session_draws_its_buttons_small_again(qtbot):
+    toc, _rows = _toc_too_long_for_its_height(qtbot)
+
+    toc.draw_for_a_session(True)
+    toc.draw_for_a_session(False)
+    QApplication.processEvents()
+
+    assert toc.separate_button.isVisible()
+    assert toc.top_button.size() == QSize(BUTTON_SIZE_HUD, BUTTON_SIZE_HUD)
 
 
 def test_the_buttons_over_the_toc_are_the_size_of_the_gallery_pane_buttons(qtbot):

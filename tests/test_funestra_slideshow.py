@@ -754,7 +754,7 @@ def test_an_error_crosses_to_fun_time_as_an_error(qtbot, tmp_path):
     assert _what_fun_time_reads(slideshow).level is MessageLevel.ERROR
 
 
-def test_a_request_line_and_a_dictation_cross_to_fun_time_with_the_microphone(qtbot, tmp_path):
+def test_a_request_message_and_a_dictation_cross_to_fun_time_with_the_microphone(qtbot, tmp_path):
     slideshow = _on_a_sessions_satellite(tmp_path)
 
     slideshow.note_request("Request submitted")
@@ -2870,7 +2870,7 @@ def test_on_a_sessions_funestra_a_request_and_what_is_being_dictated_are_said_wh
     said = []
     slideshow = _slideshow(qtbot, tmp_path, say=_into(said))
 
-    slideshow.shown.request_line("a request")
+    slideshow.shown.request_message("a request")
     slideshow.shown.dictating("some words")
     slideshow.shown.dictating("")
     slideshow.shown.room_paused(True)

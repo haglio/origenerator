@@ -22,13 +22,13 @@ from shared_ui.message_shape import (
     WARNING,
     time_to_read_ms,
 )
+from shared_ui.message_window import MessageWindow
 from shared_ui.testing import appending_to
 
 from origenerator import osr2_driver
 from origenerator.gui.funestra_slideshow import Playing
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.inflight import InFlightItem, RunReading
-from origenerator.gui.message_over_a_funestra import MessageOverAFunestra
 from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.osr2_driver import DriveScripts
@@ -1099,7 +1099,7 @@ def test_a_spoken_answer_is_a_message_across_the_top(qtbot):
 
     note = view._note.geometry()
     assert note.top() == MESSAGE_TOP_MARGIN, (
-        "at the center top, where Fun Time puts the same kind of line over a Funestra")
+        "at the center top, where Fun Time puts the same kind of message over a Funestra")
     assert abs(note.center().x() - view.width() // 2) <= 1
 
 
@@ -1127,7 +1127,7 @@ def test_what_is_being_made_of_the_slide_is_no_message_across_the_top(qtbot):
 
 def test_a_spoken_answer_sits_directly_on_the_slideshow_its_funestra_names(qtbot):
     stacked = []
-    message = MessageOverAFunestra(stack=lambda own, beneath: stacked.append(beneath) or True)
+    message = MessageWindow(stack=lambda own, beneath: stacked.append(beneath) or True)
     view = _view(qtbot, _KEYED, message=message)
 
     view.channel.heard.emit({"video": "", "window": "4242"})
@@ -1137,12 +1137,12 @@ def test_a_spoken_answer_sits_directly_on_the_slideshow_its_funestra_names(qtbot
 
 
 def test_the_message_wears_the_color_of_what_it_says(qtbot):
-    message = MessageOverAFunestra()
+    message = MessageWindow()
     qtbot.addWidget(message)
 
     message.say("a plain line")
     assert TEXT_PRIMARY.name() in message.styleSheet(), (
-        "the colors Fun Time's own messages read in, since this is the same kind of line")
+        "the colors Fun Time's own messages read in, since this is the same kind of message")
     message.say("nothing to do", kind=WARNING)
     assert YELLOW.name() in message.styleSheet()
     message.say("it broke", kind=ERROR)
@@ -2946,10 +2946,10 @@ def test_a_name_that_cannot_be_worked_out_leaves_the_item_line_blank(qtbot):
 def test_a_requests_line_stays_up_long_enough_to_be_read(qtbot):
     view = _view(qtbot)
 
-    view.request_line("Request submitted")
+    view.request_message("Request submitted")
     assert view._note_timer.interval() == 3000
 
-    view.request_line("Moved her to a tropical beach at golden hour, the way your beach "
+    view.request_message("Moved her to a tropical beach at golden hour, the way your beach "
                       "prompts usually have it, and kept the pose and the lighting as they were.")
     assert view._note_timer.interval() > 3000
 

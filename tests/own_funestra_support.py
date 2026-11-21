@@ -1,23 +1,34 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
+import numpy as np
 from funestra.funestra import Channels, Funestra
 from funestra.funestra_setup import FunestraSetup
 from funestra.funestra_verbs import QUIT, RELOAD_PLAYLIST
-from funestra.testing import FakeEngine
+from funestra.genau_engine import EngineSeams
+from funestra.off_the_loop import AtOnce
+from funestra.playlist import read_playlist
+from funestra.program.genau_here import kino_and_genau
+from funestra.testing import FakeEngine, every_thread_now_but_the_ones_that_run_for_good
 from PySide6.QtCore import QRect
 
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_asks import AsksFromTheFunestra
-from origenerator.gui.funestra_program import Wearing
+from origenerator.gui.funestra_program import Wearing, a_free_port, genau_beside
 from origenerator.gui.funestra_slideshow import FunestraSlideshow
 from origenerator.gui.on_its_own_funestra import USUAL_WIRING, OnItsOwnFunestra, OwnWiring
 from origenerator.gui.slideshow_playing import Hosting, Playing, Seat
 from origenerator.gui.slideshow_wiring import SlideshowActions
+from origenerator.gui.standalone_genau import StandaloneGenau
+from tests.genau_support import HeardBeat
 
 VIEWPORT = (1280, 720)
 USUAL_WEARING = Wearing()
+GENAU_ON_A_FAKE_ENGINE = EngineSeams(
+    decode=lambda _path: [np.zeros((8, 16, 3), dtype=np.uint8)] * 4,
+    start_thread=every_thread_now_but_the_ones_that_run_for_good, off_the_loop=AtOnce)
 
 
 class _ThisTests:
@@ -86,7 +97,9 @@ class _HandedStraightAcross:
 
     def status(self) -> dict[str, str]:
         funestra = self._program.funestra
-        return {} if funestra is None else funestra.status_fields()
+        if funestra is None or funestra.playback.has_nothing_to_play:
+            return {}
+        return funestra.status_fields()
 
 
 class FakeProgram:
@@ -97,6 +110,7 @@ class FakeProgram:
         self.channel = _HandedStraightAcross(self, folder)
         self.asks_file = folder / "asks.txt"
         self.paused_file = folder / "paused.txt"
+        self.genau = replace(genau_beside(folder), beat_port=a_free_port())
         self.engine = FakeEngine()
         self.window = _Window()
         self.funestra: Funestra | None = None
@@ -118,11 +132,12 @@ class FakeProgram:
         self.started = True
 
     def open_if_it_has_a_list(self) -> None:
-        if self.funestra is not None or not self.items:
+        if self.funestra is not None or not (self.items or read_playlist(self.genau.flicks)):
             return
         self.funestra = Funestra(self.engine, FunestraSetup(
             channels=Channels(hud=self.channel.hud_file, dashboard_cmd=self.asks_file),
-            playlist=self.items, audible=True, clock=self._clock))
+            playlist=self.items, audible=True, clock=self._clock,
+            users=kino_and_genau(self.genau, notice=None, seams=GENAU_ON_A_FAKE_ENGINE)))
         self.funestra.playback.set_paused(self._paused)
         owed, self._owed = self._owed, []
         for verb in owed:
@@ -133,6 +148,7 @@ class FakeProgram:
             self.ended = True
         elif self.funestra is None:
             self._owed.append(verb)
+            self.open_if_it_has_a_list()
         elif verb == RELOAD_PLAYLIST:
             self.funestra.take_the_list(self.items)
         else:
@@ -185,18 +201,21 @@ class StandaloneSlideshow:
     def __init__(self, folder: Path, items, *, shape: str = "", start=None, shuffle=None,
                  actions=None, hud=None, versions=None, pace=None, frames=None,
                  locked: bool = False, motion=None, radio=None, volume=None,
-                 clock=USUAL_WIRING.clock, message=None, engine=None) -> None:
+                 clock=USUAL_WIRING.clock, message=None, engine=None, genau=None) -> None:
         self._clock = clock
         self.program = FakeProgram(folder, clock=clock)
         if engine is not None:
             self.program.engine = engine
         self.program.start()
         actions = actions if actions is not None else SlideshowActions()
+        self.beat = HeardBeat()
+        self.genau = (None if genau is None
+                      else StandaloneGenau(self.program, genau, beat=self.beat))
         self.asks = AsksFromTheFunestra(self.program.asks_file, clock=clock)
         self.shown = OnItsOwnFunestra(
             self.program, shape, actions,
             OwnWiring(motion=motion, radio=radio, volume=volume, clock=clock), asks=self.asks,
-            message=message)
+            message=message, genau=self.genau)
         self.slideshow = FunestraSlideshow(
             Playing(items, start=start, shuffle=shuffle, hud=hud, actions=actions,
                     versions=versions, locked=locked),

@@ -3,11 +3,14 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 
 from funestra.dashboard import ALREADY_DONE
-from funestra.funestra_verbs import SET_VOLUME, SPEED_DOWN, SPEED_UP
-from funestra.hud_kinds import minimize_funestra_button
+from funestra.funestra_verbs import SET_VOLUME, SHOW, SPEED_DOWN, SPEED_UP
+from funestra.genau_buttons import NEXT_FLICK, PREV_FLICK, TRASH_FLICK
+from funestra.hud_kinds import MODE_BUTTONS, minimize_funestra_button
 from funestra.hud_placement import HudCorner
+from funestra.modes import MainMode
 from funestra.pointer import OMNIPAUSE_TOGGLE, PRESSED_AGAIN
 from funestra.program.asks import FOCUSED, KEY
 from funestra.session_quit import SESSION_QUIT
@@ -49,6 +52,13 @@ _WASD_AS_ARROWS = {
     Qt.Key.Key_A: Qt.Key.Key_Left,
     Qt.Key.Key_S: Qt.Key.Key_Down,
     Qt.Key.Key_D: Qt.Key.Key_Right,
+}
+_MODES_PICKED = {command: mode for command, _label, mode in MODE_BUTTONS}
+_GENAUS_KEYS = {
+    Qt.Key.Key_Left: PREV_FLICK,
+    Qt.Key.Key_Right: NEXT_FLICK,
+    Qt.Key.Key_Up: TRASH_FLICK,
+    Qt.Key.Key_Down: "lock",
 }
 _KEYS_BY_THE_NAME_A_FUNESTRA_GIVES = {
     "left": Qt.Key.Key_Left, "right": Qt.Key.Key_Right, "up": Qt.Key.Key_Up,
@@ -112,11 +122,12 @@ class PlayerOnItsOwnFunestra:
 
 
 class _FollowedChannel(QObject):
-    heard = Signal(dict)
+    heard = Signal(dict, dict)
 
-    def __init__(self, channel, parent: QObject) -> None:
+    def __init__(self, channel, parent: QObject, genau=None) -> None:
         super().__init__(parent)
         self._channel = channel
+        self._genau = genau
         self.waits_on_the_disk = channel.waits_on_the_disk
         self.write_playlist = channel.write_playlist
         self.send = channel.send
@@ -124,7 +135,7 @@ class _FollowedChannel(QObject):
 
     def status(self) -> dict[str, str]:
         fields = self._channel.status()
-        self.heard.emit(fields)
+        self.heard.emit(fields, {} if self._genau is None else self._genau.read_status())
         return fields
 
 
@@ -138,9 +149,11 @@ class _WhereTheFunestraIs(QWidget):
 
 class OnItsOwnFunestra(QObject):
     def __init__(self, program, shape: str, actions, wiring: OwnWiring = USUAL_WIRING, *,
-                 asks=None, message=None, parent=None) -> None:
+                 asks=None, message=None, genau=None, parent=None) -> None:
         super().__init__(parent)
         self._program = program
+        self._genau = genau
+        self._mode = MainMode.KINO
         self._actions = actions
         self._motion = wiring.motion
         self._clock = wiring.clock
@@ -155,7 +168,7 @@ class OnItsOwnFunestra(QObject):
         self.queue_foot = QueueFoot(actions, beside=lambda: self.over_the_funestra)
         self._hud = HudOnFile(program.channel.hud_file, shape, self.queue_foot)
         self.player = PlayerOnItsOwnFunestra(wiring.clock)
-        self.channel = _FollowedChannel(program.channel, self)
+        self.channel = _FollowedChannel(program.channel, self, genau)
         self.channel.heard.connect(self._heard_from_the_funestra)
         self._tuner = None if wiring.radio is None else wiring.radio.held_by_a_slideshow()
         opens_at = wiring.volume if wiring.volume is not None else VolumeHud()
@@ -201,8 +214,49 @@ class OnItsOwnFunestra(QObject):
             self._corner, self._minimized = corner, minimized
             self.hud_changed()
 
+    @property
+    def mode(self) -> MainMode:
+        return self._mode
+
+    def show_kino(self) -> None:
+        self._show(MainMode.KINO)
+
+    def show_genau(self, path=None) -> bool:
+        if self._genau is None:
+            return False
+        self._genau.show(path)
+        self._show(MainMode.GENAU)
+        return True
+
+    def _show(self, mode: MainMode) -> None:
+        if mode is self._mode:
+            return
+        self._mode = mode
+        self._program.channel.send(f"{SHOW} {mode}")
+        self._pause_what_does_not_show()
+        self.hud_changed()
+
+    def _pick(self, mode: MainMode) -> None:
+        if mode is MainMode.GENAU:
+            self.show_genau()
+            return
+        self.show_kino()
+        start = self._actions.start_slideshow
+        if start is not None and not self._slideshow.whole_set():
+            start()
+
+    def _pause_what_does_not_show(self) -> None:
+        genau_shows = self._mode is MainMode.GENAU
+        self._program.set_paused(self._paused or genau_shows)
+        if self._genau is not None:
+            self._genau.set_paused(self._paused or not genau_shows)
+
     def hud_changed(self) -> None:
         if self._slideshow is None or not self._up or not self._hud_shape:
+            return
+        if self._mode is MainMode.GENAU:
+            self._hud.publish_built(partial(self._genau.hud_model, self._hud_shape),
+                                    hud_corner=self._corner, hud_minimized=self._minimized)
             return
         self._hud.publish(
             self._slideshow,
@@ -235,6 +289,10 @@ class OnItsOwnFunestra(QObject):
         action, path = shape_press(self._hud_shape, verb, payload)
         if action in PRESSES_ON_THE_QUEUE:
             self.queue_foot.press(action, path)
+        elif action in _MODES_PICKED:
+            self._pick(_MODES_PICKED[action])
+        elif self._mode is MainMode.GENAU and self._genau.press(action):
+            pass
         elif verb == OMNIPAUSE_TOGGLE:
             self._toggle_pause()
         elif action in COLLAPSES or action == OPENS_IN:
@@ -270,7 +328,9 @@ class OnItsOwnFunestra(QObject):
         self.queue_foot.press(verb, payload)
         self.hud_changed()
 
-    def _heard_from_the_funestra(self, fields: dict) -> None:
+    def _heard_from_the_funestra(self, fields: dict, genaus: dict) -> None:
+        if self._genau is not None:
+            self._hear_genau(genaus)
         if not fields:
             return
         self.player.heard(fields)
@@ -284,6 +344,16 @@ class OnItsOwnFunestra(QObject):
                              level=None if volume.muted else volume.volume, paused=status.paused)
         self._mind_the_volume(volume)
 
+    def _hear_genau(self, fields: dict) -> None:
+        genau_shows = self._mode is MainMode.GENAU
+        self._genau.follow_the_beat(showing=genau_shows)
+        if self._genau.heard_from(fields) and genau_shows:
+            self.hud_changed()
+
+    def loop_came_round(self) -> None:
+        if self._genau is not None:
+            self._genau.loop_came_round()
+
     def _mind_the_volume(self, volume: VolumeHud) -> None:
         heard, self._volume_heard = self._volume_heard, volume
         if self._volume_told is not None:
@@ -295,7 +365,7 @@ class OnItsOwnFunestra(QObject):
 
     def room_paused(self, paused: bool) -> None:
         self._paused = paused
-        self._program.set_paused(paused)
+        self._pause_what_does_not_show()
 
     def _toggle_pause(self) -> None:
         if self._actions.omnipause is not None:
@@ -305,7 +375,9 @@ class OnItsOwnFunestra(QObject):
 
     def _leave(self) -> None:
         leave_for_core = self._actions.leave_for_core
-        if leave_for_core is None or not leave_for_core(self._slideshow.hud_prompt_id):
+        on_screen = (self._genau.prompt_id_on_screen() if self._mode is MainMode.GENAU
+                     else self._slideshow.hud_prompt_id)
+        if leave_for_core is None or not leave_for_core(on_screen):
             self._slideshow.close()
 
     def flash(self, text: str, *, kind: str = INFO, mark: str = "") -> None:
@@ -364,7 +436,6 @@ class OnItsOwnFunestra(QObject):
     def _key(self, key, *, shifted: bool, ctrl: bool, alt: bool = False,
              said_at: float | None = None) -> bool:
         key = _WASD_AS_ARROWS.get(key, key)
-        slideshow = self._slideshow
         if alt:
             return False
         if ctrl:
@@ -374,7 +445,17 @@ class OnItsOwnFunestra(QObject):
             self._actions.move_hud(direction)
         elif key == Qt.Key.Key_Escape and not shifted:
             self._toggle_pause()
-        elif key == Qt.Key.Key_Left:
+        elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self._leave()
+        elif not (self._genaus_key(key, shifted=shifted) if self._mode is MainMode.GENAU
+                  else self._kinos_key(key, shifted=shifted, said_at=said_at)):
+            return False
+        self._answered()
+        return True
+
+    def _kinos_key(self, key, *, shifted: bool, said_at: float | None) -> bool:
+        slideshow = self._slideshow
+        if key == Qt.Key.Key_Left:
             answer(slideshow, "cycle_version_back") if shifted else slideshow.slideshow_step(-1)
         elif key == Qt.Key.Key_Right:
             answer(slideshow, "cycle_version") if shifted else slideshow.slideshow_step(1)
@@ -386,12 +467,17 @@ class OnItsOwnFunestra(QObject):
                 slideshow.slideshow_toggle_lock, said_at)
         elif key in (Qt.Key.Key_E, Qt.Key.Key_Home):
             slideshow.slideshow_loop_cycle()
-        elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            self._leave()
-        elif not apply_motion_key(self._motion, key, on_drive_toggle=self._actions.drive_toggle):
-            return False
-        self._answered()
+        else:
+            return self._motions_key(key)
         return True
+
+    def _genaus_key(self, key, *, shifted: bool) -> bool:
+        if key in _GENAUS_KEYS and not shifted:
+            return self._genau.press(_GENAUS_KEYS[key])
+        return self._motions_key(key)
+
+    def _motions_key(self, key) -> bool:
+        return apply_motion_key(self._motion, key, on_drive_toggle=self._actions.drive_toggle)
 
     def _on_the_slide_it_was_pressed_over(self, answer_it, said_at: float | None) -> None:
         if said_at is not None:
@@ -412,6 +498,8 @@ class OnItsOwnFunestra(QObject):
         self.over_the_funestra.deleteLater()
         if self._tuner is not None:
             self._tuner.close()
+        if self._genau is not None:
+            self._genau.close()
         if self._asks is not None:
             self._asks.stop()
         self._hud.blank()

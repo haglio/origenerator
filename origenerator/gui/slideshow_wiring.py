@@ -44,6 +44,7 @@ class SlideshowActions:
     filters_changed: Callable[[SlideshowFilters], None] | None = None
     volume_moved: Callable[[VolumeHud], None] | None = None
     name_of: Callable[[str], str] | None = None
+    start_slideshow: Callable[[], object] | None = None
 
 
 @dataclass(frozen=True)

@@ -2,68 +2,78 @@ from __future__ import annotations
 
 from origenerator.usual_company import UsualCompany, usual_company
 
-_WITH_A_HAT = [
-    ("a fisherman, a wide straw hat, frayed brim, harbor", "blurry, bare head, paper hat"),
-    ("a farmer, a wide straw hat, frayed brim, a field", "blurry, Bare Head, (paper hat:1.2)"),
-    ("a child, a wide straw hat, a beach", "blurry, bare head"),
-    ("a sailor, a wide straw hat, frayed brim, a deck", "blurry, bare head"),
-]
-_WITHOUT_ONE = [
-    ("a cat on a sofa", "blurry"),
-    ("a dog in a park", "blurry, paper hat"),
-    ("a bird, a field", "blurry, paper hat"),
-]
+_SCENES = ["a fisherman, harbor, fog", "a farmer, a field, dusk", "a sailor, a deck, rain",
+           "a child, a beach, noon"]
 
 
-def _has_a_hat(positive: str) -> bool:
-    return "hat" in positive
+def _twins(scenes=_SCENES, *, came="a wide straw hat, frayed brim", kept_out="bare head"):
+    return [pair for scene in scenes
+            for pair in ((scene, "blurry"), (f"{scene}, {came}", f"blurry, {kept_out}"))]
 
 
-def test_the_parts_most_prompts_with_the_thing_have_and_other_prompts_seldom_do_are_its_company():
-    assert usual_company(_WITH_A_HAT + _WITHOUT_ONE, _has_a_hat) == UsualCompany(
+def _is_a_hat(thing: str) -> bool:
+    return "hat" in thing
+
+
+def test_the_things_that_came_with_the_thing_in_prompts_otherwise_alike_are_its_company():
+    assert usual_company(_twins(), _is_a_hat) == UsualCompany(
         positive=("a wide straw hat", "frayed brim"), negative=("bare head",))
 
 
-def test_a_part_fewer_than_three_prompts_with_the_thing_have_is_no_company_of_it():
-    company = usual_company(_WITH_A_HAT + _WITHOUT_ONE, _has_a_hat)
+def test_what_a_prompt_with_the_thing_shares_with_its_twin_is_no_company_of_it():
+    same_series = [("a fisherman, harbor, fog, a wide straw hat", "blurry, bare head, grain")] * 3
+    without = [("a fisherman, harbor, fog", "blurry, grain"), ("a cat, a sofa", "cartoon")]
 
-    assert "paper hat" not in company.negative
-
-
-def test_a_part_a_third_of_the_prompts_with_the_thing_have_is_company_and_a_rarer_one_is_not():
-    with_a_hat = ([("a hat, frayed brim", "")] * 3 + [("a hat, a red ribbon", "")] * 3
-                  + [("a hat", "")] * 4)
-
-    assert usual_company(with_a_hat + [("a hat, a feather", "")] * 2, _has_a_hat).positive == (
-        "a hat",)
-    assert usual_company(with_a_hat, _has_a_hat).positive == ("a hat",)
-    assert usual_company(with_a_hat[:9], _has_a_hat).positive == (
-        "a hat", "frayed brim", "a red ribbon")
+    assert usual_company(same_series + without, _is_a_hat) == UsualCompany(
+        positive=("a wide straw hat",), negative=("bare head",))
 
 
-def test_prompts_with_no_negative_prompt_say_nothing_about_what_is_usually_kept_out():
-    silent = [("a tall hat", "")] * 20
+def test_a_prompt_with_the_thing_and_no_prompt_like_it_without_says_nothing():
+    unlike = [("a fisherman, harbor, fog, a wide straw hat, frayed brim, nets, gulls, a pier", "")] * 5
 
-    assert usual_company(_WITH_A_HAT + silent, _has_a_hat).negative == ("blurry", "bare head")
+    assert usual_company([*unlike, ("a fisherman", "")], _is_a_hat) == UsualCompany()
+
+
+def test_fewer_than_three_twins_show_no_company():
+    assert usual_company(_twins(_SCENES[:2]), _is_a_hat) == UsualCompany()
+
+
+def test_a_thing_that_came_with_fewer_than_a_third_of_the_twins_is_no_company():
+    prompts = (_twins(_SCENES[:3], came="a hat, a red ribbon")
+               + _twins(["a cook, a kitchen, steam", "a nurse, a ward, night", "a clerk, a desk, dawn",
+                         "a guard, a gate, snow", "a miner, a tunnel, dust", "a baker, an oven, flour",
+                         "a pilot, a cockpit, cloud"], came="a hat"))
+
+    assert usual_company(prompts, _is_a_hat).positive == ("a hat",)
+    assert usual_company(prompts[:-2], _is_a_hat).positive == ("a hat", "a red ribbon")
+
+
+def test_each_thing_inside_a_weighted_group_is_a_thing_of_its_own():
+    prompts = _twins(came="(a wide straw hat, frayed brim:1.2)", kept_out="((bare head)), (cap:1.3)")
+
+    assert usual_company(prompts, _is_a_hat) == UsualCompany(
+        positive=("a wide straw hat", "frayed brim"), negative=("bare head", "cap"))
+
+
+def test_twins_of_which_one_has_no_negative_prompt_say_nothing_about_what_is_kept_out():
+    silent = [(positive, "" if "hat" in positive else negative) for positive, negative in _twins()]
+
+    assert usual_company(silent, _is_a_hat) == UsualCompany(
+        positive=("a wide straw hat", "frayed brim"))
 
 
 def test_only_his_newest_prompts_with_the_thing_say_what_its_company_is():
-    older = [("a felt hat, a feather", "bare head")] * 10
-    newer = [("a straw hat, frayed brim", "paper hat")] * 150
+    older = _twins(came="a felt hat, a feather")
+    newer = [("a clerk, a desk, dawn", "blurry")] + [
+        ("a clerk, a desk, dawn, a straw hat", "blurry, paper hat")] * 150
 
-    assert usual_company(older + newer, _has_a_hat) == UsualCompany(
-        positive=("a straw hat", "frayed brim"), negative=("paper hat",))
-
-
-def test_a_part_as_common_without_the_thing_is_no_company_of_it():
-    company = usual_company(_WITH_A_HAT + _WITHOUT_ONE, _has_a_hat)
-
-    assert "blurry" not in company.negative
+    assert usual_company(older + newer, _is_a_hat) == UsualCompany(
+        positive=("a straw hat",), negative=("paper hat",))
 
 
-def test_too_few_prompts_with_the_thing_show_no_company():
-    assert usual_company(_WITH_A_HAT[:2] + _WITHOUT_ONE, _has_a_hat) == UsualCompany()
+def test_a_word_that_usually_came_under_several_wordings_brings_its_commonest_wording():
+    prompts = [pair for scene, man in zip(_SCENES, ("a tall man", "an old man", "a tall man",
+                                                    "the man beside her"), strict=True)
+               for pair in ((scene, ""), (f"{scene}, {man}, a hat", ""))]
 
-
-def test_with_no_prompt_without_the_thing_the_parts_most_prompts_with_it_have_are_its_company():
-    assert usual_company(_WITH_A_HAT, _has_a_hat).negative == ("blurry", "bare head")
+    assert usual_company(prompts, _is_a_hat).positive == ("a hat", "a tall man")

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from origenerator.box_breaks import BOX_BREAK, parenthesis_at
+from origenerator.box_breaks import BOX_BREAK, parenthesis_at, unboxed
 from origenerator.prompt_terms import terms_with_places
 
 _NUMBER = re.compile(r"\d+(\.\d+)?|\.\d+")
@@ -68,6 +68,15 @@ def without_emphasis(text: str) -> str:
 
 def _the_thing_itself(text: str) -> str:
     return " ".join(text.split()).casefold()
+
+
+def things_of(text: str) -> dict[str, str]:
+    things: dict[str, str] = {}
+    for match in _A_THING.finditer(without_emphasis(unboxed(text or ""))):
+        thing = " ".join(match[0].split())
+        if thing:
+            things.setdefault(thing.casefold(), thing)
+    return things
 
 
 def duplicate_things(text: str) -> tuple[tuple[int, int], ...]:

@@ -72,7 +72,7 @@ REQUEST_SYSTEM_PROMPT = (
     "out only when his prompts keep nothing out beside X. When WHAT HIS PROMPTS THAT HAVE WHAT "
     "HE ASKS FOR USUALLY HAVE WITH IT is given, its positive parts are what his prompts with X "
     "usually hold: write X in those words. The app itself then puts in each of them that "
-    "describes X or the person X is part of, and all of its negative parts.\n"
+    "names X or brings the person X is part of, and all of its negative parts.\n"
     "- When he wants more of something (\"more X\", \"bigger X\", \"even more\", or a "
     "complaint that it is not in the image: \"the X didn't appear\", \"X is missing\", "
     "\"still no X\", \"I don't see X\"), answer with one change {\"more\": \"<the part of "

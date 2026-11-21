@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing import ClassVar
 
+from origenerator.prompt_checks import things_of
 from origenerator.prompt_terms import (
     WEIGHT_STEP,
     end_of_the_term,
@@ -127,6 +128,12 @@ def _whole(text: str, words: str) -> bool:
 
 def _parts(text: str) -> list[str]:
     return [part.strip() for part in segments_of(text)]
+
+
+def _only_what_is_new_to(text: str, words: str) -> str:
+    there, added = things_of(text), things_of(words)
+    new = [thing for key, thing in added.items() if key not in there]
+    return words if len(new) == len(added) else ", ".join(new)
 
 
 def _left_out(part: str) -> str:
@@ -507,6 +514,10 @@ class _Applying:
         kept_out = [_KEPT_OUT + words] if which == "negative" else []
         if _whole(text, words):
             return self._already_there(which, words, kept_out)
+        new = _only_what_is_new_to(text, words)
+        if not new:
+            return self._already_there(which, words, kept_out)
+        words = new
         anchor = _found(text, change.get("after") or "")
         at = end_of_the_term(text, anchor.end()) if anchor else len(text)
         setattr(self, which, _joined(text[:at], words, text[at:]))

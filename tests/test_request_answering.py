@@ -140,8 +140,9 @@ def test_what_his_prompts_usually_have_with_the_asked_thing_goes_to_the_model_to
         return "the revision"
 
     answerer, db, _jobs, parent = _answerer(qtbot, tmp_path, work_out=work_out)
-    for pid, prompt in (("g1", "a dog, wagging tail, a park"), ("g2", "a dog, wagging tail, a sofa"),
-                        ("g3", "a dog, wagging tail"), ("g4", "a cat on a windowsill")):
+    scenes = ("a park, a bench, autumn", "a sofa, a lamp, evening", "a beach, a pier, noon")
+    for number, prompt in enumerate([*scenes, *(f"{scene}, a dog, wagging tail" for scene in scenes)]):
+        pid = f"g{number}"
         db.insert_generation(NewGeneration(prompt_id=pid, workflow_name="sdxl_t2i", workflow_version="v002",
                              positive_prompt=prompt, negative_prompt="blurry, cats", params_json="{}",
                              workflow_json="{}", source="generated"))

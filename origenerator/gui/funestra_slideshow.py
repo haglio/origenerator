@@ -105,7 +105,8 @@ class FunestraSlideshow(QObject):
         self._asked_load_heard: object = _NOT_HEARD_YET
         def at_defaults() -> bool:
             at_base = self._actions.at_base
-            return (not self.locked and self._set.filters == SlideshowFilters()
+            return (not self.locked and not self._comparing
+                    and self._set.filters == SlideshowFilters()
                     and self._set.order_label == SHUFFLE_LABEL
                     and (at_base is None or at_base(self)))
 
@@ -522,6 +523,7 @@ class FunestraSlideshow(QObject):
         return True
 
     def slideshow_reset(self) -> None:
+        self._leave_the_versions()
         if self._actions.reset is not None:
             self._actions.reset(self)
             return

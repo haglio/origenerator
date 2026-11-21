@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from origenerator.gui.frame_files import FrameFiles
+from origenerator.gui.frame_files import SECONDS_A_FUNESTRA_MAY_STILL_OPEN_IT, FrameFiles
 
 JPEG = b"\xff\xd8\xff\xe0 a fabricated frame"
 PNG = b"\x89PNG\r\n\x1a\n a fabricated frame"
@@ -17,6 +17,25 @@ def test_a_frame_is_written_where_a_funestra_can_open_it(tmp_path):
     assert path.suffix == ".jpg"
 
 
+def test_a_funestra_never_finds_a_frame_only_half_written(tmp_path, monkeypatch):
+    folder = tmp_path / "frames"
+    frames = FrameFiles(folder)
+    seen_while_writing = []
+    write_bytes = Path.write_bytes
+
+    def look_while_writing(path, data):
+        write_bytes(path, data[:4])
+        seen_while_writing.extend(p.name for p in folder.iterdir() if p.suffix in (".jpg", ".png"))
+        return write_bytes(path, data)
+
+    monkeypatch.setattr(Path, "write_bytes", look_while_writing)
+    path = frames.write("run-1", PNG)
+
+    assert seen_while_writing == []
+    assert path.read_bytes() == PNG
+    assert [p.name for p in folder.iterdir()] == [path.name]
+
+
 def test_a_new_frame_is_a_new_file_and_the_same_frame_again_is_not(tmp_path):
     frames = FrameFiles(tmp_path / "frames")
 
@@ -29,17 +48,44 @@ def test_a_new_frame_is_a_new_file_and_the_same_frame_again_is_not(tmp_path):
     assert newer.read_bytes() == PNG + b" one step further"
 
 
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
 def test_a_runs_first_frame_stays_and_only_the_newest_two_after_it(tmp_path):
-    frames = FrameFiles(tmp_path / "frames")
+    clock = _Clock()
+    frames = FrameFiles(tmp_path / "frames", clock=clock)
 
     written = [frames.write("run-1", PNG + bytes([step])) for step in range(5)]
+    clock.now += SECONDS_A_FUNESTRA_MAY_STILL_OPEN_IT
+    frames.write("run-2", PNG)
 
     assert frames.first_of("run-1") == written[0]
     assert [path.exists() for path in written] == [True, False, False, True, True]
 
 
+def test_a_forgotten_runs_frames_wait_for_a_funestra_still_opening_them(tmp_path):
+    clock = _Clock()
+    frames = FrameFiles(tmp_path / "frames", clock=clock)
+    first = frames.write("run-1", PNG)
+
+    frames.forget("run-1")
+    clock.now += SECONDS_A_FUNESTRA_MAY_STILL_OPEN_IT - 1
+    frames.write("run-2", PNG)
+    assert first.exists()
+
+    clock.now += 1
+    frames.write("run-2", PNG + b" one step further")
+    assert not first.exists()
+
+
 def test_a_forgotten_runs_files_go_once_the_funestra_lets_go_of_them(tmp_path, monkeypatch):
-    frames = FrameFiles(tmp_path / "frames")
+    clock = _Clock()
+    frames = FrameFiles(tmp_path / "frames", clock=clock)
     held = frames.write("run-1", PNG)
     newer = frames.write("run-1", PNG + b" one step further")
     still_open = {held}
@@ -52,12 +98,14 @@ def test_a_forgotten_runs_files_go_once_the_funestra_lets_go_of_them(tmp_path, m
 
     monkeypatch.setattr(Path, "unlink", unlink_unless_open)
     frames.forget("run-1")
+    clock.now += SECONDS_A_FUNESTRA_MAY_STILL_OPEN_IT
+    frames.write("run-2", PNG)
     assert frames.first_of("run-1") is None
     assert held.exists()
     assert not newer.exists()
 
     still_open.clear()
-    frames.write("run-2", PNG)
+    frames.write("run-2", PNG + b" one step further")
     assert not held.exists()
 
 

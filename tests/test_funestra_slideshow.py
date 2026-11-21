@@ -26,7 +26,7 @@ from origenerator.funscript import (
     synthesize_actions,
     write_funscript,
 )
-from origenerator.gui import funestra_slideshow, slideshow_pass
+from origenerator.gui import frame_files, funestra_slideshow, slideshow_pass
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import (
     FunestraSlideshow,
@@ -2546,6 +2546,11 @@ def test_a_funestra_that_reaches_a_run_being_made_is_told_to_show_its_frame(qtbo
     assert _frame_shown(_sent(slideshow)) == FRAME
 
 
+@pytest.fixture
+def frames_go_at_once(monkeypatch):
+    monkeypatch.setattr(frame_files, "SECONDS_A_FUNESTRA_MAY_STILL_OPEN_IT", 0.0)
+
+
 def _slideshow_with_the_funestra_on_a_run(qtbot, tmp_path) -> FunestraSlideshow:
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
     slideshow.note_generating("id-run", FRAME)
@@ -2563,7 +2568,7 @@ def test_a_newer_frame_of_the_run_on_the_funestra_goes_to_it_at_once(qtbot, tmp_
     assert _frame_shown(_sent(slideshow)) == FRAME + b" one step further"
 
 
-def test_a_run_that_lands_is_its_file_on_the_funestra_from_then_on(qtbot, tmp_path):
+def test_a_run_that_lands_is_its_file_on_the_funestra_from_then_on(qtbot, tmp_path, frames_go_at_once):
     slideshow = _slideshow_with_the_funestra_on_a_run(qtbot, tmp_path)
     first_frame = read_playlist(slideshow.channel.playlist)[1].path
 
@@ -2575,7 +2580,7 @@ def test_a_run_that_lands_is_its_file_on_the_funestra_from_then_on(qtbot, tmp_pa
     assert not first_frame.exists()
 
 
-def test_a_run_that_stops_being_made_leaves_the_funestras_list(qtbot, tmp_path):
+def test_a_run_that_stops_being_made_leaves_the_funestras_list(qtbot, tmp_path, frames_go_at_once):
     slideshow = _slideshow_with_the_funestra_on_a_run(qtbot, tmp_path)
     first_frame = read_playlist(slideshow.channel.playlist)[1].path
 
@@ -2639,8 +2644,8 @@ def test_an_enhancement_that_stops_takes_its_frame_off_the_funestra(qtbot, tmp_p
     assert _sent(slideshow) == ["CLEAR_FRAME"]
 
 
-def test_a_run_culled_from_the_funestra_does_not_come_back_on_its_next_frame(qtbot,
-                                                                          tmp_path):
+def test_a_run_culled_from_the_funestra_does_not_come_back_on_its_next_frame(
+        qtbot, tmp_path, frames_go_at_once):
     slideshow = _slideshow_with_the_funestra_on_a_run(qtbot, tmp_path)
     slideshow.slideshow_cull()
 

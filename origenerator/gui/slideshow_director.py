@@ -79,6 +79,7 @@ from origenerator.gui.two_screens import TwoScreens, monitor_shaped
 from origenerator.gui.what_can_play import WhatCanPlay
 from origenerator.item_shape import (
     filter_rows,
+    plays_in_a_slideshow,
     row_shape,
     shaped_key,
     together,
@@ -688,7 +689,7 @@ class SlideshowDirector:
         return self._library().versions_of(rows)
 
     def _slides_of(self, rows) -> tuple[Slide, ...]:
-        return tuple(Slide.of(item) for item in self.items_of(rows))
+        return tuple(Slide.of(item) for item in self.items_of(plays_in_a_slideshow(rows)))
 
     def neighbors_of(self, prompt_id: str, *, shape: str) -> NavMapNeighbors:
         row = self._row_for(prompt_id) if prompt_id else None

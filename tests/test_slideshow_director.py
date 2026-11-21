@@ -3507,3 +3507,29 @@ def test_a_run_no_longer_in_flight_is_looked_up_afresh(slideshows):
     director.note_generating("g7", b"frame-two")
 
     assert db.gets == 2
+
+
+def test_a_regions_slideshow_leaves_out_what_a_looping_workflow_made(slideshows):
+    gallery_pane = FakeGalleryPane(collections={
+        ALL_PORTRAIT: [_row("g4"), _row("loop", workflow_name="wan22_flf2v_loop",
+                                        files=("loop.mp4",))],
+        ALL_LANDSCAPE: [_row("g5")]})
+    director, _host, _made = slideshows(gallery_pane=gallery_pane, fun_time=FakeSession())
+
+    open_both_shapes(director)
+
+    assert [item[2] for item in director.region_slideshow(PORTRAIT).items] == ["g4"]
+
+
+def test_the_map_around_a_picture_leaves_out_what_a_looping_workflow_made_from_it(
+        slideshows, tmp_path):
+    looping = {**_animation("v2", frame="g1.png", action="beta", tmp_path=tmp_path),
+               "workflow_name": "wan22_flf2v_loop"}
+    rows = [_fox("g1", seed=1), _animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path),
+            looping]
+    director, _host, _made = slideshows(_library(rows), db=_db_of(rows))
+
+    around = director.neighbors_of("g1", shape="portrait")
+
+    assert [row.slide.prompt_id for row in around.column] == ["v1"]
+    assert [slide.prompt_id for slide in around.group] == ["v1"]

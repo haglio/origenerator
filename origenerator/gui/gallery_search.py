@@ -82,6 +82,7 @@ class GallerySearchController(QObject):
         )
         self.field.setClearButtonEnabled(True)
         self.field.textChanged.connect(self._on_text_changed)
+        self.field.returnPressed.connect(self._search_everywhere)
         self.search_all = QPushButton("Search all")
         self.search_all.clicked.connect(self._search_everywhere)
         self._gray_search_all(True)

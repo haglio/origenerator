@@ -187,6 +187,19 @@ def test_search_all_searches_the_whole_library_and_keeps_the_folder_highlighted(
     assert "I2V" not in view._folder_path.display_text()
 
 
+def test_enter_in_the_search_field_searches_all(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
+    view = GalleryView(database_of(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_video_workflow(view._tree))
+    _search_for(view, "cat")
+
+    qtbot.keyPress(view.search.field, Qt.Key.Key_Return)
+
+    assert set(view.listed_prompt_ids()) == {"i1", "v1"}
+
+
 def test_picking_another_folder_after_search_all_searches_that_folder(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
     view = GalleryView(database_of(rows))

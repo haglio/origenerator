@@ -790,6 +790,24 @@ list per shape, its own borders held still, Fun Time's device and sound --
 and leaves the standalone choices it overrides as it found them, so a window
 handed back, or the next launch in Standalone, is where he left it.
 
+## Every square icon button is one size, Standalone and in a session
+
+A square button that wears only an icon is the size of the Gallery pane
+buttons, and takes it from the rule they take it from,
+`ui_scale.landing_at_the_huds_scale(BUTTON_SIZE, hosted=...)`: the HUD's 18
+pixels Standalone, and the family's 28 in a Fun Time session, where the whole
+window is drawn at 18/28 and so lands them at 18 on screen. Its gaps and its
+icon come from the same call. A button sized by a constant is right in one of
+the two and wrong in the other, and one sized like its neighbors copies
+whatever its neighbors got wrong: Separate and Together stayed 28 for weeks
+after the Gallery pane buttons went to 18, and two buttons added beside them
+were made 28 to match. A window taken into a session or handed back sizes its
+buttons again for where it is (`draw_for_a_session`, `become_hosted`).
+`tests/test_button_sizes.py` builds the window both ways and fails on a
+square icon button of any other size; the kinds it lists as waiting are older
+buttons of other sizes that the user has not ruled on, so the list only gets
+shorter, and no new button goes on it.
+
 ## Standalone is a two-screen program
 
 On a computer with a Landscape and a Portrait monitor, Standalone fills both:

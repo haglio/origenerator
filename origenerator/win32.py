@@ -3,7 +3,6 @@ from __future__ import annotations
 import ctypes
 import ctypes.wintypes
 import logging
-import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -66,40 +65,6 @@ def place_window_in_device_pixels(hwnd: int, x: int, y: int,
     return bool(_user32.SetWindowPos(ctypes.c_void_p(hwnd), None,
                                      int(x), int(y), int(width), int(height),
                                      _SWP_NOZORDER | _SWP_NOACTIVATE))
-
-
-_user32.GetWindow.argtypes = [ctypes.wintypes.HWND, ctypes.wintypes.UINT]
-_user32.GetWindow.restype = ctypes.wintypes.HWND
-_user32.GetWindowLongPtrW.argtypes = [ctypes.wintypes.HWND, ctypes.c_int]
-_user32.GetWindowLongPtrW.restype = ctypes.c_ssize_t
-_user32.GetWindowThreadProcessId.argtypes = [ctypes.wintypes.HWND,
-                                             ctypes.POINTER(ctypes.wintypes.DWORD)]
-_user32.GetWindowThreadProcessId.restype = ctypes.wintypes.DWORD
-_GW_HWNDNEXT, _GW_HWNDPREV = 2, 3
-_GWL_EXSTYLE, _WS_EX_TOPMOST = -20, 0x0008
-_HWND_TOP = 0
-_SWP_NOSIZE, _SWP_NOMOVE, _SWP_NOOWNERZORDER = 0x0001, 0x0002, 0x0200
-
-
-def _of_this_program(hwnd: int) -> bool:
-    pid = ctypes.wintypes.DWORD()
-    return bool(_user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))) and pid.value == os.getpid()
-
-
-def _topmost(hwnd: int) -> bool:
-    return bool(_user32.GetWindowLongPtrW(hwnd, _GWL_EXSTYLE) & _WS_EX_TOPMOST)
-
-
-def stack_just_above(own: int, beneath: int) -> bool:
-    if not (_of_this_program(own) and window_exists(beneath)):
-        return False
-    if _user32.GetWindow(own, _GW_HWNDNEXT) == beneath:
-        return True
-    above = _user32.GetWindow(beneath, _GW_HWNDPREV)
-    insert_after = _HWND_TOP if not above or _topmost(above) else above
-    return bool(_user32.SetWindowPos(
-        ctypes.c_void_p(own), ctypes.c_void_p(insert_after), 0, 0, 0, 0,
-        _SWP_NOMOVE | _SWP_NOSIZE | _SWP_NOACTIVATE | _SWP_NOOWNERZORDER))
 
 
 class _WindowPlacement(ctypes.Structure):

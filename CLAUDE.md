@@ -811,7 +811,7 @@ over the Gallery pane and the spoken "switch".
   Core where it was left.
 - Nothing inside that slideshow closes it: Enter, a second press on the slide
   and "stop slideshow" show its item in Core and leave it playing.
-- Core has no line for what was heard: a slideshow shows it at its top
+- Core shows no message for what was heard: a slideshow shows it at its top
   center, and in a Fun Time session the Dashboard's log does. The OSR2
   controls are Core's alone, and no slideshow's HUD carries them.
 - With one monitor, or two of one shape, none of this applies: Core keeps its

@@ -63,7 +63,7 @@ class OnASessionsFunestra:
     def flash(self, text: str, *, kind: str = INFO, mark: str = "") -> None:
         self._messages.say(text, level=_LEVELS[kind], mark=mark)
 
-    def request_line(self, message: str, request=None, *, working: bool = False,
+    def request_message(self, message: str, request=None, *, working: bool = False,
                      kind: str = INFO) -> None:
         self.flash(message, kind=kind, mark=HEARD_MARK)
 

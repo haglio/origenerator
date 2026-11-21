@@ -875,7 +875,7 @@ class FunestraSlideshow(QObject):
 
     def note_request(self, message: str, request=None, *, working: bool = False,
                      kind: str = INFO) -> None:
-        self.shown.request_line(message, request, working=working, kind=kind)
+        self.shown.request_message(message, request, working=working, kind=kind)
 
     def note_voice_command(self, message: str, *, kind: str = INFO) -> None:
         self.shown.flash(message, kind=kind, mark=HEARD_MARK)

@@ -24,7 +24,7 @@ from origenerator import gallery
 from origenerator.db import Database
 from origenerator.fun_time_mode import FunestraChannel, FunTimeSession, Rect
 from origenerator.gallery.collection import LATEST_KEY
-from origenerator.gallery.shapes import SEPARATE, TOGETHER
+from origenerator.gallery.shapes import TOGETHER
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.collapsible_section import FoldHeader
 from origenerator.gui.gallery_view import GalleryView, Shared
@@ -212,15 +212,15 @@ def test_fun_time_gallery_opens_its_toc_wider_than_a_window_of_its_own_starts_it
     assert view._arrangement.panes.widget(0).width() == SESSION_TOC_OPENING_WIDTH
 
 
-def test_fun_time_gallery_draws_neither_separate_nor_together_over_its_folder_list(qtbot):
+def test_fun_time_gallery_draws_the_whole_row_over_its_toc_at_the_gallery_pane_buttons_size(qtbot):
     view = _fun_time_view(qtbot)
     with qtbot.waitExposed(view):
         view.show()
 
-    assert not view._tree.separate_button.isVisible()
-    assert not view._tree.together_button.isVisible()
-    assert view._tree.top_button.isVisible()
-    assert view._tree.top_button.size() == view._buttons.favorite.size()
+    row = (view._tree.separate_button, view._tree.together_button,
+           view._tree.current_folder_button, view._tree.top_button)
+    assert all(button.isVisible() for button in row)
+    assert {button.size() for button in row} == {view._buttons.favorite.size()}
 
 
 def test_standalone_gallery_keeps_its_panes_side_by_side(qtbot):
@@ -1487,7 +1487,7 @@ def test_a_gallery_handed_back_from_a_session_stands_as_a_standalone_one_is_buil
     assert arrangement.folder_panes.count() == built._arrangement.folder_panes.count() == 2
 
 
-def test_a_gallery_taken_into_a_session_hides_separate_and_together_until_handed_back(qtbot):
+def test_a_gallery_taken_into_fun_time_goes_on_offering_separate_and_together(qtbot):
     view = GalleryView(database_of([]))
     qtbot.addWidget(view)
     buttons = (view._tree.separate_button, view._tree.together_button)
@@ -1496,8 +1496,38 @@ def test_a_gallery_taken_into_a_session_hides_separate_and_together_until_handed
     hosted = [button.isVisibleTo(view) for button in buttons]
     view.become_standalone()
 
-    assert hosted == [False, False]
+    assert hosted == [True, True]
     assert [button.isVisibleTo(view) for button in buttons] == [True, True]
+
+
+def test_a_slideshow_of_both_shapes_started_in_fun_time_plays_each_shape_on_its_satellite(
+        qtbot, tmp_path, monkeypatch):
+    shapes = {"tall": ({"width": 832, "height": 1216}, (100, 200)),
+              "wide": ({"width": 1216, "height": 832}, (200, 100))}
+    rows, items = [], []
+    for n, name in enumerate(("tall", "wide", "tall")):
+        params, size = shapes[name]
+        still = tmp_path / f"{name}{n}.png"
+        Image.new("RGB", size).save(still)
+        rows.append(_row(f"id-{name}-{n}", "sdxl_t2i", params, f"{name}{n}.png"))
+        items.append((str(still), "image", f"id-{name}-{n}", str(still)))
+    view = GalleryView(database_of(rows), fun_time=_session())
+    qtbot.addWidget(view)
+
+    monkeypatch.setattr(view, "rows_to_play", lambda: rows)
+    monkeypatch.setattr(view.slideshows, "items_of", lambda rows: list(items))
+    monkeypatch.setattr(view, "slideshow_subject", lambda: "a list of both shapes")
+    view.refresh()
+    view._tree.together_button.click()
+
+    view.slideshows.start()
+    monkeypatch.setattr(view.slideshows, "items_of", lambda rows: [])
+    open_both_shapes(view.slideshows)
+
+    playing = {shape: view.region_slideshow(shape) for shape in ("portrait", "landscape")}
+    assert [slide.prompt_id for slide in playing["portrait"].whole_set()] == [
+        "id-tall-0", "id-tall-2"]
+    assert [slide.prompt_id for slide in playing["landscape"].whole_set()] == ["id-wide-1"]
 
 
 def test_a_gallery_handed_back_from_a_session_draws_the_toc_as_it_was_left(qtbot):
@@ -1509,7 +1539,7 @@ def test_a_gallery_handed_back_from_a_session_draws_the_toc_as_it_was_left(qtbot
     hosted = view._tree.shapes
     view.become_standalone()
 
-    assert (hosted, view._tree.shapes) == (SEPARATE, TOGETHER)
+    assert (hosted, view._tree.shapes) == (TOGETHER, TOGETHER)
 
 
 def test_a_gallery_handed_back_from_a_session_drives_its_own_device_again(qtbot):

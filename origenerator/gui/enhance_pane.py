@@ -25,9 +25,8 @@ from shared_ui.colors import (
     TEXT_MUTED,
     YELLOW,
 )
-from shared_ui.icon_button import fill_square_with_icon
 from shared_ui.icons import qt_icon
-from shared_ui.spacing import BUTTON_SIZE_HUD, GAP_SMALL
+from shared_ui.spacing import GAP_SMALL
 from shared_ui.tick_control import TickControl
 from shared_ui.toggle_switch import ToggleSwitch
 
@@ -43,6 +42,7 @@ from origenerator.gallery import (
     models_matching_the_sources,
 )
 from origenerator.gallery.enhance_settings import match_source_model_label
+from origenerator.gui import square_buttons
 from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.eliding import open_the_list_in_full
 from origenerator.gui.enhance_settings_drags import settings_carried
@@ -386,7 +386,7 @@ class EnhancePane(QWidget):
         widget = self._fix_number()
         widget.valueChanged.connect(self._emit)
         label = self._labeled(part.name.capitalize(), widget)
-        prompts_button = fill_square_with_icon(QToolButton(), size=BUTTON_SIZE_HUD)
+        prompts_button = square_buttons.square(QToolButton())
         prompts_button.setIcon(qt_icon("pencil"))
         prompts_button.setToolTip(param_help("enhance_fix_prompts"))
         prompts_button.clicked.connect(lambda _on=False, name=part.name: self.open_fix_prompts(name))

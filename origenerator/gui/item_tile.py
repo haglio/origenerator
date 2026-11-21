@@ -4,18 +4,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
 
-from PySide6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, Signal
+from PySide6.QtCore import QEvent, QPoint, Qt, QTimer, Signal
 from PySide6.QtGui import QCursor, QIcon, QMovie, QPixmap
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
 from origenerator.gui import icons, tile_shape
 from origenerator.gui.corner_buttons import (
-    CORNER_GAP,
-    CORNER_INSET,
-    CORNER_SIZE,
     CornerButtons,
     RestoreOffer,
     bar_between_the_bottom_corners,
+    corner_gap,
+    corner_inset,
+    corner_size,
+    size_a_corner_button,
 )
 from origenerator.gui.drag_thumbnail import DragOut, label_thumbnail
 from origenerator.gui.generation_drag import generation_mime
@@ -292,22 +293,29 @@ class ItemTile(QWidget):
         set_style_property(self._image_label, SELECTED, self._selected)
 
     def _build_corner_buttons(self, actions: list[CornerButton]):
-        for i, action in enumerate(actions):
+        for action in actions:
             button = QPushButton(self)
             button.setIcon(action.icon)
-            button.setIconSize(QSize(CORNER_SIZE - 8, CORNER_SIZE - 8))
             button.setToolTip(action.tooltip)
-            button.setFixedSize(CORNER_SIZE, CORNER_SIZE)
             button.setCursor(Qt.CursorShape.PointingHandCursor)
             button.setObjectName(SEED_BUTTON)
-            button.move(self._image_label.x() + CORNER_INSET + i * (CORNER_SIZE + CORNER_GAP),
-                        self._image_label.y() + CORNER_INSET)
             button.setVisible(False)
             button.installEventFilter(self)
             button.clicked.connect(
                 lambda _=False, a=action.action_id:
                 self.corner_button_triggered.emit(self.prompt_id, a))
             self._corner_buttons.append(button)
+        self._place_the_corner_buttons()
+
+    def _place_the_corner_buttons(self) -> None:
+        for i, button in enumerate(self._corner_buttons):
+            size_a_corner_button(button)
+            button.move(self._image_label.x() + corner_inset() + i * (corner_size() + corner_gap()),
+                        self._image_label.y() + corner_inset())
+
+    def draw_at_the_huds_scale_again(self) -> None:
+        self._place_the_corner_buttons()
+        self._place_enhancing_bar()
 
     def _set_corner_buttons_visible(self, visible: bool):
         for button in self._corner_buttons:

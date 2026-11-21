@@ -45,7 +45,7 @@ from origenerator.db import Database, NewGeneration
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import CORE_READY, FunestraChannel, FunTimeSession, Rect
 from origenerator.gallery.collection import LATEST_KEY, FolderCollection
-from origenerator.gallery.shapes import BOTH, SEPARATE
+from origenerator.gallery.shapes import BOTH, SEPARATE, TOGETHER
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import core, toasts, two_screens
 from origenerator.gui.core import (
@@ -2263,7 +2263,7 @@ def test_a_window_a_session_launched_leaves_the_saved_motion_as_it_found_it(qtbo
     assert AppState(path).get("motion") == kept
 
 
-def test_a_window_a_session_launched_draws_separate_and_keeps_together_for_the_next_launch(
+def test_a_window_fun_time_launched_draws_together_where_it_was_left_on_together(
         qtbot, tmp_path):
     path = tmp_path / "ui.json"
     state = AppState(path)
@@ -2271,12 +2271,10 @@ def test_a_window_a_session_launched_draws_separate_and_keeps_together_for_the_n
     state.save()
 
     win = _window(qtbot, tmp_path, AppState(path), fun_time=_fun_time_session())
-    assert win._gallery_view._tree.shapes == SEPARATE
+    assert win._gallery_view._tree.shapes == TOGETHER
     win.close()
 
-    assert AppState(path).get("toc_shapes") == [BOTH], (
-        "a session draws one list for each of its monitors' shapes, but on its own the app is "
-        "one window, where either shape fits, so Together waits for its next launch")
+    assert AppState(path).get("toc_shapes") == [BOTH]
 
 
 def test_a_window_a_session_launched_keeps_the_folders_left_open_on_together(qtbot, tmp_path):

@@ -357,6 +357,19 @@ class SlideshowDirector:
                     listing.subject, len(items),
                     "latest" if latest else "shuffled")
 
+    def _open_each_shape_on_its_satellite(self, items, rows, location, filters, kwargs):
+        opened_on = _item_opened_on(items, kwargs.pop("start", None), None)
+        opened = None
+        for shape in _SHAPES:
+            ids = {row["prompt_id"] for row in filter_rows(rows, shape)}
+            its_items = [item for item in items if item[2] in ids]
+            if its_items:
+                opened = self.open(
+                    its_items, rows=[row for row in rows if row["prompt_id"] in ids],
+                    location=location, shape=shape, start=_place_of(opened_on, its_items),
+                    carrying=Carrying(filters=filters), **kwargs) or opened
+        return opened
+
     def _picked_since_the_slideshow_up_opened(self) -> list[str]:
         picked = self._listing().picked
         if (_still_up(self._slideshow) is not None
@@ -461,6 +474,9 @@ class SlideshowDirector:
         run = self._run_being_made_at(location) if not items else None
         where = shape or (row_shape(run) if run is not None
                          else _shape_of_the_set(rows, items or carrying.folder_items or []))
+        if self._fun_time is not None and items and the_one_shape_on(where) is None:
+            return self._open_each_shape_on_its_satellite(
+                items, rows, location, carrying.filters, kwargs)
         channel = self._fun_time.funestra(where) if self._fun_time is not None else None
         follows_a_run = not items
         if follows_a_run and not carrying.folder_items and run is None:

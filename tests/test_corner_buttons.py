@@ -6,16 +6,17 @@ import pytest
 from PySide6.QtCore import QEvent, QPointF, QRect
 from PySide6.QtGui import QEnterEvent
 from PySide6.QtWidgets import QLabel, QWidget
+from shared_ui.spacing import BUTTON_SIZE, BUTTON_SIZE_HUD
 from shared_ui.testing import appending_to
 
 from origenerator import gallery
-from origenerator.gui import icons
+from origenerator.gui import icons, square_buttons
 from origenerator.gui.corner_buttons import (
-    CORNER_SIZE,
     ENHANCE,
     STAR,
     TRASH,
     CornerButtons,
+    corner_size,
     enhance_state,
 )
 from origenerator.gui.stylesheet import build_stylesheet
@@ -192,7 +193,7 @@ def test_a_corner_button_under_the_pointer_wears_its_armed_icon(qtbot):
     star = controls.buttons()[0]
 
     def mark():
-        return star.icon().pixmap(CORNER_SIZE, CORNER_SIZE).toImage()
+        return star.icon().pixmap(corner_size(), corner_size()).toImage()
 
     resting = mark()
 
@@ -203,6 +204,27 @@ def test_a_corner_button_under_the_pointer_wears_its_armed_icon(qtbot):
     star.leaveEvent(QEvent(QEvent.Type.Leave))
 
     assert mark() == resting
+
+
+def test_in_fun_time_they_are_the_familys_square_which_fun_times_scale_lands_at_the_huds(qtbot):
+    square_buttons.draw_in_fun_time(True)
+    _host, controls = _controls(qtbot)
+
+    assert {button.width() for button in controls.buttons()} == {BUTTON_SIZE}
+
+
+def test_taken_into_fun_time_they_grow_and_stay_in_their_corners(qtbot):
+    _host, controls = _controls(qtbot)
+    area = QRect(20, 30, 120, 100)
+    controls.place(area)
+
+    square_buttons.draw_in_fun_time(True)
+    controls.draw_at_the_huds_scale_again()
+
+    star, trash, plus = (b.geometry() for b in controls.buttons())
+    assert {star.width(), trash.width(), plus.width()} == {BUTTON_SIZE}
+    assert all(area.contains(corner) for corner in (star, trash, plus))
+    assert (star.right(), trash.bottom()) == (plus.right(), plus.bottom())
 
 
 def test_they_land_one_to_a_corner_of_the_rectangle_they_are_given(qtbot):
@@ -217,7 +239,7 @@ def test_they_land_one_to_a_corner_of_the_rectangle_they_are_given(qtbot):
             "the host says where the item currently is, because only the host knows: the item "
             "in a thumbnail is a fixed rectangle and the one in a preview moves with every "
             "resize and every change of aspect ratio")
-        assert corner.size().width() == CORNER_SIZE
+        assert corner.size().width() == corner_size() == BUTTON_SIZE_HUD
     assert star.left() == plus.left() > area.center().x()
     assert star.top() < area.center().y() < plus.top()
     assert trash.left() < area.center().x()

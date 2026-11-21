@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QPushButton, QWidget
 from shared_ui.spacing import BUTTON_GAP, BUTTON_SIZE, GAP_SMALL
 
 from origenerator import gallery
-from origenerator.gui import icons
+from origenerator.gui import icons, square_buttons
 from origenerator.gui.progress_bar import BAR_HEIGHT
 from origenerator.gui.tile_rules import CORNER_FACE
 
@@ -16,10 +16,25 @@ TRASH = "trash"
 ENHANCE = "enhance"
 RESTORE = "restore"
 
-CORNER_SIZE = BUTTON_SIZE
-CORNER_GAP = BUTTON_GAP
-CORNER_INSET = GAP_SMALL
-_GLYPH_SIZE = CORNER_SIZE - 8
+_AROUND_THE_GLYPH = 8
+
+
+def corner_size() -> int:
+    return square_buttons.landing(BUTTON_SIZE)
+
+
+def corner_gap() -> int:
+    return square_buttons.landing(BUTTON_GAP)
+
+
+def corner_inset() -> int:
+    return square_buttons.landing(GAP_SMALL)
+
+
+def size_a_corner_button(button: QPushButton) -> None:
+    glyph = square_buttons.landing(BUTTON_SIZE - _AROUND_THE_GLYPH)
+    button.setFixedSize(corner_size(), corner_size())
+    button.setIconSize(QSize(glyph, glyph))
 
 _DELETE_FOR_GOOD_TIP = "Delete permanently — remove it and its files for good"
 _TIPS = {
@@ -33,7 +48,7 @@ BLINK_MS = 900
 
 
 def bar_between_the_bottom_corners(area: QRect, inset: int = 0) -> QRect:
-    clear_of_a_corner = CORNER_INSET + CORNER_SIZE + CORNER_GAP
+    clear_of_a_corner = corner_inset() + corner_size() + corner_gap()
     return QRect(area.x() + clear_of_a_corner, area.y() + area.height() - inset - BAR_HEIGHT,
                  area.width() - 2 * clear_of_a_corner, BAR_HEIGHT)
 
@@ -60,8 +75,7 @@ class _CornerButtonFace(QPushButton):
         self.setEnabled(enabled)
         self._render = render
         self._armed = False
-        self.setFixedSize(CORNER_SIZE, CORNER_SIZE)
-        self.setIconSize(QSize(_GLYPH_SIZE, _GLYPH_SIZE))
+        size_a_corner_button(self)
         self.setObjectName(CORNER_FACE)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -96,6 +110,7 @@ class CornerButtons(QObject):
         self._favorite = False
         self._enhance: str | None = None
         self._kind = "item"
+        self._placed_in: QRect | None = None
         self._star = _CornerButtonFace(
             host, lambda armed: icons.corner_star_icon(favorite=self._favorite, armed=armed)
             if restore is None
@@ -143,11 +158,19 @@ class CornerButtons(QObject):
         self._enhance = enhance
         self._redraw()
 
+    def draw_at_the_huds_scale_again(self) -> None:
+        for button in self.buttons():
+            size_a_corner_button(button)
+            button.redraw()
+        if self._placed_in is not None:
+            self.place(self._placed_in)
+
     def place(self, area: QRect):
-        inner = area.adjusted(CORNER_INSET, CORNER_INSET,
-                              -CORNER_INSET, -CORNER_INSET)
-        right = inner.right() - CORNER_SIZE + 1
-        lower = inner.bottomLeft().y() - CORNER_SIZE + 1
+        self._placed_in = QRect(area)
+        inset, size = corner_inset(), corner_size()
+        inner = area.adjusted(inset, inset, -inset, -inset)
+        right = inner.right() - size + 1
+        lower = inner.bottomLeft().y() - size + 1
         self._star.move(right, inner.top())
         self._trash.move(inner.left(), lower)
         self._enhance_button.move(right, lower)

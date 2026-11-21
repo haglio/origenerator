@@ -10,8 +10,11 @@ from typing import NamedTuple
 
 import pytest
 from app_support.kino_folder import upscale_in, upscales_in
+from funestra.funestra_verbs import play_file
 from funestra.hud_placement import HudCorner
 from funestra.hud_title import LATEST_LABEL
+from funestra.modes import MainMode
+from funestra.playlist import PlaylistItem
 from PIL import Image
 from PySide6.QtCore import QEvent, QObject, Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QKeyEvent
@@ -29,6 +32,7 @@ from origenerator.gallery.collection import (
     FolderCollection,
 )
 from origenerator.gallery.shapes import BOTH
+from origenerator.genau_flicks import GenauFilters
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import slideshow_director as module
 from origenerator.gui import two_screens
@@ -54,6 +58,7 @@ from origenerator.video_records import FiledLoops
 from origenerator.voice.app_commands import AppCommand
 from origenerator.voice.slideshow_commands import SlideshowCommand
 from tests.his_monitors import HIS_TWO_MONITORS, LANDSCAPE_MONITOR, PORTRAIT_MONITOR
+from tests.motion_doubles import FakeMotion
 from tests.own_funestra_support import FakeProgram
 from tests.real_db import database_of, on_disk
 from tests.slideshow_hud_support import open_both_shapes, program_of
@@ -1379,7 +1384,7 @@ def test_a_director_handed_back_from_a_session_gives_up_its_regions_for_a_fullsc
     director, _host, made = slideshows(fun_time=FakeSession())
     open_both_shapes(director)
     director.open([("a.png", "image", "g1", None)], shape=PORTRAIT)
-    motion = object()
+    motion = FakeMotion()
 
     director.become_standalone(motion)
     director.open([("b.png", "image", "g2", None)])
@@ -3549,3 +3554,126 @@ def test_the_openings_kept_fresh_go_with_the_window_they_are_kept_for(slideshows
 
     assert [timer.interval() for timer in host.findChildren(QTimer) if timer.isActive()] == [
         module._OPENINGS_KEPT_FRESH_MS]
+
+
+def _looping(prompt_id):
+    return {**_row(prompt_id, files=(f"{prompt_id}.mp4",)), "workflow_name": "wan22_flf2v_loop"}
+
+
+def _shown_in_genau(slideshow) -> bool:
+    return slideshow.shown.mode is MainMode.GENAU
+
+
+def _genau_told(slideshow) -> list[str]:
+    command = program_of(slideshow).genau.command
+    return command.read_text(encoding="utf-8").splitlines() if command.exists() else []
+
+
+def test_a_double_click_on_a_looping_tile_shows_genau_on_its_video_over_the_slideshow(
+        slideshows):
+    director, _host, made = slideshows(FakeHost(rows=[_row("g1"), _looping("v1")]))
+    director.open([("a.png", "image", "g1", None)])
+
+    director.open_on_tile("v1")
+
+    (slideshow,) = made
+    assert _shown_in_genau(slideshow)
+    assert program_of(slideshow).sent[-1] == f"SHOW {MainMode.GENAU}"
+    assert play_file(PlaylistItem(Path("v1.png"))) in _genau_told(slideshow)
+    assert slideshow.is_showing()
+    assert program_of(slideshow)._paused
+
+
+def test_a_double_click_on_a_looping_tile_with_no_slideshow_up_starts_one_with_genau_showing(
+        slideshows):
+    director, _host, made = slideshows(FakeHost(rows=[_looping("v1")]))
+
+    director.open_on_tile("v1")
+
+    (slideshow,) = made
+    assert slideshow.items == []
+    assert _shown_in_genau(slideshow)
+    assert director.showing is slideshow
+
+
+def test_a_double_click_on_a_looping_videos_preview_shows_genau_on_it(slideshows):
+    director, _host, made = slideshows(FakeHost(rows=[_looping("v1")]))
+
+    director.open_on_preview(("C:/made/up/v1.mp4", "video"), "v1")
+
+    assert _shown_in_genau(made[0])
+    assert play_file(PlaylistItem(Path("C:/made/up/v1.mp4"))) in _genau_told(made[0])
+
+
+def test_a_double_click_on_anything_else_goes_back_to_kino_and_plays_it(slideshows):
+    director, _host, made = slideshows(FakeHost(rows=[_row("g1"), _row("g2"), _looping("v1")]))
+    director.open([("a.png", "image", "g1", None)])
+    director.open_on_tile("v1")
+
+    director.open_on_tile("g2")
+
+    (slideshow,) = made
+    assert not _shown_in_genau(slideshow)
+    assert program_of(slideshow).sent[-1] == f"SHOW {MainMode.KINO}"
+    assert not program_of(slideshow)._paused
+
+
+def test_the_slideshow_button_goes_back_to_kino(slideshows):
+    director, _host, made = slideshows(FakeHost(rows=[_row("g1"), _looping("v1")]))
+    director.open([("a.png", "image", "g1", None)])
+    director.open_on_tile("v1")
+
+    director.start()
+
+    assert not _shown_in_genau(made[0])
+
+
+def test_the_kino_selector_on_genau_shown_with_no_slideshow_starts_the_slideshow(slideshows):
+    director, _host, made = slideshows(FakeHost(rows=[_row("g1"), _looping("v1")]))
+    director.open_on_tile("v1")
+
+    made[0].shown.press("main_kino_activate")
+
+    assert "g1" in [item[2] for item in made[0].played[-1]]
+
+
+def test_in_a_session_a_looping_tile_opens_as_it_always_has(slideshows):
+    channel = object()
+    director, _host, made = slideshows(FakeHost(rows=[_looping("v1")]),
+                                       fun_time=FakeSession(funestras={PORTRAIT: channel,
+                                                                       LANDSCAPE: channel}))
+    open_both_shapes(director)
+
+    director.open_on_tile("v1")
+
+    assert all(isinstance(slideshow.shown, FakeSessionsFunestra) for slideshow in made)
+
+
+def test_a_flip_genau_is_asked_for_is_written_on_its_item(slideshows):
+    rows = [_looping("v1")]
+    db = _db_of(rows)
+    director, _host, _made = slideshows(FakeHost(rows=rows), db=db)
+
+    director._genau_sources().flip("v1", True)
+
+    assert db.get_generation("v1")["genau_flipped"] == 1
+
+
+def test_genaus_filters_are_where_he_left_them_at_the_next_launch(slideshows):
+    director, _host, _made = slideshows(FakeHost(rows=[_looping("v1")]))
+    shown = director.open_on_tile("v1").shown
+    shown.press(f"{shown.hud_shape}_favorites")
+    saved = json.loads(json.dumps(director.remembered()))
+    later, _host, _made = slideshows(FakeHost(rows=[_looping("v1")]))
+
+    later.remember(saved)
+
+    assert later._genau_sources().starts_with == GenauFilters(favorites=True)
+
+
+def test_genaus_filters_saved_wrong_come_back_as_no_filter(slideshows):
+    director, _host, _made = slideshows()
+
+    director.remember({"genau_filters": {"favorites": "yes", "orientations": [1, 2, 3]}})
+
+    assert director._genau_sources().starts_with == GenauFilters()

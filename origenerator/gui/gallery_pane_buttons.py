@@ -92,10 +92,6 @@ class ButtonHandlers(NamedTuple):
     quit: Callable[[], None]
 
 
-def _landing_at_the_huds_scale(length: int, *, hosted: bool) -> int:
-    return length if hosted else round(length * ui_scale.HOSTED_SCALE)
-
-
 class _AudioSwitch(QToolButton):
     def set_frozen(self, frozen: bool) -> None:
         self.setStyleSheet(_LIT_WHILE_THE_ROOM_IS_PAUSED if frozen else _LIT)
@@ -216,10 +212,10 @@ class GalleryPaneButtons(QWidget):
 
     def _draw_at_the_huds_scale(self, *, hosted: bool) -> None:
         layout = self.layout()
-        layout.setSpacing(_landing_at_the_huds_scale(BUTTON_GAP, hosted=hosted))
-        layout.set_row_spacing(_landing_at_the_huds_scale(BUTTON_ROW_GAP, hosted=hosted))
-        layout.set_group_spacing(_landing_at_the_huds_scale(BUTTON_GROUP_GAP, hosted=hosted))
-        square = _landing_at_the_huds_scale(BUTTON_SIZE, hosted=hosted)
+        layout.setSpacing(ui_scale.landing_at_the_huds_scale(BUTTON_GAP, hosted=hosted))
+        layout.set_row_spacing(ui_scale.landing_at_the_huds_scale(BUTTON_ROW_GAP, hosted=hosted))
+        layout.set_group_spacing(ui_scale.landing_at_the_huds_scale(BUTTON_GROUP_GAP, hosted=hosted))
+        square = ui_scale.landing_at_the_huds_scale(BUTTON_SIZE, hosted=hosted)
         for buttons in self._groups:
             for button in buttons:
                 fill_square_with_icon(button, size=square)

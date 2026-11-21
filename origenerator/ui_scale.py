@@ -14,6 +14,10 @@ HOSTED_SCALE = BUTTON_SIZE_HUD / BUTTON_SIZE
 _ENV_VAR = "QT_SCALE_FACTOR"
 
 
+def landing_at_the_huds_scale(length: int, *, hosted: bool) -> int:
+    return length if hosted else round(length * HOSTED_SCALE)
+
+
 def hosted_scale() -> float:
     try:
         return float(os.environ.get(_ENV_VAR) or HOSTED_SCALE)

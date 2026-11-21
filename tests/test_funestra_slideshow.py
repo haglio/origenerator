@@ -1481,6 +1481,34 @@ class TestVersions:
         sent = _sent(slideshow)
         assert sent.index("FORGET_VERSIONS") < sent.index(f"SET_PACE {slideshow.dwell_s}") < sent.index(verb)
 
+    def test_reset_is_offered_while_the_versions_are_compared(self, qtbot, tmp_path):
+        slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+        slideshow.set_versions(_VERSIONS)
+
+        slideshow.slideshow_step_version(1)
+        _says(slideshow, video="one_base.png")
+        slideshow.tick()
+
+        assert not _band_button(slideshow, "reset").dim
+
+    @pytest.mark.parametrize("actions", [
+        pytest.param(SlideshowActions(), id="standalone"),
+        pytest.param(SlideshowActions(reset=lambda slideshow: None), id="in a session"),
+    ])
+    def test_a_reset_forgets_the_versions_and_hands_the_funestra_its_pace(
+            self, qtbot, tmp_path, actions):
+        slideshow = _slideshow(qtbot, tmp_path, actions=actions)
+        _says(slideshow, video="one.png")
+        slideshow.tick()
+        slideshow.set_versions(_VERSIONS)
+        slideshow.slideshow_step_version(1)
+        _sent(slideshow)
+
+        assert answer(slideshow, "reset")
+
+        sent = _sent(slideshow)
+        assert sent.index("FORGET_VERSIONS") < sent.index(f"SET_PACE {slideshow.dwell_s}")
+
     def test_a_version_landing_while_they_are_compared_holds_the_funestra_on_the_new_one(
             self, qtbot, tmp_path):
         slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")

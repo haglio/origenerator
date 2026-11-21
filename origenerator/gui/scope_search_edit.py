@@ -46,6 +46,12 @@ class ScopeSearchEdit(QLineEdit):
             self._scope = path
             self._render_placeholder()
 
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape and self.text():
+            self.clear()
+            return
+        super().keyPressEvent(event)
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._render_placeholder()

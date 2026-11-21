@@ -1125,6 +1125,17 @@ def test_what_is_being_made_of_the_slide_is_no_message_across_the_top(qtbot):
     assert view._note.isHidden()
 
 
+def test_a_spoken_answer_sits_directly_on_the_slideshow_its_funestra_names(qtbot):
+    stacked = []
+    message = MessageOverAFunestra(stack=lambda own, beneath: stacked.append(beneath) or True)
+    view = _view(qtbot, _KEYED, message=message)
+
+    view.channel.heard.emit({"video": "", "window": "4242"})
+    view.slideshow.note_voice_command("next")
+
+    assert stacked == [4242]
+
+
 def test_the_message_wears_the_color_of_what_it_says(qtbot):
     message = MessageOverAFunestra()
     qtbot.addWidget(message)

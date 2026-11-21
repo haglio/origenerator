@@ -42,6 +42,7 @@ from tests.gallery_view_support import (
     _image_workflow,
     _key,
     _of_both_kinds,
+    _on_screen,
     _pane_holding,
     _press_ctrl_f,
     _row,
@@ -125,6 +126,19 @@ def test_clearing_the_search_gives_the_pane_back_to_the_open_folder(qtbot):
     view.search.field.setText("")
 
     assert view.listed_prompt_ids() == ["i2"]
+    assert not view._gallery_pane.showing_search()
+
+
+def test_esc_in_the_search_field_clears_the_search(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
+    view = GalleryView(database_of(rows))
+    _on_screen(qtbot, view, 1200, 800)
+    _search_for(view, "dog")
+    view.search.focus_field()
+
+    qtbot.keyPress(view.search.field, Qt.Key.Key_Escape)
+
+    assert view.search.field.text() == ""
     assert not view._gallery_pane.showing_search()
 
 

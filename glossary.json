@@ -1132,7 +1132,8 @@
         "Qt.Orientation",
         "orientation: Qt.Orientation",
         "super().__init__(orientation)",
-        "upscaled_by_orientation"
+        "upscaled_by_orientation",
+        "import orientation_pair as shape_pair"
       ]
     },
     {

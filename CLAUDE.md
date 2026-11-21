@@ -785,28 +785,34 @@ being searched for, what one image shows, a nudge, and Populate, which
 a restart leaves off, since a Populate that came back on by itself
 could run unnoticed.
 
-Inside a Fun Time session the window draws what the session asks for -- one
-list per shape, its own borders held still, Fun Time's device and sound --
-and leaves the standalone choices it overrides as it found them, so a window
-handed back, or the next launch in Standalone, is where he left it.
+In Fun Time the window draws what Fun Time asks for -- its own borders held
+still, Fun Time's device and sound -- and leaves the Standalone choices it
+overrides as it found them, so a window handed back, or the next launch in
+Standalone, is where he left it. Separate and Together are no such choice:
+they are offered in Fun Time too and are one setting wherever the window is,
+and a slideshow of both shapes plays there with each shape on its own
+Satellite.
 
-## Every square icon button is one size, Standalone and in a session
+## Every square icon button is one size, Standalone and in Fun Time
 
 A square button that wears only an icon is the size of the Gallery pane
-buttons, and takes it from the rule they take it from,
-`ui_scale.landing_at_the_huds_scale(BUTTON_SIZE, hosted=...)`: the HUD's 18
-pixels Standalone, and the family's 28 in a Fun Time session, where the whole
-window is drawn at 18/28 and so lands them at 18 on screen. Its gaps and its
-icon come from the same call. A button sized by a constant is right in one of
-the two and wrong in the other, and one sized like its neighbors copies
-whatever its neighbors got wrong: Separate and Together stayed 28 for weeks
-after the Gallery pane buttons went to 18, and two buttons added beside them
-were made 28 to match. A window taken into a session or handed back sizes its
-buttons again for where it is (`draw_for_a_session`, `become_hosted`).
+buttons: the HUD's 18 pixels Standalone, and the family's 28 in Fun Time,
+where the whole window is drawn at 18/28 and so lands them at 18 on screen.
+A new one is made with `square_buttons.square(button)`, which sizes it for
+where the window is and sizes it again when Fun Time takes the window or
+hands it back; anything else measured beside it (a gap, an icon, a place in
+a corner) comes from `square_buttons.landing(length)`. A button sized by a
+constant is right in one of the two and wrong in the other, and one sized
+like its neighbors copies whatever its neighbors got wrong: Separate and
+Together stayed 28 for weeks after the Gallery pane buttons went to 18, and
+two buttons added beside them were made 28 to match.
 `tests/test_button_sizes.py` builds the window both ways and fails on a
 square icon button of any other size; the kinds it lists as waiting are older
 buttons of other sizes that the user has not ruled on, so the list only gets
-shorter, and no new button goes on it.
+shorter, and no new button goes on it. Say "in Fun Time" for this window as
+Fun Time shows it, to the user and in anything new here: "a session" is the
+user's word for a Claude session, and the older text and code that say "a
+Fun Time session" or "hosted" are not to be copied into a message to him.
 
 ## Standalone is a two-screen program
 

@@ -15,7 +15,7 @@ from shared_ui.spacing import GAP_SMALL
 from shared_ui.testing import appending_to
 
 from origenerator.gui import corner_buttons, drag_thumbnail, icons, omnipause
-from origenerator.gui.corner_buttons import CORNER_INSET, RestoreOffer
+from origenerator.gui.corner_buttons import RestoreOffer, corner_inset
 from origenerator.gui.gallery_pane import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.inflight import RunReading
 from origenerator.gui.item_tile import CornerButton, ItemTile, TileAppearance
@@ -411,7 +411,7 @@ def test_a_collections_own_actions_keep_the_top_left_edge_to_themselves(qtbot):
     tw = ItemTile("p1", None, "label", TileAppearance(enhance=icons.ENHANCE_OPEN,
                          corner_buttons=_corner_button_specs()))
     qtbot.addWidget(tw)
-    assert tw._corner_buttons[0].x() == tw._image_label.x() + CORNER_INSET
+    assert tw._corner_buttons[0].x() == tw._image_label.x() + corner_inset()
     for button in tw._corner_buttons:
         for corner in _corners(tw):
             assert corner.geometry().intersected(button.geometry()).isEmpty()

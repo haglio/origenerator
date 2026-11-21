@@ -95,36 +95,36 @@ def test_the_up_arrow_scrolls_every_list_to_its_top(qtbot):
     assert set(toc.scroll_places().values()) == {0}
 
 
-def test_a_sessions_toc_keeps_the_two_at_its_right_edge_without_separate_or_together(qtbot):
+def test_in_fun_time_the_row_keeps_all_four_with_the_two_at_its_right_edge(qtbot):
     toc, _rows = _toc_too_long_for_its_height(qtbot)
 
-    toc.draw_for_a_session(True)
+    toc.draw_at_the_huds_scale(hosted=True)
     QApplication.processEvents()
 
-    assert not toc.separate_button.isVisible()
-    assert not toc.together_button.isVisible()
-    assert toc.current_folder_button.isVisible()
+    assert toc.separate_button.isVisible()
+    assert toc.together_button.isVisible()
     assert _right_edge(toc, toc.top_button) == toc.width()
     assert _right_edge(toc, toc.current_folder_button) < toc.top_button.mapTo(toc, QPoint()).x()
 
 
-def test_a_sessions_two_buttons_are_the_size_a_sessions_gallery_pane_buttons_are(qtbot):
+def test_in_fun_time_all_four_are_the_size_fun_times_gallery_pane_buttons_are(qtbot):
     toc, _rows = _toc_too_long_for_its_height(qtbot)
 
-    toc.draw_for_a_session(True)
+    toc.draw_at_the_huds_scale(hosted=True)
     QApplication.processEvents()
 
-    for button in (toc.current_folder_button, toc.top_button):
+    for button in (toc.separate_button, toc.together_button,
+                   toc.current_folder_button, toc.top_button):
         assert button.size() == QSize(BUTTON_SIZE, BUTTON_SIZE), button.toolTip()
     gap = toc.top_button.mapTo(toc, QPoint()).x() - _right_edge(toc, toc.current_folder_button)
     assert gap == BUTTON_GAP
 
 
-def test_a_toc_handed_back_from_a_session_draws_its_buttons_small_again(qtbot):
+def test_a_toc_handed_back_from_fun_time_draws_its_buttons_small_again(qtbot):
     toc, _rows = _toc_too_long_for_its_height(qtbot)
 
-    toc.draw_for_a_session(True)
-    toc.draw_for_a_session(False)
+    toc.draw_at_the_huds_scale(hosted=True)
+    toc.draw_at_the_huds_scale(hosted=False)
     QApplication.processEvents()
 
     assert toc.separate_button.isVisible()

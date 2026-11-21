@@ -134,7 +134,6 @@ class SplitFolderTree(QWidget):
         self._sections: dict[str, QWidget] = {}
         self._shapes = SEPARATE
         self._chosen = SEPARATE
-        self._offered = True
         self._active = SEPARATE[0]
 
         self._splitter = PaneSplitter(Qt.Orientation.Vertical, "side_sections")
@@ -162,11 +161,11 @@ class SplitFolderTree(QWidget):
         self._row.addStretch()
         for button in (self.current_folder_button, self.top_button):
             self._row.addWidget(button, 0, Qt.AlignmentFlag.AlignTop)
-        self._draw_the_row_at_the_huds_scale(in_a_session=False)
+        self.draw_at_the_huds_scale(hosted=False)
         return over_the_lists
 
-    def _draw_the_row_at_the_huds_scale(self, *, in_a_session: bool) -> None:
-        landing = partial(ui_scale.landing_at_the_huds_scale, hosted=in_a_session)
+    def draw_at_the_huds_scale(self, *, hosted: bool) -> None:
+        landing = partial(ui_scale.landing_at_the_huds_scale, hosted=hosted)
         self._row.setSpacing(landing(BUTTON_GAP))
         for button in (self.current_folder_button, self.top_button):
             fill_square_with_icon(button, size=landing(BUTTON_SIZE))
@@ -202,17 +201,10 @@ class SplitFolderTree(QWidget):
         self._chosen = tuple(shapes)
         self._redraw()
 
-    def draw_for_a_session(self, in_a_session: bool) -> None:
-        self._offered = not in_a_session
-        self._choices.setVisible(self._offered)
-        self._draw_the_row_at_the_huds_scale(in_a_session=in_a_session)
-        self._redraw()
-
     def _redraw(self) -> None:
-        shapes = self._chosen if self._offered else SEPARATE
-        if shapes == self._shapes:
+        if self._chosen == self._shapes:
             return
-        self._show_sections(shapes)
+        self._show_sections(self._chosen)
         self.shapes_changed.emit()
 
     def _show_sections(self, shapes) -> None:

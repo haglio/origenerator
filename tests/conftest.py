@@ -41,6 +41,7 @@ from origenerator.gui import (
     looping_preview,
     off_the_machine,
     omnipause,
+    square_buttons,
     viewport,
     voice_router,
 )
@@ -311,6 +312,11 @@ def start_no_funestra_program(setattr) -> None:
 
     setattr(funestra_program, "_started", started)
     setattr(AsksFromTheFunestra, "start", lambda self: None)
+
+
+@pytest.fixture(autouse=True)
+def _every_test_starts_drawn_standalone(qapp):
+    square_buttons.draw_in_fun_time(False)
 
 
 @pytest.fixture(autouse=True)

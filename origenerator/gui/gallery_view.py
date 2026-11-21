@@ -83,7 +83,7 @@ from origenerator.generation_config import (
     would_reproduce_a_completed_run,
 )
 from origenerator.generation_state import GenerationSource
-from origenerator.gui import corner_buttons, icons, omnipause
+from origenerator.gui import corner_buttons, icons, omnipause, square_buttons
 from origenerator.gui.app_keys import AppKeys, Presses
 from origenerator.gui.app_title import under
 from origenerator.gui.busy_cursor import working
@@ -143,6 +143,7 @@ from origenerator.gui.inflight import (
     stop_populate_text,
     stop_populate_tooltip,
 )
+from origenerator.gui.item_tile import ItemTile
 from origenerator.gui.job_queue import JobQueue
 from origenerator.gui.look_training_controller import LookTrainingController
 from origenerator.gui.modify_batch_tile import ModifyBatchTile
@@ -280,6 +281,7 @@ class GalleryView(QWidget):
         self._app_title = shared.app_title
         self._client = client
         self._fun_time = fun_time
+        square_buttons.draw_in_fun_time(fun_time is not None)
         self._radio = shared.radio if shared.radio is not None else OrigeneratorRadio()
         omnipause.holds(self._radio)
         self.osr2 = Osr2Driving(
@@ -515,7 +517,7 @@ class GalleryView(QWidget):
     def _build_the_toc(self):
         self.toc = GalleryTree()
         self._tree = self.toc.widget
-        self._tree.draw_for_a_session(self._fun_time is not None)
+        self._tree.draw_at_the_huds_scale(hosted=self._fun_time is not None)
 
     def _build_toc_pane(self):
         self._tree.shapes_changed.connect(self._on_shapes_changed)
@@ -645,7 +647,8 @@ class GalleryView(QWidget):
                 switch.setChecked(False)
         self.osr2.let_go_for_a_session()
         self._fun_time = session
-        self._tree.draw_for_a_session(True)
+        self._tree.draw_at_the_huds_scale(hosted=True)
+        self._draw_every_square_again(in_fun_time=True)
         self.slideshows.become_hosted(session)
         self.generate_pane.become_hosted(session)
         self._voice.become_hosted()
@@ -654,6 +657,14 @@ class GalleryView(QWidget):
             self._motion_pane.hide()
         self.osr2.leave_the_device_to_the_session()
         self.wear_the_room(session)
+
+    def _draw_every_square_again(self, *, in_fun_time: bool) -> None:
+        square_buttons.draw_in_fun_time(in_fun_time)
+        square_buttons.draw_every_square_again(self)
+        for corners in self.findChildren(corner_buttons.CornerButtons):
+            corners.draw_at_the_huds_scale_again()
+        for tile in self.findChildren(ItemTile):
+            tile.draw_at_the_huds_scale_again()
 
     def wear_the_room(self, session) -> None:
         folded = self._arrangement.stack is not None
@@ -670,7 +681,8 @@ class GalleryView(QWidget):
         if self._motion_pane is not None:
             self._motion_pane.show()
         self._fun_time = None
-        self._tree.draw_for_a_session(False)
+        self._tree.draw_at_the_huds_scale(hosted=False)
+        self._draw_every_square_again(in_fun_time=False)
         self.slideshows.become_standalone(self.osr2.motion)
         self.generate_pane.become_standalone()
         self._buttons.become_standalone()

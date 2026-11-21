@@ -179,6 +179,7 @@ from origenerator.item_shape import (
     base_of as _base_of,
 )
 from origenerator.item_shape import (
+    plays_in_a_slideshow,
     requested_shape,
     row_shape,
     shaped_key,
@@ -1496,7 +1497,9 @@ class GalleryView(QWidget):
         if rows is None:
             group = self.current_group()
             rows = gallery.rows_under(group) if group is not None else []
-        return rows if self._showing_search() else what_plays_at(self.slideshow_location(), rows)
+        if self._showing_search():
+            return plays_in_a_slideshow(rows)
+        return what_plays_at(self.slideshow_location(), rows)
 
     def listing(self) -> Listing:
         if not self.rest_built:

@@ -332,6 +332,24 @@ def test_a_slideshow_of_a_searchs_hits_plays_what_it_found(qtbot, monkeypatch):
     slideshow.close()
 
 
+def test_a_slideshow_of_a_searchs_hits_leaves_out_what_a_looping_workflow_made(
+        qtbot, monkeypatch):
+    keep_rows_on_disk(monkeypatch)
+    looping = _row("l1", "wan22_flf2v_loop", {"positive_prompt": "a cat", "seed": 3}, "l1.mp4")
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), looping]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(view.toc.item_for(shaped_key(gallery.ALL_KEY, LANDSCAPE)))
+    _search_for(view, "cat")
+
+    view.slideshows.start()
+    slideshow = view.slideshows.showing
+    funestra_of(slideshow.shown)
+
+    assert _playing(slideshow) == ["i1"]
+    slideshow.close()
+
+
 def test_a_slideshow_started_on_favorites_plays_what_other_sites_made_that_you_starred(
         qtbot, monkeypatch):
     keep_rows_on_disk(monkeypatch)

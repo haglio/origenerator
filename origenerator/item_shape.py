@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from functools import lru_cache
 from pathlib import Path
 
@@ -10,6 +10,7 @@ from PIL import Image
 from shared_ui.orientation import orientation_of_size as shape_of_size
 
 from origenerator import gallery
+from origenerator.action_settings import loops
 from origenerator.config import OUTPUT_PLACES
 from origenerator.gallery.collection import LATEST_KEY, folder_collection
 from origenerator.gallery.shapes import LANDSCAPE, SHAPES_AND_BOTH, on_shape
@@ -51,7 +52,11 @@ def what_plays_at(key: str | None, rows: list[dict]) -> list[dict]:
     whole_library = base == gallery.ALL_KEY or (
         collection is not None and collection.which == LATEST_KEY
         and collection.folder == gallery.ALL_KEY)
-    return [row for row in rows if made_here(row)] if whole_library else rows
+    return [row for row in plays_in_a_slideshow(rows) if not whole_library or made_here(row)]
+
+
+def plays_in_a_slideshow(rows: Iterable[dict]) -> list[dict]:
+    return [row for row in rows if not loops(row)]
 
 
 def together(rows: list[dict], more: list[dict]) -> list[dict]:

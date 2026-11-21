@@ -151,23 +151,17 @@ def test_a_previews_funestra_wears_the_previews_icon_not_the_production_one(qapp
     preview_icon.write_bytes(b"")
     taskbar = TaskbarIdentity(qapp, "Made.Up.App", TaskbarApp("Made Up", preview_icon, "relaunch"),
                               dress=lambda *_worn: None, described=lambda _identity: None)
-    try:
-        assert worn_by_this_app(taskbar).icon == preview_icon
-    finally:
-        qapp.removeEventFilter(taskbar)
-        taskbar.setParent(None)
+
+    assert worn_by_this_app(taskbar).icon == preview_icon
 
 
 def test_it_joins_whichever_taskbar_button_the_apps_windows_wear(qapp):
     taskbar = TaskbarIdentity(qapp, "Made.Up.App", None, dress=lambda *_worn: None,
                               described=lambda _identity: None)
-    try:
-        assert worn_by_this_app(taskbar).taskbar_identity == "Made.Up.App"
-        taskbar.join("Made.Up.Session")
-        assert worn_by_this_app(taskbar).taskbar_identity == "Made.Up.Session"
-    finally:
-        qapp.removeEventFilter(taskbar)
-        taskbar.setParent(None)
+
+    assert worn_by_this_app(taskbar).taskbar_identity == "Made.Up.App"
+    taskbar.join("Made.Up.Session")
+    assert worn_by_this_app(taskbar).taskbar_identity == "Made.Up.Session"
 
 
 def _own(tmp_path):

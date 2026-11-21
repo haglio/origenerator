@@ -53,6 +53,7 @@ from origenerator.gui.off_the_machine import (
     refuse_the_dialogs_nobody_can_answer,
     start_no_comfyui_on_this_machine,
 )
+from origenerator.gui.taskbar_identity import TaskbarIdentity
 from origenerator.workflows import detail_parts
 from tests import real_db
 from tests.alert_windows import alerts_kept
@@ -369,6 +370,17 @@ def _never_ask_the_real_evolver_to_delete_anything(monkeypatch):
 @pytest.fixture(autouse=True)
 def _never_bring_a_real_record_into_a_tests_gallery(monkeypatch):
     monkeypatch.setattr(gallery_view.outside_videos, "bring_in_one", lambda *_args, **_kw: False)
+
+
+@pytest.fixture(autouse=True)
+def _no_taskbar_identity_outlives_its_test():
+    yield
+    application = QApplication.instance()
+    if application is None:
+        return
+    for left in application.findChildren(TaskbarIdentity):
+        application.removeEventFilter(left)
+        left.setParent(None)
 
 
 @pytest.fixture(autouse=True)

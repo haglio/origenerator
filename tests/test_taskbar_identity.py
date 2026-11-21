@@ -22,8 +22,7 @@ def worn(qapp):
     identity = TaskbarIdentity(qapp, "Origenerator.Preview", _OWN,
                                dress=lambda hwnd, app_id, app: dressed.append((app_id, app)),
                                described={"FunTime.App.Preview": _THE_SESSIONS}.get)
-    yield identity, dressed
-    qapp.removeEventFilter(identity)
+    return identity, dressed
 
 
 def test_a_window_wears_the_apps_own_identity_from_the_moment_it_is_shown(worn):
@@ -80,8 +79,8 @@ def test_a_window_windows_will_not_dress_still_opens(qapp):
     def refuse(hwnd, app_id, app):
         raise OSError("SHGetPropertyStoreForWindow failed")
 
-    identity = TaskbarIdentity(qapp, "Origenerator.Preview", _OWN, dress=refuse,
-                               described=lambda app_id: None)
+    TaskbarIdentity(qapp, "Origenerator.Preview", _OWN, dress=refuse,
+                    described=lambda app_id: None)
     window = QWidget()
     try:
         window.show()
@@ -89,4 +88,3 @@ def test_a_window_windows_will_not_dress_still_opens(qapp):
         assert window.isVisible()
     finally:
         window.close()
-        qapp.removeEventFilter(identity)

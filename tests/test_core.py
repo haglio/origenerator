@@ -2148,8 +2148,7 @@ def taskbar_buttons(qapp):
     taskbar = TaskbarIdentity(qapp, "Origenerator", None,
                               dress=lambda hwnd, app_id, app: worn.append(app_id),
                               described=lambda app_id: None)
-    yield taskbar, worn
-    qapp.removeEventFilter(taskbar)
+    return taskbar, worn
 
 
 def test_a_window_taken_into_a_session_shows_under_the_sessions_taskbar_button(

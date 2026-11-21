@@ -3,7 +3,9 @@ from __future__ import annotations
 from PySide6.QtCore import QPoint, QSize
 from PySide6.QtWidgets import QAbstractItemView, QApplication
 from shared_ui.icons import qt_icon
+from shared_ui.spacing import BUTTON_GAP, BUTTON_ICON_INSET, BUTTON_SIZE_HUD
 
+from origenerator import ui_scale
 from origenerator.gallery.shapes import LANDSCAPE, PORTRAIT
 from origenerator.gui.gallery_tree import GROUP_ROLE
 from origenerator.gui.split_folder_tree import SplitFolderTree
@@ -100,3 +102,14 @@ def test_a_toc_that_offers_no_separate_and_together_offers_neither_button(qtbot)
 
     assert not toc.current_folder_button.isVisible()
     assert not toc.top_button.isVisible()
+
+
+def test_the_buttons_over_the_toc_are_the_size_of_the_gallery_pane_buttons(qtbot):
+    toc, _rows = _toc_too_long_for_its_height(qtbot)
+    square = QSize(BUTTON_SIZE_HUD, BUTTON_SIZE_HUD)
+    filling = QSize(BUTTON_SIZE_HUD - 2 * BUTTON_ICON_INSET, BUTTON_SIZE_HUD - 2 * BUTTON_ICON_INSET)
+
+    for button in (toc.separate_button, toc.together_button, toc.current_folder_button, toc.top_button):
+        assert (button.size(), button.iconSize()) == (square, filling), button.toolTip()
+    gap = toc.top_button.mapTo(toc, QPoint()).x() - _right_edge(toc, toc.current_folder_button)
+    assert gap == ui_scale.landing_at_the_huds_scale(BUTTON_GAP, hosted=False)

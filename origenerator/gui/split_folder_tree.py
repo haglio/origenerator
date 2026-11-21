@@ -14,14 +14,16 @@ from PySide6.QtWidgets import (
 from shared_ui.icon_button import fill_square_with_icon
 from shared_ui.icons import qt_icon
 from shared_ui.spacing import (
-    BUTTON_FILLING_ICON,
     BUTTON_GAP,
     BUTTON_GROUP_GAP,
+    BUTTON_ICON_INSET,
     BUTTON_ROW_GAP,
+    BUTTON_SIZE,
     GAP_MEDIUM,
     GAP_SMALL,
 )
 
+from origenerator import ui_scale
 from origenerator.gallery.shapes import (
     BOTH,
     SEPARATE,
@@ -41,6 +43,11 @@ _GAP_UNDER_THE_CHOICES = 2
 _UNDER_A_WORDS_INK = 5  # clear rows under a heading's word in Windows' Segoe UI and the offscreen font
 _HEADING_FOOT = GAP_MEDIUM - _UNDER_A_WORDS_INK
 
+_SQUARE, _GAP, _GROUP_GAP, _ROW_GAP = (
+    ui_scale.landing_at_the_huds_scale(length, hosted=False)
+    for length in (BUTTON_SIZE, BUTTON_GAP, BUTTON_GROUP_GAP, BUTTON_ROW_GAP))
+_FILLING_ICON = _SQUARE - 2 * BUTTON_ICON_INSET
+
 _SEPARATE_WORD = "Separate"
 _TOGETHER_WORD = "Together"
 _SEPARATE_TIP = ("A list for each shape — Portrait and Landscape apart, so a "
@@ -55,14 +62,14 @@ class _Choice(QFrame):
     def __init__(self, word: str, mark, tip: str):
         super().__init__()
         self.setToolTip(tip)
-        self.button = fill_square_with_icon(QPushButton())
+        self.button = fill_square_with_icon(QPushButton(), size=_SQUARE)
         self.button.setObjectName("sidesChoice")
         self.button.setProperty(CHOSEN, True)
         self.button.setIcon(QIcon(mark))
         self.button.setCheckable(True)
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(BUTTON_GAP)
+        row.setSpacing(_GAP)
         row.addWidget(self.button)
         row.addWidget(QLabel(word))
 
@@ -71,7 +78,7 @@ class _Choice(QFrame):
 
 
 def _scroll_button(icon: str, tip: str, scroll) -> QPushButton:
-    button = fill_square_with_icon(QPushButton())
+    button = fill_square_with_icon(QPushButton(), size=_SQUARE)
     button.setIcon(qt_icon(icon))
     button.setToolTip(tip)
     button.clicked.connect(scroll)
@@ -148,21 +155,21 @@ class SplitFolderTree(QWidget):
         self._over_the_lists = QWidget()
         row = QHBoxLayout(self._over_the_lists)
         row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(BUTTON_GAP)
+        row.setSpacing(_GAP)
         row.addWidget(self._build_radio(), 1)
         for button in (self.current_folder_button, self.top_button):
             row.addWidget(button, 0, Qt.AlignmentFlag.AlignTop)
         return self._over_the_lists
 
     def _build_radio(self) -> QWidget:
-        separate = _Choice(_SEPARATE_WORD, folder_icons.separate_mark(BUTTON_FILLING_ICON), _SEPARATE_TIP)
-        together = _Choice(_TOGETHER_WORD, folder_icons.shape_mark(BOTH, BUTTON_FILLING_ICON), _TOGETHER_TIP)
+        separate = _Choice(_SEPARATE_WORD, folder_icons.separate_mark(_FILLING_ICON), _SEPARATE_TIP)
+        together = _Choice(_TOGETHER_WORD, folder_icons.shape_mark(BOTH, _FILLING_ICON), _TOGETHER_TIP)
         self.separate_button = separate.button
         self.together_button = together.button
         radio = QButtonGroup(self)
         radio.setExclusive(True)
         choices = QWidget()
-        FlowLayout(choices, spacing=BUTTON_GROUP_GAP, row_spacing=BUTTON_ROW_GAP)
+        FlowLayout(choices, spacing=_GROUP_GAP, row_spacing=_ROW_GAP)
         for choice, shapes in ((separate, SEPARATE), (together, TOGETHER)):
             choice.button.clicked.connect(lambda _checked, s=shapes: self.choose_shapes(s))
             radio.addButton(choice.button)

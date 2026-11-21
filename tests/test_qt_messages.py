@@ -61,6 +61,19 @@ def test_qts_note_on_taking_its_own_video_player_apart_is_logged_for_debugging(c
 
 
 @pytest.mark.no_qt_log
+def test_qts_note_on_the_scale_changing_while_windows_are_open_is_logged_for_debugging(caplog):
+    previous = install_qt_message_logging()
+    try:
+        with caplog.at_level(logging.DEBUG, logger="qt"):
+            qWarning("QHighDpiScaling::setFactor: Should only be called when no windows exist.")
+    finally:
+        qInstallMessageHandler(previous)
+
+    assert [(r.levelno, r.getMessage()) for r in caplog.records if r.name == "qt"] == [
+        (logging.DEBUG, "QHighDpiScaling::setFactor: Should only be called when no windows exist.")]
+
+
+@pytest.mark.no_qt_log
 def test_a_new_install_never_reports_a_run_an_earlier_one_was_counting(caplog):
     before = install_qt_message_logging()
     try:

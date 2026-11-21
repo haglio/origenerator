@@ -16,10 +16,12 @@ _LEVELS = {
 logger = logging.getLogger("qt")
 
 _VIDEO_PLAYER_TAKEN_APART = "wildcard call disconnects from destroyed signal of QFFmpeg::"
+_RESCALED_WITH_WINDOWS_OPEN = "QHighDpiScaling::setFactor: Should only be called when no windows exist."
+_NOTES_ON_WHAT_THIS_APP_DOES_ON_PURPOSE = (_VIDEO_PLAYER_TAKEN_APART, _RESCALED_WITH_WINDOWS_OPEN)
 
 
 def _level_of(kind, message: str) -> int:
-    if _VIDEO_PLAYER_TAKEN_APART in message:
+    if any(note in message for note in _NOTES_ON_WHAT_THIS_APP_DOES_ON_PURPOSE):
         return logging.DEBUG
     return _LEVELS.get(kind, logging.WARNING)
 

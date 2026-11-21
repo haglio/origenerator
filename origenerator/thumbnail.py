@@ -127,6 +127,7 @@ def animated_thumbnail_path(thumb_dir: Path, name: str) -> Path:
 
 
 _LOOKS_IN_A_STRETCH = 4
+_FRAMES_READ_RATHER_THAN_SOUGHT = 200
 _BLACK_AT_MOST = 10
 
 
@@ -182,18 +183,32 @@ def _looks_along(frame_at, start: int, stretch: int, total: int) -> list[Image.I
 def _sample_video_frames(path: Path, count: int, size: int) -> list[Image.Image]:
     import cv2  # noqa: PLC0415 (heavy; only a video needs it)
     cap = cv2.VideoCapture(str(path))
+    standing_at = 0
 
     def frame_at(index: int) -> Image.Image | None:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, index)
+        nonlocal standing_at
+        if index - standing_at > _FRAMES_READ_RATHER_THAN_SOUGHT:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, index)
+            standing_at = index
+        for _ in range(index - standing_at):
+            cap.grab()
         read, frame = cap.read()
-        if not read:
-            return None
-        image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-        image.thumbnail((size, size))
-        return image.convert("RGB")
+        standing_at = index + 1
+        return _shrunk(cv2, frame, size) if read else None
 
     try:
         total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         return frames_showing_something(frame_at, total, count) if total > 0 else []
     finally:
         cap.release()
+
+
+def _shrunk(cv2, frame, size: int) -> Image.Image:
+    height, width = frame.shape[:2]
+    scale = size / max(height, width)
+    if scale < 1:
+        frame = cv2.resize(frame, (max(1, round(width * scale)), max(1, round(height * scale))),
+                           interpolation=cv2.INTER_AREA)
+    image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    image.thumbnail((size, size))
+    return image.convert("RGB")

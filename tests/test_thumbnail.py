@@ -166,3 +166,32 @@ def test_a_thumbnail_showing_black_beside_other_frames_is_told_from_one_black_th
 
     assert [shows_black_among_other_frames(saved(f"{at}.webp", shades))
             for at, shades in enumerate(([0, 200], [0, 0], [200, 180]))] == [True, False, False]
+
+
+class _SeekCounting:
+    def __init__(self, capture, seeks: list):
+        self._capture, self._seeks = capture, seeks
+
+    def set(self, prop, value):
+        self._seeks.append(value)
+        return self._capture.set(prop, value)
+
+    def __getattr__(self, name):
+        return getattr(self._capture, name)
+
+
+def _seeks_sampling(tmp_path, monkeypatch, shades: list[int], count: int) -> tuple[list, int]:
+    import cv2  # noqa: PLC0415 (heavy; only the tests that open a real video need it)
+    video = write_mp4_of_shades(tmp_path / "video one.mp4", shades)
+    seeks, opened = [], cv2.VideoCapture
+    monkeypatch.setattr(cv2, "VideoCapture", lambda path: _SeekCounting(opened(path), seeks))
+    return seeks, len(thumbnail._sample_video_frames(video, count, 8))
+
+
+def test_a_short_videos_frames_are_read_in_one_pass_without_seeking(tmp_path, monkeypatch):
+    assert _seeks_sampling(tmp_path, monkeypatch, list(range(100, 132)), 8) == ([], 8)
+
+
+def test_frames_far_apart_are_reached_by_seeking_rather_than_reading_every_frame_between(
+        tmp_path, monkeypatch):
+    assert _seeks_sampling(tmp_path, monkeypatch, [150] * 600, 2) == ([300], 2)

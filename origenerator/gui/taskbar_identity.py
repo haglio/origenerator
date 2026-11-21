@@ -26,6 +26,10 @@ class TaskbarIdentity(QObject):
     def wearing(self) -> tuple[str, TaskbarApp | None]:
         return self._wearing
 
+    @property
+    def own_app(self) -> TaskbarApp | None:
+        return self._own[1]
+
     def join(self, app_id: str) -> None:
         self._wearing = (app_id, self._described(app_id))
 

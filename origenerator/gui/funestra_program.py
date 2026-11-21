@@ -128,7 +128,8 @@ def worn_by_this_app(taskbar: TaskbarIdentity | None = None) -> Wearing:
     application = QApplication.instance()
     if taskbar is None and application is not None:
         taskbar = application.findChild(TaskbarIdentity)
-    icon = PROJECT_DIR / "icon.ico"
+    own_app = None if taskbar is None else taskbar.own_app
+    icon = PROJECT_DIR / "icon.ico" if own_app is None else own_app.icon
     return Wearing(taskbar_identity=None if taskbar is None else taskbar.wearing[0],
                    icon=icon if icon.is_file() else None)
 

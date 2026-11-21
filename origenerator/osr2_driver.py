@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import bisect
 import logging
+import time
+from collections.abc import Callable
 from contextlib import ExitStack
 from dataclasses import dataclass, field
 from functools import partial
@@ -9,6 +11,7 @@ from pathlib import Path
 
 from app_support.funscript import read_actions
 from app_support.osr2_hold import PARK, RESUME
+from app_support.written_file import Look, ReadEachWhenChanged
 from funestra.funscript import Funscript
 from funestra.robot_hand import FULL_INTENSITY
 from PySide6.QtCore import QObject
@@ -32,58 +35,41 @@ def drive_script(actions) -> Funscript | None:
 
 @dataclass(frozen=True)
 class ScriptRead:
-    path: Path
-    stamp: tuple[int, int]
+    look: Look[Funscript | None]
     script: Funscript | None
 
 
-def _stamp_of(path: Path) -> tuple[int, int] | None:
-    try:
-        stat = path.stat()
-    except OSError:
-        return None
-    return stat.st_mtime_ns, stat.st_size
-
-
 class DriveScripts:
-    def __init__(self, *, read=read_actions, kept: int = 4) -> None:
+    def __init__(self, *, read=read_actions, kept: int = 4,
+                 now_ns: Callable[[], int] = time.time_ns) -> None:
         self._read = read
-        self._most_kept = kept
-        self._kept: dict[Path, ScriptRead] = {}
+        self._kept: ReadEachWhenChanged[Path, Funscript | None] = ReadEachWhenChanged(
+            most=kept, now_ns=now_ns)
 
     def read_ahead(self, video_path) -> ScriptRead | None:
-        found = self._found(video_path)
-        if found is None or self._is_kept(*found):
+        path = _script_path_of(video_path)
+        looked = None if path is None else self._kept.look(path)
+        if looked is None or looked.fresh or not looked.holds_something:
             return None
-        return self._read_at(*found)
+        return ScriptRead(looked, self._script_at(path))
 
     def keep(self, read: ScriptRead | None) -> None:
-        if read is None:
-            return
-        self._kept.pop(read.path, None)
-        self._kept[read.path] = read
-        while len(self._kept) > self._most_kept:
-            del self._kept[next(iter(self._kept))]
+        if read is not None:
+            read.look.keep(read.script)
 
     def script_of(self, video_path) -> Funscript | None:
-        found = self._found(video_path)
-        if found is None:
+        path = _script_path_of(video_path)
+        looked = None if path is None else self._kept.look(path)
+        if looked is None or not looked.holds_something:
             return None
-        if not self._is_kept(*found):
-            self.keep(self._read_at(*found))
-        return self._kept[found[0]].script
+        return looked.value if looked.fresh else looked.keep(self._script_at(path))
 
-    def _is_kept(self, path: Path, stamp: tuple[int, int]) -> bool:
-        kept = self._kept.get(path)
-        return kept is not None and kept.stamp == stamp
+    def _script_at(self, path: Path) -> Funscript | None:
+        return drive_script(self._read(path))
 
-    def _found(self, video_path) -> tuple[Path, tuple[int, int]] | None:
-        path = funscript_of(video_path, places=OUTPUT_PLACES)
-        stamp = None if path is None else _stamp_of(path)
-        return None if stamp is None else (path, stamp)
 
-    def _read_at(self, path: Path, stamp: tuple[int, int]) -> ScriptRead:
-        return ScriptRead(path, stamp, drive_script(self._read(path)))
+def _script_path_of(video_path) -> Path | None:
+    return funscript_of(video_path, places=OUTPUT_PLACES)
 
 
 SCRIPTS = DriveScripts()

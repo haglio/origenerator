@@ -2071,7 +2071,7 @@ def test_the_next_video_s_funscript_is_read_before_it_comes_on(qtbot, tmp_path, 
         read.append(path.name)
         return read_actions(path)
 
-    monkeypatch.setattr(osr2_driver, "SCRIPTS", DriveScripts(read=reading))
+    monkeypatch.setattr(osr2_driver, "SCRIPTS", DriveScripts(read=reading, now_ns=lambda: 2**62))
     view = _standalone([(str(first), "video"), (str(following), "video")],
                        shuffle=lambda order: None)
 

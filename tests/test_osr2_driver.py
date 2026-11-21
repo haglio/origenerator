@@ -310,6 +310,9 @@ def _scripted(monkeypatch, tmp_path, name="video one.mp4", actions=ACTIONS):
     return str(video), script
 
 
+LONG_AFTER_ANY_STAMP_NS = 2**62
+
+
 def _counting_reads(kept: int = 4):
     read = []
 
@@ -317,7 +320,7 @@ def _counting_reads(kept: int = 4):
         read.append(path.name)
         return osr2_driver.read_actions(path)
 
-    return DriveScripts(read=reading, kept=kept), read
+    return DriveScripts(read=reading, kept=kept, now_ns=lambda: LONG_AFTER_ANY_STAMP_NS), read
 
 
 def test_a_funscript_unchanged_since_it_was_read_is_not_read_again(monkeypatch, tmp_path):

@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 
 from app_support.file_channel import read_paused_state
+from app_support.win32 import TaskbarApp
 from funestra.funestra_verbs import QUIT
 from funestra.program.cli import build_parser
 from funestra.program.window_verbs import (
@@ -143,6 +144,18 @@ def test_one_never_started_is_not_running_and_ends_quietly(tmp_path):
 
 def test_the_apps_own_funestra_wears_the_apps_icon_so_the_window_switcher_shows_no_blank_page(qapp):
     assert worn_by_this_app().icon.is_file()
+
+
+def test_a_previews_funestra_wears_the_previews_icon_not_the_production_one(qapp, tmp_path):
+    preview_icon = tmp_path / "preview.ico"
+    preview_icon.write_bytes(b"")
+    taskbar = TaskbarIdentity(qapp, "Made.Up.App", TaskbarApp("Made Up", preview_icon, "relaunch"),
+                              dress=lambda *_worn: None, described=lambda _identity: None)
+    try:
+        assert worn_by_this_app(taskbar).icon == preview_icon
+    finally:
+        qapp.removeEventFilter(taskbar)
+        taskbar.setParent(None)
 
 
 def test_it_joins_whichever_taskbar_button_the_apps_windows_wear(qapp):

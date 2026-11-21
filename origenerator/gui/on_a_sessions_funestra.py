@@ -31,8 +31,11 @@ class HudOnFile:
             self._shape, self._painted = shape, JobQueueFile(self._hud_file, shape)
 
     def publish(self, slideshow, placement: HudPlacement = USUAL_PLACEMENT, **placed) -> None:
-        model = slideshow_hud_model(self._shape, slideshow, placement,
-                                    foot=self._painted.of(self._foot.section()))
+        self.publish_built(
+            lambda foot: slideshow_hud_model(self._shape, slideshow, placement, foot=foot), **placed)
+
+    def publish_built(self, build, **placed) -> None:
+        model = build(self._painted.of(self._foot.section()))
         if model is not None and placed:
             model = replace(model, **placed)
         text = hud_text(model) if model is not None else ""

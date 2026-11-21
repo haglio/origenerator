@@ -21,6 +21,7 @@ from origenerator import gallery, library_views
 from origenerator.db import Database
 from origenerator.db_requests import NewRequest
 from origenerator.fun_time_mode import Rect
+from origenerator.gallery import output as gallery_output
 from origenerator.gallery.collection import (
     ENHANCED_KEY,
     FAVORITES_KEY,
@@ -515,6 +516,54 @@ def test_asking_whether_anything_can_play_lists_no_folder_of_upscales(slideshows
     assert scanned == [], (
         "an upscale changes which file a slide plays, never whether there is one, and every click "
         "in the TOC asks this several times over")
+
+
+def _file_checks_counted(monkeypatch) -> list:
+    checked = []
+    look = gallery_output.is_file
+    monkeypatch.setattr(gallery_output, "is_file", lambda path: checked.append(path) or look(path))
+    return checked
+
+
+def test_asking_again_of_a_listing_with_no_file_on_disk_looks_for_no_file_again(
+        slideshows, monkeypatch):
+    director, _host, _made = slideshows(FakeHost(rows=[_row(f"g{n}") for n in range(20)]))
+    checked = _file_checks_counted(monkeypatch)
+
+    answers = [director.anything_to_play() for _press in range(3)]
+
+    assert answers == [False, False, False]
+    assert len(checked) == 20, (
+        "the Slideshow button asks this at every click, and a folder of 11,000 items whose "
+        "files are missing took 55,000 looks on disk, about 4 s, each time")
+
+
+def test_asking_again_looks_first_at_the_item_that_had_a_file(slideshows, monkeypatch):
+    director, _host, _made = slideshows(FakeHost(rows=[
+        *(_row(f"g{n}") for n in range(20)), on_disk(_row("g20"))]))
+    first = director.anything_to_play()
+    checked = _file_checks_counted(monkeypatch)
+
+    assert (first, director.anything_to_play(), len(checked)) == (True, True, 1)
+
+
+def test_a_listing_that_gains_an_item_with_a_file_on_disk_has_something_to_play(slideshows):
+    host = FakeHost(rows=[_row("g0")])
+    director, _host, _made = slideshows(host)
+    assert not director.anything_to_play()
+
+    host.rows.append(on_disk(_row("g1")))
+
+    assert director.anything_to_play()
+
+
+def test_an_item_whose_file_went_has_nothing_to_play_once_it_is_gone(slideshows, monkeypatch):
+    director, _host, _made = slideshows(FakeHost(rows=[on_disk(_row("g0"))]))
+    assert director.anything_to_play()
+
+    monkeypatch.setattr(gallery_output, "is_file", lambda path: False)
+
+    assert not director.anything_to_play()
 
 
 def _row(prompt_id, *, workflow_name="sdxl_t2i", favorite=False, params=None,

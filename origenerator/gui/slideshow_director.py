@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import asdict, dataclass, replace
-from functools import partial
+from functools import cached_property, partial
 from pathlib import Path
 from random import randrange
 from typing import Protocol
@@ -76,6 +76,7 @@ from origenerator.gui.slideshow_wiring import (
     SlideshowActions,
 )
 from origenerator.gui.two_screens import TwoScreens, monitor_shaped
+from origenerator.gui.what_can_play import WhatCanPlay
 from origenerator.item_shape import (
     filter_rows,
     row_shape,
@@ -307,9 +308,12 @@ class SlideshowDirector:
     def _window_up(self):
         return _still_up(self._slideshow)
 
+    @cached_property
+    def _what_can_play(self) -> WhatCanPlay:
+        return WhatCanPlay(lambda row: gallery.resolve_preview(row, OUTPUT_PLACES))
+
     def anything_to_play(self) -> bool:
-        return any(gallery.resolve_preview(row, OUTPUT_PLACES) is not None
-                   for row in self._listing().rows)
+        return self._what_can_play.anything_in(self._listing().rows)
 
     def start(self, *, shape: str | None = None):
         listing = self._listing()

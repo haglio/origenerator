@@ -77,8 +77,13 @@ def missing_overlay_keys(
     return tuple(key for key in missing if key not in under_an_old_name)
 
 
+def genau_flick_words() -> tuple[str, str]:
+    words = haglio_settings.value("genau_flick_words")
+    return words["one"], words["many"]
+
+
 def genau_flick_word() -> str:
-    return haglio_settings.value("genau_flick_words", "one")
+    return genau_flick_words()[0]
 
 
 def non_ai_clip_heading() -> str:

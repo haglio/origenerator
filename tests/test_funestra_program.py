@@ -7,7 +7,7 @@ from app_support.file_channel import read_paused_state
 from app_support.win32 import TaskbarApp
 from funestra.funestra_verbs import QUIT
 from funestra.program.cli import build_parser
-from funestra.program.genau_here import genau_from_args
+from funestra.program.genau_launch import genau_from_args
 from funestra.program.window_verbs import (
     WINDOW_HIDE,
     WINDOW_MINIMIZE,

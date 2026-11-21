@@ -14,7 +14,7 @@ from pathlib import Path
 from app_support.file_channel import publish_whole
 from funestra.funestra import Channels
 from funestra.funestra_verbs import QUIT
-from funestra.program.genau_here import GenauLaunch
+from funestra.program.genau_launch import GenauLaunch
 from funestra.program.launch import Asked, launch_command
 from funestra.program.placement import WindowPlacement
 from funestra.program.window_verbs import (

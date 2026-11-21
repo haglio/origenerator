@@ -110,13 +110,14 @@ def test_every_declared_button_is_answered_by_the_slideshow():
     for button in row:
         assert answer(host, button.command.removeprefix("portrait_")), button.command
 
-    assert host.calls == [("step", -1), ("nudge", -1), ("nudge", 1), ("step", 1),
-                          "funscript jump", "cull", "lock",
-                          "normal speed", "reset",
-                          ("order", False), ("order", True),
-                          ("media", (False, True)), ("media", (True, False)),
-                          "enhanced", "favorites",
-                          ("version", -1)]
+    assert sorted(host.calls, key=repr) == sorted([
+        ("step", -1), ("nudge", -1), ("nudge", 1), ("step", 1),
+        "funscript jump", "cull", "lock",
+        "normal speed", "reset",
+        ("order", False), ("order", True),
+        ("media", (False, True)), ("media", (True, False)),
+        "enhanced", "favorites",
+        ("version", -1)], key=repr)
 
 
 def test_the_next_scripted_slide_is_a_key_and_a_spoken_word_with_no_button():

@@ -140,6 +140,19 @@ def test_a_folder_made_with_a_lora_no_longer_installed_grays_its_new_tile_and_sa
                               "picked in its place.")
 
 
+def test_a_folder_made_with_a_lora_no_longer_installed_grays_populate_and_says_why(
+        qtbot, installed_models):
+    rows = [_row("i1", "sdxl_t2i", {"positive_prompt": "a cat", "seed": 1,
+                                    "lora": "retired_look.safetensors"}, "i1.png")]
+    view = GalleryView(database_of(rows), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+
+    assert not view._buttons.populate.isEnabled()
+    assert view._buttons.populate.toolTip() == _new_tile(view).toolTip()
+
+
 def test_reroll_of_sparse_import_fills_params_from_defaults(qtbot, tmp_path):
     db = Database(tmp_path / "test.db")
     db.insert_generation(NewGeneration(

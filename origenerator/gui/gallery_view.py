@@ -216,12 +216,14 @@ def _row_under(row, folder_key: str):
                  if _base_of(child.data(0, _TREE_KEY_ROLE)) == folder_key), None)
 
 
-def _why_new_is_grayed(row: dict, job) -> str | None:
+def _why_its_files_are_gone(row: dict) -> str | None:
     workflow = WORKFLOW_REGISTRY[row["workflow_name"]]
     missing = files_not_installed(filled_params(row, workflow), workflow)
-    if missing:
-        return made_with_files_not_installed(missing)
-    return None if job is None else ALREADY_MAKING_ONE_TIP
+    return made_with_files_not_installed(missing) if missing else None
+
+
+def _why_new_is_grayed(row: dict, job) -> str | None:
+    return _why_its_files_are_gone(row) or (None if job is None else ALREADY_MAKING_ONE_TIP)
 
 
 ONLY_A_LEAF_IS_DELETED = "Only a leaf folder can be deleted"
@@ -1566,7 +1568,7 @@ class GalleryView(QWidget):
         if not isinstance(group, gallery.SettingsGroup):
             return ("Populate works in a leaf folder, where every item shares its settings. "
                     "Open one to use it.")
-        return self._why_no_more_can_be_made(group)
+        return self._why_no_more_can_be_made(group) or _why_its_files_are_gone(group.rows[0])
 
     def _why_no_more_can_be_made(self, group) -> str | None:
         if self._client is None:

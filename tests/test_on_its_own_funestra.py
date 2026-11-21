@@ -1130,7 +1130,7 @@ def test_a_spoken_answer_sits_directly_on_the_slideshow_its_funestra_names(qtbot
     message = MessageWindow(stack=lambda own, beneath: stacked.append(beneath) or True)
     view = _view(qtbot, _KEYED, message=message)
 
-    view.channel.heard.emit({"video": "", "window": "4242"})
+    view.channel.heard.emit({"video": "", "window": "4242"}, {})
     view.slideshow.note_voice_command("next")
 
     assert stacked == [4242]

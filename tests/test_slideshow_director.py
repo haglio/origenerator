@@ -13,7 +13,7 @@ from app_support.kino_folder import upscale_in, upscales_in
 from funestra.hud_placement import HudCorner
 from funestra.hud_title import LATEST_LABEL
 from PIL import Image
-from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtCore import QEvent, QObject, QRect, Qt
 from PySide6.QtGui import QGuiApplication, QKeyEvent
 from shared_ui.message_shape import FAVORITE, INFO, WARNING
 
@@ -404,6 +404,9 @@ class _CoreOutOfSight:
 
     def isMinimized(self):
         return False
+
+    def frameGeometry(self):
+        return QRect(*LANDSCAPE_MONITOR.getRect())
 
 
 class FakeHost:
@@ -3533,3 +3536,13 @@ def test_the_map_around_a_picture_leaves_out_what_a_looping_workflow_made_from_i
 
     assert [row.slide.prompt_id for row in around.column] == ["v1"]
     assert [slide.prompt_id for slide in around.group] == ["v1"]
+
+
+def test_the_app_coming_to_the_front_brings_a_slideshow_on_the_other_monitor_forward_beside_core(
+        slideshows, monkeypatch):
+    director, _host, made = _core_showing_a_folder(slideshows, monkeypatch)
+    director.two_screens.core_is_up.emit()
+
+    QGuiApplication.instance().applicationStateChanged.emit(Qt.ApplicationState.ApplicationActive)
+
+    assert program_of(made[0]).window.lifted == 1

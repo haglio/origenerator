@@ -17,10 +17,10 @@ from PySide6.QtCore import QObject, QRect, Qt, QTimer, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QWidget
 from shared_ui.message_shape import HEARD_MARK, INFO, time_to_read_ms
+from shared_ui.message_window import MessageWindow
 
 from origenerator.fun_time_mode import Rect
 from origenerator.gui.hud_queue import QueueFoot
-from origenerator.gui.message_over_a_funestra import MessageOverAFunestra
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.on_a_sessions_funestra import HudOnFile
 from origenerator.gui.request_promise import RequestPromise
@@ -162,7 +162,7 @@ class OnItsOwnFunestra(QObject):
         self._volume_told: VolumeHud | None = opens_at
         self._volume_heard: VolumeHud | None = None
         program.channel.send(f"{SET_VOLUME} {opens_at.volume} {int(opens_at.muted)}")
-        self._note = message if message is not None else MessageOverAFunestra()
+        self._note = message if message is not None else MessageWindow()
         self._request_note = ""
         self._promise = RequestPromise()
         self._note_timer = QTimer(self)
@@ -318,7 +318,7 @@ class OnItsOwnFunestra(QObject):
         self._request_note = note
         self._refresh_note()
 
-    def request_line(self, message: str, request=None, *, working: bool = False,
+    def request_message(self, message: str, request=None, *, working: bool = False,
                      kind: str = INFO) -> None:
         if working:
             self._promise.make(message, request)

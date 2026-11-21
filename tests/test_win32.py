@@ -16,7 +16,6 @@ from origenerator.win32 import (
     place_window_in_device_pixels,
     register_link_handler,
     register_toast_identity,
-    stack_just_above,
 )
 
 
@@ -176,48 +175,3 @@ class TestLinkHandler:
         register_link_handler("origenerator", name="Origenerator",
                               command='"py.exe" "handler" "%1"', write=refuse)
 
-
-_creating = ctypes.windll.user32  # type: ignore[attr-defined]
-_creating.CreateWindowExW.argtypes = [
-    ctypes.wintypes.DWORD, ctypes.wintypes.LPCWSTR, ctypes.wintypes.LPCWSTR, ctypes.wintypes.DWORD,
-    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.wintypes.HWND,
-    ctypes.wintypes.HMENU, ctypes.wintypes.HINSTANCE, ctypes.wintypes.LPVOID]
-_creating.CreateWindowExW.restype = ctypes.wintypes.HWND
-_creating.DestroyWindow.argtypes = [ctypes.wintypes.HWND]
-_creating.GetWindow.argtypes = [ctypes.wintypes.HWND, ctypes.wintypes.UINT]
-_creating.GetWindow.restype = ctypes.wintypes.HWND
-_GW_HWNDPREV = 3
-_WS_POPUP = 0x80000000
-
-
-@contextmanager
-def _hidden_windows(count: int):
-    made = [_creating.CreateWindowExW(0, "STATIC", "", _WS_POPUP, 0, 0, 10, 10,
-                                      None, None, None, None) for _ in range(count)]
-    try:
-        yield made
-    finally:
-        for window in made:
-            _creating.DestroyWindow(window)
-
-
-class TestStackJustAbove:
-    def test_a_window_lower_down_comes_up_to_sit_directly_on_the_one_beneath(self):
-        with _hidden_windows(3) as (lowest, middle, _top):
-            assert stack_just_above(lowest, middle) is True
-
-            assert _creating.GetWindow(middle, _GW_HWNDPREV) == lowest
-
-    def test_a_window_comes_up_onto_the_top_window_without_rising_past_it(self):
-        with _hidden_windows(2) as (lowest, top):
-            assert stack_just_above(lowest, top) is True
-
-            assert _creating.GetWindow(top, _GW_HWNDPREV) == lowest
-
-    def test_a_window_of_another_program_is_never_moved(self):
-        with _hidden_windows(1) as (ours,):
-            assert stack_just_above(ctypes.windll.user32.GetDesktopWindow(), ours) is False
-
-    def test_nothing_is_moved_onto_a_window_that_is_gone(self):
-        with _hidden_windows(1) as (ours,):
-            assert stack_just_above(ours, 0x7FFFFFF0) is False

@@ -19,6 +19,7 @@ from shared_ui.foreground import bring_to_front
 from shared_ui.message_shape import FAVORITE, INFO, WARNING
 
 from origenerator import gallery
+from origenerator.action_settings import loops
 from origenerator.config import FRAMES_BEING_MADE_DIR, OUTPUT_PLACES, STATE_DIR
 from origenerator.fun_time_bridge import (
     ask_for_omnipause,
@@ -40,6 +41,9 @@ from origenerator.gallery.shapes import (
     SHAPES as _SHAPES,
 )
 from origenerator.gallery.shapes import shape_holds, the_one_shape_on, the_shape_of
+from origenerator.genau_flicks import NO_FILTER, GenauFilters
+from origenerator.genau_flicks import restored as genau_filters_restored
+from origenerator.genau_flicks import saved as genau_filters_saved
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.action_presses import striking
 from origenerator.gui.frame_files import FrameFiles
@@ -77,6 +81,7 @@ from origenerator.gui.slideshow_wiring import (
     Showing,
     SlideshowActions,
 )
+from origenerator.gui.standalone_genau import GenauSources, StandaloneGenau
 from origenerator.gui.two_screens import TwoScreens, monitor_shaped
 from origenerator.gui.what_can_play import WhatCanPlay
 from origenerator.item_shape import (
@@ -253,7 +258,7 @@ class SlideshowDirector:
         self._room_paused = False
         self._slideshow_state = SlideshowState()
         self._picked_as_the_slideshow_up_opened: tuple[str, ...] = ()
-        self._filters = SlideshowFilters()
+        self._filters, self._genau_filters = SlideshowFilters(), NO_FILTER
         self._enhance_status: dict[str, str] = {}
         self._library = sources.library
         self._groups = SlideGroups(library=self._library, sources=sources)
@@ -383,8 +388,11 @@ class SlideshowDirector:
 
     @looking_once
     def open_on_preview(self, media, generation):
-        if media is not None and self._plays_on_the_main_funestra(self._row_for(generation)):
+        row = self._row_for(generation) if media is not None else None
+        if self._plays_on_the_main_funestra(row):
             return None
+        if self._plays_in_genau(row):
+            return self._show_genau_on(row, media[0])
         hud = HudFacts(order_label=LATEST_LABEL)
         if media is None:
             location = self._location_of(self._row_for(generation)) if generation else None
@@ -412,6 +420,8 @@ class SlideshowDirector:
         items = self.items_of([row]) if row is not None else []
         if not items:
             return None
+        if self._plays_in_genau(row):
+            return self._show_genau_on(row, items[0][0])
         return self.open_in_its_folder(items[0][:2], generation)
 
     def _plays_on_the_main_funestra(self, row: dict | None) -> bool:
@@ -421,6 +431,23 @@ class SlideshowDirector:
                 self._session_channel, kinos,
                 in_genau=self._genau is not None and self._genau.holds(Path(kinos)))
             or self._fun_time is not None)
+
+    def _plays_in_genau(self, row: dict | None) -> bool:
+        return self._fun_time is None and row is not None and loops(row)
+
+    def _show_genau_on(self, row: dict, path):
+        shape = row_shape(row)
+        up = self._window_up()
+        if up is None:
+            up = self._now_live(self._hand_to_the_apps_own_funestra(
+                [], shape, Showing(self._slideshow_actions(shape),
+                                   HudFacts(enhancing=self._enhance_status), {}, None),
+                window_shape=shape), None)
+        else:
+            self._standalone_window_shape = shape
+            self._show_on_its_monitor(up.shown)
+        up.shown.show_genau(Path(path))
+        return up
 
     @looking_once
     def open_in_its_folder(self, media, generation):
@@ -506,12 +533,7 @@ class SlideshowDirector:
             slideshow = self._hand_to_the_apps_own_funestra(
                 items, where, showing, window_shape=shape, **kwargs)
             self._standalone_showing = _one_shape_of_the_set(rows, items) or shape
-        self._slideshow = slideshow
-        self._picked_as_the_slideshow_up_opened = self._listing().picked
-        already_live = any(live is slideshow for live, _where in self._live_slideshows)
-        self._live_slideshows = [entry for entry in self._live_slideshows
-                                 if entry[0] is not slideshow]
-        self._live_slideshows.append((slideshow, location))
+        self._now_live(slideshow, location)
         filters = carrying.filters
         if filters is None:
             filters = self._filters if self._fun_time is None else SlideshowFilters()
@@ -521,11 +543,20 @@ class SlideshowDirector:
         if not keep_the_slide:
             self._lead_with_what_is_being_made(slideshow, location,
                                                following=run if follows_a_run else None)
+        self._osr2.reconcile()
+        return slideshow
+
+    def _now_live(self, slideshow, location):
+        already_live = any(live is slideshow for live, _where in self._live_slideshows)
+        self._slideshow = slideshow
+        self._picked_as_the_slideshow_up_opened = self._listing().picked
+        self._live_slideshows = [entry for entry in self._live_slideshows
+                                 if entry[0] is not slideshow]
+        self._live_slideshows.append((slideshow, location))
         if not already_live:
             slideshow.open_requested.connect(self._pick_where_it_played)
             slideshow.closed.connect(lambda s=slideshow: self._on_closed(s))
             slideshow.media_changed.connect(self._osr2.reconcile)
-        self._osr2.reconcile()
         return slideshow
 
     def _enhance_from_slideshow(self, prompt_id: str) -> bool:
@@ -582,7 +613,22 @@ class SlideshowDirector:
             filters_changed=self._note_filters,
             volume_moved=self._volume_moved if self._fun_time is None else None,
             name_of=self._names.of,
+            start_slideshow=self.start if self._fun_time is None else None,
         )
+
+    def _genau_sources(self) -> GenauSources:
+        return GenauSources(
+            library=self._library, is_favorite=self._is_favorite,
+            unfavorite=partial(self._host.favorite_generation, favorite=False),
+            trash=self._host.trash_generation, flip=self._flip_on_its_item,
+            name_of=self._names.of, motion=self._motion, starts_with=self._genau_filters,
+            filters_changed=self._note_genau_filters)
+
+    def _note_genau_filters(self, filters: GenauFilters) -> None:
+        self._genau_filters = filters
+
+    def _flip_on_its_item(self, prompt_id: str, flipped: bool) -> None:
+        self._db.set_library_record(prompt_id, genau_flipped=int(flipped))
 
     def _the_audio_standing_on_its_own(self) -> dict:
         if self._fun_time is not None:
@@ -642,7 +688,10 @@ class SlideshowDirector:
         self.two_screens.on_top.keep_on_top_too(program)
         shown = OnItsOwnFunestra(
             program, shape, showing.actions,
-            OwnWiring(motion=self._motion, **self._the_audio_standing_on_its_own()), asks=asks)
+            OwnWiring(motion=self._motion, **self._the_audio_standing_on_its_own()), asks=asks,
+            genau=StandaloneGenau(program, self._genau_sources()))
+        if self._motion is not None:
+            self._motion.came_round = shown.loop_came_round
         slideshow = FunestraSlideshow(
             Playing(items, actions=showing.actions, hud=showing.hud, versions=showing.versions,
                     **kwargs),
@@ -662,6 +711,7 @@ class SlideshowDirector:
             up.play(Playing(items, actions=showing.actions, hud=showing.hud,
                             versions=showing.versions, **kwargs))
             self._show_on_its_monitor(up.shown)
+            up.shown.show_kino()
             return up
         slideshow = self._a_funestra_of_the_apps_own(items, shape, showing, **kwargs)
         self._show_on_its_monitor(slideshow.shown)
@@ -869,13 +919,15 @@ class SlideshowDirector:
         volume = self._volume_left_at
         return {"last_show": state.saved(), "filters": SlideshowFilters.saved(self._filters),
                 "panels": as_saved(self._huds), "pace": self._pace.seconds,
-                "volume": None if volume is None else asdict(volume)}
+                "volume": None if volume is None else asdict(volume),
+                "genau_filters": genau_filters_saved(self._genau_filters)}
 
     def remember(self, saved) -> None:
         if self._fun_time is not None or not isinstance(saved, dict):
             return
         self._slideshow_state = SlideshowState.restored(saved.get("last_show"))
         self._filters = SlideshowFilters.restored(saved.get("filters"))
+        self._genau_filters = genau_filters_restored(saved.get("genau_filters"))
         if type(saved.get("pace")) is int:
             self._pace.set_seconds(saved["pace"])
         self._volume_left_at = _volume_saved_as(saved.get("volume"))

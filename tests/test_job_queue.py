@@ -817,6 +817,27 @@ def test_a_run_that_cannot_even_be_built_is_reported_as_failed(qtbot, tmp_path):
     assert "width" in message
 
 
+def test_a_reroll_made_with_a_lora_no_longer_installed_sends_nothing_and_says_why(
+        qtbot, tmp_path, installed_models):
+    db = Database(tmp_path / "test.db")
+    client = _client()
+    queue = JobQueue(db, client)
+    said = []
+    queue.failed.connect(lambda key, message: said.append((key, message)))
+    row = {**_image_row(), "workflow_name": "sdxl_t2i",
+           "workflow_version": WORKFLOW_REGISTRY["sdxl_t2i"].version,
+           "params_json": json.dumps({"positive_prompt": "a cat", "seed": 1,
+                                      "lora": "retired_look.safetensors"})}
+
+    queue.reroll_every_seed("k", row, [])
+
+    client.submit_job.assert_not_called()
+    assert db.list_generations() == []
+    assert said == [("k", "This was made with retired_look, which isn't installed anymore, so "
+                          "no new ones can be made with it until an installed one is picked in "
+                          "its place.")]
+
+
 def test_a_folder_rerolls_start_frame_queues_behind_the_images_waiting(qtbot, tmp_path):
     db = Database(tmp_path / "test.db")
     queue = JobQueue(db, _client())

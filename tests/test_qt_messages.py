@@ -74,6 +74,21 @@ def test_qts_note_on_the_scale_changing_while_windows_are_open_is_logged_for_deb
 
 
 @pytest.mark.no_qt_log
+def test_qts_note_on_a_window_shown_again_after_the_scale_changed_is_logged_for_debugging(caplog):
+    note = ("The cached device pixel ratio value was stale on window expose.  "
+            "Please file a QTBUG which explains how to reproduce.")
+    previous = install_qt_message_logging()
+    try:
+        with caplog.at_level(logging.DEBUG, logger="qt"):
+            qWarning(note)
+    finally:
+        qInstallMessageHandler(previous)
+
+    assert [(r.levelno, r.getMessage()) for r in caplog.records if r.name == "qt"] == [
+        (logging.DEBUG, note)]
+
+
+@pytest.mark.no_qt_log
 def test_a_new_install_never_reports_a_run_an_earlier_one_was_counting(caplog):
     before = install_qt_message_logging()
     try:

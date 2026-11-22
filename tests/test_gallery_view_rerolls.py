@@ -1359,6 +1359,20 @@ def test_a_turns_image_canceled_in_the_job_queue_offers_generate_under_the_turn_
     assert _generate_offered(exchange)
 
 
+def test_a_turns_image_canceled_under_the_turn_offers_generate_there_again(qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path)
+
+    exchange = _generate_under_the_turn_then(
+        qtbot, view, lambda job: exchange_of(view).cancel_asked.emit(job.prompt_id))
+
+    assert view._live_jobs == {}
+    assert _generate_offered(exchange)
+
+
+def exchange_of(view):
+    return view.generate_pane.current_generate_tab()._param_form.request_exchange()
+
+
 def test_a_turns_image_that_fails_offers_generate_under_the_turn_again(qtbot, tmp_path):
     view = _tab_asked_for_two_cats(qtbot, tmp_path)
 

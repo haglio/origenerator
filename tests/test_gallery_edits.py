@@ -4,8 +4,10 @@ import json
 from pathlib import Path
 
 import pytest
+from app_support.testing import no_wait_for_a_held_file
 from PIL import Image
 
+import origenerator.trash as trash_mod
 from origenerator.db import Database, NewGeneration
 from origenerator.gallery import enhancement_versions, is_enhanced_row
 from origenerator.gallery_edits import GalleryEdits, GalleryEnvironment
@@ -90,6 +92,29 @@ def test_a_delete_whose_files_will_not_move_keeps_its_item(tmp_path, monkeypatch
 
     assert db.get_generation("p1") == row
     assert db.list_trashed() == []
+
+
+def test_a_delete_stopped_by_a_held_file_puts_back_every_file_it_moved(tmp_path, monkeypatch):
+    actions, db, output_dir = _actions(tmp_path)
+    first = _completed_row(db, output_dir, "p1", "a.png")
+    held = _completed_row(db, output_dir, "p2", "b.png")
+    real_move = trash_mod.shutil.move
+
+    def copied_then_refused(src, dest):
+        if Path(src).name != "b.png":
+            return real_move(src, dest)
+        trash_mod.shutil.copy2(src, dest)
+        raise PermissionError("in use")
+
+    monkeypatch.setattr(trash_mod.shutil, "move", copied_then_refused)
+
+    with no_wait_for_a_held_file(), pytest.raises(PermissionError):
+        actions.delete_rows([first, held])
+
+    assert (output_dir / "a.png").read_bytes() == b"data", (
+        "the items stay in the gallery when a delete stops, so their files stay where they "
+        "name them")
+    assert [path for path in (tmp_path / "trash").rglob("*") if path.is_file()] == []
 
 
 def test_a_version_whose_file_will_not_move_stays_listed(tmp_path, monkeypatch):

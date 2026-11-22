@@ -108,12 +108,26 @@ class Trash:
             return TrashedBatch(moves=[], subdir=None)
         subdir = self.root / uuid.uuid4().hex
         subdir.mkdir(parents=True, exist_ok=True)
-        moves: list[tuple[Path, Path]] = []
-        for i, path in enumerate(paths):
-            dest = subdir / _held_as(i, path.name)
-            _move(path, dest)
-            moves.append((path, dest))
-        return TrashedBatch(moves=moves, subdir=subdir)
+        batch = TrashedBatch(moves=[], subdir=subdir)
+        try:
+            for i, path in enumerate(paths):
+                dest = subdir / _held_as(i, path.name)
+                _move(path, dest)
+                batch.moves.append((path, dest))
+        except OSError:
+            batch.restore()
+            raise
+        return batch
+
+    def store_each(self, groups) -> list[TrashedBatch]:
+        stored: list[TrashedBatch] = []
+        try:
+            stored.extend(self.store(paths) for paths in groups)
+        except OSError:
+            for batch in stored:
+                batch.restore()
+            raise
+        return stored
 
     def held_names(self) -> set[str]:
         return {_name_before(held) for batch in self._batches() for held in os.listdir(batch)}
@@ -238,5 +252,10 @@ def _name_before(held: str) -> str:
 
 def _move(src: Path, dest: Path) -> None:
     # Retry briefly: Qt's media backend closes a source on its own thread a beat after release, and Windows AV scanners or the indexer can lock any file
-    retried_while_held(lambda: shutil.move(str(src), str(dest)),
-                       attempts=_MOVE_ATTEMPTS, delay_s=_MOVE_RETRY_DELAY)
+    try:
+        retried_while_held(lambda: shutil.move(str(src), str(dest)),
+                           attempts=_MOVE_ATTEMPTS, delay_s=_MOVE_RETRY_DELAY)
+    except OSError:
+        if Path(src).exists():
+            Path(dest).unlink(missing_ok=True)
+        raise

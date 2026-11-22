@@ -117,9 +117,10 @@ class ShownJobQueue(QObject):
             dropped = self._client.clear_foreign_queue()
         except Exception as e:
             logger.exception("Failed to clear ComfyUI's queue")
-            alert.warning(
+            alert.error(
                 "Could not clear the queue",
                 f"ComfyUI would not drop the other app's jobs:\n\n{e}",
+                level="WARNING",
             )
             return
         logger.info("Dropped %d job(s) another app had queued on ComfyUI", dropped)

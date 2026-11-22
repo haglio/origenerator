@@ -214,9 +214,6 @@ def _answered(pair: tuple[str, str], parsed: tuple, asking, told: WhatIsKnown,
     if not isinstance(answer, dict):
         return None
     settings = told.settings
-    if polarity == ADD:
-        answer = _keeping_out_what_he_usually_does(answer, negative, told.company.negative,
-                                                   asked[0])
     outcome = apply_changes(answer, pair, asked=asked, settings=settings,
                             prompts=Prompts(take_weights=told.weights, his_words=_his_words(told)))
     return PromptRevision(positive, negative, without_nothing_weighted(outcome.positive),
@@ -228,25 +225,6 @@ def _answered(pair: tuple[str, str], parsed: tuple, asking, told: WhatIsKnown,
 def _puts_into_the_positive_prompt(change) -> bool:
     return (isinstance(change, dict) and change.get("prompt") == "positive"
             and any(change.get(key) for key in _PUT_INTO_A_PROMPT))
-
-
-def _keeping_out_what_he_usually_does(answer: dict, negative: str, kept_out: tuple,
-                                      request: str) -> dict:
-    changes = answer.get("changes")
-    if not kept_out or not isinstance(changes, list) or not any(
-            _puts_into_the_positive_prompt(change) for change in changes):
-        return answer
-    its_own = next((change for change in changes if isinstance(change, dict)
-                    and change.get("prompt") == "negative" and change.get("add")), None)
-    kept_out_already = things_of(negative) | things_of(str(its_own["add"]) if its_own else "")
-    missing = [part for part in kept_out if part.casefold() not in kept_out_already]
-    if not missing:
-        return answer
-    if its_own is None:
-        return {**answer, "changes": [*changes, {"prompt": "negative", "add": ", ".join(missing),
-                                                 "for": request}]}
-    with_his = {**its_own, "add": ", ".join([str(its_own["add"]), *missing])}
-    return {**answer, "changes": [with_his if change is its_own else change for change in changes]}
 
 
 def _his_words(told: WhatIsKnown) -> frozenset:
@@ -376,7 +354,8 @@ def _company_told(company: UsualCompany) -> str:
         lines.append("positive (the app adds those that name it or bring the person it is part of): "
                      + ", ".join(company.positive))
     if company.negative:
-        lines.append("negative (the app adds these itself): " + ", ".join(company.negative))
+        lines.append("negative (the app adds those that are about it): "
+                     + ", ".join(company.negative))
     return "\n".join(lines)
 
 
@@ -418,13 +397,19 @@ _LEFT_OPEN_CHECK = (
     'wrote it>"]}}, an empty list when there are none.')
 _PEOPLE_CHECK = (
     'He asked: "{asked}". When his prompts gain it, they usually also gain these parts: {parts}. '
-    "Which of these parts bring into the image a person of a kind the current positive prompt "
-    "has no one of (a man where it describes only women), and which one word in each names that "
-    "person? A part about people the prompt already describes, in any number or wording, brings "
-    "no one new, and nor does a part about a body part, a face, a look, a garment, a pose, a "
-    "place, a camera, a light or a style. "
+    "Which of these parts say who is in the image (a man, two women, a sailor holding a thing), "
+    "and which one word in each names that person? A part only about a body part, a face, a look, "
+    "a garment, a pose, a place, a camera, a light or a style says no one. "
     'Reply with only a JSON object: {{"people": {{"<part, exactly as listed>": "<the word in it '
     'that names the person>"}}}}, an empty object when none does.')
+_ABOUT_IT_CHECK = (
+    'He asked: "{asked}". When his prompts gain it, their negative prompts usually also gain '
+    "these parts: {parts}. Which of these parts are a wrong kind, size, color, material or look "
+    "of the thing he asked for, or something an image shows in its place? A part about anything "
+    "else (another part of the body, a face, a pose, a place, a camera, a light, a style, how "
+    "well the image is drawn) is not. "
+    'Reply with only a JSON object: {{"about_it": ["<each such part, exactly as listed>"]}}, an '
+    "empty list when none is.")
 _PUT_INTO_A_PROMPT = ("with", "add")
 _FAILED_TO_LOAD = 500
 
@@ -464,21 +449,35 @@ def _uncounted(word: str) -> str:
 _NAMING_NO_ONE = frozenset({"her", "his", "she", "him", "they", "their", "them", "its"})
 
 
-def _people_among(parts: list[str], asked: tuple[str, str], ask_again) -> set[str]:
-    request, positive = asked
+def _who_each_brings(parts: list[str], request: str, ask_again) -> dict[str, str]:
     try:
         people = local_llm.answer_of(ask_again(_PEOPLE_CHECK.format(
             asked=request, parts=json.dumps(parts)))).get("people")
     except Exception as exc:  # noqa: BLE001 -- the check is extra: the model's change stands
         logger.warning("prompt_edit: the model could not say which usual parts bring a person (%s)",
                        type(exc).__name__)
-        return set()
-    there = {_uncounted(word) for word, *_ in _tokens(positive)}
-    return {str(part).strip().casefold() for part, who in (people.items()
-                                                           if isinstance(people, dict) else ())
+        return {}
+    return {str(part).strip().casefold(): named
+            for part, who in (people.items() if isinstance(people, dict) else ())
             if (named := str(who).strip().lower()) not in _NAMING_NO_ONE
-            and named in {word for word, *_ in _tokens(str(part))}
-            and not _one_or_many(_uncounted(named)) & there}
+            and named in {word for word, *_ in _tokens(str(part))}}
+
+
+def _there_already(who: str, positive: str) -> bool:
+    return bool(_one_or_many(_uncounted(who)) & {_uncounted(word) for word, *_ in _tokens(positive)})
+
+
+def _counts_someone_it_counts(part: str, positive: str) -> bool:
+    counted = [_uncounted(word) for word, *_ in _tokens(positive)
+               if word[0].isdigit() and not word.isdigit()]
+    counted_there = set().union(*(_one_or_many(who) for who in counted))
+    return bool({_uncounted(word) for word, *_ in _tokens(part)} & counted_there)
+
+
+def _naming_it(usual: tuple, request: str) -> set[str]:
+    each = _each_thing_asked_for(request)
+    return {part.casefold() for part in usual
+            if any(_touches(thing, part) == len(thing) for thing in each)}
 
 
 def _its_own_company(answer: dict, asked: tuple[str, str], usual: tuple, ask_again) -> tuple:
@@ -486,12 +485,58 @@ def _its_own_company(answer: dict, asked: tuple[str, str], usual: tuple, ask_aga
     if not usual or not isinstance(changes, list) or not any(
             _puts_into_the_positive_prompt(change) for change in changes):
         return ()
-    each = _each_thing_asked_for(asked[0])
-    names_it = {part.casefold() for part in usual
-                if any(_touches(thing, part) == len(thing) for thing in each)}
+    request, positive = asked
+    names_it = _naming_it(usual, request)
+    brings = _who_each_brings(list(usual), request, ask_again)
+    return tuple(
+        part for part in usual
+        if (part.casefold() in names_it or part.casefold() in brings)
+        and not _counts_someone_it_counts(part, positive)
+        and not (part.casefold() in brings and _there_already(brings[part.casefold()], positive)))
+
+
+def _about_it_among(parts: list[str], request: str, ask_again) -> set[str]:
+    try:
+        about_it = local_llm.answer_of(ask_again(_ABOUT_IT_CHECK.format(
+            asked=request, parts=json.dumps(parts)))).get("about_it")
+    except Exception as exc:  # noqa: BLE001 -- the check is extra: the model's change stands
+        logger.warning("prompt_edit: the model could not say which usual parts are about it (%s)",
+                       type(exc).__name__)
+        return set()
+    return {str(part).strip().casefold() for part in (about_it if isinstance(about_it, list) else ())}
+
+
+def _holds_a_word_he_asked_for(part: str, request: str) -> bool:
+    return _touches(_asked_about(request), part) > 0
+
+
+def _keeping_out_what_goes_with_it(answer: dict, asked: tuple[str, str], usual: tuple,
+                                   ask_again) -> dict:
+    request, negative = asked
+    changes = answer.get("changes")
+    parsed = parse_request(request)
+    if (not usual or parsed is None or parsed[0] != ADD or not isinstance(changes, list)
+            or not any(_puts_into_the_positive_prompt(change) for change in changes)):
+        return answer
+    names_it = _naming_it(usual, request)
     others = [part for part in usual if part.casefold() not in names_it]
-    people = _people_among(others, asked, ask_again) if others else set()
-    return tuple(part for part in usual if part.casefold() in names_it | people)
+    goes_with_it = names_it | (_about_it_among(others, request, ask_again) if others else set())
+    kept_out = [part for part in usual if part.casefold() in goes_with_it]
+    its_own = next((change for change in changes if isinstance(change, dict)
+                    and change.get("prompt") == "negative" and change.get("add")), None)
+    the_models = [part for thing, part in things_of(str(its_own["add"]) if its_own else "").items()
+                  if thing in goes_with_it or _holds_a_word_he_asked_for(part, request)]
+    kept_out_already = things_of(negative) | things_of(", ".join(the_models))
+    adding = ", ".join([*the_models,
+                        *(part for part in kept_out if part.casefold() not in kept_out_already)])
+    others_of_its = [change for change in changes if change is not its_own]
+    if not adding:
+        return {**answer, "changes": others_of_its}
+    if its_own is None:
+        return {**answer, "changes": [*changes, {"prompt": "negative", "add": adding,
+                                                 "for": request}]}
+    return {**answer, "changes": [{**its_own, "add": adding} if change is its_own else change
+                                  for change in changes]}
 
 
 def _words(text: str) -> set[str]:
@@ -512,11 +557,15 @@ def _holding_its_own_company(answer: dict, company: tuple[tuple, tuple], positiv
                                                   for part in his)]}
     said_by_his = set().union(*(_forms(word) for part in its_own for word in _words(part)))
     only_usual_company = {part.casefold() for part in usual}
-    the_models = [part for thing, part in things_of(str(adding["add"])).items()
+    its_things = things_of(str(adding["add"]))
+    the_models = [part for thing, part in its_things.items()
                   if thing not in there and thing not in only_usual_company
-                  and not _words(part) & said_by_his]
-    adding["add"] = ", ".join([*his, *the_models])
-    return answer
+                  and not _words(part) & said_by_his and _holds_a_word_he_asked_for(part, request)
+                  and not _counts_someone_it_counts(part, positive)]
+    adding["add"] = ", ".join([*his, *the_models]) or (
+        "" if its_own else _thing_he_asks_to_add(request) or adding["add"])
+    return {**answer, "changes": [change for change in changes
+                                  if change is not adding or adding["add"]]}
 
 
 def _adds_to_the_positive_prompt(change) -> bool:
@@ -577,6 +626,8 @@ def ask_the_model(positive: str, negative: str, request: str, known: WhatIsKnown
 
     answer = _adding_what_he_asked_for(local_llm.answer_of(said), request)
     its_own = _its_own_company(answer, (request, positive), known.company.positive, ask_again)
-    return _holding_its_own_company(
+    answer = _holding_its_own_company(
         _leaving_open_what_he_did(answer, request, ask_again, " ".join(its_own)),
         (its_own, known.company.positive), positive, request)
+    return _keeping_out_what_goes_with_it(answer, (request, negative), known.company.negative,
+                                          ask_again)

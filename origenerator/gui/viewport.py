@@ -41,6 +41,7 @@ from origenerator.gui.drag_thumbnail import (
 )
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.live_frames import pixmap_of
+from origenerator.gui.looping_preview import put_down
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.scrubber import Scrubber
 from origenerator.gui.video_surface import (
@@ -473,8 +474,7 @@ class Viewport(QWidget):
         self._combination.clear()
         self._sheet.clear()
         if self._movie is not None:
-            self._movie.stop()
-            self._movie.deleteLater()
+            put_down(self._movie)
         self._movie = movie
         self._movie_native = native_size
         if movie is not None:

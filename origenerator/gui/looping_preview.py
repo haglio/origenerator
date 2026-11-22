@@ -89,9 +89,14 @@ def stop_what_plays_in(label) -> None:
     label.setMovie(None)
     if playing is None:
         return
-    playing.stop()
     playing.setParent(None)
-    playing.deleteLater()
+    put_down(playing)
+
+
+def put_down(movie: QMovie) -> None:
+    movie.stop()
+    movie.setFileName("")
+    movie.deleteLater()
 
 
 def _fitted(path: str, size: QSize, parent) -> QMovie:

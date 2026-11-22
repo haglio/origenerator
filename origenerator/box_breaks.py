@@ -136,17 +136,77 @@ def _most_that_fit(units: list[str], fits: Callable[[str], bool]) -> int:
     return low
 
 
+def _ends_a_thing(text: str) -> bool:
+    return text.replace(CARET, "").rstrip().endswith(",")
+
+
+def _things(text: str) -> list[str]:
+    things, current = [], ""
+    for unit in _units(text):
+        current += unit
+        if _ends_a_thing(unit):
+            things.append(current)
+            current = ""
+    return [*things, current] if current else things
+
+
+def _kept_and_pushed_on(text: str, its_last_goes_on: str,
+                        fits: Callable[[str], bool]) -> tuple[str, str]:
+    things = _things(text)
+    whole = _most_that_fit(things, fits) if fits(things[0]) else 0
+    kept, pushed_on = things[:whole], things[whole:]
+    goes_on = its_last_goes_on if len(pushed_on) == 1 else ""
+    if not pushed_on or fits(_joined(pushed_on[0].strip(), goes_on)):
+        return "".join(kept), "".join(pushed_on)
+    start = ["".join(kept)] if kept else []
+    words = _units(pushed_on[0])
+    of_its_words = _most_that_fit([*start, *words], fits) - len(start)
+    return ("".join(kept + words[:of_its_words]),
+            "".join(words[of_its_words:] + pushed_on[1:]))
+
+
+def _where_its_last_goes_on(texts: list[str], index: int) -> str:
+    goes_on = (index + 1 < len(texts) and not _ends_a_thing(texts[index])
+               and not _wordless(texts[index + 1]))
+    return _things(texts[index + 1])[0].strip() if goes_on else ""
+
+
+def _cut_short(texts: list[str], index: int, fits: Callable[[str], bool]) -> str:
+    things, goes_on = _things(texts[index]), _where_its_last_goes_on(texts, index)
+    if len(things) < 2 or not goes_on:
+        return ""
+    whole_fits_a_box = fits(_joined(things[-1].strip(), goes_on))
+    return things[-1] if whole_fits_a_box and not fits(_joined(texts[index], goes_on)) else ""
+
+
 def _push_on(texts: list[str], index: int, fits: Callable[[str], bool]) -> None:
-    units = _units(texts[index])
-    kept = _most_that_fit(units, fits) if len(units) > 1 else len(units)
-    if kept == len(units):
+    if not texts[index]:
         return
-    texts[index] = "".join(units[:kept]).rstrip()
-    words = "".join(units[kept:]).strip()
+    cut_short = _cut_short(texts, index, fits)
+    kept, pushed_on = _kept_and_pushed_on(
+        texts[index][:len(texts[index]) - len(cut_short)],
+        "" if cut_short else _where_its_last_goes_on(texts, index), fits)
+    words = (pushed_on + cut_short).strip()
+    if not words:
+        return
+    texts[index] = kept.rstrip()
     if index + 1 == len(texts):
         texts.append(words)
     else:
         texts[index + 1] = _joined(words, texts[index + 1])
+
+
+def _first_to_take_up(texts: list[str], index: int, fits: Callable[[str], bool]) -> str:
+    text, following = texts[index], texts[index + 1]
+    things = _things(following)
+    thing = things[0]
+    if fits(_joined(text, thing.strip())):
+        return thing
+    begun = "" if _ends_a_thing(text) or not text else _things(text)[-1]
+    goes_on = _where_its_last_goes_on(texts, index + 1) if len(things) == 1 else ""
+    too_long_for_a_box = not fits(_joined(_joined(begun.strip(), thing.strip()), goes_on))
+    word = _units(following)[0]
+    return word if too_long_for_a_box and fits(_joined(text, word.strip())) else ""
 
 
 def _take_back_up(texts: list[str], index: int, fits: Callable[[str], bool]) -> None:
@@ -154,12 +214,11 @@ def _take_back_up(texts: list[str], index: int, fits: Callable[[str], bool]) -> 
         if _wordless(texts[index + 1]):
             texts[index] += texts.pop(index + 1).strip()
             continue
-        following = _units(texts[index + 1])
-        merged = _joined(texts[index], following[0].strip())
-        if not fits(merged):
+        taken = _first_to_take_up(texts, index, fits)
+        if not taken:
             return
-        texts[index] = merged
-        texts[index + 1] = "".join(following[1:]).lstrip()
+        texts[index] = _joined(texts[index], taken.strip())
+        texts[index + 1] = texts[index + 1][len(taken):].lstrip()
 
 
 def _joined(before: str, after: str) -> str:

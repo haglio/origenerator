@@ -131,6 +131,32 @@ def test_a_word_is_never_split_at_its_letters():
     assert flowed(["  ab cd"], _words, limit=1) == (["  ab", "cd"], None)
 
 
+def test_a_thing_that_runs_past_a_boxs_end_moves_whole_into_the_next_box():
+    assert flowed(["a b, c d"], _words, limit=3) == (["a b,", "c d"], None)
+    assert flowed(["a, b c, d", "e"], _words, limit=3) == (["a, b c,", "d e"], None)
+
+
+def test_with_room_a_whole_thing_flows_back_up_and_half_of_one_never_does():
+    assert flowed(["a,", "b c, d"], _words, limit=3) == (["a, b c,", "d"], None)
+    assert flowed(["a b,", "c d, e"], _words, limit=3) == (["a b,", "c d, e"], None)
+
+
+def test_a_thing_too_long_for_one_box_is_split_between_two_of_its_words():
+    assert flowed(["a, b c d e, f"], _words, limit=3) == (["a, b c", "d e, f"], None)
+    assert flowed(["a,", "b c d e, f"], _words, limit=3) == (["a, b c", "d e, f"], None)
+    assert flowed(["x, a b c", "d e"], _words, limit=3) == (["x, a b", "c d e"], None)
+    assert flowed(["x,", "a b c", "d e"], _words, limit=3) == (["x, a b", "c d e"], None)
+    assert flowed(["a b c", "d, e"], _words, limit=3) == (["a b c", "d, e"], None)
+
+
+def test_a_thing_an_older_split_cut_in_two_is_put_back_together():
+    assert flowed(["a b, c", "d, e f"], _words, limit=3) == (["a b,", "c d,", "e f"], None)
+
+
+def test_the_caret_goes_with_a_thing_moved_whole():
+    assert flowed(["a b, c d"], _words, caret=(0, 6), limit=3) == (["a b,", "c d"], (1, 1))
+
+
 def test_the_boxes_ahead_of_the_one_edited_only_take_words_back_up():
     assert flowed(["a b c d", "e"], _words, start=1, limit=3) == (["a b c d", "e"], None)
     assert flowed(["a b", "c d"], _words, start=1, limit=3) == (["a b c", "d"], None)

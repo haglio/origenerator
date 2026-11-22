@@ -17,7 +17,9 @@ logger = logging.getLogger("qt")
 
 _VIDEO_PLAYER_TAKEN_APART = "wildcard call disconnects from destroyed signal of QFFmpeg::"
 _RESCALED_WITH_WINDOWS_OPEN = "QHighDpiScaling::setFactor: Should only be called when no windows exist."
-_NOTES_ON_WHAT_THIS_APP_DOES_ON_PURPOSE = (_VIDEO_PLAYER_TAKEN_APART, _RESCALED_WITH_WINDOWS_OPEN)
+_SHOWN_AGAIN_AFTER_RESCALING = "The cached device pixel ratio value was stale on window expose."
+_NOTES_ON_WHAT_THIS_APP_DOES_ON_PURPOSE = (
+    _VIDEO_PLAYER_TAKEN_APART, _RESCALED_WITH_WINDOWS_OPEN, _SHOWN_AGAIN_AFTER_RESCALING)
 
 
 def _level_of(kind, message: str) -> int:

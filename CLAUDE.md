@@ -904,7 +904,13 @@ other sessions' suites run out of it. Every sibling such a launcher puts on
 `PYTHONPATH` comes from a checkout held at the version the branch needs -- the
 sibling branch's own worktree for the unlanded change, a worktree at the
 pinned tag for any other -- never from a primary checkout, which every landing pulls forward under
-the launcher until the link dies on import before a window appears. And before
+the launcher until the link dies on import before a window appears. For an
+unlanded sibling change, the launcher's `PYTHONPATH` names a copy of that
+sibling's package kept inside this worktree's own `state/siblings/`, made
+again at every handoff, never the sibling's worktree itself: that folder can
+be retired while he still holds the link, and the preview then falls back to
+the installed release without a word, so two new buttons came up wearing the
+missing-icon mark. And before
 that link goes out, replay the launch's imports under the launcher's own
 environment: `tests/test_launch_smoke.py` strips `PYTHONPATH` on purpose, so a
 green run of it cannot see what such a launcher loads.

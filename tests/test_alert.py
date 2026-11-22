@@ -42,4 +42,4 @@ def test_an_alert_qt_cannot_open_is_said_in_a_windows_window_instead(qapp):
     with alert_shown(side_effect=RuntimeError("no Qt today")), error_popup() as windows:
         alert.error("Sample title", "A made-up error.")
 
-    windows.assert_called_once_with("Sample title", "A made-up error.")
+    windows.assert_called_once_with("Sample title", "A made-up error.", app_icon=alert.ICON_FILE)

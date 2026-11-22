@@ -807,9 +807,9 @@ like its neighbors copies whatever its neighbors got wrong: Separate and
 Together stayed 28 for weeks after the Gallery pane buttons went to 18, and
 two buttons added beside them were made 28 to match.
 `tests/test_button_sizes.py` builds the window both ways and fails on a
-square icon button of any other size; the kinds it lists as waiting are older
-buttons of other sizes that the user has not ruled on, so the list only gets
-shorter, and no new button goes on it. Say "in Fun Time" for this window as
+square icon button of any other size, with no kind left out. What sits
+beside such a button on a tile (the image or video icon, a video's length)
+takes its margin and its scale from the same `landing`. Say "in Fun Time" for this window as
 Fun Time shows it, to the user and in anything new here: "a session" is the
 user's word for a Claude session, and the older text and code that say "a
 Fun Time session" or "hosted" are not to be copied into a message to him.

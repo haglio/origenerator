@@ -208,6 +208,16 @@ def test_release_media_reaches_a_fullscreen_view_of_the_file(make_preview, tmp_p
     w._fullscreen.release_media.assert_called_once_with([video])
 
 
+def test_release_media_lets_go_of_an_animated_image_before_it_returns(make_preview, tmp_path):
+    w = make_preview()
+    animation = _animated_webp(tmp_path / "loop.webp")
+    w.show_image(animation)
+
+    w.release_media([animation])
+
+    animation.rename(tmp_path / "moved.webp")
+
+
 def test_a_video_plays_with_no_sound_output_at_all(make_preview, tmp_path):
     w = make_preview()
 

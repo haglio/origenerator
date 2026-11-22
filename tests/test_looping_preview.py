@@ -165,3 +165,12 @@ def test_a_thumbnail_whose_moment_comes_while_the_room_is_stopped_is_held_still(
     omnipause.freeze(True)
 
     wait_until(lambda: movie.state() == QMovie.MovieState.Paused, pump=QApplication.processEvents)
+
+
+def test_a_clip_taken_off_its_label_lets_go_of_its_file_at_once(label, tmp_path):
+    path = tmp_path / "one.webp"
+    play_in(label, _loop(path), QSize(40, 30))
+
+    looping_preview.stop_what_plays_in(label)
+
+    path.rename(tmp_path / "moved.webp")

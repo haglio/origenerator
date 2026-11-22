@@ -17,7 +17,7 @@ from origenerator.gui.drop_style import AIMED, LIT
 from origenerator.gui.generation_drag import dragged_generation
 from origenerator.gui.grayscale import grayscale_pixmap
 from origenerator.gui.item_type_icon import ItemTypeIcon
-from origenerator.gui.looping_preview import play_gray_in, play_in
+from origenerator.gui.looping_preview import play_gray_in, play_in, put_down
 from origenerator.gui.style_property import set_style_property
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 
@@ -155,8 +155,7 @@ class DropZone(DropZones):
 
     def _stop_movie(self):
         if self._movie is not None:
-            self._movie.stop()
-            self._movie.deleteLater()
+            put_down(self._movie)
             self._movie = None
 
     def reread_name(self) -> None:

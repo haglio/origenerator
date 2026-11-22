@@ -79,6 +79,7 @@ from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.enhance_versions import RunningEnhancement, _AddRow, _PendingRow, _VersionRow
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.gallery_view_parts import Shared
+from origenerator.gui.generate_button import GenerateButton
 from origenerator.gui.generate_tab import TYPICAL_TIME, GenerateTab
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.label_cells import LabelCell
@@ -5200,6 +5201,54 @@ def test_generate_under_a_turn_asked_now_runs_that_turns_prompts_asked_of_the_im
     assert asked["source_prompt_id"] == "img1"
     assert [turn.said for turn in asked["turns"]] == ["two women"]
     assert _positive(tab) == "two women on a bed"
+
+
+def _asked_for_two_women_where_the_prompt_says_a_thing_twice(saved_panel, qtbot, monkeypatch, *,
+                                                             auto_generate: bool):
+    _rewriting(monkeypatch, answer=[_TWO_WOMEN])
+    tab, db = saved_panel
+    image = _image_row(db, "img1", prompt="a woman on a couch, a lamp, a lamp")
+    tab.show_saved_generation(image, [image])
+    asked_for = _turn_runs(tab)
+    tab._param_form.request_exchange().set_auto_generate(auto_generate)
+    exchange = _ask(tab, qtbot, "two women")
+    until(lambda: len(exchange.turns()) == 1 and bool(exchange.turns()[0][1]))
+    return exchange, asked_for
+
+
+def _generate_under_the_answer(exchange):
+    (button,) = [button for button in exchange._conversation.viewport().findChildren(GenerateButton)
+                 if not button.isHidden()]
+    return button
+
+
+def test_generate_under_a_turn_is_held_while_its_prompt_says_a_thing_twice(
+        saved_panel, qtbot, monkeypatch):
+    exchange, asked_for = _asked_for_two_women_where_the_prompt_says_a_thing_twice(
+        saved_panel, qtbot, monkeypatch, auto_generate=False)
+
+    exchange.generate_asked.emit(0)
+
+    assert asked_for == []
+    assert _generate_under_the_answer(exchange).text() == "Resolve duplicates first"
+
+
+def test_auto_generate_is_held_while_the_prompt_says_a_thing_twice(saved_panel, qtbot, monkeypatch):
+    exchange, asked_for = _asked_for_two_women_where_the_prompt_says_a_thing_twice(
+        saved_panel, qtbot, monkeypatch, auto_generate=True)
+
+    assert asked_for == []
+    assert _generate_under_the_answer(exchange).text() == "Resolve duplicates first"
+
+
+def test_the_cancel_under_a_turn_being_made_is_passed_on_with_its_item(saved_panel, qtbot):
+    tab, _db = saved_panel
+    canceled = []
+    tab.turn_cancel_requested.connect(canceled.append)
+
+    tab._param_form.request_exchange().cancel_asked.emit("made1")
+
+    assert canceled == ["made1"]
 
 
 def test_once_a_turn_made_an_item_the_turns_after_it_are_asked_of_that_item(

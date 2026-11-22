@@ -26,10 +26,11 @@ from shared_ui.spacing import GAP_SMALL, MARGIN_STANDARD
 from shared_ui.toggle_switch import ToggleSwitch
 
 from origenerator.db_requests import Turn
+from origenerator.gui.cancel_bar import CancelBar
 from origenerator.gui.change_tip import change_tip, fitted
 from origenerator.gui.generate_button import GenerateButton
 from origenerator.gui.generation_job import JobState
-from origenerator.gui.inflight import RunReading
+from origenerator.gui.inflight import RunReading, cancel_tooltip
 from origenerator.gui.progress_bar import ProgressBar
 
 _ASK = "What to change, e.g. two women"
@@ -144,6 +145,7 @@ def _scaled_to(image_format: QTextImageFormat) -> QPixmap:
 
 class _Conversation(QTextEdit):
     generate_asked = Signal(int)
+    cancel_asked = Signal(str)
     item_activated = Signal(str)
 
     def __init__(self, parent=None):
@@ -159,6 +161,7 @@ class _Conversation(QTextEdit):
         self.verticalScrollBar().valueChanged.connect(lambda _value: self._place())
         self._tips: list[str] = []
         self._placed: list[tuple[QWidget, int]] = []
+        self._generate_buttons: dict[int, GenerateButton] = {}
         self.hide()
 
     def show_entries(self, entries: list[_Entry], made: list[_Made], showing: str | None) -> None:
@@ -166,6 +169,7 @@ class _Conversation(QTextEdit):
             widget.hide()
             widget.deleteLater()
         self._placed = []
+        self._generate_buttons = {}
         self.clear()
         cursor = self.textCursor()
         self._tips = []
@@ -182,9 +186,10 @@ class _Conversation(QTextEdit):
     def _show_what_was_made(self, cursor: QTextCursor, index: int, entry: _Entry,
                             made: _Made, showing: str | None) -> None:
         if made.reading is not None:
-            bar = ProgressBar(self.viewport())
+            bar = CancelBar(cancel_tooltip(False), self.viewport())
             bar.setFixedSize(self._generate_button_size())
             bar.show_progress(made.reading.caption(), *made.reading.bars())
+            bar.clicked.connect(lambda item=made.item: self.cancel_asked.emit(item))
             self._reserve(cursor, bar, entry)
         elif made.item:
             image_format = fitted(made.thumbnail, self._thumbnail_box())
@@ -194,9 +199,15 @@ class _Conversation(QTextEdit):
                 thumbnail.clicked.connect(lambda item=made.item: self.item_activated.emit(item))
                 self._reserve(cursor, thumbnail, entry)
         elif made.generate:
-            button = GenerateButton(self.viewport())
+            button = GenerateButton(self.viewport(), sizes_itself=True)
             button.clicked.connect(lambda _checked=False, at=index: self.generate_asked.emit(at))
+            self._generate_buttons[index] = button
             self._reserve(cursor, button, entry)
+
+    def refuse_generate(self, index: int, why: str) -> None:
+        button = self._generate_buttons.get(index)
+        if button is not None:
+            button.flash_guard(why)
 
     def _generate_button_size(self) -> QSize:
         button = GenerateButton(self.viewport())
@@ -227,6 +238,8 @@ class _Conversation(QTextEdit):
             block = page.findBlockByNumber(block_number)
             top = page.documentLayout().blockBoundingRect(block).top()
             widget.move(MARGIN_STANDARD, round(top + block.blockFormat().topMargin()) - scrolled)
+            if isinstance(widget, CancelBar):
+                widget.hover_if_the_pointer_is_on_it()
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
@@ -257,6 +270,7 @@ class _Conversation(QTextEdit):
 class RequestExchange(QWidget):
     asked = Signal(str)
     generate_asked = Signal(int)
+    cancel_asked = Signal(str)
     item_activated = Signal(str)
     auto_generate_chosen = Signal(bool)
 
@@ -266,6 +280,7 @@ class RequestExchange(QWidget):
         column.setSpacing(GAP_SMALL)
         self._conversation = _Conversation()
         self._conversation.generate_asked.connect(self.generate_asked)
+        self._conversation.cancel_asked.connect(self.cancel_asked)
         self._conversation.item_activated.connect(self.item_activated)
         self._in_flight: dict[str, RunReading] = {}
         self._held: list[_Entry] = []
@@ -381,6 +396,9 @@ class RequestExchange(QWidget):
         self._settle()
         if self._auto_generate.isChecked() and self._offers_generate(len(self._held) - 1):
             self.generate_asked.emit(len(self._held) - 1)
+
+    def refuse_generate(self, index: int, why: str) -> None:
+        self._conversation.refuse_generate(index, why)
 
     def set_auto_generate(self, on: bool) -> None:
         self._auto_generate.setChecked(on)

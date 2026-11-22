@@ -71,6 +71,7 @@ class GeneratePane(QTabWidget):
     tab_added = Signal(object)
     generate_requested = Signal(str, list)
     turn_generate_requested = Signal(object, str, dict, dict, bool)
+    turn_cancel_requested = Signal(str)
     modify_batch_requested = Signal(str, str, dict)
     folder_requested = Signal(str)
 
@@ -176,6 +177,7 @@ class GeneratePane(QTabWidget):
         tab.modify_batch_requested.connect(
             lambda key, name, params, p=tab: self._on_tab_changes(p, key, name, params)
         )
+        tab.turn_cancel_requested.connect(self.turn_cancel_requested)
         tab.turn_generate_requested.connect(
             lambda name, params, asked, the_tab_follows, p=tab: self._on_turn_generate(
                 p, name, params, asked, the_tab_follows))

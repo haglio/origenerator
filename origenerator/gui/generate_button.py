@@ -17,11 +17,12 @@ REMOVE_EMPHASIS = "Remove emphasis"
 
 
 class GenerateButton(QPushButton):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, sizes_itself: bool = False):
         super().__init__(DEFAULT_CAPTION, parent)
         self.setObjectName("generateBtn")
         self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
         self._caption = DEFAULT_CAPTION
+        self._sizes_itself = sizes_itself
         self._guard_timer = QTimer(self)
         self._guard_timer.setSingleShot(True)
         self._guard_timer.timeout.connect(self._clear_guard)
@@ -42,6 +43,8 @@ class GenerateButton(QPushButton):
 
     def _wear_warning(self, warning: bool) -> None:
         set_style_property(self, "warning", warning)
+        if self._sizes_itself:
+            self.adjustSize()
 
 
 def _wants_emphasis_removed(button: GenerateButton) -> bool:

@@ -19,7 +19,7 @@ from funestra.video_families import seed_group_and_seed
 from PIL import Image
 
 from origenerator import config
-from origenerator.evolver_export import PARTIAL_MARKER
+from origenerator.evolver_export import could_be_a_finished_video
 from origenerator.evolver_upscales import filed_under, filed_upscales
 from origenerator.gallery.output import generations_by_stem, parse_file_list
 from origenerator.gallery.signatures import parse_params
@@ -471,6 +471,6 @@ def outside_videos(upscaled_dir, *, skip_sources, rows: list[dict],
     return [OutsideVideo(path, source) for source, path in filed_upscales(upscaled_dir)
             if source not in skip_sources
             and media_type_from_filename(path.name) == MediaType.VIDEO
-            and PARTIAL_MARKER not in path.name
+            and could_be_a_finished_video(path.name)
             and str(path) not in held
             and stem_as_made(path) not in made_here]

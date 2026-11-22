@@ -6,6 +6,8 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support.mirrored_tree import PCLOUDS_MARK_ON_A_CONFLICTED_COPY
+
 from origenerator.config import EVOLVER_INBOX_DIR
 
 
@@ -48,6 +50,10 @@ def export_video(src: Path, dest_dir: Path, *, funscript: Path | None = None) ->
 
 
 PARTIAL_MARKER = ".partial."
+
+
+def could_be_a_finished_video(name: str) -> bool:
+    return PARTIAL_MARKER not in name and PCLOUDS_MARK_ON_A_CONFLICTED_COPY not in name.lower()
 
 
 def partial_name(final: Path) -> Path:

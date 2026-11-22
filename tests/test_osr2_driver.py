@@ -6,9 +6,10 @@ from app_support.osr2_hold import PARK, RESUME
 from funestra.funscript import Funscript
 
 from origenerator import osr2_driver
-from origenerator.funscript import funscript_path_for, write_funscript
+from origenerator.funscript import funscript_path_for
 from origenerator.osr2_driver import DriveScripts, Osr2Driver, drive_script
 from origenerator.output_places import OutputPlaces
+from tests.funscript_files import write_funscript
 from tests.osr2_fakes import FakeBroker
 from tests.running_ahead_support import record_the_app_running_ahead
 

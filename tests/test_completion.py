@@ -1,26 +1,15 @@
 from __future__ import annotations
 
-from functools import partial
 from pathlib import Path
 
 import pytest
-from app_support.funscript import read_actions
 from PIL import Image
 
-import origenerator.workflows.wan22_animate as animate
-from origenerator import completion, config, gallery
-from origenerator.config import MOTION_DEFAULT_HZ
-from origenerator.funscript import (
-    funscript_of,
-    synthesize_actions,
-    synthesize_funscript,
-    video_duration_seconds,
-    write_funscript,
-)
+from origenerator import completion
+from origenerator.funscript import funscript_of
 from origenerator.output_places import OutputFolders, OutputPlaces
 from origenerator.thumbnail import animated_thumbnail_path
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.frame_rate import NATIVE_FPS
 from tests.media_files import write_mp4
 
 SDXL = WORKFLOW_REGISTRY["sdxl_t2i"]
@@ -156,109 +145,16 @@ def test_a_completed_image_has_no_thumbnail_to_animate(tmp_path):
     assert not animated_thumbnail_path(tmp_path / "thumbs", "n1").exists()
 
 
-def test_completing_a_video_synthesizes_a_funscript(tmp_path, monkeypatch):
-    out = tmp_path / "out"
-    (out / "video").mkdir(parents=True)
-    (out / "video" / "wan22_i2v_00001_.mp4").write_bytes(b"v")
-    calls = []
-    monkeypatch.setattr(
-        "origenerator.completion.synthesize_funscript",
-        lambda video_path, *, hz, places: calls.append((Path(video_path), hz, places)),
-    )
-    completion.extract_completion(
-        I2V, _video_history("19", "images", "wan22_i2v_00001_.mp4"),
-        OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "n1",
-    )
-    assert calls == [(out / "video" / "wan22_i2v_00001_.mp4", MOTION_DEFAULT_HZ,
-                      OutputPlaces.in_one_folder(out))]
-
-
-def test_a_video_given_a_deleted_videos_name_is_scripted_for_its_own_length(tmp_path):
-    out = tmp_path / "out"
-    video = out / "video" / "wan22_i2v_00001_.mp4"
-    history = _video_history("19", "images", video.name)
-    write_mp4(video, seconds=15.0)
-    completion.extract_completion(I2V, history, OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "deleted")
-    video.unlink()
-
-    write_mp4(video, seconds=5.0)
-    completion.extract_completion(I2V, history, OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "namesake")
-
-    assert read_actions(funscript_of(video, places=OutputPlaces.in_one_folder(out))) == synthesize_actions(
-        video_duration_seconds(video), hz=MOTION_DEFAULT_HZ)
-
-
-def test_a_video_made_for_genau_is_scripted_as_exactly_one_cycle(tmp_path, monkeypatch):
-    out = tmp_path / "out"
-    video = out / "video" / "flf2v_loop_00001.mp4"
-    video.parent.mkdir(parents=True)
-    video.write_bytes(b"v")
-    cycle_seconds = gallery.CYCLE_FRAMES / NATIVE_FPS
-    monkeypatch.setattr(
-        "origenerator.completion.synthesize_funscript",
-        partial(synthesize_funscript, duration_provider=lambda _video: cycle_seconds),
-    )
-
-    completion.extract_completion(
-        FLF2V, _video_history("16", "gifs", video.name),
-        OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "n1",
-    )
-
-    actions = read_actions(funscript_of(video, places=OutputPlaces.in_one_folder(out)))
-    assert [a["pos"] for a in actions] == [0, 100, 0]
-    assert actions[-1]["at"] == round(cycle_seconds * 1000)
-
-
-def test_a_video_performed_from_a_library_video_takes_that_videos_script(tmp_path, monkeypatch):
-    performs = WORKFLOW_REGISTRY["wan22_animate"]
-    videos, scripts = tmp_path / "videos" / "videos", tmp_path / "videos" / "scripts" / "scripts"
-    monkeypatch.setattr(config, "LIBRARY_VIDEOS_DIR", videos)
-    monkeypatch.setattr(config, "LIBRARY_SCRIPTS_DIR", scripts)
-    monkeypatch.setattr(animate, "video_duration_seconds", lambda path: 60.0)
-    driving = videos / "scene one.mp4"
-    driving.parent.mkdir(parents=True)
-    driving.write_bytes(b"v")
-    write_funscript(scripts / "scene one.funscript", synthesize_actions(60.0, hz=0.5))
-    out = tmp_path / "out"
-    video = out / "video" / "wan22_animate_00001_.mp4"
-    video.parent.mkdir(parents=True)
-    video.write_bytes(b"v")
-    metronome = []
-    monkeypatch.setattr("origenerator.completion.synthesize_funscript",
-                        lambda *a, **k: metronome.append((a, k)))
-    params = dict(performs.default_params(), video=str(driving), video_start=2.0, frame_count=81)
-
-    completion.extract_completion(performs, _video_history("24", "gifs", video.name),
-                       OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "n1", params=params)
-
-    assert read_actions(funscript_of(video, places=OutputPlaces.in_one_folder(out))) == (
-        performs.authored_actions(params))
-    assert metronome == []
-
-
-def test_completing_an_image_writes_no_funscript(tmp_path, monkeypatch):
-    Image.new("RGB", (8, 8), (1, 2, 3)).save(tmp_path / "a.png")
-    calls = []
-    monkeypatch.setattr(
-        "origenerator.completion.synthesize_funscript",
-        lambda *a, **k: calls.append((a, k)),
-    )
-    completion.extract_completion(SDXL, SDXL_HISTORY, OutputFolders(OutputPlaces.in_one_folder(tmp_path), tmp_path / "thumbs"), "n1")
-    assert calls == []
-
-
-def test_a_script_that_cannot_be_written_never_strands_a_finished_video(tmp_path, monkeypatch):
+def test_a_finished_video_is_left_for_goblinscript_with_no_funscript_of_origenerators(tmp_path):
     out = tmp_path / "out"
     video = write_mp4(out / "video" / "wan22_i2v_00001_.mp4", seconds=1.0)
 
-    def refuse(*_a, **_k):
-        raise OSError("disk full")
-
-    monkeypatch.setattr("origenerator.completion.synthesize_funscript", refuse)
     files, _thumb, _duration = completion.extract_completion(
         I2V, _video_history("19", "images", video.name), OutputFolders(OutputPlaces.in_one_folder(out), tmp_path / "thumbs"), "n1")
 
     assert files == [{"filename": video.name, "subfolder": "video"}]
+    assert funscript_of(video, places=OutputPlaces.in_one_folder(out)) is None
+    assert not list(out.rglob("*.funscript"))
 
 
 def test_a_finished_run_is_filed_in_the_library_before_its_thumbnail_is_drawn(tmp_path):

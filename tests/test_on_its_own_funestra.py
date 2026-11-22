@@ -25,10 +25,6 @@ from shared_ui.message_shape import (
 from shared_ui.testing import appending_to
 
 from origenerator import osr2_driver
-from origenerator.funscript import (
-    synthesize_actions,
-    write_funscript,
-)
 from origenerator.gui.funestra_slideshow import Playing
 from origenerator.gui.hud_nav_map import NavMapNeighbors, NavMapRow
 from origenerator.gui.inflight import InFlightItem, RunReading
@@ -37,6 +33,7 @@ from origenerator.gui.slideshow_pace import SlideshowPace
 from origenerator.gui.slideshow_wiring import HudFacts, SlideshowActions
 from origenerator.osr2_driver import DriveScripts
 from origenerator.slideshow import LIVE, Slide, SlideshowFilters, in_order
+from tests.funscript_files import back_and_forth_actions, write_funscript
 from tests.marked_words import words
 from tests.motion_doubles import FakeMotion
 from tests.own_funestra_support import standalone as _standalone
@@ -1970,7 +1967,7 @@ def test_it_plays_audio_unlike_the_muted_inline_preview(qtbot):
 def test_a_scripted_clip_hands_its_motion_to_the_hud(qtbot, tmp_path):
     vid = tmp_path / "c.mp4"
     write_funscript(vid.with_suffix(".funscript"),
-                    synthesize_actions(2.0, hz=1.0))
+                    back_and_forth_actions(2.0, hz=1.0))
     view = _view(qtbot, [(str(vid), "video")])
     assert view.funestra.playback.has_funscript
 
@@ -1998,7 +1995,7 @@ def test_releasing_another_file_leaves_the_slideshow_alone(qtbot, tmp_path):
 def test_osr2_drive_target_bundles_the_scripted_video(qtbot, tmp_path):
     vid = tmp_path / "c.mp4"
     write_funscript(vid.with_suffix(".funscript"),
-                    synthesize_actions(2.0, hz=1.0))
+                    back_and_forth_actions(2.0, hz=1.0))
     view = _standalone([(str(vid), "video")], shuffle=lambda order: None)
 
     target = view.slideshow.osr2_drive_target()
@@ -2014,7 +2011,7 @@ def test_osr2_drive_target_bundles_the_scripted_video(qtbot, tmp_path):
 def test_the_next_video_s_funscript_is_read_before_it_comes_on(qtbot, tmp_path, monkeypatch):
     first, following = tmp_path / "c.mp4", tmp_path / "d.mp4"
     for video in (first, following):
-        write_funscript(video.with_suffix(".funscript"), synthesize_actions(2.0, hz=1.0))
+        write_funscript(video.with_suffix(".funscript"), back_and_forth_actions(2.0, hz=1.0))
     read = []
 
     def reading(path):

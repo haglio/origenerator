@@ -5,8 +5,9 @@ from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
 from PySide6.QtGui import QColor, QMouseEvent
 from PySide6.QtWidgets import QApplication
 
-from origenerator.funscript import heatmap_colors, synthesize_actions
+from origenerator.funscript import heatmap_colors
 from origenerator.gui.scrubber import Scrubber
+from tests.funscript_files import back_and_forth_actions
 
 
 def test_the_timeline_is_a_thin_fixed_height_track(qtbot):
@@ -21,7 +22,7 @@ def test_paints_without_error_scripted_and_empty(qtbot):
     qtbot.addWidget(scrubber)
     scrubber.resize(120, scrubber.height())
 
-    scrubber.set_actions(synthesize_actions(3.0, hz=1.2))
+    scrubber.set_actions(back_and_forth_actions(3.0, hz=1.2))
     assert not scrubber.grab().isNull()
 
     scrubber.set_actions([])
@@ -40,7 +41,7 @@ def test_the_cursor_rides_the_videos_own_length(qtbot):
     scrubber = Scrubber()
     qtbot.addWidget(scrubber)
     scrubber.resize(100, scrubber.height())
-    scrubber.set_actions(synthesize_actions(4.0, hz=1.0))
+    scrubber.set_actions(back_and_forth_actions(4.0, hz=1.0))
     scrubber.set_duration(8000)
     scrubber.set_position(4000)
     assert abs(_cursor_x(scrubber) - 50) <= 3
@@ -91,9 +92,9 @@ def test_a_new_script_starts_with_no_position(qtbot):
     scrubber = Scrubber()
     qtbot.addWidget(scrubber)
     scrubber.resize(100, scrubber.height())
-    scrubber.set_actions(synthesize_actions(4.0, hz=1.0))
+    scrubber.set_actions(back_and_forth_actions(4.0, hz=1.0))
     scrubber.set_position(1000)
-    scrubber.set_actions(synthesize_actions(2.0, hz=1.0))
+    scrubber.set_actions(back_and_forth_actions(2.0, hz=1.0))
     assert scrubber._position is None
     image = scrubber.grab().toImage()
     y = scrubber.height() // 2
@@ -196,7 +197,7 @@ def test_the_motion_is_colored_once_however_often_the_cursor_moves(qtbot):
     scrubber = Scrubber(heatmap=_counting_heatmap(colored))
     qtbot.addWidget(scrubber)
     scrubber.resize(120, scrubber.height())
-    scrubber.set_actions(synthesize_actions(3.0, hz=1.2))
+    scrubber.set_actions(back_and_forth_actions(3.0, hz=1.2))
     scrubber.set_duration(3000)
 
     for position in range(0, 3000, 500):
@@ -211,9 +212,9 @@ def test_a_new_script_or_a_new_width_colors_the_motion_again(qtbot):
     scrubber = Scrubber(heatmap=_counting_heatmap(colored))
     qtbot.addWidget(scrubber)
     scrubber.resize(120, scrubber.height())
-    scrubber.set_actions(synthesize_actions(3.0, hz=1.2))
+    scrubber.set_actions(back_and_forth_actions(3.0, hz=1.2))
     scrubber.grab()
-    scrubber.set_actions(synthesize_actions(4.0, hz=1.0))
+    scrubber.set_actions(back_and_forth_actions(4.0, hz=1.0))
     scrubber.grab()
     scrubber.resize(200, scrubber.height())
     scrubber.grab()

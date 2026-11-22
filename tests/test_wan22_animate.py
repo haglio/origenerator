@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 import origenerator.workflows.model_dropdowns as dropdowns
 import origenerator.workflows.wan22_animate as animate
 from origenerator import config
-from origenerator.funscript import write_funscript
 from origenerator.workflows.derived_size import scale_to_total_pixels
-from origenerator.workflows.driving_video import driven_actions
 from origenerator.workflows.frame_rate import NATIVE_FPS
 from origenerator.workflows.model_arch import WAN, WAN_ANIMATE, WAN_I2V
 from origenerator.workflows.model_files import NO_LORA
@@ -190,56 +186,6 @@ def test_the_run_is_cut_to_what_the_video_has_past_its_start(monkeypatch):
     assert loader["inputs"]["frame_load_cap"] == 45
     _animate_id, node = _node(payload, "WanAnimateToVideo")
     assert node["inputs"]["length"] == 45
-
-
-def _library(tmp_path, monkeypatch) -> tuple[Path, Path]:
-    videos = tmp_path / "videos" / "videos"
-    scripts = tmp_path / "videos" / "scripts" / "scripts"
-    monkeypatch.setattr(config, "LIBRARY_VIDEOS_DIR", videos)
-    monkeypatch.setattr(config, "LIBRARY_SCRIPTS_DIR", scripts)
-    return videos, scripts
-
-
-_SCRIPT = [{"at": 0, "pos": 0}, {"at": 1500, "pos": 100}, {"at": 3000, "pos": 0},
-           {"at": 4500, "pos": 100}, {"at": 6000, "pos": 0}, {"at": 7500, "pos": 100}]
-
-
-def test_the_script_is_the_library_videos_cut_to_the_stretch_performed(tmp_path, monkeypatch):
-    videos, scripts = _library(tmp_path, monkeypatch)
-    video = videos / "2D" / "sample" / "scene one.mp4"
-    video.parent.mkdir(parents=True)
-    video.write_bytes(b"v")
-    write_funscript(scripts / "2D" / "sample" / "scene one.funscript", _SCRIPT)
-    monkeypatch.setattr(animate, "video_duration_seconds", lambda path: 60.0)
-
-    actions = Wan22AnimateWorkflow().authored_actions(_params(video=str(video), video_start=1.0, frame_count=81))
-
-    assert actions == driven_actions(_SCRIPT, start_ms=1000, length_ms=5062)
-    assert actions[0] == {"at": 0, "pos": 67}
-    assert actions[-1] == {"at": 5062, "pos": 4}
-
-
-def test_the_script_is_cut_to_what_the_video_has_when_the_run_is(tmp_path, monkeypatch):
-    videos, scripts = _library(tmp_path, monkeypatch)
-    video = videos / "clip.mp4"
-    video.parent.mkdir(parents=True)
-    video.write_bytes(b"v")
-    write_funscript(scripts / "clip.funscript", _SCRIPT)
-    monkeypatch.setattr(animate, "video_duration_seconds", lambda path: 4.0)
-
-    actions = Wan22AnimateWorkflow().authored_actions(_params(video=str(video), video_start=1.0, frame_count=81))
-
-    assert actions[-1]["at"] == round(45 / NATIVE_FPS * 1000)
-
-
-def test_a_video_with_no_script_leaves_the_script_to_the_metronome(tmp_path, monkeypatch):
-    videos, _scripts = _library(tmp_path, monkeypatch)
-    video = videos / "clip.mp4"
-    video.parent.mkdir(parents=True)
-    video.write_bytes(b"v")
-
-    assert Wan22AnimateWorkflow().authored_actions(_params(video=str(video))) is None
-    assert Wan22AnimateWorkflow().authored_actions(_params(video="")) is None
 
 
 def test_a_run_with_no_video_picked_has_nothing_to_start_from():

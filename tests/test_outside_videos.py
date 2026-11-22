@@ -10,7 +10,7 @@ from pathlib import Path
 from funestra.video_families import seed_group_and_seed
 from PIL import Image
 
-from origenerator import config, funscript_backfill, trash_collection
+from origenerator import config, trash_collection
 from origenerator.action_setter import waiting
 from origenerator.db import Database
 from origenerator.gallery import (
@@ -412,17 +412,6 @@ def test_a_video_from_another_source_is_never_followed_into_comfyuis_output(tmp_
 
     assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output)) == 0
     assert db.get_generation(shown["prompt_id"])["output_files"] == shown["output_files"]
-
-
-def test_the_funscript_sweep_writes_nothing_for_a_video_from_another_source(tmp_path):
-    _brought_in(tmp_path)
-    written = []
-
-    funscript_backfill.backfill(Database(tmp_path / "test.db"), OutputPlaces.in_one_folder(_comfyui_output(tmp_path)),
-                                steps=funscript_backfill.Steps(write=lambda path, **_: written.append(path),
-                                                rewrite=lambda *_args, **_kw: False))
-
-    assert written == []
 
 
 def test_a_video_from_another_source_is_never_stamped_with_this_apps_workflows(tmp_path):

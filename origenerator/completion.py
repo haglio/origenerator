@@ -5,17 +5,11 @@ import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
-from origenerator.config import MOTION_DEFAULT_HZ, OUTPUT_PLACES
-from origenerator.funscript import (
-    funscript_path_for,
-    synthesize_funscript,
-    write_funscript,
-)
+from origenerator.config import OUTPUT_PLACES
 from origenerator.gallery.output import output_file_path
 from origenerator.generation_state import GenerationStatus
 from origenerator.item_shape import shape_its_files_say
 from origenerator.library_filing import file_into_library
-from origenerator.media import MediaType
 from origenerator.output_places import OutputFolders, OutputPlaces
 from origenerator.thumbnail import animate_if_video, generate_thumbnail
 from origenerator.timing import execution_duration_seconds
@@ -24,15 +18,13 @@ from origenerator.video_lengths import video_seconds_of
 logger = logging.getLogger(__name__)
 
 
-def extract_completion(workflow, history_data, folders: OutputFolders, prompt_id,
-                       params: dict | None = None):
+def extract_completion(workflow, history_data, folders: OutputFolders, prompt_id):
     places, thumb_dir = folders
     files = file_into_library(workflow.extract_output_info(history_data), places, prompt_id)
     thumb = _make_thumbnail(workflow, files, places, thumb_dir, prompt_id)
     source = _first_output_file(files, places)
     if source is not None:
         animate_if_video(source, thumb_dir, name=prompt_id)
-    _write_video_funscript(workflow, files, places, params)
     try:
         duration = execution_duration_seconds(history_data)
     except Exception as e:
@@ -46,22 +38,6 @@ def _first_output_file(files, places: OutputPlaces) -> Path | None:
         return None
     source = output_file_path(files[0], places)
     return source if source.exists() else None
-
-
-def _write_video_funscript(workflow, files, places: OutputPlaces, params: dict | None):
-    if workflow.output_type != MediaType.VIDEO:
-        return
-    source = _first_output_file(files, places)
-    if source is None:
-        return
-    try:
-        authored = workflow.authored_actions(params) if params else None
-        if authored:
-            write_funscript(funscript_path_for(source, places=places), authored)
-        else:
-            synthesize_funscript(source, hz=MOTION_DEFAULT_HZ, places=places)
-    except Exception as e:
-        logger.warning("Funscript generation failed for %s: %s", source, e)
 
 
 def _make_thumbnail(workflow, files, places: OutputPlaces, thumb_dir: Path, name):

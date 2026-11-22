@@ -55,7 +55,6 @@ from origenerator.gui.core import (
     OwnedBy,
     SatellitesServedFirst,
 )
-from origenerator.gui.headset_window import CAP_PX
 from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP
 from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
@@ -1818,7 +1817,8 @@ def test_crossing_into_the_headset_grows_the_window_back_to_desktop_size(qtbot, 
     assert ui_scale.active_scale() == ui_scale.HOSTED_SCALE
 
 
-def test_crossing_into_the_headset_takes_the_window_off_the_sessions_rect(qtbot, tmp_path):
+def test_crossing_into_the_headset_takes_the_window_off_the_sessions_rect(
+        qtbot, tmp_path, his_two_monitors):
     win = _window(qtbot, tmp_path)
     monitors = _hosted_with_a_channel(tmp_path)
     win.become_hosted(monitors)
@@ -1828,7 +1828,7 @@ def test_crossing_into_the_headset_takes_the_window_off_the_sessions_rect(qtbot,
     _say(win, tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
     assert win.hands_its_window_over is not None
 
-    assert max(win.width(), win.height()) == CAP_PX
+    assert win.size() == LANDSCAPE_MONITOR.adjusted(0, 0, 0, -TASKBAR).size()
 
 
 def test_a_takeover_by_a_headset_session_starts_handing_the_window_over(qtbot, tmp_path):
@@ -1855,17 +1855,14 @@ def test_a_window_hosted_in_the_headset_is_not_put_at_the_sessions_rect(qtbot, t
                                            session.main_rect.height)
 
 
-def test_a_window_hosted_in_the_headset_opens_as_big_as_the_frame_can_carry(
-        qtbot, tmp_path):
+def test_a_window_hosted_in_the_headset_is_as_big_as_core_standing_alone_on_its_monitor(
+        qtbot, tmp_path, his_two_monitors):
     win = _window(qtbot, tmp_path)
     win.resize(400, 300)
-    stood_alone_at = win.size()
 
     win.become_hosted(_headset_session(tmp_path))
 
-    assert max(win.width(), win.height()) == CAP_PX
-    assert win.width() / win.height() == pytest.approx(
-        stood_alone_at.width() / stood_alone_at.height(), abs=0.02)
+    assert win.size() == LANDSCAPE_MONITOR.adjusted(0, 0, 0, -TASKBAR).size()
 
 
 def test_fun_time_window_is_frameless_topmost_at_the_named_rect(qtbot, tmp_path):

@@ -34,7 +34,7 @@ from origenerator.gui.enhance_controller import EnhanceController
 from origenerator.gui.gallery_search import GallerySearchController
 from origenerator.gui.gallery_view import GalleryView, Shared
 from origenerator.gui.generate_pane import GeneratePane
-from origenerator.gui.headset_window import CAP_PX, HeadsetWindow
+from origenerator.gui.headset_window import HeadsetWindow
 from origenerator.gui.osr2_driving import Osr2Driving
 from origenerator.gui.panes import RememberedBorders
 from origenerator.gui.prompt_field import PROMPT_HEIGHTS
@@ -172,12 +172,12 @@ class Core(QMainWindow):
         self.setMinimumSize(600, 400)
         self._device_rect = None
         self._satellites_first: SatellitesFirst | None = None
-        if fun_time is not None:
-            self._wear_the_session(fun_time)
-
         self._sides = TwoScreens(self)
         self._sides.put_core_on(app_state.get(_CORE_ON_KEY))
         self._sides.switched.connect(self._fill_its_monitor)
+        if fun_time is not None:
+            self._wear_the_session(fun_time)
+
         self._title = AppTitle(WINDOW_TITLE, self.windowIcon(), preview)
         self._title.hide()
         self._gallery_view = GalleryView(db, client=client, fun_time=fun_time,
@@ -422,7 +422,7 @@ class Core(QMainWindow):
     def _wear_the_session(self, session: FunTimeSession) -> None:
         self._dress_for_the_room(session)
         if session.in_a_headset:
-            self._fill_the_frame_cap()
+            self._stand_as_big_as_on_its_monitor()
         else:
             self._sit_at_the_sessions_rect(session.main_rect)
 
@@ -436,14 +436,12 @@ class Core(QMainWindow):
             self._restore_geometry()
         else:
             self.restoreGeometry(self._found[0])
-        self._fill_the_frame_cap()
+        self._stand_as_big_as_on_its_monitor()
 
-    def _fill_the_frame_cap(self) -> None:
-        width, height = self.width(), self.height()
-        if width <= 0 or height <= 0:
-            return
-        grow = CAP_PX / max(width, height)
-        self.resize(round(width * grow), round(height * grow))
+    def _stand_as_big_as_on_its_monitor(self) -> None:
+        monitor = self._sides.cores_monitor()
+        if monitor is not None:
+            self.resize(monitor.availableGeometry().size())
 
     def _sit_at_the_sessions_rect(self, rect: Rect) -> None:
         self.setGeometry(rect.x, rect.y, rect.width, rect.height)

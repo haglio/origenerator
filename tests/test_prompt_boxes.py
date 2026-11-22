@@ -240,6 +240,24 @@ def test_a_word_typed_past_a_boxs_end_moves_whole_into_a_new_box_and_the_caret_g
     assert _texts(typed_into) == ["a b c", "dd"]
 
 
+def test_a_thing_typed_past_a_boxs_end_moves_whole_into_the_next_box(qtbot, typed_into):
+    typed_into.set_value("a b,")
+
+    _type(qtbot, typed_into, 0, 4, " c d,")
+
+    assert _texts(typed_into) == ["a b,", "c d,"]
+
+
+def test_a_thing_an_older_split_cut_in_two_is_whole_again_once_its_box_is_typed_in(
+        qtbot, typed_into):
+    typed_into.set_value(f"a b, c{BOX_BREAK}d, e")
+    assert _texts(typed_into) == ["a b, c", "d, e"]
+
+    _type(qtbot, typed_into, 0, 0, " ")
+
+    assert _texts(typed_into) == [" a b,", "c d,", "e"]
+
+
 def test_words_typed_in_cascade_on_through_the_boxes(qtbot, typed_into):
     typed_into.set_value(f"a b c{BOX_BREAK}d e f")
 

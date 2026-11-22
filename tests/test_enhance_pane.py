@@ -2526,7 +2526,7 @@ def test_a_fixs_trigger_word_clicked_in_goes_at_the_start_of_its_first_box_and_f
 
     qtbot.mouseClick(worded_fix.prompt_warning, Qt.MouseButton.LeftButton)
 
-    assert worded_fix.positive.value() == f"exmplstyle, {_cats(64)}{BOX_BREAK}{_cats(6)}"
+    assert worded_fix.positive.value() == f"exmplstyle,{BOX_BREAK}{_cats(70)}"
 
 
 def test_a_fixs_prompts_already_open_are_brought_forward_rather_than_opened_twice(qtbot):

@@ -57,6 +57,18 @@
       "ruled": "2026-10-17 and 2026-10-30, his words; CLAUDE.md, One word per thing"
     },
     {
+      "id": "mini_toc",
+      "thing": "the list of section names down the left of a Generate tab's Generation settings and Item info, which opens the section pressed and folds the rest",
+      "screen": null,
+      "his_word": "mini TOC (2026-11-22)",
+      "code_today": [
+        "mini toc"
+      ],
+      "code_word": "mini toc",
+      "status": "ruled",
+      "ruled": "2026-11-22, his words"
+    },
+    {
       "id": "caret",
       "thing": "the mark on a TOC row that opens and shuts the folder",
       "screen": null,

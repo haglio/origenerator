@@ -91,6 +91,14 @@ from origenerator.gui.inflight import (
 from origenerator.gui.item_area import ItemArea
 from origenerator.gui.lora_offers import LoraOffers
 from origenerator.gui.metadata_section import MetadataSection, wrappable
+from origenerator.gui.mini_toc import (
+    GENERATION_SETTINGS,
+    ITEM_INFO,
+    MiniToc,
+    beside_its_mini_toc,
+    line_up,
+    scroll_floor,
+)
 from origenerator.gui.modify_batch import ModifyBatch
 from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.panes import PaneSplitter, pane
@@ -331,7 +339,7 @@ class GenerateTab(DropZones):
         self._build_workflow_dropdown(settings_body)
         settings_body.addStretch(1)
         self._settings_pane = self._build_settings_pane()
-        ItemArea(self._item_scroll,
+        ItemArea(self._item_pane,
                  (self._metadata_section, self._related, self._versions),
                  self._settings_split,
                  dragged=lambda: self._settings_split.dragged_sizes() is not None)
@@ -433,8 +441,11 @@ class GenerateTab(DropZones):
         buttons.addLayout(self._build_button_row(), 1)
         self._viewport_column.addLayout(buttons)
         self._settings_split = PaneSplitter(Qt.Orientation.Vertical)
-        self._settings_split.addWidget(self._settings_scroll)
-        self._settings_split.addWidget(self._item_scroll)
+        settings_side = beside_its_mini_toc(GENERATION_SETTINGS, self._settings_scroll)
+        self._item_pane = beside_its_mini_toc(ITEM_INFO, self._item_scroll)
+        line_up((settings_side.findChild(MiniToc), self._item_pane.findChild(MiniToc)))
+        self._settings_split.addWidget(settings_side)
+        self._settings_split.addWidget(self._item_pane)
         self._settings_split.setStretchFactor(0, 2)
         self._settings_split.setStretchFactor(1, 1)
         self._settings_split.hold_still(self._fun_time is not None)
@@ -498,7 +509,7 @@ class GenerateTab(DropZones):
         return hint
 
     def _contents_floor(self) -> int:
-        return max(_scroll_floor(self._item_scroll), _scroll_floor(self._settings_scroll))
+        return max(scroll_floor(self._item_scroll), scroll_floor(self._settings_scroll))
 
     def _can_generate(self) -> bool:
         return (self._client is not None
@@ -1710,9 +1721,3 @@ def _scrolling_column() -> tuple[QScrollArea, QVBoxLayout]:
     scroll.setWidget(host)
     return scroll, column
 
-
-def _scroll_floor(scroll: QScrollArea) -> int:
-    return (scroll.widget().minimumSizeHint().width()
-            + scroll.verticalScrollBar().sizeHint().width()
-            + 2 * scroll.frameWidth()
-            + 2 * MARGIN_STANDARD)

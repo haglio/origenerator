@@ -348,6 +348,20 @@ def build_stylesheet() -> str:
         padding-left: {BUTTON_PAD_H_TIGHT}px;
         padding-right: {BUTTON_PAD_H_TIGHT}px;
     }}
+    QLabel#miniTocHeading {{
+        color: {_h(TEXT_PRIMARY)};
+        font-weight: bold;
+    }}
+    QPushButton#miniTocEntry {{
+        background: transparent;
+        border: none;
+        color: {_h(TEXT_MUTED)};
+        text-align: left;
+        padding: 0;
+    }}
+    QPushButton#miniTocEntry:hover {{
+        color: {_h(BLUE)};
+    }}
     QLabel#combineHeading {{
         color: {_h(TEXT_MUTED)};
         font-weight: bold;

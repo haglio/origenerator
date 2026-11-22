@@ -83,6 +83,7 @@ from origenerator.gui.generate_tab import TYPICAL_TIME, GenerateTab
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.label_cells import LabelCell
 from origenerator.gui.look_training_controller import LookTrainingController
+from origenerator.gui.mini_toc import MiniToc
 from origenerator.gui.param_form import STRENGTH_ONE_HELP, ParamForm
 from origenerator.gui.pills import Pill
 from origenerator.gui.seed_dropdown import SeedDropdown
@@ -354,8 +355,10 @@ def test_the_pane_keeps_a_margin_round_its_contents(tab):
     top_left = tab._viewport.mapTo(tab, tab._viewport.rect().topLeft())
     assert top_left.x() == margin_written_out
     assert top_left.y() == margin_written_out
+    for toc in tab.findChildren(MiniToc):
+        heading = toc.findChild(QLabel)
+        assert heading.mapTo(tab, QPoint(0, 0)).x() == margin_written_out
     form = tab._form_host
-    assert form.mapTo(tab, form.rect().topLeft()).x() == margin_written_out
     viewport = tab._settings_scroll.viewport()
     bar_side = viewport.mapTo(tab, viewport.rect().topRight()).x()
     assert bar_side - form.mapTo(tab, form.rect().topRight()).x() == margin_written_out
@@ -412,8 +415,21 @@ def test_the_settings_scroll_nearest_the_preview_with_the_item_under_a_border(ta
         assert _is_descendant(widget, tab._item_scroll)
     assert _is_descendant(tab._param_form, tab._settings_scroll)
     split = tab._settings_split
-    assert (split.orientation(), split.widget(0), split.widget(1)) == (
-        Qt.Orientation.Vertical, tab._settings_scroll, tab._item_scroll)
+    assert split.orientation() == Qt.Orientation.Vertical
+    assert _is_descendant(tab._settings_scroll, split.widget(0))
+    assert _is_descendant(tab._item_scroll, split.widget(1))
+
+
+def test_each_pane_has_a_mini_toc_on_its_left_headed_by_its_name(tab):
+    tab.resize(900, 900)
+    tab.show()
+    tocs = {toc.heading(): toc for toc in tab.findChildren(MiniToc)}
+    assert set(tocs) == {"Generation settings", "Item info"}
+    for heading, scroll in (("Generation settings", tab._settings_scroll),
+                            ("Item info", tab._item_scroll)):
+        toc = tocs[heading]
+        assert toc.parentWidget() is scroll.parentWidget()
+        assert toc.geometry().right() < scroll.geometry().left()
 
 
 def _leaves_outside_sections(tab, scroll):
@@ -1835,7 +1851,7 @@ def test_a_levels_facts_sit_one_gap_after_their_longest_key_as_a_field_after_its
     tab, db = saved_panel
     image = _enhanced_image_row(db)
     tab.show_saved_generation(image, [image])
-    tab.resize(480, 1400)
+    tab.resize(1200, 1400)
     tab.show()
     tab.layout().activate()
     facts = next(row for row in _version_rows(tab) if "Enhancement" in _row_texts(row))._facts
@@ -1995,12 +2011,12 @@ def test_the_way_to_the_folder_is_one_button_in_the_row_with_generate(saved_pane
     tab.resize(700, 1600)
     tab.show()
     QApplication.processEvents()
-    body = tab._settings_scroll.widget()
+    heading = next(toc for toc in tab.findChildren(MiniToc)
+                   if toc.heading() == "Generation settings").findChild(QLabel)
 
     assert button.isVisibleTo(tab)
     assert button.mapTo(tab, QPoint(0, 0)).y() == tab._generate_pair.mapTo(tab, QPoint(0, 0)).y()
-    assert button.mapTo(tab, QPoint(0, 0)).x() == body.mapTo(tab, QPoint(
-        body.layout().contentsMargins().left(), 0)).x()
+    assert button.mapTo(tab, QPoint(0, 0)).x() == heading.mapTo(tab, QPoint(0, 0)).x()
     for row in _version_rows(tab):
         assert "goToFolderButton" not in [b.objectName()
                                           for b in row.findChildren(QPushButton)]

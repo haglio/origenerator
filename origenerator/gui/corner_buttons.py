@@ -4,7 +4,7 @@ from typing import NamedTuple
 
 from PySide6.QtCore import QObject, QRect, QSize, Qt, QTimer, Signal
 from PySide6.QtWidgets import QPushButton, QWidget
-from shared_ui.spacing import BUTTON_GAP, BUTTON_SIZE, GAP_SMALL
+from shared_ui.spacing import BUTTON_GAP, BUTTON_SIZE, MARGIN_STANDARD
 
 from origenerator import gallery
 from origenerator.gui import icons, square_buttons
@@ -28,7 +28,7 @@ def corner_gap() -> int:
 
 
 def corner_inset() -> int:
-    return square_buttons.landing(GAP_SMALL)
+    return square_buttons.landing(MARGIN_STANDARD)
 
 
 def size_a_corner_button(button: QPushButton) -> None:

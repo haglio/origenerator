@@ -27,6 +27,7 @@ from shared_ui.spacing import (
     MARGIN_STANDARD,
 )
 
+from origenerator.gui import square_buttons
 from origenerator.gui.dashed_edge import dashed_pen
 from origenerator.gui.flow_layout import FlowLayout
 
@@ -163,10 +164,8 @@ class PillRow(QWidget):
         self._flow = FlowLayout(self, spacing=GAP_SMALL)
         self._adder = QToolButton(objectName=adder_name)
         self._adder.setIcon(qt_icon("plus", color=TEXT_SECONDARY))
-        self._adder.setIconSize(QSize(_X_INK, _X_INK))
-        side = _height(self.fontMetrics())
-        self._adder.setFixedSize(side, side)
-        self._adder.setStyleSheet(_round(side))
+        square_buttons.square(self._adder)
+        self._adder.setStyleSheet(_round(self._adder.width()))
         self._adder.setCursor(Qt.CursorShape.PointingHandCursor)
         self._adder.setToolTip("Add an action")
         self._adder.clicked.connect(self._offer)

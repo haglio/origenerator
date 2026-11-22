@@ -19,6 +19,7 @@ from origenerator.gui.corner_buttons import (
     corner_size,
     enhance_state,
 )
+from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.media import MediaType
 
@@ -225,6 +226,28 @@ def test_taken_into_fun_time_they_grow_and_stay_in_their_corners(qtbot):
     assert {star.width(), trash.width(), plus.width()} == {BUTTON_SIZE}
     assert all(area.contains(corner) for corner in (star, trash, plus))
     assert (star.right(), trash.bottom()) == (plus.right(), plus.bottom())
+
+
+def test_they_stand_as_far_in_from_a_tiles_corner_as_its_image_or_video_icon_does(qtbot):
+    host, controls = _controls(qtbot)
+    area = QRect(0, 0, 120, 100)
+    icon = ItemTypeIcon(MediaType.IMAGE, host)
+
+    controls.place(area)
+
+    star, trash, _plus = (b.geometry() for b in controls.buttons())
+    assert (area.right() - star.right(), star.top(), trash.left()) == (icon.x(), icon.y(), icon.x())
+
+
+def test_a_tiles_image_or_video_icon_is_shrunk_as_its_corner_buttons_are(qtbot):
+    host = _controls(qtbot)[0]
+
+    standalone = ItemTypeIcon(MediaType.IMAGE, host)
+    square_buttons.draw_in_fun_time(True)
+    in_fun_time = ItemTypeIcon(MediaType.IMAGE, host)
+
+    assert (standalone.width(), in_fun_time.width()) == (
+        round(icons.ITEM_TYPE_ICON_SIZE * BUTTON_SIZE_HUD / BUTTON_SIZE), icons.ITEM_TYPE_ICON_SIZE)
 
 
 def test_they_land_one_to_a_corner_of_the_rectangle_they_are_given(qtbot):

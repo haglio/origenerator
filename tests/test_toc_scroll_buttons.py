@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QPoint, QSize
-from PySide6.QtWidgets import QAbstractItemView, QApplication
+from PySide6.QtWidgets import QAbstractItemView, QApplication, QLabel
 from shared_ui.icons import qt_icon
 from shared_ui.spacing import BUTTON_GAP, BUTTON_ICON_INSET, BUTTON_SIZE, BUTTON_SIZE_HUD
 
@@ -105,6 +105,18 @@ def test_in_fun_time_the_row_keeps_all_four_with_the_two_at_its_right_edge(qtbot
     assert toc.together_button.isVisible()
     assert _right_edge(toc, toc.top_button) == toc.width()
     assert _right_edge(toc, toc.current_folder_button) < toc.top_button.mapTo(toc, QPoint()).x()
+
+
+def test_in_fun_time_separate_and_together_show_no_words(qtbot):
+    toc, _rows = _toc_too_long_for_its_height(qtbot)
+    words = [button.parent().findChild(QLabel)
+             for button in (toc.separate_button, toc.together_button)]
+
+    toc.draw_at_the_huds_scale(hosted=True)
+    in_fun_time = [word.isVisible() for word in words]
+    toc.draw_at_the_huds_scale(hosted=False)
+
+    assert (in_fun_time, [word.isVisible() for word in words]) == ([False, False], [True, True])
 
 
 def test_in_fun_time_all_four_are_the_size_fun_times_gallery_pane_buttons_are(qtbot):

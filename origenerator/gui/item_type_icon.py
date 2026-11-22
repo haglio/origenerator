@@ -6,10 +6,9 @@ from PySide6.QtWidgets import QLabel, QWidget
 from shared_ui.spacing import BUTTON_RADIUS, GAP_SMALL, MARGIN_STANDARD
 from shared_ui.type_scale import SIZE_TINY, in_pixels
 
-from origenerator.gui import icons
+from origenerator.gui import icons, square_buttons
 from origenerator.timing import clock_duration
 
-_INSET = MARGIN_STANDARD
 _LENGTH_PADDING = GAP_SMALL
 _LENGTH_CSS = (
     f"background: {icons.ITEM_TYPE_ICON_GROUND.name(QColor.NameFormat.HexArgb)}; "
@@ -23,8 +22,7 @@ class ItemTypeIcon(QLabel):
     def __init__(self, media_type: str, tile: QWidget):
         super().__init__(tile)
         self.media_type = media_type
-        self._wear(media_type)
-        self.move(_INSET, _INSET)
+        self.draw_at_the_huds_scale_again()
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.raise_()
 
@@ -33,8 +31,13 @@ class ItemTypeIcon(QLabel):
             self.media_type = media_type
             self._wear(media_type)
 
+    def draw_at_the_huds_scale_again(self) -> None:
+        inset = square_buttons.landing(MARGIN_STANDARD)
+        self._wear(self.media_type)
+        self.move(inset, inset)
+
     def _wear(self, media_type: str):
-        pixmap = icons.item_type_icon(media_type)
+        pixmap = icons.item_type_icon(media_type, square_buttons.landing(icons.ITEM_TYPE_ICON_SIZE))
         self.setPixmap(pixmap)
         self.setFixedSize(pixmap.size())
 
@@ -44,8 +47,13 @@ class VideoLength(QLabel):
         super().__init__(clock_duration(round(seconds)), beside.parentWidget())
         self.setStyleSheet(_LENGTH_CSS)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setFixedHeight(beside.height())
-        self.adjustSize()
-        self.move(beside.geometry().right() + 1 + GAP_SMALL, beside.y())
+        self._beside = beside
+        self.draw_at_the_huds_scale_again()
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.raise_()
+
+    def draw_at_the_huds_scale_again(self) -> None:
+        beside = self._beside
+        self.setFixedHeight(beside.height())
+        self.adjustSize()
+        self.move(beside.geometry().right() + 1 + square_buttons.landing(GAP_SMALL), beside.y())

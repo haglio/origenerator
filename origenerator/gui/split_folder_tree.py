@@ -67,7 +67,11 @@ class _Choice(QFrame):
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
         row.addWidget(self.button)
-        row.addWidget(QLabel(word))
+        self._word = QLabel(word)
+        row.addWidget(self._word)
+
+    def show_its_word(self, shown: bool) -> None:
+        self._word.setVisible(shown)
 
     def draw_at(self, landing) -> None:
         square = landing(BUTTON_SIZE)
@@ -173,6 +177,7 @@ class SplitFolderTree(QWidget):
         self._choices.layout().set_row_spacing(landing(BUTTON_ROW_GAP))
         for choice in self._choices.findChildren(_Choice):
             choice.draw_at(landing)
+            choice.show_its_word(not hosted)
 
     def _build_radio(self) -> QWidget:
         separate = _Choice(_SEPARATE_WORD, folder_icons.separate_mark, _SEPARATE_TIP)

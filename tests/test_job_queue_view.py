@@ -6,12 +6,22 @@ from itertools import pairwise
 import pytest
 import shiboken6
 from PIL import Image
-from PySide6.QtCore import QBuffer, QCoreApplication, QEvent, QMimeData, QPoint, QPointF, QRect, Qt
+from PySide6.QtCore import (
+    QBuffer,
+    QCoreApplication,
+    QEvent,
+    QMimeData,
+    QPoint,
+    QPointF,
+    QRect,
+    QSize,
+    Qt,
+)
 from PySide6.QtGui import QDrag, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QMouseEvent, QPixmap
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QStyle, QStyleOptionButton
 from shared_ui.colors import BLUE, BORDER_SUBTLE
-from shared_ui.spacing import GAP_SMALL
+from shared_ui.spacing import BUTTON_SIZE_HUD, GAP_SMALL
 
 from origenerator.gui.combination import Combination
 from origenerator.gui.inflight import EMPTY_QUEUE_TEXT, InFlightItem, RunReading
@@ -543,6 +553,15 @@ def test_a_rows_text_elides_rather_than_widen_the_row_past_a_narrow_strip(queue)
     assert row.width() <= queue._scroll.viewport().width()
     assert row._lead.display_text(row._lead.width()).endswith("…")
     assert row._lead.text().endswith("past the Job Queue")
+
+
+def test_a_rows_arrows_and_shield_are_the_size_of_the_gallery_pane_buttons(queue):
+    queue.set_items([_item(key="a", cancel=lambda: None, shield=lambda _on: None)])
+    QApplication.processEvents()
+    (row,) = queue.rows()
+
+    assert {button.size() for button in (row._up, row._down, row._shield)} == {
+        QSize(BUTTON_SIZE_HUD, BUTTON_SIZE_HUD)}
 
 
 def test_every_rows_shield_sits_just_left_of_its_cancel(queue):

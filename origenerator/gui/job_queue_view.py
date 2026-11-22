@@ -15,10 +15,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from shared_ui.colors import BLUE, BORDER_SUBTLE
-from shared_ui.icon_button import fill_square_with_icon
-from shared_ui.spacing import BUTTON_ICON_INSET, GAP_MEDIUM, GAP_SMALL
+from shared_ui.spacing import BUTTON_ICON_INSET, BUTTON_SIZE, GAP_MEDIUM, GAP_SMALL
 
-from origenerator.gui import icons
+from origenerator.gui import icons, square_buttons
 from origenerator.gui.combination import Combination
 from origenerator.gui.combination_view import combination_pixmap
 from origenerator.gui.drag_thumbnail import DragOut
@@ -251,7 +250,7 @@ class QueueRow(OpensAFolder, QWidget):
         layout.addWidget(self._up)
         self._down = self._arrow(icons.move_down_icon(), MOVE_DOWN_TIP, self._on_down)
         layout.addWidget(self._down)
-        self._shield = fill_square_with_icon(QPushButton(), size=self.BUTTON_HEIGHT)
+        self._shield = square_buttons.square(QPushButton())
         self._shield.setProperty(CHOSEN, True)
         self._shield.setCheckable(True)
         self._shield.setIcon(icons.shield_icon())
@@ -277,7 +276,7 @@ class QueueRow(OpensAFolder, QWidget):
         self.update_item(item)
 
     def _arrow(self, icon, tooltip: str, pressed) -> QPushButton:
-        arrow = fill_square_with_icon(QPushButton(), size=self.BUTTON_HEIGHT)
+        arrow = square_buttons.square(QPushButton())
         arrow.setIcon(icon)
         arrow.setToolTip(tooltip)
         arrow.clicked.connect(pressed)
@@ -434,7 +433,7 @@ class JobQueueView(QWidget):
         stack.addStretch(1)
         self._shield_all = QPushButton(SHIELD_ALL_TEXT)
         self._shield_all.setIcon(icons.shield_icon())
-        mark = QueueRow.BUTTON_HEIGHT - 2 * BUTTON_ICON_INSET
+        mark = square_buttons.landing(BUTTON_SIZE) - 2 * BUTTON_ICON_INSET
         self._shield_all.setIconSize(QSize(mark, mark))
         self._shield_all.setToolTip(SHIELD_ALL_TIP)
         self._shield_all.clicked.connect(self._shield_every_job)

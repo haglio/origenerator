@@ -314,6 +314,9 @@ class ParamForm(QWidget):
     def request_exchange(self) -> RequestExchange | None:
         return self._request_exchange
 
+    def reads(self, key: str) -> bool:
+        return key not in self._shut_down
+
     def request_section(self) -> CollapsibleSection | None:
         return self._request_section
 

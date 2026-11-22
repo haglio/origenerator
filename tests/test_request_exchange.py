@@ -8,6 +8,7 @@ from shared_ui.spacing import MARGIN_STANDARD
 from shared_ui.testing import appending_to
 
 from origenerator.db_requests import Turn
+from origenerator.gui.cancel_bar import CancelBar
 from origenerator.gui.generate_button import GenerateButton
 from origenerator.gui.inflight import RunReading
 from origenerator.gui.progress_bar import ProgressBar
@@ -594,6 +595,49 @@ def test_a_turn_whose_item_is_being_made_shows_its_progress_until_the_thumbnail_
     exchange.note_in_flight({})
 
     assert (_placed(exchange, ProgressBar), _thumbnails_shown(exchange)) == ([], ["first"])
+
+
+def test_the_progress_of_a_turn_being_made_cancels_that_item_on_a_click(qtbot):
+    exchange = _shown_at(qtbot, 400)
+    exchange.show_exchange([_changed("a cap", made="first")])
+    exchange.note_in_flight({"first": RunReading(status="running", progress=(3, 10))})
+    (bar,) = _placed(exchange, CancelBar)
+
+    asked = []
+    exchange.cancel_asked.connect(asked.append)
+
+    qtbot.mouseClick(bar, Qt.MouseButton.LeftButton)
+    until(lambda: asked)
+
+    assert asked == ["first"]
+    assert bar.toolTip() == "Cancel this generation"
+
+
+def test_the_progress_of_a_turn_being_made_reads_cancel_under_the_pointer(qtbot, monkeypatch):
+    exchange = _shown_at(qtbot, 400)
+    exchange.show_exchange([_changed("a cap", made="first")])
+    exchange.note_in_flight({"first": RunReading(status="running", progress=(3, 10))})
+    (bar,) = _placed(exchange, CancelBar)
+    assert bar.text() != "Cancel"
+
+    monkeypatch.setattr(QApplication, "widgetAt", lambda *_where: _placed(exchange, CancelBar)[0])
+    exchange.note_in_flight({"first": RunReading(status="running", progress=(4, 10))})
+
+    (redrawn,) = _placed(exchange, CancelBar)
+    assert redrawn is not bar
+    assert redrawn.text() == "Cancel"
+
+
+def test_a_generate_refused_says_why_on_its_own_button_and_fits_the_words(qtbot):
+    exchange = _shown_at(qtbot, 400)
+    exchange.show_exchange([_changed("a cap"), _changed("red")])
+    first, second = _placed(exchange, GenerateButton)
+    width = second.width()
+
+    exchange.refuse_generate(1, "Resolve duplicates first")
+
+    assert (first.text(), second.text()) == ("Generate", "Resolve duplicates first")
+    assert second.width() > width
 
 
 def test_auto_generate_sits_at_the_end_of_the_line_and_starts_off(qtbot):

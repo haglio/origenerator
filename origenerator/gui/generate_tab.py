@@ -30,6 +30,7 @@ from origenerator import (
     gallery,
     request_settings,
 )
+from origenerator.box_breaks import unboxed
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import (
     COMFYUI_INPUT_DIR,
@@ -111,6 +112,7 @@ from origenerator.gui.param_form import (
     WorkflowRow,
     WorkflowTraits,
 )
+from origenerator.gui.prompt_marks import RESOLVE_DUPLICATES
 from origenerator.gui.related_media import RelatedLookups, RelatedMedia
 from origenerator.gui.request_aims import RequestAim, RequestAims
 from origenerator.gui.request_answering import RequestAnswerer
@@ -122,6 +124,7 @@ from origenerator.library_views import NO_VIEWS, LibraryViews, TabViews
 from origenerator.media import MediaType, ShownFile
 from origenerator.one_look import one_look
 from origenerator.osr2_driver import drive_target_for
+from origenerator.prompt_checks import duplicate_things
 from origenerator.prompt_tokens import prompt_readings
 from origenerator.published_actions import set_many_actions
 from origenerator.regeneration import (
@@ -220,6 +223,7 @@ class GenerateTab(DropZones):
     go_to_folder_requested = Signal(str)
     generate_requested = Signal(str, list)
     turn_generate_requested = Signal(str, dict, dict, bool)
+    turn_cancel_requested = Signal(str)
     modify_batch_requested = Signal(str, str, dict)
     cancel_requested = Signal()
     how_many_chosen = Signal(int)
@@ -742,6 +746,7 @@ class GenerateTab(DropZones):
         if form.request_exchange() is not None:
             form.request_exchange().asked.connect(self._on_request_asked)
             form.request_exchange().generate_asked.connect(self._generate_from_turn)
+            form.request_exchange().cancel_asked.connect(self.turn_cancel_requested)
             form.request_exchange().item_activated.connect(self.link_clicked)
             form.request_exchange().set_auto_generate(self._request_auto_generate)
             form.request_exchange().auto_generate_chosen.connect(
@@ -1454,11 +1459,19 @@ class GenerateTab(DropZones):
 
     def _generate_from_turn(self, index: int) -> None:
         launch = self._turn_launch(index)
-        if launch is None:
+        if launch is None or self._refused_over_duplicates(index, launch[1]):
             return
         self._turn_being_made = index
         self.turn_generate_requested.emit(
             *launch, self._request_aim.is_nearest_the_end_of_the_made(index))
+
+    def _refused_over_duplicates(self, index: int, params: dict) -> bool:
+        refused = any(duplicate_things(unboxed(params.get(key) or ""))
+                      for key in ("positive_prompt", "negative_prompt")
+                      if self._param_form.reads(key))
+        if refused:
+            self._param_form.request_exchange().refuse_generate(index, RESOLVE_DUPLICATES)
+        return refused
 
     def _still_there(self, prompt_id: str) -> bool:
         row = self._db.get_generation(prompt_id)

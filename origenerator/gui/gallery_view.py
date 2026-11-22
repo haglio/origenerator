@@ -639,6 +639,7 @@ class GalleryView(QWidget):
             app.aboutToQuit.connect(self._radio.stop)
         self.generate_pane.generate_requested.connect(self._on_generate_requested)
         self.generate_pane.turn_generate_requested.connect(self._on_turn_generate_requested)
+        self.generate_pane.turn_cancel_requested.connect(self._cancel_job)
         self.generate_pane.modify_batch_requested.connect(self._on_modify_batch_requested)
         self.generate_pane.folder_requested.connect(self._go_to_folder)
         generate_pane = QWidget()

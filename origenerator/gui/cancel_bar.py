@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QCursor
+from PySide6.QtWidgets import QApplication
 
 from origenerator.gui.deferred import defer
 from origenerator.gui.inflight import CANCEL_TEXT
@@ -33,6 +35,9 @@ class CancelBar(ProgressBar):
     def leaveEvent(self, event):
         self._hover(False)
         super().leaveEvent(event)
+
+    def hover_if_the_pointer_is_on_it(self) -> None:
+        self._hover(QApplication.widgetAt(QCursor.pos()) is self)
 
     def _hover(self, hovered: bool) -> None:
         self._hovered = hovered

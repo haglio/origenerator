@@ -65,6 +65,7 @@ def test_the_videos_found_are_the_outbox_videos_this_app_did_not_make(tmp_path):
     found = _filed(tmp_path, "portrait", "a-site", "clip1_topaz.mp4")
     _filed(tmp_path, "landscape", "this-app", "made-here_topaz.mp4")
     _filed(tmp_path, "portrait", "a-site", "half.partial.mp4")
+    _filed(tmp_path, "portrait", "a-site", "clip1_topaz [Conflicted].mp4")
     _filed(tmp_path, "portrait", "a-site", "notes.txt")
     _filed(tmp_path, "portrait", "a-site", "wan22_i2v_00001__topaz.mp4")
     held = [{"prompt_id": "g1", "output_files": json.dumps([{"filename": "wan22_i2v_00001_.mp4"}])}]

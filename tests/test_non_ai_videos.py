@@ -88,6 +88,7 @@ def test_a_scan_brings_each_non_ai_video_in_once_from_where_it_is_kept(tmp_path)
     db, places = Database(tmp_path / "test.db"), _library(tmp_path)
     kept = write_mp4(places.videos / "sample" / "full" / "video one.mp4")
     write_mp4(places.videos / "sample" / "full" / "video two.partial.mp4")
+    write_mp4(places.videos / "sample" / "full" / "video one [conflicted 2].mp4")
 
     assert (scan(db, places), scan(db, places)) == (1, 0)
     [row] = _videos(db)

@@ -17,7 +17,7 @@ from app_support.video_names import (
 )
 
 from origenerator import config
-from origenerator.evolver_export import PARTIAL_MARKER
+from origenerator.evolver_export import could_be_a_finished_video
 from origenerator.generation_state import GenerationSource, GenerationStatus
 from origenerator.media import MediaType, media_type_from_filename
 from origenerator.one_at_a_time import WAIT_S
@@ -198,7 +198,7 @@ def tell_fun_time_of_favorites(rows, favorite: bool, records: Path, *,
 
 def non_ai_videos(folder: Path) -> list[Path]:
     return sorted(path for path in (folder.rglob("*") if folder.is_dir() else ())
-                  if path.is_file() and PARTIAL_MARKER not in path.name
+                  if path.is_file() and could_be_a_finished_video(path.name)
                   and media_type_from_filename(path.name) == MediaType.VIDEO)
 
 

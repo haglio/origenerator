@@ -169,7 +169,7 @@ class GalleryEdits:
                 [path for files in by_row for path in files]
                 + [video for copies in in_play for _place, video in copies],
                 the_item_stays=the_item_stays)
-        batches = [(row, self._trash.store(files)) for row, files in zip(rows, by_row, strict=True)]
+        batches = list(zip(rows, self._trash.store_each(by_row), strict=True))
         for (_row, batch), copies in zip(batches, in_play, strict=True):
             batch.out_of_play = [taken for place, video in copies
                                  if (taken := take_out_of_play(place, video)) is not None]

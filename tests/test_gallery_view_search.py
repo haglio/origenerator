@@ -142,6 +142,16 @@ def test_esc_in_the_search_field_clears_the_search(qtbot):
     assert not view._gallery_pane.showing_search()
 
 
+def test_esc_in_the_empty_search_field_leaves_it(qtbot):
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
+    _on_screen(qtbot, view, 1200, 800)
+    view.search.focus_field()
+
+    qtbot.keyPress(view.search.field, Qt.Key.Key_Escape)
+
+    assert not view.search.field.hasFocus()
+
+
 def test_the_tree_selection_is_what_the_search_covers(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA", prompt="a cat")]
     view = GalleryView(database_of(rows))

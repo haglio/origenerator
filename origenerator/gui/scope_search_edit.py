@@ -47,8 +47,11 @@ class ScopeSearchEdit(QLineEdit):
             self._render_placeholder()
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Escape and self.text():
-            self.clear()
+        if event.key() == Qt.Key.Key_Escape:
+            if self.text():
+                self.clear()
+            else:
+                self.clearFocus()
             return
         super().keyPressEvent(event)
 

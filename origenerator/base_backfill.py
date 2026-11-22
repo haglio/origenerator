@@ -124,7 +124,6 @@ def render_base_now(client, workflow, params: dict, *,
             continue
         files, _thumb, _duration = extract_completion(
             workflow, history, OutputFolders(OUTPUT_PLACES, THUMB_DIR), prompt_id,
-            params=params,
         )
         return files
     logger.warning("Base re-render %s did not land within %ss",

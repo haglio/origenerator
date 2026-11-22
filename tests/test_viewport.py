@@ -12,11 +12,7 @@ from PySide6.QtMultimedia import QMediaMetaData, QMediaPlayer, QVideoFrame
 from PySide6.QtWidgets import QApplication, QWidget
 
 from origenerator.fun_time_mode import FunestraChannel
-from origenerator.funscript import (
-    funscript_path_for,
-    synthesize_actions,
-    write_funscript,
-)
+from origenerator.funscript import funscript_path_for
 from origenerator.gui import corner_buttons, drag_thumbnail, icons, omnipause, viewport
 from origenerator.gui.combination import Combination
 from origenerator.gui.drag_thumbnail import THUMBNAIL_MAX
@@ -27,6 +23,7 @@ from origenerator.gui.viewport import Viewport
 from origenerator.media import MediaType, ShownFile
 from origenerator.output_places import OutputPlaces
 from tests.drawn_on_the_graphics_card import drawn_on_the_graphics_card
+from tests.funscript_files import back_and_forth_actions, write_funscript
 from tests.heard_drags import HeardDrags
 from tests.media_files import write_mp4
 from tests.slideshow_support import stop_the_poll_to_tick_by_hand
@@ -35,7 +32,7 @@ from tests.slideshow_support import stop_the_poll_to_tick_by_hand
 def _scripted_video(tmp_path, name="clip.mp4"):
     vid = tmp_path / name
     write_funscript(vid.with_suffix(".funscript"),
-                    synthesize_actions(2.0, hz=1.0))
+                    back_and_forth_actions(2.0, hz=1.0))
     return vid
 
 
@@ -547,7 +544,7 @@ def test_a_script_in_the_scripts_folder_fills_the_timeline(qtbot, tmp_path, monk
     vid = tmp_path / "video" / "filed.mp4"
     vid.parent.mkdir()
     write_funscript(funscript_path_for(vid, places=OutputPlaces.in_one_folder(tmp_path)),
-                    synthesize_actions(2.0, hz=1.0))
+                    back_and_forth_actions(2.0, hz=1.0))
 
     w = _scrubber_preview(qtbot)
     w.show_video(vid)

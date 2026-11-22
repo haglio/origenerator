@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from app_support.funscript import read_actions
-
 from origenerator import config
-from origenerator.funscript import library_funscript_of, video_duration_seconds
+from origenerator.funscript import video_duration_seconds
 from origenerator.media import MediaType, video_frame_size
 from origenerator.workflows.base import (
     DURATION_OPTIONS,
@@ -15,7 +13,7 @@ from origenerator.workflows.base import (
     chained_frames,
 )
 from origenerator.workflows.derived_size import scale_to_total_pixels
-from origenerator.workflows.driving_video import driven_actions, frames_within, start_frame
+from origenerator.workflows.driving_video import frames_within, start_frame
 from origenerator.workflows.frame_rate import MAX_PLAYBACK_FPS, NATIVE_FPS
 from origenerator.workflows.lora_rows import LORA_KEYS, lora_defaults, lora_rows, picked_loras
 from origenerator.workflows.model_arch import WAN, WAN_ANIMATE, WAN_I2V
@@ -98,16 +96,6 @@ class Wan22AnimateWorkflow(WorkflowTemplate):
     def derived_display_size(self, params: dict) -> tuple[int, int] | None:
         size = video_frame_size(params.get("video") or "")
         return scale_to_total_pixels(*size) if size else None
-
-    def authored_actions(self, params: dict) -> list[dict] | None:
-        script = library_funscript_of(params.get("video") or "", videos_dir=config.LIBRARY_VIDEOS_DIR,
-                                      scripts_dir=config.LIBRARY_SCRIPTS_DIR)
-        actions = read_actions(script)
-        if not actions:
-            return None
-        params = self._within_the_video(params)
-        return driven_actions(actions, start_ms=_ms(start_frame(params["video_start"])),
-                              length_ms=_ms(self.video_frames(self.scene_plan(params))))
 
     @staticmethod
     def _within_the_video(params: dict) -> dict:
@@ -258,7 +246,3 @@ class Wan22AnimateWorkflow(WorkflowTemplate):
                 "scale_stick_for_xinsr_cn": "disable",
             },
         }
-
-
-def _ms(frames: int) -> int:
-    return round(frames / NATIVE_FPS * 1000)

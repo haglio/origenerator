@@ -507,8 +507,8 @@ in or held in Trash, so a deleted video's filename goes to a later one once
 Trash has let the deleted one go, and two videos
 can share a name: in two folders, or in one folder as an mp4 and a webm. So a
 script is filed where its video is, under the video's whole filename
-(`funscript_path_for`), and moves with the video when the app follows a move;
-completion writes each finished video's script over whatever was filed there.
+(`funscript_path_for`), where Evolver's Make funscripts files GoblinScript's,
+and moves with the video when the app follows a move.
 Older scripts are filed by the name without its type, or beside the video, and
 anything that carries one of those to a video by name -- a copy into Evolver's
 library, say -- first checks that the two are the same length. A one-off copy
@@ -730,22 +730,17 @@ is the two hooks that call the guard, below.
 A new command here gets a line in this list and a test, or it is invisible by
 the time anyone needs it.
 
-## A change to how a video is scripted is finished by the sweep
+## This app writes no funscript: GoblinScript makes every video's
 
-A video's funscript is synthesized once, when the video finishes. So a change to
-the pace (`config.MOTION_DEFAULT_SPEED`) or to what `synthesize_actions` writes
-reaches only the videos made after it lands, and the library goes on moving the
-device the old way: when the pace came down from 72 cycles a minute to the Robot
-Hand's 29, the user had to ask for the videos he already had to follow
-(2026-09-21). `origenerator.funscript_backfill` is what carries such a change
-back: it rewrites every script that is one of the app's own metronomes at
-another pace, writes one for any video with none, and leaves alone every script
-that follows its own video — ATI's, a measured one, a hand-made one — which it
-tells apart by shape, since most of the library's scripts predate the creator
-stamp. Run it once when such a change lands, from the production checkout, as
-`python -c "from origenerator.funscript_backfill import main; main()"`: spelled
-with `-m` it names the package first, and the hook that keeps the app's window
-off his screen refuses it.
+A finished video is filed with no funscript. Evolver's Make funscripts has
+GoblinScript make one in its next run or two and files it where
+`funscript_path_for` says, and this app reads and plays it from there (his
+decision, 2026-11-22: "Origenerator should not save its own funscript. that
+whole feature can be removed"). That took out the back-and-forth motion this
+app wrote for each video at a set pace, the sweep that rewrote that motion,
+and the Animate workflow's copy of the part of its source video's funscript it
+used. So nothing here writes a funscript again, and a video newer than
+Evolver's last run moves the OSR2 not at all until GoblinScript's arrives.
 
 ## Each Genau flick gets a finale, made while the app is closed
 

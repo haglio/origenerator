@@ -6,16 +6,12 @@ from pathlib import Path
 from app_support.funscript import read_actions
 
 from origenerator.db import Database, NewGeneration
-from origenerator.funscript import (
-    funscript_of,
-    funscript_path_for,
-    synthesize_actions,
-    write_funscript,
-)
+from origenerator.funscript import funscript_of, funscript_path_for
 from origenerator.gallery import output_file_path, resolve_preview
 from origenerator.importer import import_comfyui_output
 from origenerator.output_places import OutputPlaces
 from origenerator.relocate import relocate_moved_outputs
+from tests.funscript_files import back_and_forth_actions, write_funscript
 
 
 def _library(tmp_path, rows):
@@ -180,14 +176,14 @@ def test_a_moved_videos_script_moves_with_it(tmp_path):
     db, output_dir = _library(tmp_path, {"a": [_file("wan22_i2v_00001_.mp4", "video")]})
     was = output_dir / "video" / "wan22_i2v_00001_.mp4"
     write_funscript(funscript_path_for(was, places=OutputPlaces.in_one_folder(output_dir)),
-                    synthesize_actions(2.0, hz=1.0))
+                    back_and_forth_actions(2.0, hz=1.0))
     moved = output_dir / "tidied" / "wan22_i2v_00001_.mp4"
     moved.parent.mkdir()
     moved.write_bytes(b"mp4")
 
     relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir))
 
-    assert read_actions(funscript_of(moved, places=OutputPlaces.in_one_folder(output_dir))) == synthesize_actions(
+    assert read_actions(funscript_of(moved, places=OutputPlaces.in_one_folder(output_dir))) == back_and_forth_actions(
         2.0, hz=1.0)
 
 
@@ -195,23 +191,23 @@ def test_a_script_already_where_a_video_went_is_left_as_it_is(tmp_path):
     db, output_dir = _library(tmp_path, {"a": [_file("wan22_i2v_00001_.mp4", "video")]})
     write_funscript(funscript_path_for(output_dir / "video" / "wan22_i2v_00001_.mp4",
                                        places=OutputPlaces.in_one_folder(output_dir)),
-                    synthesize_actions(2.0, hz=1.0))
+                    back_and_forth_actions(2.0, hz=1.0))
     moved = output_dir / "tidied" / "wan22_i2v_00001_.mp4"
     moved.parent.mkdir()
     moved.write_bytes(b"mp4")
     already = funscript_path_for(moved, places=OutputPlaces.in_one_folder(output_dir))
-    write_funscript(already, synthesize_actions(5.0, hz=1.0))
+    write_funscript(already, back_and_forth_actions(5.0, hz=1.0))
 
     assert relocate_moved_outputs(db, OutputPlaces.in_one_folder(output_dir)) == 1
 
-    assert read_actions(already) == synthesize_actions(5.0, hz=1.0)
+    assert read_actions(already) == back_and_forth_actions(5.0, hz=1.0)
 
 
 def test_a_script_that_will_not_move_leaves_its_video_followed(tmp_path, monkeypatch):
     db, output_dir = _library(tmp_path, {"a": [_file("wan22_i2v_00001_.mp4", "video")]})
     write_funscript(funscript_path_for(output_dir / "video" / "wan22_i2v_00001_.mp4",
                                        places=OutputPlaces.in_one_folder(output_dir)),
-                    synthesize_actions(2.0, hz=1.0))
+                    back_and_forth_actions(2.0, hz=1.0))
     (output_dir / "tidied").mkdir()
     (output_dir / "tidied" / "wan22_i2v_00001_.mp4").write_bytes(b"mp4")
 

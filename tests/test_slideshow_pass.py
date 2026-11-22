@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from origenerator.funscript import synthesize_actions, write_funscript
 from origenerator.gui import slideshow_pass
 from origenerator.gui.slideshow_pass import playlist_item, rotated_onto
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
+from tests.funscript_files import back_and_forth_actions, write_funscript
 
 
 @dataclass
@@ -40,7 +40,7 @@ def test_an_upscale_another_site_made_plays_with_the_script_filed_for_it_in_the_
     upscale = library / "kino" / "2D" / "AI" / "landscape" / "example_site" / "video_one_topaz.mp4"
     script = tmp_path / "videos" / "scripts" / "scripts" / "kino" / "2D" / "AI" / "landscape" / (
         "example_site/video_one_topaz.funscript")
-    write_funscript(script, synthesize_actions(2.0, hz=1.0))
+    write_funscript(script, back_and_forth_actions(2.0, hz=1.0))
     monkeypatch.setattr(slideshow_pass, "OUTPUT_PLACES",
                         OutputPlaces.in_one_folder(tmp_path / "output", library=library))
 

@@ -402,8 +402,8 @@ class GenerationJob(QObject):
         self._detach()
         held_before, self._state = self._state, JobState.FINISHING
         canceled = self._filing_canceled = threading.Event()
-        workflow, places, thumb_dir, prompt_id, params = (
-            self.workflow, self._places, self._thumb_dir, self.prompt_id, self.params)
+        workflow, places, thumb_dir, prompt_id = (
+            self.workflow, self._places, self._thumb_dir, self.prompt_id)
         video = self.media_type == MediaType.VIDEO
 
         def file_what_it_made():
@@ -412,7 +412,7 @@ class GenerationJob(QObject):
             if canceled.is_set():
                 return None
             return extract_completion(workflow, history_data, OutputFolders(places, thumb_dir),
-                                      prompt_id, params=params)
+                                      prompt_id)
 
         self._filing = Errand(file_what_it_made,
                               lambda filing: self._filed(filing, held_before)).send(

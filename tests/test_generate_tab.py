@@ -59,11 +59,7 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database, NewGeneration, NewRequest
 from origenerator.db_requests import Turn
-from origenerator.funscript import (
-    funscript_path_for,
-    synthesize_actions,
-    write_funscript,
-)
+from origenerator.funscript import funscript_path_for
 from origenerator.gallery import media_type_of_row as gallery_media_type
 from origenerator.gallery.keys import folder_id, settings_key
 from origenerator.gallery.tree import settings_folder_key
@@ -107,6 +103,7 @@ from origenerator.workflows.model_arch import KREA2, WAN
 from origenerator.workflows.model_files import NO_LORA
 from tests import drops
 from tests.comfyui_folders import SUITE_FOLDERS
+from tests.funscript_files import back_and_forth_actions, write_funscript
 from tests.gallery_view_support import _struck_and_lit
 from tests.marked_words import words_shown
 from tests.qt_exec import faking_exec
@@ -2377,7 +2374,7 @@ def test_video_without_a_known_source_hides_the_link(saved_panel, kept):
 
 
 def _script_for(video_path, output_dir=None):
-    actions = synthesize_actions(2.0, hz=1.0)
+    actions = back_and_forth_actions(2.0, hz=1.0)
     dest = (video_path.with_suffix(".funscript") if output_dir is None
             else funscript_path_for(video_path, places=OutputPlaces.in_one_folder(output_dir)))
     write_funscript(dest, actions)

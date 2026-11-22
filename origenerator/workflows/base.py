@@ -304,9 +304,6 @@ class WorkflowTemplate(ABC):
     def payload_for_comfyui(self, params: dict) -> dict:
         return _without_box_breaks(self.build_api_payload(params))
 
-    def authored_actions(self, params: dict) -> list[dict] | None:
-        return None
-
     @staticmethod
     def lora_chain(node_id: str, model_ref, loras, clip_ref=None) -> LoraChain:
         nodes: dict = {}

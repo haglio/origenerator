@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 from app_support import flick_folder, haglio_settings, kino_folder, siblings
-from funestra.robot_hand import bpm_for_speed
 
 from origenerator.branch_session import THIS_CHECKOUT, is_branch_session
 from origenerator.content import load_content
@@ -97,7 +96,6 @@ COMFYUI_DIR = LIBRARY_ROOT / "projects" / "ComfyUIApp" / "ComfyUI"
 
 
 LIBRARY_VIDEOS_DIR = LIBRARY_ROOT / "videos" / "videos"
-LIBRARY_SCRIPTS_DIR = LIBRARY_ROOT / "videos" / "scripts" / "scripts"
 
 EVOLVER_AI_DIR = LIBRARY_VIDEOS_DIR / "2D" / "AI"
 NON_AI_DIR = LIBRARY_VIDEOS_DIR / "2D" / "non_AI"
@@ -130,9 +128,6 @@ COMFYUI_PORT = 8188
 
 
 CUSTOM_POSES_DIR = LIBRARY_ROOT / "images" / "custom_poses"
-
-MOTION_DEFAULT_SPEED = 50
-MOTION_DEFAULT_HZ = bpm_for_speed(MOTION_DEFAULT_SPEED) / 60
 
 VOICE_MODEL_NAME = "vosk-model-en-us-0.22-lgraph"  # the vosk model Fun Time listens with; cached under ~/.cache/vosk
 # Windows has made a dead headset microphone the default input before.

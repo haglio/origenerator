@@ -21,11 +21,7 @@ from shared_ui.testing import appending_to
 
 from origenerator import fun_time_mode, osr2_driver
 from origenerator.fun_time_mode import FunestraChannel
-from origenerator.funscript import (
-    funscript_path_for,
-    synthesize_actions,
-    write_funscript,
-)
+from origenerator.funscript import funscript_path_for
 from origenerator.gui import frame_files, funestra_slideshow, slideshow_pass
 from origenerator.gui.frame_files import FrameFiles
 from origenerator.gui.funestra_slideshow import (
@@ -45,6 +41,7 @@ from origenerator.one_look import one_look
 from origenerator.output_places import OutputPlaces
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState, in_order
 from origenerator.slideshow_buttons import LOCK_ON_LED_BY_THE_SESSION, answer
+from tests.funscript_files import back_and_forth_actions, write_funscript
 from tests.slideshow_support import (
     deleting_through_the_gallery,
     slides_named,
@@ -351,7 +348,7 @@ def test_the_osr2_follows_nothing_on_a_session_s_funestra(qtbot, tmp_path, monke
     monkeypatch.setattr(osr2_driver, "OUTPUT_PLACES", places)
     script = funscript_path_for("clip.mp4", places=places)
     script.parent.mkdir(parents=True)
-    write_funscript(script, synthesize_actions(2.0, hz=1.0))
+    write_funscript(script, back_and_forth_actions(2.0, hz=1.0))
     slideshow = _slideshow(qtbot, tmp_path, items=[("clip.mp4", "video", "id-1")])
 
     assert slideshow.osr2_drive_target() is None, (

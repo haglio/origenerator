@@ -90,8 +90,7 @@ def _record(db, row, workflow, history: dict, folders: OutputFolders) -> bool:
         return False
     prompt_id = row["prompt_id"]
     files, thumb, duration = extract_completion(
-        workflow, history, folders, prompt_id,
-        params=parse_params(row.get("params_json")))
+        workflow, history, folders, prompt_id)
     if not files:
         return False
     mark_generation_completed(db, prompt_id, files, thumb, duration)

@@ -18,7 +18,7 @@ from origenerator.gui.combination import (
     paren_width,
     plus_width,
 )
-from origenerator.gui.looping_preview import fit_size, play_gray_in
+from origenerator.gui.looping_preview import fit_size, play_gray_in, put_down
 from origenerator.gui.queue_thumbs import fitted_cell
 
 _HEIGHT_SHARE = 0.8
@@ -154,8 +154,7 @@ class CombinationView(QWidget):
 
     def _stop_movie(self) -> None:
         if self._movie is not None:
-            self._movie.stop()
-            self._movie.deleteLater()
+            put_down(self._movie)
             self._movie = None
 
     def resizeEvent(self, event):

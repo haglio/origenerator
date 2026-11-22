@@ -27,7 +27,7 @@ from shared_ui.icons import draw_icon_filling
 from shared_ui.spacing import GAP_SMALL
 
 from origenerator.gui.grayscale import grayscale_pixmap
-from origenerator.gui.looping_preview import looping_movie
+from origenerator.gui.looping_preview import looping_movie, put_down
 from origenerator.gui.no_wheel import NoWheelDropdown
 from origenerator.gui.queue_thumbs import fitted_thumbnail
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX
@@ -242,9 +242,8 @@ class ThumbnailDropdown(NoWheelDropdown):
 
     def _stop_playing(self) -> None:
         for movie in self.findChildren(QMovie):
-            movie.stop()
             movie.setObjectName("")
-            movie.deleteLater()
+            put_down(movie)
 
     def _row_option(self) -> QStyleOptionViewItem:
         view = self.view()

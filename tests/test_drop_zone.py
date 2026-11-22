@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 from PIL import Image
@@ -182,6 +183,16 @@ def test_a_video_preview_animates(qtbot, tmp_path):
     movie = zone._label.movie()
     assert isinstance(movie, QMovie)
     assert movie.state() == QMovie.MovieState.Running
+
+
+def test_emptying_a_zone_lets_go_of_the_file_it_was_looping(qtbot, tmp_path):
+    webp = _write_looping_webp(tmp_path / "v1_anim.webp")
+    zone = _zone(qtbot, kind="video", lookups=replace(_NO_LOOKUPS, preview=lambda pid: (None, webp)))
+    _drop(zone, "vid1")
+
+    zone.clear()
+
+    Path(webp).rename(tmp_path / "moved.webp")
 
 
 def test_emptying_a_zone_stops_the_clip_it_was_looping(qtbot, tmp_path):

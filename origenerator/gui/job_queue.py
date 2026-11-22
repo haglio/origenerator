@@ -32,6 +32,7 @@ from origenerator.gui.job_records import (
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.media import MediaType
 from origenerator.run_toast import RunOutcome
+from origenerator.setting_advice import files_not_installed, made_with_files_not_installed
 from origenerator.timing import JOB_QUEUE_CLOCK, elapsed_since
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -243,20 +244,27 @@ class JobQueue(QObject):
         workflow = WORKFLOW_REGISTRY[row["workflow_name"]]
         video_params = prepared_params(row, workflow) if new_video else filled_params(row, workflow)
         source = self._reroll_source_image(row, image_rows) if new_image else None
+        video_plan = JobPlan(workflow, video_params)
         if source is None:
             if not new_video:
                 return
-            self._launch(key, JobPlan(workflow, video_params), self._on_finished)
+            plan, also_needs, on_finished = video_plan, (), self._on_finished
         else:
             source_row, image_workflow = source
-            self._launch(
-                key,
-                JobPlan(image_workflow, prepared_params(source_row, image_workflow),
-                        run_media_type=workflow.output_type),
-                lambda k, job, files, thumb, dur: self._on_image_finished(
-                    k, job, (files, thumb, dur), workflow, video_params
-                ),
-            )
+            plan = JobPlan(image_workflow, prepared_params(source_row, image_workflow),
+                           run_media_type=workflow.output_type)
+            also_needs = (video_plan,)
+
+            def on_finished(k, job, files, thumb, dur):
+                self._on_image_finished(k, job, (files, thumb, dur), workflow, video_params)
+        missing = list(dict.fromkeys(
+            name for needed in (plan, *also_needs)
+            for name in files_not_installed(needed.params, needed.workflow)))
+        if missing:
+            logger.info("Did not re-roll %s: it was made with files no longer installed", key)
+            self.failed.emit(key, made_with_files_not_installed(missing))
+            return
+        self._launch(key, plan, on_finished)
 
     def _reroll_source_image(self, row: dict, image_rows: list[dict]):
         picked = gallery.rebuildable_source_image(row, image_rows)

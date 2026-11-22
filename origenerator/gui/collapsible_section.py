@@ -154,7 +154,12 @@ class CollapsibleSection(QWidget):
         self._apply_state()
 
     def _toggle(self):
-        self._collapsed = not self._collapsed
+        self.fold_as_if_pressed(not self._collapsed)
+
+    def fold_as_if_pressed(self, collapsed: bool) -> None:
+        if collapsed == self._collapsed:
+            return
+        self._collapsed = collapsed
         self._apply_state()
         self.toggled.emit()
 

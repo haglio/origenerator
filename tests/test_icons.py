@@ -173,7 +173,7 @@ def test_an_item_type_mark_is_a_white_glyph_on_a_translucent_dark_ground(qtbot):
 
 def test_the_mark_among_words_is_drawn_without_the_ground(qtbot):
     for media_type in (MediaType.IMAGE, MediaType.VIDEO):
-        drawn = icons.media_type_icon(media_type).pixmap(icons._ITEM_TYPE_ICON_SIZE).toImage()
+        drawn = icons.media_type_icon(media_type).pixmap(icons.ITEM_TYPE_ICON_SIZE).toImage()
         ground = drawn.pixelColor(drawn.width() // 2, 3)
         inked = any(drawn.pixelColor(x, y).alpha() > 40 for x in range(drawn.width())
                     for y in range(drawn.height()))

@@ -4,6 +4,7 @@ import shiboken6
 from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
 from PySide6.QtGui import QEnterEvent
 from PySide6.QtWidgets import QApplication, QPushButton
+from shared_ui import tooltip_look
 from shared_ui.testing import appending_to
 
 from origenerator.gui.link_tip import LinkTip, link
@@ -161,3 +162,20 @@ def test_a_tip_beside_the_screens_bottom_opens_above_its_widget(qtbot):
 
     assert screen.contains(shown)
     assert shown.bottom() < button.frameGeometry().top()
+
+
+def test_the_tip_wears_the_one_haglio_tooltip_look(qtbot):
+    button, tip = _watched(qtbot)
+    _enter(button)
+    tip._appear.timeout.emit()
+
+    drawn = tip._popup.grab().toImage()
+    corner = drawn.pixelColor(0, 0)
+    middle = drawn.pixelColor(drawn.width() // 2, drawn.height() - 2)
+    lettering = tip._popup.label.font()
+
+    assert corner.alpha() == 0
+    assert (middle.red(), middle.green(), middle.blue()) == tooltip_look.GROUND
+    assert lettering.bold()
+    assert lettering.pointSize() == tooltip_look.LETTERING_SIZE
+    assert tip._popup.label.alignment() & Qt.AlignmentFlag.AlignHCenter

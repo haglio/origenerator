@@ -13,7 +13,7 @@ from app_support.kino_folder import upscale_in, upscales_in
 from funestra.hud_placement import HudCorner
 from funestra.hud_title import LATEST_LABEL
 from PIL import Image
-from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QKeyEvent
 from shared_ui.message_shape import FAVORITE, INFO, WARNING
 
@@ -3533,3 +3533,19 @@ def test_the_map_around_a_picture_leaves_out_what_a_looping_workflow_made_from_i
 
     assert [row.slide.prompt_id for row in around.column] == ["v1"]
     assert [slide.prompt_id for slide in around.group] == ["v1"]
+
+
+class _WindowHost(QObject, FakeHost):
+    def __init__(self):
+        QObject.__init__(self)
+        FakeHost.__init__(self)
+
+
+def test_the_openings_kept_fresh_go_with_the_window_they_are_kept_for(slideshows):
+    host = _WindowHost()
+    director, _host, _made = slideshows(host)
+
+    director.library_moved()
+
+    assert [timer.interval() for timer in host.findChildren(QTimer) if timer.isActive()] == [
+        module._OPENINGS_KEPT_FRESH_MS]

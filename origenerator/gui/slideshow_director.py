@@ -12,7 +12,7 @@ from app_support.gallery_rows import source_of
 from funestra.hud_placement import HudCorner
 from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.volume import VolumeHud
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QObject, QTimer
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QWidget
 from shared_ui.foreground import bring_to_front
@@ -198,8 +198,8 @@ def _shape_it_opens_on(shape: str, rows, items, opened_on: str | None) -> str:
     return _shape_of_the_set(rows, items)
 
 
-def _every(interval_ms: int, then) -> QTimer:
-    timer = QTimer()
+def _every(interval_ms: int, then, *, lasting_as_long_as) -> QTimer:
+    timer = QTimer(lasting_as_long_as if isinstance(lasting_as_long_as, QObject) else None)
     timer.setInterval(interval_ms)
     timer.timeout.connect(then)
     return timer
@@ -244,7 +244,8 @@ class SlideshowDirector:
         self._regions_wanted: set[str] = set()
         self._openings = RegionOpenings(self._rows_of_the_base_state, self._opening_of,
                                         self._with_its_lead_on_the_map)
-        self._openings_kept_fresh = _every(_OPENINGS_KEPT_FRESH_MS, self.make_the_openings_ready)
+        self._openings_kept_fresh = _every(_OPENINGS_KEPT_FRESH_MS, self.make_the_openings_ready,
+                                           lasting_as_long_as=host)
         self._asked_for: dict[str, partial] = {}
         self._region_slideshows: dict[str, QWidget | None] = (
             dict.fromkeys(_SHAPES) if fun_time is not None else {}

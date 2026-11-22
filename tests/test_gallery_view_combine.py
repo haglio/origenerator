@@ -1126,8 +1126,8 @@ def test_a_job_launched_as_an_action_is_made_from_no_video_though_one_gave_its_s
 
 def test_what_the_gallery_tells_him_offers_nothing_to_copy(monkeypatch):
     told = MagicMock()
-    monkeypatch.setattr(gallery_view_module.alert, "information", told)
+    monkeypatch.setattr(gallery_view_module.alert, "warning", told)
 
     GalleryView.tell(None, "No past video yet", "Make one first.")
 
-    told.assert_called_once_with("No past video yet", "Make one first.", copyable=False)
+    told.assert_called_once_with("No past video yet", "Make one first.")

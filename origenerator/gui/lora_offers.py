@@ -11,7 +11,7 @@ def trashed(lora: str, *, trash=trash_old_version) -> bool:
     try:
         trash(lora)
     except OSError as refused:
-        alert.warning("Trash", str(refused))
+        alert.error("Trash", str(refused), level="WARNING")
         return False
     return True
 

@@ -37,7 +37,7 @@ class LookTrainingController:
             ("krea2_training_python", "krea2_training_scripts"), base,
             folder, bool(lora_training.image_files(folder)))
         if refusal is not None:
-            alert.information("Train", refusal)
+            alert.error("Train", refusal, level="INFO")
             return
         self._watch(look_training.training_job(base), tab, key).begin()
 
@@ -69,7 +69,7 @@ class LookTrainingController:
         if lora:
             self._take(job, lora, tab, key)
         elif why:
-            alert.warning("Train", why)
+            alert.error("Train", why, level="WARNING")
 
     def _take(self, job: dict, lora: str, tab=None, key: str | None = None) -> None:
         look_training.take(job)

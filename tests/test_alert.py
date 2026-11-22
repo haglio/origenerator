@@ -11,20 +11,16 @@ from origenerator import alert
 from tests.alert_windows import Alert
 
 
-@pytest.mark.parametrize(("say", "level"), [
-    (alert.error, Level.ERROR),
-    (alert.warning, Level.WARNING),
-    (alert.information, Level.INFO),
-])
-def test_each_window_is_the_familys_alert_at_its_own_level(qapp, alerts, say, level):
-    say("Sample title", "Something made up went wrong.")
+@pytest.mark.parametrize("level", [Level.ERROR, Level.WARNING, Level.INFO])
+def test_an_error_is_the_familys_alert_at_the_level_it_names(qapp, alerts, level):
+    alert.error("Sample title", "Something made up went wrong.", level.name)
 
     assert alerts == [Alert("Sample title", "Something made up went wrong.", level)]
 
 
-def test_an_information_window_can_leave_out_copy_error_message(qapp):
+def test_a_warning_offers_nothing_to_copy(qapp):
     with alert_shown() as shown:
-        alert.information("Sample title", "Open a made-up window first.", copyable=False)
+        alert.warning("Sample title", "Open a made-up window first.")
 
     assert shown.call_args.kwargs["copyable"] is False
 

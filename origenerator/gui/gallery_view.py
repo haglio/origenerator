@@ -1784,7 +1784,7 @@ class GalleryView(QWidget):
         self.enhance.enhance_items(prompt_ids)
 
     def tell(self, title: str, message: str) -> None:
-        alert.information(title, message, copyable=False)
+        alert.warning(title, message)
 
     def reveal_launch(self, key: str):
         if self._stand_on_the_run_in(key):
@@ -2225,7 +2225,7 @@ class GalleryView(QWidget):
                 self.refresh()
                 then(outcome)
         if error is not None:
-            alert.warning(failed, f"{could_not}:\n\n{error}")
+            alert.error(failed, f"{could_not}:\n\n{error}", level="WARNING")
 
     def purge_from_trash(self, prompt_ids):
         if not prompt_ids:

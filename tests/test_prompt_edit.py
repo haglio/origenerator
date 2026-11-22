@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from urllib.error import HTTPError
 
@@ -712,6 +713,41 @@ def test_a_usual_part_that_neither_names_the_thing_nor_brings_a_person_is_not_ad
     answered = ask_the_model("a woman", "", "add a beard", WhatIsKnown(company=_MAN_COMPANY), llm=ask)
 
     assert answered["changes"][0]["add"] == "a full gray beard, thick eyebrows"
+
+
+def test_a_usual_person_stays_out_of_a_prompt_that_counts_one_named_the_same():
+    ask, _asked = _answers_in_turn(
+        _A_BEARD, '{"people": {"2men at a bar": "2men"}}', '{"left_open": []}')
+
+    answered = ask_the_model("1man, a sofa", "", "add a beard", WhatIsKnown(
+        company=UsualCompany(positive=("a full gray beard", "2men at a bar"))), llm=ask)
+
+    assert answered["changes"][0]["add"] == "a full gray beard, a tall man, thick eyebrows, beside her"
+
+
+def test_asked_to_add_a_thing_a_model_that_only_edits_the_negative_prompt_still_gets_it_added():
+    ask, _asked = _answers_in_turn(
+        '{"changes": [{"prompt": "negative", "remove": "hats", "for": "add a tall hat"}]}',
+        '{"left_open": []}')
+
+    answered = ask_the_model("a man", "blurry, hats", "please add a tall hat", WhatIsKnown(), llm=ask)
+
+    assert answered["changes"][1:] == [
+        {"prompt": "positive", "add": "tall hat", "for": "please add a tall hat"}]
+
+
+@pytest.mark.parametrize(("request_words", "answer"), [
+    ("two cats", '{"changes": [{"prompt": "negative", "remove": "cats", "for": "two cats"}]}'),
+    ("no hat", '{"changes": [{"prompt": "negative", "add": "hat", "for": "no hat"}]}'),
+    ("add a hat", '{"changes": [], "why": "It already has a hat."}'),
+    ("add a hat", '{"changes": [{"setting": "steps", "to": 30, "for": "add a hat"}]}')])
+def test_only_a_request_to_add_answered_in_the_negative_prompt_alone_gains_the_thing(
+        request_words, answer):
+    ask, _asked = _answers_in_turn(answer, '{"left_open": []}')
+
+    answered = ask_the_model("a man", "blurry, cats", request_words, WhatIsKnown(), llm=ask)
+
+    assert answered["changes"] == json.loads(answer)["changes"]
 
 
 def test_with_only_parts_that_name_the_thing_the_model_is_asked_about_no_people():

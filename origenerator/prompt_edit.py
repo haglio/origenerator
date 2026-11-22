@@ -413,15 +413,16 @@ _LEFT_OPEN_CHECK = (
     "List the words of yours in it that he did not say and that settle something he left open: "
     "which way a body lies or faces, a pose, a place, a person, a garment, a camera or a time that "
     "neither his words nor the prompt had. Words that only say more about the thing he asked for "
-    "(its size, color, material, look) are not such words, and nor is the person the thing is "
-    "part of when no one in the prompt can have it. "
+    "(its size, color, material, look) are not such words. "
     'Reply with only a JSON object: {{"left_open": ["<each such word or phrase, exactly as you '
     'wrote it>"]}}, an empty list when there are none.')
 _PEOPLE_CHECK = (
     'He asked: "{asked}". When his prompts gain it, they usually also gain these parts: {parts}. '
-    "Which of these parts bring a person into the image (a man, two women, a sailor), and which "
-    "one word in each names that person? A part about a body part, a face, a look, a garment, a "
-    "pose, a place, a camera, a light or a style brings no person. "
+    "Which of these parts bring into the image a person of a kind the current positive prompt "
+    "has no one of (a man where it describes only women), and which one word in each names that "
+    "person? A part about people the prompt already describes, in any number or wording, brings "
+    "no one new, and nor does a part about a body part, a face, a look, a garment, a pose, a "
+    "place, a camera, a light or a style. "
     'Reply with only a JSON object: {{"people": {{"<part, exactly as listed>": "<the word in it '
     'that names the person>"}}}}, an empty object when none does.')
 _PUT_INTO_A_PROMPT = ("with", "add")
@@ -456,6 +457,10 @@ def _one_or_many(who: str) -> set[str]:
     return _forms(who).union(*(pair for pair in _ONE_AND_MANY if who in pair))
 
 
+def _uncounted(word: str) -> str:
+    return word.lstrip("0123456789") or word
+
+
 _NAMING_NO_ONE = frozenset({"her", "his", "she", "him", "they", "their", "them", "its"})
 
 
@@ -468,12 +473,12 @@ def _people_among(parts: list[str], asked: tuple[str, str], ask_again) -> set[st
         logger.warning("prompt_edit: the model could not say which usual parts bring a person (%s)",
                        type(exc).__name__)
         return set()
-    there = {word for word, *_ in _tokens(positive)}
+    there = {_uncounted(word) for word, *_ in _tokens(positive)}
     return {str(part).strip().casefold() for part, who in (people.items()
                                                            if isinstance(people, dict) else ())
             if (named := str(who).strip().lower()) not in _NAMING_NO_ONE
             and named in {word for word, *_ in _tokens(str(part))}
-            and not _one_or_many(named) & there}
+            and not _one_or_many(_uncounted(named)) & there}
 
 
 def _its_own_company(answer: dict, asked: tuple[str, str], usual: tuple, ask_again) -> tuple:
@@ -505,7 +510,7 @@ def _holding_its_own_company(answer: dict, company: tuple[tuple, tuple], positiv
     if adding is None:
         return {**answer, "changes": [*changes, *({"prompt": "positive", "add": part, "for": request}
                                                   for part in his)]}
-    said_by_his = set().union(*(_words(part) for part in its_own))
+    said_by_his = set().union(*(_forms(word) for part in its_own for word in _words(part)))
     only_usual_company = {part.casefold() for part in usual}
     the_models = [part for thing, part in things_of(str(adding["add"])).items()
                   if thing not in there and thing not in only_usual_company
@@ -516,6 +521,24 @@ def _holding_its_own_company(answer: dict, company: tuple[tuple, tuple], positiv
 
 def _adds_to_the_positive_prompt(change) -> bool:
     return isinstance(change, dict) and change.get("prompt") == "positive" and bool(change.get("add"))
+
+
+_ASKING_TO_ADD = frozenset({"add", "adding", "give", "include", "including", "put"})
+
+
+def _thing_he_asks_to_add(request: str) -> str | None:
+    asking = next((word for word, *_ in _tokens(request) if word not in _FILLER), None)
+    parsed = parse_request(request) if asking in _ASKING_TO_ADD else None
+    return parsed[1] if parsed is not None else None
+
+
+def _adding_what_he_asked_for(answer: dict, request: str) -> dict:
+    thing, changes = _thing_he_asks_to_add(request), answer.get("changes")
+    only_the_negative_prompt = isinstance(changes, list) and bool(changes) and all(
+        isinstance(change, dict) and change.get("prompt") == "negative" for change in changes)
+    if thing is None or not only_the_negative_prompt:
+        return answer
+    return {**answer, "changes": [*changes, {"prompt": "positive", "add": thing, "for": request}]}
 
 
 def _leaving_open_what_he_did(answer: dict, request: str, ask_again, his: str = "") -> dict:
@@ -552,7 +575,7 @@ def ask_the_model(positive: str, negative: str, request: str, known: WhatIsKnown
         return asking([*messages, {"role": "assistant", "content": local_llm.text_of(said)},
                        {"role": "user", "content": question}], temperature=0)
 
-    answer = local_llm.answer_of(said)
+    answer = _adding_what_he_asked_for(local_llm.answer_of(said), request)
     its_own = _its_own_company(answer, (request, positive), known.company.positive, ask_again)
     return _holding_its_own_company(
         _leaving_open_what_he_did(answer, request, ask_again, " ".join(its_own)),

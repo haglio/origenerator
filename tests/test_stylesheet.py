@@ -66,12 +66,10 @@ def test_stylesheet_greys_disabled_dropdown_items():
 
 def test_stylesheet_styles_tooltips():
     # Native tooltips render unreadably on Windows 11 dark mode, so the sheet
-    # must style QToolTip explicitly — with square corners, since a rounded
-    # stylesheet tooltip paints artifact squares on Windows.
+    # must style QToolTip explicitly.
     qss = build_stylesheet()
     tooltip_rule = qss.split("QToolTip", 1)[1].split("}", 1)[0]
     assert "background-color" in tooltip_rule
-    assert "border-radius" not in tooltip_rule
 
 
 

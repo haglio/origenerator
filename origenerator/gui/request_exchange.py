@@ -142,10 +142,10 @@ class _ThumbnailAndChange(QWidget):
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(GAP_SMALL)
-        row.addWidget(thumbnail)
         mark = ChangeMark()
         mark.show_change(tip)
         row.addWidget(mark, 0, Qt.AlignmentFlag.AlignVCenter)
+        row.addWidget(thumbnail)
         row.addStretch(1)
 
 

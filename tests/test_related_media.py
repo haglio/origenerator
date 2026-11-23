@@ -22,6 +22,7 @@ from origenerator.gui.related_media import (
 from origenerator.gui.source_tile import SourceTile
 from origenerator.gui.trash_box import TrashBox
 from origenerator.workflows.non_ai import non_ai_workflow
+from tests.change_marks import shows_the_delta
 from tests.related_links import (
     POINTING_BACK,
     no_sources,
@@ -599,8 +600,24 @@ def test_a_requested_tiles_delta_sits_before_its_heading(make_related, tmp_path)
     tile.layout().activate()
 
     mark, heading = (part.mapTo(tile, part.rect().center()) for part in (tile.change_mark, tile._heading))
-    assert (tile.change_mark.text(), tile.change_mark.isVisible(), mark.x() < heading.x()) == (
-        "Δ", True, True)
+    assert (shows_the_delta(tile.change_mark), tile.change_mark.isVisible(), mark.x() < heading.x()) == (
+        True, True, True)
+
+
+def test_a_click_on_a_requested_tiles_delta_opens_nothing(make_related, tmp_path, qtbot):
+    before = _with_thumbnail(_image_row(), tmp_path)
+    after = _with_thumbnail(_image_row("img2", "sdxl_t2i_img2.png"), tmp_path)
+    request = {**_batch_modified("img2", "img1"), "asked": "a cap instead"}
+    related = make_related(rows=[before, after], requests=[request])
+    related.show()
+    related.show_row(after, [])
+    opened = []
+    related.link_clicked.connect(appending_to(opened))
+    mark = _tile_of(related._requests, "img1").change_mark
+
+    qtbot.mouseClick(mark, Qt.MouseButton.LeftButton)
+
+    assert (opened, mark.cursor().shape()) == ([], Qt.CursorShape.WhatsThisCursor)
 
 
 def test_a_tile_with_no_change_to_show_has_no_delta(make_related):

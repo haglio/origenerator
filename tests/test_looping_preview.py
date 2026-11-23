@@ -148,13 +148,19 @@ def test_thumbnails_start_at_moments_of_their_own_within_one_slow_frame(staggere
     assert all(0 <= wait < 5 * FRAME_MS for wait in waits)
 
 
-def test_a_thumbnail_shows_its_first_frame_until_its_moment_then_runs(staggered, label, tmp_path):
-    path = _changing_loop(tmp_path / "one.webp")
-    assert stagger_ms(path) > 0
+def test_a_thumbnail_shows_its_first_frame_until_its_moment(monkeypatch, label, tmp_path):
+    monkeypatch.setattr(looping_preview, "stagger_ms", lambda _path: 10 * 60 * 1000)
 
-    movie = play_in(label, path, QSize(40, 30))
+    movie = play_in(label, _changing_loop(tmp_path / "one.webp"), QSize(40, 30))
 
     assert (movie.state(), movie.currentFrameNumber()) == (QMovie.MovieState.NotRunning, 0)
+
+
+def test_a_thumbnail_runs_once_its_moment_comes(monkeypatch, label, tmp_path):
+    monkeypatch.setattr(looping_preview, "stagger_ms", lambda _path: 1)
+
+    movie = play_in(label, _changing_loop(tmp_path / "one.webp"), QSize(40, 30))
+
     wait_until(lambda: movie.state() == QMovie.MovieState.Running, pump=QApplication.processEvents)
 
 

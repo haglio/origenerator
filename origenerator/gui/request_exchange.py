@@ -4,7 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from math import ceil
 
-from PySide6.QtCore import QEvent, QPoint, QSize, Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import (
     QPixmap,
     QTextBlockFormat,
@@ -17,7 +17,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QTextEdit,
-    QToolTip,
     QVBoxLayout,
     QWidget,
 )
@@ -27,6 +26,7 @@ from shared_ui.toggle_switch import ToggleSwitch
 
 from origenerator.db_requests import Turn
 from origenerator.gui.cancel_bar import CancelBar
+from origenerator.gui.change_mark import ChangeMark
 from origenerator.gui.change_tip import change_tip, fitted
 from origenerator.gui.generate_button import GenerateButton
 from origenerator.gui.generation_job import JobState
@@ -114,12 +114,11 @@ class _Made:
 class _Thumbnail(QLabel):
     clicked = Signal()
 
-    def __init__(self, parent: QWidget, item: str, image: QPixmap, *, opens: bool, tip: str):
-        super().__init__(parent)
+    def __init__(self, item: str, image: QPixmap, *, opens: bool):
+        super().__init__()
         self.item = item
         self._opens = opens
         self.setPixmap(image)
-        self.setToolTip(tip)
         if opens:
             self.setCursor(Qt.CursorShape.PointingHandCursor)
 
@@ -135,6 +134,19 @@ class _Thumbnail(QLabel):
 
     def mouseReleaseEvent(self, event) -> None:
         event.accept()
+
+
+class _ThumbnailAndChange(QWidget):
+    def __init__(self, parent: QWidget, thumbnail: _Thumbnail, tip: str):
+        super().__init__(parent)
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(GAP_SMALL)
+        row.addWidget(thumbnail)
+        mark = ChangeMark()
+        mark.show_change(tip)
+        row.addWidget(mark, 0, Qt.AlignmentFlag.AlignVCenter)
+        row.addStretch(1)
 
 
 def _scaled_to(image_format: QTextImageFormat) -> QPixmap:
@@ -159,7 +171,6 @@ class _Conversation(QTextEdit):
         page.setDocumentMargin(0)
         page.documentLayout().documentSizeChanged.connect(lambda _size: self._fit())
         self.verticalScrollBar().valueChanged.connect(lambda _value: self._place())
-        self._tips: list[str] = []
         self._placed: list[tuple[QWidget, int]] = []
         self._generate_buttons: dict[int, GenerateButton] = {}
         self.hide()
@@ -172,13 +183,10 @@ class _Conversation(QTextEdit):
         self._generate_buttons = {}
         self.clear()
         cursor = self.textCursor()
-        self._tips = []
         for index, entry in enumerate(entries):
-            _paragraph(cursor, entry.said, BLUE_LIGHT, above=GAP_SMALL if self._tips else 0)
-            self._tips.append(entry.tip)
+            _paragraph(cursor, entry.said, BLUE_LIGHT, above=GAP_SMALL if index else 0)
             if entry.answered:
                 _paragraph(cursor, entry.answered, TEXT_PRIMARY, indent=MARGIN_STANDARD)
-                self._tips.append(entry.tip)
             self._show_what_was_made(cursor, index, entry, made[index], showing)
         self.setVisible(bool(entries))
         self._fit()
@@ -190,20 +198,20 @@ class _Conversation(QTextEdit):
             bar.setFixedSize(self._generate_button_size())
             bar.show_progress(made.reading.caption(), *made.reading.bars())
             bar.clicked.connect(lambda item=made.item: self.cancel_asked.emit(item))
-            self._reserve(cursor, bar, entry)
+            self._reserve(cursor, bar)
         elif made.item:
             image_format = fitted(made.thumbnail, self._thumbnail_box())
             if image_format is not None:
-                thumbnail = _Thumbnail(self.viewport(), made.item, _scaled_to(image_format),
-                                       opens=made.item != showing, tip=entry.tip)
+                thumbnail = _Thumbnail(made.item, _scaled_to(image_format),
+                                       opens=made.item != showing)
                 thumbnail.clicked.connect(lambda item=made.item: self.item_activated.emit(item))
-                self._reserve(cursor, thumbnail, entry)
+                self._reserve(cursor, _ThumbnailAndChange(self.viewport(), thumbnail, entry.tip))
         elif made.generate:
             button = GenerateButton(self.viewport(), sizes_itself=True)
             button.setCursor(Qt.CursorShape.ArrowCursor)
             button.clicked.connect(lambda _checked=False, at=index: self.generate_asked.emit(at))
             self._generate_buttons[index] = button
-            self._reserve(cursor, button, entry)
+            self._reserve(cursor, button)
 
     def refuse_generate(self, index: int, why: str) -> None:
         button = self._generate_buttons.get(index)
@@ -222,13 +230,12 @@ class _Conversation(QTextEdit):
         tall = self.fontMetrics().lineSpacing() * _THUMBNAIL_LINES
         return QSize(tall * 2, tall)
 
-    def _reserve(self, cursor: QTextCursor, widget: QWidget, entry: _Entry) -> None:
+    def _reserve(self, cursor: QTextCursor, widget: QWidget) -> None:
         widget.adjustSize()
         _block(cursor, indent=MARGIN_STANDARD, above=GAP_SMALL)
         room = QTextBlockFormat(cursor.blockFormat())
         room.setLineHeight(widget.height(), QTextBlockFormat.LineHeightTypes.FixedHeight.value)
         cursor.setBlockFormat(room)
-        self._tips.append(entry.tip)
         self._placed.append((widget, cursor.blockNumber()))
         widget.show()
 
@@ -252,20 +259,6 @@ class _Conversation(QTextEdit):
         bar = self.verticalScrollBar()
         bar.setValue(bar.maximum())
         self._place()
-
-    def tip_at(self, place: QPoint) -> str:
-        block = self.cursorForPosition(place).blockNumber()
-        return self._tips[block] if block < len(self._tips) else ""
-
-    def viewportEvent(self, event) -> bool:
-        if event.type() != QEvent.Type.ToolTip:
-            return super().viewportEvent(event)
-        tip = self.tip_at(event.pos())
-        if tip:
-            QToolTip.showText(event.globalPos(), tip, self.viewport())
-        else:
-            QToolTip.hideText()
-        return True
 
 
 class RequestExchange(QWidget):

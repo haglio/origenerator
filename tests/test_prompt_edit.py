@@ -791,6 +791,37 @@ def test_only_a_request_to_add_answered_in_the_negative_prompt_alone_gains_the_t
     assert answered["changes"] == json.loads(answer)["changes"]
 
 
+@pytest.mark.parametrize("answer", [
+    '{"changes": [], "why": "It already has a tall hat."}',
+    '{"changes": [{"prompt": "positive", "add": "A Tall Hat", "for": "tall hat"}]}'])
+@pytest.mark.parametrize("request_words", ["tall hat", "add a tall hat"])
+def test_a_request_for_a_part_the_prompt_already_has_asks_for_more_of_it(answer, request_words):
+    ask, _asked = _answers_in_turn(answer, '{"left_open": []}')
+
+    answered = ask_the_model("a man, a tall hat, a pier", "", request_words, WhatIsKnown(), llm=ask)
+
+    assert answered["changes"] == [{"more": "a tall hat", "stronger": "a tall hat", "opposite": "",
+                                    "for": request_words}]
+
+
+def test_a_request_the_model_answered_with_a_change_of_its_own_is_left_to_the_model():
+    answer = '{"changes": [{"more": "a tall hat", "stronger": "a very tall hat", "for": "tall hat"}]}'
+    ask, _asked = _answers_in_turn(answer)
+
+    answered = ask_the_model("a man, a tall hat", "", "tall hat", WhatIsKnown(), llm=ask)
+
+    assert answered["changes"] == json.loads(answer)["changes"]
+
+
+def test_more_of_a_part_already_there_moves_it_first_and_says_so():
+    ask, _asked = _answers_in_turn('{"changes": [], "why": "It already has a tall hat."}')
+
+    revision = work_out("a man, a tall hat, a pier", "", "tall hat", weights=False,
+                        ask=lambda *told: ask_the_model(*told, llm=ask))
+
+    assert revision.positive == "a tall hat, a man, a pier"
+
+
 def _asked_to_add_a_beard_they_usually_wear(positive: str, usual: str, people: str):
     ask, _asked = _answers_in_turn(_A_BEARD, people, '{"left_open": []}')
     answered = ask_the_model(positive, "", "add a beard", WhatIsKnown(

@@ -559,6 +559,25 @@ def _thing_he_asks_to_add(request: str) -> str | None:
     return parsed[1] if parsed is not None else None
 
 
+def _part_he_names(request: str, positive: str) -> str | None:
+    parsed, each = parse_request(request), _each_thing_asked_for(request)
+    if parsed is None or parsed[0] != ADD or len(each) != 1:
+        return None
+    return next((part for part in things_of(positive).values()
+                 if _touches(each[0], part) == len(each[0])), None)
+
+
+def _wanting_more_of_what_is_there(answer: dict, request: str, positive: str) -> dict:
+    part, changes = _part_he_names(request, positive), answer.get("changes")
+    there = things_of(positive)
+    adds_only_what_is_there = isinstance(changes, list) and all(
+        _adds_to_the_positive_prompt(change) and things_of(str(change["add"])).keys() <= there.keys()
+        for change in changes)
+    if part is None or not adds_only_what_is_there:
+        return answer
+    return {**answer, "changes": [{"more": part, "stronger": part, "opposite": "", "for": request}]}
+
+
 def _adding_what_he_asked_for(answer: dict, request: str) -> dict:
     thing, changes = _thing_he_asks_to_add(request), answer.get("changes")
     only_the_negative_prompt = isinstance(changes, list) and bool(changes) and all(
@@ -602,7 +621,8 @@ def ask_the_model(positive: str, negative: str, request: str, known: WhatIsKnown
         return asking([*messages, {"role": "assistant", "content": local_llm.text_of(said)},
                        {"role": "user", "content": question}], temperature=0)
 
-    answer = _adding_what_he_asked_for(local_llm.answer_of(said), request)
+    answer = _adding_what_he_asked_for(
+        _wanting_more_of_what_is_there(local_llm.answer_of(said), request, positive), request)
     its_own = _its_own_company(answer, (request, positive), known.company.positive, ask_again)
     answer = _holding_its_own_company(
         _leaving_open_what_he_did(answer, request, ask_again, " ".join(its_own)),

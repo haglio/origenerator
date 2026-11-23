@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from PySide6.QtGui import QFont, QIcon
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
-from shared_ui.palette import LOADING_ACCENT, PREVIEW_INK, as_hex
+from shared_ui.fonts import wordmark_font
+from shared_ui.palette import as_hex
 from shared_ui.preview import Preview, window_title
 from shared_ui.spacing import BUTTON_GAP, BUTTON_SIZE, MARGIN_STANDARD
-from shared_ui.type_scale import FONT_UI, SIZE_BODY
+from shared_ui.wordmark import wordmark_ink
 
 
 class AppTitle(QWidget):
@@ -17,12 +18,8 @@ class AppTitle(QWidget):
         self.logo = QLabel()
         self.logo.setPixmap(icon.pixmap(BUTTON_SIZE, BUTTON_SIZE))
         self.name = QLabel(name)
-        lettering = QFont(FONT_UI, SIZE_BODY)
-        lettering.setBold(True)
-        lettering.setItalic(True)
-        self.name.setFont(lettering)
-        ink = LOADING_ACCENT if preview is None else PREVIEW_INK
-        self.name.setStyleSheet(f"color: {as_hex(ink)};")
+        self.name.setFont(wordmark_font())
+        self.name.setStyleSheet(f"color: {as_hex(wordmark_ink(preview))};")
         row.addWidget(self.logo)
         row.addWidget(self.name)
         row.addStretch(1)

@@ -11,7 +11,7 @@ from funestra.main_hud import ModeHud
 from funestra.modes import MainMode
 from funestra.playlist import read_playlist
 
-from origenerator.genau_flicks import GenauFilters
+from origenerator.genau_flicks import AS_GENAU_STARTS, GenauFilters, GenauLeft
 from origenerator.gui.standalone_genau import GenauSources, StandaloneGenau
 from origenerator.osr2_motion_driver import Osr2MotionDriver
 from tests.genau_support import FlicksLibrary, HeardBeat, looping_row
@@ -56,7 +56,8 @@ class _Gallery:
 
 
 class Genau:
-    def __init__(self, tmp_path: Path, rows, *, favorites=(), motion=None) -> None:
+    def __init__(self, tmp_path: Path, rows, *, favorites=(), motion=None,
+                 left: GenauLeft = AS_GENAU_STARTS) -> None:
         self.library = FlicksLibrary(rows, folder=tmp_path / "videos")
         self.library.folder.mkdir()
         for row in rows:
@@ -70,7 +71,7 @@ class Genau:
             library=lambda: self.library, is_favorite=self.gallery.favorites.__contains__,
             unfavorite=self.gallery.unfavorite, trash=self.gallery.trash,
             flip=lambda prompt_id, flipped: self.gallery.flipped.append((prompt_id, flipped)),
-            name_of=lambda prompt_id: f"name of {prompt_id}", motion=motion,
+            name_of=lambda prompt_id: f"name of {prompt_id}", motion=motion, starts_with=left,
             flick_words=lambda: ("twirl", "twirls")), beat=self.beat)
 
     @property
@@ -109,6 +110,44 @@ def test_shown_it_lists_every_looping_video_newest_first_and_tells_genau_to_read
 
     assert genau.listed() == ["new", "old"]
     assert genau.program.sent[-1] == RELOAD_FLICKS
+
+
+def test_first_shown_genau_is_put_back_as_it_was_left(tmp_path):
+    genau = Genau(tmp_path, [looping_row("new"), looping_row("old")],
+                  left=GenauLeft(latest=True, locked=False, seconds=9, flick="old"))
+
+    genau.up()
+
+    heard = genau.genau.heard
+    assert genau.on_screen() == "old"
+    assert (genau.genau.latest, heard.locked, heard.interval) == (True, False, 9)
+
+
+def test_where_genau_stands_is_what_it_was_last_heard_to_be(tmp_path):
+    genau = Genau(tmp_path, [looping_row("new"), looping_row("old")])
+    genau.up(path=genau.library.file_of("old"))
+    genau.genau.press("lock")
+    genau.tick()
+
+    assert genau.genau.left(showing=True) == GenauLeft(
+        showing=True, locked=not AS_GENAU_STARTS.locked, flick="old")
+
+
+def test_where_genau_stands_carries_the_order_he_picked(tmp_path):
+    genau = Genau(tmp_path, [looping_row("new"), looping_row("old")])
+    genau.up()
+
+    genau.genau.press("latest")
+
+    assert genau.genau.left(showing=True).latest
+
+
+def test_genau_never_shown_stands_where_it_was_left(tmp_path):
+    left = GenauLeft(filters=GenauFilters(favorites=True), latest=True, locked=False, seconds=9,
+                     flick="old")
+    genau = Genau(tmp_path, [looping_row("new"), looping_row("old")], left=left)
+
+    assert genau.genau.left(showing=False) == left
 
 
 def test_shown_on_a_flick_genau_plays_that_flick(tmp_path):

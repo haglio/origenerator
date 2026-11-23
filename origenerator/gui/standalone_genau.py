@@ -8,9 +8,9 @@ from app_support.file_channel import publish_whole, read_key_values
 from funestra.broker_feed import BeatSender
 from funestra.file_channel import append_command
 from funestra.flick_list import RELOAD_FLICKS, write_flicks
-from funestra.funestra_verbs import LOCK_ON, NEXT, TOGGLE_LOCK, play_file
+from funestra.funestra_verbs import LOCK_OFF, LOCK_ON, NEXT, TOGGLE_LOCK, play_file
 from funestra.genau_buttons import FLIP_THE_FLICK, GENAU_VERBS, TRASH_FLICK
-from funestra.genau_controls import PAUSE, RESUME
+from funestra.genau_controls import FLICK_SECONDS, PAUSE, RESUME
 from funestra.genau_status import GenauStatus, genau_status_from
 from funestra.hud_kinds import HudFacts, HudKind, main_title
 from funestra.inclusion_pair import orientation_pair as shape_pair
@@ -20,7 +20,15 @@ from funestra.playlist import PlaylistItem
 from funestra.satellite_hud import HudModel
 
 from origenerator.content import genau_flick_words
-from origenerator.genau_flicks import NO_FILTER, Flick, FlicksLibrary, GenauFilters, flicks_of
+from origenerator.genau_flicks import (
+    AS_GENAU_STARTS,
+    NO_FILTER,
+    Flick,
+    FlicksLibrary,
+    GenauFilters,
+    GenauLeft,
+    flicks_of,
+)
 from origenerator.gui.osr2_controls_state import post_device_action
 
 GENAU_RESET = "genau_reset"
@@ -41,8 +49,7 @@ class GenauSources:
     flip: Callable[[str, bool], None]
     name_of: Callable[[str], str]
     motion: object = None
-    starts_with: GenauFilters = NO_FILTER
-    filters_changed: Callable[[GenauFilters], None] = lambda _filters: None
+    starts_with: GenauLeft = AS_GENAU_STARTS
     flick_words: Callable[[], tuple[str, str]] = genau_flick_words
 
 
@@ -52,8 +59,9 @@ class StandaloneGenau:
         self._channel = program.channel
         self._sources = sources
         self._beat = beat if beat is not None else BeatSender(program.genau.beat_port)
-        self.filters = sources.starts_with
-        self.latest = False
+        self._left_as: GenauLeft | None = sources.starts_with
+        self.filters = sources.starts_with.filters
+        self.latest = sources.starts_with.latest
         self.heard = GenauStatus()
         self._flicks: dict[Path, Flick] = {}
         self._flipped_here: dict[str, bool] = {}
@@ -65,8 +73,25 @@ class StandaloneGenau:
 
     def show(self, path: Path | None = None) -> None:
         self._list()
+        left, self._left_as = self._left_as, None
+        if left is not None:
+            path = path or self._put_back_as(left)
         if path is not None:
             self._tell(play_file(PlaylistItem(Path(path))))
+
+    def _put_back_as(self, left: GenauLeft) -> Path | None:
+        self._tell("LATEST" if left.latest else "SHUFFLE")
+        self._tell(LOCK_ON if left.locked else LOCK_OFF)
+        self._tell(f"{FLICK_SECONDS} {left.seconds}")
+        return next((path for path, flick in self._flicks.items()
+                     if flick.prompt_id == left.flick), None)
+
+    def left(self, *, showing: bool) -> GenauLeft:
+        if self._left_as is not None:
+            return replace(self._left_as, filters=self.filters, showing=showing)
+        return GenauLeft(filters=self.filters, showing=showing, latest=self.latest,
+                         locked=self.heard.locked, seconds=self.heard.interval,
+                         flick=self.prompt_id_on_screen() or "")
 
     def press(self, action: str) -> bool:
         if action in GENAU_VERBS:
@@ -173,7 +198,6 @@ class StandaloneGenau:
 
     def _narrow(self, filters: GenauFilters, *, says: str = "") -> None:
         self.filters = filters
-        self._sources.filters_changed(filters)
         self._list(says)
 
     def _reset(self) -> None:

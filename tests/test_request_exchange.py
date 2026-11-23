@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
+from PySide6.QtCore import QEvent, QPoint, QPointF, QRect, Qt
 from PySide6.QtGui import (
     QColor,
     QEnterEvent,
@@ -17,6 +17,7 @@ from shared_ui.testing import appending_to
 
 from origenerator.db_requests import Turn
 from origenerator.gui.cancel_bar import CancelBar
+from origenerator.gui.change_mark import DELTA, ChangeMark
 from origenerator.gui.generate_button import GenerateButton
 from origenerator.gui.inflight import RunReading
 from origenerator.gui.progress_bar import ProgressBar
@@ -327,41 +328,53 @@ def test_its_right_click_menu_takes_no_color_from_the_words(qtbot):
     assert "color" not in exchange._conversation.styleSheet()
 
 
-def test_hovering_his_words_or_the_answer_shows_that_turns_change(qtbot):
-    exchange = _shown_at(qtbot, 400)
-    exchange.show_exchange([Turn("no hat", "Took it off.", "a hat", "", "a", ""), ("hello", "Hi.")])
+def _rest_on(widget, place=None):
+    place = place or widget.rect().center()
+    QToolTip.hideText()
+    QApplication.sendPostedEvents()
+    QApplication.sendEvent(widget, QHelpEvent(QEvent.Type.ToolTip, place, widget.mapToGlobal(place)))
+    return QToolTip.text() if QToolTip.isVisible() else ""
+
+
+def test_resting_the_mouse_on_his_words_the_answer_or_the_thumbnail_opens_nothing(
+        qtbot, tmp_path):
+    exchange = _shown_with_a_thumbnail(qtbot, tmp_path)
     conversation = exchange._conversation
 
-    def tip_on(line):
+    def on_line(line):
         block = conversation.document().findBlockByNumber(line)
-        return conversation.tip_at(conversation.cursorRect(QTextCursor(block)).center())
+        return _rest_on(conversation.viewport(), conversation.cursorRect(QTextCursor(block)).center())
 
-    assert "hat" in tip_on(0)
-    assert "hat" in tip_on(1)
-    assert tip_on(3) == ""
+    assert [on_line(0), on_line(1), _rest_on(_the_thumbnail(exchange))] == ["", "", ""]
 
 
-def test_resting_the_mouse_on_a_turn_opens_its_tooltip_and_on_one_with_no_change_closes_it(qtbot):
+def test_resting_the_mouse_on_the_delta_beside_a_turns_thumbnail_opens_its_change(qtbot, tmp_path):
+    exchange = _shown_with_a_thumbnail(qtbot, tmp_path)
+
+    (mark,) = _placed(exchange, ChangeMark)
+
+    assert (mark.text(), mark.toolTip(), "cap" in _rest_on(mark)) == (
+        DELTA, exchange._entries()[0].tip, True)
+
+
+def test_the_delta_sits_beside_the_thumbnail_on_its_right(qtbot, tmp_path):
+    exchange = _shown_with_a_thumbnail(qtbot, tmp_path)
+    viewport = exchange._conversation.viewport()
+    (mark,) = _placed(exchange, ChangeMark)
+    thumbnail = _the_thumbnail(exchange)
+
+    thumbnail_box = QRect(thumbnail.mapTo(viewport, QPoint()), thumbnail.size())
+    mark_box = QRect(mark.mapTo(viewport, QPoint()), mark.size())
+    assert (mark_box.left() > thumbnail_box.right(),
+            thumbnail_box.top() <= mark_box.center().y() <= thumbnail_box.bottom()) == (True, True)
+
+
+def test_a_turn_with_nothing_made_yet_shows_no_delta(qtbot):
     exchange = _shown_at(qtbot, 400)
-    exchange.show_exchange([Turn("no hat", "Took it off.", "a hat", "", "a", ""), ("hello", "Hi.")])
-    conversation = exchange._conversation
 
-    def rest_on(line):
-        block = conversation.document().findBlockByNumber(line)
-        place = conversation.cursorRect(QTextCursor(block)).center()
-        QApplication.sendEvent(conversation.viewport(), QHelpEvent(
-            QEvent.Type.ToolTip, place, conversation.viewport().mapToGlobal(place)))
+    exchange.show_exchange([_changed("a cap")])
 
-    rest_on(0)
-    assert "hat" in QToolTip.text()
-    rest_on(3)
-    qtbot.waitUntil(lambda: not QToolTip.isVisible(), timeout=2000)
-
-
-def test_a_place_with_no_turn_has_no_tooltip(qtbot):
-    exchange = _shown_at(qtbot, 400)
-
-    assert exchange._conversation.tip_at(QPoint(1, 1)) == ""
+    assert _placed(exchange, ChangeMark) == []
 
 
 def _thumbnails(tmp_path, *names):
@@ -453,8 +466,8 @@ def test_the_stand_in_for_an_item_not_made_is_a_gray_the_hover_box_does_not_wear
 
 
 def _placed(exchange, kind):
-    return [widget for widget in exchange._conversation.viewport().findChildren(kind)
-            if not widget.isHidden()]
+    viewport = exchange._conversation.viewport()
+    return [widget for widget in viewport.findChildren(kind) if widget.isVisibleTo(viewport)]
 
 
 def test_a_turn_that_changed_something_and_made_nothing_offers_generate_under_it(qtbot):
@@ -507,8 +520,7 @@ def test_a_turn_an_item_was_made_from_shows_its_thumbnail_where_generate_would_b
 
     (thumbnail,) = _placed(exchange, _Thumbnail)
     assert (len(_placed(exchange, GenerateButton)), thumbnail.item,
-            thumbnail.pixmap().isNull(), thumbnail.toolTip()) == (
-        1, "first", False, exchange._entries()[0].tip)
+            thumbnail.pixmap().isNull(), thumbnail.toolTip()) == (1, "first", False, "")
 
 
 def test_a_turn_whose_generate_would_only_remake_an_item_shows_that_items_thumbnail(

@@ -103,7 +103,7 @@
     "tests/test_recent_videos.py": 3,
     "tests/test_related_media.py": 3,
     "tests/test_request_answering.py": 3,
-    "tests/test_request_exchange.py": 9,
+    "tests/test_request_exchange.py": 8,
     "tests/test_scenes_editor.py": 1,
     "tests/test_scope_search_edit.py": 2,
     "tests/test_single_instance.py": 1,

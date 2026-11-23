@@ -63,19 +63,20 @@ def main(argv: list[str] | None = None, *, db_path: Path | None = None,
         found = []
     elif args.verb == "record":
         found = [take_record(db, args.video, read_json(args.record), places=places(), grab=grab)]
+    elif args.verb == "watched":
+        rows = db.list_generations()
+        found, changed = _watch_totals_written(db, rows, VideoRows(rows), read_json(args.totals))
     else:
         found = _written_on_their_rows(db, args)
     if not args.leave_the_phones_file:
         phone_records(db).write()
-    print(json.dumps({"done": sum(found), "no_row": len(found) - sum(found)}))
+    said = {"done": sum(found), "no_row": len(found) - sum(found)}
+    print(json.dumps(said if args.verb != "watched" else {**said, "changed": changed}))
     return 0
 
 
 def _written_on_their_rows(db, args) -> list[bool]:
-    rows = db.list_generations()
-    row_of = VideoRows(rows)
-    if args.verb == "watched":
-        return _watch_totals_written(db, rows, row_of, read_json(args.totals))
+    row_of = VideoRows(db.list_generations())
 
     def on_its_row(video: Path, write: str, *values, **fields) -> bool:
         prompt_id = row_of(video)
@@ -91,7 +92,7 @@ def _written_on_their_rows(db, args) -> list[bool]:
                        upscale_provenance=json.dumps(read_json(args.provenance)))]
 
 
-def _watch_totals_written(db, rows, row_of, totals: dict) -> list[bool]:
+def _watch_totals_written(db, rows, row_of, totals: dict) -> tuple[list[bool], int]:
     by_id = {row["prompt_id"]: row for row in rows}
     found, moved = [], {}
     for video, counts in totals.items():
@@ -103,7 +104,7 @@ def _watch_totals_written(db, rows, row_of, totals: dict) -> list[bool]:
         if any(by_id.get(prompt_id, {}).get(column) != value for column, value in wanted.items()):
             moved[prompt_id] = counts
     db.set_many_watch_counts(moved)
-    return found
+    return found, len(moved)
 
 
 if __name__ == "__main__":

@@ -14,6 +14,8 @@ from origenerator.box_breaks import (
     cut_into_boxes,
     prompt_boxes,
     unboxed,
+    with_the_commas_boxes_end_on,
+    without_the_commas_boxes_end_on,
 )
 from origenerator.gui import diff_text, tracked_prompt
 from origenerator.gui.param_help import MORE_THAN_ONE_BOX
@@ -56,8 +58,8 @@ class Countdown(QLabel):
 
 
 def count_down(countdown: Countdown, field: QPlainTextEdit, reading: PromptReading | None,
-               *, in_use: bool = True) -> None:
-    text = diff_text.live_text(field)
+               *, in_use: bool = True, kept: str | None = None) -> None:
+    text = diff_text.live_text(field) if kept is None else kept
     countdown.show_left(None if reading is None or not in_use
                         else reading.reads_well - reading.tokens(text))
     mark_past_the_limit(field, None if reading is None or not in_use
@@ -71,12 +73,12 @@ def _in_this_box(spans, start: int, end: int) -> tuple[tuple[int, int], ...]:
 
 
 def mark_problems_in(fields: list[QPlainTextEdit], reading: PromptReading | None,
-                     *, in_use: bool, opposing: str = "") -> None:
+                     *, in_use: bool, opposing: str = "", kept: list[str] | None = None) -> None:
     if not in_use:
         for field in fields:
             mark_problems(field, PromptProblems())
         return
-    texts = [diff_text.live_text(field) for field in fields]
+    texts = [diff_text.live_text(field) for field in fields] if kept is None else kept
     whole = " ".join(texts)
     duplicates, in_both_prompts = duplicate_things(whole), things_in_both(whole, opposing)
     start = 0
@@ -228,11 +230,12 @@ class PromptBoxes(QWidget):
         other.mark_problems()
 
     def words_it_reads(self) -> str:
-        return " ".join(diff_text.live_text(box) for box in self._boxes) if self._in_use else ""
+        return " ".join(self._texts) if self._in_use else ""
 
     def mark_problems(self) -> None:
         opposing = self._opposite.words_it_reads() if self._opposite is not None else ""
-        mark_problems_in(self._boxes, self._reading, in_use=self._in_use, opposing=opposing)
+        mark_problems_in(self._boxes, self._reading, in_use=self._in_use, opposing=opposing,
+                         kept=self._texts)
 
     def _mark_boxes_in_use(self) -> None:
         tip = self._tip
@@ -267,11 +270,16 @@ class PromptBoxes(QWidget):
                 self._add_box()
             while len(self._boxes) > len(texts):
                 self._remove_last_box()
-            shares = (baselines_for(self._baseline, texts, self._cut_from)
-                      if self._baseline is not None else [None] * len(texts))
+            shares = (without_the_commas_boxes_end_on(
+                baselines_for(self._baseline, texts, self._cut_from))
+                if self._baseline is not None else [None] * len(texts))
+            as_typed = with_the_commas_boxes_end_on(
+                [diff_text.live_text(box) for box in self._boxes], texts)
+            shown = without_the_commas_boxes_end_on(texts)
             for index, (box, text, share) in enumerate(zip(self._boxes, texts, shares, strict=True)):
-                if (diff_text.live_text(box), self._shares[index]) != (text, share):
-                    _put(box, text, share)
+                if (as_typed[index], self._shares[index]) != (text, share):
+                    _put(box, diff_text.live_text(box) if as_typed[index] == text else shown[index],
+                         share)
                     self._shares[index] = share
         finally:
             self._writing = False
@@ -308,7 +316,8 @@ class PromptBoxes(QWidget):
     def _edited(self, box: QPlainTextEdit) -> None:
         if self._writing or box not in self._boxes:
             return
-        texts = [diff_text.live_text(each) for each in self._boxes]
+        texts = with_the_commas_boxes_end_on(
+            [diff_text.live_text(each) for each in self._boxes], self._texts)
         if texts == self._texts:
             return
         if not self._burst.isActive():
@@ -388,8 +397,8 @@ class PromptBoxes(QWidget):
                                                    self._reading.pieces(self._cut_from), strict=True):
                 countdown.show_left(self._reading.reads_well - tokens if self._in_use else None)
             return
-        for box, countdown in zip(self._boxes, self._countdowns, strict=True):
-            count_down(countdown, box, self._reading, in_use=self._in_use)
+        for box, countdown, kept in zip(self._boxes, self._countdowns, self._texts, strict=True):
+            count_down(countdown, box, self._reading, in_use=self._in_use, kept=kept)
 
 
 def _put(box: QPlainTextEdit, text: str, share: str | None) -> None:

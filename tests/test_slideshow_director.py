@@ -32,7 +32,8 @@ from origenerator.gallery.collection import (
     FolderCollection,
 )
 from origenerator.gallery.shapes import BOTH
-from origenerator.genau_flicks import GenauFilters
+from origenerator.genau_flicks import GenauFilters, GenauLeft
+from origenerator.genau_flicks import saved as genau_saved
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import slideshow_director as module
 from origenerator.gui import two_screens
@@ -3659,7 +3660,7 @@ def test_a_flip_genau_is_asked_for_is_written_on_its_item(slideshows):
     assert db.get_generation("v1")["genau_flipped"] == 1
 
 
-def test_genaus_filters_are_where_he_left_them_at_the_next_launch(slideshows):
+def test_genau_is_where_he_left_it_at_the_next_launch(slideshows):
     director, _host, _made = slideshows(FakeHost(rows=[_looping("v1")]))
     shown = director.open_on_tile("v1").shown
     shown.press(f"{shown.hud_shape}_favorites")
@@ -3668,12 +3669,33 @@ def test_genaus_filters_are_where_he_left_them_at_the_next_launch(slideshows):
 
     later.remember(saved)
 
-    assert later._genau_sources().starts_with == GenauFilters(favorites=True)
+    left = later._genau_sources().starts_with
+    assert (left.filters, left.showing) == (GenauFilters(favorites=True), True)
 
 
-def test_genaus_filters_saved_wrong_come_back_as_no_filter(slideshows):
+def test_genau_is_where_he_left_it_once_its_funestra_has_closed(slideshows):
+    director, _host, _made = slideshows(FakeHost(rows=[_looping("v1")]))
+    slideshow = director.open_on_tile("v1")
+    slideshow.shown.press(f"{slideshow.shown.hud_shape}_favorites")
+
+    slideshow.close()
+
+    assert director.remembered()["genau"]["favorites"] is True
+
+
+def test_genau_saved_wrong_comes_back_as_genau_starts(slideshows):
     director, _host, _made = slideshows()
 
-    director.remember({"genau_filters": {"favorites": "yes", "orientations": [1, 2, 3]}})
+    director.remember({"genau": {"favorites": "yes", "shapes": [1, 2, 3]}})
 
-    assert director._genau_sources().starts_with == GenauFilters()
+    assert director._genau_sources().starts_with == GenauLeft()
+
+
+def test_the_slideshow_the_app_brings_up_by_itself_goes_back_to_genau_where_he_left_it(
+        slideshows, monkeypatch):
+    director, _host, made = _core_showing_a_folder(slideshows, monkeypatch)
+    director.remember({"genau": genau_saved(GenauLeft(showing=True))})
+
+    director.two_screens.core_is_up.emit()
+
+    assert _shown_in_genau(made[0])

@@ -1,8 +1,18 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-from origenerator.genau_flicks import NO_FILTER, Flick, GenauFilters, flicks_of, restored, saved
+from origenerator.genau_flicks import (
+    AS_GENAU_STARTS,
+    NO_FILTER,
+    Flick,
+    GenauFilters,
+    GenauLeft,
+    flicks_of,
+    restored,
+    saved,
+)
 from tests.genau_support import FlicksLibrary as _Library
 from tests.genau_support import looping_row as _row
 
@@ -58,11 +68,19 @@ def test_the_files_of_every_flick_are_asked_for_in_one_go():
     assert library.slides_asked == 1
 
 
-def test_filters_saved_come_back_as_they_were():
-    filters = GenauFilters(favorites=True, enhanced=True, shapes=(False, True))
+def test_where_genau_was_left_comes_back_as_it_was_saved():
+    left = GenauLeft(filters=GenauFilters(favorites=True, enhanced=True, shapes=(False, True)),
+                     showing=True, latest=True, locked=False, seconds=9, flick="v7")
 
-    assert restored(saved(filters)) == filters
+    assert restored(json.loads(json.dumps(saved(left)))) == left
 
 
-def test_nothing_saved_comes_back_as_no_filter():
-    assert restored(None) == NO_FILTER
+def test_nothing_saved_comes_back_as_genau_starts():
+    assert restored(None) == AS_GENAU_STARTS == GenauLeft()
+
+
+def test_each_thing_saved_wrong_comes_back_as_genau_starts_it():
+    wrong = {"favorites": "yes", "enhanced": 1, "shapes": [1, 2, 3], "showing": "no",
+             "latest": None, "locked": "locked", "seconds": "nine", "flick": 7}
+
+    assert restored(wrong) == AS_GENAU_STARTS

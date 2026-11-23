@@ -23,6 +23,7 @@ from shared_ui.message_shape import HEARD_MARK, INFO, time_to_read_ms
 from shared_ui.message_window import MessageWindow
 
 from origenerator.fun_time_mode import Rect
+from origenerator.genau_flicks import AS_GENAU_STARTS, GenauLeft
 from origenerator.gui.hud_queue import QueueFoot
 from origenerator.gui.motion_hud import apply_motion_key
 from origenerator.gui.on_a_sessions_funestra import HudOnFile
@@ -217,6 +218,11 @@ class OnItsOwnFunestra(QObject):
     @property
     def mode(self) -> MainMode:
         return self._mode
+
+    def genau_left(self) -> GenauLeft:
+        if self._genau is None:
+            return AS_GENAU_STARTS
+        return self._genau.left(showing=self._mode is MainMode.GENAU)
 
     @property
     def player(self) -> PlayerOnItsOwnFunestra | None:

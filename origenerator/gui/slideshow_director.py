@@ -41,9 +41,9 @@ from origenerator.gallery.shapes import (
     SHAPES as _SHAPES,
 )
 from origenerator.gallery.shapes import shape_holds, the_one_shape_on, the_shape_of
-from origenerator.genau_flicks import NO_FILTER, GenauFilters
-from origenerator.genau_flicks import restored as genau_filters_restored
-from origenerator.genau_flicks import saved as genau_filters_saved
+from origenerator.genau_flicks import AS_GENAU_STARTS, GenauLeft
+from origenerator.genau_flicks import restored as genau_restored
+from origenerator.genau_flicks import saved as genau_saved
 from origenerator.generation_state import GenerationSource
 from origenerator.gui.action_presses import striking
 from origenerator.gui.frame_files import FrameFiles
@@ -258,7 +258,7 @@ class SlideshowDirector:
         self._room_paused = False
         self._slideshow_state = SlideshowState()
         self._picked_as_the_slideshow_up_opened: tuple[str, ...] = ()
-        self._filters, self._genau_filters = SlideshowFilters(), NO_FILTER
+        self._filters, self._genau_left = SlideshowFilters(), AS_GENAU_STARTS
         self._enhance_status: dict[str, str] = {}
         self._library = sources.library
         self._groups = SlideGroups(library=self._library, sources=sources)
@@ -436,7 +436,9 @@ class SlideshowDirector:
         return self._fun_time is None and row is not None and loops(row)
 
     def _show_genau_on(self, row: dict, path):
-        shape = row_shape(row)
+        return self._show_genau(row_shape(row), Path(path))
+
+    def _show_genau(self, shape: str, path: Path | None = None):
         up = self._window_up()
         if up is None:
             up = self._now_live(self._hand_to_the_apps_own_funestra(
@@ -446,7 +448,7 @@ class SlideshowDirector:
         else:
             self._standalone_window_shape = shape
             self._show_on_its_monitor(up.shown)
-        up.shown.show_genau(Path(path))
+        up.shown.show_genau(path)
         return up
 
     @looking_once
@@ -621,11 +623,11 @@ class SlideshowDirector:
             library=self._library, is_favorite=self._is_favorite,
             unfavorite=partial(self._host.favorite_generation, favorite=False),
             trash=self._host.trash_generation, flip=self._flip_on_its_item,
-            name_of=self._names.of, motion=self._motion, starts_with=self._genau_filters,
-            filters_changed=self._note_genau_filters)
+            name_of=self._names.of, motion=self._motion, starts_with=self._genau_left)
 
-    def _note_genau_filters(self, filters: GenauFilters) -> None:
-        self._genau_filters = filters
+    def _where_genau_stands(self) -> GenauLeft:
+        up = self._window_up() if self._fun_time is None else None
+        return self._genau_left if up is None else up.shown.genau_left()
 
     def _flip_on_its_item(self, prompt_id: str, flipped: bool) -> None:
         self._db.set_library_record(prompt_id, genau_flipped=int(flipped))
@@ -738,6 +740,8 @@ class SlideshowDirector:
             self._asked_for_by_him = False
             try:
                 self.start()
+                if self._genau_left.showing:
+                    self._show_genau(self.two_screens.slideshow_on())
             finally:
                 self._asked_for_by_him = True
 
@@ -876,6 +880,8 @@ class SlideshowDirector:
         shape = self._shape_of(slideshow) if slideshow is not None else None
         if slideshow is not None:
             self._slideshow_state = self._where_it_stands(slideshow)
+            if self._fun_time is None:
+                self._genau_left = slideshow.shown.genau_left()
         if shape is not None:
             self._regions_left[shape] = self._left_on(slideshow)
         self._live_slideshows = [entry for entry in self._live_slideshows
@@ -920,14 +926,14 @@ class SlideshowDirector:
         return {"last_show": state.saved(), "filters": SlideshowFilters.saved(self._filters),
                 "panels": as_saved(self._huds), "pace": self._pace.seconds,
                 "volume": None if volume is None else asdict(volume),
-                "genau_filters": genau_filters_saved(self._genau_filters)}
+                "genau": genau_saved(self._where_genau_stands())}
 
     def remember(self, saved) -> None:
         if self._fun_time is not None or not isinstance(saved, dict):
             return
         self._slideshow_state = SlideshowState.restored(saved.get("last_show"))
         self._filters = SlideshowFilters.restored(saved.get("filters"))
-        self._genau_filters = genau_filters_restored(saved.get("genau_filters"))
+        self._genau_left = genau_restored(saved.get("genau"))
         if type(saved.get("pace")) is int:
             self._pace.set_seconds(saved["pace"])
         self._volume_left_at = _volume_saved_as(saved.get("volume"))

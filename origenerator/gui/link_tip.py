@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QObject, QPoint, QRect, Qt, QTimer, Signal
-from PySide6.QtGui import QPainter
-from PySide6.QtWidgets import QFrame, QLabel, QStyle, QStyleOption, QVBoxLayout
+from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 from shared_ui import tooltip_look
 from shared_ui.colors import BLUE
 from shared_ui.spacing import GAP_SMALL
@@ -102,27 +101,17 @@ class _TipPopup(QFrame):
         # Qt: the ToolTip window type is frameless and focus-free yet, unlike QToolTip's window, receives the mouse.
         super().__init__(None, Qt.WindowType.ToolTip)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setStyleSheet(
             f"QFrame {{ {tooltip_look.qt_box()} }}"
             f" QLabel {{ {tooltip_look.qt_lettering()} background: transparent; border: none; }}"
         )
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(*(tooltip_look.PAD,) * 4)
+        layout.setContentsMargins(tooltip_look.PAD_H, tooltip_look.PAD_V, tooltip_look.PAD_H, tooltip_look.PAD_V)
         self.label = QLabel()
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.setTextFormat(Qt.TextFormat.RichText)
         self.label.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
         self.label.setOpenExternalLinks(False)
         layout.addWidget(self.label)
-
-    def paintEvent(self, event):
-        # Qt: a see-through window skips the style sheet's background, so the box is drawn here.
-        option = QStyleOption()
-        option.initFrom(self)
-        painter = QPainter(self)
-        self.style().drawPrimitive(QStyle.PrimitiveElement.PE_Widget, option, painter, self)
-        painter.end()
 
     def enterEvent(self, event):
         super().enterEvent(event)

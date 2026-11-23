@@ -4,11 +4,24 @@ from origenerator import motion_engine
 from origenerator.motion_engine import Motion
 
 
+class _SaidToWhoeverListens:
+    def __init__(self):
+        self._listening = []
+
+    def connect(self, listener):
+        self._listening.append(listener)
+
+    def emit(self):
+        for listener in self._listening:
+            listener()
+
+
 class FakeMotion:
     def __init__(self):
         self.state = Motion()
         self.active = False
         self.calls = []
+        self.came_round = _SaidToWhoeverListens()
 
     def toggle(self):
         self.active = not self.active

@@ -693,7 +693,7 @@ class SlideshowDirector:
             OwnWiring(motion=self._motion, **self._the_audio_standing_on_its_own()), asks=asks,
             genau=StandaloneGenau(program, self._genau_sources()))
         if self._motion is not None:
-            self._motion.came_round = shown.loop_came_round
+            self._motion.came_round.connect(shown.loop_came_round)
         slideshow = FunestraSlideshow(
             Playing(items, actions=showing.actions, hud=showing.hud, versions=showing.versions,
                     **kwargs),

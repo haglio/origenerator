@@ -181,6 +181,7 @@ class StandaloneGenau:
 
     def close(self) -> None:
         if self._driving:
+            self._driving = False
             self._beat.drive(False)
         self._beat.close()
 

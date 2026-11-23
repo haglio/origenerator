@@ -17,13 +17,14 @@ from shared_ui.testing import appending_to
 
 from origenerator.db_requests import Turn
 from origenerator.gui.cancel_bar import CancelBar
-from origenerator.gui.change_mark import DELTA, ChangeMark
+from origenerator.gui.change_mark import ChangeMark
 from origenerator.gui.generate_button import GenerateButton
 from origenerator.gui.inflight import RunReading
 from origenerator.gui.progress_bar import ProgressBar
 from origenerator.gui.request_exchange import RequestExchange, _Thumbnail
 from origenerator.gui.source_tile import SourceTile
 from origenerator.gui.stylesheet import build_stylesheet
+from tests.change_marks import shows_the_delta
 from tests.waiting import until
 
 EXCHANGE = [("a hat", "Gave her a straw hat."), ("make it red", "The hat is red now.")]
@@ -353,11 +354,25 @@ def test_resting_the_mouse_on_the_delta_beside_a_turns_thumbnail_opens_its_chang
 
     (mark,) = _placed(exchange, ChangeMark)
 
-    assert (mark.text(), mark.toolTip(), "cap" in _rest_on(mark)) == (
-        DELTA, exchange._entries()[0].tip, True)
+    assert (shows_the_delta(mark), mark.toolTip(), "cap" in _rest_on(mark)) == (
+        True, exchange._entries()[0].tip, True)
 
 
-def test_the_delta_sits_beside_the_thumbnail_on_its_right(qtbot, tmp_path):
+def test_a_click_on_the_delta_opens_nothing(qtbot, tmp_path):
+    paths = _thumbnails(tmp_path, "first")
+    exchange = _shown_at(qtbot, 400)
+    exchange.set_thumbnail_of(paths.get)
+    exchange.show_exchange([_changed("a cap", made="first")], showing="other")
+    opened = []
+    exchange.item_activated.connect(appending_to(opened))
+    (mark,) = _placed(exchange, ChangeMark)
+
+    qtbot.mouseClick(mark, Qt.MouseButton.LeftButton)
+
+    assert (opened, mark.cursor().shape()) == ([], Qt.CursorShape.WhatsThisCursor)
+
+
+def test_the_delta_sits_before_the_thumbnail(qtbot, tmp_path):
     exchange = _shown_with_a_thumbnail(qtbot, tmp_path)
     viewport = exchange._conversation.viewport()
     (mark,) = _placed(exchange, ChangeMark)
@@ -365,7 +380,7 @@ def test_the_delta_sits_beside_the_thumbnail_on_its_right(qtbot, tmp_path):
 
     thumbnail_box = QRect(thumbnail.mapTo(viewport, QPoint()), thumbnail.size())
     mark_box = QRect(mark.mapTo(viewport, QPoint()), mark.size())
-    assert (mark_box.left() > thumbnail_box.right(),
+    assert (mark_box.right() < thumbnail_box.left(),
             thumbnail_box.top() <= mark_box.center().y() <= thumbnail_box.bottom()) == (True, True)
 
 

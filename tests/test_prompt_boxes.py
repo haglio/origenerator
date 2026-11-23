@@ -245,7 +245,8 @@ def test_a_thing_typed_past_a_boxs_end_moves_whole_into_the_next_box(qtbot, type
 
     _type(qtbot, typed_into, 0, 4, " c d,")
 
-    assert _texts(typed_into) == ["a b,", "c d,"]
+    assert _texts(typed_into) == ["a b", "c d,"]
+    assert typed_into.value() == f"a b,{BOX_BREAK}c d,"
 
 
 def test_a_thing_an_older_split_cut_in_two_is_whole_again_once_its_box_is_typed_in(
@@ -255,7 +256,39 @@ def test_a_thing_an_older_split_cut_in_two_is_whole_again_once_its_box_is_typed_
 
     _type(qtbot, typed_into, 0, 0, " ")
 
-    assert _texts(typed_into) == [" a b,", "c d,", "e"]
+    assert _texts(typed_into) == [" a b", "c d", "e"]
+    assert typed_into.value() == f" a b,{BOX_BREAK}c d,{BOX_BREAK}e"
+
+
+def test_a_box_shows_no_comma_where_it_ends_and_the_prompt_keeps_it(typed_into):
+    typed_into.set_value(f"a b,{BOX_BREAK}c d")
+
+    assert _texts(typed_into) == ["a b", "c d"]
+    assert typed_into.value() == f"a b,{BOX_BREAK}c d"
+
+
+def test_typing_in_a_box_keeps_the_comma_the_box_ended_on(qtbot, typed_into):
+    typed_into.set_value(f"a,{BOX_BREAK}c d")
+
+    _type(qtbot, typed_into, 0, 1, " b")
+
+    assert _texts(typed_into) == ["a b", "c d"]
+    assert typed_into.value() == f"a b,{BOX_BREAK}c d"
+
+
+def test_a_comma_he_types_where_a_box_ends_stays_in_front_of_him(qtbot, typed_into):
+    typed_into.set_value(f"a,{BOX_BREAK}c d")
+
+    _type(qtbot, typed_into, 0, 1, ",")
+
+    assert _texts(typed_into) == ["a,", "c d"]
+    assert typed_into.value() == f"a,{BOX_BREAK}c d"
+
+
+def test_a_box_counts_the_comma_it_ends_on_as_the_flow_does(prompt):
+    prompt.set_value(f"{_words(70)},{BOX_BREAK}cat")
+
+    assert _shown(prompt)[0][0] == "4 left"
 
 
 def test_words_typed_in_cascade_on_through_the_boxes(qtbot, typed_into):

@@ -140,6 +140,17 @@ def _ends_a_thing(text: str) -> bool:
     return text.replace(CARET, "").rstrip().endswith(",")
 
 
+def without_the_commas_boxes_end_on(texts: list[str]) -> list[str]:
+    return [*(text.rstrip()[:-1].rstrip() if _ends_a_thing(text) else text for text in texts[:-1]),
+            *texts[-1:]]
+
+
+def with_the_commas_boxes_end_on(shown: list[str], kept: list[str]) -> list[str]:
+    ended_a_thing = [_ends_a_thing(text) for text in kept[:len(shown) - 1]]
+    return [f"{text.rstrip()}," if ended and text.strip() and not _ends_a_thing(text) else text
+            for text, ended in zip(shown, [*ended_a_thing, *[False] * len(shown)], strict=False)]
+
+
 def _things(text: str) -> list[str]:
     things, current = [], ""
     for unit in _units(text):

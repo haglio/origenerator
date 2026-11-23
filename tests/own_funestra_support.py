@@ -26,7 +26,7 @@ from tests.genau_support import HeardBeat
 VIEWPORT = (1280, 720)
 USUAL_WEARING = Wearing()
 GENAU_ON_A_FAKE_ENGINE = EngineSeams(
-    decode=lambda _path: [np.zeros((8, 16, 3), dtype=np.uint8)] * 4,
+    decode=lambda _path: [np.zeros((8, 16, 3), dtype=np.uint8)] * 4, frame_rate=lambda _flick: 30.0,
     start_thread=every_thread_now_but_the_ones_that_run_for_good, off_the_loop=AtOnce)
 
 

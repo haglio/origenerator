@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from PySide6.QtWidgets import QWidget
+from shared_ui.flow_layout import FlowLayout
 
-from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.tiles_in_sight import TilesInSight
 
 

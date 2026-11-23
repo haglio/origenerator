@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from shared_ui.colors import TEXT_PRIMARY, YELLOW
+from shared_ui.flow_layout import FlowLayout
 from shared_ui.icons import icon_then_text, qt_icon
 from shared_ui.message_label import set_marked_text
 from shared_ui.orientation import orientation_of_size as shape_of_size
@@ -77,7 +78,6 @@ from origenerator.gui.enhance_versions import (
     EnhanceVersions,
     RunningEnhancement,
 )
-from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.forms_ahead import FormsAhead
 from origenerator.gui.generate_button import (
     DEFAULT_CAPTION,

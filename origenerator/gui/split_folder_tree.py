@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.flow_layout import FlowLayout
 from shared_ui.icon_button import fill_square_with_icon
 from shared_ui.icons import qt_icon
 from shared_ui.spacing import (
@@ -35,7 +36,6 @@ from origenerator.gallery.shapes import (
 )
 from origenerator.gallery.tree import ALL_KEY
 from origenerator.gui import folder_icons
-from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tree import FolderTree
 from origenerator.gui.panes import PaneSplitter
 from origenerator.gui.stylesheet import CHOSEN

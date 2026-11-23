@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QVBoxLayout, QWidget
+from shared_ui.flow_layout import FlowLayout
 from shared_ui.spacing import GAP_MEDIUM
 
 from origenerator.content import non_ai_clip_heading
@@ -18,7 +19,6 @@ from origenerator.gallery import (
 from origenerator.gallery.non_ai import alternate_versions, started_from_no_image
 from origenerator.gui.change_tip import change_tip
 from origenerator.gui.collapsible_section import CollapsibleSection
-from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.source_tile import SourceTile
 from origenerator.gui.trash_box import TILE_GAP, place_tiles
 from origenerator.media import MediaType

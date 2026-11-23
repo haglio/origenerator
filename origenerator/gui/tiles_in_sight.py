@@ -3,8 +3,7 @@ from __future__ import annotations
 from bisect import bisect_left, bisect_right
 
 from PySide6.QtCore import QPoint
-
-from origenerator.gui.flow_layout import FlowLayout
+from shared_ui.flow_layout import FlowLayout
 
 
 class TilesInSight:

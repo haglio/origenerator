@@ -10,10 +10,10 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.flow_layout import FlowLayout
 from shared_ui.spacing import GAP_SMALL
 
 from origenerator.gallery import ENHANCE_WORKFLOW
-from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.no_wheel import NoWheelDoubleSpinBox, NoWheelDropdown
 from origenerator.gui.param_fields import choose_option, offer_options
 from origenerator.gui.param_help import definition_help

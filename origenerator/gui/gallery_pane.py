@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.flow_layout import FlowLayout
 from shared_ui.spacing import GAP_DIALOG, GAP_MEDIUM, MARGIN_DIALOG
 
 from origenerator import gallery, search
@@ -31,7 +32,6 @@ from origenerator.gui import folder_icons, icons
 from origenerator.gui.collapsible_section import FOLD, FoldHeader
 from origenerator.gui.corner_buttons import enhance_state
 from origenerator.gui.deferred import defer
-from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderMarks, FolderTile
 from origenerator.gui.inflight import (
     CANCEL_TEXT,

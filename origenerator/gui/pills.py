@@ -16,6 +16,7 @@ from shared_ui.colors import (
     TEXT_SECONDARY,
     hovered,
 )
+from shared_ui.flow_layout import FlowLayout
 from shared_ui.icons import qt_icon
 from shared_ui.spacing import (
     BUTTON_ICON,
@@ -30,7 +31,6 @@ from shared_ui.spacing import (
 
 from origenerator.gui import square_buttons
 from origenerator.gui.dashed_edge import dashed_pen
-from origenerator.gui.flow_layout import FlowLayout
 
 _X = BUTTON_ICON
 _X_INK = BUTTON_ICON - 2 * BUTTON_ICON_INSET

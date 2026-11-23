@@ -12,6 +12,7 @@ from app_support.threading_utils import wait_until
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QMovie
 from PySide6.QtWidgets import QApplication, QLabel, QWidget
+from shared_ui.flow_layout import FlowLayout
 
 from origenerator import gallery, search
 from origenerator.db_generations import ENHANCE_WHEN_FINISHED
@@ -26,7 +27,6 @@ from origenerator.gallery.collection import (
 )
 from origenerator.gallery.shapes import LANDSCAPE, SHAPES_AND_BOTH
 from origenerator.gui import gallery_pane, pane_place
-from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.gallery_pane import (
     GalleryPane,
@@ -1255,10 +1255,9 @@ def test_scroll_steps_that_draw_no_page_measure_nothing_and_tell_only_the_tiles_
     told = []
     monkeypatch.setattr(ItemTile, "set_in_sight",
                         lambda tile, in_sight: told.append((tile.prompt_id, in_sight)))
-    worked_out = []
-    rows = FlowLayout._rows
-    monkeypatch.setattr(FlowLayout, "_rows",
-                        lambda layout, area, *rest: worked_out.append(1) or rows(layout, area, *rest))
+    flows = scroll.widget().findChildren(FlowLayout)
+    assert flows, "no flow layout found to count the measuring of"
+    measured_before = [flow.times_measured for flow in flows]
 
     tiles = list(pane._thumb_widgets.values())
     crossing = []
@@ -1269,7 +1268,7 @@ def test_scroll_steps_that_draw_no_page_measure_nothing_and_tell_only_the_tiles_
         crossing += [(tile.prompt_id, after[tile]) for tile in tiles if after[tile] != before[tile]]
 
     assert len(pane._thumb_widgets) == drawn, "the steps were meant to draw nothing"
-    assert (worked_out, told) == ([], crossing), (
+    assert ([flow.times_measured for flow in flows], told) == (measured_before, crossing), (
         "every tile drawn was measured and told again on each step, where only the ones "
         "that came into sight or went out of it needed telling")
 

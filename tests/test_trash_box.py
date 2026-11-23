@@ -5,8 +5,8 @@ from itertools import groupby
 from PySide6.QtCore import QPoint
 from PySide6.QtGui import QImage, QRegion
 from PySide6.QtWidgets import QApplication, QWidget
+from shared_ui.flow_layout import FlowLayout
 
-from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.trash_box import place_tiles
 
 _TILE = 96

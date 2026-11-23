@@ -44,6 +44,7 @@ _MIN_SECTION_HEIGHT = 90
 _GAP_UNDER_THE_CHOICES = 2
 _UNDER_A_WORDS_INK = 5  # clear rows under a heading's word in Windows' Segoe UI and the offscreen font
 _HEADING_FOOT = GAP_MEDIUM - _UNDER_A_WORDS_INK
+_ROOM_BESIDE_A_MARK = 1  # Qt at Fun Time's 18/28 scale cuts the last column of a label as wide as its pixmap
 
 _SEPARATE_WORD = "Separate"
 _TOGETHER_WORD = "Together"
@@ -104,6 +105,8 @@ def _heading(shape: str) -> QFrame:
     mark = QLabel()
     mark.setObjectName("treeSectionMark")
     mark.setPixmap(folder_icons.shape_mark(shape))
+    mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    mark.setFixedWidth(mark.pixmap().width() + 2 * _ROOM_BESIDE_A_MARK)
     row.addWidget(mark)
 
     name = QLabel(SHAPE_LABELS[shape])

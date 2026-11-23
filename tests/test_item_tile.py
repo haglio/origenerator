@@ -307,6 +307,18 @@ def test_every_corner_of_a_tile_is_up_at_rest(qtbot):
         "control that only appears once the tile is swept is one the user has to go looking for")
 
 
+def test_a_tiles_image_or_video_icon_stands_in_from_its_images_corner_like_its_star(qtbot):
+    tw = ItemTile("p1", None, "label", TileAppearance(media_type="video", video_seconds=7))
+    qtbot.addWidget(tw)
+    image, star = tw._image_label.geometry(), _corners(tw)[0].geometry()
+    (icon,) = tw.findChildren(ItemTypeIcon)
+    (length,) = tw.findChildren(VideoLength)
+
+    assert (icon.x() - image.left(), icon.y() - image.top()) == (
+        image.right() - star.right(), star.top() - image.top())
+    assert (length.y(), length.x() > icon.geometry().right()) == (icon.y(), True)
+
+
 def test_a_favorite_tile_shows_it_in_the_favorite(qtbot):
     tw = ItemTile("p1", None, "label", TileAppearance(favorite=True))
     qtbot.addWidget(tw)

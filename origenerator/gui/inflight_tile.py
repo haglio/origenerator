@@ -80,7 +80,7 @@ class InFlightTile(QWidget):
         self.update_item(item)
 
         if item.media_type:
-            ItemTypeIcon(item.media_type, self)
+            ItemTypeIcon(item.media_type, self).place(self._image.geometry())
 
     @property
     def key(self) -> str:

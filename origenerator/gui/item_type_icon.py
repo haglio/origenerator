@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPoint, QRect, Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QLabel, QWidget
 from shared_ui.spacing import BUTTON_RADIUS, GAP_SMALL, MARGIN_STANDARD
@@ -22,6 +22,8 @@ class ItemTypeIcon(QLabel):
     def __init__(self, media_type: str, tile: QWidget):
         super().__init__(tile)
         self.media_type = media_type
+        self._corner = QPoint()
+        self._beside_it: list[VideoLength] = []
         self.draw_at_the_huds_scale_again()
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.raise_()
@@ -31,10 +33,19 @@ class ItemTypeIcon(QLabel):
             self.media_type = media_type
             self._wear(media_type)
 
+    def place(self, area: QRect) -> None:
+        self._corner = area.topLeft()
+        self.draw_at_the_huds_scale_again()
+
     def draw_at_the_huds_scale_again(self) -> None:
         inset = square_buttons.landing(MARGIN_STANDARD)
         self._wear(self.media_type)
-        self.move(inset, inset)
+        self.move(self._corner + QPoint(inset, inset))
+        for beside in self._beside_it:
+            beside.draw_at_the_huds_scale_again()
+
+    def keep_beside(self, length: VideoLength) -> None:
+        self._beside_it.append(length)
 
     def _wear(self, media_type: str):
         pixmap = icons.item_type_icon(media_type, square_buttons.landing(icons.ITEM_TYPE_ICON_SIZE))
@@ -48,6 +59,7 @@ class VideoLength(QLabel):
         self.setStyleSheet(_LENGTH_CSS)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._beside = beside
+        beside.keep_beside(self)
         self.draw_at_the_huds_scale_again()
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.raise_()

@@ -530,6 +530,20 @@ def test_together_s_line_sits_as_far_under_its_choices_as_portrait_s_under_its_w
     assert under_the_choices == under_the_word
 
 
+def test_a_headings_shape_icon_has_room_either_side_so_no_scale_cuts_its_edge(qtbot):
+    pane = _laid_out(qtbot, 300)
+    marks = [label for label in pane.findChildren(QLabel)
+             if label.objectName() == "treeSectionMark"]
+
+    assert marks
+    for mark in marks:
+        spare = mark.width() - mark.pixmap().width()
+        assert (spare >= 2, mark.alignment() & Qt.AlignmentFlag.AlignHCenter) == (
+            True, Qt.AlignmentFlag.AlignHCenter), (
+            "Fun Time draws this window at 18/28, where a label exactly as wide as its "
+            "pixmap loses its last column and the Landscape frame reads as a C")
+
+
 def _clear_rows_over_the_line(pane, shape, above) -> int:
     image = pane.grab().toImage()
     (rule,) = pane._sections[shape].findChildren(QFrame, "treeSectionRule")

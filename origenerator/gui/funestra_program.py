@@ -8,7 +8,7 @@ import socket
 import subprocess
 import sys
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 
 from app_support.file_channel import publish_whole
@@ -53,10 +53,10 @@ def a_free_port() -> int:
         return probe.getsockname()[1]
 
 
-def genau_beside(folder: Path) -> GenauLaunch:
+def genau_beside(folder: Path, *, beat_port: int) -> GenauLaunch:
     command, paused, status, drive, flicks = (folder / name for name in _GENAUS_FILES)
     return GenauLaunch(command=command, paused=paused, status=status, drive=drive, flicks=flicks,
-                       beat_port=0)
+                       beat_port=beat_port)
 
 
 def _the_interpreter_that_is_not_pythonw() -> Path:
@@ -87,14 +87,13 @@ class FunestraProgram:
         self._app_pid = app_pid
         self._process = None
         self._let_it_take_the_keyboard = let_it_take_the_keyboard
-        self._free_port = free_port
         self.place: Rect | None = None
         self.minimized = False
         playlist, command, status, hud, asks, paused = (self._folder / name for name in _FILES)
         self.channel = FunestraChannel(playlist, command, status, hud)
         self.asks_file = asks
         self.paused_file = paused
-        self.genau = genau_beside(self._folder)
+        self.genau = genau_beside(self._folder, beat_port=free_port())
 
     @property
     def running(self) -> bool:
@@ -104,7 +103,6 @@ class FunestraProgram:
         self._folder.mkdir(parents=True, exist_ok=True)
         offer_the_copy_beside_the_checkouts()
         channel = self.channel
-        self.genau = replace(self.genau, beat_port=self._free_port())
         command = launch_command(
             self._python_exe or _the_interpreter_that_is_not_pythonw(),
             Channels(playlist=channel.playlist, command=channel.command_file,

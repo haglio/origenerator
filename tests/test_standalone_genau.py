@@ -353,6 +353,18 @@ def test_each_time_the_motion_comes_round_genau_is_told_to_meet_it(tmp_path):
     assert genau.beat.said[-1] == "sync"
 
 
+def test_closed_it_says_no_more_when_the_motion_comes_round(tmp_path):
+    motion = _motion()
+    genau = Genau(tmp_path, [looping_row("one")], motion=motion)
+    motion.start()
+    genau.genau.follow_the_beat(showing=True)
+    genau.genau.close()
+
+    genau.genau.loop_came_round()
+
+    assert genau.beat.said[-2:] == ["drive 0", "closed"]
+
+
 def test_with_kino_showing_it_follows_no_beat(tmp_path):
     motion = _motion()
     genau = Genau(tmp_path, [looping_row("one")], motion=motion)

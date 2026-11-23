@@ -81,7 +81,7 @@ def test_the_program_is_handed_the_files_the_app_reaches_it_through(tmp_path):
                 args.paused}) == 6
 
 
-def test_the_program_carries_genau_on_files_of_its_own_and_a_beat_port_free_at_launch(tmp_path):
+def test_the_program_carries_genau_on_files_of_its_own_and_a_beat_port_of_its_own(tmp_path):
     program, started = _program(tmp_path, free_port=lambda: 50777)
 
     program.start()

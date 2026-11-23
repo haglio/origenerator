@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -110,7 +109,7 @@ class FakeProgram:
         self.channel = _HandedStraightAcross(self, folder)
         self.asks_file = folder / "asks.txt"
         self.paused_file = folder / "paused.txt"
-        self.genau = replace(genau_beside(folder), beat_port=a_free_port())
+        self.genau = genau_beside(folder, beat_port=a_free_port())
         self.engine = FakeEngine()
         self.window = _Window()
         self.funestra: Funestra | None = None

@@ -73,6 +73,28 @@ def test_the_genau_selector_shows_genau_and_holds_the_slideshow_still(tmp_path):
     assert up.slideshow.is_showing()
 
 
+def test_while_genau_shows_the_osr2_is_told_no_video_of_the_slideshows_plays(tmp_path):
+    up, _library, _gallery = _shown(tmp_path)
+    told = []
+    up.slideshow.media_changed.connect(lambda: told.append(up.slideshow.video_on_screen()))
+    assert up.slideshow.video_on_screen() is not None
+
+    up.shown.press("genau_activate")
+
+    assert told == [None]
+
+
+def test_back_in_kino_the_osr2_is_told_the_slideshows_video_plays_again(tmp_path):
+    up, _library, _gallery = _shown(tmp_path)
+    up.shown.press("genau_activate")
+    told = []
+    up.slideshow.media_changed.connect(lambda: told.append(up.slideshow.video_on_screen()))
+
+    up.shown.press("main_kino_activate")
+
+    assert told and told[-1] is not None
+
+
 def test_the_kino_selector_brings_the_slideshow_back_where_it_was(tmp_path):
     up, _library, _gallery = _shown(tmp_path)
     up.shown.press(f"{SHAPE}_next")

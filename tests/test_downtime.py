@@ -5,6 +5,8 @@ import types
 from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from origenerator import collection_notes, downtime, flick_finales, gallery, lora_training
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.comfyui_inputs import ComfyFolders
@@ -50,6 +52,15 @@ def test_nothing_is_started_while_origenerator_is_open():
 
     assert machine.queued == 0
     assert turn.holds_the_graphics_card is False
+
+
+@pytest.mark.parametrize(("machine", "said"), [
+    (_Machine(app_open=True), "nothing to do while Origenerator is open"),
+    (_Machine(training=True), "nothing to do while a fix is training"),
+    (_Machine(comfyui_busy=True), "nothing to do while ComfyUI is still working"),
+])
+def test_a_turn_that_starts_nothing_says_why_in_a_sentence_evolver_can_show(machine, said):
+    assert machine.turn().did == said
 
 
 def test_the_work_origenerator_left_as_it_closed_is_handed_over_before_any_notes():
@@ -158,7 +169,7 @@ def test_the_command_evolver_runs_says_what_it_did_and_whether_it_holds_the_tile
     assert downtime.main() == 0
 
     assert json.loads(capsys.readouterr().out) == {
-        "did": "nothing: Origenerator is open", "holds_the_graphics_card": False}
+        "did": "nothing to do while Origenerator is open", "holds_the_graphics_card": False}
 
 
 def _answered(request, timeout):

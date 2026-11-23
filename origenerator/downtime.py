@@ -50,11 +50,11 @@ class Machine:
 
 def _nothing_while_it_is_in_use(machine: Machine) -> Turn | None:
     if machine.app_open():
-        return Turn("nothing: Origenerator is open", machine.training_running())
+        return Turn("nothing to do while Origenerator is open", machine.training_running())
     if machine.training_running():
-        return Turn("nothing: a fix is training", True)
+        return Turn("nothing to do while a fix is training", True)
     if machine.comfyui_busy():
-        return Turn("nothing: ComfyUI is still working", False)
+        return Turn("nothing to do while ComfyUI is still working", False)
     return None
 
 
@@ -137,7 +137,7 @@ def hand_comfyui_the_work_left(db, client, ui: AppState) -> None:
 
 def main() -> int:
     if is_branch_session():
-        print(json.dumps({"did": "nothing: a preview leaves this to production",
+        print(json.dumps({"did": "nothing to do, since a preview leaves this to production",
                           "holds_the_graphics_card": False}))
         return 0
     configure_logging("", config.STATE_DIR / "origenerator.log")

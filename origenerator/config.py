@@ -7,7 +7,12 @@ from typing import Any
 
 from app_support import flick_folder, haglio_settings, kino_folder, siblings
 
-from origenerator.branch_session import THIS_CHECKOUT, is_branch_session
+from origenerator.branch_session import (
+    THIS_CHECKOUT,
+    is_branch_session,
+    production_checkout,
+    the_librarys_checkout,
+)
 from origenerator.content import load_content
 from origenerator.output_places import OutputPlaces
 
@@ -69,8 +74,8 @@ def project_dir(name: str, roots: tuple[Path, ...] | None = None) -> Path:
 
 
 RECORDS_DIR = LIBRARY_ROOT / "app_data" / "origenerator"
-_THE_LIBRARYS_CHECKOUT = project_dir("origenerator")
-PRODUCTION_CHECKOUT = _THE_LIBRARYS_CHECKOUT if _BRANCH_SESSION else PROJECT_DIR
+_THE_LIBRARYS_CHECKOUT = the_librarys_checkout(PROJECT_ROOTS)
+PRODUCTION_CHECKOUT = production_checkout(roots=PROJECT_ROOTS)
 LIBRARY_STATE_DIR = PRODUCTION_CHECKOUT / "state" if _BRANCH_SESSION else STATE_DIR
 DB_PATH = LIBRARY_STATE_DIR / "origenerator.db"
 OPENS_THE_LIBRARY = (not _TOLD_WHERE_STATE_IS and LIBRARY_STATE_DIR.resolve()

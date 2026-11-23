@@ -804,6 +804,54 @@ def test_a_request_for_a_part_the_prompt_already_has_asks_for_more_of_it(answer,
                                     "for": request_words}]
 
 
+_HIS_HAT = ("a tall felt hat", 1.5)
+
+
+@pytest.mark.parametrize("answer", [
+    '{"changes": [], "why": "It already has a tall hat."}',
+    '{"changes": [{"more": "a tall hat", "stronger": "(a towering hat:1.3)", "opposite": "", '
+    '"for": "tall hat"}]}'])
+def test_more_of_a_part_he_names_is_written_the_way_his_prompts_usually_write_it(answer):
+    ask, _asked = _answers_in_turn(answer)
+
+    answered = ask_the_model("a man, (a tall hat:1.1), a pier", "", "tall hat",
+                             WhatIsKnown(usual_writing=_HIS_HAT), llm=ask)
+
+    assert answered["changes"] == [{"more": "a tall hat", "stronger": "a tall felt hat",
+                                    "weight": 1.5, "opposite": "", "for": "tall hat"}]
+
+
+def test_more_of_something_else_than_the_part_he_names_keeps_the_models_words():
+    answer = '{"changes": [{"more": "a pier", "stronger": "a long pier", "for": "tall hat"}]}'
+    ask, _asked = _answers_in_turn(answer)
+
+    answered = ask_the_model("a man, a tall hat, a pier", "", "tall hat",
+                             WhatIsKnown(usual_writing=_HIS_HAT), llm=ask)
+
+    assert answered["changes"] == json.loads(answer)["changes"]
+
+
+def test_a_part_strengthened_his_usual_way_is_one_change_said_once():
+    ask, _asked = _answers_in_turn('{"changes": [], "why": "It already has a tall hat."}')
+
+    revision = work_out("a man, (a tall hat:1.1), a pier", "", "tall hat", usual_writing=_HIS_HAT,
+                        ask=lambda *told: ask_the_model(*told, llm=ask))
+
+    assert revision.positive == "(a tall felt hat:1.5), a man, a pier"
+    assert revision.answer == (
+        'Replaced "(a tall hat:1.1)" with "(a tall felt hat:1.5)" in the Positive prompt. '
+        'Moved "(a tall felt hat:1.5)" earlier in the Positive prompt.')
+
+
+def test_a_part_already_written_his_usual_way_weighs_one_step_more():
+    ask, _asked = _answers_in_turn('{"changes": [], "why": "It already has a tall hat."}')
+
+    revision = work_out("(a tall felt hat:1.5), a man", "", "tall felt hat", usual_writing=_HIS_HAT,
+                        ask=lambda *told: ask_the_model(*told, llm=ask))
+
+    assert revision.positive == "(a tall felt hat:1.6), a man"
+
+
 def test_a_request_the_model_answered_with_a_change_of_its_own_is_left_to_the_model():
     answer = '{"changes": [{"more": "a tall hat", "stronger": "a very tall hat", "for": "tall hat"}]}'
     ask, _asked = _answers_in_turn(answer)

@@ -154,6 +154,27 @@ def test_what_his_prompts_usually_have_with_the_asked_thing_goes_to_the_model_to
     assert seen["company"] == UsualCompany(positive=("a dog", "wagging tail"), negative=())
 
 
+def test_how_his_prompts_usually_write_the_asked_thing_goes_to_the_model_too(qtbot, tmp_path):
+    seen = {}
+
+    def work_out(positive, negative, words, **known):
+        seen["usual_writing"] = known["usual_writing"]
+        return "the revision"
+
+    answerer, db, _jobs, parent = _answerer(qtbot, tmp_path, work_out=work_out)
+    for number, scene in enumerate(("a park", "a sofa", "a beach")):
+        db.insert_generation(NewGeneration(
+            prompt_id=f"g{number}", workflow_name="sdxl_t2i", workflow_version="v002",
+            positive_prompt=f"{scene}, (a spotted dog:1.4)", negative_prompt="", params_json="{}",
+            workflow_json="{}", source="generated"))
+    answers = []
+
+    answerer.ask("fresh", ("a spotted dog", ""), "spotted dog", owner=parent, then=answers.append)
+
+    until(lambda: answers == ["the revision"])
+    assert seen["usual_writing"] == ("a spotted dog", 1.4)
+
+
 def test_the_line_is_let_go_even_when_the_one_who_asked_is_gone(qtbot, tmp_path):
     answerer, _db, jobs, _parent = _answerer(
         qtbot, tmp_path, work_out=lambda *args, **settings: "the revision")

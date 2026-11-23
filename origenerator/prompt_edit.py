@@ -20,7 +20,7 @@ from origenerator.prompt_checks import things_of
 from origenerator.prompt_terms import without_nothing_weighted
 from origenerator.prompts import REQUEST_SYSTEM_PROMPT
 from origenerator.request_changes import Prompts, apply_changes, words_of_his
-from origenerator.usual_company import UsualCompany, usual_company
+from origenerator.usual_company import UsualCompany, usual_company, usual_writing
 from origenerator.workflows.base import scene_prompts, scene_text, story_of
 
 logger = logging.getLogger(__name__)
@@ -178,6 +178,7 @@ class WhatIsKnown:
     settings: tuple = ()
     weights: bool = True
     company: UsualCompany = field(default_factory=UsualCompany)
+    usual_writing: tuple[str, float] | None = None
 
 
 def work_out(positive: str, negative: str, request: str, *, in_scenes: bool = False, ask=None,
@@ -229,7 +230,8 @@ def _puts_into_the_positive_prompt(change) -> bool:
 
 def _his_words(told: WhatIsKnown) -> frozenset:
     notes = told.notes.as_told() if told.notes is not None and told.notes.complete else ""
-    return words_of_his([positive for positive, _negative in told.examples] + [notes])
+    his_way = told.usual_writing[0] if told.usual_writing else ""
+    return words_of_his([positive for positive, _negative in told.examples] + [notes, his_way])
 
 
 _SHORTEST_ROOT = 3
@@ -300,6 +302,13 @@ def company_of(request: str, prompts) -> UsualCompany:
     return UsualCompany(
         positive=tuple(dict.fromkeys(part for company in found for part in company.positive)),
         negative=tuple(dict.fromkeys(part for company in found for part in company.negative)))
+
+
+def usual_writing_of(request: str, prompts) -> tuple[str, float] | None:
+    each = _each_thing_asked_for(request)
+    if len(each) != 1:
+        return None
+    return usual_writing(prompts, lambda thing: _touches(each[0], thing) == len(each[0]))
 
 
 def _notes_touching(request: str, notes: CollectionNotes) -> str:
@@ -578,6 +587,16 @@ def _wanting_more_of_what_is_there(answer: dict, request: str, positive: str) ->
     return {**answer, "changes": [{"more": part, "stronger": part, "opposite": "", "for": request}]}
 
 
+def _written_his_usual_way(answer: dict, request: str, usual: tuple[str, float] | None) -> dict:
+    each, changes = _each_thing_asked_for(request), answer.get("changes")
+    if usual is None or len(each) != 1 or not isinstance(changes, list):
+        return answer
+    return {**answer, "changes": [
+        {**change, "stronger": usual[0], "weight": usual[1]}
+        if isinstance(change, dict) and _touches(each[0], str(change.get("more") or "")) == len(each[0])
+        else change for change in changes]}
+
+
 def _adding_what_he_asked_for(answer: dict, request: str) -> dict:
     thing, changes = _thing_he_asks_to_add(request), answer.get("changes")
     only_the_negative_prompt = isinstance(changes, list) and bool(changes) and all(
@@ -621,8 +640,9 @@ def ask_the_model(positive: str, negative: str, request: str, known: WhatIsKnown
         return asking([*messages, {"role": "assistant", "content": local_llm.text_of(said)},
                        {"role": "user", "content": question}], temperature=0)
 
+    answer = _wanting_more_of_what_is_there(local_llm.answer_of(said), request, positive)
     answer = _adding_what_he_asked_for(
-        _wanting_more_of_what_is_there(local_llm.answer_of(said), request, positive), request)
+        _written_his_usual_way(answer, request, known.usual_writing), request)
     its_own = _its_own_company(answer, (request, positive), known.company.positive, ask_again)
     answer = _holding_its_own_company(
         _leaving_open_what_he_did(answer, request, ask_again, " ".join(its_own)),

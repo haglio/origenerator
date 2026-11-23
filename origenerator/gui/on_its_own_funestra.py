@@ -167,7 +167,7 @@ class OnItsOwnFunestra(QObject):
         self.over_the_funestra = _WhereTheFunestraIs()
         self.queue_foot = QueueFoot(actions, beside=lambda: self.over_the_funestra)
         self._hud = HudOnFile(program.channel.hud_file, shape, self.queue_foot)
-        self.player = PlayerOnItsOwnFunestra(wiring.clock)
+        self._player = PlayerOnItsOwnFunestra(wiring.clock)
         self.channel = _FollowedChannel(program.channel, self, genau)
         self.channel.heard.connect(self._heard_from_the_funestra)
         self._tuner = None if wiring.radio is None else wiring.radio.held_by_a_slideshow()
@@ -218,6 +218,10 @@ class OnItsOwnFunestra(QObject):
     def mode(self) -> MainMode:
         return self._mode
 
+    @property
+    def player(self) -> PlayerOnItsOwnFunestra | None:
+        return self._player if self._mode is MainMode.KINO else None
+
     def show_kino(self) -> None:
         self._show(MainMode.KINO)
 
@@ -235,6 +239,7 @@ class OnItsOwnFunestra(QObject):
         self._program.channel.send(f"{SHOW} {mode}")
         self._pause_what_does_not_show()
         self.hud_changed()
+        self._slideshow.media_changed.emit()
 
     def _pick(self, mode: MainMode) -> None:
         if mode is MainMode.GENAU:
@@ -333,7 +338,7 @@ class OnItsOwnFunestra(QObject):
             self._hear_genau(genaus)
         if not fields:
             return
-        self.player.heard(fields)
+        self._player.heard(fields)
         if fields.get("window"):
             self._note.stay_above(int(fields["window"]))
         status = parse_status(fields)

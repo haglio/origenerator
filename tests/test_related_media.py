@@ -510,9 +510,20 @@ def _batch_modified(prompt_id, source_prompt_id):
             "old_negative": "", "new_negative": ""}
 
 
+def _tile_of(section, prompt_id):
+    return next(tile for tile in section.findChildren(SourceTile) if tile.prompt_id == prompt_id)
+
+
 def _tip_of(section, prompt_id):
-    return next(tile.toolTip() for tile in section.findChildren(SourceTile)
-                if tile.prompt_id == prompt_id)
+    return _tile_of(section, prompt_id).change_mark.toolTip()
+
+
+def _rest_on(widget):
+    place = widget.rect().center()
+    QToolTip.hideText()
+    QApplication.sendPostedEvents()
+    QApplication.sendEvent(widget, QHelpEvent(QEvent.Type.ToolTip, place, widget.mapToGlobal(place)))
+    return QToolTip.text() if QToolTip.isVisible() else ""
 
 
 def test_hovering_batch_modified_from_shows_the_image_before_then_this_one_then_the_change(
@@ -555,21 +566,51 @@ def test_hovering_requested_from_and_into_shows_the_same_before_and_after(make_r
         assert tip.index(before["thumbnail_path"]) < tip.index(after["thumbnail_path"]) < tip.index("cap")
 
 
-def test_resting_the_mouse_on_a_batch_modified_thumbnail_opens_its_tooltip(make_related, tmp_path):
+def test_resting_the_mouse_on_a_batch_modified_tiles_delta_opens_the_change(make_related, tmp_path):
     before = _with_thumbnail(_image_row(), tmp_path)
     after = _with_thumbnail(_image_row("img2", "sdxl_t2i_img2.png"), tmp_path)
     related = make_related(rows=[before, after], requests=[_batch_modified("img2", "img1")])
     related.show()
     related.show_row(after, [])
-    thumbnail = next(tile for tile in related._batch_modified.findChildren(SourceTile)
-                     if tile.prompt_id == "img1")._thumb
-    place = thumbnail.rect().center()
 
-    QApplication.sendPostedEvents()
-    QApplication.sendEvent(thumbnail, QHelpEvent(QEvent.Type.ToolTip, place,
-                                                 thumbnail.mapToGlobal(place)))
+    assert "cap" in _rest_on(_tile_of(related._batch_modified, "img1").change_mark)
 
-    assert "cap" in QToolTip.text()
+
+def test_resting_the_mouse_on_the_rest_of_a_batch_modified_tile_opens_nothing(
+        make_related, tmp_path):
+    before = _with_thumbnail(_image_row(), tmp_path)
+    after = _with_thumbnail(_image_row("img2", "sdxl_t2i_img2.png"), tmp_path)
+    related = make_related(rows=[before, after], requests=[_batch_modified("img2", "img1")])
+    related.show()
+    related.show_row(after, [])
+    tile = _tile_of(related._batch_modified, "img1")
+
+    assert [_rest_on(part) for part in (tile, tile._thumb, tile._name)] == ["", "", ""]
+
+
+def test_a_requested_tiles_delta_sits_before_its_heading(make_related, tmp_path):
+    before = _with_thumbnail(_image_row(), tmp_path)
+    after = _with_thumbnail(_image_row("img2", "sdxl_t2i_img2.png"), tmp_path)
+    request = {**_batch_modified("img2", "img1"), "asked": "a cap instead"}
+    related = make_related(rows=[before, after], requests=[request])
+    related.show()
+    related.show_row(after, [])
+    tile = _tile_of(related._requests, "img1")
+    tile.layout().activate()
+
+    mark, heading = (part.mapTo(tile, part.rect().center()) for part in (tile.change_mark, tile._heading))
+    assert (tile.change_mark.text(), tile.change_mark.isVisible(), mark.x() < heading.x()) == (
+        "Δ", True, True)
+
+
+def test_a_tile_with_no_change_to_show_has_no_delta(make_related):
+    image = _image_row()
+    related = make_related(_video_row())
+    related.show()
+
+    related.show_row(image, [image])
+
+    assert all(tile.change_mark.isHidden() for tile in related.findChildren(SourceTile))
 
 
 def test_every_kind_of_link_sits_in_the_one_section_headed_links(make_related):

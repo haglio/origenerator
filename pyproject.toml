@@ -23,7 +23,7 @@ requires-python = ">=3.14"
 dependencies = [
     "app-support @ git+https://github.com/haglio/app_support@v0.1.551",
     "funestra @ git+https://github.com/haglio/funestra@v0.1.1096",
-    "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.480",
+    "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.481",
     "voice-core @ git+https://github.com/haglio/voice_core@v0.1.202",
     # PySide6 and the Qt it ships are 6.12, for every app of the family: on 6.11,
     # 6.11.3 included, a Generate tab with prompt boxes, shown in the gallery and

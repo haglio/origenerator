@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import partial
 
 from PySide6.QtCore import QObject, Signal
 
@@ -15,6 +16,7 @@ class RequestAim:
     turns: list = field(default_factory=list)
     values: list = field(default_factory=list)
     asking: str | None = None
+    awaited: object | None = None
 
     def every_turn(self) -> list:
         return self.earlier + self.turns
@@ -75,8 +77,17 @@ class RequestAims(QObject):
     def forget(self, prompt_id: str) -> None:
         self._by_item.pop(prompt_id, None)
 
-    def take_answer(self, aim: RequestAim, values: dict, revision) -> None:
-        said, aim.asking = aim.asking, None
+    def awaiting(self, aim: RequestAim, words: str, values: dict):
+        aim.asking, aim.awaited = words, object()
+        return partial(self._take_answer, aim, values, aim.awaited)
+
+    def cancel(self, aim: RequestAim) -> None:
+        aim.asking = aim.awaited = None
+
+    def _take_answer(self, aim: RequestAim, values: dict, awaited: object, revision) -> None:
+        if aim.awaited is not awaited:
+            return
+        said, aim.asking, aim.awaited = aim.asking, None, None
         if revision is not None:
             aim.answered(revision.turn(said), {**values, **dict(revision.settings)})
         self.answered.emit(aim, revision)

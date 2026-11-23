@@ -201,6 +201,10 @@ def build_stylesheet() -> str:
     QPushButton#generateBtn:hover {{
         background-color: {_h(hovered(BLUE))};
     }}
+    QPushButton#generateBtn[warning="true"], QPushButton#generateBtn[warning="true"]:hover {{
+        background-color: {_h(YELLOW)};
+        color: {_h(BG_PRIMARY)};
+    }}
     QFrame#generateWithHowMany {{
         background-color: {_h(BLUE)};
         border: 1px solid {_h(BORDER_SUBTLE)};
@@ -215,7 +219,6 @@ def build_stylesheet() -> str:
     }}
     QFrame#generateWithHowMany QPushButton#generateBtn[warning="true"] {{
         background-color: {_h(YELLOW)};
-        color: {_h(BG_PRIMARY)};
     }}
     QComboBox#howMany {{
         background-color: transparent;

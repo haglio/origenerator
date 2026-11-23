@@ -3872,6 +3872,42 @@ def test_an_answer_to_a_request_made_of_an_image_since_left_is_dropped(qtbot, tm
         "and rewrote the owl")
 
 
+def _asked_and_canceled(qtbot, tmp_path, monkeypatch):
+    _rewriting(monkeypatch, answer=_a_change(prompt="positive", add="grass", for_="more grass"))
+    answers = _AnswersHeldBack()
+    tab, db = _saved_panel(qtbot, tmp_path, TabViews(requests=answers))
+    cat = _image_row(db, "img1", prompt="a cat")
+    tab.show_saved_generation(cat, [cat])
+    exchange = _ask(tab, qtbot, "more grass")
+    exchange.request_cancel_asked.emit()
+    return tab, exchange, answers
+
+
+def test_a_canceled_request_comes_off_and_its_answer_changes_nothing_when_it_comes(
+        qtbot, tmp_path, installed_models, monkeypatch):
+    tab, exchange, answers = _asked_and_canceled(qtbot, tmp_path, monkeypatch)
+
+    assert (exchange.turns(), exchange._line.isEnabled()) == ([], True)
+
+    answers.answer_the_first()
+
+    assert (_positive(tab), exchange.turns()) == ("a cat", [])
+
+
+def test_a_request_asked_after_a_cancel_takes_only_its_own_answer(
+        qtbot, tmp_path, installed_models, monkeypatch):
+    tab, exchange, answers = _asked_and_canceled(qtbot, tmp_path, monkeypatch)
+    _ask(tab, qtbot, "more grass")
+
+    answers.answer_the_first()
+
+    assert (_positive(tab), exchange.turns()) == ("a cat", [("more grass", "")])
+
+    answers.answer_the_first()
+
+    assert _positive(tab) == "a cat, grass"
+
+
 def test_a_request_changes_each_scene_of_a_video_told_in_scenes(saved_panel, qtbot, monkeypatch):
     _rewriting(monkeypatch, answer=_a_change(prompt="positive", add="grass", for_="more grass"))
     tab, db = saved_panel

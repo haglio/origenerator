@@ -752,6 +752,7 @@ class _FakeRadio:
 
 class _SignalMotion(QObject):
     active_changed = Signal(bool)
+    came_round = Signal()
 
     def __init__(self):
         super().__init__()

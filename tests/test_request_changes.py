@@ -677,6 +677,17 @@ def test_more_of_a_part_already_weighted_raises_its_one_weight_whatever_weight_t
     assert outcome.line.count("Replaced") == 1
 
 
+def test_a_part_reworded_and_weighed_for_more_of_it_is_one_replacement_said_once():
+    outcome = _one({"more": "a tall hat", "stronger": "a tall felt hat", "opposite": "",
+                    "for": "tall hat"}, ("a woman, (a tall hat:1.1)", ""), ("tall hat",),
+                   prompts=Prompts(his_words=frozenset({"a", "tall", "felt", "hat"})))
+
+    assert outcome.positive == "(a tall felt hat:1.2), a woman"
+    assert outcome.line == (
+        'Replaced "(a tall hat:1.1)" with "(a tall felt hat:1.2)" in the Positive prompt. '
+        'Moved "(a tall felt hat:1.2)" earlier in the Positive prompt.')
+
+
 def test_more_of_something_already_first_in_his_words_with_its_opposite_kept_out_says_so():
     outcome = _one({"more": "a velvet couch", "stronger": "a velvet couch", "opposite": "bare floor",
                     "for": "even more couch"}, _MORE_COUCH, ("even more couch",))

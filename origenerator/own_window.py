@@ -85,7 +85,7 @@ def show_or_say(title: str, built) -> bool:
     from origenerator import alert
 
     if isinstance(built, str):
-        alert.error(title, built, level="INFO")
+        alert.warning(title, built)
         return True
     built.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
     built.showMaximized()

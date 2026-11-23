@@ -27,7 +27,7 @@ class GenerationFailed:
         self._box.open()
 
     def _window_saying(self, message: str) -> AlertDialog:
-        box = AlertDialog(TITLE, message, level=Level.WARNING, icon=alert.window_icon())
+        box = AlertDialog(TITLE, message, level=Level.ERROR, icon=alert.window_icon())
         box.setParent(self._window, box.windowFlags())
         box.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         box.finished.connect(self._dismissed)

@@ -120,7 +120,6 @@ class ShownJobQueue(QObject):
             alert.error(
                 "Could not clear the queue",
                 f"ComfyUI would not drop the other app's jobs:\n\n{e}",
-                level="WARNING",
             )
             return
         logger.info("Dropped %d job(s) another app had queued on ComfyUI", dropped)

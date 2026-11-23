@@ -291,7 +291,7 @@ def _say_what_evolver_no_longer_agrees_with(fun_time) -> None:
                + "\n".join(f"    {line}" for line in said))
     print(f"Origenerator: {message}", file=sys.stderr)
     if fun_time is None:
-        alert.error("Origenerator: Evolver has moved", message, level="WARNING")
+        alert.error("Origenerator: Evolver has moved", message)
 
 
 @dataclass

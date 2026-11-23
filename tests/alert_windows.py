@@ -19,7 +19,7 @@ class Alert(NamedTuple):
 def alerts_kept() -> Iterator[list[Alert]]:
     kept: list[Alert] = []
     with alert_shown(side_effect=lambda title, message, **how: kept.append(
-            Alert(title, message, how["level"]))):
+            Alert(title, message, how.get("level", Level.ERROR)))):
         yield kept
 
 

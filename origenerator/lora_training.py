@@ -50,14 +50,25 @@ def train_tooltip(name: str, folders: list[Path], each: str = "") -> str:
             "stopped.")
 
 
+@dataclass(frozen=True)
+class Refusal:
+    message: str
+    is_an_error: bool
+
+    def tell(self) -> None:
+        from origenerator import alert  # noqa: PLC0415
+
+        (alert.error if self.is_an_error else alert.warning)("Train", self.message)
+
+
 def why_it_cannot_train(program: tuple, program_settings: tuple[str, str], subject: str,
-                        folder: Path, has_images: bool) -> str | None:
+                        folder: Path, has_images: bool) -> Refusal | None:
     if None in program:
-        return ("No training program is set up: content.local.json names no "
-                f"{program_settings[0]} and {program_settings[1]}.")
+        return Refusal("No training program is set up: content.local.json names no "
+                       f"{program_settings[0]} and {program_settings[1]}.", is_an_error=True)
     folder.mkdir(parents=True, exist_ok=True)
     if not has_images:
-        return f"Put images of {subject} in {folder}, then press Train again."
+        return Refusal(f"Put images of {subject} in {folder}, then press Train again.", is_an_error=False)
     return None
 
 

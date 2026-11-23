@@ -70,10 +70,16 @@ class _Side(QWidget):
         self._pills.setObjectName(action_pills(side))
         self._pills.changed.connect(self._pills_changed)
         row.addWidget(self._pills, 1)
+        self.draw_at_the_huds_scale_again()
         self._setter = QPushButton(ADD, objectName=setter_button(side))
         self._setter.setToolTip(_TIPS[side])
         self._setter.clicked.connect(lambda: opened(side, next(iter(self._held), "")))
         column.addWidget(self._setter, 0, Qt.AlignmentFlag.AlignLeft)
+
+    def draw_at_the_huds_scale_again(self) -> None:
+        for box in self._boxes.values():
+            box.setFixedHeight(self._pills.line_height())
+        self._pills.updateGeometry()
 
     def show_actions(self, held: dict[str, ItemActions], *, editable: bool = True) -> None:
         self._held = dict(held)
@@ -129,6 +135,10 @@ def _tick(checked: int, of: int) -> Qt.CheckState:
     if checked and checked == of:
         return Qt.CheckState.Checked
     return Qt.CheckState.PartiallyChecked if checked else Qt.CheckState.Unchecked
+
+
+def sides_under(root: QWidget) -> list[_Side]:
+    return root.findChildren(_Side)
 
 
 class ActionRow(QWidget):

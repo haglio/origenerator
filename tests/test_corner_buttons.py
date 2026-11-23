@@ -228,15 +228,22 @@ def test_taken_into_fun_time_they_grow_and_stay_in_their_corners(qtbot):
     assert (star.right(), trash.bottom()) == (plus.right(), plus.bottom())
 
 
-def test_they_stand_as_far_in_from_a_tiles_corner_as_its_image_or_video_icon_does(qtbot):
+def test_they_stand_as_far_in_from_the_images_corners_as_its_image_or_video_icon_does(qtbot):
     host, controls = _controls(qtbot)
-    area = QRect(0, 0, 120, 100)
+    area = QRect(20, 30, 120, 100)
     icon = ItemTypeIcon(MediaType.IMAGE, host)
 
     controls.place(area)
+    icon.place(area)
 
-    star, trash, _plus = (b.geometry() for b in controls.buttons())
-    assert (area.right() - star.right(), star.top(), trash.left()) == (icon.x(), icon.y(), icon.x())
+    star, trash, plus = (b.geometry() for b in controls.buttons())
+    in_from_the_left, in_from_the_top = icon.x() - area.left(), icon.y() - area.top()
+    assert in_from_the_left == in_from_the_top > 0
+    assert (area.right() - star.right(), star.top() - area.top()) == (in_from_the_left, in_from_the_top)
+    assert (trash.left() - area.left(), area.bottom() - trash.bottom()) == (
+        in_from_the_left, in_from_the_top)
+    assert (area.right() - plus.right(), area.bottom() - plus.bottom()) == (
+        in_from_the_left, in_from_the_top)
 
 
 def test_a_tiles_image_or_video_icon_is_shrunk_as_its_corner_buttons_are(qtbot):

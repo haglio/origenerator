@@ -84,6 +84,7 @@ from origenerator.generation_config import (
 )
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import corner_buttons, icons, omnipause, square_buttons
+from origenerator.gui.action_row import sides_under
 from origenerator.gui.app_keys import AppKeys, Presses
 from origenerator.gui.app_title import under
 from origenerator.gui.busy_cursor import working
@@ -144,7 +145,7 @@ from origenerator.gui.inflight import (
     stop_populate_tooltip,
 )
 from origenerator.gui.item_tile import ItemTile
-from origenerator.gui.item_type_icon import ItemTypeIcon, VideoLength
+from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.job_queue import JobQueue
 from origenerator.gui.look_training_controller import LookTrainingController
 from origenerator.gui.modify_batch_tile import ModifyBatchTile
@@ -664,8 +665,8 @@ class GalleryView(QWidget):
         square_buttons.draw_every_square_again(self)
         for corners in self.findChildren(corner_buttons.CornerButtons):
             corners.draw_at_the_huds_scale_again()
-        for drawn in (*self.findChildren(ItemTypeIcon), *self.findChildren(VideoLength),
-                      *self.findChildren(ItemTile)):
+        for drawn in (*self.findChildren(ItemTypeIcon), *self.findChildren(ItemTile),
+                      *sides_under(self)):
             drawn.draw_at_the_huds_scale_again()
 
     def wear_the_room(self, session) -> None:

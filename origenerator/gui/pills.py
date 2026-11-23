@@ -22,6 +22,7 @@ from shared_ui.spacing import (
     BUTTON_ICON_INSET,
     BUTTON_PAD_H_TIGHT,
     BUTTON_PAD_V,
+    BUTTON_SIZE,
     GAP_SMALL,
     HAIRLINE,
     MARGIN_STANDARD,
@@ -161,7 +162,7 @@ class PillRow(QWidget):
         self._names: tuple[str, ...] = ()
         self._partial: tuple[str, ...] = ()
         self._editable = True
-        self._flow = FlowLayout(self, spacing=GAP_SMALL)
+        self._flow = FlowLayout(self, spacing=GAP_SMALL, least_row_height=self.line_height)
         self._adder = QToolButton(objectName=adder_name)
         self._adder.setIcon(qt_icon("plus", color=TEXT_SECONDARY))
         square_buttons.square(self._adder)
@@ -170,6 +171,9 @@ class PillRow(QWidget):
         self._adder.setToolTip("Add an action")
         self._adder.clicked.connect(self._offer)
         self._flow.addWidget(self._adder)
+
+    def line_height(self) -> int:
+        return max(_height(self.fontMetrics()), square_buttons.landing(BUTTON_SIZE))
 
     def names(self) -> tuple[str, ...]:
         return self._names

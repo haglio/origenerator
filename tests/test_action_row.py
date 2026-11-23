@@ -17,6 +17,7 @@ from shared_ui.colors import TEXT_SECONDARY
 from shared_ui.tick_control import TickControl
 
 from origenerator.generation_state import GenerationSource
+from origenerator.gui import square_buttons
 from origenerator.gui.action_row import (
     ADD,
     EDIT,
@@ -388,7 +389,8 @@ def test_the_plus_stands_left_of_the_pills_and_stays_put_as_one_is_added(action,
 
     pills = _pills(action, MediaType.IMAGE)
     assert (plus.pos(), [pill.text() for pill in pills],
-            all(pill.x() > plus.x() and pill.y() == plus.y() for pill in pills)) == (
+            all(pill.x() > plus.x() and pill.geometry().center().y() == plus.geometry().center().y()
+                for pill in pills)) == (
         before, ["beta", "alpha"], True)
 
 
@@ -427,6 +429,29 @@ def _inked(drawn) -> int:
 def _drawn_whole(button: QAbstractButton) -> bool:
     icon = button.icon().pixmap(button.iconSize())
     return _inked(button.grab()) >= _inked(icon) * 3 // 4
+
+
+@pytest.mark.parametrize("in_fun_time", [False, True])
+def test_the_plus_sits_on_the_line_of_the_checkboxes_and_the_actions_beside_it(
+        qtbot, in_fun_time):
+    square_buttons.draw_in_fun_time(in_fun_time)
+    form_host = QWidget()
+    qtbot.addWidget(form_host)
+    action = ActionRow(LabelForm(form_host), checkboxes=_BOXES, actions=_ACTIONS,
+                       open_setter=lambda *_a, **_k: None)
+    action.show_row(_row(image=ItemActions(("beta",))))
+    host = _rows(action)
+    host.resize(900, 400)
+    host.show()
+    _laid_out(action, qtbot)
+    plus = _adder(action, MediaType.IMAGE)
+    (pill,) = _pills(action, MediaType.IMAGE)
+    box = _box(action, MediaType.IMAGE, _BOXES[MediaType.IMAGE][0])
+
+    def middle(widget) -> int:
+        return widget.mapTo(host, widget.rect().center()).y()
+
+    assert (middle(plus), middle(box)) == (middle(pill), middle(pill))
 
 
 def test_each_pills_x_and_the_plus_are_drawn_whole_under_the_apps_own_look(action, qtbot):

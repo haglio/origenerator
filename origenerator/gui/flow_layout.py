@@ -40,13 +40,14 @@ class _Row(NamedTuple):
 
 class FlowLayout(QLayout):
     def __init__(self, parent=None, *, margin=0, spacing=6, row_spacing=None,
-                 group_spacing=None, align_right=False):
+                 group_spacing=None, align_right=False, least_row_height=None):
         super().__init__(parent)
         self._items = []
         self._groups_added = 0
         self._row_spacing = spacing if row_spacing is None else row_spacing
         self._group_spacing = spacing if group_spacing is None else group_spacing
         self._align_right = align_right
+        self._least_row_height = least_row_height
         self._height_at: dict[int, int] = {}
         self._resume: _Resume | None = None
         self._adding = False
@@ -167,6 +168,7 @@ class FlowLayout(QLayout):
                 last = resume._replace(at=first, top=y)
             leading = _closed_up([entry for entry in placed if not isinstance(entry[0], _Trailing)])
             trailing = _closed_up([entry for entry in placed if isinstance(entry[0], _Trailing)])
+            height = self._height_of(placed)
             x = area.x()
             if self._align_right:
                 x += max(0, area.width() - _width_of(placed))
@@ -176,14 +178,21 @@ class FlowLayout(QLayout):
                 for item, hint, before in run:
                     start += before
                     if place:
-                        item.setGeometry(QRect(QPoint(start, y), hint))
+                        item.setGeometry(QRect(QPoint(start, y + self._lowered(hint, height)), hint))
                     start += hint.width()
-            y += max(hint.height() for _item, hint, _gap in placed) + self._row_spacing
+            y += height + self._row_spacing
         if place:
             self._resume, self._placed_from = last, resume
         if not rows:
             return margin_height
         return y - self._row_spacing - area.y() + margin_height
+
+    def _height_of(self, placed) -> int:
+        tallest = max(hint.height() for _item, hint, _gap in placed)
+        return tallest if self._least_row_height is None else max(tallest, self._least_row_height())
+
+    def _lowered(self, hint, row_height: int) -> int:
+        return 0 if self._least_row_height is None else (row_height - hint.height()) // 2
 
     def _rows(self, area, start: int = 0) -> list[_Row]:
         right = area.x() + area.width()

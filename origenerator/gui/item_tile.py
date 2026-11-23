@@ -129,11 +129,13 @@ class ItemTile(QWidget):
         self._style_by_selection()
 
         self._media_type = appearance.media_type
-        self._mark_its_kind(appearance)
+        self._kind_mark = self._mark_its_kind(appearance)
 
         layout.activate()  # Qt gives the thumbnail its rectangle only once the layout has run
         self._controls = CornerButtons(self, restore=appearance.restore)
         self._controls.place(self._image_label.geometry())
+        if self._kind_mark is not None:
+            self._kind_mark.place(self._image_label.geometry())
         self._controls.triggered.connect(
             lambda action: self.control_triggered.emit(self.prompt_id, action))
         for button in self._controls.buttons():
@@ -157,12 +159,13 @@ class ItemTile(QWidget):
         else:
             self._image_label.setText("No preview")
 
-    def _mark_its_kind(self, appearance: TileAppearance) -> None:
+    def _mark_its_kind(self, appearance: TileAppearance) -> ItemTypeIcon | None:
         if not appearance.media_type:
-            return
+            return None
         mark = ItemTypeIcon(appearance.media_type, self)
         if appearance.media_type == MediaType.VIDEO and appearance.video_seconds:
             VideoLength(appearance.video_seconds, mark)
+        return mark
 
     def _build_the_enhancing_bar(self) -> None:
         self._status_scrim = TileStatusScrim(self)

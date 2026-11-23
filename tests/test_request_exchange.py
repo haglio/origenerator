@@ -1,9 +1,17 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
-from PySide6.QtGui import QColor, QHelpEvent, QImage, QMouseEvent, QTextCursor, QTextDocument
+from PySide6.QtGui import (
+    QColor,
+    QEnterEvent,
+    QHelpEvent,
+    QImage,
+    QMouseEvent,
+    QTextCursor,
+    QTextDocument,
+)
 from PySide6.QtWidgets import QApplication, QToolTip
-from shared_ui.colors import BG_TERTIARY, BLUE_LIGHT, TEXT_MUTED, TEXT_PRIMARY
+from shared_ui.colors import BG_TERTIARY, BLUE_LIGHT, TEXT_MUTED, TEXT_PRIMARY, YELLOW
 from shared_ui.spacing import MARGIN_STANDARD
 from shared_ui.testing import appending_to
 
@@ -14,6 +22,7 @@ from origenerator.gui.inflight import RunReading
 from origenerator.gui.progress_bar import ProgressBar
 from origenerator.gui.request_exchange import RequestExchange, _Thumbnail
 from origenerator.gui.source_tile import SourceTile
+from origenerator.gui.stylesheet import build_stylesheet
 from tests.waiting import until
 
 EXCHANGE = [("a hat", "Gave her a straw hat."), ("make it red", "The hat is red now.")]
@@ -195,6 +204,46 @@ def test_a_request_the_model_could_not_work_out_comes_off_and_says_so_beside_the
     assert "couldn't" in exchange._status.text()
     assert not exchange._status.isHidden()
     assert exchange._line.isEnabled()
+
+
+def _pointer_onto(bar) -> None:
+    QApplication.sendEvent(bar, QEnterEvent(QPointF(), QPointF(), QPointF()))
+
+
+def test_the_bar_of_a_request_being_worked_out_reads_cancel_under_the_pointer(qtbot):
+    exchange = _exchange(qtbot)
+    exchange.add_turn("brighter")
+    (bar,) = [bar for bar in exchange.findChildren(CancelBar) if not bar.isHidden()]
+
+    _pointer_onto(bar)
+
+    assert (bar.text(), bar.toolTip()) == ("Cancel", "Cancel this Request")
+
+
+def test_a_click_on_the_bar_of_a_request_being_worked_out_asks_to_cancel_it(qtbot):
+    exchange = _exchange(qtbot)
+    exchange.add_turn("brighter")
+    (bar,) = [bar for bar in exchange.findChildren(CancelBar) if not bar.isHidden()]
+    asked = []
+    exchange.request_cancel_asked.connect(lambda: asked.append("cancel"))
+
+    qtbot.mouseClick(bar, Qt.MouseButton.LeftButton)
+    until(lambda: asked)
+
+    assert asked == ["cancel"]
+
+
+def test_a_canceled_request_comes_off_and_leaves_the_line_to_ask_again(qtbot):
+    exchange = _exchange(qtbot)
+    exchange.show_exchange(EXCHANGE)
+    exchange.add_turn("please")
+
+    exchange.canceled()
+
+    assert exchange.turns() == EXCHANGE
+    assert (exchange._status.isHidden(), exchange._line.isEnabled(),
+            _request_button(exchange).isHidden(), _sweeping_bars(exchange)) == (
+        True, True, False, [])
 
 
 def test_a_failed_only_turn_leaves_the_line_alone_on_its_own(qtbot):
@@ -638,6 +687,36 @@ def test_a_generate_refused_says_why_on_its_own_button_and_fits_the_words(qtbot)
 
     assert (first.text(), second.text()) == ("Generate", "Resolve duplicates first")
     assert second.width() > width
+
+
+def _share_painted(button, color) -> float:
+    image = button.grab().toImage()
+    painted = sum(1 for y in range(image.height()) for x in range(image.width())
+                  if image.pixelColor(x, y) == color)
+    return painted / (image.width() * image.height())
+
+
+def test_a_generate_refused_turns_its_own_button_yellow_as_the_tabs_generate_does(qtbot):
+    exchange = _shown_at(qtbot, 400)
+    exchange.setStyleSheet(build_stylesheet())
+    exchange.show_exchange([_changed("a cap"), _changed("red")])
+    first, second = _placed(exchange, GenerateButton)
+
+    exchange.refuse_generate(1, "Resolve duplicates first")
+    QApplication.processEvents()
+
+    assert _share_painted(second, YELLOW) > 0.5
+    assert _share_painted(first, YELLOW) == 0
+
+
+def test_the_generate_under_an_answer_wears_the_arrow_every_other_generate_wears(qtbot):
+    exchange = _shown_at(qtbot, 400)
+    exchange.show_exchange([_changed("a cap")])
+
+    (generate,) = _placed(exchange, GenerateButton)
+
+    assert generate.cursor().shape() == _request_button(exchange).cursor().shape()
+    assert generate.cursor().shape() != exchange._conversation.viewport().cursor().shape()
 
 
 def test_auto_generate_sits_at_the_end_of_the_line_and_starts_off(qtbot):

@@ -31,13 +31,13 @@ from origenerator.gui.change_tip import change_tip, fitted
 from origenerator.gui.generate_button import GenerateButton
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.inflight import RunReading, cancel_tooltip
-from origenerator.gui.progress_bar import ProgressBar
 
 _ASK = "What to change, e.g. two women"
 _REQUEST = "Request"
 _FAILED = "couldn't work that into the prompts"
 _LINES_AT_MOST = 20
 _THUMBNAIL_LINES = 2
+_CANCEL_REQUEST_TIP = "Cancel this Request"
 _AUTO_GENERATE = "Auto-generate"
 _AUTO_GENERATE_TIP = "Generate each time the model comes back with its changes"
 
@@ -200,6 +200,7 @@ class _Conversation(QTextEdit):
                 self._reserve(cursor, thumbnail, entry)
         elif made.generate:
             button = GenerateButton(self.viewport(), sizes_itself=True)
+            button.setCursor(Qt.CursorShape.ArrowCursor)
             button.clicked.connect(lambda _checked=False, at=index: self.generate_asked.emit(at))
             self._generate_buttons[index] = button
             self._reserve(cursor, button, entry)
@@ -271,6 +272,7 @@ class RequestExchange(QWidget):
     asked = Signal(str)
     generate_asked = Signal(int)
     cancel_asked = Signal(str)
+    request_cancel_asked = Signal()
     item_activated = Signal(str)
     auto_generate_chosen = Signal(bool)
 
@@ -299,7 +301,8 @@ class RequestExchange(QWidget):
         self._request = GenerateButton()
         self._request.set_caption(_REQUEST)
         self._request.clicked.connect(self._ask)
-        self._working = ProgressBar()
+        self._working = CancelBar(_CANCEL_REQUEST_TIP)
+        self._working.clicked.connect(self.request_cancel_asked)
         self._working.hide()
         self._status = QLabel()
         self._status.hide()
@@ -404,6 +407,12 @@ class RequestExchange(QWidget):
         self._auto_generate.setChecked(on)
 
     def failed(self) -> None:
+        self._take_off_the_turn_waiting(_FAILED)
+
+    def canceled(self) -> None:
+        self._take_off_the_turn_waiting()
+
+    def _take_off_the_turn_waiting(self, status: str = "") -> None:
         self._held.pop()
         self._draw()
-        self._settle(_FAILED)
+        self._settle(status)

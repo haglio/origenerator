@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 from contextlib import contextmanager
-from functools import partial
 from pathlib import Path
 from typing import NamedTuple
 
@@ -745,6 +744,7 @@ class GenerateTab(DropZones):
         self._param_form.item_activated.connect(self.link_clicked)
         if form.request_exchange() is not None:
             form.request_exchange().asked.connect(self._on_request_asked)
+            form.request_exchange().request_cancel_asked.connect(self._on_request_canceled)
             form.request_exchange().generate_asked.connect(self._generate_from_turn)
             form.request_exchange().cancel_asked.connect(self.turn_cancel_requested)
             form.request_exchange().item_activated.connect(self.link_clicked)
@@ -1501,7 +1501,7 @@ class GenerateTab(DropZones):
         aim = self._request_aim
         if aim is None or not words:
             return
-        aim.asking = words
+        then = self._request_aims.awaiting(aim, words, self._param_form.get_values())
         self._param_form.request_exchange().add_turn(words)
         params = self.current_config().params
         self._requests.ask(
@@ -1509,8 +1509,13 @@ class GenerateTab(DropZones):
             words, settings=request_settings.settings_to_tell(self._param_form.definitions(), params),
             in_scenes=self._param_form.tells_a_story(), since=tuple(aim.turns),
             weights=workflow_named(self._form_workflow_key).prompts_take_weights,
-            owner=self._request_aims,
-            then=partial(self._request_aims.take_answer, aim, self._param_form.get_values()))
+            owner=self._request_aims, then=then)
+
+    def _on_request_canceled(self) -> None:
+        aim = self._request_aim
+        if aim is not None and aim.asking is not None:
+            self._request_aims.cancel(aim)
+            self._param_form.request_exchange().canceled()
 
     def _on_request_answered(self, aim: RequestAim, revision) -> None:
         if aim is not self._request_aim:

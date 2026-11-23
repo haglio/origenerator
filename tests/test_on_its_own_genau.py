@@ -92,7 +92,7 @@ def test_back_in_kino_the_osr2_is_told_the_slideshows_video_plays_again(tmp_path
 
     up.shown.press("main_kino_activate")
 
-    assert told and told[-1] is not None
+    assert [said is not None for said in told[-1:]] == [True]
 
 
 def test_the_kino_selector_brings_the_slideshow_back_where_it_was(tmp_path):

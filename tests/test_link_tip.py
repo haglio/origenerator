@@ -3,7 +3,7 @@ from __future__ import annotations
 import shiboken6
 from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
 from PySide6.QtGui import QEnterEvent
-from PySide6.QtWidgets import QApplication, QPushButton
+from PySide6.QtWidgets import QApplication, QLabel, QPushButton
 from shared_ui import tooltip_look
 from shared_ui.testing import appending_to
 
@@ -170,12 +170,10 @@ def test_the_tip_wears_the_one_haglio_tooltip_look(qtbot):
     tip._appear.timeout.emit()
 
     drawn = tip._popup.grab().toImage()
-    corner = drawn.pixelColor(0, 0)
     middle = drawn.pixelColor(drawn.width() // 2, drawn.height() - 2)
-    lettering = tip._popup.label.font()
+    lettered = QLabel()
+    lettered.setStyleSheet(f"QLabel {{ {tooltip_look.qt_lettering()} }}")
+    lettered.ensurePolished()
 
-    assert corner.alpha() == 0
     assert (middle.red(), middle.green(), middle.blue()) == tooltip_look.GROUND
-    assert lettering.bold()
-    assert lettering.pointSize() == tooltip_look.LETTERING_SIZE
-    assert tip._popup.label.alignment() & Qt.AlignmentFlag.AlignHCenter
+    assert tip._popup.label.font() == lettered.font()

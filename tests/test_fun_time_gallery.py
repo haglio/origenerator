@@ -1306,6 +1306,24 @@ def test_a_landscape_image_stays_stacked_when_hosted(qtbot):
     assert tab._media_split.indexOf(tab._viewport_pane) == 0
 
 
+def test_stepping_between_a_portrait_and_a_landscape_image_turns_the_tab_each_time(
+        qtbot, tmp_path):
+    tall = tmp_path / "tall.png"
+    Image.new("RGB", (400, 900)).save(tall)
+    wide = tmp_path / "wide.png"
+    Image.new("RGB", (1200, 700)).save(wide)
+    tab = GenerateTab(None, database_of([]), fun_time=_session())
+    qtbot.addWidget(tab)
+    tab.resize(800, 1200)
+    tab.show()
+
+    tab._viewport.show_image(tall)
+    assert tab._media_split.orientation() == Qt.Orientation.Horizontal, (
+        "a portrait item opened in a tab already showing leaves its settings stacked under it")
+    tab._viewport.show_image(wide)
+    assert tab._media_split.orientation() == Qt.Orientation.Vertical
+
+
 def test_a_panel_taken_into_a_session_stands_its_portrait_image_beside_the_form(qtbot):
     tab = GenerateTab(None, database_of([]))
     qtbot.addWidget(tab)

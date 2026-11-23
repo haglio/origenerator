@@ -132,7 +132,7 @@ class Viewport(QWidget):
         self._player.setVideoOutput(self._video.video_sink())
         self._player.setLoops(QMediaPlayer.Loops.Infinite)
 
-        self._player.metaDataChanged.connect(self._place_controls)
+        self._player.metaDataChanged.connect(self._resolution_arrived)
 
         self._combination = _lets_the_mouse_through(CombinationView())
         self._sheet = _lets_the_mouse_through(ContactSheet(make_player=make_player))
@@ -199,8 +199,12 @@ class Viewport(QWidget):
         if reader.supportsAnimation() and reader.imageCount() > 1:
             self._set_movie(QMovie(str(path)), reader.size())
             self._stack.setCurrentWidget(self._image_label)
-            return
-        self._image_size = reader.size()
+        else:
+            self._image_size = reader.size()
+            self._decode_off_the_window_thread(path, last_frame)
+        self.media_resized.emit()
+
+    def _decode_off_the_window_thread(self, path, last_frame: QPixmap | None) -> None:
         if last_frame is not None:
             self._image_label.setPixmap(last_frame)
             self._stack.setCurrentWidget(self._image_label)
@@ -325,14 +329,20 @@ class Viewport(QWidget):
         rect.moveCenter(self._media_host.geometry().center())
         return rect
 
+    def _resolution_arrived(self) -> None:
+        self._place_controls()
+        self.media_resized.emit()
+
+    def _video_resolution(self) -> QSize | None:
+        # Qt Multimedia: a video's resolution arrives late, or never; a backend need not report it.
+        resolution = self._player.metaData().value(QMediaMetaData.Key.Resolution)
+        return resolution if isinstance(resolution, QSize) and resolution.isValid() else None
+
     def _drawn_size(self):
         if self.is_showing_video():
-            # Qt Multimedia: a video's resolution arrives late, or never; a backend need not report it.
-            resolution = self._player.metaData().value(QMediaMetaData.Key.Resolution)
-            if isinstance(resolution, QSize) and resolution.isValid():
-                return resolution.scaled(self._video.size(),
-                                         Qt.AspectRatioMode.KeepAspectRatio)
-            return None
+            resolution = self._video_resolution()
+            return None if resolution is None else resolution.scaled(
+                self._video.size(), Qt.AspectRatioMode.KeepAspectRatio)
         if self._movie is not None:
             scaled = self._movie.scaledSize()
             return scaled if scaled.isValid() else None
@@ -378,6 +388,9 @@ class Viewport(QWidget):
             self._play_where_it_is_seen()
 
     def media_size(self) -> tuple[int, int] | None:
+        if self.is_showing_video():
+            resolution = self._video_resolution()
+            return None if resolution is None else (resolution.width(), resolution.height())
         if self._movie is not None:
             frame = self._movie.currentPixmap()
             if not frame.isNull():

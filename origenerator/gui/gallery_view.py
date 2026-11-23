@@ -543,7 +543,6 @@ class GalleryView(QWidget):
         self._motion_pane = None
         if self.osr2.motion is not None:
             self._osr2_controls = Osr2Controls(self.osr2.motion, control=self.osr2.control)
-            self._osr2_controls.setToolTip(f"{self._osr2_controls.toolTip()} · Esc pauses")
             hud_scroll = QScrollArea()
             hud_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
             hud_scroll.setWidget(self._osr2_controls)

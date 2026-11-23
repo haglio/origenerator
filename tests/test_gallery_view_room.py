@@ -784,9 +784,9 @@ def test_esc_in_a_text_field_is_the_fields_own_even_with_the_osr2_moving(
     assert omnipause.frozen() is paused
 
 
-def test_the_osr2_controls_hint_that_esc_pauses_the_room(qtbot):
+def test_the_osr2_controls_tooltip_says_nothing_of_esc(qtbot):
     view, _driver, _panel = _osr2_view(qtbot)
-    assert view._osr2_controls.toolTip().endswith(" · Esc pauses")
+    assert "Esc" not in view._osr2_controls.toolTip()
 
 
 def test_esc_defers_to_a_fullscreen_window(qtbot, monkeypatch):

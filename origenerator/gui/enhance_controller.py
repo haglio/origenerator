@@ -121,7 +121,7 @@ class EnhanceController:
             ("lora_training_python", "lora_training_scripts"), name,
             fix_training.images_folder(part), bool(fix_training.training_images(part)))
         if refusal is not None:
-            alert.error("Train", refusal, level="INFO")
+            refusal.tell()
             return
         job = fix_training.training_job(part,
                                         fix_training.model_to_train_for(self._settings.params))
@@ -151,7 +151,7 @@ class EnhanceController:
         if lora:
             self._take(job, lora)
         elif why:
-            alert.error("Train", why, level="WARNING")
+            alert.error("Train", why)
 
     def _take(self, job: dict, lora: str) -> None:
         self.pane.use_fix_lora(job["part"], lora)

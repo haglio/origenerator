@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 from app_support.testing import error_popup
 from shared_ui.alert import Level
 from shared_ui.testing import alert_shown
@@ -11,18 +10,16 @@ from origenerator import alert
 from tests.alert_windows import Alert
 
 
-@pytest.mark.parametrize("level", [Level.ERROR, Level.WARNING, Level.INFO])
-def test_an_error_is_the_familys_alert_at_the_level_it_names(qapp, alerts, level):
-    alert.error("Sample title", "Something made up went wrong.", level.name)
+def test_an_error_is_the_familys_red_x_window(qapp, alerts):
+    alert.error("Sample title", "Something made up went wrong.")
 
-    assert alerts == [Alert("Sample title", "Something made up went wrong.", level)]
+    assert alerts == [Alert("Sample title", "Something made up went wrong.", Level.ERROR)]
 
 
-def test_a_warning_offers_nothing_to_copy(qapp):
-    with alert_shown() as shown:
-        alert.warning("Sample title", "Open a made-up window first.")
+def test_a_warning_is_the_familys_yellow_triangle_window(qapp, alerts):
+    alert.warning("Sample title", "Open a made-up window first.")
 
-    assert shown.call_args.kwargs["copyable"] is False
+    assert alerts == [Alert("Sample title", "Open a made-up window first.", Level.WARNING)]
 
 
 def test_the_alert_wears_the_apps_icon(qapp):

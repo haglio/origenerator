@@ -89,9 +89,9 @@ def _controller(tabs, shown=None):
     return LookTrainingController(SimpleNamespace(), info_tabs_of=lambda: info_tabs, parent=None)
 
 
-def _told(answered_by, level=Level.INFO) -> list:
+def _told(answered_by, level=Level.ERROR) -> list:
     told = []
-    answered_by(lambda title, text, **how: told.append(text) if how["level"] is level else None)
+    answered_by(lambda title, text, **how: told.append(text) if how.get("level", Level.ERROR) is level else None)
     return told
 
 
@@ -109,8 +109,8 @@ def test_train_with_no_training_program_set_up_says_so(look, monkeypatch, alerts
     assert _runs == []
 
 
-def test_train_with_no_images_makes_the_folder_and_says_to_put_them_there(look, alerts_answered_by):
-    told = _told(alerts_answered_by)
+def test_train_with_no_images_makes_the_folder_and_warns_to_put_them_there(look, alerts_answered_by):
+    told = _told(alerts_answered_by, Level.WARNING)
     tab = FakeGenerateTab()
     controller = _controller([tab])
     controller.wire(tab)
@@ -167,7 +167,7 @@ def test_a_finished_training_gives_the_version_its_title_and_word_and_picks_it_i
 
 
 def test_a_failed_training_says_why_and_lets_another_start(look, alerts_answered_by):
-    warned = _told(alerts_answered_by, Level.WARNING)
+    warned = _told(alerts_answered_by)
     (look / "one.jpg").write_bytes(b"")
     tab = FakeGenerateTab()
     controller = _controller([tab])
@@ -240,14 +240,14 @@ def test_a_version_windows_will_not_recycle_says_why(alerts_answered_by):
     def refuse(_lora):
         raise OSError("Windows would not move it.")
 
-    told = _told(alerts_answered_by, Level.WARNING)
+    told = _told(alerts_answered_by)
 
     assert trashed("example_look.safetensors", trash=refuse) is False
     assert told == ["Windows would not move it."]
 
 
 def test_a_version_windows_recycled_is_gone_without_a_word(alerts_answered_by):
-    told = _told(alerts_answered_by, Level.WARNING)
+    told = _told(alerts_answered_by)
 
     assert trashed("example_look.safetensors", trash=lambda _lora: None) is True
     assert told == []

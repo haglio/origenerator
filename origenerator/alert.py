@@ -11,12 +11,12 @@ CHECKOUT = Path(__file__).resolve().parent.parent
 ICON_FILE = CHECKOUT / "icon.ico"
 
 
-def error(title: str, message: str, level: str = "ERROR") -> None:
-    _show(title, message, level)
+def error(title: str, message: str) -> None:
+    _show(title, message, error=True)
 
 
 def warning(title: str, message: str) -> None:
-    _show(title, message, "INFO", error=False)
+    _show(title, message, error=False)
 
 
 def window_icon():
@@ -27,12 +27,12 @@ def window_icon():
     return app_icon(ICON_FILE, shown_as(CHECKOUT))
 
 
-def _show(title: str, message: str, level: str, *, error: bool = True) -> None:
+def _show(title: str, message: str, *, error: bool) -> None:
     try:
         from shared_ui import alert  # noqa: PLC0415
 
         show = alert.show_error if error else alert.show_warning
-        show(title, message, level=alert.Level[level], icon=window_icon())
+        show(title, message, icon=window_icon())
     except Exception:
         log.exception("Could not open the alert window: %s", title)
         _fall_back_to_windows(title, message)

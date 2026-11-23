@@ -2225,7 +2225,7 @@ class GalleryView(QWidget):
                 self.refresh()
                 then(outcome)
         if error is not None:
-            alert.error(failed, f"{could_not}:\n\n{error}", level="WARNING")
+            alert.error(failed, f"{could_not}:\n\n{error}")
 
     def purge_from_trash(self, prompt_ids):
         if not prompt_ids:

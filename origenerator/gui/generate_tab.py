@@ -1672,7 +1672,7 @@ class GenerateTab(DropZones):
                       inbox=self._inbox, places=OUTPUT_PLACES)
         except Exception as e:
             logger.exception("Failed to send %s to %s", path, lane.name)
-            alert.error(lane.failure_title, lane.failure_body(e), level="WARNING")
+            alert.error(lane.failure_title, lane.failure_body(e))
             return
         self._redraw_lane_button()
 

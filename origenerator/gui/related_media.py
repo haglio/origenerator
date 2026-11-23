@@ -79,7 +79,7 @@ class _LinkRow(QWidget):
 
     def _tile(self, heading: str, row: dict, name_of, tip: str) -> SourceTile:
         tile = SourceTile()
-        tile.setToolTip(tip)
+        tile.change_mark.show_change(tip)
         tile.activated.connect(self.activated)
         tile.show_source(row, name_of(row["prompt_id"]), heading=heading,
                          media_type=media_type_of_row(row), movie=self._movie_of(row),

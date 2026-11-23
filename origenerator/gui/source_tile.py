@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 from shared_ui.colors import BORDER_SUBTLE
 from shared_ui.spacing import BUTTON_RADIUS, GAP_SMALL
 
 from origenerator.gui import tile_shape
+from origenerator.gui.change_mark import ChangeMark
 from origenerator.gui.grayscale import grayscale_pixmap
 from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.link_heading import link_heading
@@ -42,7 +43,14 @@ class SourceTile(QWidget):
         self._heading = link_heading(_DEFAULT_HEADING)
         self._heading.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom)
         self._heading.setMinimumHeight(2 * self._heading.fontMetrics().lineSpacing())
-        column.addWidget(self._heading, 0, Qt.AlignmentFlag.AlignHCenter)
+        self.change_mark = ChangeMark()
+        heading_row = QHBoxLayout()
+        heading_row.setContentsMargins(0, 0, 0, 0)
+        heading_row.setSpacing(GAP_SMALL)
+        heading_row.addWidget(self.change_mark, 0, Qt.AlignmentFlag.AlignBottom)
+        heading_row.addWidget(self._heading)
+        column.addLayout(heading_row)
+        column.setAlignment(heading_row, Qt.AlignmentFlag.AlignHCenter)
 
         self._thumb = QLabel()
         self._thumb.setFixedSize(THUMBNAIL_BOX)

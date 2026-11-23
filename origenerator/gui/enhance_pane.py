@@ -25,6 +25,7 @@ from shared_ui.colors import (
     TEXT_MUTED,
     YELLOW,
 )
+from shared_ui.flow_layout import FlowLayout
 from shared_ui.icons import qt_icon
 from shared_ui.spacing import GAP_SMALL
 from shared_ui.tick_control import TickControl
@@ -55,7 +56,7 @@ from origenerator.gui.fix_prompts_parts import (
     strength_box,
     window_column,
 )
-from origenerator.gui.flow_layout import FieldGrid, FlowLayout
+from origenerator.gui.flow_layout import FieldGrid
 from origenerator.gui.lora_offers import trashed
 from origenerator.gui.no_wheel import (
     NoWheelDoubleSpinBox,

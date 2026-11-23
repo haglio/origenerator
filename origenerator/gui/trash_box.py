@@ -6,11 +6,11 @@ from PySide6.QtCore import QRectF, QSize
 from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from shared_ui.colors import BORDER_PANEL, TEXT_MUTED
+from shared_ui.flow_layout import FlowLayout
 from shared_ui.spacing import BUTTON_RADIUS, GAP_DIALOG, GAP_SMALL, MARGIN_STANDARD
 
 from origenerator.gui import tile_shape
 from origenerator.gui.dashed_edge import dashed_pen
-from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.text_color import color_text
 
 _EDGE = 1

@@ -5,6 +5,7 @@ from typing import NamedTuple
 
 from PySide6.QtWidgets import QToolButton, QWidget
 from shared_ui.colors import BG_PRIMARY
+from shared_ui.flow_layout import FlowLayout
 from shared_ui.icon_button import fill_square_with_icon
 from shared_ui.palette import BLUE, YELLOW, as_hex
 from shared_ui.reference import REFERENCE_WINDOW_TITLE
@@ -19,7 +20,6 @@ from shared_ui.spacing import (
 from origenerator import ui_scale
 from origenerator.config import RADIO_STATIONS
 from origenerator.gui import icons, omnipause
-from origenerator.gui.flow_layout import FlowLayout
 from origenerator.gui.link_tip import LinkTip, link
 from origenerator.gui.reference_window import ReferenceWindow
 from origenerator.gui.two_screens import LEFT, TwoScreens

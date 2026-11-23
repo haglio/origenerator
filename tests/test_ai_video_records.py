@@ -123,7 +123,7 @@ def test_watch_totals_land_on_each_videos_row_and_a_video_with_none_is_counted(t
     said = _run(tmp_path, capsys, "watched", "--totals", _json_file(tmp_path, "totals.json", totals))
 
     row = db.get_generation("o1")
-    assert said == {"done": 1, "no_row": 1}
+    assert said == {"done": 1, "no_row": 1, "changed": 1}
     assert (row["watch_completions"], row["watch_skips"], row["watch_locks"]) == (3, 1, 2)
 
 
@@ -232,9 +232,10 @@ def test_the_watch_totals_of_many_videos_are_written_in_one_go_and_only_when_the
 
     said = _run(tmp_path, capsys, "watched", "--totals", _json_file(tmp_path, "w.json", totals))
     version = _the_gallery(tmp_path).library_version()
-    _run(tmp_path, capsys, "watched", "--totals", _json_file(tmp_path, "w.json", totals))
+    said_again = _run(tmp_path, capsys, "watched", "--totals", _json_file(tmp_path, "w.json", totals))
 
-    assert said == {"done": 4, "no_row": 0}
+    assert said == {"done": 4, "no_row": 0, "changed": 4}
+    assert said_again == {"done": 4, "no_row": 0, "changed": 0}
     assert [row["watch_completions"] for row in _the_gallery(tmp_path).list_generations()] == [2] * 4
     assert _the_gallery(tmp_path).library_version() == version
 

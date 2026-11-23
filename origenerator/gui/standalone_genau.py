@@ -70,6 +70,7 @@ class StandaloneGenau:
         self._driving: bool | None = None
         self._bpm: float | None = None
         self._speed: int | None = None
+        self._closed = False
 
     def show(self, path: Path | None = None) -> None:
         self._list()
@@ -160,6 +161,8 @@ class StandaloneGenau:
         self._tell(PAUSE if paused else RESUME)
 
     def follow_the_beat(self, *, showing: bool) -> None:
+        if self._closed:
+            return
         motion = self._sources.motion
         driving = showing and motion is not None and motion.active
         if driving != self._driving:
@@ -183,6 +186,7 @@ class StandaloneGenau:
         if self._driving:
             self._driving = False
             self._beat.drive(False)
+        self._closed = True
         self._beat.close()
 
     def _tell(self, verb: str) -> None:

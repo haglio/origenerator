@@ -1058,11 +1058,44 @@ def test_taking_a_favorite_off_the_favorites_collection_leaves_it_where_it_was(q
     assert _in_view(view, far)
 
 
-def test_reopening_a_slideshow_comes_back_to_the_slide_it_was_closed_on(qtbot, monkeypatch):
+def test_next_in_a_slideshow_of_a_folder_of_one_plays_on_through_the_library(qtbot, monkeypatch):
     keep_rows_on_disk(monkeypatch)
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1),
                                _image("i2", "a dog", 50, 2),
                                _image("i3", "a fox", 50, 3)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _open_leaf(view)
+    view.slideshows.start()
+    showing = view.slideshows.showing
+
+    press_key_on(showing, Qt.Key.Key_Right)
+
+    assert sorted(showing._set.playlist.order_ids()) == ["i1", "i2", "i3"]
+    showing.close()
+
+
+def test_next_in_a_slideshow_of_one_search_hit_plays_on_through_the_library(qtbot, monkeypatch):
+    keep_rows_on_disk(monkeypatch)
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1),
+                               _image("i2", "a dog", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _search_for(view, "cat")
+    view.slideshows.start()
+    showing = view.slideshows.showing
+
+    press_key_on(showing, Qt.Key.Key_Right)
+
+    assert sorted(showing._set.playlist.order_ids()) == ["i1", "i2"]
+    showing.close()
+
+
+def test_reopening_a_slideshow_comes_back_to_the_slide_it_was_closed_on(qtbot, monkeypatch):
+    keep_rows_on_disk(monkeypatch)
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1),
+                               _image("i2", "a cat", 50, 2),
+                               _image("i3", "a cat", 50, 3)]))
     qtbot.addWidget(view)
     view.refresh()
     _open_leaf(view)

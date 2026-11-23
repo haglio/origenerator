@@ -284,8 +284,8 @@ class FunestraSlideshow(QObject):
             self._hold_what_is_being_made_for_half()
             self._frame_on_funestra = None
             self._show_what_is_being_made()
-        if asked_for:
-            self._mind_a_step(asked_for)
+        if asked_for and self._mind_a_step(asked_for):
+            self._send(NEXT)
         self._step_past_a_file_that_would_not_open(fields, status)
         self._tell_the_keep()
         self._give_the_lock_its_gesture()
@@ -432,11 +432,15 @@ class FunestraSlideshow(QObject):
             return 0
         return int(fields.get("asked_step") or 0)
 
-    def _mind_a_step(self, delta: int) -> None:
+    def _mind_a_step(self, delta: int) -> bool:
         self._unlock()
-        if delta > 0:
-            self._set.end_a_loop_of_one()
+        played_on = delta > 0 and self._play_on_past_a_pass_of_one()
         self._leave_the_versions()
+        return played_on
+
+    def _play_on_past_a_pass_of_one(self) -> bool:
+        self._set.end_a_loop_of_one()
+        return self.pass_size() <= 1 and self._browse_it_all()
 
     def slideshow_toggle_lock(self) -> None:
         self.set_locked(not self.locked)

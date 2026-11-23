@@ -2721,6 +2721,49 @@ def test_the_loop_key_off_a_folder_on_a_funestra_leaves_it_in_one_press(qtbot, t
     assert (widened, said) == ([slideshow], ["Loop off"])
 
 
+_A_FOLDER_OF_TWO = [("one.mp4", "video", "id-1"), ("two.mp4", "video", "id-2")]
+_THE_LIBRARY = [*_A_FOLDER_OF_TWO, ("three.mp4", "video", "id-3")]
+
+
+def _a_folder_whose_favorites_leave_one(qtbot, tmp_path) -> FunestraSlideshow:
+    slideshow = _slideshow(qtbot, tmp_path, _A_FOLDER_OF_TWO, actions=SlideshowActions(
+        is_favorite={"id-1", "id-3"}.__contains__,
+        browse_all=lambda s: s.reorder(_THE_LIBRARY, latest=False, keep_slide=True) or True))
+    slideshow.take_up(SlideshowFilters(favorites=True))
+    _sent(slideshow)
+    return slideshow
+
+
+def test_next_on_a_pass_of_one_plays_on_through_the_library_as_loop_off_does(qtbot, tmp_path):
+    slideshow = _a_folder_whose_favorites_leave_one(qtbot, tmp_path)
+
+    slideshow.slideshow_step(1)
+
+    sent = _sent(slideshow)
+    assert [str(item.path) for item in read_playlist(slideshow.channel.playlist)] == [
+        "one.mp4", "three.mp4"], (
+        "a pass holding only the item on screen has nowhere for Next to go, which is the place "
+        "Loop off meets when the folder holds one row, so Next plays on through the library "
+        "from here, its filters kept, rather than starting the same video over")
+    assert sent.index("RELOAD_PLAYLIST") < sent.index("NEXT")
+    assert slideshow.hud_favorites_filter is True
+
+
+def test_a_next_someone_else_asked_the_funestra_for_on_a_pass_of_one_plays_on_too(
+        qtbot, tmp_path):
+    slideshow = _a_folder_whose_favorites_leave_one(qtbot, tmp_path)
+    _says(slideshow, video="one.mp4")
+    slideshow.tick()
+
+    _says(slideshow, video="one.mp4", loads=2, asked=(2, 1))
+    slideshow.tick()
+
+    sent = _sent(slideshow)
+    assert sent.index("RELOAD_PLAYLIST") < sent.index("NEXT"), (
+        "the Funestra's own step could only start the one video over, so once the library is "
+        "handed over the slideshow takes the step again onto the next item")
+
+
 FACE = ((0.4, 0.1, 0.6, 0.3),)
 _PLACED = {"one.png": [("one.png", "image", "Enhance 1", FACE), ("one-base.png", "image", "Original")]}
 

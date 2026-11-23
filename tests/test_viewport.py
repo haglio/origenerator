@@ -703,6 +703,25 @@ def test_the_corners_move_to_the_item_once_a_videos_resolution_arrives(qtbot, tm
                if not b.isHidden())
 
 
+def test_a_video_says_its_shape_once_its_resolution_arrives(qtbot, tmp_path):
+    known = {}
+    player = MagicMock()
+    player.metaData.return_value.value.side_effect = known.get
+    w = Viewport(player=player, show_scrubber=True)
+    qtbot.addWidget(w)
+    w.show_video(_scripted_video(tmp_path))
+    the_resolution_arrived = player.metaDataChanged.connect.call_args.args[0]
+    told = []
+    w.media_resized.connect(lambda: told.append(w.media_size()))
+
+    known[QMediaMetaData.Key.Resolution] = QSize(480, 864)
+    the_resolution_arrived()
+
+    assert told == [(480, 864)], (
+        "a Generate tab in Fun Time stands a portrait item beside its settings, so a video has "
+        "to say what shape it is")
+
+
 def test_a_video_without_a_funscript_still_gets_its_timeline(qtbot, tmp_path):
     w = _scrubber_preview(qtbot)
     w.show_video(tmp_path / "unscripted.mp4")

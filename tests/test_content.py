@@ -248,4 +248,4 @@ def test_a_preview_with_an_overlay_of_its_own_reads_that_one(tmp_path):
 
 
 def test_a_copy_that_is_no_preview_reads_only_its_own_overlay(tmp_path):
-    assert content.local_overlay(tmp_path, None) == tmp_path / "content.local.json"
+    assert content.local_overlay(tmp_path, tmp_path) == tmp_path / "content.local.json"

@@ -7,7 +7,14 @@ import pytest
 from app_support.launcher import dry_run
 from shared_ui.preview import Preview
 
-from origenerator.branch_session import ENV_FLAG, is_branch_session, shown_as
+from origenerator.branch_session import (
+    ENV_FLAG,
+    THIS_CHECKOUT,
+    is_branch_session,
+    production_checkout,
+    shown_as,
+    the_librarys_checkout,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -16,6 +23,23 @@ def test_the_flag_marks_a_branch_session():
     assert is_branch_session({ENV_FLAG: "1"}) is True
     assert is_branch_session({ENV_FLAG: "0"}) is False
     assert is_branch_session({}) is False
+
+
+def test_the_production_app_is_its_own_production_checkout(tmp_path):
+    assert production_checkout({}, roots=(tmp_path,)) == THIS_CHECKOUT
+
+
+def test_a_preview_takes_the_librarys_checkout_for_the_production_one(tmp_path):
+    (tmp_path / "origenerator").mkdir()
+
+    assert production_checkout({ENV_FLAG: "1"}, roots=(tmp_path,)) == tmp_path / "origenerator"
+
+
+def test_the_librarys_checkout_is_the_origenerator_folder_among_the_project_roots(tmp_path):
+    first, second = tmp_path / "first", tmp_path / "second"
+    first.mkdir(), (second / "origenerator").mkdir(parents=True)
+
+    assert the_librarys_checkout((first, second)) == second / "origenerator"
 
 
 def test_a_branch_session_is_shown_as_the_preview_its_checkout_describes(monkeypatch):

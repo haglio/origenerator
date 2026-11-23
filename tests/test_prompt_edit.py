@@ -619,7 +619,7 @@ def test_what_his_prompts_usually_have_with_the_thing_is_told_to_the_model():
             "do):\n"
             "positive (the app adds those that name it or bring the person it is part of): a wide "
             "straw hat, frayed brim\n"
-            "negative (the app adds those that are about it): bare head, paper hat") in messages[-1]["content"]
+            "negative (the app adds those that name it): bare head, paper hat") in messages[-1]["content"]
 
 
 def test_with_no_usual_company_the_messages_say_none():
@@ -632,44 +632,38 @@ _A_STRAW_HAT = UsualCompany(positive=("a wide straw hat",), negative=("bare head
 _ADDS_A_HAT = '{"prompt": "positive", "add": "a wide straw hat", "for": "add a hat"}'
 
 
-def _asked_to_add_a_hat(negative: str, about_it, its_negative: str = ""):
+def _asked_to_add_a_hat(negative: str, its_negative: str = "", company=_A_STRAW_HAT):
     its_own = (', {"prompt": "negative", "add": "' + its_negative + '", "for": "add a hat"}'
                if its_negative else "")
     ask, asked = _answers_in_turn('{"changes": [' + _ADDS_A_HAT + its_own + "]}",
-                                  '{"people": {}}', '{"left_open": []}', about_it)
-    answered = ask_the_model("a man", negative, "add a hat", WhatIsKnown(company=_A_STRAW_HAT),
-                             llm=ask)
+                                  '{"people": {}}', '{"left_open": []}')
+    answered = ask_the_model("a man", negative, "add a hat", WhatIsKnown(company=company), llm=ask)
     return answered["changes"][1:], asked
 
 
-def test_adding_a_thing_keeps_out_the_usual_parts_that_name_it_or_that_the_model_says_are_about_it():
-    changes, asked = _asked_to_add_a_hat("blurry", '{"about_it": ["Bare Head"]}')
+def test_adding_a_thing_keeps_out_only_the_usual_parts_that_name_it():
+    changes, asked = _asked_to_add_a_hat("blurry")
 
-    assert changes == [{"prompt": "negative", "add": "bare head, paper hat", "for": "add a hat"}]
-    question = asked[3][0][-1]["content"]
-    assert 'He asked: "add a hat".' in question
-    assert 'usually also gain these parts: ["bare head"].' in question
+    assert changes == [{"prompt": "negative", "add": "paper hat", "for": "add a hat"}]
+    assert len(asked) == 3
 
 
-@pytest.mark.parametrize("about_it", ['{"about_it": []}', '{"about_it": "bare head"}', "no json",
-                                      TimeoutError("the model gave no answer")])
-def test_a_usual_negative_part_the_model_does_not_say_is_about_the_thing_stays_out(about_it):
-    changes, _asked = _asked_to_add_a_hat("blurry", about_it)
+def test_where_usual_parts_name_the_thing_nothing_of_the_models_own_is_kept_out():
+    changes, _asked = _asked_to_add_a_hat("blurry", "low angle shot, Bare Head, a felt hat")
 
     assert changes == [{"prompt": "negative", "add": "paper hat", "for": "add a hat"}]
 
 
-def test_of_what_the_model_keeps_out_only_what_goes_with_the_thing_is_kept_out():
-    changes, _asked = _asked_to_add_a_hat("blurry", '{"about_it": ["bare head"]}',
-                                          "low angle shot, Bare Head, a felt hat")
+def test_where_no_usual_part_names_the_thing_the_model_keeps_out_only_what_holds_his_word():
+    changes, _asked = _asked_to_add_a_hat(
+        "blurry", "low angle shot, a felt hat",
+        UsualCompany(positive=("a wide straw hat",), negative=("bare head",)))
 
-    assert changes == [{"prompt": "negative", "add": "Bare Head, a felt hat, paper hat",
-                        "for": "add a hat"}]
+    assert changes == [{"prompt": "negative", "add": "a felt hat", "for": "add a hat"}]
 
 
-def test_a_negative_change_of_the_models_with_nothing_about_the_thing_is_dropped():
-    changes, _asked = _asked_to_add_a_hat("blurry, (paper hat, cap:1.2)", '{"about_it": []}',
-                                          "low angle shot")
+def test_a_negative_change_of_the_models_that_leaves_nothing_to_keep_out_is_dropped():
+    changes, _asked = _asked_to_add_a_hat("blurry, (paper hat, cap:1.2)", "low angle shot")
 
     assert changes == []
 

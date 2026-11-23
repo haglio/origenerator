@@ -354,8 +354,7 @@ def _company_told(company: UsualCompany) -> str:
         lines.append("positive (the app adds those that name it or bring the person it is part of): "
                      + ", ".join(company.positive))
     if company.negative:
-        lines.append("negative (the app adds those that are about it): "
-                     + ", ".join(company.negative))
+        lines.append("negative (the app adds those that name it): " + ", ".join(company.negative))
     return "\n".join(lines)
 
 
@@ -402,14 +401,6 @@ _PEOPLE_CHECK = (
     "a garment, a pose, a place, a camera, a light or a style says no one. "
     'Reply with only a JSON object: {{"people": {{"<part, exactly as listed>": "<the word in it '
     'that names the person>"}}}}, an empty object when none does.')
-_ABOUT_IT_CHECK = (
-    'He asked: "{asked}". When his prompts gain it, their negative prompts usually also gain '
-    "these parts: {parts}. Which of these parts are a wrong kind, size, color, material or look "
-    "of the thing he asked for, or something an image shows in its place? A part about anything "
-    "else (another part of the body, a face, a pose, a place, a camera, a light, a style, how "
-    "well the image is drawn) is not. "
-    'Reply with only a JSON object: {{"about_it": ["<each such part, exactly as listed>"]}}, an '
-    "empty list when none is.")
 _PUT_INTO_A_PROMPT = ("with", "add")
 _FAILED_TO_LOAD = 500
 
@@ -495,23 +486,11 @@ def _its_own_company(answer: dict, asked: tuple[str, str], usual: tuple, ask_aga
         and not (part.casefold() in brings and _there_already(brings[part.casefold()], positive)))
 
 
-def _about_it_among(parts: list[str], request: str, ask_again) -> set[str]:
-    try:
-        about_it = local_llm.answer_of(ask_again(_ABOUT_IT_CHECK.format(
-            asked=request, parts=json.dumps(parts)))).get("about_it")
-    except Exception as exc:  # noqa: BLE001 -- the check is extra: the model's change stands
-        logger.warning("prompt_edit: the model could not say which usual parts are about it (%s)",
-                       type(exc).__name__)
-        return set()
-    return {str(part).strip().casefold() for part in (about_it if isinstance(about_it, list) else ())}
-
-
 def _holds_a_word_he_asked_for(part: str, request: str) -> bool:
     return _touches(_asked_about(request), part) > 0
 
 
-def _keeping_out_what_goes_with_it(answer: dict, asked: tuple[str, str], usual: tuple,
-                                   ask_again) -> dict:
+def _keeping_out_what_names_it(answer: dict, asked: tuple[str, str], usual: tuple) -> dict:
     request, negative = asked
     changes = answer.get("changes")
     parsed = parse_request(request)
@@ -519,13 +498,12 @@ def _keeping_out_what_goes_with_it(answer: dict, asked: tuple[str, str], usual: 
             or not any(_puts_into_the_positive_prompt(change) for change in changes)):
         return answer
     names_it = _naming_it(usual, request)
-    others = [part for part in usual if part.casefold() not in names_it]
-    goes_with_it = names_it | (_about_it_among(others, request, ask_again) if others else set())
-    kept_out = [part for part in usual if part.casefold() in goes_with_it]
+    kept_out = [part for part in usual if part.casefold() in names_it]
     its_own = next((change for change in changes if isinstance(change, dict)
                     and change.get("prompt") == "negative" and change.get("add")), None)
-    the_models = [part for thing, part in things_of(str(its_own["add"]) if its_own else "").items()
-                  if thing in goes_with_it or _holds_a_word_he_asked_for(part, request)]
+    the_models = [] if kept_out else [
+        part for part in things_of(str(its_own["add"]) if its_own else "").values()
+        if _holds_a_word_he_asked_for(part, request)]
     kept_out_already = things_of(negative) | things_of(", ".join(the_models))
     adding = ", ".join([*the_models,
                         *(part for part in kept_out if part.casefold() not in kept_out_already)])
@@ -629,5 +607,4 @@ def ask_the_model(positive: str, negative: str, request: str, known: WhatIsKnown
     answer = _holding_its_own_company(
         _leaving_open_what_he_did(answer, request, ask_again, " ".join(its_own)),
         (its_own, known.company.positive), positive, request)
-    return _keeping_out_what_goes_with_it(answer, (request, negative), known.company.negative,
-                                          ask_again)
+    return _keeping_out_what_names_it(answer, (request, negative), known.company.negative)

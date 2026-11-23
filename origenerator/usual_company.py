@@ -4,13 +4,10 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 
-from origenerator.box_breaks import unboxed
 from origenerator.prompt_checks import things_of
-from origenerator.prompt_terms import segments_of, unwrapped
 
 _FEWEST_TWINS = 3
 _NEWEST_PROMPTS = 150
-_NEWEST_THAT_SAY_HOW_HE_WRITES_IT = 30
 _SHARE_THAT_IS_USUAL = 1 / 3
 _ALIKE_ENOUGH_TO_BE_A_TWIN = 0.5
 _SHORTEST_WORD = 3
@@ -101,19 +98,3 @@ def usual_company(prompts, is_it) -> UsualCompany:
         positive=(usual := _usual(came)) + _usual_by_a_word(came, usual),
         negative=_usual([_only_in(prompt.negative, twin.negative) for prompt, twin in twins
                          if prompt.negative and twin.negative]))
-
-
-def _as_he_wrote_it(positive: str, is_it) -> tuple[str, float] | None:
-    return next(((term, weight) for term, weight in map(unwrapped, segments_of(unboxed(positive)))
-                 if is_it(term)), None)
-
-
-def usual_writing(prompts, is_it) -> tuple[str, float] | None:
-    written = [wrote for positive, _negative in prompts
-               if (wrote := _as_he_wrote_it(positive, is_it)) is not None]
-    written = written[-_NEWEST_THAT_SAY_HOW_HE_WRITES_IT:]
-    times = Counter((term.casefold(), weight) for term, weight in written)
-    usual, count = times.most_common(1)[0] if times else (None, 0)
-    if count < _FEWEST_TWINS:
-        return None
-    return next(wrote for wrote in reversed(written) if (wrote[0].casefold(), wrote[1]) == usual)

@@ -90,7 +90,8 @@ class RequestAnswerer(QObject):
         return self._work_out(*pair, words, exchange=exchange,
                               notes=collection_notes.read(self._notes_path),
                               examples=prompt_edit.prompts_touching(words, reversed(his_prompts)),
-                              company=prompt_edit.company_of(words, his_prompts), **told)
+                              company=prompt_edit.company_of(words, his_prompts),
+                              usual_writing=prompt_edit.usual_writing_of(words, his_prompts), **told)
 
     def _deliver(self, owner: QObject, then, answered) -> None:
         revision, model_stays = answered

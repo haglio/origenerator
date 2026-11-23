@@ -339,27 +339,37 @@ class _Applying:
             self.prompt(change)
 
     def more(self, change: dict) -> None:
-        of = str(change.get("more") or "")
-        stronger = self._as_these_prompts_take(str(change.get("stronger") or "") or of)
+        of = without_weights(str(change.get("more") or ""))
+        stronger = without_weights(str(change.get("stronger") or "")) or of
         opposite = str(change.get("opposite") or "")
+        to = change.get("weight")
+        to = float(to) if isinstance(to, int | float) else None
         if not self._answers_him(change, f"{of} {stronger}"):
             return
         part = _as_written(self.positive, of) if of else ""
         if part and not _words_of(stronger) - _words_of(part) <= self.his_words:
             stronger = part
-        said = (self._brought_out(part, stronger) if part and _whole(self.positive, part)
+        said = (self._brought_out(part, stronger, to) if part and _whole(self.positive, part)
                 else self._put_first("positive", stronger))
         said += self._add("negative", {"add": opposite}) if opposite else []
         self.said += said
         if not said:
             self.gave_up = _NOTHING_ELSE_TO_DO.format(_quoted(part or stronger))
 
-    def _brought_out(self, part: str, stronger: str) -> list[str]:
-        said = []
-        if stronger.lower() != part.lower():
-            said += self._replace("positive", {"replace": part, "with": stronger})
-            part = stronger if _whole(self.positive, stronger) else part
-        return said + self._moved_first(part) + self._weighed_up("positive", part)
+    def _segment_holding(self, words: str) -> str:
+        index = index_of(self.positive, words)
+        return words if index is None else segments_of(self.positive)[index].strip()
+
+    def _brought_out(self, part: str, stronger: str, to: float | None) -> list[str]:
+        was = self._segment_holding(part)
+        said = (self._replace("positive", {"replace": part, "with": stronger})
+                if stronger.lower() != part.lower() else [])
+        if not said or not _whole(self.positive, stronger):
+            return said + self._moved_first(part) + self._weighed_up("positive", part, to)
+        if self._weighed_up("positive", stronger, to):
+            said = [f"Replaced {_quoted(was)} with {_quoted(self._segment_holding(stronger))} "
+                    f"in the {PROMPTS['positive']}."]
+        return said + self._moved_first(stronger)
 
     def _put_first(self, which: str, words: str) -> list[str]:
         text = getattr(self, which)
@@ -376,12 +386,13 @@ class _Applying:
         self.positive = ", ".join([parts[at], *parts[:at], *parts[at + 1:]])
         return [f"Moved {_quoted(parts[at])} earlier in the Positive prompt."]
 
-    def _weighed_up(self, which: str, words: str) -> list[str]:
+    def _weighed_up(self, which: str, words: str, to: float | None = None) -> list[str]:
         text = getattr(self, which)
         index = index_of(text, words) if self.take_weights else None
         if index is None:
             return []
-        setattr(self, which, reweighted(text, index, WEIGHT_STEP))
+        by = max(WEIGHT_STEP, (to or 0) - unwrapped(segments_of(text)[index])[1])
+        setattr(self, which, reweighted(text, index, by))
         before, after = (segments_of(prompt)[index].strip() for prompt in (text, getattr(self, which)))
         return [f"Replaced {_quoted(before)} with {_quoted(after)} in the {PROMPTS[which]}."]
 

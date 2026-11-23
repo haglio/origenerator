@@ -666,6 +666,17 @@ def test_more_of_something_where_the_prompts_take_weights_weighs_it_and_its_oppo
         'prompt. Replaced "bare floor" with "(bare floor:1.1)" in the Negative prompt.')
 
 
+@pytest.mark.parametrize("stronger", ["a tall hat", "(a tall hat:1.2)", "((a tall hat:1.2):1.1)"])
+def test_more_of_a_part_already_weighted_raises_its_one_weight_whatever_weight_the_model_wrote(
+        stronger):
+    outcome = _one({"more": "a tall hat", "stronger": stronger, "opposite": "", "for": "tall hat"},
+                   ("a woman, (a tall hat:1.1)", ""), ("tall hat",),
+                   prompts=Prompts(his_words=frozenset({"a", "tall", "hat"})))
+
+    assert outcome.positive == "(a tall hat:1.2), a woman"
+    assert outcome.line.count("Replaced") == 1
+
+
 def test_more_of_something_already_first_in_his_words_with_its_opposite_kept_out_says_so():
     outcome = _one({"more": "a velvet couch", "stronger": "a velvet couch", "opposite": "bare floor",
                     "for": "even more couch"}, _MORE_COUCH, ("even more couch",))

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from origenerator.usual_company import UsualCompany, usual_company
+from origenerator.usual_company import UsualCompany, usual_company, usual_writing
 
 _SCENES = ["a fisherman, harbor, fog", "a farmer, a field, dusk", "a sailor, a deck, rain",
            "a child, a beach, noon"]
@@ -93,3 +93,29 @@ def test_a_wording_that_says_more_than_what_usually_came_is_no_wording_to_bring(
                for pair in ((scene, ""), (f"{scene}, {man}, a hat", ""))]
 
     assert usual_company(prompts, _is_a_hat).positive == ("a hat", "a tall man")
+
+
+def _writing_a_hat(writing: str, times: int, scene: str = "a pier") -> list[tuple[str, str]]:
+    return [(f"a man, {writing}, {scene} {number}", "") for number in range(times)]
+
+
+def test_the_wording_and_weight_his_prompts_most_often_give_a_thing_is_its_usual_writing():
+    prompts = [*_writing_a_hat("(a hat:1.2)", 2), *_writing_a_hat("(a Tall Felt hat:1.5)", 3),
+               *_writing_a_hat("a tall felt hat", 2)]
+
+    assert usual_writing(prompts, _is_a_hat) == ("a Tall Felt hat", 1.5)
+
+
+def test_a_writing_fewer_than_three_prompts_share_is_no_usual_writing():
+    prompts = [*_writing_a_hat("(a hat:1.2)", 2), *_writing_a_hat("(a tall felt hat:1.5)", 2)]
+
+    assert usual_writing(prompts, _is_a_hat) is None
+    assert usual_writing([("a man", "")], _is_a_hat) is None
+
+
+def test_only_his_newest_thirty_prompts_with_the_thing_say_how_he_writes_it():
+    prompts = [*_writing_a_hat("(a hat:1.2)", 40, "a field"),
+               *_writing_a_hat("(a tall felt hat:1.5)", 16),
+               *_writing_a_hat("(a straw hat:1.3)", 14)]
+
+    assert usual_writing(prompts, _is_a_hat) == ("a tall felt hat", 1.5)

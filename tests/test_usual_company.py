@@ -72,8 +72,24 @@ def test_only_his_newest_prompts_with_the_thing_say_what_its_company_is():
 
 
 def test_a_word_that_usually_came_under_several_wordings_brings_its_commonest_wording():
-    prompts = [pair for scene, man in zip(_SCENES, ("a tall man", "an old man", "a tall man",
-                                                    "the man beside her"), strict=True)
+    prompts = [pair for scene, man in zip(_SCENES, ("a tall man", "the tall man", "a tall man",
+                                                    "a man"), strict=True)
+               for pair in ((scene, ""), (f"{scene}, {man}, a hat", ""))]
+
+    assert usual_company(prompts, _is_a_hat).positive == ("a hat", "a tall man")
+
+
+def test_a_wording_that_says_more_than_what_usually_came_is_no_wording_to_bring():
+    scenes = [f"{who}, {where}, {light}" for who, where, light in zip(
+        ("a fisherman", "a farmer", "a sailor", "a child", "a baker", "a nurse", "a judge",
+         "a painter", "a pilot", "a clerk"),
+        ("harbor", "a field", "a deck", "a beach", "a kitchen", "a ward", "a court", "a loft",
+         "a runway", "an office"),
+        ("fog", "dusk", "rain", "noon", "dawn", "night", "snow", "haze", "wind", "frost"),
+        strict=True)]
+    men = (*["two sailors hauling a tall man"] * 3, *["a tall man"] * 3, "an old man",
+           "the man beside her", "a kind man", "a quiet man")
+    prompts = [pair for scene, man in zip(scenes, men, strict=True)
                for pair in ((scene, ""), (f"{scene}, {man}, a hat", ""))]
 
     assert usual_company(prompts, _is_a_hat).positive == ("a hat", "a tall man")

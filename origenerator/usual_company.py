@@ -67,13 +67,16 @@ def _usual_by_a_word(came_with_it: list[dict], named_already: tuple) -> tuple:
     times = Counter(thing for came in came_with_it for thing in came)
     with_the_word = Counter(word for came in came_with_it
                             for word in set().union(*(_words(thing) for thing in came)))
+    usually = [word for word, count in with_the_word.most_common()
+               if count >= _FEWEST_TWINS and count / len(came_with_it) >= _SHARE_THAT_IS_USUAL]
     said = set().union(*(_words(thing) for thing in named_already))
     found = []
-    for word, count in with_the_word.most_common():
-        if (word in said or count < _FEWEST_TWINS
-                or count / len(came_with_it) < _SHARE_THAT_IS_USUAL):
+    for word in usually:
+        saying_only_what_usually_came = [thing for thing in times
+                                         if word in _words(thing) and _words(thing) <= set(usually)]
+        if word in said or not saying_only_what_usually_came:
             continue
-        commonest = max((thing for thing in times if word in _words(thing)), key=times.__getitem__)
+        commonest = max(saying_only_what_usually_came, key=times.__getitem__)
         found.append(as_written[commonest])
         said |= _words(commonest)
     return tuple(found)

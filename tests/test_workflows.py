@@ -36,7 +36,7 @@ from origenerator.workflows.base import (
 )
 from origenerator.workflows.derived_size import scale_to_total_pixels
 from origenerator.workflows.duration import seconds_for_frames
-from origenerator.workflows.fix_finding import saved_before_each_fix
+from origenerator.workflows.fix_finding import parts_found_by, saved_before_each_fix
 from origenerator.workflows.flux_t2i_upscaled import FluxT2iUpscaledWorkflow
 from origenerator.workflows.frame_rate import (
     MAX_PLAYBACK_FPS,
@@ -2535,3 +2535,20 @@ def test_enable_audio_is_a_switch_first_under_audio(workflow):
 def test_only_krea_2_says_its_prompts_take_no_weights():
     assert [name for name, workflow in WORKFLOW_REGISTRY.items()
             if not workflow.prompts_take_weights] == ["krea2_t2i"]
+
+
+def test_each_fixs_detector_says_which_part_it_looks_for():
+    payload = _enhance_payload(enhance_detail_fixes={"faces": 0.45, "hands": 0.6})
+
+    assert [payload[f"fix{at}_detector"]["_meta"] for at in range(2)] == [
+        {"title": "faces"}, {"title": "hands"}]
+
+
+def test_a_fix_is_named_by_what_its_detector_says_it_looks_for_whatever_its_file_is_called():
+    history = {"prompt": [3, "run", {
+        "fix0_detector": {"class_type": "UltralyticsDetectorProvider", "_meta": {"title": "hands"},
+                          "inputs": {"model_name": "bbox/face_finder.pt"}},
+        "fix1_detector": {"class_type": "UltralyticsDetectorProvider",
+                          "inputs": {"model_name": "bbox/face_finder.pt"}}}, {}, []]}
+
+    assert {at: part.name for at, part in parts_found_by(history).items()} == {0: "hands", 1: "faces"}

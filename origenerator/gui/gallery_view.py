@@ -171,6 +171,7 @@ from origenerator.gui.populate_controller import PopulateController
 from origenerator.gui.prompt_reveal import reveal_prompt
 from origenerator.gui.request_aims import RequestAims
 from origenerator.gui.shown_job_queue import ShownJobQueue, read_foreign_queue
+from origenerator.gui.site_generations import SiteGenerations
 from origenerator.gui.slideshow_director import (
     DirectorSources,
     DirectorSurroundings,
@@ -207,6 +208,7 @@ from origenerator.item_shape import (
 from origenerator.library_readings import LibraryReadings, arrived, read_whole
 from origenerator.media import MediaType
 from origenerator.one_look import looking_once
+from origenerator.output_places import OutputFolders
 from origenerator.prompt_tokens import boxed_as_typed
 from origenerator.published_actions import give_the_launch_its_actions
 from origenerator.radio import OrigeneratorRadio
@@ -214,7 +216,7 @@ from origenerator.request_seed_remake import RemakesInTheQueue
 from origenerator.setting_advice import files_not_installed, made_with_files_not_installed
 from origenerator.trash import Genau, KeptBesideItsTrash, Kino, Trash
 from origenerator.voice.app_commands import AppCommand
-from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows import WORKFLOW_REGISTRY, workflow_named
 from origenerator.workflows.derived_size import resolve_input_image_path
 
 logger = logging.getLogger(__name__)
@@ -329,7 +331,9 @@ class GalleryView(QWidget):
     def _in_flight_items(self, rows=None, requests=None) -> list:
         if self._gallery_pane is None:
             return []
-        return self._gallery_pane.inflight_items(rows=rows, requests=requests)
+        on_a_site = self._sites.making()
+        return [item for item in self._gallery_pane.inflight_items(rows=rows, requests=requests)
+                if item.key not in on_a_site]
 
     def every_satellite_has_its_list(self) -> bool:
         return all(self.slideshows.region_slideshow(shape) is not None
@@ -420,6 +424,9 @@ class GalleryView(QWidget):
         self._jobs.finished.connect(self._on_reroll_finished)
         self._jobs.failed.connect(self._on_reroll_failed)
         self._jobs.run_ended.connect(self.run_ended)
+        self._sites = SiteGenerations(db, OutputFolders(OUTPUT_PLACES, THUMB_DIR), self)
+        self._sites.finished.connect(self._on_reroll_finished)
+        self._sites.failed.connect(self._on_reroll_failed)
         self._generation_failed = GenerationFailed(self)
         self._populate = PopulateController(self._start_populate_reroll)
         self._populate.stopped.connect(self._on_populate_stopped)
@@ -876,8 +883,8 @@ class GalleryView(QWidget):
 
     def _launch(self, workflow_name: str, batch: list[dict], launching,
                 asked: dict | None) -> tuple[str, list[str]] | None:
-        wf = WORKFLOW_REGISTRY.get(workflow_name)
-        if self._client is None or wf is None:
+        wf = workflow_named(workflow_name)
+        if self._client is None or wf is None or not (wf.generates_here or wf.makes_on_its_site):
             return None
         batch = [{**wf.default_params(), **params} for params in batch]
         if asked is not None:
@@ -887,14 +894,14 @@ class GalleryView(QWidget):
                 return None
             batch = [made]
         key = self.library.folder_key_for(workflow_name, batch[0])
-        if key in self._live_jobs:
+        makers = self._sites if wf.makes_on_its_site else self._jobs
+        if makers is self._jobs and key in self._live_jobs:
             return None
         if asked is None and self.would_reproduce_a_completed_run(wf, batch[0]):
             batch[0] = randomize_seeds(batch[0], wf.seed_keys())
             if launching is not None:
                 launching.use_random_seed()
-        launched = [prompt_id for prompt_id in self._jobs.start_batch(key, wf, batch)
-                    if prompt_id]
+        launched = [prompt_id for prompt_id in makers.start_batch(key, wf, batch) if prompt_id]
         if not launched:
             return None
         if launching is not None:
@@ -947,6 +954,7 @@ class GalleryView(QWidget):
         self.close_the_slideshows()
         self._voice.close()
         self._jobs.close()
+        self._sites.close()
         super().closeEvent(event)
 
     def refresh(self, *, only_if_moved: bool = False):

@@ -222,6 +222,7 @@ class WorkflowTemplate(ABC):
     derived_size_source: str = "input_image"
     selectable: bool = True
     generates_here: bool = True
+    makes_on_its_site: bool = False
     why_it_has_no_settings: str | None = None
     model_keys: tuple[str, ...] = ()
     lora_keys: tuple[str, ...] = ()

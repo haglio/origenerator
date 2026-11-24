@@ -27,9 +27,6 @@ from origenerator.record_fold import file_key
 
 logger = logging.getLogger(__name__)
 
-IN_PLACE_OF = "enhance_in_place_of"
-
-
 def _history_entries(files: list[dict], params: dict, enhance_row: dict) -> list[dict]:
     settings = version_settings(params)
     return [
@@ -44,10 +41,6 @@ def _history_entries(files: list[dict], params: dict, enhance_row: dict) -> list
 def _seed_kept(enhance_row: dict) -> dict:
     seed = parse_params(enhance_row.get("params_json")).get("seed")
     return {"seed": seed} if isinstance(seed, int) else {}
-
-
-def in_place_of(enhance_row: dict) -> str | None:
-    return parse_params(enhance_row.get("params_json")).get(IN_PLACE_OF)
 
 
 def fold_enhancement(db, enhance_row: dict,
@@ -66,15 +59,11 @@ def fold_enhancement(db, enhance_row: dict,
     listed = {file_key(entry) for entry in source_files}
     new_files = [entry for entry in enhanced_files if file_key(entry) not in listed]
     history = parse_file_list(source.get("enhance_history"))
-    replaced = in_place_of(enhance_row)
     updates = {
-        "output_files": json.dumps(_put_in_at(
-            source_files, new_files,
-            lambda entry: replaced is not None and entry.get("filename") == replaced)),
-        "enhance_history": json.dumps(_put_in_at(
-            history, _history_entries(new_files, enhance_version_params(enhance_row), enhance_row),
-            lambda entry: (replaced is not None and isinstance(entry, dict)
-                           and entry.get("filename") == replaced))),
+        "output_files": json.dumps(new_files + source_files),
+        "enhance_history": json.dumps(
+            _history_entries(new_files, enhance_version_params(enhance_row), enhance_row)
+            + history),
     }
     if not source.get("original_files"):
         updates["original_files"] = source.get("output_files")
@@ -83,11 +72,6 @@ def fold_enhancement(db, enhance_row: dict,
     db.update_generation(source_id, **updates)
     db.delete_generation(enhance_row["prompt_id"])
     return source_id
-
-
-def _put_in_at(listed: list, new: list, is_the_one_replaced) -> list:
-    at = next((at for at, entry in enumerate(listed) if is_the_one_replaced(entry)), 0)
-    return listed[:at] + new + listed[at:]
 
 
 def fold_completed_enhancements(db) -> int:

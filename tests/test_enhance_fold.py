@@ -616,25 +616,6 @@ def test_fold_keeps_the_seed_the_enhancement_was_made_from(tmp_path):
         "is the one way it comes out the same")
 
 
-def test_an_enhancement_made_in_the_place_of_another_is_listed_where_that_one_is(tmp_path):
-    db = Database(tmp_path / "t.db")
-    _add_source(db)
-    for run, saved in (("e1", "image_enhance_00001_.png"), ("e2", "image_enhance_00002_.png")):
-        fold_enhancement(db, _add_enhance(db, run, "image/sdxl_t2i_src.png [output]", saved))
-    again = _add_enhance(db, "e3", "image/sdxl_t2i_src.png [output]", "image_enhance_00003_.png",
-                         **{gallery.IN_PLACE_OF: "image_enhance_00001_.png"})
-
-    assert gallery.in_place_of(again) == "image_enhance_00001_.png"
-    fold_enhancement(db, again)
-
-    upgraded = db.get_generation("src")
-    assert [f["filename"] for f in gallery.row_output_files(upgraded)] == [
-        "image_enhance_00002_.png", "image_enhance_00003_.png", "image_enhance_00001_.png",
-        "sdxl_t2i_src.png"]
-    assert [entry["filename"] for entry in json.loads(upgraded["enhance_history"])] == [
-        "image_enhance_00002_.png", "image_enhance_00003_.png", "image_enhance_00001_.png"]
-
-
 _UNDER, _FIXED = (10, 10, 10), (200, 0, 0)
 
 

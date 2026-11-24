@@ -30,7 +30,7 @@ PUBLISHED = {
     "fold_completed_enhancements", "fold_enhancement",
     "folder_chain", "folder_id", "folder_key_at_level", "folder_key_for", "folder_level", "folder_signature",
     "forget_fixes_of_enhancements_gone", "full_settings",
-    "IN_PLACE_OF", "finish_fix_switches_cut_short", "in_place_of", "seed_written_in",
+    "finish_fix_switches_cut_short", "seed_written_in",
     "generation_seed", "group_level", "holds", "image_lent_by", "input_image_reference",
     "is_a_flick", "is_enhance_product_row", "is_enhanceable_row", "item_type_of",
     "is_enhanced_row", "is_image_conditioned", "is_in_progress", "item_type_labels",

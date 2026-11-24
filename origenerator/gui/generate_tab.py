@@ -231,7 +231,7 @@ class GenerateTab(DropZones):
     enhance_requested = Signal(str)
     versions_delete_requested = Signal(str, list)
     fix_change_requested = Signal(str, str, str, str, bool)
-    enhance_again_requested = Signal(str, str, bool)
+    enhance_again_requested = Signal(str, str)
     train_requested = Signal(str)
     trash_requested = Signal(str)
     actions_saved = Signal(str, object)
@@ -412,8 +412,7 @@ class GenerateTab(DropZones):
             lambda position, part, what, to: self._ask_of_the_version(
                 position, self.fix_change_requested, part, what, to))
         self._versions.enhance_again_requested.connect(
-            lambda position, in_its_place: self._ask_of_the_version(
-                position, self.enhance_again_requested, in_its_place))
+            lambda position: self._ask_of_the_version(position, self.enhance_again_requested))
         body.addWidget(self._versions)
 
     def _build_settings_pane(self) -> QWidget:

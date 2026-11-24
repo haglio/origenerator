@@ -278,31 +278,28 @@ class EnhanceController:
                      settings: gallery.EnhanceSettings | None = None) -> None:
         self._enqueue(rows, settings or self._settings)
 
-    def enhance_again(self, prompt_id: str, filename: str, in_its_place: bool) -> None:
+    def enhance_again(self, prompt_id: str, filename: str) -> None:
         row = self._db.get_generation(prompt_id) or {}
         version = next((version for version in gallery.enhancement_versions(row)
                         if version.file.get("filename") == filename), None)
         if version is None:
             return
         settings = dict(version.params)
-        if not in_its_place:
-            left_out = fix_switches.left_out_of_a_re_enhance(version.file)
-            settings["enhance_detail_fixes"] = {
-                name: amount for name, amount in detail_fixes_of(settings).items()
-                if name not in left_out}
+        left_out = fix_switches.left_out_of_a_re_enhance(version.file)
+        settings["enhance_detail_fixes"] = {
+            name: amount for name, amount in detail_fixes_of(settings).items()
+            if name not in left_out}
         params = gallery.enhance_params_for(
             row, gallery.EnhanceSettings(params=gallery.full_settings(settings)))
         if params is None:
             return
-        if in_its_place:
-            params[gallery.IN_PLACE_OF] = filename
         seed = version.seed if version.seed is not None else gallery.seed_written_in(
             gallery.output_file_path(version.file, config.OUTPUT_PLACES))
         if seed is not None:
             params["seed"] = seed
         for launched in launch_enhancements(
                 self._jobs, self._db, [(row, params)], self._library.reading.image_index,
-                seeds_as_asked=seed is not None, even_if_made=in_its_place):
+                seeds_as_asked=seed is not None, even_if_made=True):
             self._note_launch(*launched)
 
     def enhance_a_videos_start_image(self, row: dict) -> None:

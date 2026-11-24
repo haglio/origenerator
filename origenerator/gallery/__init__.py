@@ -41,14 +41,12 @@ from origenerator.gallery.enhance import (
     version_matching_settings,
 )
 from origenerator.gallery.enhance_fold import (
-    IN_PLACE_OF,
     disown_foreign_runs,
     enhancements_of_images_gone,
     finish_fix_switches_cut_short,
     fold_completed_enhancements,
     fold_enhancement,
     forget_fixes_of_enhancements_gone,
-    in_place_of,
 )
 from origenerator.gallery.enhance_graph import seed_written_in
 from origenerator.gallery.enhance_settings import (
@@ -179,7 +177,6 @@ __all__ = [
     "ENHANCE_SETTING_KEYS",
     "ENHANCE_WORKFLOW",
     "GENERATION_SEED_KEYS",
-    "IN_PLACE_OF",
     "MATCH_SOURCE_MODEL",
     "SELECTION_KEY",
     "AllGroup",
@@ -245,7 +242,6 @@ __all__ = [
     "holds",
     "image_config_index_of",
     "image_lent_by",
-    "in_place_of",
     "input_image_reference",
     "is_a_flick",
     "is_enhance_product_row",

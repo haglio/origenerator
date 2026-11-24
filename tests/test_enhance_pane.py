@@ -2799,7 +2799,7 @@ def test_an_enhancement_made_before_fixes_were_kept_names_its_fixes_with_no_mark
         "This enhancement was made before fixes were individually removable"}
 
 
-def test_an_enhancement_made_before_fixes_were_kept_has_a_button_to_redo_it_in_its_place(qtbot):
+def test_an_enhancement_made_before_fixes_were_kept_has_a_button_to_redo_it(qtbot):
     versions = _showing(qtbot, EnhanceVersion(
         1, "Enhancement 1/1", {"filename": "img.png"},
         {"enhance_scale": 2.0, "enhance_detail_fixes": {"faces": 0.4}}))
@@ -2810,7 +2810,8 @@ def test_an_enhancement_made_before_fixes_were_kept_has_a_button_to_redo_it_in_i
     redo.click()
 
     assert redo.text() == "Redo"
-    assert asked == [(0, True)]
+    assert asked == [(0,)]
+    assert "This one stays as it is" in redo.toolTip()
 
 
 def test_an_enhancement_made_with_no_fixes_has_nothing_to_redo(qtbot):
@@ -2837,7 +2838,7 @@ def test_re_enhance_shows_under_the_fixes_label_once_a_fix_is_unchecked_or_marke
     assert _again_button(one_off).parentWidget() is beside
     assert beside.layout().indexOf(fixes_label) < beside.layout().indexOf(_again_button(one_off))
     _again_button(one_off).click()
-    assert asked == [(0, False)]
+    assert asked == [(0,)]
 
 
 def test_the_fixes_and_their_label_keep_the_apps_own_background_while_their_row_is_picked(qtbot):

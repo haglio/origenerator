@@ -485,6 +485,14 @@ the images one after another off the window's thread.
   random seeds are larger than a site takes.
 - A row left running by a copy of the app that died is cleared at the next
   launch like any run ComfyUI no longer knows.
+- When the site answers without an image, the script hands on the site's own
+  message, and the Generation failed window shows it after "<site> said:".
+  That message can quote his prompt (a moderation refusal names the phrase it
+  objected to), so it is his the way a prompt is: it goes to the window and
+  the gallery's record and is never logged, and an agent checking a refusal
+  reads the answer's keys and its `status`, never its `message`. The site
+  warns that repeated refusals can end the account, so nothing here ever
+  asks again by itself.
 
 Only images are made this way so far; a site's video keeps its dead Generate.
 

@@ -164,5 +164,18 @@ def test_closing_drops_what_waits_and_closes_the_chrome(making):
 
 
 def test_a_reason_the_site_gives_in_its_own_words_is_passed_on():
-    assert why_in_words("madeup", "made-up reason") == (
-        "madeup did not make the image: made-up reason.")
+    assert why_in_words("madeup", "Please revise what you asked for.") == (
+        "madeup did not make the image. madeup said: Please revise what you asked for.")
+
+
+def test_what_a_site_said_is_never_written_to_the_log(making, caplog):
+    said = "Please revise what you asked for, which named a made-up phrase."
+    generations, db, later, heard = making(FakeSite(SiteRefused(said)))
+    caplog.set_level("DEBUG")
+
+    (prompt_id,) = generations.start_batch(KEY, _its_images(), [ASKED])
+    later.run_one()
+
+    assert said in heard["failed"][0][1]
+    assert db.get_generation(prompt_id)["error_message"] == said
+    assert "made-up phrase" not in caplog.text

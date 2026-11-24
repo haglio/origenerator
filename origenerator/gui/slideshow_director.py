@@ -411,12 +411,18 @@ class SlideshowDirector:
         return self.open(items[:1], rows=rows, start=0, shuffle=in_order, hud=hud,
                          locked=True)
 
+    def can_open_on_tile(self, generation) -> bool:
+        return bool(self._slides_on_tile(self._row_for(generation)))
+
+    def _slides_on_tile(self, row: dict | None) -> list:
+        return self.items_of([row]) if row is not None else []
+
     @looking_once
     def open_on_tile(self, generation):
         row = self._row_for(generation)
         if self._plays_on_the_main_funestra(row):
             return None
-        items = self.items_of([row]) if row is not None else []
+        items = self._slides_on_tile(row)
         if not items:
             return None
         if self._plays_in_genau(row):

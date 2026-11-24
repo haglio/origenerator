@@ -183,6 +183,12 @@ def test_a_file_name_finds_an_item_brought_in_from_the_library():
     assert _hits(_index(rows), "an example clip") == ["brought in"]
 
 
+def test_the_first_few_characters_of_a_file_name_find_the_item_it_was_made_as():
+    rows = [_made_as("made", "A1B2C3D4-0000-4000-8000-000000000001_topaz.mp4"),
+            _made_as("other", "e5f6a7b8-0000-4000-8000-000000000002.mp4")]
+    assert _hits(_index(rows), "a1b2c3d4") == ["made"]
+
+
 def test_the_code_leading_a_name_finds_every_item_of_its_folder():
     rows = [_row("g1", "a quiet street"), _row("g2", "a quiet street"),
             _row("g3", "a quiet street")]

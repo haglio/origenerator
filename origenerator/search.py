@@ -227,7 +227,8 @@ def _field_score(term: QueryTerm, stems: frozenset[str]) -> float:
 def _term_score(term: QueryTerm, entry: _Entry) -> float:
     if term.side_by_side:
         return _EXACT if _says(entry, term.side_by_side) else 0.0
-    if term.stem in entry.seeds or _starts_the_name(term.stem, entry.name):
+    if term.stem in entry.seeds or _starts(term.stem, entry.name) \
+            or any(_starts(term.text, file) for file in entry.files):
         return _EXACT
     return max(
         _field_score(term, entry.title),
@@ -278,7 +279,7 @@ def _said_in(tags, words: tuple[str, ...]) -> bool:
                for tag in tags for at in range(len(tag) - count + 1))
 
 
-def _starts_the_name(typed: str, name: str) -> bool:
+def _starts(typed: str, name: str) -> bool:
     return len(typed) >= _SHORTEST_NAME_START and name.startswith(typed)
 
 

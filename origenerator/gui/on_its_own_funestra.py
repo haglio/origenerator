@@ -42,7 +42,7 @@ from origenerator.slideshow_buttons import (
 )
 
 _RATE_STEPS = {"speed_up": SPEED_UP, "speed_down": SPEED_DOWN}
-_HUD_MOVES = {
+_ARROW_DIRECTIONS = {
     Qt.Key.Key_Left: "left",
     Qt.Key.Key_Right: "right",
     Qt.Key.Key_Up: "up",
@@ -55,8 +55,6 @@ _WASD_AS_ARROWS = {
     Qt.Key.Key_D: Qt.Key.Key_Right,
 }
 _MODES_PICKED = {command: mode for command, _label, mode in MODE_BUTTONS}
-_NAV_MAP_STEPS = {Qt.Key.Key_Left: "left", Qt.Key.Key_Right: "right", Qt.Key.Key_Up: "up",
-                  Qt.Key.Key_Down: "down"}
 _SHIFTED_STEPS = {Qt.Key.Key_Left: "prev_fix", Qt.Key.Key_Right: "next_fix",
                   Qt.Key.Key_Up: "cycle_version", Qt.Key.Key_Down: "cycle_version_back"}
 _GENAUS_KEYS = {
@@ -453,12 +451,12 @@ class OnItsOwnFunestra(QObject):
              said_at: float | None = None) -> bool:
         key = _WASD_AS_ARROWS.get(key, key)
         if alt:
-            direction = _NAV_MAP_STEPS.get(key)
+            direction = _ARROW_DIRECTIONS.get(key)
             if direction is None or self._mode is MainMode.GENAU:
                 return False
             self._slideshow.slideshow_nav(direction)
         elif ctrl:
-            direction = _HUD_MOVES.get(key)
+            direction = _ARROW_DIRECTIONS.get(key)
             if direction is None or self._actions.move_hud is None:
                 return False
             self._actions.move_hud(direction)

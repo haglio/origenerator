@@ -21,6 +21,7 @@ ANSWERS_WITHIN_S = 240.0
 LOOKS_FOR_A_SIGN_IN_EVERY_S = 1.0
 
 _NOWHERE = "about:blank"
+_IS_NOWHERE = f"location.href === '{_NOWHERE}' && document.readyState === 'complete'"
 _HAS_LOADED = "document.readyState === 'complete'"
 _WHAT_IT_MADE = "JSON.stringify(window.funTimeMade || null)"
 _IS_SIGNED_OUT = "window.funTimeSite ? window.funTimeSite.signedOut() : null"
@@ -41,6 +42,7 @@ class SiteRefused(Exception):
 def made_on(page, address: str, script: str, *, until: Callable = wait_until) -> Made:
     try:
         page.go_to(_NOWHERE)
+        until(lambda: page.read(_IS_NOWHERE), timeout=LOADS_WITHIN_S)
         page.go_to(address)
         until(lambda: page.read(_HAS_LOADED), timeout=LOADS_WITHIN_S)
         page.run(script)

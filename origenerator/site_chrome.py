@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 PORT_FILE = "DevToolsActivePort"
 STARTS_WITHIN_S = 60.0
 ENDS_WITHIN_S = 15.0
+SAYS_SOMETHING_WITHIN_S = 120.0
+A_PAGE_ASKS_BEFORE_IT_GOES_ON = "Page.javascriptDialogOpening"
 _CHROME_UNDER = ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA")
 _CHROME = Path("Google") / "Chrome" / "Application" / "chrome.exe"
 
@@ -44,15 +46,21 @@ class DevTools:
         self._asked = 0
 
     def ask(self, method: str, **params) -> dict:
-        self._asked += 1
-        self._connection.send(json.dumps({"id": self._asked, "method": method, "params": params}))
+        asked = self._send(method, params)
         while True:
-            said = json.loads(self._connection.recv())
-            if said.get("id") != self._asked:
+            said = json.loads(self._connection.recv(SAYS_SOMETHING_WITHIN_S))
+            if said.get("method") == A_PAGE_ASKS_BEFORE_IT_GOES_ON:
+                self._send("Page.handleJavaScriptDialog", {"accept": True})
+            if said.get("id") != asked:
                 continue
             if "error" in said:
                 raise ChromeRefused(f"{method}: {said['error'].get('message', '')}")
             return said.get("result", {})
+
+    def _send(self, method: str, params: dict) -> int:
+        self._asked += 1
+        self._connection.send(json.dumps({"id": self._asked, "method": method, "params": params}))
+        return self._asked
 
     def close(self) -> None:
         self._connection.close()
@@ -61,6 +69,7 @@ class DevTools:
 class SitePage:
     def __init__(self, devtools: DevTools):
         self._devtools = devtools
+        devtools.ask("Page.enable")
         devtools.ask("Emulation.setFocusEmulationEnabled", enabled=True)
 
     def go_to(self, address: str) -> None:

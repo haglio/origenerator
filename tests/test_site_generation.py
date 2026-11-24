@@ -42,6 +42,9 @@ class FakePage:
         self.did.append(("run", script))
 
     def read(self, expression: str):
+        if "about:blank" in expression:
+            self.did.append(("left the last page", ""))
+            return True
         if "readyState" in expression:
             return self.loaded
         if "funTimeMade" in expression:
@@ -59,7 +62,8 @@ def test_an_image_is_made_by_filling_the_page_and_reading_what_it_says_it_made()
     made = made_on(page, ADDRESS, SCRIPT, until=without_waiting)
 
     assert made == Made(image="https://example.com/a.webp", seed="123")
-    assert page.did == [("go to", "about:blank"), ("go to", ADDRESS), ("run", SCRIPT)]
+    assert page.did == [("go to", "about:blank"), ("left the last page", ""), ("go to", ADDRESS),
+                        ("run", SCRIPT)]
 
 
 def test_a_page_that_says_why_it_made_nothing_is_a_refusal_with_that_reason():

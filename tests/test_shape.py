@@ -219,8 +219,8 @@ def test_the_pane_is_one_table_of_contents_per_shape(qtbot, tmp_path):
     for shape in ("portrait", "landscape"):
         assert _rows(view._tree, shape) == ["All"], \
             "a set mixing the shapes has no one screen to play on, so each shape has the whole tree"
-        assert _under_all(view._tree, shape)[:5] == [
-            "Latest", "Favorites", "Enhanced", "Experiments", "Trash",
+        assert _under_all(view._tree, shape)[:6] == [
+            "Latest", "Favorites", "Enhanced", "Populating", "Experiments", "Trash",
         ]
 
 

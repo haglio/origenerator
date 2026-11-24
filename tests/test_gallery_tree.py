@@ -186,7 +186,7 @@ def _children(item):
     return [item.child(i) for i in range(item.childCount())]
 
 
-_COLLECTIONS = ["Latest", "Favorites", "Enhanced", "Experiments", "Trash"]
+_COLLECTIONS = ["Latest", "Favorites", "Enhanced", "Populating", "Experiments", "Trash"]
 
 
 def _leads_with(folder, collections) -> bool:
@@ -195,7 +195,7 @@ def _leads_with(folder, collections) -> bool:
             and all(row.data(0, GROUP_ROLE) is None for row in rows))
 
 
-def test_all_leads_with_its_five_collections_then_images_then_videos(qtbot):
+def test_all_leads_with_its_collections_then_images_then_videos(qtbot):
     half = _table_of_contents(qtbot, [_video("v1", "style_a"), _image("i1", "a cat")])
     (all_row,) = [half.topLevelItem(i) for i in range(half.topLevelItemCount())]
 
@@ -203,7 +203,7 @@ def test_all_leads_with_its_five_collections_then_images_then_videos(qtbot):
     assert _leads_with(all_row, _COLLECTIONS)
 
 
-def test_images_and_videos_each_lead_with_the_five_then_their_workflows(qtbot):
+def test_images_and_videos_each_lead_with_the_collections_then_their_workflows(qtbot):
     half = _table_of_contents(qtbot, [_video("v1", "style_a"), _image("i1", "a cat")])
     (all_row,) = [half.topLevelItem(i) for i in range(half.topLevelItemCount())]
     images, videos = _children(all_row)[len(_COLLECTIONS):]

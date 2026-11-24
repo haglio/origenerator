@@ -167,10 +167,10 @@ def test_stop_all_ends_populate_wherever_it_runs(qtbot):
 
     assert not populate.is_active("a")
     assert stopped == ["a"]
-    assert populate.active_key() is None
+    assert populate.active_keys() == ()
 
 
-def test_populating_in_a_new_folder_ends_it_in_the_old_one(qtbot):
+def test_populating_in_a_new_folder_keeps_it_running_in_the_old_one(qtbot):
     launcher = FakeLauncher()
     populate = PopulateController(launcher)
     stopped = []
@@ -179,26 +179,21 @@ def test_populating_in_a_new_folder_ends_it_in_the_old_one(qtbot):
 
     populate.start("b")
 
-    assert populate.is_active("b")
-    assert not populate.is_active("a"), (
-        "Populate runs in one folder at a time: two would only take turns at the machine, each "
-        "waiting out the other's render")
-    assert stopped == ["a"], (
-        "reported as a hand-stop is, so the folder left behind has its switch cleared in the one "
-        "handler every ending goes through")
+    assert populate.active_keys() == ("a", "b")
+    assert stopped == []
 
 
-def test_populate_names_the_folder_it_runs_in_and_none_once_stopped(qtbot):
+def test_populate_names_every_folder_it_runs_in(qtbot):
     populate = PopulateController(FakeLauncher())
     populate.start("a")
+    populate.start("b")
 
-    assert populate.active_key() == "a", (
-        "a Populate the user has walked away from is the one they need to be told about")
     populate.stop("a")
-    assert populate.active_key() is None
+
+    assert populate.active_keys() == ("b",)
 
 
-def test_the_displaced_folder_launches_nothing_more(qtbot):
+def test_each_folder_populating_launches_its_own_next_variation(qtbot):
     launcher = FakeLauncher()
     populate = PopulateController(launcher)
     populate.start("a")
@@ -206,7 +201,7 @@ def test_the_displaced_folder_launches_nothing_more(qtbot):
 
     populate.note_finished("a")
 
-    assert launcher.calls == ["a", "b"]
+    assert launcher.calls == ["a", "b", "a"]
 
 
 def test_a_new_folder_that_cannot_start_leaves_populate_where_it_was(qtbot):
@@ -221,3 +216,28 @@ def test_a_new_folder_that_cannot_start_leaves_populate_where_it_was(qtbot):
     assert populate.is_active("a")
     assert not populate.is_active("b")
     assert stopped == []
+
+
+def test_populate_remembers_what_its_runs_made_until_it_stops(qtbot):
+    populate = PopulateController(FakeLauncher())
+    populate.start("a")
+    populate.start("b")
+    populate.note_launch("a", origin="image a")
+    populate.note_launch("a", origin="next image a")
+    populate.note_launch("b", origin="image b")
+    populate.note_landed(origin="image b", prompt_id="video b")
+
+    landed = populate.note_landed(origin="image a", prompt_id="video a")
+    populate.stop("b")
+
+    assert (landed, populate.made_ids()) == (True, frozenset({"image a", "video a"}))
+    assert [populate.owns(run) for run in ("image a", "next image a")] == [False, True]
+
+
+def test_a_run_populate_did_not_launch_is_none_of_its(qtbot):
+    populate = PopulateController(FakeLauncher())
+    populate.start("a")
+
+    landed = populate.note_landed(origin="by hand", prompt_id="image")
+
+    assert (landed, populate.made_ids()) == (False, frozenset())

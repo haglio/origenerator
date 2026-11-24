@@ -61,6 +61,9 @@ from origenerator.gallery.collection import (
     LATEST_KEY as _LATEST_KEY,
 )
 from origenerator.gallery.collection import (
+    POPULATING_KEY as _POPULATING_KEY,
+)
+from origenerator.gallery.collection import (
     TRASH_KEY as _TRASH_KEY,
 )
 from origenerator.gallery.collection import (
@@ -117,12 +120,12 @@ from origenerator.gui.gallery_pane import (
 )
 from origenerator.gui.gallery_pane_buttons import (
     GROUP_TIP,
-    POPULATE_ELSEWHERE_TIP,
     Button,
     ButtonHandlers,
     ButtonStates,
     GalleryPaneButtons,
     OfferedPress,
+    populate_elsewhere_tip,
 )
 from origenerator.gui.gallery_search import GallerySearchController, SearchScope
 from origenerator.gui.gallery_tree import (
@@ -295,7 +298,8 @@ class GalleryView(QWidget):
         self._pace = SlideshowPace(parent=self)
         self._build_the_queue_of_runs(db, client)
         self._item_names = ItemNames(db)
-        self.library = LibraryReadings(db, self._item_names, shared.publish_names)
+        self.library = LibraryReadings(db, self._item_names, shared.publish_names,
+                                       populating=self._populated_ids)
         self._build_what_the_satellites_play(db, client)
         self._edits_given = actions
         self.rest_built = False
@@ -419,7 +423,6 @@ class GalleryView(QWidget):
         self._populate = PopulateController(self._start_populate_reroll)
         self._populate.stopped.connect(self._on_populate_stopped)
         self._populate_settings: dict = {}
-        self._populate_origins: set[str] = set()
         self._selected_reroll_key: str | None = None
         self._generating_tile: GeneratingTile | None = None
         self._lead_drawn_for: tuple | None = None
@@ -1476,14 +1479,20 @@ class GalleryView(QWidget):
         job = self._jobs.newest_job_for(key)
         if job is None:
             return
-        self._populate_origins = {origin for origin in self._populate_origins
-                              if self._jobs.job_for_origin(origin) is not None}
-        self._populate_origins.add(job.origin)
+        self._populate.note_launch(key, origin=job.origin)
+
+    def _populated_ids(self) -> frozenset[str]:
+        return self._populate.made_ids() | {job.prompt_id for job in self._jobs.all_jobs
+                                            if self._populate.owns(job.origin)}
 
     def _toggle_populate(self, checked: bool):
         group = self.current_group()
-        if not checked:
-            self._populate.stop_all()
+        if self._in_populating():
+            if not checked:
+                self._populate.stop_all()
+        elif not checked:
+            if group is not None:
+                self._populate.stop(group.key)
         elif group is not None:
             self._begin_populate(group.key)
         self._re_aim_every_button()
@@ -1511,6 +1520,8 @@ class GalleryView(QWidget):
         self._populate_settings.pop(key, None)
         if key == self._selected_reroll_key and key not in self._live_jobs:
             self._clear_reroll_selection()
+        if self._in_populating():
+            self.refresh()
         self._re_aim_every_button()
         self._sync_cancel_buttons()
 
@@ -1529,9 +1540,8 @@ class GalleryView(QWidget):
         self._voice.drop_the_request()
 
     def _go_to_populating_folder(self, _href: str):
-        key = self._populate.active_key()
-        if key is not None:
-            self._stand_on_the_run_in(key, rebuild=True)
+        self._tree.setCurrentItem(self.toc.collection_item(_POPULATING_KEY,
+                                                           self.toc.shape_in_view()))
 
     def rows_to_play(self) -> list[dict]:
         rows = [] if self._in_the_trash() else self._gallery_pane.collection_rows()
@@ -1571,12 +1581,6 @@ class GalleryView(QWidget):
         can_go_back, can_go_forward = self._trail
         undo_label = self._edits.undo_label()
         redo_label = self._edits.redo_label()
-        populate_folder = self._populate.active_key()
-        group = self.current_group()
-        why_not = self._why_populate_cannot(group)
-        can_populate = why_not is None
-        elsewhere = (populate_folder is not None
-                     and populate_folder != getattr(group, "key", None))
         return ButtonStates(
             back=Button(enabled=can_go_back, tip="Back"),
             forward=Button(enabled=can_go_forward, tip="Forward"),
@@ -1593,18 +1597,37 @@ class GalleryView(QWidget):
                        if self._in_the_trash()
                        else Button(visible=self.slideshows.anything_to_play(),
                                    tip=f"Play {self.slideshow_subject()} as a slideshow")),
-            populate=Button(enabled=can_populate or populate_folder is not None,
-                        tip="" if elsewhere else self._populate_tip(why_not, populate_folder),
-                        checked=populate_folder is not None),
-            populate_tip=POPULATE_ELSEWHERE_TIP if elsewhere else "",
+            populate=self._populate_switch(),
+            populate_tip=self._populate_elsewhere_tip(),
         )
 
-    @staticmethod
-    def _populate_tip(why_not: str | None, populate_folder: str | None) -> str:
-        if populate_folder is not None:
-            return "Populate is running in this folder — click to stop it"
-        return why_not or ("Populate: repeatedly generate variations of this folder "
-                           "until toggled off")
+    def _populate_elsewhere_tip(self) -> str:
+        if self._populate_switch().tip:
+            return ""
+        group = self.current_group()
+        return populate_elsewhere_tip(
+            sum(key != getattr(group, "key", None) for key in self._populate.active_keys()))
+
+    def _populate_switch(self) -> Button:
+        if self._in_populating():
+            running = bool(self._populate.active_keys())
+            return Button(enabled=running, checked=running,
+                          tip=("Stop Populate in every folder it is running in" if running
+                               else "Populate is not running in any folder"))
+        group = self.current_group()
+        if group is not None and self._populate.is_active(group.key):
+            return Button(tip="Populate is running in this folder — click to stop it",
+                          checked=True)
+        why_not = self._why_populate_cannot(group)
+        if why_not is None and self._populate.active_keys():
+            return Button(tip="", checked=False)
+        return Button(enabled=why_not is None, checked=False,
+                      tip=why_not or ("Populate: repeatedly generate variations of this "
+                                      "folder until toggled off"))
+
+    def _in_populating(self) -> bool:
+        collection = folder_collection(_base_of(self.selected_folder_key()))
+        return collection is not None and collection.which == _POPULATING_KEY
 
     def _why_populate_cannot(self, group) -> str | None:
         if not isinstance(group, gallery.SettingsGroup):
@@ -1931,9 +1954,8 @@ class GalleryView(QWidget):
 
     def _on_reroll_finished(self, key: str, prompt_id: str, origin: str = ""):
         run = origin or prompt_id
-        launcher = (None if run in self._populate_origins
+        launcher = (None if self._populate.note_landed(origin=run, prompt_id=prompt_id)
                     else self.generate_pane.tab_that_launched(run))
-        self._populate_origins.discard(run)
         finished_row = self._db.get_generation(prompt_id)
         if finished_row is None or finished_row.get("source") in (GenerationSource.EXPERIMENT,
                                                                   GenerationSource.REMAKE):

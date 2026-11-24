@@ -27,8 +27,10 @@ def read_whole(db, last: Read | None = None) -> Read:
 
 
 class LibraryReadings:
-    def __init__(self, db, item_names, publish_names: Callable[[dict[str, str]], None]) -> None:
+    def __init__(self, db, item_names, publish_names: Callable[[dict[str, str]], None], *,
+                 populating: Callable[[], frozenset[str]] = frozenset) -> None:
         self._db = db
+        self._populating = populating
         self._item_names = item_names
         self._publish_names = publish_names
         self.reading = LibrarySnapshot([])
@@ -85,7 +87,8 @@ class LibraryReadings:
                                   folder_meta=meta, name_of=self._item_names.of,
                                   custom_collections=self._db.list_custom_collections(),
                                   previous=self.reading,
-                                  names_version=lambda: self._item_names.version)
+                                  names_version=lambda: self._item_names.version,
+                                  populating=self._populating)
         if not unmoved:
             self._lists_built_from = state
             self._item_names.take(library.rows, library.held_rows, library.image_index,

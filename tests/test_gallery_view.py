@@ -124,10 +124,11 @@ from tests.qt_exec import faking_exec
 from tests.real_db import database_of, keep_rows_on_disk, put_rows
 from tests.test_folder_tree import _shown
 
-_COLLECTION_NAMES = ["Latest", "Favorites", "Enhanced", "Experiments", "Trash"]
+_COLLECTION_NAMES = ["Latest", "Favorites", "Enhanced", "Populating", "Experiments", "Trash"]
 
 
-_COLLECTIONS_FILLED_WITH_BOTH_KINDS = [name for name in _COLLECTION_NAMES if name != "Enhanced"]
+_COLLECTIONS_FILLED_WITH_BOTH_KINDS = [name for name in _COLLECTION_NAMES
+                                      if name not in ("Enhanced", "Populating")]
 
 
 def _collection_names(item):
@@ -380,7 +381,7 @@ def test_a_non_ai_folder_has_no_experiments_since_nothing_in_it_was_generated(qt
     view.refresh()
 
     assert _collection_names(_video_workflow(view._tree)) == [
-        name for name in _COLLECTION_NAMES if name != "Experiments"]
+        name for name in _COLLECTION_NAMES if name not in ("Populating", "Experiments")]
 
 
 def test_a_folder_of_folders_shows_its_collections_as_squares_before_its_folders(qtbot):

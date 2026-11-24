@@ -813,6 +813,9 @@ class GalleryPane(QObject):
     def showing_trash(self) -> bool:
         return base_of(self._tree.selected_folder_key()) == TRASH_KEY
 
+    def showing_populating(self) -> bool:
+        return base_of(self._tree.selected_folder_key()) == POPULATING_KEY
+
     def _favorite_folders(self, shape: str | None, folder: str) -> list:
         group = self._model.placement(shape).folder(folder)
         return gallery.favorite_folders(gallery.child_groups(group)) if group else []

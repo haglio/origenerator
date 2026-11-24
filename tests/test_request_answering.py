@@ -13,7 +13,6 @@ from origenerator.db_requests import Turn
 from origenerator.gui.request_answering import RequestAnswerer, leave_the_graphics_card
 from origenerator.prompt_edit import NO_GRAPHICS_CARD
 from origenerator.queue_line import ModelHold
-from origenerator.usual_company import UsualCompany
 from tests.waiting import until
 
 
@@ -132,11 +131,11 @@ def test_his_own_prompts_that_touch_the_request_are_gathered_newest_first_for_th
                                 ("a dog on a park bench, wagging tail", "blurry, cats")]
 
 
-def test_what_his_prompts_usually_have_with_the_asked_thing_goes_to_the_model_too(qtbot, tmp_path):
+def test_every_prompt_of_his_goes_along_for_the_way_he_adds_a_thing(qtbot, tmp_path):
     seen = {}
 
     def work_out(positive, negative, words, **known):
-        seen["company"] = known["company"]
+        seen["his_prompts"] = known["his_prompts"]
         return "the revision"
 
     answerer, db, _jobs, parent = _answerer(qtbot, tmp_path, work_out=work_out)
@@ -151,7 +150,9 @@ def test_what_his_prompts_usually_have_with_the_asked_thing_goes_to_the_model_to
     answerer.ask("fresh", ("a woman", ""), "add a dog", owner=parent, then=answers.append)
 
     until(lambda: answers == ["the revision"])
-    assert seen["company"] == UsualCompany(positive=("a dog", "wagging tail"), negative=())
+    assert seen["his_prompts"] == tuple(
+        (prompt, "blurry, cats")
+        for prompt in [*scenes, *(f"{scene}, a dog, wagging tail" for scene in scenes)])
 
 
 def test_the_line_is_let_go_even_when_the_one_who_asked_is_gone(qtbot, tmp_path):

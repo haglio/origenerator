@@ -389,6 +389,20 @@ prompts only there, speaks only to him, and reaches neither an agent nor the
 internet; its cloud models and web search are off by his environment, not by
 this code, so no test and no agent turns them on.
 
+A Request to add a thing his prompts already have never reaches the model.
+`his_edits.the_way_he_adds` reads the edits he made by hand (a prompt of his
+that holds an earlier one and a few things more), takes the nearest ones that
+added the thing, and adds it in their words, with what nearly all of them
+brought and kept out beside it. It replaced statistics on what his prompts
+"usually" hold with a thing, and model questions asked after them, which added
+unrelated parts through four days of review (2026-11-23); nothing goes back to
+that. `python -m origenerator.request_measure [how many]` scores the answering
+against his own edits, each asked for as a Request with only his earlier
+prompts known, and writes scores alone to `state/request_measure.txt`. A
+change to how a Request is answered is measured there before it goes to him:
+by an agent where the model is not asked, and by him from a launcher where it
+is, since the run then takes the graphics card's claim.
+
 The model and ComfyUI do not fit on the graphics card together.
 `graphics_card.wait_for_the_graphics_card` waits for ComfyUI's queue to drain, takes the
 card's one claim (`origenerator/card_claim.py`, which the LoRA trainers take too), asks

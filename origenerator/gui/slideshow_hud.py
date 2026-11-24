@@ -23,9 +23,9 @@ COLLAPSES = {"hud_minimize": True, "hud_restore": False}
 OPENS_IN = "hud_restore_at"
 
 
-def _cell(slide, label: str = "") -> HudCell:
+def _cell(slide, slideshow, label: str = "") -> HudCell:
     return HudCell(path="" if slide.is_live else str(slide.path), thumb=thumb_of(slide),
-                   label=label)
+                   label=label, name=slideshow.hud_name_of(slide.prompt_id))
 
 
 @dataclass(frozen=True)
@@ -61,9 +61,9 @@ def slideshow_hud_model(shape: str, slideshow, placement: HudPlacement = USUAL_P
         item_name=slideshow.hud_item_name,
         item_note=slideshow.hud_item_note,
         foot=foot,
-        corner=_cell(shown.corner),
-        seeds=tuple(_cell(slide) for slide in shown.seeds),
-        actions=tuple(_cell(row.slide, row.label) for row in shown.column),
+        corner=_cell(shown.corner, slideshow),
+        seeds=tuple(_cell(slide, slideshow) for slide in shown.seeds),
+        actions=tuple(_cell(row.slide, slideshow, row.label) for row in shown.column),
         current_action=shown.label,
         filter_query=action_filter or (shown.label if shown.loop == SEED else ""),
         seed_count=len(shown.seeds) + 1,

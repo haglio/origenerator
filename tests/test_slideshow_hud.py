@@ -134,6 +134,17 @@ def test_a_hud_with_no_one_to_name_its_items_names_none(qtbot):
     assert slideshow_hud_model("portrait", window.slideshow).item_name == ""
 
 
+def test_each_item_in_the_nav_map_carries_the_name_the_gallery_gives_it(qtbot):
+    window = _dressed([("scene one.png", "image", "id-one"), ("scene two.png", "image", "id-two")],
+                      actions=SlideshowActions(name_of=lambda prompt_id: f"A3F {prompt_id}"))
+    model = slideshow_hud_model("portrait", window.slideshow)
+
+    cells = [model.corner, *model.seeds, *model.actions]
+
+    assert {cell.name for cell in cells} <= {"A3F id-one", "A3F id-two"}
+    assert model.corner.name == "A3F id-one"
+
+
 class TestTheOneHudASlideshowWears:
     @staticmethod
     def _window(**kwargs):

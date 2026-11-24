@@ -12,6 +12,7 @@ class RequestState(Enum):
     COLLECTING = "collecting"
     COMPLETED = "completed"
     ABANDONED = "abandoned"
+    CANCELED = "canceled"
 
     @property
     def listening(self) -> bool:
@@ -22,11 +23,13 @@ OPENED = RequestState.OPENED
 COLLECTING = RequestState.COLLECTING
 COMPLETED = RequestState.COMPLETED
 ABANDONED = RequestState.ABANDONED
+CANCELED = RequestState.CANCELED
 
 # As Whisper renders the lead word; a hurried "request:" comes back in the trailing forms.
 LEAD_WORDS = ("request", "requests", "requested")
-_END_WORDS = ("over",)
-_RETRY_WORDS = ("retry",)
+SUBMIT_WORD = "submit"
+RETRY_WORD = "retry"
+CANCEL_WORD = "cancel"
 
 _MAX_UTTERANCES = 8
 
@@ -39,8 +42,8 @@ def _without_trailing_word(text: str) -> str:
     return re.sub(r"\W*[\w']+\W*$", "", text or "", count=1)
 
 
-def _ends_on(heard: list[str], markers: tuple) -> bool:
-    return bool(heard) and sounds_like(heard[-1], markers)
+def _ends_on(heard: list[str], marker: str) -> bool:
+    return bool(heard) and sounds_like(heard[-1], (marker,))
 
 
 def _join(parts: list) -> str:
@@ -90,20 +93,18 @@ class RequestDictation:
         self._opened_at = spoken_at
         self._heard = [text]
         body = _without_leading_word(text)
-        if _ends_on(heard, _RETRY_WORDS):
-            return self._retry(text)
-        if _ends_on(heard, _END_WORDS):
-            return self._finish(_without_trailing_word(body))
+        marked = self._ended_on_a_marker(heard, text, _without_trailing_word(body))
+        if marked is not None:
+            return marked
         self._parts = [body]
         return SpokenRequest(OPENED, _join(self._parts), _join(self._heard), self._opened_at)
 
     def _continue(self, text: str):
         self._heard.append(text)
-        heard = words(text, keep_apostrophes=True)
-        if _ends_on(heard, _RETRY_WORDS):
-            return self._retry(text)
-        if _ends_on(heard, _END_WORDS):
-            return self._finish(_join([*self._parts, _without_trailing_word(text)]))
+        marked = self._ended_on_a_marker(words(text, keep_apostrophes=True), text,
+                                         _join([*self._parts, _without_trailing_word(text)]))
+        if marked is not None:
+            return marked
         self._parts.append(text)
         if len(self._heard) >= self._max:
             given_up, opened_at = _join(self._heard), self._opened_at
@@ -111,10 +112,24 @@ class RequestDictation:
             return SpokenRequest(ABANDONED, "", given_up, opened_at)
         return SpokenRequest(COLLECTING, _join(self._parts), _join(self._heard), self._opened_at)
 
+    def _ended_on_a_marker(self, heard: list[str], text: str, submitted: str):
+        if _ends_on(heard, CANCEL_WORD):
+            return self._cancel()
+        if _ends_on(heard, RETRY_WORD):
+            return self._retry(text)
+        if _ends_on(heard, SUBMIT_WORD):
+            return self._finish(submitted)
+        return None
+
     def _retry(self, text: str):
         self._parts = []
         self._heard = [text]
         return SpokenRequest(COLLECTING, "", text, self._opened_at)
+
+    def _cancel(self):
+        heard, opened_at = _join(self._heard), self._opened_at
+        self.reset()
+        return SpokenRequest(CANCELED, "", heard, opened_at)
 
     def _finish(self, body: str):
         heard, opened_at = _join(self._heard), self._opened_at
@@ -136,4 +151,4 @@ def words_of(record: dict | None) -> str:
 
 def request_bias() -> str:
     # A short marker word off a quiet mic comes back as something else unless Whisper is told to expect it.
-    return "Voice requests: request, over, retry."
+    return f"Voice requests: request, {SUBMIT_WORD}, {RETRY_WORD}, {CANCEL_WORD}."

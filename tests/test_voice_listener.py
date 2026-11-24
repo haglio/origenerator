@@ -150,7 +150,7 @@ def test_closing_ends_the_commands_and_waits_for_the_microphone_to_close(qtbot):
 
 
 
-def _request_listener(says="Request, no hat, over."):
+def _request_listener(says="Request, no hat, submit."):
     hearing = FakeHearing(says)
     listener = CommandAndRequestListener(
         hearing=hearing, dictation=RequestDictation(),
@@ -184,7 +184,7 @@ def test_a_request_keeps_the_time_the_mic_heard_its_first_step_said(qtbot):
 def test_a_request_the_session_heard_keeps_when_it_was_said(qtbot):
     listener, _hearing = _request_listener()
 
-    spoken = listener.push_dictation("Request, no hat, over.", spoken_at=7.5)
+    spoken = listener.push_dictation("Request, no hat, submit.", spoken_at=7.5)
 
     assert spoken.opened_at == 7.5
 
@@ -205,7 +205,7 @@ def test_an_open_request_swallows_what_would_be_a_command(qtbot):
 
 
 def test_a_request_is_logged_by_where_it_stands_and_never_by_its_words(qtbot, caplog):
-    listener, hearing = _request_listener(says="Request, no example lantern, over.")
+    listener, hearing = _request_listener(says="Request, no example lantern, submit.")
     spoken = []
     listener.request.connect(appending_to(spoken))
     listener.start_commands(_ignore)
@@ -294,8 +294,8 @@ def _routes(listener, say, utterances):
 
 
 @pytest.mark.parametrize("utterances", [
-    ["requests"], ["trash"], ["fix teeth"], ["Request, fix teeth, over."],
-    ["Request.", "trash", "over"],
+    ["requests"], ["trash"], ["fix teeth"], ["Request, fix teeth, submit."],
+    ["Request.", "trash", "submit"],
 ])
 def test_the_suites_stand_in_routes_what_it_hears_as_the_listener_does(qtbot, utterances):
     hearing = FakeHearing()
@@ -341,17 +341,17 @@ def test_a_request_opened_at_the_mic_is_finished_by_what_the_session_heard(qtbot
     listener.start_commands(_ignore)
 
     hearing.hear()
-    finished = listener.push_dictation("on a snowy hill, over")
+    finished = listener.push_dictation("on a snowy hill, submit")
 
     assert getattr(finished, "text", None) == "a red scarf on a snowy hill", (
         "the mic's half and the session's half of one request are one dictation")
 
 
-def test_it_says_a_request_is_being_taken_from_its_opening_word_until_over(qtbot):
+def test_it_says_a_request_is_being_taken_from_its_opening_word_until_submit(qtbot):
     listener, _hearing = _bare_listener("unused")
 
     listener.push_dictation("request")
     taking_one = listener.taking_a_request
-    listener.push_dictation("a red scarf over")
+    listener.push_dictation("a red scarf submit")
 
     assert (taking_one, listener.taking_a_request) == (True, False)

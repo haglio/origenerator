@@ -451,7 +451,7 @@ def test_saying_request_pauses_the_slideshow_until_over(qtbot, tmp_path, monkeyp
     assert view.slideshows.showing._keeps()
     assert "Request" in words(view.slideshows.showing.shown._note)
 
-    view._voice.listener.speak("no hat. Over.")
+    view._voice.listener.speak("no hat. Submit.")
     assert not view.slideshows.showing._keeps()
 
 
@@ -460,7 +460,7 @@ def test_a_finished_request_stands_in_every_job_queue_until_its_job_does(
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     shown = view.slideshows.showing.shown
 
-    view._voice.listener.speak("Request, no hat, over.")
+    view._voice.listener.speak("Request, no hat, submit.")
 
     (standing,) = view.job_queue.view._items
     assert standing.starting
@@ -477,7 +477,7 @@ def test_a_finished_request_queues_the_revision_with_the_same_seed(
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
 
-    _speak_request(view, qtbot, "Request, no hat, over.")
+    _speak_request(view, qtbot, "Request, no hat, submit.")
 
     (job,) = view._live_jobs.values()
     assert job.params["seed"] == 7
@@ -492,7 +492,7 @@ def test_a_request_rewritten_past_a_boxs_end_queues_in_boxes_of_whole_words(
     cats = [" ".join(["cat"] * count) for count in (80, 75, 5)]
     view = _requesting_view(qtbot, tmp_path, monkeypatch, prompt=f"a hat, {cats[0]}")
 
-    _speak_request(view, qtbot, "Request, no hat, over.")
+    _speak_request(view, qtbot, "Request, no hat, submit.")
 
     (job,) = view._live_jobs.values()
     assert job.params["positive_prompt"] == f"{cats[1]}{BOX_BREAK}{cats[2]}"
@@ -506,7 +506,7 @@ def test_a_request_on_a_prompt_in_boxes_is_recorded_as_stored_and_as_queued(
     stored = f"a hat,{BOX_BREAK}{cats[0]}{BOX_BREAK}{cats[1]}"
     view = _requesting_view(qtbot, tmp_path, monkeypatch, prompt=stored)
 
-    _speak_request(view, qtbot, "Request, no hat, over.")
+    _speak_request(view, qtbot, "Request, no hat, submit.")
 
     (job,) = view._live_jobs.values()
     record = view._db.get_request(job.prompt_id)
@@ -523,7 +523,7 @@ def test_a_request_the_model_answered_says_only_that_it_was_submitted_and_keeps_
         ask=lambda p, n, r, known: {"changes": [
             {"prompt": "positive", "remove": "a hat", "for": "no hat"}]})
 
-    _speak_request(view, qtbot, "Request, no hat, over.")
+    _speak_request(view, qtbot, "Request, no hat, submit.")
 
     assert words(view.slideshows.showing.shown._note) == "Request submitted"
     (job,) = view._live_jobs.values()
@@ -541,7 +541,7 @@ def test_a_spoken_request_the_model_changes_nothing_for_says_so_and_makes_nothin
         positive, negative, words,
         ask=lambda p, n, r, known: {"changes": [], "why": "A hat is on."})
 
-    _speak_request(view, qtbot, "Request, a hat, over.")
+    _speak_request(view, qtbot, "Request, a hat, submit.")
 
     assert words(view.slideshows.showing.shown._note) == "A hat is on. Nothing changed."
     assert not view._live_jobs
@@ -555,7 +555,7 @@ def test_a_spoken_request_about_a_setting_remakes_the_image_with_that_setting(
         ask=lambda p, n, r, known: {"changes": [
             {"setting": "steps", "to": 30, "for": "fewer steps"}]})
 
-    _speak_request(view, qtbot, "Request, fewer steps, over.")
+    _speak_request(view, qtbot, "Request, fewer steps, submit.")
 
     assert words(view.slideshows.showing.shown._note) == "Request submitted"
     (job,) = view._live_jobs.values()
@@ -569,7 +569,7 @@ def test_a_request_for_something_absent_goes_to_the_negative_prompt(
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch, prompt="a woman, soft light")
 
-    _speak_request(view, qtbot, "Request, no hat, over.")
+    _speak_request(view, qtbot, "Request, no hat, submit.")
 
     (job,) = view._live_jobs.values()
     assert job.params["negative_prompt"] == "blurry, hat"
@@ -579,12 +579,12 @@ def test_a_queued_request_is_recorded_against_what_it_was_asked_about(
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
 
-    _speak_request(view, qtbot, "Request, no hat, over.")
+    _speak_request(view, qtbot, "Request, no hat, submit.")
 
     (job,) = view._live_jobs.values()
     record = view._db.get_request(job.prompt_id)
     assert record["source_prompt_id"] == "orig"
-    assert record["heard"] == "Request, no hat, over.", (
+    assert record["heard"] == "Request, no hat, submit.", (
         "what was heard is every transcription that went into the request, markers and all, kept "
         "verbatim so a request that came out wrong shows why rather than just being wrong")
     assert record["old_positive"] == "a woman, a hat, soft light"
@@ -594,7 +594,7 @@ def test_a_queued_request_is_recorded_against_what_it_was_asked_about(
 def test_a_queued_request_keeps_its_words_without_the_markers(qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
 
-    _speak_request(view, qtbot, "Request, no hat, over.")
+    _speak_request(view, qtbot, "Request, no hat, submit.")
 
     (job,) = view._live_jobs.values()
     assert view._db.get_request(job.prompt_id)["asked"] == "no hat"
@@ -606,7 +606,7 @@ def test_a_queued_request_is_logged_by_the_images_it_joins_never_by_its_words(
                             prompt="gamma form, an example lantern, soft light")
 
     with caplog.at_level("INFO"):
-        _speak_request(view, qtbot, "Request, no example lantern, over.")
+        _speak_request(view, qtbot, "Request, no example lantern, submit.")
 
     (job,) = view._live_jobs.values()
     assert f"Request on orig: term rewritten, queued as {job.prompt_id}" in caplog.messages
@@ -621,7 +621,7 @@ def test_the_request_lands_on_the_slide_it_was_opened_over(
 
     view.slideshows.showing._set.playlist.add(("other.png", "image", "elsewhere", None))
     view.slideshows.showing.slideshow_step(1)
-    _speak_request(view, qtbot, "no hat. Over.")
+    _speak_request(view, qtbot, "no hat. Submit.")
 
     (job,) = view._live_jobs.values()
     assert view._db.get_request(job.prompt_id)["source_prompt_id"] == "orig"
@@ -644,7 +644,7 @@ def test_a_request_naming_nothing_is_answered_not_generated(
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
 
-    _speak_request(view, qtbot, "Request. Over.")
+    _speak_request(view, qtbot, "Request. Submit.")
 
     assert view._live_jobs == {}
     assert "didn't catch" in words(view.slideshows.showing.shown._note)
@@ -663,7 +663,7 @@ def test_the_words_of_a_request_never_reach_the_fix_matcher(
 def test_a_request_item_links_back_to_what_it_was_asked_about(
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
-    _speak_request(view, qtbot, "Request, no hat, over.")
+    _speak_request(view, qtbot, "Request, no hat, submit.")
     view.slideshows.showing.close()
     (job,) = view._live_jobs.values()
     _finish_reroll(view, job)
@@ -679,7 +679,7 @@ def test_a_request_item_links_back_to_what_it_was_asked_about(
 def test_a_request_landing_takes_the_place_of_its_image_on_a_slideshow_locked_on_it(
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
-    _speak_request(view, qtbot, "Request, no hat, over.")
+    _speak_request(view, qtbot, "Request, no hat, submit.")
     slideshow = view.slideshows.showing
     slideshow.show_item(kept_file("sdxl_t2i_orig.png"), lock=True)
     (job,) = view._live_jobs.values()
@@ -693,7 +693,7 @@ def test_a_request_landing_takes_the_place_of_its_image_on_a_slideshow_locked_on
 def test_a_request_item_shows_its_words_in_its_tab_s_request_section(
         qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
-    _speak_request(view, qtbot, "Request, no hat, over.")
+    _speak_request(view, qtbot, "Request, no hat, submit.")
     view.slideshows.showing.close()
     (job,) = view._live_jobs.values()
     _finish_reroll(view, job)

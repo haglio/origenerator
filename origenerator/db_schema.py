@@ -219,7 +219,7 @@ CREATE TABLE IF NOT EXISTS requests (
     new_positive     TEXT,
     new_negative     TEXT,
     created_at       TEXT NOT NULL DEFAULT (datetime('now')),
-    -- The request's own words: what was said between "Request" and "over", or
+    -- The request's own words: what was said between "Request" and "submit", or
     -- what was typed into a tab's Request section. NULL on a record from before
     -- the column, whose words are read back out of `heard`.
     asked            TEXT

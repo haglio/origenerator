@@ -5,7 +5,7 @@ from shared_ui.reference import CommandRef, ReferenceGroup, ReferenceSection
 from origenerator.gallery.collection import spoken_collections
 from origenerator.gallery.voice_commands import ENHANCE_COMMAND
 from origenerator.voice.app_commands import AppCommand, GoToCollection, said_as
-from origenerator.voice.dictation import LEAD_WORDS
+from origenerator.voice.dictation import CANCEL_WORD, LEAD_WORDS, RETRY_WORD, SUBMIT_WORD
 from origenerator.voice.slideshow_commands import SlideshowCommand, said_to_the_slideshow
 from origenerator.workflows.detail_parts import published_fix_phrases
 
@@ -61,7 +61,9 @@ def _core() -> ReferenceSection:
         ReferenceGroup("Voice control", (
             _row("stop listening", said=_said(AppCommand.MIC_OFF)),
             _row("switch Core and the slideshow", said=_said(AppCommand.SWITCH)),
-            _row("Request — say what to change about the image on screen, and end with “over”",
+            _row(f"Request — say what to change about the image on screen, and end with "
+                 f"“{SUBMIT_WORD}”, or with “{RETRY_WORD}” to say it again or “{CANCEL_WORD}” "
+                 "to drop it",
                  said=LEAD_WORDS[:1]),
         )),
     ))

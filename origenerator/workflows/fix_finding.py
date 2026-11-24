@@ -3,7 +3,13 @@ from __future__ import annotations
 import re
 
 from origenerator import points_of_interest
-from origenerator.workflows.detail_parts import DetailFixPass, DetailPart, detector_part, finder_of
+from origenerator.workflows.detail_parts import (
+    DetailFixPass,
+    DetailPart,
+    detector_part,
+    finder_of,
+    part_table,
+)
 
 _DETECTOR_MIN_CONFIDENCE = 0.5
 _DETECTOR_CONTEXT_AROUND_RECT = 3.0
@@ -23,6 +29,7 @@ def finding_nodes(index: int, fix: DetailFixPass, image_ref, original_ref) -> tu
             # ComfyUI's detector provider dropdown prefixes its detector models
             # this way, and hands out an outline only for a segm/ one.
             "inputs": {"model_name": f"{finder}/{fix.detector}"},
+            "_meta": {"title": fix.part.name},
         },
         segs_id: {
             "class_type": f"{finder.capitalize()}DetectorSEGS",
@@ -62,4 +69,10 @@ def parts_found_by(history_data: dict) -> dict[int, DetailPart]:
              and isinstance(run[_GRAPH_AT], dict) else {})
     return {int(found[1]): part for node_id, node in graph.items()
             if (found := _DETECTOR_NODE.fullmatch(str(node_id))) and isinstance(node, dict)
-            and (part := detector_part(str((node.get("inputs") or {}).get("model_name", "")))) is not None}
+            and (part := _part_a_detector_looked_for(node)) is not None}
+
+
+def _part_a_detector_looked_for(node: dict) -> DetailPart | None:
+    named = (node.get("_meta") or {}).get("title")
+    said = next((part for part in part_table() if part.name == named), None)
+    return said or detector_part(str((node.get("inputs") or {}).get("model_name", "")))

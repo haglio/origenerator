@@ -250,7 +250,7 @@ def test_binning_a_version_tells_the_slideshows_what_the_image_has_left(qtbot, t
     assert [row["prompt_id"] for row in told] == ["g0"]
 
 
-def test_a_choice_made_for_a_fix_on_an_enhancements_row_is_carried_out_and_that_enhancement_stays_shown(
+def test_a_change_made_to_a_fix_on_an_enhancements_row_is_carried_out_and_that_enhancement_stays_shown(
         qtbot, tmp_path):
     client = _reroll_client()
     db = _enhanceable_db(tmp_path, count=1)
@@ -271,9 +271,9 @@ def test_a_choice_made_for_a_fix_on_an_enhancements_row_is_carried_out_and_that_
     refreshes = []
     view.refresh = lambda **_how: refreshes.append(1)
 
-    tab._versions.fix_choice_requested.emit(0, "faces", "off")
+    tab._versions.fix_change_requested.emit(0, "faces", "on", False)
 
-    assert actions.fixes_chosen == [("g0", "image_enhance_00001_.png", "faces", "off")]
+    assert actions.fixes_changed == [("g0", "image_enhance_00001_.png", "faces", "on", False)]
     assert shown == [0]
     assert redrawn_files == ["image_enhance_00001_.png"], (
         "a slideshow showing the enhancement is told which file was drawn again, to show it again")

@@ -232,7 +232,7 @@ class GenerateTab(DropZones):
     displayed_changed = Signal()
     enhance_requested = Signal(str)
     versions_delete_requested = Signal(str, list)
-    fix_choice_requested = Signal(str, str, str, str)
+    fix_change_requested = Signal(str, str, str, str, bool)
     enhance_again_requested = Signal(str, str, bool)
     train_requested = Signal(str)
     trash_requested = Signal(str)
@@ -410,9 +410,9 @@ class GenerateTab(DropZones):
         self._versions.version_selected.connect(self._show_version)
         self._versions.enhance_requested.connect(self._on_enhance_requested)
         self._versions.delete_requested.connect(self._on_versions_delete_requested)
-        self._versions.fix_choice_requested.connect(
-            lambda position, part, choice: self._ask_of_the_version(
-                position, self.fix_choice_requested, part, choice))
+        self._versions.fix_change_requested.connect(
+            lambda position, part, what, to: self._ask_of_the_version(
+                position, self.fix_change_requested, part, what, to))
         self._versions.enhance_again_requested.connect(
             lambda position, in_its_place: self._ask_of_the_version(
                 position, self.enhance_again_requested, in_its_place))

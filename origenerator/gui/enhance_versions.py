@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.colors import BG_PRIMARY, TEXT_MUTED, TEXT_PRIMARY, YELLOW
+from shared_ui.colors import BG_PRIMARY, TEXT_PRIMARY, YELLOW
 from shared_ui.icons import icon_pixmap
 from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, GAP_SMALL
 
@@ -29,13 +29,12 @@ from origenerator.gui import icons, palette
 from origenerator.gui.collapsible_section import CollapsibleSection
 from origenerator.gui.copy_button import IconButton
 from origenerator.gui.drag_thumbnail import DragOut, fit_thumbnail
-from origenerator.gui.fix_choices import FixChoices
+from origenerator.gui.fix_lines import FixList, ListedFix
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.metadata_section import label_column_width, metadata_cells
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.param_fields import NOT_KNOWN
 from origenerator.gui.picking import Picking
-from origenerator.gui.text_color import color_text
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 
 ENHANCE_VERSION_MIME = "application/x-origenerator-enhance-version"
@@ -50,7 +49,7 @@ _FACTS_OF_A_FILE = ("File", "Created")
 _MADE_BEFORE_FIXES_WERE_KEPT = "This enhancement was made before fixes were individually removable"
 _RE_ENHANCE = "Re-enhance"
 _RE_ENHANCE_TIP = ("Make a new enhancement with the same settings and seed, "
-                   "leaving out each fix that is off or marked with the red x")
+                   "leaving out each fix that is unchecked or marked as bad")
 _REDO = "Redo"
 _REDO_TIP = ("Make this enhancement again with the same settings and seed, so that its fixes "
              "are individually removable. The new one takes this one's place.")
@@ -60,8 +59,6 @@ _SELECTED_ROW_CSS = (
     f"#versionRow {{ background-color: {palette.SELECTED_FILL}; border-radius: {BUTTON_RADIUS}px; }}"
     + _ROW_CSS
 )
-_FIX_LIST_CSS = (
-    f"#fixList {{ background-color: {BG_PRIMARY.name()}; border-radius: {BUTTON_RADIUS}px; }}")
 _PICKED_FACT_CSS = f"color: {TEXT_PRIMARY.name()};"
 _ADD_TILE_CSS = f"background-color: {YELLOW.name()}; border-radius: {BUTTON_RADIUS}px;"
 _ARROW_STEPS = {Qt.Key.Key_Up: -1, Qt.Key.Key_Left: -1,
@@ -92,13 +89,6 @@ def _pass_mouse_through(widget) -> None:
     widget.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
 
 
-class FixLine(NamedTuple):
-    name: str
-    detail: str
-    choices: QWidget | None = None
-    tooltip: str = ""
-
-
 class RunningEnhancement(NamedTuple):
     status: str
     frame: bytes | None
@@ -113,13 +103,6 @@ class EnhanceOffer(NamedTuple):
 def _fact_label_width() -> int:
     return label_column_width([MetadataItem(label, "") for label in (
         *LABELS_ON_THE_ENHANCE_PANE.values(), _FIXES, *_FACTS_OF_A_FILE)])
-
-
-def _said_on_a_fix_line(text: str, tooltip: str) -> QLabel:
-    label = QLabel(text)
-    label.setToolTip(tooltip)
-    _pass_mouse_through(label)
-    return label
 
 
 class _Row(QWidget):
@@ -156,6 +139,7 @@ class _Row(QWidget):
         facts.addWidget(self._title, 0, 0, 1, -1)
         self._facts = facts
         self._fact_cells: list[QWidget] = []
+        self.fix_list: FixList | None = None
         self._resting_ink: dict[QLabel, str] = {}
         self._selected = False
         row.addLayout(facts, 1)
@@ -197,15 +181,15 @@ class _Row(QWidget):
         self._wrapped = wrapped
         self.updateGeometry()
 
-    def _show_settings(self, params: dict, fix_lines=None) -> int:
+    def _show_settings(self, params: dict, listed_fixes=None) -> int:
         self._clear_facts()
         line = self._add_facts([MetadataItem(label, value)
                                 for label, value in enhance_settings_fields(params)], line=1)
         details = fix_details(params)
-        listed, beside_the_label = (
-            fix_lines(details) if fix_lines is not None
-            else ([FixLine(name, detail) for name, detail in details.items()], None))
-        return self._add_fixes(listed[::-1], line, beside_the_label)
+        listed, under_the_label = (
+            listed_fixes(details) if listed_fixes is not None
+            else ([ListedFix(name, detail) for name, detail in details.items()], None))
+        return self._add_fixes(listed[::-1], line, under_the_label)
 
     def _clear_facts(self) -> None:
         for widget in self._fact_cells:
@@ -231,47 +215,27 @@ class _Row(QWidget):
                 self._keep_fact(widget)
         return line + len(items)
 
-    def _add_fixes(self, drawn_last_first: list[FixLine], line: int,
-                   beside_the_label: QWidget | None) -> int:
+    def _add_fixes(self, drawn_last_first: list[ListedFix], line: int,
+                   under_the_label: QWidget | None) -> int:
+        self.fix_list = None
         if not drawn_last_first:
             return line
-        listed = QWidget()
-        listed.setObjectName("fixList")
-        listed.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        listed.setStyleSheet(_FIX_LIST_CSS)
-        lines = QGridLayout(listed)
-        lines.setContentsMargins(GAP_SMALL, GAP_SMALL, GAP_SMALL, GAP_SMALL)
-        lines.setHorizontalSpacing(GAP_MEDIUM)
-        lines.setVerticalSpacing(GAP_SMALL)
-        lines.setColumnStretch(_DETAIL_COLUMN, 1)
-        for at, fix in enumerate(drawn_last_first):
-            if fix.choices is not None:
-                lines.addWidget(fix.choices, at, 0, Qt.AlignmentFlag.AlignVCenter)
-            detail = _said_on_a_fix_line(fix.detail, fix.tooltip)
-            color_text(detail, TEXT_MUTED)
-            lines.addWidget(_said_on_a_fix_line(fix.name.capitalize(), fix.tooltip), at, _NAME_COLUMN,
-                            Qt.AlignmentFlag.AlignVCenter)
-            lines.addWidget(detail, at, _DETAIL_COLUMN, Qt.AlignmentFlag.AlignVCenter)
         label = metadata_cells(MetadataItem(_FIXES, ""), _fact_label_width())[0]
         label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        label.setFixedHeight(max(
-            lines.itemAtPosition(0, column).widget().sizeHint().height()
-            for column in range(lines.columnCount()) if lines.itemAtPosition(0, column) is not None))
-        beside_the_first = QWidget()
-        beside_the_first.setObjectName("besideTheFixes")
-        beside_the_first.setStyleSheet("#besideTheFixes { background: transparent; }")
-        above = QVBoxLayout(beside_the_first)
-        above.setContentsMargins(0, GAP_SMALL, 0, 0)
+        _pass_mouse_through(label)
+        beside_the_fixes = QWidget()
+        beside_the_fixes.setObjectName("besideTheFixes")
+        beside_the_fixes.setStyleSheet("#besideTheFixes { background: transparent; }")
+        above = QVBoxLayout(beside_the_fixes)
+        above.setContentsMargins(0, 0, 0, 0)
         above.setSpacing(GAP_SMALL)
         above.addWidget(label)
-        if beside_the_label is not None:
-            above.addWidget(beside_the_label, 0, Qt.AlignmentFlag.AlignRight)
-        above.addStretch(1)
-        self._facts.addWidget(beside_the_first, line, 0)
-        self._facts.addWidget(listed, line, _VALUE_COLUMN, 1, -1)
-        self._fact_cells += [beside_the_first, listed]
-        _pass_mouse_through(label)
-        self._resting_ink[label] = label.styleSheet()
+        if under_the_label is not None:
+            above.addWidget(under_the_label, 0, Qt.AlignmentFlag.AlignRight)
+        self.fix_list = FixList(drawn_last_first, beside_the_fixes)
+        label.setFixedHeight(self.fix_list.lines()[0].sizeHint().height())
+        self._facts.addWidget(self.fix_list, line, 0, 1, -1)
+        self._fact_cells.append(self.fix_list)
         return line + 1
 
     def _keep_fact(self, widget: QWidget) -> None:
@@ -332,7 +296,7 @@ class _VersionRow(_Row):
     clicked = Signal(int, Qt.KeyboardModifier)
     context_requested = Signal(int, QPoint)
     delete_pressed = Signal(int)
-    fix_chosen = Signal(int, str, str)
+    fix_changed = Signal(int, str, str, bool)
     again_pressed = Signal(int, bool)
 
     def __init__(self, version, position: int, thumbnails=_STILL_COMING,
@@ -349,7 +313,12 @@ class _VersionRow(_Row):
             trash = IconButton(icons.delete_icon(), "Delete this version", "deleteButton")
             trash.clicked.connect(
                 lambda _checked=False: self.delete_pressed.emit(self._position))
-        line = self._show_settings(self._params, lambda details: self._fix_lines(version, details))
+        self._again: QPushButton | None = None
+        line = self._show_settings(self._params,
+                                   lambda details: self._listed_fixes(version, details))
+        if self.fix_list is not None:
+            self.fix_list.changed.connect(
+                lambda part, what, to: self.fix_changed.emit(self._position, part, what, to))
         self._add_facts([file_item(version.file, held_days=dating.held_days),
                          created_item(version.file, dating.created_fallback)],
                         line, beside_copy=trash)
@@ -376,21 +345,21 @@ class _VersionRow(_Row):
             self._thumbnail.setText(NOT_KNOWN)
             self._thumbnail.setToolTip("This version's file is no longer on disk")
 
-    def _fix_lines(self, version, details: dict[str, str]) -> tuple[list[FixLine], QWidget | None]:
+    def _listed_fixes(self, version, details: dict[str, str]) -> tuple[list[ListedFix], QWidget | None]:
         if version.fixes:
-            lines = [FixLine(switch.part, details.get(switch.part, ""), self._choices_of(switch))
-                     for switch in version.fixes]
-            return lines, (self._again_button(_RE_ENHANCE, _RE_ENHANCE_TIP, in_its_place=False)
-                           if left_out_of_a_re_enhance(version.file) else None)
-        lines = [FixLine(name, detail, tooltip=_MADE_BEFORE_FIXES_WERE_KEPT)
-                 for name, detail in details.items()]
-        return lines, (self._again_button(_REDO, _REDO_TIP, in_its_place=True) if lines else None)
+            self._again = self._again_button(_RE_ENHANCE, _RE_ENHANCE_TIP, in_its_place=False)
+            self._again.setVisible(bool(left_out_of_a_re_enhance(version.file)))
+            return [ListedFix(switch.part, details.get(switch.part, ""), switch)
+                    for switch in version.fixes], self._again
+        listed = [ListedFix(name, detail, tooltip=_MADE_BEFORE_FIXES_WERE_KEPT)
+                  for name, detail in details.items()]
+        return listed, (self._again_button(_REDO, _REDO_TIP, in_its_place=True) if listed else None)
 
-    def _choices_of(self, switch) -> FixChoices:
-        choices = FixChoices(switch)
-        choices.chosen.connect(lambda choice, part=switch.part:
-                               self.fix_chosen.emit(self._position, part, choice))
-        return choices
+    def show_fixes(self, version) -> None:
+        if self.fix_list is None or self._again is None:
+            return
+        self.fix_list.show_switches(version.fixes)
+        self._again.setVisible(bool(left_out_of_a_re_enhance(version.file)))
 
     def _again_button(self, says: str, tooltip: str, *, in_its_place: bool) -> QPushButton:
         button = QPushButton(says)
@@ -492,7 +461,7 @@ class EnhanceVersions(QWidget):
     version_selected = Signal(int)
     enhance_requested = Signal()
     delete_requested = Signal(list)
-    fix_choice_requested = Signal(int, str, str)
+    fix_change_requested = Signal(int, str, str, bool)
     enhance_again_requested = Signal(int, bool)
 
     def __init__(self, parent=None, *, read=QImage):
@@ -557,13 +526,17 @@ class EnhanceVersions(QWidget):
             row.clicked.connect(self._on_row_clicked)
             row.context_requested.connect(self._on_row_menu)
             row.delete_pressed.connect(lambda at: self.delete_requested.emit([at]))
-            row.fix_chosen.connect(self.fix_choice_requested)
+            row.fix_changed.connect(self.fix_change_requested)
             row.again_pressed.connect(self.enhance_again_requested)
             self._rows.append(row)
             self._picking.note_shown(position)
             column.addWidget(row)
         form.addRow(self._host)
         self.setVisible(bool(items) or pending is not None or add is not None)
+
+    def show_fixes(self, position: int, version) -> None:
+        if 0 <= position < len(self._rows):
+            self._rows[position].show_fixes(version)
 
     def selected_positions(self) -> list[int]:
         return self._picking.in_shown_order()

@@ -7,6 +7,7 @@ import pytest
 from app_support.threading_utils import wait_until
 from PySide6.QtCore import (
     QEvent,
+    QPoint,
     Qt,
 )
 from PySide6.QtGui import (
@@ -42,6 +43,7 @@ from tests.gallery_view_support import (
     FakeActions,
     _a_slideshow_standing_on_its_own,
     _alls,
+    _answer_menu,
     _at,
     _children_by_prompt,
     _collection,
@@ -57,6 +59,7 @@ from tests.gallery_view_support import (
     _in_view,
     _key,
     _keys_are_the_gallerys,
+    _menu_labels,
     _on_screen,
     _open_latest,
     _open_leaf,
@@ -1748,3 +1751,49 @@ def test_an_arrow_pressed_in_a_text_field_of_cores_stays_in_the_field(qtbot, mon
 
     assert (taken, steps) == (False, [])
     slideshow.close()
+
+
+def test_open_in_slideshow_on_an_items_menu_opens_the_slideshow_a_double_click_opens(
+        qtbot, monkeypatch):
+    keep_rows_on_disk(monkeypatch)
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    _answer_menu(monkeypatch, "Open in slideshow")
+
+    view.generation_menu(["i2"], QPoint(0, 0))
+
+    slideshow = view.slideshows.showing
+    assert slideshow is not None
+    assert slideshow.hud_prompt_id == "i2"
+    slideshow.close()
+
+
+def test_open_in_slideshow_is_offered_for_one_item_that_can_play(qtbot, monkeypatch):
+    keep_rows_on_disk(monkeypatch)
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    labels = []
+    _menu_labels(monkeypatch, labels)
+
+    view.generation_menu(["i1", "i2"], QPoint(0, 0))
+
+    assert labels
+    assert "Open in slideshow" not in labels
+
+
+def test_open_in_slideshow_is_not_offered_for_an_item_still_being_made(qtbot, monkeypatch):
+    keep_rows_on_disk(monkeypatch)
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _running_row("r1")]))
+    qtbot.addWidget(view)
+    view.refresh()
+    labels = []
+    _menu_labels(monkeypatch, labels)
+
+    view.generation_menu(["r1"], QPoint(0, 0))
+
+    assert labels
+    assert "Open in slideshow" not in labels

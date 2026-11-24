@@ -298,7 +298,8 @@ def _as_a_funestra_names(key) -> str:
 
 def _press(view, key, modifiers=Qt.KeyboardModifier.NoModifier):
     held = [name for name, modifier in (("shift", Qt.KeyboardModifier.ShiftModifier),
-                                        ("ctrl", Qt.KeyboardModifier.ControlModifier))
+                                        ("ctrl", Qt.KeyboardModifier.ControlModifier),
+                                        ("alt", Qt.KeyboardModifier.AltModifier))
             if modifiers & modifier]
     view.key(_as_a_funestra_names(key), "+".join(held))
 
@@ -1688,6 +1689,17 @@ def test_versions_that_arrive_with_places_hand_the_funestra_the_image_on_screens
     _settle(view)
 
     assert _engine(view).points_told == [FACE]
+
+
+@_ARROW_KEYS_OR_WASD
+def test_alt_with_a_step_key_steps_the_image_on_screen_through_its_fixes(qtbot, tmp_path, arrows):
+    image = _png(tmp_path / "e1.png")
+    view = _view(qtbot, [(image, "image", "id-a")])
+
+    for arrow in (arrows.right, arrows.left):
+        _press(view, arrow, Qt.KeyboardModifier.AltModifier)
+
+    assert (_engine(view).fix_steps, _media_on_screen(view)) == ([1, -1], image)
 
 
 def test_a_version_stepped_to_goes_up_with_its_own_places(qtbot, tmp_path):

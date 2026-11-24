@@ -245,10 +245,14 @@ class _SaidOverShow:
     def slideshow_step_version(self, step):
         self.done.append(("version", step))
 
+    def slideshow_step_fix(self, step):
+        self.done.append(("fix", step))
+
 
 @pytest.mark.parametrize(("said", "done"), [
     ("trash", ("trash",)), ("wrong_action", ("wrong action",)), ("more_seeds", ("more seeds",)),
-    ("cycle_version", ("version", -1)), ("cycle_version_back", ("version", 1))])
+    ("cycle_version", ("version", -1)), ("cycle_version_back", ("version", 1)),
+    ("next_fix", ("fix", 1)), ("prev_fix", ("fix", -1))])
 def test_a_word_about_the_slide_goes_back_to_the_slide_it_was_said_over_first(
         qtbot, tmp_path, monkeypatch, said, done):
     view, bridge = _view_with_bridge(qtbot, tmp_path)

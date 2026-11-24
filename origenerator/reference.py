@@ -117,6 +117,8 @@ def _slideshow() -> ReferenceSection:
             _row("next", ("Right", "D"), said=_said(AppCommand.FORWARD)),
             _row("previous version", ("Shift+Left", "Shift+A")),
             _row("next version", ("Shift+Right", "Shift+D")),
+            _row("previous fix", ("Alt+Left", "Alt+A")),
+            _row("next fix", ("Alt+Right", "Alt+D")),
             _row("up the nav map", ("Shift+Up", "Shift+W")),
             _row("down the nav map", ("Shift+Down", "Shift+S")),
             _row("cycle loop mode", ("E", "Home")),

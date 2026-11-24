@@ -16,7 +16,7 @@ THE_SLIDESHOWS_OWN = frozenset({
     "action_loop", "loop", "more_seeds", "play_video", "lock_video", "filter",
     "no_filter", "nav_left", "nav_right", "nav_up", "nav_down", "cycle_seed",
     "cycle_action", "cycle_version", "cycle_version_back", "clip_seconds_up",
-    "clip_seconds_down",
+    "clip_seconds_down", "next_fix", "prev_fix",
 })
 
 COLLAPSES = {"hud_minimize": True, "hud_restore": False}

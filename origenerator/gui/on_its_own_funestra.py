@@ -55,6 +55,7 @@ _WASD_AS_ARROWS = {
     Qt.Key.Key_D: Qt.Key.Key_Right,
 }
 _MODES_PICKED = {command: mode for command, _label, mode in MODE_BUTTONS}
+_FIX_STEPS = {Qt.Key.Key_Left: "prev_fix", Qt.Key.Key_Right: "next_fix"}
 _GENAUS_KEYS = {
     Qt.Key.Key_Left: PREV_FLICK,
     Qt.Key.Key_Right: NEXT_FLICK,
@@ -425,7 +426,8 @@ class OnItsOwnFunestra(QObject):
 
     def take_key(self, event) -> None:
         self._key(event.key(), shifted=bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier),
-                  ctrl=bool(event.modifiers() & Qt.KeyboardModifier.ControlModifier))
+                  ctrl=bool(event.modifiers() & Qt.KeyboardModifier.ControlModifier),
+                  alt=bool(event.modifiers() & Qt.KeyboardModifier.AltModifier))
 
     def _key_by_name(self, name: str, held: list[str], at: float) -> None:
         key = _KEYS_BY_THE_NAME_A_FUNESTRA_GIVES.get(name)
@@ -448,8 +450,11 @@ class OnItsOwnFunestra(QObject):
              said_at: float | None = None) -> bool:
         key = _WASD_AS_ARROWS.get(key, key)
         if alt:
-            return False
-        if ctrl:
+            step = _FIX_STEPS.get(key)
+            if step is None or self._mode is MainMode.GENAU:
+                return False
+            answer(self._slideshow, step)
+        elif ctrl:
             direction = _HUD_MOVES.get(key)
             if direction is None or self._actions.move_hud is None:
                 return False

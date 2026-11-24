@@ -64,6 +64,8 @@ _PRESSES: dict[str, Callable[[Any], object]] = {
     "cycle_action": lambda host: host.slideshow_cycle(ACTION),
     "cycle_version": lambda host: host.slideshow_step_version(_NEWER),
     "cycle_version_back": lambda host: host.slideshow_step_version(_OLDER),
+    "next_fix": lambda host: host.slideshow_step_fix(1),
+    "prev_fix": lambda host: host.slideshow_step_fix(-1),
     "clip_seconds_up": lambda host: host.step_dwell(1),
     "clip_seconds_down": lambda host: host.step_dwell(-1),
 }
@@ -80,7 +82,8 @@ PRESSES = tuple(_PRESSES)
 PRESSES_ABOUT_THE_SLIDE = frozenset({"trash", "lock_action", "wrong_action", "seed_loop",
                                      "action_loop", "loop", "more_seeds",
                                      "cycle_seed", "cycle_action",
-                                     "cycle_version", "cycle_version_back"})
+                                     "cycle_version", "cycle_version_back",
+                                     "next_fix", "prev_fix"})
 PRESSES_ABOUT_A_FILE = tuple(_PRESSES_ABOUT_A_FILE)
 STEPS = frozenset({"next", "prev"})
 PRESSES_ON_THE_QUEUE = {FOOT_PRESS: "{x}|{y}", FOOT_DRAG: "{x}|{y}", FOOT_RELEASE: "{x}|{y}",

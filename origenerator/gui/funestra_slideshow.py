@@ -655,7 +655,10 @@ class FunestraSlideshow(QObject):
 
     @property
     def hud_item_name(self) -> str:
-        name_of, prompt_id = self._actions.name_of, self.hud_prompt_id
+        return self.hud_name_of(self.hud_prompt_id)
+
+    def hud_name_of(self, prompt_id: str | None) -> str:
+        name_of = self._actions.name_of
         if name_of is None or not prompt_id:
             return ""
         try:

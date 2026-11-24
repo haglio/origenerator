@@ -463,9 +463,20 @@ class GeneratePane(QTabWidget):
         for tab in self.generate_tabs():
             tab.hear_actions(side, actions_by_id)
 
-    def refresh_displayed(self, row: dict, image_rows: list[dict], version: str | None = None):
+    def refresh_displayed(self, row: dict, image_rows: list[dict]):
         for tab in self.generate_tabs():
-            tab.refresh_displayed(row, image_rows, version)
+            tab.refresh_displayed(row, image_rows)
+
+    def show_fixes_changed(self, prompt_id: str, filename: str, shown) -> None:
+        for tab in self.generate_tabs():
+            tab.show_fixes_changed(prompt_id, filename, shown)
+
+    def pointer_is_on_the_fixes(self) -> bool:
+        return any(tab.pointer_is_on_the_fixes() for tab in self.generate_tabs())
+
+    def take_fixes_recorded(self, row: dict) -> None:
+        for tab in self.generate_tabs():
+            tab.take_fixes_recorded(row)
 
     def reread_names(self):
         for tab in self.generate_tabs():

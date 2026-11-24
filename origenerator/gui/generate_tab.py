@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 from contextlib import contextmanager
@@ -72,6 +73,7 @@ from origenerator.gui.action_row import ActionRow
 from origenerator.gui.collapsible_section import line_up_the_labels
 from origenerator.gui.combination import Combination
 from origenerator.gui.corner_buttons import enhance_state
+from origenerator.gui.drawn_images import as_qimage
 from origenerator.gui.drop_zone import DropZone, DropZones
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.enhance_versions import (
@@ -407,6 +409,7 @@ class GenerateTab(DropZones):
         body.addWidget(self._related)
         self._versions = EnhanceVersions()
         self._listed_versions = []
+        self._fixes_not_yet_recorded: dict[tuple, dict] = {}
         self._versions.version_selected.connect(self._show_version)
         self._versions.enhance_requested.connect(self._on_enhance_requested)
         self._versions.delete_requested.connect(self._on_versions_delete_requested)
@@ -1224,14 +1227,62 @@ class GenerateTab(DropZones):
             return
         self._display_result(row, image_rows, made_with=merge_denormalized(row))
 
-    def refresh_displayed(self, row: dict, image_rows: list[dict], version: str | None = None):
+    def refresh_displayed(self, row: dict, image_rows: list[dict]):
         shown = self._displayed_row
         if shown is None or shown.get("prompt_id") != row.get("prompt_id"):
             return
         self._display_result(row, image_rows)
-        listed = [listed.file.get("filename") for listed in self._listed_versions]
-        if version in listed:
-            self._versions.pick_and_show(listed.index(version))
+
+    def show_fixes_changed(self, prompt_id: str, filename: str, shown) -> None:
+        position = self._position_listed(prompt_id, filename)
+        if position is None:
+            return
+        if shown is not None:
+            self._fixes_not_yet_recorded[(prompt_id, filename)] = shown.file
+            self._listed_versions[position] = dataclasses.replace(
+                self._listed_versions[position], file=shown.file)
+        self._versions.show_fixes(position, self._listed_versions[position])
+        if shown is None:
+            return
+        if shown.image is not None:
+            redrawn = as_qimage(shown.image)
+            self._versions.pick(position)
+            self._versions.show_redrawn(position, redrawn)
+            self._viewport.show_redrawn(shown.path, redrawn, prompt_id)
+            self._arm_preview_actions()
+        elif not self._viewport.is_showing_any([shown.path]):
+            self._versions.pick_and_show(position)
+
+    def pointer_is_on_the_fixes(self) -> bool:
+        return self._versions.pointer_is_on_the_fixes()
+
+    def _with_the_fixes_not_yet_recorded(self, row: dict, versions: list) -> list:
+        chosen = self._fixes_not_yet_recorded
+        return [dataclasses.replace(version, file=chosen[key]) if key in chosen else version
+                for version in versions
+                for key in [(row.get("prompt_id"), version.file.get("filename"))]]
+
+    def take_fixes_recorded(self, row: dict) -> None:
+        self._fixes_not_yet_recorded = {
+            key: file for key, file in self._fixes_not_yet_recorded.items()
+            if key[0] != row.get("prompt_id")}
+        shown = self._displayed_row
+        if shown is None or shown.get("prompt_id") != row.get("prompt_id"):
+            return
+        self._displayed_row = row
+        recorded = {version.file.get("filename"): version for version in displayed_versions(row)}
+        for position, listed in enumerate(self._listed_versions):
+            version = recorded.get(listed.file.get("filename"))
+            if version is not None:
+                self._listed_versions[position] = version
+                self._versions.show_fixes(position, version)
+
+    def _position_listed(self, prompt_id: str, filename: str) -> int | None:
+        shown = self._displayed_row
+        if shown is None or shown.get("prompt_id") != prompt_id:
+            return None
+        return next((position for position, version in enumerate(self._listed_versions)
+                     if version.file.get("filename") == filename), None)
 
     def show_finished_media(self, row: dict):
         if resolve_preview(row, OUTPUT_PLACES) is not None:
@@ -1691,7 +1742,8 @@ class GenerateTab(DropZones):
                 deletable=False,
             )
             return
-        self._listed_versions = displayed_versions(row)
+        self._listed_versions = self._with_the_fixes_not_yet_recorded(
+            row, displayed_versions(row))
         self._versions.show_versions(
             [(version, self._version_path(version)) for version in self._listed_versions],
             self._pending_enhancement, self._add_row_for(row),

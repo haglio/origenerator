@@ -619,7 +619,7 @@ def test_fold_keeps_the_seed_the_enhancement_was_made_from(tmp_path):
 _UNDER, _FIXED = (10, 10, 10), (200, 0, 0)
 
 
-def _a_switch_cut_short(tmp_path, *, recorded_off: bool):
+def _a_switch_written_and_never_recorded(tmp_path):
     db = Database(tmp_path / "t.db")
     _add_source(db)
     places = OutputPlaces.in_one_folder(tmp_path / "out")
@@ -628,34 +628,36 @@ def _a_switch_cut_short(tmp_path, *, recorded_off: bool):
     Image.new("RGB", (20, 20), _FIXED).save(image)
     entry = {"filename": "enhanced.png", "subfolder": "image", "fixes_kept": "run-1",
              "fixes": [{"part": "faces", "box": [0, 0, 20, 20], "over": []}]}
-    if recorded_off:
-        entry["fixes_off"] = ["faces"]
     db.update_generation("src", output_files=json.dumps([entry]))
     kept = tmp_path / "kept from fixes" / "run-1"
     kept.mkdir(parents=True)
-    waiting = fixes_kept.set_down(
-        fixes_kept.Redrawn(Image.new("RGB", (20, 20), _UNDER), {}), kept, image, "faces", on=False)
-    return db, places, image, waiting
+    fixes_kept.write_over(
+        fixes_kept.Redrawn(Image.new("RGB", (20, 20), _UNDER), {}), kept, image, ["faces"])
+    return db, places, image, kept
 
 
-def test_a_switch_cut_short_after_it_was_written_down_is_finished_at_the_next_launch(tmp_path):
-    db, places, image, waiting = _a_switch_cut_short(tmp_path, recorded_off=True)
+def test_a_fix_switched_on_the_image_and_never_recorded_is_recorded_at_the_next_launch(tmp_path):
+    db, places, image, kept = _a_switch_written_and_never_recorded(tmp_path)
 
     assert finish_fix_switches_cut_short(db, tmp_path / "kept from fixes", places) == 1
 
+    (entry,) = gallery.row_output_files(db.get_generation("src"))
+    assert entry["fixes_off"] == ["faces"], (
+        "the image shows the fix off, and a record still saying on would check its box")
     with Image.open(image) as redrawn:
         assert redrawn.getpixel((5, 5)) == _UNDER
-    assert not waiting.exists()
-
-
-def test_a_switch_cut_short_before_it_was_written_down_is_dropped(tmp_path):
-    db, places, image, waiting = _a_switch_cut_short(tmp_path, recorded_off=False)
-
+    assert [left.name for left in kept.iterdir()] == []
     assert finish_fix_switches_cut_short(db, tmp_path / "kept from fixes", places) == 0
 
-    with Image.open(image) as untouched:
-        assert untouched.getpixel((5, 5)) == _FIXED
-    assert not waiting.exists()
+
+def test_an_image_cut_short_part_way_through_being_written_over_is_written_whole(tmp_path):
+    db, places, image, _kept = _a_switch_written_and_never_recorded(tmp_path)
+    Image.new("RGB", (20, 20), _FIXED).save(image)
+
+    finish_fix_switches_cut_short(db, tmp_path / "kept from fixes", places)
+
+    with Image.open(image) as redrawn:
+        assert redrawn.getpixel((5, 5)) == _UNDER
 
 
 def test_the_seed_of_an_enhancement_is_read_from_what_comfyui_wrote_inside_its_file(tmp_path):

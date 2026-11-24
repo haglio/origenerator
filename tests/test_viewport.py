@@ -1554,3 +1554,18 @@ def test_letting_go_of_the_player_at_quitting_lets_go_of_the_folders_videos_too(
     w.release_player()
 
     assert w._sheet.count() == 0
+
+
+def test_a_redrawn_image_shows_at_once_without_its_file_being_read(make_preview, tmp_path,
+                                                                    decodes_held):
+    w = make_preview()
+    w._image_label.resize(200, 200)
+    not_written_yet = tmp_path / "enhanced.png"
+
+    w.show_redrawn(not_written_yet, QImage(32, 24, QImage.Format.Format_RGB888))
+
+    assert decodes_held == [], (
+        "a switched fix is on the screen before its file is written, so there is no file to read")
+    assert w._image_label.pixmap().size() == QSize(200, 150)
+    assert w.media_size() == (32, 24)
+    assert w.is_showing_any([not_written_yet])

@@ -1334,12 +1334,18 @@ def test_capture_restore_round_trips_config(tabs, qtbot):
 def test_a_refreshed_row_reaches_a_tab_that_is_not_in_front(tabs):
     covered, _front = tabs.current_generate_tab(), tabs._add_subtab()
     told = []
-    covered.refresh_displayed = lambda row, image_rows, version: told.append(
-        (row["prompt_id"], version))
+    covered.refresh_displayed = lambda row, image_rows: told.append(row["prompt_id"])
+    covered.show_fixes_changed = lambda prompt_id, filename, shown: told.append(
+        (prompt_id, filename, shown))
+    covered.take_fixes_recorded = lambda row: told.append(("recorded", row["prompt_id"]))
+    covered.pointer_is_on_the_fixes = lambda: True
 
-    tabs.refresh_displayed({"prompt_id": "g1"}, [], "enhanced.png")
+    tabs.refresh_displayed({"prompt_id": "g1"}, [])
+    tabs.show_fixes_changed("g1", "enhanced.png", None)
+    tabs.take_fixes_recorded({"prompt_id": "g1"})
+    assert tabs.pointer_is_on_the_fixes()
 
-    assert told == [("g1", "enhanced.png")], (
+    assert told == ["g1", ("g1", "enhanced.png", None), ("recorded", "g1")], (
         "every tab is told, not only the one in front: a tab out of sight holds a row of its own, "
         "and would show it stale the next time it came forward")
 

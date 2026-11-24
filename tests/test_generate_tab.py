@@ -59,6 +59,7 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import EVOLVER_INBOX_DIR, EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.db import Database, NewGeneration, NewRequest
 from origenerator.db_requests import Turn
+from origenerator.fixes_being_chosen import Shown
 from origenerator.funscript import funscript_path_for
 from origenerator.gallery import media_type_of_row as gallery_media_type
 from origenerator.gallery.keys import folder_id, settings_key
@@ -5635,3 +5636,126 @@ def test_each_key_in_a_prompt_checks_each_prompt_for_problems_once(tab, qtbot, m
     assert len(checked) == 3 * 2, (
         "a key in one prompt changes its own problems and the words the other prompt shares "
         "with it, and nothing else")
+
+
+def _enhanced_with_a_fix(db, *, off=()):
+    file = {"filename": "image_enhance_00001_.png", "subfolder": "image", "fixes_kept": "run-1",
+            "fixes": [{"part": "faces", "box": [0, 0, 4, 4], "over": []}]}
+    if off:
+        file["fixes_off"] = list(off)
+    db.update_generation(
+        "img1",
+        output_files=json.dumps([file, {"filename": "sdxl_img1.png", "subfolder": "image"}]),
+        original_files=json.dumps([{"filename": "sdxl_img1.png", "subfolder": "image"}]),
+        enhance_history=json.dumps([{"filename": "image_enhance_00001_.png",
+                                     "params": {"enhance_scale": 2.0,
+                                                "enhance_detail_fixes": {"faces": 0.4}}}]))
+    return db.get_generation("img1")
+
+
+@pytest.fixture
+def showing_an_enhancement_with_a_fix(saved_panel, tmp_path, monkeypatch):
+    tab, db = saved_panel
+    output_dir = tmp_path / "out"
+    (output_dir / "image").mkdir(parents=True)
+    for name in ("sdxl_img1.png", "image_enhance_00001_.png"):
+        (output_dir / "image" / name).write_bytes(b"x")
+    monkeypatch.setattr(generate_tab_module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output_dir))
+    _image_row(db, "img1", prompt="a cat")
+    enhanced = _enhanced_with_a_fix(db)
+    tab.show_saved_generation(enhanced, [enhanced])
+    tab._viewport.show_redrawn = MagicMock()
+    tab._viewport.show_media.reset_mock()
+    return tab, db, output_dir / "image" / "image_enhance_00001_.png"
+
+
+def _the_fixs_checkbox(tab):
+    return _version_rows(tab)[0].fix_list.lines()[0].findChild(TickControl, "fix on")
+
+
+def test_a_switched_fix_shows_on_the_tab_from_memory_with_its_rows_left_standing(
+        showing_an_enhancement_with_a_fix):
+    tab, _db, enhanced_file = showing_an_enhancement_with_a_fix
+    rows = _version_rows(tab)
+    switched = dict(tab._listed_versions[0].file, fixes_off=["faces"])
+
+    tab.show_fixes_changed("img1", "image_enhance_00001_.png",
+                           Shown(switched, Image.new("RGB", (4, 4)), enhanced_file))
+
+    assert _version_rows(tab) == rows, (
+        "listing the versions again read every version's file and took the pointer off the row")
+    assert not _the_fixs_checkbox(tab).isChecked()
+    ((path, on_screen, prompt_id), _named) = tab._viewport.show_redrawn.call_args
+    assert (path, on_screen.width(), prompt_id) == (enhanced_file, 4, "img1")
+    assert not rows[0]._thumbnail.pixmap().isNull(), "the row's own thumbnail follows the switch"
+    tab._viewport.show_media.assert_not_called()
+    assert tab._versions.selected_positions() == [0]
+
+
+def test_a_fix_marked_as_bad_leaves_the_image_on_the_tab_alone(showing_an_enhancement_with_a_fix):
+    tab, _db, enhanced_file = showing_an_enhancement_with_a_fix
+    tab._viewport.is_showing_any = lambda paths: True
+    marked = dict(tab._listed_versions[0].file, fixes_left_out=["faces"])
+
+    tab.show_fixes_changed("img1", "image_enhance_00001_.png", Shown(marked, None, enhanced_file))
+
+    assert tab._listed_versions[0].file == marked
+    tab._viewport.show_redrawn.assert_not_called()
+    tab._viewport.show_media.assert_not_called()
+
+
+def test_a_change_that_was_refused_puts_the_fixs_checkbox_back(showing_an_enhancement_with_a_fix):
+    tab, _db, _enhanced_file = showing_an_enhancement_with_a_fix
+    _the_fixs_checkbox(tab).setChecked(False)
+
+    tab.show_fixes_changed("img1", "image_enhance_00001_.png", None)
+
+    assert _the_fixs_checkbox(tab).isChecked()
+
+
+def test_a_fix_changed_on_another_item_leaves_this_tab_alone(showing_an_enhancement_with_a_fix):
+    tab, _db, enhanced_file = showing_an_enhancement_with_a_fix
+
+    tab.show_fixes_changed("another item", "image_enhance_00001_.png",
+                           Shown({"filename": "image_enhance_00001_.png"}, None, enhanced_file))
+
+    assert _the_fixs_checkbox(tab).isChecked()
+
+
+def test_the_record_of_the_fixes_chosen_reaches_the_tab_without_showing_the_item_again(
+        showing_an_enhancement_with_a_fix):
+    tab, db, _enhanced_file = showing_an_enhancement_with_a_fix
+    rows = _version_rows(tab)
+
+    recorded = _enhanced_with_a_fix(db, off=["faces"])
+    tab.take_fixes_recorded(recorded)
+
+    assert tab._displayed_row == recorded
+    assert _version_rows(tab) == rows
+    assert not _the_fixs_checkbox(tab).isChecked()
+    tab._viewport.show_media.assert_not_called()
+
+
+def test_a_tab_shown_again_from_the_record_keeps_the_fixes_chosen_and_not_yet_recorded(
+        showing_an_enhancement_with_a_fix):
+    tab, db, enhanced_file = showing_an_enhancement_with_a_fix
+    switched = dict(tab._listed_versions[0].file, fixes_off=["faces"])
+    tab.show_fixes_changed("img1", "image_enhance_00001_.png", Shown(switched, None, enhanced_file))
+    not_recorded_yet = db.get_generation("img1")
+
+    tab.refresh_displayed(not_recorded_yet, [not_recorded_yet])
+
+    assert not _the_fixs_checkbox(tab).isChecked(), (
+        "the image already shows the fix off, and its box read from the record would say on")
+    tab.take_fixes_recorded(not_recorded_yet)
+    assert _the_fixs_checkbox(tab).isChecked(), "once recorded, the record is what the tab shows"
+
+
+def test_the_pointer_is_on_the_fixes_while_it_is_over_any_rows_list_of_them(
+        showing_an_enhancement_with_a_fix):
+    tab, _db, _enhanced_file = showing_an_enhancement_with_a_fix
+    away = tab.pointer_is_on_the_fixes()
+
+    _version_rows(tab)[0].fix_list.underMouse = lambda: True
+
+    assert (away, tab.pointer_is_on_the_fixes()) == (False, True)

@@ -43,7 +43,6 @@ _PLUS = THUMBNAIL_BOX.width() * 2 // 3
 _PENDING_BORDER = f"2px solid {palette.IN_FLIGHT_BORDER}"
 _MATCH_BORDER = f"2px solid {palette.MATCH_BORDER}"
 _VALUE_COLUMN = 1
-_NAME_COLUMN, _DETAIL_COLUMN = 1, 2
 _FIXES = "Fixes"
 _FACTS_OF_A_FILE = ("File", "Created")
 _MADE_BEFORE_FIXES_WERE_KEPT = "This enhancement was made before fixes were individually removable"
@@ -537,6 +536,13 @@ class EnhanceVersions(QWidget):
         if 0 <= position < len(self._rows):
             self._rows[position].show_fixes(version)
 
+    def pointer_is_on_the_fixes(self) -> bool:
+        return any(row.fix_list is not None and row.fix_list.underMouse() for row in self._rows)
+
+    def show_redrawn(self, position: int, image: QImage) -> None:
+        if 0 <= position < len(self._rows):
+            self._rows[position].take_thumbnails(_Thumbnails.from_scaled(_scaled(image)))
+
     def selected_positions(self) -> list[int]:
         return self._picking.in_shown_order()
 
@@ -555,7 +561,7 @@ class EnhanceVersions(QWidget):
         for row in self._rows:
             row.set_selected(self._picking.holds(row.position()))
 
-    def _pick_only(self, position: int) -> None:
+    def pick(self, position: int) -> None:
         if position == _ENHANCE_ROW:
             self._picking.clear()
             self._show_picks()
@@ -565,7 +571,7 @@ class EnhanceVersions(QWidget):
         self._show_picks()
 
     def pick_and_show(self, position: int) -> None:
-        self._pick_only(position)
+        self.pick(position)
         self.version_selected.emit(position)
 
     def _step_to(self, position: int) -> None:
@@ -575,7 +581,7 @@ class EnhanceVersions(QWidget):
             return
         self._arrows_from = position
         if position == _ENHANCE_ROW:
-            self._pick_only(position)
+            self.pick(position)
         else:
             self.pick_and_show(position)
 
@@ -583,7 +589,7 @@ class EnhanceVersions(QWidget):
         if position in self._originals:
             return
         if position not in self.selected_positions():
-            self._pick_only(position)
+            self.pick(position)
         doomed = self._deleted_by(self.selected_positions())
         menu = QMenu(self)
         action = menu.addAction(

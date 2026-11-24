@@ -5,7 +5,6 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
 from shared_ui.spacing import GAP_SMALL
 
 from origenerator.gallery import sort_order
-from origenerator.gui import thin_divider
 from origenerator.gui.no_wheel import NoWheelDropdown
 
 _LABELS = {
@@ -27,7 +26,6 @@ class SortBy(QWidget):
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(GAP_SMALL)
-        row.addWidget(thin_divider.upright())
         row.addWidget(QLabel("Sort by"))
         row.addWidget(self.dropdown)
         self.hide()

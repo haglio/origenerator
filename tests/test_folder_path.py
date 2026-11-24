@@ -92,3 +92,13 @@ def test_the_copy_button_sits_left_of_a_wrapped_path_level_with_its_first_line(q
     assert path.left() - copy.right() - 1 == GAP_MEDIUM
     assert copy.top() == path.top()
     assert path.height() > 2 * copy.height()
+
+
+def test_the_path_asks_for_the_width_that_holds_it_on_one_line(qtbot):
+    header = FolderPath()
+    qtbot.addWidget(header)
+    header.show_folder(_STEPS)
+    wide = header.sizeHint().width()
+
+    assert header.heightForWidth(wide) == header.heightForWidth(wide * 4)
+    assert header.heightForWidth(wide - 1) > header.heightForWidth(wide)

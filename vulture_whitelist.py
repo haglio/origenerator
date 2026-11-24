@@ -22,9 +22,9 @@ from __future__ import annotations
 _.dragEnterEvent
 _.dropEvent
 _.contextMenuEvent
-_.hasHeightForWidth
 _.startDrag
 _.wheelEvent
+_.hasHeightForWidth
 _.highlightBlock
 _.nextCheckState
 

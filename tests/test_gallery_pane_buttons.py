@@ -490,3 +490,11 @@ def test_a_squeezed_bank_wraps_between_groups_never_inside_one(buttons):
         for group in made._groups:
             shown = [button for button in group if not button.isHidden()]
             assert len({button.y() for button in shown}) == 1, (width, [b.toolTip() for b in shown])
+
+
+def test_the_buttons_ask_for_the_width_that_holds_every_one_in_a_single_row(buttons):
+    row = buttons()
+    wide = row.sizeHint().width()
+
+    assert row.heightForWidth(wide) == row.heightForWidth(wide * 4)
+    assert row.heightForWidth(wide - 1) > row.heightForWidth(wide)

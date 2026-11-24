@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QPoint
+from PySide6.QtWidgets import QApplication
 
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.thin_divider import ThinDivider
@@ -27,13 +28,30 @@ def _layout_order(widget) -> list:
     return [layout.itemAt(index).widget() for index in range(layout.count())]
 
 
-def test_the_sort_dropdown_shares_the_buttons_row_rather_than_a_row_of_its_own(qtbot):
+def test_the_buttons_path_sort_by_and_actions_share_one_row_in_that_order(qtbot):
     view = _laid_out(qtbot, [_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)])
-    buttons_top, buttons_bottom = _span(view, view._buttons)
-    sort_top, sort_bottom = _span(view, view.sort_by)
+    parts = [view._buttons, view._folder_path, view.sort_by, view._folder_actions]
 
-    assert buttons_top <= sort_top
-    assert sort_bottom <= buttons_bottom
+    assert [_span(view, part)[0] for part in parts] == [_span(view, parts[0])[0]] * 4
+    assert [part.mapTo(view, QPoint()).x() for part in parts] == sorted(
+        part.mapTo(view, QPoint()).x() for part in parts)
+
+
+def test_the_sort_dropdown_is_never_narrower_than_its_longest_choice(qtbot):
+    view = _laid_out(qtbot, [_image("i1", "a cat", 50, 1)])
+    view.resize(500, 1000)
+    view.layout().activate()
+    dropdown = view.sort_by.dropdown
+
+    assert dropdown.width() >= dropdown.sizeHint().width()
+
+
+def test_the_actions_name_keeps_its_whole_width_in_a_narrow_gallery(qtbot):
+    view = _laid_out(qtbot, [_image("i1", "a cat", 50, 1)])
+    view.resize(500, 1000)
+    view.layout().activate()
+
+    assert view._folder_actions.width() >= view._folder_actions.minimumSizeHint().width()
 
 
 def test_a_thin_divider_parts_the_search_from_the_toc(qtbot):
@@ -52,24 +70,15 @@ def test_a_thin_divider_parts_the_header_from_the_gallery(qtbot):
     assert isinstance(order[at - 1], ThinDivider)
 
 
-def _layout_holding(layout, widget):
-    for index in range(layout.count()):
-        item = layout.itemAt(index)
-        if item.widget() is widget:
-            return layout, index
-        if item.layout() is not None and (found := _layout_holding(item.layout(), widget)):
-            return found
-    return None
-
-
-def test_the_divider_beside_actions_goes_when_the_actions_do(qtbot):
+def test_the_gallery_starts_below_every_row_of_the_header_in_a_narrow_window(qtbot):
     view = _laid_out(qtbot, [_image("i1", "a cat", 50, 1)])
-    layout, at = _layout_holding(view._folder_actions.parentWidget().layout(),
-                                 view._folder_actions)
-    beside = layout.itemAt(at - 1).widget()
-    assert isinstance(beside, ThinDivider)
-    assert not beside.isHidden()
+    view.resize(500, 1000)
+    view.show()
+    for _ in range(3):
+        QApplication.processEvents()
+        view.layout().activate()
+    lowest = max(_span(view, part)[1] for part in
+                 (view._buttons, view._folder_path, view.sort_by, view._folder_actions)
+                 if not part.isHidden())
 
-    view._folder_actions.show_folder(None)
-
-    assert beside.isHidden()
+    assert _span(view, view._scroll)[0] >= lowest

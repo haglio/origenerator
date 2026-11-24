@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import NamedTuple
 
+from PySide6.QtCore import QSize
 from PySide6.QtWidgets import QToolButton, QWidget
 from shared_ui.colors import BG_PRIMARY
 from shared_ui.flow_layout import FlowLayout
@@ -23,6 +24,7 @@ from origenerator.gui import icons, omnipause
 from origenerator.gui.link_tip import LinkTip, link
 from origenerator.gui.reference_window import ReferenceWindow
 from origenerator.gui.two_screens import LEFT, TwoScreens
+from origenerator.gui.widget_size import narrowest_on_fewest_rows
 
 
 def _lit(color: str) -> str:
@@ -139,7 +141,7 @@ def _reference_button() -> QToolButton:
 
 class GalleryPaneButtons(QWidget):
     def __init__(self, handlers: ButtonHandlers, *, hosted: bool,
-                 two_screens: TwoScreens | None = None, trailing: QWidget | None = None):
+                 two_screens: TwoScreens | None = None):
         super().__init__()
         self._two_screens = two_screens or TwoScreens(self)
         policy = self.sizePolicy()
@@ -209,10 +211,12 @@ class GalleryPaneButtons(QWidget):
             buttons = tuple(b for b in listed if b is not None)
             layout.add_group(buttons)
             self._groups.append(buttons)
-        if trailing is not None:
-            layout.add_trailing(trailing)
         self._point_the_switch_where_core_would_move()
         self._draw_at_the_huds_scale(hosted=hosted)
+
+    def sizeHint(self) -> QSize:
+        wide = narrowest_on_fewest_rows(self)
+        return QSize(wide, self.heightForWidth(wide))
 
     def _draw_at_the_huds_scale(self, *, hosted: bool) -> None:
         layout = self.layout()

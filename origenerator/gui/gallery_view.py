@@ -19,7 +19,6 @@ from PySide6.QtWidgets import (
 )
 from shared_ui.find_bar import FindBar
 from shared_ui.message_shape import ERROR, INFO
-from shared_ui.spacing import GAP_MEDIUM
 from shared_ui.tick_control import TickControl
 
 from origenerator import (
@@ -146,6 +145,7 @@ from origenerator.gui.gallery_view_parts import NO_SHARED, Shared
 from origenerator.gui.generate_pane import GeneratePane, TabViews
 from origenerator.gui.generating_tile import GeneratingTile
 from origenerator.gui.generation_failed import GenerationFailed
+from origenerator.gui.header_parts import PartsInARow
 from origenerator.gui.inflight import (
     ALREADY_MAKING_ONE_TIP,
     CANCEL_TEXT,
@@ -262,19 +262,13 @@ def _stacked(*widgets: QWidget) -> QWidget:
     return stacked
 
 
-def _top_section(folder_path: QWidget, buttons: QWidget, folder_actions: QWidget) -> QHBoxLayout:
-    left = QVBoxLayout()
-    left.setContentsMargins(0, 0, 0, 0)
-    left.addWidget(folder_path)
-    left.addWidget(thin_divider.across())
-    left.addWidget(buttons)
-    top = QHBoxLayout()
-    top.setContentsMargins(0, 0, 0, 0)
-    top.setSpacing(GAP_MEDIUM)
-    top.addLayout(left, 1)
-    top.addWidget(thin_divider.upright().shown_with(folder_actions))
-    top.addWidget(folder_actions, 1, Qt.AlignmentFlag.AlignTop)
-    return top
+
+
+def _held_in_a_row(header: QWidget) -> QHBoxLayout:
+    row = QHBoxLayout()
+    row.setContentsMargins(0, 0, 0, 0)
+    row.addWidget(header)
+    return row
 
 
 def _generate_with_random_seeds_text(rows: list[dict]) -> str:
@@ -628,7 +622,6 @@ class GalleryView(QWidget):
                 quit=self.quit_asked.emit,
             ),
             hosted=self._fun_time is not None, two_screens=self._two_screens,
-            trailing=self.sort_by,
         )
         EnhanceSettingsDrag(self._buttons.enhance,
                             self._folder_switches.enhance_params_of_the_open_folder)
@@ -637,7 +630,8 @@ class GalleryView(QWidget):
             self._buttons.enhance, self._folder_switches.enhance_params_of_the_one_enhancing,
             takes_them=self._folder_switches.the_open_folder_takes_enhance_settings,
             keep=self._folder_switches.keep_enhance_params_of_the_open_folder)
-        gallery_column.addLayout(_top_section(self._folder_path, self._buttons, self._folder_actions))
+        gallery_column.addLayout(_held_in_a_row(PartsInARow(
+            self._buttons, self._folder_path, self.sort_by, self._folder_actions)))
         self._experiments_cb = TickControl("Run experiments while the app is closed")
         self._experiments_cb.toggled.connect(self._on_experiments_toggled)
         self._experiments_cb.setEnabled(not is_branch_session())

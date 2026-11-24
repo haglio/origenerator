@@ -1856,7 +1856,7 @@ def test_a_levels_facts_sit_one_gap_after_their_longest_key_as_a_field_after_its
     tab.resize(1200, 1400)
     tab.show()
     tab.layout().activate()
-    facts = next(row for row in _version_rows(tab) if "Upscale factor" in _row_texts(row))._facts
+    facts = next(row for row in _version_rows(tab) if "Scale" in _row_texts(row))._facts
     lines = [line for line in range(1, facts.rowCount()) if facts.itemAtPosition(line, 1)]
     keys = [facts.itemAtPosition(line, 0).widget() for line in lines]
     values = [facts.itemAtPosition(line, 1).widget() for line in lines]
@@ -1872,7 +1872,7 @@ def test_a_levels_fact_that_wraps_keeps_its_key_and_buttons_at_its_middle(saved_
     tab.resize(300, 1400)
     tab.show()
     tab.layout().activate()
-    facts = next(row for row in _version_rows(tab) if "Upscale factor" in _row_texts(row))._facts
+    facts = next(row for row in _version_rows(tab) if "Scale" in _row_texts(row))._facts
     line = max((line for line in range(1, facts.rowCount()) if facts.itemAtPosition(line, 1)),
                key=lambda line: facts.itemAtPosition(line, 1).widget().height())
     cells = [facts.itemAtPosition(line, column).widget() for column in range(facts.columnCount())
@@ -1977,7 +1977,7 @@ def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
     rows = _version_rows(tab)
     first = " / ".join(t for t in _row_texts(rows[0]) if t and t != "—")
     assert first.startswith("Enhancement 1/1")
-    assert "Upscale factor / 2x / Enhance steps / 20 / Enhance redraw amount / 0.15" in first
+    assert "Scale / 2x / Steps / 20 / Redraw amount / 0.15" in first
     assert "Original" in _row_texts(rows[1])
 
 

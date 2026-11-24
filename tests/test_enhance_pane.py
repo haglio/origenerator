@@ -928,7 +928,7 @@ def test_a_versions_settings_are_each_a_field_of_its_row(qtbot):
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(1, {"enhance_scale": 2.0, "enhance_steps": 20})))
     facts = _facts(_rows(versions)[0])
-    assert "Upscale factor / 2x / Enhance steps / 20" in facts
+    assert "Scale / 2x / Steps / 20" in facts
 
 
 def test_rebuilding_for_another_image_drops_the_old_rows(qtbot):
@@ -1774,7 +1774,7 @@ def test_the_live_tile_names_the_settings_it_is_running_at(qtbot):
              for lbl in versions._pending.findChildren(QLabel)]
     assert "Queued…" in texts
     assert [texts[texts.index(label) + 1] for label in (
-        "Upscale factor", "Enhance steps", "Enhance redraw amount")] == ["3x", "40", "0.35"]
+        "Scale", "Steps", "Redraw amount")] == ["3x", "40", "0.35"]
     assert "3x · 40 steps · 0.35 redraw" in versions._pending.toolTip()
 
 
@@ -2784,6 +2784,9 @@ def test_the_fixes_keep_the_apps_own_background_while_their_row_is_picked(qtbot)
         "row's blue the word could not be read and a checked box could not be seen")
     fixes_label = next(label for label in row.findChildren(QLabel) if label.text() == "Fixes")
     assert TEXT_PRIMARY.name() in fixes_label.styleSheet()
+    assert "transparent" in fixes_label.parentWidget().styleSheet(), (
+        "a plain widget paints the app's dark background, and the Fixes label sat on a dark patch "
+        "of a picked row")
 
 
 def test_every_cell_of_the_file_line_shares_one_middle(qtbot, tmp_path):

@@ -598,15 +598,16 @@ def test_a_folder_stored_with_the_old_detail_pass_still_fixes_what_it_asked_for(
     assert EnhanceSettings.parse(raw).params["enhance_detail_fixes"] == {"teeth": 0.45}
 
 
-def test_an_enhancements_settings_are_fields_under_the_enhance_panes_own_labels(titled_models):
-    titled_models({"driftwood_v1": "Driftwood v1"})
+def test_an_enhancements_settings_are_fields_under_the_enhance_panes_labels_in_its_order(
+        titled_models):
+    titled_models({"driftwood_v1": "Driftwood v1", "sharp_4x": "Sharp 4x"})
 
     assert enhance_settings_fields({
         "enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.15,
-        "checkpoint": "driftwood_v1.safetensors",
+        "checkpoint": "driftwood_v1.safetensors", "upscale_model": "sharp_4x.pth",
         "enhance_detail_fixes": {"faces": 0.45},
-    }) == [("Upscale factor", "2x"), ("Enhance steps", "20"),
-           ("Enhance redraw amount", "0.15"), ("Model", "Driftwood v1")]
+    }) == [("Model", "Driftwood v1"), ("Upscaler", "Sharp 4x"), ("Scale", "2x"),
+           ("Steps", "20"), ("Redraw amount", "0.15")]
     assert enhance_settings_fields({"checkpoint": MATCH_SOURCE_MODEL}) == []
 
 

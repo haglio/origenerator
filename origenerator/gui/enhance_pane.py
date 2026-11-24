@@ -42,7 +42,10 @@ from origenerator.gallery import (
     models_matching_a_folders_sources,
     models_matching_the_sources,
 )
-from origenerator.gallery.enhance_settings import match_source_model_label
+from origenerator.gallery.enhance_settings import (
+    LABELS_ON_THE_ENHANCE_PANE,
+    match_source_model_label,
+)
 from origenerator.gui import square_buttons
 from origenerator.gui.drop_target import DropTarget
 from origenerator.gui.eliding import open_the_list_in_full
@@ -300,13 +303,15 @@ class EnhancePane(QWidget):
         self._scale = self._number("enhance_scale", NoWheelDoubleSpinBox())
         self._steps = self._number("enhance_steps", NoWheelSpinBox())
         self._denoise = self._number("enhance_denoise", NoWheelDoubleSpinBox())
-        model_caption = self._labeled("Model", self._model)
+        labels = LABELS_ON_THE_ENHANCE_PANE
+        model_caption = self._labeled(labels["checkpoint"], self._model)
         settings_column.addLayout(FieldGrid(
             dropdowns=[(model_caption, self._model),
-                     (self._labeled("Upscaler", self._upscaler), self._upscaler)],
-            numbers=[(self._labeled(label, widget), widget)
-                     for label, widget in (("Scale", self._scale), ("Steps", self._steps),
-                                           ("Redraw amount", self._denoise))],
+                       (self._labeled(labels["upscale_model"], self._upscaler), self._upscaler)],
+            numbers=[(self._labeled(labels[key], widget), widget)
+                     for key, widget in (("enhance_scale", self._scale),
+                                         ("enhance_steps", self._steps),
+                                         ("enhance_denoise", self._denoise))],
             marks={model_caption: self._model_warning},
         ))
 

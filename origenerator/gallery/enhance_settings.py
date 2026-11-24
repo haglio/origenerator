@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from functools import cache
 
 from origenerator.model_titles import model_title
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -16,6 +15,11 @@ ENHANCE_SETTING_KEYS = (
 )
 
 MATCH_SOURCE_MODEL = "(match the source image)"
+
+LABELS_ON_THE_ENHANCE_PANE = {
+    "checkpoint": "Model", "upscale_model": "Upscaler", "enhance_scale": "Scale",
+    "enhance_steps": "Steps", "enhance_denoise": "Redraw amount",
+}
 
 
 def match_source_model_label() -> str:
@@ -97,8 +101,8 @@ def describe_enhance_params(params: dict) -> str:
 
 
 def enhance_settings_fields(params: dict) -> list[tuple[str, str]]:
-    labels = _labels_on_the_enhance_pane()
-    return [(labels[key], value) for key, value in _settings_said(params).items()]
+    said = _settings_said(params)
+    return [(label, said[key]) for key, label in LABELS_ON_THE_ENHANCE_PANE.items() if key in said]
 
 
 def fix_details(params: dict) -> dict[str, str]:
@@ -128,10 +132,7 @@ def _settings_said(params: dict) -> dict[str, str]:
     checkpoint = params.get("checkpoint")
     if checkpoint and checkpoint != MATCH_SOURCE_MODEL:
         said["checkpoint"] = model_title(checkpoint)
+    upscaler = params.get("upscale_model")
+    if upscaler:
+        said["upscale_model"] = model_title(upscaler)
     return said
-
-
-@cache
-def _labels_on_the_enhance_pane() -> dict[str, str]:
-    return {definition.key: definition.label
-            for definition in WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].param_definitions()}

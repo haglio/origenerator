@@ -22,6 +22,7 @@ from origenerator import gallery, search
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     LATEST_KEY,
+    POPULATING_KEY,
     TRASH_KEY,
     FolderCollection,
     all_collections,
@@ -291,6 +292,7 @@ class GalleryPane(QObject):
         )
         self._renders = {
             LATEST_KEY: self._render_latest,
+            POPULATING_KEY: self._render_populating,
             EXPERIMENTS_KEY: self._render_experiments,
             TRASH_KEY: self._render_trash,
         }
@@ -544,9 +546,15 @@ class GalleryPane(QObject):
                             show_favorites=False, empty=gathered.empty)
 
     def _render_latest(self):
+        self._render_newest_first(LATEST_KEY, self._latest_empty_hint())
+
+    def _render_populating(self):
+        self._render_newest_first(POPULATING_KEY, collection(POPULATING_KEY).empty)
+
+    def _render_newest_first(self, which: str, empty: str):
         container, flow = self._fresh_tile_pane()
-        rows = self._open_collection_rows(LATEST_KEY)
-        items = self._latest_inflight_items()
+        rows = self._open_collection_rows(which)
+        items = self._newest_first_items(which)
         self._inflight_signature = _inflight_signature(items)
         self._inflight_tiles = {}
         self._inflight_by_key = {}
@@ -560,7 +568,7 @@ class GalleryPane(QObject):
                        opens_now=bool(items) and gallery.new_work_opens_a_section(rows),
                        draw_leading=draw_leading)
         if not (items or rows):
-            self.show_widget(self._empty_state(self._latest_empty_hint()))
+            self.show_widget(self._empty_state(empty))
             return
         self._show_paged(container, _between_headings(
             flow, rows, headings, lambda row: self._add_collection_thumbnail(flow, row)))
@@ -660,6 +668,13 @@ class GalleryPane(QObject):
                 .held_by(self._collection_folder, in_progress)}
         return _back_of_the_line_first(self._tile_items(rows, requests), held)
 
+    def _newest_first_items(self, which: str, rows=None, requests=None) -> list[InFlightItem]:
+        items = self._latest_inflight_items(rows, requests)
+        if which != POPULATING_KEY:
+            return items
+        populating = self._model.populating()
+        return [item for item in items if item.key in populating]
+
     def _latest_empty_hint(self) -> str:
         noun = next((label.lower() for kind, label in gallery.MEDIA_LABELS.items()
                      if key_holds(kind, self._collection_folder)), "generations")
@@ -669,15 +684,19 @@ class GalleryPane(QObject):
     def showing_latest(self) -> bool:
         return base_of(self._tree.selected_folder_key()) == LATEST_KEY
 
+    def _newest_first_shown(self) -> str | None:
+        shown = folder_collection(base_of(self._tree.selected_folder_key()))
+        return shown.which if shown is not None and collection(shown.which).newest_first else None
+
     def refresh_inflight(self, rows=None, requests=None):
-        if not self._inflight_tiles and not self.showing_latest():
+        newest_first = self._newest_first_shown()
+        if not self._inflight_tiles and newest_first is None:
             return
-        items = (self._latest_inflight_items(rows, requests) if self.showing_latest()
-                 else self._tile_items(rows, requests))
-        if (self.showing_latest()
-                and _inflight_signature(items) != self._inflight_signature):
+        items = (self._newest_first_items(newest_first, rows, requests)
+                 if newest_first is not None else self._tile_items(rows, requests))
+        if newest_first is not None and _inflight_signature(items) != self._inflight_signature:
             place = self.place()
-            self._render_latest()
+            self._renders[newest_first]()
             self.return_to(place)
             return
         for item in items:

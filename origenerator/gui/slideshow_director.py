@@ -346,7 +346,7 @@ class SlideshowDirector:
         items = self.items_of(rows)
         if not items:
             return
-        latest = collection is not None and collection.which == _LATEST_KEY
+        latest = _plays_newest_first(location)
         picked = [] if latest else self._picked_since_the_slideshow_up_opened()
         one_picked = picked[0] if len(picked) == 1 else None
         resume = None if latest else self._place_coming_back_to(location, items)
@@ -834,7 +834,7 @@ class SlideshowDirector:
         return [row for row in rows if video_kino_plays(row) is None]
 
     def _one_per_run_where_the_order_is_newest_first(self, location, rows) -> list[dict]:
-        if not _plays_latest(location):
+        if not _plays_newest_first(location):
             return rows
         return one_per_stretch(rows, image_index=self._library().image_index)
 
@@ -1031,7 +1031,7 @@ class SlideshowDirector:
                   start=_place_of(left.state.current, items),
                   carrying=Carrying(resume=left.state, filters=left.filters,
                                     versions=ready.versions if ready is not None else None),
-                  **self._order(_plays_latest(location)))
+                  **self._order(_plays_newest_first(location)))
         logger.info("The %s region opens where it was left: %d items", shape, len(items))
         return True
 
@@ -1149,7 +1149,7 @@ class SlideshowDirector:
 
     def note_arrived(self, rows) -> None:
         in_latest = [(slideshow, location) for slideshow, location in self._live_slideshows
-                     if _plays_latest(location)]
+                     if _plays_newest_first(location)]
         for row in rows:
             self._line_up_where_it_plays(row, in_latest)
 
@@ -1304,7 +1304,7 @@ class SlideshowDirector:
         if not items:
             return
         self.open(items, rows=rows, location=key, shape=command.shape,
-                  **self._order(command.collection_key == _LATEST_KEY))
+                  **self._order(_plays_newest_first(key)))
 
     def set_favorites_filter(self, shape, on: bool) -> None:
         slideshow = self.surface_for(shape)
@@ -1366,9 +1366,9 @@ class SlideshowDirector:
         return self._library().is_enhanced_id(prompt_id)
 
 
-def _plays_latest(location) -> bool:
+def _plays_newest_first(location) -> bool:
     collection = folder_collection(_split_collection_key(location)[0])
-    return collection is not None and collection.which == _LATEST_KEY
+    return collection is not None and _collection(collection.which).newest_first
 
 
 def _volume_saved_as(saved) -> VolumeHud | None:

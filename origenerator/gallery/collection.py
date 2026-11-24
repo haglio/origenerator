@@ -13,6 +13,8 @@ FAVORITES_KEY = "__starred__"
 FAVORITES_LABEL = "Favorites"
 ENHANCED_KEY = "__enhanced__"
 ENHANCED_LABEL = "Enhanced"
+POPULATING_KEY = "__populating__"
+POPULATING_LABEL = "Populating"
 EXPERIMENTS_KEY = "__experiments__"
 EXPERIMENTS_LABEL = "Experiments"
 TRASH_KEY = "__trash__"
@@ -41,7 +43,7 @@ class Collection:
     tooltip: str
     glyph: Glyph
     rows: Callable[[object], list[dict]] | None = None
-    picked_fresh: Callable[[list[dict]], list[dict]] | None = None
+    picked_fresh: Callable[[object, list[dict]], list[dict]] | None = None
     shown_in: Callable[[object], bool] = lambda shape: True
     marked: bool = False
     counted: bool = True
@@ -50,6 +52,7 @@ class Collection:
     voice: Voice | None = None
     slideshow_filter: str | None = None
     of_what_was_generated: bool = False
+    newest_first: bool = False
 
 
 ALL_COLLECTIONS: tuple[Collection, ...] = (
@@ -57,11 +60,11 @@ ALL_COLLECTIONS: tuple[Collection, ...] = (
         LATEST_KEY, LATEST_LABEL, "Recently generated", Glyph("latest"),
         rows=lambda library: library.recent_rows,
         shown_in=lambda shape: shape.show_latest, counted=False,
-        voice=Voice(("recents", "recent"))),
+        voice=Voice(("recents", "recent")), newest_first=True),
     Collection(
         FAVORITES_KEY, FAVORITES_LABEL,
         "Your favorite folders and items — drop a folder here to add it",
-        Glyph("star", "GREEN"), picked_fresh=favorite_generations,
+        Glyph("star", "GREEN"), picked_fresh=lambda _library, rows: favorite_generations(rows),
         shown_in=lambda shape: bool(shape.tree_model), marked=True, gathers_folders=True,
         empty=("No bookmarks yet.\n\nStar an image or video from its right-click menu, "
                "or favorite a folder from the list, to collect them here."),
@@ -75,6 +78,14 @@ ALL_COLLECTIONS: tuple[Collection, ...] = (
                "right-click menu or the plus in its corner to see it here. A video shows here "
                "once Evolver has enhanced it."),
         slideshow_filter="enhanced"),
+    Collection(
+        POPULATING_KEY, POPULATING_LABEL,
+        "What Populate has made and is making, in every folder it is running in",
+        Glyph("bolt"), picked_fresh=lambda library, rows: library.populating_rows(rows),
+        shown_in=lambda shape: bool(shape.tree_model), counted=False,
+        empty=("Nothing is populating.\n\nTurn on Populate in a leaf folder to see what it "
+               "makes here."),
+        of_what_was_generated=True, newest_first=True),
     Collection(
         EXPERIMENTS_KEY, EXPERIMENTS_LABEL, "Background experiments awaiting your review",
         Glyph("flask"), rows=lambda library: library.experiment_rows,

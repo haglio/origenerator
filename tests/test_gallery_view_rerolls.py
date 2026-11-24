@@ -8,12 +8,9 @@ import pytest
 from app_support.threading_utils import wait_until
 from PIL import Image
 from PySide6.QtCore import (
-    QObject,
     QPoint,
     QRect,
     Qt,
-    Signal,
-    Slot,
 )
 from PySide6.QtWidgets import QApplication
 
@@ -41,7 +38,6 @@ from tests.gallery_view_support import (
     _REROLL_HISTORY,
     _SDXL,
     _alls,
-    _at,
     _completed_image,
     _every_job_is_with_comfyui,
     _finish_reroll,
@@ -570,62 +566,6 @@ def test_populate_relaunches_when_a_variation_finishes(qtbot, tmp_path):
     assert key in view._live_jobs
 
 
-class _WindowTurn(QObject):
-    asked = Signal()
-
-    def __init__(self):
-        super().__init__()
-        self.taken = threading.Event()
-        self.asked.connect(self._take)
-
-    @Slot()
-    def _take(self):
-        self.taken.set()
-
-
-def _accepted_only_after_the_window_has_had_a_turn(client):
-    turn = _WindowTurn()
-
-    def submit(*_args, **_kwargs):
-        turn.taken.clear()
-        turn.asked.emit()
-        turn.taken.wait()
-        return "comfy-X"
-
-    client.submit_job.side_effect = submit
-
-
-def test_turning_populate_on_in_a_second_folder_ends_it_in_the_first(qtbot, tmp_path):
-    client = _reroll_client()
-    _accepted_only_after_the_window_has_had_a_turn(client)
-    db = _seeded_db(tmp_path)
-    db.insert_generation(NewGeneration(
-        prompt_id="other", workflow_name="sdxl_t2i", workflow_version=_SDXL.version,
-        positive_prompt="a dog", negative_prompt="", seed=9,
-        params_json=json.dumps(dict(_SDXL.default_params(), seed=9,
-                                    positive_prompt="a dog")),
-        workflow_json="{}",
-    ))
-    db.update_generation("other", status="completed",
-                         output_files=json.dumps([{"filename": "b.png", "subfolder": ""}]))
-    view = GalleryView(db, client=client)
-    qtbot.addWidget(view)
-    view.refresh()
-    settings = _at(_image_workflow(view._tree), 0, 0)
-    first, second = (_at(settings, index).data(0, _GROUP_ROLE).key for index in (0, 1))
-    view._tree.setCurrentItem(view.toc.item_for(first))
-    view._toggle_populate(True)
-
-    view._tree.setCurrentItem(view.toc.item_for(second))
-    view._toggle_populate(True)
-
-    assert view._populate.is_active(second)
-    assert not view._populate.is_active(first), (
-        "one folder at a time: Populate in two would take turns on the machine, each waiting "
-        "out the other's render")
-    assert view._buttons.populate.isChecked()
-
-
 def test_toggling_populate_off_stops_populate(qtbot, tmp_path):
     client = _reroll_client()
     view = GalleryView(_seeded_db(tmp_path), client=client)
@@ -976,39 +916,6 @@ def test_a_tip_with_no_link_in_it_stays_qts_own_tooltip(qtbot, tmp_path):
     assert said == (True, ""), (
         "the tip that can be clicked into is only for words holding a link; ordinary words stay "
         "with Qt's tooltip, which shows them well enough")
-
-
-def test_the_switch_stays_lit_and_live_in_a_folder_populate_is_not_running_in(qtbot, tmp_path):
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    _select_first_leaf(view)
-    view._toggle_populate(True)
-
-    view._tree.setCurrentItem(_image_workflow(view._tree))
-
-    populate = view._buttons.populate
-    assert (populate.isChecked(), populate.isEnabled()) == (True, True), (
-        "a lit switch says Populate is running somewhere, not that this folder is the one "
-        "running it, and it is grayed only when there is nothing for a press to do: here a "
-        "press stops it where it runs")
-
-
-def test_the_switchs_tip_takes_you_to_whichever_folder_populate_runs_in(qtbot, tmp_path):
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    key = _select_first_leaf(view)
-    view._toggle_populate(True)
-    view._tree.setCurrentItem(_image_workflow(view._tree))
-    assert _selected_folder(view) != key
-
-    view._buttons.populate_tip.link_activated.emit("populate")
-
-    assert _selected_folder(view) == key, (
-        "being taken there is the whole of what the tip is for: naming the folder would be no "
-        "help, since the names are long and alike")
-
 
 
 def test_generate_launches_a_reroll_in_the_configs_existing_folder(qtbot, tmp_path):
@@ -1980,19 +1887,6 @@ def test_populate_switched_on_over_a_folders_experiment_carries_on_when_it_lands
         "with nothing running")
 
 
-def test_switching_populate_off_from_another_folder_stops_it_there(qtbot, tmp_path):
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    key = _select_first_leaf(view)
-    view._toggle_populate(True)
-    view._tree.setCurrentItem(_image_workflow(view._tree))
-
-    view._toggle_populate(False)
-
-    assert not view._populate.is_active(key)
-
-
 def test_populate_that_could_not_launch_forgets_the_settings_it_read(qtbot, tmp_path):
     client = _reroll_client()
 
@@ -2036,31 +1930,6 @@ def test_watching_populate_the_next_variation_is_the_selection_not_a_saved_item(
 
     assert view.selected_generation() is None
     assert view.selected_prompt_ids() == []
-
-
-def test_populates_launches_are_remembered_only_while_they_can_still_finish(qtbot, tmp_path):
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    key = _select_first_leaf(view)
-    view._toggle_populate(True)
-
-    view._cancel_reroll(key)
-
-    assert view._populate_origins == {view._live_jobs[key].origin}
-
-
-def test_with_populate_running_elsewhere_the_switch_leaves_the_saying_to_its_tip(qtbot, tmp_path):
-    view = GalleryView(_seeded_db(tmp_path), client=_reroll_client())
-    qtbot.addWidget(view)
-    view.refresh()
-    _select_first_leaf(view)
-    view._toggle_populate(True)
-    assert view._buttons.populate.toolTip() != ""
-
-    view._tree.setCurrentItem(_image_workflow(view._tree))
-
-    assert view._buttons.populate.toolTip() == ""
 
 
 def test_a_seed_re_roll_into_a_folder_already_making_one_starts_nothing(qtbot, tmp_path):

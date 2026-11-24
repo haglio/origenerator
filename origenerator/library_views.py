@@ -47,13 +47,15 @@ class LibrarySnapshot:
                  custom_collections: list[dict] = (),
                  previous: LibrarySnapshot | None = None,
                  names_version: Callable[[], object] = lambda: None,
-                 evolvers_folder: Path = EVOLVER_AI_DIR):
+                 evolvers_folder: Path = EVOLVER_AI_DIR,
+                 populating: Callable[[], frozenset[str]] = frozenset):
         self.rows = _carried_over(rows, previous.rows if previous else ())
         self.held_rows = _carried_over(held_rows, previous.held_rows if previous else ())
         self.folder_meta = _carried_over_whole(folder_meta or {},
                                                previous.folder_meta if previous else None)
         self._name_of = name_of
         self._names_version = names_version
+        self.populating = populating
         self._custom_records = custom_collections
         self._evolvers_folder = evolvers_folder
         self._customs: dict[str, list] = {}
@@ -151,6 +153,11 @@ class LibrarySnapshot:
                 lambda rows: gallery.enhanced_generations(rows, self.is_enhanced), "enhanced",
                 depends_on=self.upscales)
 
+    def populating_rows(self, rows: list[dict]) -> list[dict]:
+        populating = self.populating()
+        return gallery.recent_generations([row for row in rows if row["prompt_id"] in populating],
+                                          bumped=self.recency)
+
     @cached_property
     def experiment_rows(self) -> list[dict]:
         return self._each_alone(gallery.unreviewed_experiments, "experiment")
@@ -173,7 +180,7 @@ class LibrarySnapshot:
     def on_shape(self, shape: str | None, listing: str | None = None) -> list[dict]:
         picked = collection(listing).picked_fresh if listing is not None else None
         if picked is not None:
-            return picked(self.on_shape(shape))
+            return picked(self, self.on_shape(shape))
         if (listing, shape) not in self._on_shape:
             self._on_shape[(listing, shape)] = self._on_the_shape(self._listing(listing), shape)
         return self._on_shape[(listing, shape)]

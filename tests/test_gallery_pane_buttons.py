@@ -11,11 +11,11 @@ from shared_ui.spacing import BUTTON_GAP, BUTTON_ICON_INSET, BUTTON_ROW_GAP, BUT
 from origenerator import ui_scale
 from origenerator.gui import icons, omnipause, two_screens
 from origenerator.gui.gallery_pane_buttons import (
-    POPULATE_ELSEWHERE_TIP,
     Button,
     ButtonHandlers,
     ButtonStates,
     GalleryPaneButtons,
+    populate_elsewhere_tip,
 )
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.two_screens import TwoScreens
@@ -164,10 +164,10 @@ def test_a_state_that_says_nothing_about_a_switch_leaves_it_as_the_user_set_it(b
 def test_populate_running_elsewhere_shows_the_clickable_tip_and_no_tooltip(buttons):
     made = buttons()
 
-    made.apply(_state(populate=Button(tip=""), populate_tip=POPULATE_ELSEWHERE_TIP))
+    made.apply(_state(populate=Button(tip=""), populate_tip=populate_elsewhere_tip(1)))
 
     assert made.populate.toolTip() == ""
-    assert "Go to it" in made.populate_tip._html, (
+    assert "Go to Populating" in made.populate_tip._html, (
         "naming the folder is no use when its name is a short code, so the tip offers to go "
         "there instead")
 

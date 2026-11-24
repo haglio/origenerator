@@ -33,10 +33,9 @@ _LIT = _lit(as_hex(BLUE))
 _LIT_WHILE_THE_ROOM_IS_PAUSED = _lit(as_hex(YELLOW))
 
 GROUP_TIP = "Group the selected folders into a collection of your own"
-POPULATE_ELSEWHERE_TIP = (
-    "Populate is running in another folder<br>"
-    f"{link('populate', 'Go to it')} · click the switch to stop it"
-)
+def populate_elsewhere_tip(folders: int) -> str:
+    where = "another folder" if folders == 1 else f"{folders} other folders"
+    return f"Populate is running in {where}<br>{link('populate', 'Go to Populating')}"
 
 
 class Button(NamedTuple):

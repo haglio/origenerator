@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import NamedTuple
 
 from app_support.written_file import ReadEachWhenChanged
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QEvent, QSize, Qt, Signal
 from PySide6.QtGui import QIcon, QPixmap
-from PySide6.QtWidgets import QApplication, QMenu, QTabWidget
+from PySide6.QtWidgets import QApplication, QMenu, QStyle, QTabWidget, QToolButton
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
@@ -67,6 +67,18 @@ def parse_tabs_state(state) -> tuple[list[SavedTab], int]:
     return restored, current if isinstance(current, int) else 0
 
 
+def _new_tab_button(style: QStyle) -> QToolButton:
+    mark = style.pixelMetric(QStyle.PixelMetric.PM_TabCloseIndicatorWidth)
+    plus = QToolButton()
+    plus.setObjectName("newTabButton")
+    plus.setIcon(icons.new_tab_icon())
+    plus.setIconSize(QSize(mark, mark))
+    plus.setAutoRaise(True)
+    plus.setCursor(Qt.CursorShape.PointingHandCursor)
+    plus.setToolTip("New tab")
+    return plus
+
+
 class GeneratePane(QTabWidget):
     tab_added = Signal(object)
     generate_requested = Signal(str, list)
@@ -103,7 +115,24 @@ class GeneratePane(QTabWidget):
         self._request_auto_generate = False
         self._thumbnail_marks = ReadEachWhenChanged(_thumbnail_mark, most=_MARKS_KEPT)
         self._media_marks: dict[ItemType | None, QIcon] = {}
+        self._plus = _new_tab_button(self.style())
+        self._plus.clicked.connect(lambda _checked=False: self._add_subtab())
+        self.setCornerWidget(self._plus, Qt.Corner.TopRightCorner)
         self._add_subtab()
+
+    def _stand_the_plus_after_the_last_tab(self) -> None:
+        bar = self.tabBar()
+        if bar.count() == 0:
+            return
+        last = bar.tabRect(bar.count() - 1)
+        self._plus.setGeometry(bar.x() + last.right() + 1, bar.y(),
+                               self._plus.sizeHint().width(), bar.height())
+
+    def event(self, event) -> bool:
+        handled = super().event(event)
+        if event.type() == QEvent.Type.LayoutRequest:
+            self._stand_the_plus_after_the_last_tab()
+        return handled
 
     def _front_tab_relayout(self, _index: int = -1) -> None:
         tab = self.currentWidget()

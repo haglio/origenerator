@@ -7,7 +7,7 @@ from unittest.mock import ANY, MagicMock, patch
 import pytest
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QApplication, QInputDialog, QLabel, QMenu, QTabBar
+from PySide6.QtWidgets import QApplication, QInputDialog, QLabel, QMenu, QTabBar, QToolButton
 from shared_ui.testing import appending_to
 
 from origenerator.comfyui_client import ComfyUIClient
@@ -141,9 +141,80 @@ def test_a_middle_click_on_a_tab_closes_it(tabs, qtbot):
     assert tabs.generate_tabs() == [keeper]
 
 
-def test_the_pane_carries_no_corner_controls(tabs):
-    assert tabs.cornerWidget(Qt.Corner.TopLeftCorner) is None
-    assert tabs.cornerWidget(Qt.Corner.TopRightCorner) is None
+def _plus(tabs):
+    plus = tabs.findChild(QToolButton, "newTabButton")
+    assert plus is not None, "the tab row has no + for a new tab"
+    return plus
+
+
+def test_the_plus_opens_a_new_tab_beside_the_others_and_brings_it_forward(tabs, qtbot):
+    _pick_workflow(tabs.widget(0))
+    kept = tabs.widget(0)
+
+    qtbot.mouseClick(_plus(tabs), Qt.MouseButton.LeftButton)
+
+    assert tabs.count() == 2
+    assert tabs.widget(0) is kept
+    assert tabs.currentWidget() is tabs.widget(1)
+    assert tabs.widget(1).is_blank()
+
+
+def _shown(tabs, width):
+    tabs.resize(width, 400)
+    tabs.show()
+    QApplication.processEvents()
+
+
+def _stands_right_after_the_last_tab(tabs):
+    bar = tabs.tabBar()
+    last = bar.tabRect(bar.count() - 1).translated(bar.pos())
+    plus = _plus(tabs).geometry()
+    return (plus.left() == last.right() + 1 and plus.top() == bar.y()
+            and plus.height() == bar.height())
+
+
+def test_the_plus_stands_right_after_the_last_tab_as_tabs_open_and_close(tabs):
+    _shown(tabs, 1200)
+    assert _stands_right_after_the_last_tab(tabs)
+
+    tabs._add_subtab()
+    QApplication.processEvents()
+    assert _stands_right_after_the_last_tab(tabs)
+
+    tabs._close_subtab(1)
+    QApplication.processEvents()
+    assert _stands_right_after_the_last_tab(tabs)
+
+    tabs.resize(1000, 400)
+    QApplication.processEvents()
+    assert _stands_right_after_the_last_tab(tabs)
+
+
+def test_the_plus_follows_a_tab_whose_name_shrinks(tabs):
+    _shown(tabs, 1200)
+    before = _plus(tabs).x()
+
+    tabs.setTabText(0, "A")
+    QApplication.processEvents()
+
+    assert _plus(tabs).x() < before
+    assert _stands_right_after_the_last_tab(tabs)
+
+
+def test_a_row_too_full_for_its_tabs_still_leaves_the_plus_in_view(tabs):
+    _shown(tabs, 400)
+    for _ in range(8):
+        tabs._add_subtab()
+    QApplication.processEvents()
+
+    assert _stands_right_after_the_last_tab(tabs)
+    assert _plus(tabs).geometry().right() < tabs.width()
+
+    tabs.resize(300, 400)
+    QApplication.processEvents()
+
+    assert _stands_right_after_the_last_tab(tabs)
+    assert _plus(tabs).geometry().right() < tabs.width()
 
 
 def test_tabs_can_be_dragged_along_the_row(tabs):

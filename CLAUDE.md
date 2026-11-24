@@ -453,6 +453,41 @@ folder of those names that a save created would read to its startup repair as
 every image having vanished from a folder that still holds files. Removing
 them is safe only once no checkout that old can be started.
 
+## Generate on a site's image asks the site, in a Chrome nobody sees
+
+A site's image whose site has an image page named in the settings all of
+Haglio shares (`site_pages`, `{site: {"image": address, "video": address}}`,
+read by `sites`) has a live Generate (`OutsideWorkflow.makes_on_its_site`).
+A press never goes to ComfyUI or the Job Queue (his ruling, 2026-11-23: the
+site runs beside anything ComfyUI is doing): `gui/site_generations` writes a
+running row at once, so the image shows as a tile among the items, and makes
+the images one after another off the window's thread.
+
+- The site's page is opened in Chrome on a desktop of its own
+  (`unseen_desktop`), so no window, taskbar button or change of focus reaches
+  his screen, on a profile of its own in the production checkout's
+  `state/site_chrome`, which is where the site's sign-in is kept. His own
+  Chrome profile cannot be used: a window opened in a Chrome that is already
+  running lands on his desktop and takes the focus.
+- `site_chrome` drives that Chrome over its DevTools port. `site_generation`
+  goes to the address app_support's `site_pages.page_address` packs the form's
+  settings into, runs Fun Time's fill script on the page (the private
+  `regen_autofill.user.js` in Fun Time's production checkout, found with
+  `site_pages.fill_script`, the one piece of code that knows the site's form
+  for both apps), and reads `window.funTimeMade`, which the script sets once
+  the site has answered its GENERATE: the image's address and the seed.
+- When the script says the site is signed out, the page is shown in a Chrome
+  he can see until he has signed in, then closed, and the image is made
+  unseen. That window is the only one this feature ever shows.
+- `site_items` files the downloaded image with the images this app makes,
+  numbered like them, as that site's image, under the seed the site used. A
+  seed left random on the form is left for the site to pick, since this app's
+  random seeds are larger than a site takes.
+- A row left running by a copy of the app that died is cleared at the next
+  launch like any run ComfyUI no longer knows.
+
+Only images are made this way so far; a site's video keeps its dead Generate.
+
 ## The gallery holds the videos no model made, where they are kept
 
 Origenerator's gallery is to hold every Haglio video and image, the ones no

@@ -4,6 +4,7 @@ from enum import StrEnum
 
 from app_support.gallery_records import PLACES
 
+from origenerator import sites
 from origenerator.display_names import shown_name
 from origenerator.media import MediaType
 from origenerator.workflows.base import ParamDef, ParamType, WorkflowTemplate
@@ -97,6 +98,10 @@ class OutsideWorkflow(MadeElsewhereWorkflow):
             ParamDef("aspect_ratio", "Aspect ratio", ParamType.STR, ""),
             ParamDef("quality", "Quality", ParamType.STR, ""),
         ) if pd.key in recorded]
+
+    @property
+    def makes_on_its_site(self) -> bool:
+        return self.output_type == MediaType.IMAGE and sites.makes_images(self.source)
 
     def pins_reused_seed(self) -> bool:
         return True

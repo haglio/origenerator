@@ -4,9 +4,11 @@ import json
 from unittest.mock import MagicMock
 
 import pytest
+from app_support import haglio_settings
 from PIL import Image
 from shared_ui.tick_control import TickControl
 
+from origenerator import sites
 from origenerator.action_vocabulary import vocabulary
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
@@ -224,3 +226,53 @@ def test_a_tab_left_on_an_ai_video_comes_back_after_a_restart(library):
     [tab], _current = parse_tabs_state(state)
 
     assert tab.config.workflow_name == outside_workflow("a-site")
+
+
+@pytest.fixture
+def a_site_that_makes_images(monkeypatch, tmp_path):
+    written = tmp_path / "haglio_settings.json"
+    written.write_text(json.dumps({**haglio_settings.example_inside(tmp_path), sites.SETTING: {
+        "a-site": {"image": "https://example.com/create"}}}), encoding="utf-8")
+    monkeypatch.setenv(haglio_settings.SETTINGS_ENV, str(written))
+
+
+def _asked_for_by_generate(tab) -> list:
+    asked = []
+    tab.generate_requested.connect(lambda name, batch: asked.append((name, batch)))
+    tab._generate_btn.click()
+    return asked
+
+
+def test_generate_works_on_an_image_of_a_site_whose_image_page_the_settings_name(
+        library, a_site_that_makes_images):
+    tab, _db, _video, image = library
+    tab.show_saved_generation(image, [image])
+    tab._param_form.set_values({"positive_prompt": "a loud shore"})
+
+    assert tab._generate_pair.isEnabled()
+    ((name, (asked,)),) = _asked_for_by_generate(tab)
+
+    assert name == outside_workflow("a-site", MediaType.IMAGE)
+    assert (asked["positive_prompt"], asked["model"], asked["seed"]) == (
+        "a loud shore", "Image Model", 22)
+
+
+def test_a_random_seed_is_left_for_the_site_to_pick(library, a_site_that_makes_images):
+    tab, _db, _video, image = library
+    tab.show_saved_generation(image, [image])
+    tab._param_form.set_values({"positive_prompt": "a loud shore"})
+    tab.use_random_seed()
+
+    ((_name, (asked,)),) = _asked_for_by_generate(tab)
+
+    assert "seed" not in asked
+    assert asked["positive_prompt"] == "a loud shore"
+
+
+def test_generate_stays_grayed_on_a_video_of_a_site_that_makes_only_images_here(
+        library, a_site_that_makes_images):
+    tab, _db, video, image = library
+
+    tab.show_saved_generation(video, [image])
+
+    assert not tab._generate_pair.isEnabled()

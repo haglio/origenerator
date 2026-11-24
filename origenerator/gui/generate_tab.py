@@ -509,6 +509,8 @@ class GenerateTab(DropZones):
 
     def _why_generate_is_blocked(self) -> str | None:
         workflow = workflow_named(self._workflow_dropdown.currentData())
+        if workflow is not None and workflow.makes_on_its_site:
+            return None
         if workflow is not None and not workflow.generates_here:
             return workflow.why_it_cannot_be_made_again
         told = self._told_why_the_shown_item_cannot_be_remade()
@@ -820,8 +822,15 @@ class GenerateTab(DropZones):
             return
         if self._would_remake_what_it_shows():
             self.use_random_seed()
-        self.generate_requested.emit(key, self._batch_of(self._how_many.how_many()))
+        batch = self._batch_of(self._how_many.how_many())
+        if workflow_named(key).makes_on_its_site:
+            batch = [self._leaving_a_random_seed_to_the_site(params) for params in batch]
+        self.generate_requested.emit(key, batch)
         self._param_form.roll_random_seeds()
+
+    def _leaving_a_random_seed_to_the_site(self, params: dict) -> dict:
+        return {key: value for key, value in params.items()
+                if key not in self._param_form.random_seed_keys()}
 
     def _batch_of(self, how_many: int) -> list[dict]:
         batch = [self._param_form.values_as_left()]

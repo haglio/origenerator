@@ -87,6 +87,8 @@ def declaration() -> dict:
         "generated_fps_by_workflow": {name: workflow.native_fps
                                       for name, workflow in sorted(WORKFLOW_REGISTRY.items())
                                       if workflow.output_type == MediaType.VIDEO},
+        "item_type_by_workflow": {name: str(workflow.item_type)
+                                  for name, workflow in sorted(WORKFLOW_REGISTRY.items())},
         "downtime_command": list(DOWNTIME_COMMAND),
         "outside_video_entries_command": list(OUTSIDE_VIDEO_ENTRIES_COMMAND),
         "records_command": list(RECORDS_COMMAND),

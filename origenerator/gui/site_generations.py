@@ -37,7 +37,10 @@ _WHY = {
 
 
 def why_in_words(site: str, reason: str) -> str:
-    return f"{shown_name(site)} did not make the image: {_WHY.get(reason, reason)}."
+    name = shown_name(site)
+    if reason in _WHY:
+        return f"{name} did not make the image: {_WHY[reason]}."
+    return f"{name} did not make the image. {name} said: {reason}"
 
 
 class _NothingToMakeItWith:

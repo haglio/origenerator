@@ -395,7 +395,7 @@
         "web browser",
         "web-browser",
         "browser_and_enhance",
-        "Origenerator over the browser"
+        "Origenerator over the browser", "Browser.close", "--no-default-browser-check"
       ]
     },
     {

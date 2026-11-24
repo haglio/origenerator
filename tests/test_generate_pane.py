@@ -12,6 +12,7 @@ from shared_ui.testing import appending_to
 
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
+from origenerator.gallery import source_image
 from origenerator.gallery.keys import folder_id
 from origenerator.gallery.tree import settings_folder_key
 from origenerator.gui import generate_pane
@@ -563,6 +564,23 @@ def test_a_click_reads_the_table_no_more_than_the_tab_it_lands_in(tabs):
         tabs.load_selection(b, [a, b])
 
     assert reads.call_count == shown_alone
+
+
+def test_clicks_in_a_library_that_has_not_changed_index_its_images_once(tabs, monkeypatch):
+    params = _sdxl_full(positive_prompt="a wizard", seed=1)
+    a = _complete_gen(tabs._db, "a", params, "sdxl_a.png")
+    b = _complete_gen(tabs._db, "b", dict(params, seed=2), "sdxl_b.png")
+    tabs.currentWidget()._viewport.show_media = MagicMock()
+    tabs.load_selection(a, [a, b])
+    indexed = []
+    signature = source_image.settings_signature
+    monkeypatch.setattr(source_image, "settings_signature",
+                        lambda *args, **kwargs: indexed.append(args) or signature(*args, **kwargs))
+
+    for row in (b, a, b):
+        tabs.load_selection(row, [a, b])
+
+    assert indexed == []
 
 
 def _two_kept_generations(tabs, folder):

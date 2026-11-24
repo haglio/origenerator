@@ -4,6 +4,7 @@ from collections.abc import Callable
 from contextlib import nullcontext
 from dataclasses import dataclass, replace
 from functools import partial
+from html import escape
 from typing import NamedTuple
 
 import shiboken6
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.colors import YELLOW
 from shared_ui.flow_layout import FlowLayout
 from shared_ui.spacing import GAP_DIALOG, GAP_MEDIUM, MARGIN_DIALOG
 
@@ -53,6 +55,7 @@ from origenerator.gui.item_tile import (
     TileAppearance,
     restore_offer_of,
 )
+from origenerator.gui.link_tip import link
 from origenerator.gui.pane_place import (
     PanePlace,
     bring_into_view,
@@ -94,15 +97,21 @@ class GalleryPaneScrollArea(QScrollArea):
         super().mousePressEvent(event)
 
 
+CLEAR_SEARCH = "clear-search"
+
+
 def _search_empty_hint(outcome, query: str, scope: str) -> str:
     if outcome.unmatched:
-        missing = ", ".join(f"“{word}”" for word in outcome.unmatched)
-        return (f"Nothing in {scope} matches {missing}.\n\nEvery word has to be "
-                "found somewhere in a generation, so dropping that one — or "
-                "searching a wider folder — widens the search.")
-    return (f"No generation in {scope} matches all of “{query}”.\n\nEach of "
-            "those words is in there somewhere, but no single item has them "
-            "all — try fewer of them.")
+        missing = ", ".join(f"“{escape(word)}”" for word in outcome.unmatched)
+        found_nothing = f"Nothing in {escape(scope)} matches {missing}."
+        why = ("Every word has to be found somewhere in a generation, so dropping "
+               "that one — or searching a wider folder — widens the search.")
+    else:
+        found_nothing = f"No generation in {escape(scope)} matches all of “{escape(query)}”."
+        why = ("Each of those words is in there somewhere, but no single item has "
+               "them all — try fewer of them.")
+    return (f"<p>{found_nothing}</p><p>{link(CLEAR_SEARCH, 'Clear search', YELLOW)}</p>"
+            f"<p>{why}</p>")
 
 
 @looking_once
@@ -451,8 +460,12 @@ class GalleryPane(QObject):
     def show_search_results(self, tiles, terms: search.SearchTerms):
         self._reset_pane_state()
         if not tiles:
-            self.show_widget(self._empty_state(
-                _search_empty_hint(terms.outcome, terms.query, terms.scope)))
+            hint = self._empty_state(_search_empty_hint(terms.outcome, terms.query, terms.scope))
+            hint.setTextFormat(Qt.TextFormat.RichText)
+            hint.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
+            if terms.on_clear_search is not None:
+                hint.linkActivated.connect(lambda _href: terms.on_clear_search())
+            self.show_widget(hint)
             self._showing_search = True
             return
         drawn = list(tiles)[:SEARCH_DRAW_LIMIT]

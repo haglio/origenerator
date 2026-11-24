@@ -394,6 +394,7 @@ class SearchTerms:
     scope: str = ""
     collapsed: object = ()
     on_section_toggled: object = None
+    on_clear_search: object = None
 
 
 @dataclass(frozen=True)

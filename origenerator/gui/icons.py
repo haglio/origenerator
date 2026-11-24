@@ -317,6 +317,13 @@ def tab_close_icon() -> QIcon:
     return qt_icon("cross", size=_SIZE)
 
 
+def new_tab_icon() -> QIcon:
+    icon = QIcon()
+    icon.addPixmap(icon_pixmap("plus", _SIZE, TEXT_MUTED), QIcon.Mode.Normal)
+    icon.addPixmap(icon_pixmap("plus", _SIZE, TEXT_PRIMARY), QIcon.Mode.Active)
+    return icon
+
+
 @cache
 def toc_initial_icon(level: str) -> QIcon:
     icon = QIcon()

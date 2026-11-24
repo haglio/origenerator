@@ -329,6 +329,14 @@ def build_stylesheet() -> str:
         border-radius: 0;
         padding: 0;
     }}
+    QToolButton#newTabButton {{
+        background-color: {_h(BG_SECONDARY)};
+        border-style: solid;
+        border-color: transparent {_h(BORDER_SUBTLE)} transparent transparent;
+        border-width: 0 1px 2px 0;
+        border-radius: 0;
+        padding: 0 {GAP_MEDIUM}px;
+    }}
     /* A row in the Job Queue: flat, and lit while hovered or while it
        is the one being dragged, so a drag reads as something the Job Queue meant to
        offer rather than an accident. */

@@ -22,6 +22,7 @@ from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, GAP_SMALL
 from shared_ui.tick_control import TickControl
 
 from origenerator.gallery import describe_enhance_params, enhance_settings_fields, fix_details
+from origenerator.gallery.enhance_settings import LABELS_ON_THE_ENHANCE_PANE
 from origenerator.generation_metadata import UNDATED, Dating, MetadataItem, created_item, file_item
 from origenerator.gui import icons, palette
 from origenerator.gui.collapsible_section import CollapsibleSection
@@ -114,9 +115,8 @@ class EnhanceOffer(NamedTuple):
 
 
 def _fact_label_width() -> int:
-    labels = [label for label, _value in enhance_settings_fields(
-        {"enhance_scale": 1, "enhance_steps": 1, "enhance_denoise": 0, "checkpoint": "any"})]
-    return label_column_width([MetadataItem(label, "") for label in (*labels, _FIXES, *_FACTS_OF_A_FILE)])
+    return label_column_width([MetadataItem(label, "") for label in (
+        *LABELS_ON_THE_ENHANCE_PANE.values(), _FIXES, *_FACTS_OF_A_FILE)])
 
 
 def _named_fix(name: str) -> QLabel:
@@ -256,6 +256,7 @@ class _Row(QWidget):
         label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         label.setFixedHeight(drawn_last_first[0][0].sizeHint().height())
         beside_the_first = QWidget()
+        beside_the_first.setStyleSheet("background: transparent;")
         above = QVBoxLayout(beside_the_first)
         above.setContentsMargins(0, GAP_SMALL, 0, 0)
         above.addWidget(label)

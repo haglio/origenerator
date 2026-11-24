@@ -7,6 +7,7 @@ import pytest
 
 from origenerator.site_chrome import (
     PORT_FILE,
+    SAYS_SOMETHING_WITHIN_S,
     ChromeRefused,
     DevTools,
     SiteChrome,
@@ -32,7 +33,8 @@ class FakeConnection:
         except ChromeRefused as refused:
             self._waiting.append({"id": sent["id"], "error": {"message": str(refused)}})
 
-    def recv(self) -> str:
+    def recv(self, timeout: float | None = None) -> str:
+        self.waited = timeout
         return json.dumps(self._waiting.pop(0))
 
     def close(self) -> None:
@@ -46,6 +48,24 @@ def test_an_answer_is_the_one_to_what_was_asked_whatever_the_chrome_says_first()
     assert DevTools(connection).ask("Page.navigate", url="https://example.com/") == {
         "frameId": "made-up"}
     assert connection.asked == [("Page.navigate", {"url": "https://example.com/"})]
+
+
+def test_a_page_asking_whether_to_leave_it_is_told_yes_so_the_next_address_loads():
+    connection = FakeConnection(first=[{"method": "Page.javascriptDialogOpening",
+                                        "params": {"type": "beforeunload"}}])
+
+    DevTools(connection).ask("Page.navigate", url="https://example.com/")
+
+    assert connection.asked == [("Page.navigate", {"url": "https://example.com/"}),
+                                ("Page.handleJavaScriptDialog", {"accept": True})]
+
+
+def test_an_answer_is_waited_for_only_so_long_so_a_chrome_gone_quiet_cannot_hold_the_app():
+    connection = FakeConnection()
+
+    DevTools(connection).ask("Page.enable")
+
+    assert connection.waited == SAYS_SOMETHING_WITHIN_S
 
 
 def test_what_the_chrome_refuses_is_raised_with_what_was_asked():
@@ -88,7 +108,8 @@ def test_a_script_that_throws_on_the_page_is_raised():
 def test_a_page_is_told_to_act_as_the_window_in_front_so_typing_reaches_it():
     _the_page, connection = _page(lambda params: {})
 
-    assert connection.asked == [("Emulation.setFocusEmulationEnabled", {"enabled": True})]
+    assert connection.asked == [("Page.enable", {}),
+                                ("Emulation.setFocusEmulationEnabled", {"enabled": True})]
 
 
 class FakeStarted:

@@ -88,9 +88,12 @@ def item_words(item_type: str) -> tuple[str, str]:
     return genau_flick_words() if item_type is ItemType.FLICK else (item_type, f"{item_type}s")
 
 
+def with_its_article(named: str) -> str:
+    return f"{'an' if named[:1].lower() in 'aeiou' else 'a'} {named}"
+
+
 def an_item(item_type: str) -> str:
-    one = item_words(item_type)[0]
-    return f"{'an' if one[:1] in 'aeiou' else 'a'} {one}"
+    return with_its_article(item_words(item_type)[0])
 
 
 def non_ai_clip_heading() -> str:

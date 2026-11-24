@@ -390,17 +390,22 @@ internet; its cloud models and web search are off by his environment, not by
 this code, so no test and no agent turns them on.
 
 A Request to add a thing his prompts already have never reaches the model.
-`his_edits.the_way_he_adds` reads the edits he made by hand (a prompt of his
-that holds an earlier one and a few things more), takes the nearest ones that
-added the thing, and adds it in their words, with what nearly all of them
-brought and kept out beside it; only the times he first added the thing
-count. A thing many of his prompts have also brings the part holding a word
+`his_edits.the_way_he_adds` reads his latest prompts that have the thing,
+takes the one most like the prompt in hand whose wording of the thing is
+most like the others', and adds every part of it that names the thing, to
+the Positive prompt and to the Negative prompt alike (his expectation,
+2026-11-24: the thing as he usually writes it, with what he usually keeps
+out about it). A thing many of his prompts have also brings the part holding a word
 those prompts usually have and his other prompts seldom do, when the prompt
 lacks that word (asked to add a part of a man, a prompt with no man gains the
-man, his rule). It replaced statistics on what his prompts
-"usually" hold with a thing, and model questions asked after them, which added
-unrelated parts through four days of review (2026-11-23); nothing goes back to
-that. `python -m origenerator.request_measure [how many]` scores the answering
+man, his rule). A Request for none of a thing (no, without, remove) never
+reaches the model either: the parts naming it leave the Positive prompt, the
+thing goes in the Negative prompt, and nothing else changes, since the model
+answered one by rewriting a part he had not named. All of it replaced
+statistics on what his prompts "usually" hold with a thing, model questions
+asked after them, and a copy of only what his hand edits had added, which
+between them added unrelated parts or too little through five days of review
+(2026-11-24); nothing goes back to those. `python -m origenerator.request_measure [how many]` scores the answering
 against his own edits, each asked for as a Request with only his earlier
 prompts known, and writes scores alone to `state/request_measure.txt`. A
 change to how a Request is answered is measured there before it goes to him:

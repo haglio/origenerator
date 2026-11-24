@@ -443,6 +443,20 @@ def _leaving_open_what_he_did(answer: dict, request: str, ask_again) -> dict:
     return answer
 
 
+_ASKING_FOR_NONE_OF_IT = frozenset({"no", "without", "remove", "removing", "drop", "lose", "ditch"})
+
+
+def _keeping_out_what_he_names(request: str, positive: str) -> dict | None:
+    asking = next((word for word, *_ in _tokens(request) if word not in _FILLER), None)
+    parsed, each = parse_request(request), _each_thing_asked_for(request)
+    if asking not in _ASKING_FOR_NONE_OF_IT or parsed is None or len(each) != 1:
+        return None
+    naming_it = [part for part in things_of(positive).values()
+                 if _touches(each[0], part) == len(each[0])]
+    return {"changes": [*({"prompt": "positive", "remove": part, "for": request} for part in naming_it),
+                        {"prompt": "negative", "add": parsed[1], "for": request}]}
+
+
 def _the_way_he_adds_it(request: str, pair: tuple[str, str], his_prompts) -> dict | None:
     parsed, each = parse_request(request), _each_thing_asked_for(request)
     if parsed is None or parsed[0] != ADD or len(each) != 1:
@@ -463,7 +477,8 @@ def answer_to(positive: str, negative: str, request: str, known: WhatIsKnown, *,
     if part is not None:
         return {"changes": [{"more": part, "stronger": part, "opposite": "", "for": request}]}
     the_model = ask_the_model if llm is None else partial(ask_the_model, llm=llm)
-    return (_the_way_he_adds_it(request, (positive, negative), known.his_prompts)
+    return (_keeping_out_what_he_names(request, positive)
+            or _the_way_he_adds_it(request, (positive, negative), known.his_prompts)
             or the_model(positive, negative, request, known))
 
 

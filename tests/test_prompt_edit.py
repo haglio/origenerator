@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from functools import partial
 from urllib.error import HTTPError
 
 import pytest
@@ -608,7 +609,7 @@ def test_a_weight_the_model_writes_is_left_out_where_the_prompts_take_none():
 
 
 _HIS_HATS = (("a man on a pier, fog, gulls", "blurry"),
-             ("a man on a pier, a wide straw hat, frayed brim, fog, gulls", "blurry, bare head"))
+             ("a man on a pier, a wide straw hat, frayed hat brim, fog, gulls", "blurry, torn hat"))
 
 
 def test_a_thing_his_prompts_have_goes_in_the_way_he_added_it_and_the_model_is_not_asked():
@@ -619,20 +620,39 @@ def test_a_thing_his_prompts_have_goes_in_the_way_he_added_it_and_the_model_is_n
 
     assert asked == []
     assert answered["changes"] == [
-        {"prompt": "positive", "add": "a wide straw hat, frayed brim", "after": "a man on a pier",
+        {"prompt": "positive", "add": "a wide straw hat, frayed hat brim", "after": "a man on a pier",
          "for": "add a hat"},
-        {"prompt": "negative", "add": "bare head", "for": "add a hat"}]
+        {"prompt": "negative", "add": "torn hat", "for": "add a hat"}]
 
 
 def test_a_thing_added_his_way_stands_beside_what_it_stood_beside_in_his_prompts():
     revision = work_out("a man on a pier, fog, gulls, rain", "blurry", "add a hat",
                         his_prompts=_HIS_HATS)
 
-    assert revision.positive == "a man on a pier, a wide straw hat, frayed brim, fog, gulls, rain"
-    assert revision.negative == "blurry, bare head"
+    assert revision.positive == "a man on a pier, a wide straw hat, frayed hat brim, fog, gulls, rain"
+    assert revision.negative == "blurry, torn hat"
 
 
-@pytest.mark.parametrize("request_words", ["add a scarf", "no hat", "add a hat and a scarf"])
+def test_asked_for_no_thing_only_its_parts_leave_and_it_is_kept_out_and_the_model_is_not_asked():
+    ask, asked = _answers_in_turn()
+
+    revision = work_out("a man on a pier, a wide straw hat, curly hair, fog", "blurry", "No straw hat.",
+                        ask=partial(answer_to, llm=ask))
+
+    assert asked == []
+    assert (revision.positive, revision.negative) == ("a man on a pier, curly hair, fog",
+                                                      "blurry, straw hat")
+
+
+def test_asked_for_no_thing_the_prompt_lacks_it_is_only_kept_out():
+    ask, _asked = _answers_in_turn()
+
+    revision = work_out("a man on a pier, fog", "blurry", "no hat", ask=partial(answer_to, llm=ask))
+
+    assert (revision.positive, revision.negative) == ("a man on a pier, fog", "blurry, hat")
+
+
+@pytest.mark.parametrize("request_words", ["add a scarf", "less fog", "add a hat and a scarf"])
 def test_what_his_prompts_cannot_answer_is_asked_of_the_model(request_words):
     ask, asked = _answers_in_turn('{"changes": [], "why": "Nothing to do."}')
 

@@ -33,9 +33,13 @@ _LIT = _lit(as_hex(BLUE))
 _LIT_WHILE_THE_ROOM_IS_PAUSED = _lit(as_hex(YELLOW))
 
 GROUP_TIP = "Group the selected folders into a collection of your own"
+POPULATE_TIP = "Populate: repeatedly generate variations of this folder until toggled off"
+
+
 def populate_elsewhere_tip(folders: int) -> str:
     where = "another folder" if folders == 1 else f"{folders} other folders"
-    return f"Populate is running in {where}<br>{link('populate', 'Go to Populating')}"
+    return (f"{POPULATE_TIP}<br>Populate is running in {where} · "
+            f"{link('populate', 'Go to Populating')}")
 
 
 class Button(NamedTuple):
@@ -151,8 +155,7 @@ class GalleryPaneButtons(QWidget):
         self.slideshow.hide()
         self.populate = _lit_switch(
             icons.populate_icon(),
-            "Populate: repeatedly generate variations of this folder until "
-            "toggled off",
+            POPULATE_TIP,
             handlers.toggle_populate,
         )
         self.populate_tip = LinkTip(self.populate)

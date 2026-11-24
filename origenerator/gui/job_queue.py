@@ -210,15 +210,19 @@ class JobQueue(QObject):
         return source != GenerationSource.EXPERIMENT or not self._jobs.get(key)
 
     def start_prepared(self, key: str, workflow, params: dict, *,
-                       source: str = GenerationSource.GENERATED) -> str | None:
-        (prompt_id,) = self.start_batch(key, workflow, [params], source=source)
+                       source: str = GenerationSource.GENERATED,
+                       takes_turns: bool = False) -> str | None:
+        (prompt_id,) = self.start_batch(key, workflow, [params], source=source,
+                                        takes_turns=takes_turns)
         return prompt_id
 
     def start_batch(self, key: str, workflow, batch: list[dict], *,
-                    source: str = GenerationSource.GENERATED) -> list[str | None]:
+                    source: str = GenerationSource.GENERATED,
+                    takes_turns: bool = False) -> list[str | None]:
         if self._client is None or not self._launchable(key, source):
             return [None] * len(batch)
-        jobs = [self._new_job(key, JobPlan(workflow, params, source=source), self._on_finished)
+        jobs = [self._new_job(key, JobPlan(workflow, params, source=source,
+                                           takes_turns=takes_turns), self._on_finished)
                 for params in batch]
         lined_up = [job for job in jobs if job is not None]
         if lined_up:
@@ -229,13 +233,15 @@ class JobQueue(QObject):
         return [job.prompt_id if job is not None and self._key_of(job) == key else None
                 for job in jobs]
 
-    def start_reroll(self, key: str, group, image_rows: list[dict]):
+    def start_reroll(self, key: str, group, image_rows: list[dict], *, takes_turns: bool = False):
         if not isinstance(group, gallery.SettingsGroup) or not group.rows:
             return
-        self.reroll_every_seed(key, group.rows[0], image_rows)
+        self.reroll_every_seed(key, group.rows[0], image_rows, takes_turns=takes_turns)
 
-    def reroll_every_seed(self, key: str, row: dict, image_rows: list[dict]):
-        self._reroll_variation(key, row, image_rows, new_image=True, new_video=True)
+    def reroll_every_seed(self, key: str, row: dict, image_rows: list[dict], *,
+                          takes_turns: bool = False):
+        self._reroll_variation(key, row, image_rows, new_image=True, new_video=True,
+                               takes_turns=takes_turns)
 
     def reroll_video_seed(self, key: str, row: dict):
         self._reroll_variation(key, row, (), new_image=False, new_video=True)
@@ -248,7 +254,8 @@ class JobQueue(QObject):
             key, JobPlan(workflow := WORKFLOW_REGISTRY[row["workflow_name"]], filled_params(row, workflow)),
             self._on_finished)
 
-    def _reroll_variation(self, key, row, image_rows, *, new_image, new_video):
+    def _reroll_variation(self, key, row, image_rows, *, new_image, new_video,
+                          takes_turns: bool = False):
         if self._client is None or not self._launchable(key):
             return
         if not gallery.rerollable(row):
@@ -256,7 +263,7 @@ class JobQueue(QObject):
         workflow = WORKFLOW_REGISTRY[row["workflow_name"]]
         video_params = prepared_params(row, workflow) if new_video else filled_params(row, workflow)
         source = self._reroll_source_image(row, image_rows) if new_image else None
-        video_plan = JobPlan(workflow, video_params)
+        video_plan = JobPlan(workflow, video_params, takes_turns=takes_turns)
         if source is None:
             if not new_video:
                 return
@@ -264,7 +271,7 @@ class JobQueue(QObject):
         else:
             source_row, image_workflow = source
             plan = JobPlan(image_workflow, prepared_params(source_row, image_workflow),
-                           run_media_type=workflow.output_type)
+                           run_media_type=workflow.output_type, takes_turns=takes_turns)
             also_needs = (video_plan,)
 
             def on_finished(k, job, files, thumb, dur):
@@ -301,6 +308,7 @@ class JobQueue(QObject):
         job.origin = plan.origin or job.prompt_id
         job.run_media_type = plan.run_media_type or job.media_type
         job.shielded = plan.shielded
+        job.takes_turns = plan.takes_turns
         self._register(key, job, on_finished)
         start_image = self._enhanced_start_image_of(job)
         if start_image:
@@ -790,7 +798,7 @@ class JobQueue(QObject):
         self._launch(
             key,
             JobPlan(video_workflow, video_params, origin=image_job.origin,
-                    shielded=image_job.shielded),
+                    shielded=image_job.shielded, takes_turns=image_job.takes_turns),
             self._on_finished)
         self._pump()
 

@@ -120,6 +120,7 @@ from origenerator.gui.gallery_pane import (
 )
 from origenerator.gui.gallery_pane_buttons import (
     GROUP_TIP,
+    POPULATE_TIP,
     Button,
     ButtonHandlers,
     ButtonStates,
@@ -1463,9 +1464,11 @@ class GalleryView(QWidget):
         if settings is not None:
             workflow, params = settings
             self._jobs.start_prepared(key, workflow,
-                                      randomize_seeds(params, workflow.seed_keys()))
+                                      randomize_seeds(params, workflow.seed_keys()),
+                                      takes_turns=from_populate)
         else:
-            self._jobs.start_reroll(key, self.group_for_key(key), self.library.reading.image_rows)
+            self._jobs.start_reroll(key, self.group_for_key(key), self.library.reading.image_rows,
+                                    takes_turns=from_populate)
         self._claim_launch(key)
         if not from_populate:
             self._select_reroll(key)
@@ -1622,8 +1625,7 @@ class GalleryView(QWidget):
         if why_not is None and self._populate.active_keys():
             return Button(tip="", checked=False)
         return Button(enabled=why_not is None, checked=False,
-                      tip=why_not or ("Populate: repeatedly generate variations of this "
-                                      "folder until toggled off"))
+                      tip=why_not or POPULATE_TIP)
 
     def _in_populating(self) -> bool:
         collection = folder_collection(_base_of(self.selected_folder_key()))

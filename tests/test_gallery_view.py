@@ -125,6 +125,7 @@ from tests.real_db import database_of, keep_rows_on_disk, put_rows
 from tests.test_folder_tree import _shown
 
 _COLLECTION_NAMES = ["Latest", "Favorites", "Enhanced", "Populating", "Experiments", "Trash"]
+_A_FOLDERS_COLLECTIONS = [name for name in _COLLECTION_NAMES if name != "Populating"]
 
 
 _COLLECTIONS_FILLED_WITH_BOTH_KINDS = [name for name in _COLLECTION_NAMES
@@ -184,7 +185,7 @@ def test_every_folder_of_folders_leads_with_collections_of_its_own(qtbot):
     model, lora, source = (_at(workflow, *[0] * depth) for depth in (1, 2, 3))
 
     for folder in (_alls(view._tree)["Videos"], workflow, model, lora, source):
-        assert _collection_names(folder) == _COLLECTION_NAMES
+        assert _collection_names(folder) == _A_FOLDERS_COLLECTIONS
     assert _at(source, 0).childCount() == 0
 
 
@@ -381,7 +382,7 @@ def test_a_non_ai_folder_has_no_experiments_since_nothing_in_it_was_generated(qt
     view.refresh()
 
     assert _collection_names(_video_workflow(view._tree)) == [
-        name for name in _COLLECTION_NAMES if name not in ("Populating", "Experiments")]
+        name for name in _A_FOLDERS_COLLECTIONS if name != "Experiments"]
 
 
 def test_a_folder_of_folders_shows_its_collections_as_squares_before_its_folders(qtbot):
@@ -392,7 +393,7 @@ def test_a_folder_of_folders_shows_its_collections_as_squares_before_its_folders
 
     view._tree.setCurrentItem(lora)
 
-    assert _square_names(view) == [*_COLLECTION_NAMES, *(row.text(0) for row in _subs(lora))]
+    assert _square_names(view) == [*_A_FOLDERS_COLLECTIONS, *(row.text(0) for row in _subs(lora))]
 
 
 def test_clicking_a_collection_square_opens_that_folders_collection(qtbot):
@@ -548,7 +549,7 @@ def test_images_shows_its_collections_then_its_workflow_folders_as_squares(qtbot
 
     view._tree.setCurrentItem(_alls(view._tree)["Images"])
 
-    assert _square_names(view) == [*_COLLECTION_NAMES, "T2I SDXL"]
+    assert _square_names(view) == [*_A_FOLDERS_COLLECTIONS, "T2I SDXL"]
 
 
 def test_a_folder_with_folders_inside_offers_no_favorite_on_its_menu(qtbot, monkeypatch):

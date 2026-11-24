@@ -28,6 +28,14 @@ def test_an_image_joins_the_front():
         "an image is seconds of the graphics card, and usually the thing being waited for")
 
 
+def test_an_image_populate_made_joins_the_back_so_folders_populating_take_turns():
+    populates = SimpleNamespace(**vars(_image()), takes_turns=True)
+
+    assert queue_line.insertion_index([_image(), _video()], populates) == 2, (
+        "a folder whose image went first would otherwise go first again every time, and the "
+        "other folders populating would never get a turn")
+
+
 def test_a_video_joins_the_back():
     line = [_image(), _video()]
     assert queue_line.insertion_index(line, _video()) == 2, (

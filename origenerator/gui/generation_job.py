@@ -34,6 +34,7 @@ class JobPlan:
     origin: str | None = None
     run_media_type: str | None = None
     shielded: bool = False
+    takes_turns: bool = False
 
 
 class JobState(StrEnum):
@@ -99,6 +100,7 @@ class GenerationJob(QObject):
         self.origin = self.prompt_id
         self.run_media_type = self.media_type
         self.shielded = False
+        self.takes_turns = False
         self._thumb_dir = folders.thumb_dir
         self._state = JobState.IDLE
         self._stages = stage_names(self.payload)

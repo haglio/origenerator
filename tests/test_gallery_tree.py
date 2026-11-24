@@ -187,6 +187,7 @@ def _children(item):
 
 
 _COLLECTIONS = ["Latest", "Favorites", "Enhanced", "Populating", "Experiments", "Trash"]
+_A_FOLDERS_COLLECTIONS = [name for name in _COLLECTIONS if name != "Populating"]
 
 
 def _leads_with(folder, collections) -> bool:
@@ -207,11 +208,13 @@ def test_images_and_videos_each_lead_with_the_collections_then_their_workflows(q
     half = _table_of_contents(qtbot, [_video("v1", "style_a"), _image("i1", "a cat")])
     (all_row,) = [half.topLevelItem(i) for i in range(half.topLevelItemCount())]
     images, videos = _children(all_row)[len(_COLLECTIONS):]
+    assert "Populating" in [row.text(0) for row in _children(all_row)], (
+        "one Populating, at the very top, holds every folder's populating items")
 
     for kind in (images, videos):
-        assert _leads_with(kind, _COLLECTIONS)
+        assert _leads_with(kind, _A_FOLDERS_COLLECTIONS)
         assert [isinstance(row.data(0, GROUP_ROLE), gallery.WorkflowGroup)
-                for row in _children(kind)[len(_COLLECTIONS):]] == [True]
+                for row in _children(kind)[len(_A_FOLDERS_COLLECTIONS):]] == [True]
 
 
 def test_enhanced_wears_the_plus_an_enhanced_image_wears_and_says_what_it_holds(qtbot):

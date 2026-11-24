@@ -15,6 +15,7 @@ from origenerator.gallery.collection import (
     POPULATING_LABEL,
 )
 from origenerator.gallery.shapes import LANDSCAPE
+from origenerator.gui.gallery_pane_buttons import POPULATE_TIP
 from origenerator.gui.gallery_tree import TREE_KEY_ROLE
 from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.slideshow_director import _plays_newest_first
@@ -189,6 +190,18 @@ def test_with_populate_running_elsewhere_the_switchs_tip_takes_you_to_populating
 
     view._buttons.populate_tip.link_activated.emit("populate")
 
-    assert (told[0], "Populate is running in another folder" in told[1]) == ("", True)
+    assert (told[0], told[1].startswith(POPULATE_TIP),
+            "Populate is running in another folder" in told[1]) == ("", True, True), (
+        "the tip still says what a press does here, then where else Populate is running")
     assert view.selected_folder_key() == view.toc.collection_item(
         POPULATING_KEY, view.toc.shape_in_view()).data(0, TREE_KEY_ROLE)
+
+
+
+def test_every_job_populate_starts_takes_its_turn(qtbot, tmp_path):
+    view, first, _second = _two_folders(qtbot, tmp_path)
+    _populate_in(view, first)
+    started = view._live_jobs[first]
+    _finish_reroll(view, started)
+
+    assert (started.takes_turns, view._live_jobs[first].takes_turns) == (True, True)

@@ -64,8 +64,10 @@ def _inside(group, inside: tuple) -> tuple:
 
 def _shown_collections(shape, group) -> list:
     nothing_generated = folder_kind(getattr(group, "workflow_name", None)) == "non_ai"
+    at_the_top = getattr(group, "key", None) == gallery.ALL_KEY
     return [shown for shown in all_collections() if shown.shown_in(shape)
-            and not (shown.of_what_was_generated and nothing_generated)]
+            and not (shown.of_what_was_generated and nothing_generated)
+            and (at_the_top or not shown.at_the_top_only)]
 
 
 @dataclass

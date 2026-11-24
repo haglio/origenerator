@@ -53,6 +53,7 @@ class Collection:
     slideshow_filter: str | None = None
     of_what_was_generated: bool = False
     newest_first: bool = False
+    at_the_top_only: bool = False
 
 
 ALL_COLLECTIONS: tuple[Collection, ...] = (
@@ -85,7 +86,7 @@ ALL_COLLECTIONS: tuple[Collection, ...] = (
         shown_in=lambda shape: bool(shape.tree_model), counted=False,
         empty=("Nothing is populating.\n\nTurn on Populate in a leaf folder to see what it "
                "makes here."),
-        of_what_was_generated=True, newest_first=True),
+        of_what_was_generated=True, newest_first=True, at_the_top_only=True),
     Collection(
         EXPERIMENTS_KEY, EXPERIMENTS_LABEL, "Background experiments awaiting your review",
         Glyph("flask"), rows=lambda library: library.experiment_rows,

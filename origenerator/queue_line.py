@@ -17,7 +17,7 @@ def _users_own(job) -> bool:
 
 
 def takes_the_front(job) -> bool:
-    return not is_video(job) and _users_own(job)
+    return not is_video(job) and _users_own(job) and not getattr(job, "takes_turns", False)
 
 
 def insertion_index(line: list, job) -> int:

@@ -53,7 +53,6 @@ from tests.gallery_view_support import (
     _SDXL,
     _VID_REROLL_HISTORY,
     _WAN_I2V,
-    _alls,
     _answer_confirmation,
     _answer_menu,
     _at,
@@ -1424,12 +1423,11 @@ def test_inflight_tile_frame_updates_in_place_without_a_rerender(qtbot):
     assert not tile._image.pixmap().isNull()
 
 
-def test_latest_collection_appears_for_a_running_generation(qtbot):
+def test_all_shows_a_running_generation_as_an_inflight_tile(qtbot):
     view = GalleryView(database_of([_running_row("gen1")]))
     qtbot.addWidget(view)
     view.refresh()
 
-    assert "All" in _alls(view._tree)
     _open_all_items(view)
     assert "gen1" in view._gallery_pane._inflight_tiles
 
@@ -1899,7 +1897,7 @@ def test_reroll_inflight_tile_persists_across_navigation_and_polls(qtbot, tmp_pa
     gv._start_reroll(folder_key)
     rr_pid = gv._live_jobs[folder_key].prompt_id
 
-    gv._tree.setCurrentItem(_collection(gv, ALL_ITEMS_KEY))
+    _open_all_items(gv)
     assert rr_pid in gv._gallery_pane._inflight_tiles
 
     gv._tree.setCurrentItem(gv.toc.item_for(folder_key))

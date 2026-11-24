@@ -120,7 +120,7 @@ def _pane_host(lead_tiles=lambda group: LeadTiles(), selected=None,
         lead_tiles=lead_tiles,
         item_name=lambda prompt_id: f"item {prompt_id}",
         tree=TreeNavigation(
-            selected_folder_key=lambda: selected,
+            listed_key=lambda: selected,
             folder_context=folder_context,
             group_for_key=lambda key: None,
         ),
@@ -423,6 +423,11 @@ def test_a_video_tile_says_how_long_its_video_runs(qtbot, db, opened):
     assert [length.text() for length in _drawn(scroll, VideoLength)] == ["0:07"]
 
 
+def _show_folders(pane, groups, collections=()):
+    pane.show_collection(ALL_ITEMS_KEY, LANDSCAPE,
+                         under=(groups, list(collections)))
+
+
 def test_a_folder_of_folders_draws_a_page_of_them_at_a_time(qtbot, db):
     folders = [gallery.SettingsGroup(key=f"k{n}", label=f"scene {n}", rows=[_row(f"g{n}", n)])
                for n in range(60)]
@@ -431,7 +436,7 @@ def test_a_folder_of_folders_draws_a_page_of_them_at_a_time(qtbot, db):
     scroll.setWidgetResizable(True)
     scroll.resize(900, 400)
 
-    pane.show_folder_tiles(folders)
+    _show_folders(pane, folders)
 
     assert len(_drawn(scroll, FolderTile)) <= _filling(scroll) + gallery_pane._TILES_A_TURN
     assert _drawn_to(scroll) >= scroll.viewport().height()
@@ -595,7 +600,7 @@ def test_revealing_a_folder_past_the_first_page_draws_its_square(qtbot, db):
     folders = [gallery.SettingsGroup(key=f"k{n}", label=f"scene {n}", rows=[_row(f"g{n}", n)])
                for n in range(60)]
     pane, scroll = _pane(qtbot, db)
-    pane.show_folder_tiles(folders)
+    _show_folders(pane, folders)
 
     assert pane.reveal_folder("k59")
     assert [tile.key for tile in _drawn(scroll, FolderTile) if tile._selected] == ["k59"]
@@ -776,7 +781,7 @@ def test_a_folder_of_folders_lists_them_oldest_first_by_the_newest_item_in_each(
     pane, _scroll = _pane(qtbot, db, [*older.rows, *newer.rows],
                           host=_pane_host(sort=sort_order.OLDEST))
 
-    pane.show_folder_tiles([newer, older])
+    _show_folders(pane, [newer, older])
 
     assert pane._listed_folders == ["k1", "k2"]
 
@@ -796,7 +801,7 @@ def test_latest_redraws_its_tiles_when_the_line_changes_order(qtbot, db):
 
 def test_a_pane_with_no_live_tiles_off_latest_asks_the_database_nothing(qtbot, db):
     pane, _scroll = _pane(qtbot, db, [_waiting("j1", 1)])
-    pane.show_folder_tiles([])
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=[_row("g1", 1)]))
     asked = []
     pane._db.list_generations = lambda: asked.append("rows") or []
     pane._db.list_requests = lambda: asked.append("requests") or []
@@ -1278,27 +1283,29 @@ def test_a_collection_square_wears_the_mark_its_row_wears(qtbot, db):
     pane, scroll = _pane(qtbot, db, rows)
     pane.set_model(LibrarySnapshot(rows))
 
-    pane.show_folder_tiles([], collections=[shaped_key(TRASH_KEY, LANDSCAPE)])
+    _show_folders(pane, [], [shaped_key(TRASH_KEY, LANDSCAPE)])
 
     (tile,) = scroll.widget().findChildren(FolderTile)
     assert [label for label in tile.findChildren(QLabel)
             if label.toolTip() == "Trash" and not label.pixmap().isNull()]
 
 
-def test_a_folders_collection_squares_stand_apart_from_its_folders_behind_a_heading_line(qtbot, db):
+def test_a_folders_items_come_first_then_its_collections_then_its_folders_each_behind_a_line(
+        qtbot, db):
     rows = [_made_with("a1", "alpha.safetensors")]
     tree = gallery.build_gallery_tree(rows)
     pane, scroll = _pane(qtbot, db, rows)
     pane.set_model(LibrarySnapshot(rows))
 
-    pane.show_folder_tiles(tree, collections=[shaped_key(ALL_ITEMS_KEY, LANDSCAPE),
-                                              shaped_key(TRASH_KEY, LANDSCAPE)])
+    _show_folders(pane, tree, [shaped_key(TRASH_KEY, LANDSCAPE)])
 
     layout = scroll.widget().layout()
     shown = [layout.itemAt(index).widget() for index in range(layout.count())]
-    assert [widget.objectName() for widget in shown] == [
-        "folderTile", "folderTile", "tileGroupHeading", "folderTile"]
-    assert not shown[2].text().strip()
+    after_the_item = [widget.objectName()
+                      for widget in shown[[w.objectName() for w in shown].index("tileGroupHeading", 1):]]
+    assert after_the_item == ["tileGroupHeading", "folderTile", "tileGroupHeading", "folderTile"]
+    assert [pane.listed_prompt_ids(), [not w.text().strip() for w in shown
+            if w.objectName() == "tileGroupHeading"]] == [["a1"], [True, True]]
 
 
 def test_a_slideshow_closing_with_the_app_marks_no_folder_square_in_an_empty_pane(qtbot, db):

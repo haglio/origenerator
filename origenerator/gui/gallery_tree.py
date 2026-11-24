@@ -9,8 +9,10 @@ from PySide6.QtWidgets import QTreeWidgetItem
 
 from origenerator import gallery
 from origenerator.gallery.collection import (
+    ALL_ITEMS_KEY,
     FolderCollection,
     all_collections,
+    folder_collection,
 )
 from origenerator.gallery.shapes import LANDSCAPE, SHAPE_LABELS, shape_holding
 from origenerator.gui import folder_icons, icons
@@ -62,6 +64,15 @@ def _inside(group, inside: tuple) -> tuple:
     return (*inside, group.key) if inside else ()
 
 
+def _holds_folders(group) -> bool:
+    return group is not None and not isinstance(
+        group, (gallery.SettingsGroup, gallery.CustomCollection))
+
+
+def _rebased(key: str, base: str) -> str:
+    return base + key[len(base_of(key)):]
+
+
 def _shown_collections(shape, group) -> list:
     nothing_generated = folder_kind(getattr(group, "workflow_name", None)) == "non_ai"
     at_the_top = getattr(group, "key", None) == gallery.ALL_KEY
@@ -84,7 +95,6 @@ class ShapeModel:
     shape: str
     tree_model: list
     custom_collections: list = field(default_factory=list)
-    show_latest: bool = False
     collection_counts: dict[str, int] = field(default_factory=dict)
 
 
@@ -362,7 +372,10 @@ class GalleryTree:
             item.emitDataChanged()
 
     def collection_item(self, collection_key: str, shape: str) -> QTreeWidgetItem | None:
-        return self.item_by_key.get(shaped_key(collection_key, shape))
+        key = shaped_key(collection_key, shape)
+        if folder_collection(collection_key).which == ALL_ITEMS_KEY:
+            return self.item_for(key)
+        return self.item_by_key.get(key)
 
     def set_collection_counts(self, shape: str, counts: dict[str, int]) -> None:
         blocked = self._tree.blockSignals(True)
@@ -415,6 +428,12 @@ class GalleryTree:
         item = self._tree.currentItem()
         return item.data(0, TREE_KEY_ROLE) if item is not None else None
 
+    def listed_key(self) -> str | None:
+        key = self.selected_folder_key()
+        if not _holds_folders(self._tree.currentItem().data(0, GROUP_ROLE) if key else None):
+            return key
+        return _rebased(key, FolderCollection(ALL_ITEMS_KEY, base_of(key)).key)
+
     def shape_in_view(self) -> str:
         return (shape_of(self.selected_folder_key())
                 or shape_holding(LANDSCAPE, self._tree.shapes))
@@ -424,6 +443,9 @@ class GalleryTree:
         if item is not None:
             return item
         folder = base_of(key)
+        every_item = folder_collection(folder)
+        if every_item is not None and every_item.which == ALL_ITEMS_KEY:
+            return self.item_for(_rebased(key, every_item.folder))
         drawn = self.keys_for_folder(folder)
         if shape_of(key) in self._tree.shapes:
             return next((self.item_by_key[row] for row in drawn

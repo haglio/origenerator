@@ -37,7 +37,6 @@ from origenerator.prompt_edit import work_out
 from tests.gallery_view_support import (
     _REROLL_HISTORY,
     _SDXL,
-    _alls,
     _completed_image,
     _every_job_is_with_comfyui,
     _finish_reroll,
@@ -61,6 +60,7 @@ from tests.gallery_view_support import (
     _selected_folder,
     _struck_and_lit,
     _tile_kinds_in_order,
+    _top_level,
     held_off_the_window_thread,
     land,
 )
@@ -2018,7 +2018,7 @@ def _a_portrait_launch_while_landscape_is_browsed(qtbot, tmp_path):
     view = GalleryView(db, client=_reroll_client())
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     params = dict(_SDXL.default_params(), positive_prompt="a tall one", width=720, height=1280)
     key = view.library.folder_key_for("sdxl_t2i", params)
     view._jobs.start_prepared(key, _SDXL, params)

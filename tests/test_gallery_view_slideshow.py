@@ -28,11 +28,10 @@ from origenerator.gallery.collection import (
 )
 from origenerator.gallery.shapes import LANDSCAPE
 from origenerator.gui import slideshow_director, two_screens
-from origenerator.gui.folder_tile import FolderTile
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.osr2_controls import Osr2Controls
 from origenerator.gui.slideshow_hud import HudPlacement, slideshow_hud_model
-from origenerator.item_shape import key_holds, shaped_key
+from origenerator.item_shape import shaped_key
 from origenerator.slideshow import LIVE
 from origenerator.voice.app_commands import AppCommand
 from origenerator.workflows.non_ai import non_ai_workflow
@@ -47,7 +46,6 @@ from tests.gallery_view_support import (
     _at,
     _children_by_prompt,
     _collection,
-    _collection_row,
     _double_click_slideshow,
     _drawn,
     _enhanceable_db,
@@ -397,7 +395,7 @@ def test_a_double_click_on_a_non_ai_video_starts_a_slideshow_on_it(qtbot, monkey
     slideshow = view.slideshows.showing
     funestra_of(slideshow.shown)
 
-    assert _playing(slideshow) == ["n1"]
+    assert slideshow._set.playlist.current()[2] == "n1"
     slideshow.close()
 
 
@@ -560,7 +558,7 @@ def test_a_slideshow_of_one_kinds_latest_plays_that_kind_alone(qtbot, monkeypatc
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _i2v_video("v1", "styleA")]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Images"], "All"))
+    view._tree.setCurrentItem(_alls(view._tree)["Images"])
 
     view.slideshows.start()
 
@@ -893,7 +891,7 @@ def test_a_slideshow_ended_on_a_locked_slide_picks_that_slide_where_it_played(qt
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     view.slideshows.start()
     slideshow = view.slideshows.showing
     held = slideshow._set.playlist.current()[2]
@@ -913,14 +911,14 @@ def test_a_slideshow_ended_on_an_unlocked_slide_picks_that_slide_where_it_played
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     view.slideshows.start()
     slideshow = view.slideshows.showing
     shown = slideshow._set.playlist.current()[2]
 
     slideshow.close()
 
-    assert view._tree.currentItem() is _alls(view._tree)["All"]
+    assert view._tree.currentItem() is _top_level(view._tree)["All"]
     assert view._gallery_pane.selected_ids == {shown}
 
 
@@ -938,7 +936,7 @@ def test_a_slide_pages_down_latest_is_drawn_and_picked_on_leaving(qtbot, monkeyp
     view = GalleryView(database_of([_image(f"i{n}", f"scene {n}", 50, n)
                                for n in reversed(range(120))]))
     _on_screen(qtbot, view, 1800, 1300)
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     view.slideshows.start()
     slideshow = view.slideshows.showing
     funestra_of(slideshow.shown)
@@ -955,21 +953,7 @@ def test_a_slide_pages_down_latest_is_drawn_and_picked_on_leaving(qtbot, monkeyp
     assert _in_view(view, shown)
 
 
-def _folder_squares(view):
-    return view._scroll.widget().findChildren(FolderTile)
-
-
-def _folder_square_holding(view, prompt_id: str) -> str:
-    folder = gallery.settings_folder_key(view._db.get_generation(prompt_id),
-                                         view.library.reading.image_index)
-    for tile in _folder_squares(view):
-        if key_holds(tile.key, folder):
-            return tile.key
-    raise AssertionError(f"no drawn square holds {prompt_id} ({folder})")
-
-
-def test_leaving_a_slideshow_of_all_picks_the_folder_square_its_slide_came_from(qtbot,
-                                                                          monkeypatch):
+def test_leaving_a_slideshow_of_all_picks_the_tile_of_the_item_it_ended_on(qtbot, monkeypatch):
     keep_rows_on_disk(monkeypatch)
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]))
     qtbot.addWidget(view)
@@ -983,9 +967,7 @@ def test_leaving_a_slideshow_of_all_picks_the_folder_square_its_slide_came_from(
     slideshow.close()
 
     assert view._tree.currentItem() is all_row
-    assert view._gallery_pane.selected_ids == set()
-    picked = [tile.key for tile in _folder_squares(view) if tile._selected]
-    assert picked == [_folder_square_holding(view, shown)]
+    assert view._gallery_pane.selected_ids == {shown}
 
 
 def test_the_image_a_locked_slideshow_ends_on_stays_picked_and_in_view_as_the_library_moves(
@@ -1394,7 +1376,7 @@ def test_a_run_being_made_joins_a_latest_slideshow_too(qtbot, monkeypatch):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     view.slideshows.start()
 
     view._on_reroll_preview("some-key", "i2", b"a-frame")
@@ -1411,7 +1393,7 @@ def test_an_enhancement_being_made_is_nobody_slide(qtbot, monkeypatch):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     view.slideshows.start()
 
     view._on_reroll_preview("some-key", "e1", b"a-frame")

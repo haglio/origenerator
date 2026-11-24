@@ -42,7 +42,6 @@ from origenerator.db import Database, NewGeneration
 from origenerator.gallery import output as gallery_output
 from origenerator.gallery import tree as gallery_tree_module
 from origenerator.gallery.collection import (
-    ALL_ITEMS_KEY,
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
@@ -55,7 +54,6 @@ from origenerator.gallery_edits import GalleryEdits
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import (
     corner_buttons,
-    folder_icons,
     icons,
     off_thread,
 )
@@ -127,12 +125,12 @@ from tests.qt_exec import faking_exec
 from tests.real_db import database_of, keep_rows_on_disk, put_rows
 from tests.test_folder_tree import _shown
 
-_COLLECTION_NAMES = ["All", "Favorites", "Enhanced", "Populating", "Experiments", "Trash"]
+_COLLECTION_NAMES = ["Favorites", "Enhanced", "Populating", "Experiments", "Trash"]
 _A_FOLDERS_COLLECTIONS = [name for name in _COLLECTION_NAMES if name != "Populating"]
 
 
-_COLLECTIONS_FILLED_WITH_BOTH_KINDS = [name for name in _COLLECTION_NAMES
-                                      if name not in ("Enhanced", "Populating")]
+_COLLECTIONS_FILLED_WITH_BOTH_KINDS = ["All", *(name for name in _COLLECTION_NAMES
+                                               if name not in ("Enhanced", "Populating"))]
 
 
 def _collection_names(item):
@@ -323,6 +321,16 @@ def test_selecting_a_folder_shows_its_full_name_as_a_title(qtbot):
     assert "All" in view._folder_path.display_text()
 
 
+def _all_drawn(view) -> None:
+    wait_until(lambda: not view._gallery_pane._pages.more(), pump=lambda: _scroll_to_the_end(view))
+
+
+def _folder_tile(view, key) -> FolderTile:
+    _all_drawn(view)
+    (tile,) = [tile for tile in view._scroll.widget().findChildren(FolderTile) if tile.key == key]
+    return tile
+
+
 def test_a_folder_of_images_wears_the_photo_mark_on_its_square_as_on_its_row(qtbot):
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
@@ -331,27 +339,11 @@ def test_a_folder_of_images_wears_the_photo_mark_on_its_square_as_on_its_row(qtb
 
     view._tree.setCurrentItem(lora)
 
-    (square,) = [tile for tile in view._scroll.widget().findChildren(FolderTile)
-                 if tile.key == _key(_at(lora, 0))]
+    square = _folder_tile(view, _key(_at(lora, 0)))
     assert any(label.toolTip() == "Images" for label in square.findChildren(QLabel))
 
 
-def test_the_latest_square_wears_the_calendar_its_row_wears(qtbot):
-    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
-    qtbot.addWidget(view)
-    view.refresh()
-
-    view._tree.setCurrentItem(_top_level(view._tree)["All"])
-
-    (square,) = [tile for tile in view._scroll.widget().findChildren(FolderTile)
-                 if tile._text == "All"]
-    (mark,) = [label for label in square.findChildren(QLabel)
-               if label.toolTip() == "All" and not label.pixmap().isNull()]
-    size = mark.pixmap().size()
-    assert mark.pixmap().toImage() == folder_icons.collection_icon(ALL_ITEMS_KEY).pixmap(size).toImage()
-
-
-def test_branch_shows_folder_tiles_and_leaf_shows_thumbnails(qtbot):
+def test_a_folder_of_folders_lists_every_item_in_it_and_its_folders_and_a_leaf_its_own(qtbot):
     rows = [
         _image("i1", "a cat", 50, 1),
         _image("i2", "a cat", 50, 2),
@@ -364,7 +356,7 @@ def test_branch_shows_folder_tiles_and_leaf_shows_thumbnails(qtbot):
     lora = _at(_image_workflow(view._tree), 0, 0)
     view._tree.setCurrentItem(lora)
     assert len(view._gallery_pane._listed_folders) == 2
-    assert view.listed_prompt_ids() == []
+    assert set(view.listed_prompt_ids()) == {"i1", "i2", "i3"}
 
     cat_leaf = _at(lora, 0)
     view._tree.setCurrentItem(cat_leaf)
@@ -373,6 +365,7 @@ def test_branch_shows_folder_tiles_and_leaf_shows_thumbnails(qtbot):
 
 
 def _square_names(view):
+    _all_drawn(view)
     return [tile._text for tile in view._scroll.widget().findChildren(FolderTile)]
 
 
@@ -967,14 +960,14 @@ def test_favorite_collection_is_pinned_first_and_collects_favorite_folders(qtbot
     dog_key = _key(_at(lora, 1))
     view.toc_editing.toggle_favorite(dog_key)
 
-    assert list(_alls(view._tree))[:2] == ["All", "Favorites"]
+    assert list(_alls(view._tree))[:1] == ["Favorites"]
     collection = _alls(view._tree)["Favorites"]
     view._tree.setCurrentItem(collection)
     assert view._gallery_pane._listed_folders == [dog_key]
     assert view.listed_prompt_ids() == ["i2"]
 
 
-def test_favorites_leads_with_its_count_and_latest_leaves_its_count_to_all(qtbot):
+def test_favorites_leads_with_its_count_and_all_counts_everything(qtbot):
     db = database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
                  _image("i3", "a dog", 50, 1)])
     db.set_generation_favorite("i1", True)
@@ -990,7 +983,6 @@ def test_favorites_leads_with_its_count_and_latest_leaves_its_count_to_all(qtbot
     assert _shown(alls["Favorites"]) == "(2) Favorites", (
         "the favorited item is in the favorited folder, and is counted once")
     assert _shown(_top_level(view._tree)["All"]) == "(3) All"
-    assert _shown(alls["All"]) == "All"
 
 
 def test_experiments_collection_is_always_reachable(qtbot):
@@ -1319,42 +1311,41 @@ def test_favorite_collection_is_absent_until_a_folder_exists(qtbot):
     assert "Favorites" not in alls
 
 
-def test_a_folders_latest_lists_what_that_folder_made_under_its_path(qtbot):
+def test_a_folder_of_folders_lists_what_it_made_under_its_own_path(qtbot):
     rows = [_image("i2", "a dog", 50, 2), _i2v_video("v1", "styleA"), _image("i1", "a cat", 50, 1)]
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
     workflow = _image_workflow(view._tree)
 
-    view._tree.setCurrentItem(workflow.child(0))
+    view._tree.setCurrentItem(workflow)
 
     assert view.listed_prompt_ids() == ["i2", "i1"]
     assert view._folder_path.display_text() == (
-        f"{SHAPE_LABELS[LANDSCAPE]}  \u203a  All  \u203a  Images  \u203a  {workflow.text(0)}  \u203a  All")
+        f"{SHAPE_LABELS[LANDSCAPE]}  \u203a  All  \u203a  Images  \u203a  {workflow.text(0)}")
 
 
-def test_a_folders_collection_names_itself_by_its_path_to_the_slideshow_button(qtbot):
+def test_a_folder_of_folders_names_itself_by_its_path_to_the_slideshow_button(qtbot):
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
     workflow = _image_workflow(view._tree)
 
-    view._tree.setCurrentItem(workflow.child(0))
+    view._tree.setCurrentItem(workflow)
 
     assert view.slideshow_subject() == (
-        f"{SHAPE_LABELS[LANDSCAPE]}  \u203a  All  \u203a  Images  \u203a  {workflow.text(0)}  \u203a  All")
+        f"{SHAPE_LABELS[LANDSCAPE]}  \u203a  All  \u203a  Images  \u203a  {workflow.text(0)}")
 
 
-def test_latest_collection_is_pinned_first_and_lists_recent_items(qtbot):
+def test_all_lists_every_item_latest_first_and_then_its_folders(qtbot):
     rows = [_image("i2", "a dog", 50, 2), _image("i1", "a cat", 50, 1)]
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
 
-    assert next(iter(_alls(view._tree))) == "All"
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     assert view.listed_prompt_ids() == ["i2", "i1"]
-    assert view._gallery_pane._listed_folders == []
+    assert view._gallery_pane._listed_folders == ["image"]
 
 
 def test_latest_collection_lists_imported_files_too(qtbot):
@@ -1364,7 +1355,7 @@ def test_latest_collection_lists_imported_files_too(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     assert sorted(view.listed_prompt_ids()) == ["gen", "imp"], (
         "a file ComfyUI wrote on its own arrives at the launch that finds it, and Latest is "
         "where it is looked for then")
@@ -1376,7 +1367,7 @@ def test_clicking_a_recent_item_previews_it_without_leaving_the_collection(qtbot
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     _pick_by_clicking(view, "i2")
     assert view.selected_generation() == "i2"
     assert view._gallery_pane.showing_all_items()
@@ -1389,7 +1380,7 @@ def test_double_clicking_a_recent_item_opens_it_selected_in_its_folder(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     view._gallery_pane._thumb_widgets["i2"].double_clicked.emit("i2")
     assert view.selected_generation() == "i2"
     assert view._gallery_pane.showing_all_items() is False
@@ -1403,7 +1394,7 @@ def test_double_clicking_a_recent_item_also_keeps_its_tab(qtbot):
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     _pick_by_clicking(view, "i2")
     assert view.generate_pane._preview_tab is not None
 
@@ -1418,7 +1409,7 @@ def test_latest_collection_shows_empty_state_when_nothing_has_a_result(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     assert view.listed_prompt_ids() == []
 
 
@@ -1426,7 +1417,7 @@ def test_latest_collection_stays_selected_across_a_refresh(qtbot):
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
 
     view.refresh()
 
@@ -1442,7 +1433,7 @@ def test_latest_opens_on_one_page_however_far_back_it_goes(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     assert 0 < len(_drawn(view)) < 120
     assert _drawn(view)[0] == "i119"
 
@@ -1456,7 +1447,7 @@ def _scroll_to_the_end(view):
 def test_scrolling_to_the_end_of_latest_draws_the_next_page(qtbot):
     view = GalleryView(database_of(_many_latest(120)))
     _on_screen(qtbot, view, 1800, 1300)
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     opened_on = len(_drawn(view))
     assert opened_on < 120
 
@@ -1469,7 +1460,7 @@ def test_a_rebuild_keeps_the_pages_latest_had_been_scrolled_into(qtbot):
     db = database_of(_many_latest(120))
     view = GalleryView(db)
     _on_screen(qtbot, view, 1800, 1300)
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     _scroll_to_the_end(view)
     scrolled_into = _drawn(view)
 
@@ -1484,7 +1475,7 @@ def test_a_double_click_on_an_image_in_latest_plays_everything_latest_lists(qtbo
     view = GalleryView(database_of(_many_latest(120)))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
 
     slideshow = view.slideshows.open_in_its_folder(("i119.png", "image"), "i119")
 
@@ -1497,7 +1488,7 @@ def test_a_double_clicked_tile_plays_its_folder_from_it(qtbot, monkeypatch):
     view = GalleryView(database_of(_many_latest(120)))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
 
     view._gallery_pane._thumbnail_double_clicked("i110")
     slideshow = view.slideshows.showing
@@ -1512,7 +1503,7 @@ def test_a_double_clicked_preview_plays_its_item_alone_locked(qtbot, monkeypatch
     view = GalleryView(database_of(_many_latest(120)))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
 
     slideshow = view.slideshows.open_on_preview(("i119.png", "image"), "i119")
 
@@ -1526,7 +1517,7 @@ def test_alls_latest_lists_both_kinds(qtbot):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
 
     assert set(view.listed_prompt_ids()) == {"i1", "v1"}
 
@@ -1558,7 +1549,7 @@ def test_opening_one_kinds_latest_lists_it_without_building_the_list_again(qtbot
     monkeypatch.setattr(gallery, "build_gallery_tree",
                         lambda *a, **k: built.append(1) or [])
 
-    view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Videos"], "All"))
+    view._tree.setCurrentItem(_alls(view._tree)["Videos"])
 
     assert view.listed_prompt_ids() == ["v1"]
     assert built == [], (
@@ -1569,12 +1560,12 @@ def test_opening_one_kinds_latest_lists_it_without_building_the_list_again(qtbot
 def test_another_latest_opens_on_its_first_page(qtbot):
     view = GalleryView(database_of(_many_latest(120)))
     _on_screen(qtbot, view, 1800, 1300)
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     opened_on = _drawn(view)
     wait_until(lambda: len(_drawn(view)) > len(opened_on), pump=lambda: _scroll_to_the_end(view))
     scrolled = _drawn(view)
 
-    view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Images"], "All"))
+    view._tree.setCurrentItem(_alls(view._tree)["Images"])
 
     now = _drawn(view)
     assert now == scrolled[:len(now)]
@@ -1587,10 +1578,10 @@ def test_one_kinds_latest_leaves_out_the_other_kinds_work_in_flight(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     assert "rr1" in view._gallery_pane._inflight_tiles
 
-    view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Images"], "All"))
+    view._tree.setCurrentItem(_alls(view._tree)["Images"])
 
     assert "rr1" not in view._gallery_pane._inflight_tiles
 
@@ -1600,7 +1591,7 @@ def test_a_new_generation_appears_at_the_top_of_latest(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     assert view.listed_prompt_ids() == ["old"]
 
     put_rows(db, [_image("new", "a dog", 50, 2)])
@@ -1627,7 +1618,7 @@ def test_the_gallery_polls_on_a_timer_of_its_own(qtbot):
     view = GalleryView(db)
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
 
     assert view._poll_timer.isActive()
     assert view._poll_timer.interval() == 1500, (
@@ -1872,7 +1863,7 @@ def test_opening_a_folder_of_sub_folders_picks_nothing(qtbot):
     view._tree.setCurrentItem(_image_workflow(view._tree))
 
     assert view._gallery_pane._listed_folders
-    assert view.listed_prompt_ids() == []
+    assert set(view.listed_prompt_ids()) == {"i1", "i2"}
     assert view._selected is None
 
 
@@ -2383,7 +2374,7 @@ def test_back_returns_to_the_latest_collection_then_forward_reopens_the_folder(q
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     view._gallery_pane._thumb_widgets["i2"].double_clicked.emit("i2")
     assert view._gallery_pane.showing_all_items() is False
     assert view._buttons.back.isEnabled()
@@ -2401,7 +2392,7 @@ def test_back_returns_to_a_collection_left_by_opening_a_folder(qtbot):
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
 
     view._tree.setCurrentItem(
         _at(_image_workflow(view._tree), 0, 0, 0)
@@ -2474,7 +2465,7 @@ def test_back_to_latest_restores_the_item_selected_on_the_collection(qtbot):
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     _pick_by_clicking(view, "i2")
     view._gallery_pane._thumb_widgets["i2"].double_clicked.emit("i2")
     assert view._gallery_pane.showing_all_items() is False
@@ -2491,7 +2482,7 @@ def test_previewing_on_the_collection_is_its_own_history_step(qtbot):
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     for pid in ("i1", "i2", "i3"):
         _pick_by_clicking(view, pid)
 
@@ -2511,7 +2502,7 @@ def test_back_to_a_collection_item_re_highlights_its_tile(qtbot):
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     _pick_by_clicking(view, "i1")
     _pick_by_clicking(view, "i2")
 
@@ -2576,7 +2567,7 @@ def test_an_item_looked_at_on_a_collection_goes_back_to_that_collection(qtbot):
     view = GalleryView(database_of(rows))
     qtbot.addWidget(view)
     view.refresh()
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    view._tree.setCurrentItem(_top_level(view._tree)["All"])
     _pick_by_clicking(view, "i1")
     view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
 
@@ -2913,8 +2904,7 @@ def test_right_clicking_a_folder_tile_raises_the_folder_menu(qtbot, monkeypatch)
     labels = []
     _menu_labels(monkeypatch, labels)
     model = _key(_at(_image_workflow(view._tree), 0))
-    (tile,) = [tile for tile in view._scroll.widget().findChildren(FolderTile)
-               if tile.key == model]
+    tile = _folder_tile(view, model)
 
     tile.context_requested.emit(model, QPoint(1, 1))
 
@@ -3262,8 +3252,7 @@ def test_a_folder_saved_under_its_own_key_alone_is_still_the_one_a_rebuild_reope
         "reopening must still land on that folder")
 
 
-@pytest.mark.parametrize("saved", ["__recents__", "__starred__", "__enhanced__",
-                                   "__experiments__", "__trash__"])
+@pytest.mark.parametrize("saved", ["__starred__", "__enhanced__", "__experiments__", "__trash__"])
 def test_a_session_saved_on_a_collection_reopens_on_that_collection(qtbot, saved):
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
     qtbot.addWidget(view)
@@ -3274,6 +3263,16 @@ def test_a_session_saved_on_a_collection_reopens_on_that_collection(qtbot, saved
     assert view.toc.selected_folder_key() == shaped_key(saved, LANDSCAPE), (
         "a collection's key never changes, even when its label is renamed, because saved "
         "sessions name the folder they reopen on by it")
+
+
+def test_a_session_saved_on_alls_old_list_reopens_on_all_itself(qtbot):
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]))
+    qtbot.addWidget(view)
+
+    view.select_folder(shaped_key("__recents__", LANDSCAPE))
+    view.refresh()
+
+    assert view.toc.selected_folder_key() == shaped_key(gallery.ALL_KEY, LANDSCAPE)
 
 
 def test_what_a_delete_takes_off_the_tree_is_a_folders_row_on_each_side_and_under_it(qtbot):

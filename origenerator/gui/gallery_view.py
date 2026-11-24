@@ -476,7 +476,7 @@ class GalleryView(QWidget):
                 lead_tiles=self._lead_tiles,
                 item_name=self._item_names.of,
                 tree=TreeNavigation(
-                    selected_folder_key=self.selected_folder_key,
+                    listed_key=self.toc.listed_key,
                     folder_context=self.toc.folder_context,
                     group_for_key=self.group_for_key,
                 ),
@@ -1127,6 +1127,7 @@ class GalleryView(QWidget):
         self._pending_key = self._pending_selection = None
         self.combine.offer_the_actions(rows)
         trash_collection.settle_regenerations(self._db)
+        read = rows
         library = self.library.take(rows, meta, self._tree.shapes, prepared)
         drawn_from = self.library.drawn_from
         rows = library.rows
@@ -1136,7 +1137,7 @@ class GalleryView(QWidget):
             self.search.index.update(rows + library.held_rows, drawn_from.named_folders(),
                                      item_name=drawn_from.name_of)
         requests = self.library.requests
-        self._gallery_pane.set_model(library, requests=requests)
+        self._gallery_pane.set_model(library, requests=requests, rows_read=read)
         self.toc.populate(
             self._build_sides(trees), folder_meta=meta,
             recently_worked=gallery.recently_worked_folders(trees, rows, bumped=library.recency),
@@ -1181,7 +1182,6 @@ class GalleryView(QWidget):
             shape=shape,
             tree_model=trees[shape],
             custom_collections=gallery.outermost(self.library.customs_by_shape[shape]),
-            show_latest=bool(trees[shape]),
             collection_counts=self._gallery_pane.collection_counts(shape),
         ) for shape in self._tree.shapes]
 
@@ -1310,7 +1310,7 @@ class GalleryView(QWidget):
             self.search.run()
             return
         self._re_aim_every_button()
-        base, shape = _split_collection_key(self.toc.selected_folder_key())
+        base, shape = _split_collection_key(self.toc.listed_key())
         collection = folder_collection(base)
         self._experiments_bar.setVisible(collection is not None
                                          and collection.which == _EXPERIMENTS_KEY)
@@ -1355,12 +1355,21 @@ class GalleryView(QWidget):
     def _open_collection(self, collection: FolderCollection, shape: str | None, item):
         if collection.which == _EXPERIMENTS_KEY:
             self._sync_experiments_bar()
-        self._folder_path.show_folder(self.toc.path_steps(item),
-                                      mark=collection_mark(collection.which))
+        folder = item.data(0, _GROUP_ROLE)
+        self._folder_path.show_folder(
+            self.toc.path_steps(item),
+            mark=None if folder is not None else collection_mark(collection.which))
         self._folder_actions.show_folder(None)
-        self._avg_label.setText("")
+        if folder is None:
+            self._avg_label.setText("")
+        else:
+            self._note_folder_visit(item.data(0, _TREE_KEY_ROLE))
+            self._update_folder_average(folder)
         self._clear_metadata()
-        self._gallery_pane.show_collection(collection.key, shape)
+        self._gallery_pane.show_collection(
+            collection.key, shape,
+            under=() if folder is None else (gallery.child_groups(folder),
+                                             self.toc.collections_in(item)))
         self._navigation.record()
 
     def _show_group_contents(self, group, item):
@@ -1369,9 +1378,6 @@ class GalleryView(QWidget):
             self._gallery_pane.show_thumbnails(group)
         elif isinstance(group, gallery.CustomCollection):
             self._gallery_pane.show_custom_collection(group)
-        else:
-            self._gallery_pane.show_folder_tiles(gallery.child_groups(group),
-                                            collections=self.toc.collections_in(item))
 
     def _go_to_folder(self, key: str):
         item = _row_under(self._tree.currentItem(), key) or self.toc.item_for(key)
@@ -2536,7 +2542,7 @@ class GalleryView(QWidget):
         return self.toc.item_for(key) if key else None
 
     def _current_collection_key(self) -> str | None:
-        key = self.selected_folder_key()
+        key = self.toc.listed_key()
         return key if folder_collection(_base_of(key)) is not None else None
 
     def _clear_metadata(self):

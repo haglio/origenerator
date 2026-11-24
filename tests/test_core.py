@@ -44,7 +44,7 @@ from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database, NewGeneration
 from origenerator.fun_time_bridge import FunTimeBridge
 from origenerator.fun_time_mode import CORE_READY, FunestraChannel, FunTimeSession, Rect
-from origenerator.gallery.collection import ALL_ITEMS_KEY, FolderCollection
+from origenerator.gallery.collection import ALL_ITEMS_KEY
 from origenerator.gallery.shapes import BOTH, SEPARATE, TOGETHER
 from origenerator.generation_state import GenerationSource
 from origenerator.gui import core, toasts, two_screens
@@ -1541,20 +1541,20 @@ def test_a_folder_left_open_on_together_is_open_again_after_a_restart(qtbot, tmp
     assert reopened._gallery_view.selected_folder_key() == folder
 
 
-def test_the_videos_latest_left_open_is_open_on_its_videos_after_a_restart(qtbot, tmp_path):
+def test_the_videos_folder_left_open_is_open_on_its_videos_after_a_restart(qtbot, tmp_path):
     _seed_combine_db(tmp_path)
     path = tmp_path / "ui.json"
     first = _window(qtbot, tmp_path, AppState(path))
     view = first._gallery_view
     view.refresh()
-    latest = shaped_key(FolderCollection(ALL_ITEMS_KEY, MediaType.VIDEO).key, SEPARATE[1])
-    view._tree.setCurrentItem(view.toc.item_for(latest))
+    videos = shaped_key(MediaType.VIDEO, SEPARATE[1])
+    view._tree.setCurrentItem(view.toc.item_for(videos))
     first.close()
 
     reopened = _window(qtbot, tmp_path, AppState(path))
     reopened._gallery_view.refresh()
 
-    assert reopened._gallery_view.selected_folder_key() == latest
+    assert reopened._gallery_view.selected_folder_key() == videos
     assert reopened._gallery_view.listed_prompt_ids() == ["vid"]
 
 

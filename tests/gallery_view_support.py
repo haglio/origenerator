@@ -37,6 +37,7 @@ from origenerator.config import (
 )
 from origenerator.db import Database, NewGeneration
 from origenerator.gallery.collection import (
+    ALL_ITEMS_LABEL,
     TRASH_KEY,
 )
 from origenerator.gallery_edits import GalleryEdits
@@ -294,6 +295,8 @@ def _of_both_kinds(qtbot, actions=None):
 
 
 def _collection_row(folder, label):
+    if label == ALL_ITEMS_LABEL:
+        return folder
     (row,) = [folder.child(i) for i in range(folder.childCount())
               if folder.child(i).data(0, _GROUP_ROLE) is None and folder.child(i).text(0) == label]
     return row
@@ -610,7 +613,11 @@ class _FakeRerollJob:
 
 
 def _open_all_items(view):
-    view._tree.setCurrentItem(_alls(view._tree)["All"])
+    all_row = _top_level(view._tree)["All"]
+    if view._tree.currentItem() is all_row:
+        view.hand_pane_back()
+    else:
+        view._tree.setCurrentItem(all_row)
 
 
 def _running_row(prompt_id, prompt="a cat", workflow="sdxl_t2i"):

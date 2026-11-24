@@ -59,7 +59,7 @@ ALL_COLLECTIONS: tuple[Collection, ...] = (
     Collection(
         ALL_ITEMS_KEY, ALL_ITEMS_LABEL, "Every item in this folder", Glyph("latest"),
         rows=lambda library: library.recent_rows,
-        shown_in=lambda shape: shape.show_latest, counted=False,
+        shown_in=lambda _shape: False, counted=False,
         voice=Voice(("all",)), newest_first=True),
     Collection(
         FAVORITES_KEY, FAVORITES_LABEL,

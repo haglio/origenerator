@@ -219,8 +219,8 @@ def test_the_pane_is_one_table_of_contents_per_shape(qtbot, tmp_path):
     for shape in ("portrait", "landscape"):
         assert _rows(view._tree, shape) == ["All"], \
             "a set mixing the shapes has no one screen to play on, so each shape has the whole tree"
-        assert _under_all(view._tree, shape)[:6] == [
-            "All", "Favorites", "Enhanced", "Populating", "Experiments", "Trash",
+        assert _under_all(view._tree, shape)[:5] == [
+            "Favorites", "Enhanced", "Populating", "Experiments", "Trash",
         ]
 
 
@@ -266,7 +266,7 @@ def test_every_sides_latest_leads_with_the_runs_in_flight_it_holds(qtbot, shape)
     view = _view_of_runs(qtbot)
     _drawing(view, shape)
 
-    view._tree.setCurrentItem(view.toc.item_by_key[shaped_key(ALL_ITEMS_KEY, shape)])
+    view._tree.setCurrentItem(view.toc.collection_item(ALL_ITEMS_KEY, shape))
 
     assert set(view._gallery_pane._inflight_tiles) == {
         run for run, of_item in _RUNS.items() if shape_holds(shape, of_item)}
@@ -285,7 +285,7 @@ def test_a_folder_shows_its_waiting_runs_whichever_latest_was_opened_before_it(
     qtbot.addWidget(view)
     view.refresh()
     _drawing(view, opened_first)
-    view._tree.setCurrentItem(view.toc.item_by_key[shaped_key(ALL_ITEMS_KEY, opened_first)])
+    view._tree.setCurrentItem(view.toc.collection_item(ALL_ITEMS_KEY, opened_first))
     holding_the_folder = next(shape for shape in view._tree.shapes
                               if shape_holds(shape, PORTRAIT))
     folder = gallery.settings_folder_key(finished, gallery.build_image_config_index([finished]))
@@ -677,7 +677,7 @@ def test_a_collection_belongs_to_one_side(qtbot, tmp_path):
     qtbot.addWidget(view)
     view.refresh()
 
-    view._tree.setCurrentItem(view.toc.item_by_key[shaped_key(ALL_ITEMS_KEY, "portrait")])
+    view._tree.setCurrentItem(view.toc.collection_item(ALL_ITEMS_KEY, "portrait"))
 
     assert view._gallery_pane.listed_prompt_ids() == ["t1"]
     assert [row["prompt_id"] for row in view.rows_to_play()] == ["t1"]
@@ -774,7 +774,7 @@ def test_a_slideshow_goes_to_the_region_its_side_names(qtbot, tmp_path):
         return stub
 
     view.slideshows.open = record
-    view._tree.setCurrentItem(view.toc.item_by_key[shaped_key(ALL_ITEMS_KEY, "portrait")])
+    view._tree.setCurrentItem(view.toc.collection_item(ALL_ITEMS_KEY, "portrait"))
     view.slideshows.start()
 
     assert opened

@@ -605,7 +605,8 @@ def test_the_huds_map_is_the_gamma_around_the_slide_on_screen(qtbot, tmp_path, m
     assert (model.seed_count, model.action_count) == (2, 3)
     assert model.playing == ("corner", 0)
     assert model.active_loop == ""
-    assert model.title == "Unlocked · Shuffle"
+    assert model.title == "Unlocked · Latest", (
+        "a slideshow started on a folder of folders plays it in the order the gallery lists it")
     assert model.locked is False
 
     slideshow.slideshow_toggle_lock()
@@ -802,7 +803,8 @@ def test_the_maps_loop_button_loops_the_seed_row_and_the_next_press_ends_it(
     answer(slideshow, "no_loop")
 
     assert slideshow.is_showing()
-    assert slideshow.pass_size() == 4, "one of g1 and the video made from it, and the other three"
+    assert slideshow.pass_size() == 3, (
+        "the folder plays as its list shows it, one item for each run")
     assert slideshow._set.playlist.current()[2] == "g1"
     dropped = slideshow_hud_model("portrait", slideshow)
     assert dropped.active_loop == ""

@@ -215,6 +215,10 @@ def _time_heading(text: str) -> QLabel:
     return heading
 
 
+def _rule_off(flow) -> None:
+    flow.add_full_row(_time_heading("\u00a0"))
+
+
 _NOW_HEADING = "Now"
 
 
@@ -262,7 +266,7 @@ class LeadTiles:
 
 @dataclass(frozen=True)
 class TreeNavigation:
-    selected_folder_key: Callable[[], str | None]
+    listed_key: Callable[[], str | None]
     folder_context: Callable[[str], str]
     group_for_key: Callable[[str], object]
 
@@ -337,19 +341,23 @@ class GalleryPane(QObject):
         self._inflight_signature: tuple = ()
         self._model = LibrarySnapshot([])
         self._requests: list[dict] | None = None
+        self._rows_read: list[dict] | None = None
         self._pages = _Pages()
         self._drawing_ahead_of: QWidget | None = None
         self._drawn_again: Callable[[], None] | None = None
         self._search_rows: list[dict] = []
         self._showing_search = False
         self._collection_shape: str | None = None
+        self._folders_below: tuple = ()
         self._collection_folder = gallery.ALL_KEY
         scroll.verticalScrollBar().valueChanged.connect(self.follow_the_scroll)
         scroll.verticalScrollBar().rangeChanged.connect(self.follow_the_scroll)
 
-    def set_model(self, model: LibrarySnapshot, *, requests: list[dict] | None = None):
+    def set_model(self, model: LibrarySnapshot, *, requests: list[dict] | None = None,
+                  rows_read: list[dict] | None = None):
         self._model = model
         self._requests = requests
+        self._rows_read = rows_read
 
     def _open_collection_rows(self, collection: str) -> list[dict]:
         return self._model.in_collection(collection, self._collection_shape,
@@ -372,7 +380,7 @@ class GalleryPane(QObject):
         self._scroll.setWidget(widget)  # Qt deletes the previous widget
 
     def _show_paged(self, container: QWidget, entries) -> None:
-        pages = _Pages(self._tree.selected_folder_key(), entries)
+        pages = _Pages(self._tree.listed_key(), entries)
         for item in pages.items():
             self._selection.note_shown(item)
         self._listed_folders = pages.folders()
@@ -443,18 +451,21 @@ class GalleryPane(QObject):
         sort = self._host.sort_by.for_listing(rows)
         return sort_order.in_order(rows, [None] * len(rows), sort)[0]
 
-    def show_folder_tiles(self, groups, collections=()):
-        container, flow = self._fresh_tile_pane()
-        self._drawn_again = partial(self.show_folder_tiles, groups, collections)
-        groups = sort_order.folders_in_order(groups, self._host.sort_by.for_listing([]))
-        for key in collections:
-            self._add_collection_tile(flow, key)
+    def _folders_under(self, flow, under, sort: str, *, after_items: bool) -> list[_Entry]:
+        if not under:
+            return []
+        groups, collections = under
+        groups = sort_order.folders_in_order(list(groups), sort)
+        entries = [_Entry(partial(self._add_collection_tile, flow, key)) for key in collections]
         if collections and groups:
-            flow.add_full_row(_time_heading("\u00a0"))
-        self._show_paged(container, [
+            entries.append(_Entry(partial(_rule_off, flow)))
+        entries.extend(
             _Entry(partial(self._add_folder_tile, flow, group, favorite=group.favorite),
                    folder=group.key)
-            for group in groups])
+            for group in groups)
+        if after_items and entries:
+            entries.insert(0, _Entry(partial(_rule_off, flow)))
+        return entries
 
     def _add_collection_tile(self, flow, key: str):
         rows = self.rows_for_collection(key)
@@ -574,13 +585,14 @@ class GalleryPane(QObject):
     def showing_search(self) -> bool:
         return self._showing_search
 
-    def show_collection(self, key: str, shape: str | None = None):
+    def show_collection(self, key: str, shape: str | None = None, under=()):
         in_folder = folder_collection(key)
         if in_folder is None:
             return
         self._collection_shape = shape
         self._collection_folder = in_folder.folder
-        self._drawn_again = partial(self.show_collection, key, shape)
+        self._folders_below = under
+        self._drawn_again = partial(self.show_collection, key, shape, under)
         render = self._renders.get(in_folder.which)
         if render is not None:
             render()
@@ -594,16 +606,20 @@ class GalleryPane(QObject):
         self._show_gathered(self._open_collection_rows(which), folders,
                             show_favorites=False, empty=gathered.empty)
 
-    def _render_all_items(self):
-        self._render_newest_first(ALL_ITEMS_KEY, self._all_items_empty_hint())
+    def _render_all_items(self, items=None):
+        self._render_newest_first(ALL_ITEMS_KEY, self._all_items_empty_hint(), items=items,
+                                  folders_below=self._folders_below)
 
-    def _render_populating(self):
-        self._render_newest_first(POPULATING_KEY, collection(POPULATING_KEY).empty)
+    def _render_populating(self, items=None):
+        self._render_newest_first(POPULATING_KEY, collection(POPULATING_KEY).empty, items=items)
 
-    def _render_newest_first(self, which: str, empty: str):
+    def _render_newest_first(self, which: str, empty: str, *, items=None, folders_below=()):
         container, flow = self._fresh_tile_pane()
         rows = self._open_collection_rows(which)
-        items = self._newest_first_items(which)
+        if items is None:
+            read, self._rows_read = self._rows_read, None
+            items = self._newest_first_items(
+                which, read, self._requests if read is not None else None)
         self._inflight_signature = _inflight_signature(items)
         self._inflight_tiles = {}
         self._inflight_by_key = {}
@@ -623,10 +639,12 @@ class GalleryPane(QObject):
             _between_headings(flow, rows, headings,
                               lambda row: self._add_collection_thumbnail(flow, row)),
             last=last, opens_now=opens_now, draw_new_work=draw_new_work)
-        if not (items or rows):
+        folders = self._folders_under(flow, folders_below, sort,
+                                      after_items=bool(items or rows))
+        if not (items or rows or folders):
             self.show_widget(self._empty_state(empty))
             return
-        self._show_paged(container, entries)
+        self._show_paged(container, [*entries, *folders])
 
     def follow_the_scroll(self, *_):
         drawn, seen = self._scroll.widget(), self._scroll.viewport()
@@ -738,10 +756,10 @@ class GalleryPane(QObject):
                 "gallery re-roll — collect here.")
 
     def showing_all_items(self) -> bool:
-        return base_of(self._tree.selected_folder_key()) == ALL_ITEMS_KEY
+        return base_of(self._tree.listed_key()) == ALL_ITEMS_KEY
 
     def _newest_first_shown(self) -> str | None:
-        shown = folder_collection(base_of(self._tree.selected_folder_key()))
+        shown = folder_collection(base_of(self._tree.listed_key()))
         return shown.which if shown is not None and collection(shown.which).newest_first else None
 
     def refresh_inflight(self, rows=None, requests=None):
@@ -752,7 +770,7 @@ class GalleryPane(QObject):
                  if newest_first is not None else self._tile_items(rows, requests))
         if newest_first is not None and _inflight_signature(items) != self._inflight_signature:
             place = self.place()
-            self._renders[newest_first]()
+            self._renders[newest_first](items)
             self.return_to(place)
             return
         for item in items:
@@ -869,10 +887,10 @@ class GalleryPane(QObject):
                 "one, or delete it permanently when you're sure.")
 
     def showing_trash(self) -> bool:
-        return base_of(self._tree.selected_folder_key()) == TRASH_KEY
+        return base_of(self._tree.listed_key()) == TRASH_KEY
 
     def showing_populating(self) -> bool:
-        return base_of(self._tree.selected_folder_key()) == POPULATING_KEY
+        return base_of(self._tree.listed_key()) == POPULATING_KEY
 
     def _favorite_folders(self, shape: str | None, folder: str) -> list:
         group = self._model.placement(shape).folder(folder)
@@ -896,7 +914,7 @@ class GalleryPane(QObject):
         return self._model.collection_counts(shape)
 
     def selected_collection_rows(self) -> list[dict] | None:
-        return self.rows_for_collection(self._tree.selected_folder_key())
+        return self.rows_for_collection(self._tree.listed_key())
 
     def rows_for_collection(self, key: str | None) -> list[dict] | None:
         base, shape = split_key(key)

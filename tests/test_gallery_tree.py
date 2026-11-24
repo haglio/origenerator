@@ -67,8 +67,7 @@ def _gathered_tree(qtbot, rows, collections_of_your_own, folder_meta=None, recen
     qtbot.addWidget(pane)
     tree = GalleryTree(pane)
     tree.populate(
-        [ShapeModel(LANDSCAPE, model, custom_collections=list(collections_of_your_own(model)),
-                   show_latest=True),
+        [ShapeModel(LANDSCAPE, model, custom_collections=list(collections_of_your_own(model))),
          ShapeModel(PORTRAIT, [])],
         folder_meta=folder_meta, recently_worked=recently_worked)
     return pane, tree, model
@@ -172,21 +171,19 @@ def _wears(item, mark: str) -> bool:
     return drawn == icon_pixmap(mark, 48, TEXT_PRIMARY).toImage()
 
 
-def test_all_wears_the_database_and_its_latest_the_calendar(qtbot):
+def test_all_wears_the_database_and_holds_no_all_of_its_own(qtbot):
     half = _table_of_contents(qtbot, [_image("i1", "a cat")])
     (all_row,) = [half.topLevelItem(i) for i in range(half.topLevelItemCount())]
-    latest = all_row.child(0)
 
-    assert (all_row.text(0), latest.text(0)) == ("All", "All")
+    assert (all_row.text(0), all_row.child(0).text(0)) == ("All", "Favorites")
     assert _wears(all_row, "database")
-    assert _wears(latest, "latest")
 
 
 def _children(item):
     return [item.child(i) for i in range(item.childCount())]
 
 
-_COLLECTIONS = ["All", "Favorites", "Enhanced", "Populating", "Experiments", "Trash"]
+_COLLECTIONS = ["Favorites", "Enhanced", "Populating", "Experiments", "Trash"]
 _A_FOLDERS_COLLECTIONS = [name for name in _COLLECTIONS if name != "Populating"]
 
 
@@ -196,7 +193,7 @@ def _leads_with(folder, collections) -> bool:
             and all(row.data(0, GROUP_ROLE) is None for row in rows))
 
 
-def test_all_leads_with_its_collections_then_images_then_videos(qtbot):
+def test_all_leads_with_its_four_collections_then_images_then_videos_and_no_all_inside_it(qtbot):
     half = _table_of_contents(qtbot, [_video("v1", "style_a"), _image("i1", "a cat")])
     (all_row,) = [half.topLevelItem(i) for i in range(half.topLevelItemCount())]
 
@@ -204,7 +201,7 @@ def test_all_leads_with_its_collections_then_images_then_videos(qtbot):
     assert _leads_with(all_row, _COLLECTIONS)
 
 
-def test_images_and_videos_each_lead_with_the_collections_then_their_workflows(qtbot):
+def test_images_and_videos_each_lead_with_the_four_then_their_workflows(qtbot):
     half = _table_of_contents(qtbot, [_video("v1", "style_a"), _image("i1", "a cat")])
     (all_row,) = [half.topLevelItem(i) for i in range(half.topLevelItemCount())]
     images, videos = _children(all_row)[len(_COLLECTIONS):]
@@ -416,11 +413,10 @@ def _drawn_twice(qtbot, before_rows, after_rows, *, counts=None, recently_worked
     pane = SplitFolderTree(GROUP_ROLE)
     qtbot.addWidget(pane)
     tree = GalleryTree(pane)
-    tree.populate([ShapeModel(LANDSCAPE, gallery.build_gallery_tree(before_rows, kept=kept),
-                              show_latest=True)])
+    tree.populate([ShapeModel(LANDSCAPE, gallery.build_gallery_tree(before_rows, kept=kept))])
     drawn = dict(tree.item_by_key)
     again = gallery.build_gallery_tree(after_rows, kept=KeptFolders(kept))
-    tree.populate([ShapeModel(LANDSCAPE, again, show_latest=True,
+    tree.populate([ShapeModel(LANDSCAPE, again,
                               collection_counts=counts or {})],
                   recently_worked=recently_worked)
     return tree, drawn

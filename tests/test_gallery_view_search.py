@@ -314,7 +314,7 @@ def test_a_second_search_in_a_collection_is_still_over_the_whole_collection(qtbo
         "read off the TOC's selection and never off what is drawn")
 
 
-def test_a_folders_collection_scopes_the_search_and_names_its_path(qtbot):
+def test_a_folder_of_folders_scopes_the_search_and_names_its_path(qtbot):
     rows = [_image("i1", "a cat", 50, 1),
             _row("v1", "wan22_i2v", {"positive_prompt": "a cat", "seed": 5},
                  "wan22_i2v_00001_.mp4")]
@@ -323,13 +323,13 @@ def test_a_folders_collection_scopes_the_search_and_names_its_path(qtbot):
     view.search.field.setFixedWidth(_WIDE_ENOUGH_THAT_NO_PATH_ELIDES)
     view.refresh()
     workflow = _image_workflow(view._tree)
-    view._tree.setCurrentItem(workflow.child(0))
+    view._tree.setCurrentItem(workflow)
 
     _search_for(view, "cat")
 
     assert view.listed_prompt_ids() == ["i1"]
     assert view.search.field.placeholderText() == (
-        f"Search {SHAPE_LABELS[LANDSCAPE]}  \u203a  All  \u203a  Images  \u203a  {workflow.text(0)}  \u203a  All…")
+        f"Search {SHAPE_LABELS[LANDSCAPE]}  \u203a  All  \u203a  Images  \u203a  {workflow.text(0)}…")
 
 
 def test_the_trash_collection_searches_what_it_is_holding(qtbot):
@@ -391,7 +391,7 @@ def test_the_field_says_what_it_would_search(qtbot):
     assert videos.text(0) in placeholder
 
     view._tree.setCurrentItem(_collection(view, ALL_ITEMS_KEY))
-    assert view.search.field.placeholderText() == "Search Landscape  \u203a  All  \u203a  All…"
+    assert view.search.field.placeholderText() == "Search Landscape  \u203a  All…"
 
 
 def test_the_field_shows_the_tail_of_a_path_too_long_for_it(qtbot):

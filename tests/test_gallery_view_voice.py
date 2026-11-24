@@ -27,7 +27,6 @@ from origenerator.config import (
 )
 from origenerator.db import NewGeneration
 from origenerator.gallery.collection import (
-    ALL_ITEMS_KEY,
     EXPERIMENTS_KEY,
     FAVORITES_KEY,
 )
@@ -1049,7 +1048,7 @@ def _listening(qtbot, tmp_path, db=None):
 
 @pytest.mark.parametrize(("said", "key"), [
     ("experiments", EXPERIMENTS_KEY),
-    ("all", ALL_ITEMS_KEY),
+    ("all", gallery.ALL_KEY),
     ("go to favorites", FAVORITES_KEY),
     ("go to experiments", EXPERIMENTS_KEY),
 ])

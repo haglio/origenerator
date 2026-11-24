@@ -2087,8 +2087,8 @@ class GalleryView(QWidget):
         suffix = " " + gallery.counted(rows)
         if len(rows) == 1 and self._can_open_containing_folder(rows[0]):
             offer("Go to folder", lambda: self.follow_link(ids[0]))
-        if len(rows) == 1 and self.slideshows.can_open_on_tile(ids[0]):
-            offer("Open in slideshow", lambda: self.slideshows.open_on_tile(ids[0]))
+        if self.slideshows.can_open_on(ids):
+            offer("Open in slideshow", lambda: self.slideshows.open_on(ids))
         if to_generate := self._made_again_from_here(rows):
             offer(_generate_with_random_seeds_text(to_generate),
                   lambda: self._generate_with_random_seeds(to_generate))

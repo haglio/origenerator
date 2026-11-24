@@ -5,7 +5,7 @@ import json
 import numpy as np
 import pytest
 from funestra.funestra_verbs import NEXT
-from funestra.hud_controls import TRASH_TOOLTIP
+from funestra.hud_controls import TRASH_ICON
 from funestra.hud_corners import CORNER_PLUS_OVERLAY_ID
 from funestra.hud_overlay import HUD_OVERLAY_ID
 from funestra.hud_placement import HudCorner
@@ -275,7 +275,7 @@ class TestTheTrashOverAFavorite:
         model = self._model(window, hosted)
 
         assert not model.facts.favorite
-        assert self._trash(model).tooltip == TRASH_TOOLTIP
+        assert (self._trash(model).icon, self._trash(model).danger) == (TRASH_ICON, True)
 
     def test_a_standalone_press_on_it_unfavorites_the_item_and_moves_on(self, qtbot):
         window, unfavorited, deleted = self._window()

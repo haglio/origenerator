@@ -240,6 +240,28 @@ def test_a_video_tile_shows_how_long_the_video_runs_just_right_of_its_video_mark
         "1:05", (True, True, True), False, True)
 
 
+def test_a_flick_s_tile_shows_how_many_frames_its_file_holds_where_a_video_s_shows_its_time(qtbot):
+    said = []
+    for item_type in (ItemType.FLICK, ItemType.VIDEO):
+        tile = ItemTile("p1", None, "label", TileAppearance(
+            item_type=item_type, video_seconds=1.76, video_frames=197))
+        qtbot.addWidget(tile)
+        said.append([length.text() for length in tile.findChildren(VideoLength)])
+
+    assert said == [["197 frames"], ["0:02"]]
+
+
+def test_a_flick_of_one_frame_says_frame_and_one_whose_frames_were_never_counted_says_nothing(qtbot):
+    said = []
+    for frames in (1, None):
+        tile = ItemTile("p1", None, "label", TileAppearance(
+            item_type=ItemType.FLICK, video_seconds=1.76, video_frames=frames))
+        qtbot.addWidget(tile)
+        said.append([length.text() for length in tile.findChildren(VideoLength)])
+
+    assert said == [["1 frame"], []]
+
+
 def test_a_tile_with_no_known_length_shows_none(qtbot):
     unmeasured = _video_tile(qtbot)
     image = ItemTile("p2", None, "label", TileAppearance(item_type=MediaType.IMAGE,
@@ -731,6 +753,7 @@ _A_CHANGE_TO = {
     "caption": lambda: "another name",
     "item_type": lambda: ItemType.VIDEO,
     "video_seconds": lambda: 5.0,
+    "video_frames": lambda: 12,
     "movie_path": lambda: "moving.webp",
     "favorite": lambda: True,
     "enhance": lambda: "2x",

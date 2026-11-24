@@ -30,6 +30,7 @@ from origenerator.gui.style_property import set_style_property
 from origenerator.gui.tile_rules import CAPTION, ITEM_TILE, SEED_BUTTON, SELECTED, THUMBNAIL
 from origenerator.gui.tile_status_scrim import TileStatusScrim
 from origenerator.media import ItemType
+from origenerator.timing import clock_duration
 from origenerator.trash_collection import why_it_cannot_be_restored
 
 _IMAGE_SIZE = tile_shape.thumbnail_size()
@@ -47,12 +48,22 @@ class TileAppearance:
     caption: str | None = None
     item_type: str | None = None
     video_seconds: float | None = None
+    video_frames: int | None = None
     movie_path: str | None = None
     favorite: bool = False
     enhance: str | None = None
     enhancing: RunReading | None = None
     corner_buttons: list[CornerButton] | None = None
     restore: RestoreOffer | None = None
+
+
+def _length_said(appearance: TileAppearance) -> str:
+    if appearance.item_type == ItemType.FLICK:
+        frames = appearance.video_frames
+        return f"{frames} frame{'' if frames == 1 else 's'}" if frames else ""
+    if appearance.item_type == ItemType.VIDEO and appearance.video_seconds:
+        return clock_duration(round(appearance.video_seconds))
+    return ""
 
 
 PLAIN_APPEARANCE = TileAppearance()
@@ -163,8 +174,9 @@ class ItemTile(QWidget):
         if not appearance.item_type:
             return None
         mark = ItemTypeIcon(appearance.item_type, self)
-        if appearance.item_type != ItemType.IMAGE and appearance.video_seconds:
-            VideoLength(appearance.video_seconds, mark)
+        length = _length_said(appearance)
+        if length:
+            VideoLength(length, mark)
         return mark
 
     def _build_the_enhancing_bar(self) -> None:
@@ -183,7 +195,8 @@ class ItemTile(QWidget):
     def look_of(prompt_id: str, thumb_path: str | None, label_text: str,
                 appearance: TileAppearance = PLAIN_APPEARANCE) -> tuple:
         return (prompt_id, thumb_path, label_text, appearance.item_type,
-                appearance.video_seconds, appearance.movie_path, appearance.restore,
+                appearance.video_seconds, appearance.video_frames, appearance.movie_path,
+                appearance.restore,
                 tuple(action.action_id for action in appearance.corner_buttons or ()))
 
     def set_selected(self, selected: bool):

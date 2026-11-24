@@ -640,6 +640,7 @@ class GalleryPane(QObject):
             TileAppearance(
                 item_type=gallery.item_type_of(row),
                 video_seconds=row.get("video_seconds"),
+                video_frames=row.get("video_frames"),
                 movie_path=self._host.animated_preview(row),
                 favorite=bool(row.get("starred")),
                 enhance=self._enhance_state(row),
@@ -809,6 +810,7 @@ class GalleryPane(QObject):
                 caption=f"{OLD_VERSION} · {name}" if row.get("old_version_of") else name,
                 item_type=gallery.item_type_of(row),
                 video_seconds=row.get("video_seconds"),
+                video_frames=row.get("video_frames"),
                 movie_path=self._host.animated_preview(row),
                 favorite=bool(row.get("starred")),
                 restore=restore_offer_of(row)),
@@ -885,6 +887,7 @@ class GalleryPane(QObject):
                 TileAppearance(
                     item_type=gallery.item_type_of(row),
                     video_seconds=row.get("video_seconds"),
+                video_frames=row.get("video_frames"),
                     movie_path=self._host.animated_preview(row),
                     favorite=bool(row.get("starred")),
                     enhance=self._enhance_state(row),

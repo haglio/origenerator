@@ -42,7 +42,8 @@ def watch_columns_of(counts: dict) -> dict[str, int]:
 
 
 LIBRARY_RECORD_COLUMNS = frozenset({"web_url", "library_id", "upscale_provenance",
-                                    "video_seconds", "genau_flipped", "video_resolution",
+                                    "video_seconds", "video_frames", "genau_flipped",
+                                    "video_resolution",
                                     "video_aspect_ratio"})
 
 _KNOWN_SOURCES = tuple(GenerationSource)

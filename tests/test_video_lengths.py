@@ -8,6 +8,7 @@ from origenerator import video_lengths
 from origenerator.completion import mark_generation_completed
 from origenerator.db import NewGeneration
 from origenerator.generation_state import GenerationStatus
+from origenerator.media import video_header
 from origenerator.output_places import OutputPlaces
 from tests.media_files import write_mp4
 
@@ -40,7 +41,7 @@ def test_a_finished_video_keeps_how_long_it_runs(db, tmp_path):
 def test_recording_measures_each_finished_video_that_has_no_length(db, tmp_path, places):
     _added(db, "unmeasured", _video(tmp_path, "video one", 1.0))
     _added(db, "measured", _video(tmp_path, "video two", 1.0))
-    db.set_library_record("measured", video_seconds=9.0)
+    db.set_library_record("measured", video_seconds=9.0, video_frames=270)
     _added(db, "image", [{"filename": "made-up.png", "library_path": str(tmp_path / "x.png")}])
     _added(db, "running", _video(tmp_path, "video three", 1.0), status=GenerationStatus.RUNNING)
 
@@ -68,3 +69,26 @@ def test_recording_looks_for_no_file_of_an_image(db, tmp_path, places, monkeypat
     assert looked_for == [], (
         "the library holds thousands of images, and looking each one's file up on every launch "
         "took over a minute")
+
+
+def test_a_finished_video_keeps_how_many_frames_its_file_holds(db, tmp_path):
+    _added(db, "v1", [], status=GenerationStatus.RUNNING)
+
+    mark_generation_completed(db, "v1", _video(tmp_path, "video one", 2.0), None, 30.0)
+
+    kept = db.get_generation("v1")
+    assert kept["video_frames"] > 1
+    assert kept["video_frames"] / kept["video_seconds"] == pytest.approx(
+        video_header(tmp_path / "video one.mp4").fps)
+
+
+def test_recording_counts_the_frames_of_a_video_measured_before_frames_were_kept(
+        db, tmp_path, places):
+    _added(db, "timed", _video(tmp_path, "video one", 1.0))
+    db.set_library_record("timed", video_seconds=9.0)
+
+    recorded = video_lengths.record_video_lengths(db, places)
+
+    kept = db.get_generation("timed")
+    assert (recorded, kept["video_seconds"], kept["video_frames"]) == (
+        1, 9.0, round(video_header(tmp_path / "video one.mp4").frames))

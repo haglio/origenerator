@@ -13,7 +13,7 @@ from origenerator.library_filing import file_into_library
 from origenerator.output_places import OutputFolders, OutputPlaces
 from origenerator.thumbnail import animate_if_video, generate_thumbnail
 from origenerator.timing import execution_duration_seconds
-from origenerator.video_lengths import video_seconds_of
+from origenerator.video_lengths import as_recorded, video_length_of
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,6 @@ def mark_generation_completed(db, prompt_id, files, thumb_path, duration):
     finished = {**(db.get_generation(prompt_id) or {}), **fields}
     fields["shape"] = shape_its_files_say(finished)
     db.update_generation(prompt_id, **fields)
-    seconds = video_seconds_of(finished, OUTPUT_PLACES)
-    if seconds is not None:
-        db.set_library_record(prompt_id, video_seconds=seconds)
+    length = video_length_of(finished, OUTPUT_PLACES)
+    if length is not None:
+        db.set_library_record(prompt_id, **as_recorded(length))

@@ -142,6 +142,7 @@ CREATE TABLE IF NOT EXISTS generations (
     library_id TEXT,
     upscale_provenance TEXT,
     video_seconds REAL,
+    video_frames INTEGER,
     genau_flipped INTEGER NOT NULL DEFAULT 0,
     video_resolution TEXT,
     video_aspect_ratio TEXT,
@@ -327,6 +328,7 @@ ADDED_COLUMNS = {
         "library_id": "TEXT",
         "upscale_provenance": "TEXT",
         "video_seconds": "REAL",
+        "video_frames": "INTEGER",
         "genau_flipped": "INTEGER NOT NULL DEFAULT 0",
         "video_resolution": "TEXT",
         "video_aspect_ratio": "TEXT",
@@ -378,7 +380,8 @@ GENERATION_COLUMNS = (
     "image_actions", "image_checked", "video_actions", "video_checked", "combined_labels",
     "why_it_cannot_be_made_again", "evolver_upscale", "evolver_upscaled_at", "finale_id",
     "watch_completions", "watch_skips", "watch_locks", "web_url", "library_id",
-    "upscale_provenance", "video_seconds", "genau_flipped", "video_resolution",
+    "upscale_provenance", "video_seconds", "video_frames", "genau_flipped",
+    "video_resolution",
     "video_aspect_ratio", "trash_requested_at", "enhance_requested_at",
 )
 

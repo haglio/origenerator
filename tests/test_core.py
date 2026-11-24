@@ -1817,13 +1817,29 @@ def test_crossing_into_the_headset_grows_the_window_back_to_desktop_size(qtbot, 
     assert ui_scale.active_scale() == ui_scale.HOSTED_SCALE
 
 
+def _in_device_pixels(win) -> tuple[int, int, int, int]:
+    ratio = win.devicePixelRatioF()
+    geo = win.geometry()
+    return tuple(round(length * ratio) for length in (geo.x(), geo.y(), geo.width(), geo.height()))
+
+
+def test_a_window_hosted_on_the_monitors_is_at_the_sessions_rect_in_device_pixels(
+        qtbot, tmp_path, his_two_monitors):
+    win = _window(qtbot, tmp_path)
+    monitors = _hosted_with_a_channel(tmp_path)
+
+    win.become_hosted(monitors)
+
+    assert win.devicePixelRatioF() != 1.0
+    assert _in_device_pixels(win) == (10, 20, 800, 600)
+
+
 def test_crossing_into_the_headset_takes_the_window_off_the_sessions_rect(
         qtbot, tmp_path, his_two_monitors):
     win = _window(qtbot, tmp_path)
     monitors = _hosted_with_a_channel(tmp_path)
     win.become_hosted(monitors)
-    assert (win.width(), win.height()) == (monitors.main_rect.width,
-                                           monitors.main_rect.height)
+    assert _in_device_pixels(win) == (10, 20, 800, 600)
 
     _say(win, tmp_path, f"HAND_OVER|{tmp_path / 'frame.bin'}|{tmp_path / 'input.txt'}")
     assert win.hands_its_window_over is not None
@@ -1872,8 +1888,7 @@ def test_fun_time_window_is_frameless_topmost_at_the_named_rect(qtbot, tmp_path)
     assert win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint, (
         "in the topmost layer where every managed window lives: Fun Time decides who within the "
         "layer is in front")
-    geo = win.geometry()
-    assert (geo.x(), geo.y(), geo.width(), geo.height()) == (10, 20, 800, 600)
+    assert _in_device_pixels(win) == (10, 20, 800, 600)
     assert win._gallery_view._fun_time is not None
 
 
@@ -2082,8 +2097,7 @@ def test_a_standalone_window_taken_into_a_session_is_hosted_at_the_rect_it_names
 
     assert win.windowFlags() & Qt.WindowType.FramelessWindowHint
     assert win.windowFlags() & Qt.WindowType.WindowStaysOnTopHint
-    geo = win.geometry()
-    assert (geo.x(), geo.y(), geo.width(), geo.height()) == (10, 20, 800, 600)
+    assert _in_device_pixels(win) == (10, 20, 800, 600)
     assert [bridge.parent() for bridge in win.findChildren(FunTimeBridge)] == [win]
     assert win._gallery_view._fun_time is not None
 
@@ -2509,8 +2523,7 @@ def test_core_in_a_session_stays_at_the_sessions_rect_through_a_switch(
 
     win._sides.switch()
 
-    geo = win.geometry()
-    assert (geo.x(), geo.y(), geo.width(), geo.height()) == (10, 20, 800, 600)
+    assert _in_device_pixels(win) == (10, 20, 800, 600)
 
 
 def _times_core_said_it_was_up(win) -> list:

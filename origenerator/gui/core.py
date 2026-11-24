@@ -444,7 +444,9 @@ class Core(QMainWindow):
             self.resize(monitor.availableGeometry().size())
 
     def _sit_at_the_sessions_rect(self, rect: Rect) -> None:
-        self.setGeometry(rect.x, rect.y, rect.width, rect.height)
+        ratio = self.devicePixelRatioF()
+        self.setGeometry(*(round(length / ratio)
+                           for length in (rect.x, rect.y, rect.width, rect.height)))
         self._device_rect = (rect.x, rect.y, rect.width, rect.height)
 
     def closeEvent(self, event):

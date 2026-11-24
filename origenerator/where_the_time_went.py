@@ -1,55 +1,43 @@
 from __future__ import annotations
 
 import ctypes
-import faulthandler
-import re
-import tempfile
+import sys
 import threading
 import time
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
+from types import FrameType
 from typing import NamedTuple
 
 PACKAGE_DIR = str(Path(__file__).resolve().parent)
 LOOK_EVERY_S = 0.1
 MOST_NAMED = 25
 
-_A_FRAME = re.compile(r'^\s+File "(?P<file>.+)", line \d+ in (?P<function>.+)$')
-
-
-def every_threads_stack() -> str:
-    with tempfile.TemporaryFile(mode="w+", encoding="utf-8", errors="replace") as dumped:
-        faulthandler.dump_traceback(dumped, all_threads=True)
-        dumped.seek(0)
-        return dumped.read()
-
-
-def functions_stood_in(stacks: str, thread_id: int, under: str = PACKAGE_DIR) -> set[str]:
-    its_header = f"0x{thread_id:08x}"
-    stood_in = set()
-    reading_it = False
-    for line in stacks.splitlines():
-        frame = _A_FRAME.match(line)
-        if frame is None:
-            reading_it = its_header in line
-        elif reading_it and frame["file"].startswith(under):
-            stood_in.add(f"{Path(frame['file']).stem}.{frame['function']}")
+def functions_stood_in(frame: FrameType | None, under: str = PACKAGE_DIR) -> list[str]:
+    stood_in: list[str] = []
+    while frame is not None:
+        code = frame.f_code
+        if code.co_filename.startswith(under):
+            function = f"{Path(code.co_filename).stem}.{code.co_name}"
+            if function not in stood_in:
+                stood_in.append(function)
+        frame = frame.f_back
     return stood_in
 
 
 def said_in_one_line(looks: int, stood_in: Counter, most: int = MOST_NAMED) -> str:
-    most_often_first = sorted(stood_in.items(), key=lambda found: (-found[1], found[0]))
+    most_often_first = sorted(stood_in.items(), key=lambda found: -found[1])
     named = ", ".join(f"{function} {count}" for function, count in most_often_first[:most])
     return f"{looks} looks at the thread, and how many found it inside each function: {named}"
 
 
 class LooksAtAThread:
     def __init__(self, thread_id: int, *,
-                 stacks: Callable[[], str] = every_threads_stack,
+                 frames: Callable[[], dict[int, FrameType]] = sys._current_frames,
                  every_s: float = LOOK_EVERY_S) -> None:
         self._thread_id = thread_id
-        self._stacks = stacks
+        self._frames = frames
         self._every_s = every_s
         self._stood_in: Counter = Counter()
         self._looks = 0
@@ -66,11 +54,11 @@ class LooksAtAThread:
         self._looking.join()
 
     def look(self) -> None:
-        self._stood_in.update(functions_stood_in(self._stacks(), self._thread_id))
+        self._stood_in.update(functions_stood_in(self._frames().get(self._thread_id)))
         self._looks += 1
 
-    def said_in_one_line(self) -> str:
-        return said_in_one_line(self._looks, self._stood_in)
+    def said_in_one_line(self, most: int = MOST_NAMED) -> str:
+        return said_in_one_line(self._looks, self._stood_in, most)
 
     def _keep_looking(self) -> None:
         while not self._done.wait(self._every_s):

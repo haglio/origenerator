@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import threading
 from collections import Counter
+from types import SimpleNamespace
 
 from origenerator.where_the_time_went import (
     PACKAGE_DIR,
     LooksAtAThread,
     Seconds,
-    every_threads_stack,
     functions_stood_in,
     read_seconds,
     said_in_one_line,
@@ -18,18 +18,15 @@ _WATCHED = 0x1D34
 _ANOTHER = 0x2294
 
 
-def _stacks(*, watched_frames: list[tuple[str, str]]) -> str:
-    def frames(found):
-        return "".join(f'  File "{file}", line 7 in {function}\n' for file, function in found)
+def _frame(file: str, function: str, under=None) -> SimpleNamespace:
+    return SimpleNamespace(f_code=SimpleNamespace(co_filename=file, co_name=function), f_back=under)
 
-    return (f"Thread 0x{_ANOTHER:08x} [ComfyUIClient] (most recent call first):\n"
-            + frames([(PACKAGE_DIR + "\\comfyui_client.py", "run")])
-            + "\n"
-            + f"Thread 0x{_WATCHED:08x} (most recent call first):\n"
-            + frames(watched_frames)
-            + "\n"
-            + "Current thread 0x00000042 [where-the-time-went] (most recent call first):\n"
-            + frames([(PACKAGE_DIR + "\\where_the_time_went.py", "look")]))
+
+def _stack(innermost_first: list[tuple[str, str]]) -> SimpleNamespace | None:
+    frame = None
+    for file, function in reversed(innermost_first):
+        frame = _frame(file, function, under=frame)
+    return frame
 
 
 _BUILDING_THE_GALLERY = [
@@ -39,27 +36,34 @@ _BUILDING_THE_GALLERY = [
 ]
 
 
-def test_a_look_names_every_function_of_the_app_the_thread_stands_in():
-    stacks = _stacks(watched_frames=_BUILDING_THE_GALLERY)
+def _every_threads_frames() -> dict:
+    return {_ANOTHER: _stack([(PACKAGE_DIR + "\\comfyui_client.py", "run")]),
+            _WATCHED: _stack(_BUILDING_THE_GALLERY)}
 
-    assert functions_stood_in(stacks, _WATCHED) == {"core.__init__", "gallery_view._build_ui"}
+
+def test_a_look_names_every_function_of_the_app_the_thread_stands_in_innermost_first():
+    assert functions_stood_in(_stack(_BUILDING_THE_GALLERY)) == [
+        "gallery_view._build_ui", "core.__init__"]
 
 
 def test_a_thread_that_has_ended_stands_in_nothing():
-    assert functions_stood_in(_stacks(watched_frames=_BUILDING_THE_GALLERY), 0x7777) == set()
+    assert functions_stood_in(_every_threads_frames().get(0x7777)) == []
 
 
 def test_a_function_calling_itself_counts_once_a_look():
     walking = [(PACKAGE_DIR + "\\gallery\\tree.py", "walk")] * 2
 
-    assert functions_stood_in(_stacks(watched_frames=walking), _WATCHED) == {"tree.walk"}
+    assert functions_stood_in(_stack(walking)) == ["tree.walk"]
 
 
-def test_the_stacks_it_reads_name_the_thread_that_asked():
-    stacks = every_threads_stack()
+def test_a_real_look_at_its_own_thread_finds_itself_looking():
+    looks = LooksAtAThread(threading.get_ident())
 
-    assert functions_stood_in(stacks, threading.get_ident()) == {
-        "where_the_time_went.every_threads_stack"}
+    looks.look()
+
+    assert looks.said_in_one_line() == (
+        "1 looks at the thread, and how many found it inside each function: "
+        "where_the_time_went.look 1")
 
 
 def test_the_line_names_the_functions_found_most_often_first():
@@ -70,35 +74,34 @@ def test_the_line_names_the_functions_found_most_often_first():
                     "core.__init__ 4, gallery_view._build_ui 3")
 
 
-def test_functions_found_as_often_are_named_in_the_order_of_their_names():
+def test_functions_found_as_often_are_named_in_the_order_they_were_first_found():
     line = said_in_one_line(2, Counter({"gallery_view._build_ui": 2, "core.__init__": 2}))
 
-    assert line.endswith(": core.__init__ 2, gallery_view._build_ui 2")
+    assert line.endswith(": gallery_view._build_ui 2, core.__init__ 2")
 
 
 def test_each_look_reads_the_thread_it_was_given():
-    looks = LooksAtAThread(_WATCHED,
-                           stacks=lambda: _stacks(watched_frames=_BUILDING_THE_GALLERY))
+    looks = LooksAtAThread(_WATCHED, frames=_every_threads_frames)
 
     looks.look()
     looks.look()
 
     assert looks.said_in_one_line() == (
         "2 looks at the thread, and how many found it inside each function: "
-        "core.__init__ 2, gallery_view._build_ui 2")
+        "gallery_view._build_ui 2, core.__init__ 2")
 
 
 def test_it_goes_on_looking_until_the_work_it_watches_is_over():
     looked_twice = threading.Event()
     seen = []
 
-    def stacks():
+    def frames():
         seen.append(1)
         if len(seen) == 2:
             looked_twice.set()
-        return ""
+        return {}
 
-    with LooksAtAThread(_WATCHED, stacks=stacks, every_s=0.001) as looks:
+    with LooksAtAThread(_WATCHED, frames=frames, every_s=0.001) as looks:
         assert looked_twice.wait()
 
     assert looks.said_in_one_line().startswith(f"{len(seen)} looks at the thread")

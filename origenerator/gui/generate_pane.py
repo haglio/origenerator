@@ -13,11 +13,7 @@ from PySide6.QtWidgets import QApplication, QMenu, QTabWidget
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.db import Database
 from origenerator.evolver_export import EvolverInbox
-from origenerator.gallery import (
-    build_image_config_index,
-    media_type_of_row,
-    settings_signature,
-)
+from origenerator.gallery import settings_signature
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.gui import icons
 from origenerator.gui.copy_names import offer_copy_names
@@ -26,7 +22,7 @@ from origenerator.gui.generate_tab import GenerateTab
 from origenerator.gui.how_many import HOW_MANY
 from origenerator.item_names import ItemNames
 from origenerator.library_views import NO_VIEWS, LibraryViews, TabViews
-from origenerator.media import ItemType, MediaType
+from origenerator.media import ItemType
 from origenerator.workflows import workflow_named
 
 _MARKS_KEPT = 64
@@ -394,18 +390,17 @@ class GeneratePane(QTabWidget):
 
     def load_selection(self, row: dict, image_rows: list[dict]):
         target = (self.tab_showing(row["prompt_id"])
-                  or self._tab_for_the_same_folder(row, image_rows)
+                  or self._tab_for_the_same_folder(row)
                   or self._landing_tab())
         target.show_saved_generation(row, image_rows)
         self.setCurrentWidget(target)
 
-    def _tab_for_the_same_folder(self, row: dict, image_rows: list[dict]) -> GenerateTab | None:
-        image_index = build_image_config_index(
-            [r for r in image_rows if media_type_of_row(r) == MediaType.IMAGE])
+    def _tab_for_the_same_folder(self, row: dict) -> GenerateTab | None:
         cur = self.current_generate_tab()
-        if (cur is not None and not cur.is_blank()
-                and cur.workflow_and_signature(image_index)
-                == self._row_settings_key(row, image_index)):
+        if cur is None or cur.is_blank():
+            return None
+        image_index = self._views.library.now().image_config_index
+        if cur.workflow_and_signature(image_index) == self._row_settings_key(row, image_index):
             return cur
         return None
 

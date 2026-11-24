@@ -51,8 +51,8 @@ _RE_ENHANCE = "Re-enhance"
 _RE_ENHANCE_TIP = ("Make a new enhancement with the same settings and seed, "
                    "leaving out each fix that is unchecked or marked as bad")
 _REDO = "Redo"
-_REDO_TIP = ("Make this enhancement again with the same settings and seed, so that its fixes "
-             "are individually removable. The new one takes this one's place.")
+_REDO_TIP = ("Make a new enhancement with the same settings and seed as this one, "
+             "whose fixes are individually removable. This one stays as it is.")
 # The app's global QWidget background paints every label opaque over the row's fill.
 _ROW_CSS = "#versionRow QLabel { background-color: transparent; }"
 _SELECTED_ROW_CSS = (
@@ -297,7 +297,7 @@ class _VersionRow(_Row):
     context_requested = Signal(int, QPoint)
     delete_pressed = Signal(int)
     fix_changed = Signal(int, str, str, bool)
-    again_pressed = Signal(int, bool)
+    again_pressed = Signal(int)
 
     def __init__(self, version, position: int, thumbnails=_STILL_COMING,
                  dating: Dating = UNDATED, deletable: bool = False):
@@ -347,13 +347,13 @@ class _VersionRow(_Row):
 
     def _listed_fixes(self, version, details: dict[str, str]) -> tuple[list[ListedFix], QWidget | None]:
         if version.fixes:
-            self._again = self._again_button(_RE_ENHANCE, _RE_ENHANCE_TIP, in_its_place=False)
+            self._again = self._again_button(_RE_ENHANCE, _RE_ENHANCE_TIP)
             self._again.setVisible(bool(left_out_of_a_re_enhance(version.file)))
             return [ListedFix(switch.part, details.get(switch.part, ""), switch)
                     for switch in version.fixes], self._again
         listed = [ListedFix(name, detail, tooltip=_MADE_BEFORE_FIXES_WERE_KEPT)
                   for name, detail in details.items()]
-        return listed, (self._again_button(_REDO, _REDO_TIP, in_its_place=True) if listed else None)
+        return listed, (self._again_button(_REDO, _REDO_TIP) if listed else None)
 
     def show_fixes(self, version) -> None:
         if self.fix_list is None or self._again is None:
@@ -361,13 +361,12 @@ class _VersionRow(_Row):
         self.fix_list.show_switches(version.fixes)
         self._again.setVisible(bool(left_out_of_a_re_enhance(version.file)))
 
-    def _again_button(self, says: str, tooltip: str, *, in_its_place: bool) -> QPushButton:
+    def _again_button(self, says: str, tooltip: str) -> QPushButton:
         button = QPushButton(says)
         button.setObjectName("enhanceAgainButton")
         button.setToolTip(tooltip)
         button.setCursor(Qt.CursorShape.PointingHandCursor)
-        button.clicked.connect(
-            lambda _checked=False: self.again_pressed.emit(self._position, in_its_place))
+        button.clicked.connect(lambda _checked=False: self.again_pressed.emit(self._position))
         return button
 
     def set_highlighted(self, on: bool) -> None:
@@ -462,7 +461,7 @@ class EnhanceVersions(QWidget):
     enhance_requested = Signal()
     delete_requested = Signal(list)
     fix_change_requested = Signal(int, str, str, bool)
-    enhance_again_requested = Signal(int, bool)
+    enhance_again_requested = Signal(int)
 
     def __init__(self, parent=None, *, read=QImage):
         super().__init__(parent)

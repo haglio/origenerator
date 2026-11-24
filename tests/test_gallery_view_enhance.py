@@ -917,7 +917,7 @@ def test_an_image_auto_enhanced_as_it_lands_leaves_the_folders_enhance_offer_at_
     assert button.toolTip().startswith("Enhance 1 not-yet-enhanced image in this folder")
 
 
-def test_an_enhancement_made_again_lands_in_the_old_ones_place_and_the_old_one_is_deleted(
+def test_an_enhancement_made_again_is_listed_as_a_new_one_and_the_old_one_stays(
         qtbot, tmp_path):
     client = _reroll_client()
     db = _enhanceable_db(tmp_path, count=1)
@@ -932,12 +932,11 @@ def test_an_enhancement_made_again_lands_in_the_old_ones_place_and_the_old_one_i
     (job,) = view._jobs.all_jobs
     client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
 
-    view.enhance.enhance_again("g0", "image_enhance_00001_.png", True)
+    view.enhance.enhance_again("g0", "image_enhance_00001_.png")
     (again,) = view._jobs.all_jobs
     client.job_completed.emit(again.prompt_id, {"outputs": {"12": {"images": [
         {"filename": "image_enhance_00002_.png", "subfolder": "image", "type": "output"}]}}})
 
-    assert deleted == [("g0", ["image_enhance_00001_.png"])]
+    assert deleted == []
     assert [f["filename"] for f in gallery.row_output_files(db.get_generation("g0"))] == [
-        "image_enhance_00002_.png", "image_enhance_00001_.png", "sdxl_t2i_g0.png"], (
-        "the new one is listed where the old one is, so it has the old one's place once that goes")
+        "image_enhance_00002_.png", "image_enhance_00001_.png", "sdxl_t2i_g0.png"]

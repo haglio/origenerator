@@ -1428,34 +1428,35 @@ def _launching_what_is_asked(monkeypatch, *, seed_in_the_file=None):
     monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
 
 
-def test_a_re_enhance_is_the_same_enhancement_from_the_same_seed_without_the_fixes_off_or_left_out(
+def test_a_re_enhance_is_the_same_enhancement_from_the_same_seed_without_the_fixes_off_or_marked_bad(
         enhance, monkeypatch, stored):
     _launching_what_is_asked(monkeypatch)
     jobs = FakeReroll()
     controller, _host = enhance(
         db=stored([_enhanced_with_fixes(seed=4242, off=["hands"], left_out=["eyes"])]), jobs=jobs)
 
-    controller.enhance_again("i1", "better.png", False)
+    controller.enhance_again("i1", "better.png")
 
     ((_key, asked),) = jobs.prepared
     assert (asked["seed"], asked["enhance_detail_fixes"], asked["enhance_steps"]) == (
         4242, {"faces": 0.45}, 20)
-    assert module.gallery.IN_PLACE_OF not in asked
 
 
-def test_a_redo_is_asked_in_the_old_ones_place_though_the_image_has_those_settings_already(
+def test_a_redo_is_asked_as_a_new_enhancement_though_the_image_has_those_settings_already(
         enhance, monkeypatch, stored):
     _launching_what_is_asked(monkeypatch, seed_in_the_file=777)
     monkeypatch.setattr(module.gallery, "version_matching_params", lambda row, wanted: 0)
     jobs = FakeReroll()
     controller, _host = enhance(db=stored([_enhanced_with_fixes(kept=False)]), jobs=jobs)
 
-    controller.enhance_again("i1", "better.png", True)
+    controller.enhance_again("i1", "better.png")
 
     ((_key, asked),) = jobs.prepared
-    assert (asked["seed"], asked[module.gallery.IN_PLACE_OF]) == (777, "better.png"), (
+    assert asked["seed"] == 777, (
         "an enhancement folded before seeds were kept still has its seed written inside its file")
     assert asked["enhance_detail_fixes"] == {"faces": 0.45, "hands": 0.5, "eyes": 0.3}
+    assert "enhance_in_place_of" not in asked, (
+        "the redone enhancement is listed as a new one, and the old one stays")
 
 
 def test_an_enhancement_whose_seed_is_nowhere_is_made_again_from_a_new_one(
@@ -1464,7 +1465,7 @@ def test_an_enhancement_whose_seed_is_nowhere_is_made_again_from_a_new_one(
     jobs = FakeReroll()
     controller, _host = enhance(db=stored([_enhanced_with_fixes(kept=False)]), jobs=jobs)
 
-    controller.enhance_again("i1", "better.png", True)
+    controller.enhance_again("i1", "better.png")
 
     ((_key, asked),) = jobs.prepared
     assert asked["seed"] != 1
@@ -1476,6 +1477,6 @@ def test_asking_again_for_an_enhancement_the_image_no_longer_lists_launches_noth
     jobs = FakeReroll()
     controller, _host = enhance(db=stored([_enhanced_with_fixes(seed=5)]), jobs=jobs)
 
-    controller.enhance_again("i1", "gone.png", False)
+    controller.enhance_again("i1", "gone.png")
 
     assert jobs.prepared == []

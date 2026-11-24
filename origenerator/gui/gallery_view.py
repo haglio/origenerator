@@ -1989,13 +1989,10 @@ class GalleryView(QWidget):
         folded = False
         if finished_row is not None \
                 and finished_row.get("workflow_name") == gallery.ENHANCE_WORKFLOW:
-            replaced = gallery.in_place_of(finished_row)
             source_id = gallery.fold_enhancement(self._db, finished_row)
             if source_id is not None:
                 folded = True
                 finished_row = self._db.get_generation(source_id)
-                if replaced and self._edits.delete_enhance_versions(finished_row, [replaced]):
-                    finished_row = self._db.get_generation(source_id)
                 self.slideshows.note_enhanced(finished_row)
         self.combine.send_to_genau_if_requested(finished_row)
         self.carry_out_when_finished()

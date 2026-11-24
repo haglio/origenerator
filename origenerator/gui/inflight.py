@@ -4,8 +4,10 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from origenerator.gallery import JobKind
+from origenerator.content import an_item, as_sentence
+from origenerator.gallery import JobKind, job_kind_said, made_by_a_job
 from origenerator.gui.generation_job import JobState
+from origenerator.media import ItemType
 from origenerator.timing import (
     JOB_QUEUE_CLOCK,
     RunTiming,
@@ -23,7 +25,7 @@ class InFlightItem:
     caption: str
     reading: RunReading
     reveal: Callable[[], None]
-    media_type: str | None = None
+    item_type: str | None = None
     cancel: Callable[[], None] | None = None
     shield: Callable[[bool], None] | None = None
     shielded: bool = False
@@ -50,13 +52,13 @@ class InFlightItem:
 
     @property
     def is_an_item(self) -> bool:
-        return self.job_kind in (JobKind.IMAGE, JobKind.VIDEO)
+        return made_by_a_job(self.job_kind) is not None
 
 
 def queue_lead_text(item: InFlightItem) -> str:
     parts = [queue_estimate_label(item.reading.typical_seconds)]
     if item.job_kind:
-        parts.append(item.job_kind)
+        parts.append(job_kind_said(item.job_kind))
     if item.action:
         parts.append(item.action)
     if item.populating:
@@ -76,7 +78,7 @@ def queue_lead_tooltip(item: InFlightItem) -> str:
     else:
         lines = [(f"About {queue_estimate_label(item.reading.typical_seconds).lstrip('~')}"
                  " on this workflow's recent runs")]
-    lines.extend(part for part in (_KIND_TOOLTIPS.get(item.job_kind),) if part)
+    lines.extend(part for part in (_kind_tooltip(item.job_kind),) if part)
     if item.action:
         lines.append(f"The “{item.action}” action, picked in Combine")
     if item.populating:
@@ -89,11 +91,17 @@ def queue_lead_tooltip(item: InFlightItem) -> str:
 
 
 _KIND_TOOLTIPS = {
-    JobKind.IMAGE: "An image",
-    JobKind.VIDEO: "A video made from a start image",
     JobKind.ENHANCE: "An enhancement of an image already made",
     JobKind.TRAINING: "A fix's LoRA being trained: nothing is sent to ComfyUI until it ends",
 }
+
+
+def _kind_tooltip(job_kind) -> str | None:
+    made = made_by_a_job(job_kind)
+    if made is None:
+        return _KIND_TOOLTIPS.get(job_kind)
+    an = as_sentence(an_item(made))
+    return an if made is ItemType.IMAGE else f"{an} made from a start image"
 
 
 TICK_MS = 1000

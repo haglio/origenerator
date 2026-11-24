@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from origenerator import config
 from origenerator.genau_flicks import (
     AS_GENAU_STARTS,
     NO_FILTER,
@@ -13,6 +14,7 @@ from origenerator.genau_flicks import (
     restored,
     saved,
 )
+from origenerator.workflows.non_ai import non_ai_workflow
 from tests.genau_support import FlicksLibrary as _Library
 from tests.genau_support import looping_row as _row
 
@@ -21,11 +23,23 @@ def _ids(flicks: list[Flick]) -> list[str]:
     return [flick.prompt_id for flick in flicks]
 
 
-def test_genau_lists_every_looping_video_made_here_newest_first_and_nothing_else():
+def test_genau_lists_every_flick_newest_first_and_nothing_else():
     library = _Library([_row("new"), _row("a still", workflow="sdxl_t2i"),
-                        _row("made elsewhere", source="outside"), _row("old")])
+                        _row("a full video", workflow="wan22_i2v"), _row("old")])
 
     assert _ids(flicks_of(library, NO_FILTER)) == ["new", "old"]
+
+
+def test_genau_lists_the_flicks_no_model_made_among_the_ones_made_here(tmp_path, monkeypatch):
+    genau = tmp_path / "videos" / "sample app"
+    monkeypatch.setattr(config, "GENAU_DIR", genau)
+    monkeypatch.setattr(config, "GENAU_FLICKS_NO_MODEL_MADE", (genau / "flicks" / "2D" / "non_AI",))
+    cut_by_hand = dict(_row("cut by hand", workflow=non_ai_workflow("sample app flicks"),
+                            source="non_ai"),
+                       output_files=json.dumps([{"filename": "video one.mp4"}]))
+    library = _Library([_row("made here"), cut_by_hand])
+
+    assert _ids(flicks_of(library, NO_FILTER)) == ["made here", "cut by hand"]
 
 
 def test_each_flick_is_the_file_its_item_plays():

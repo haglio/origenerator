@@ -32,7 +32,7 @@ from origenerator.gallery.collection import (
 )
 from origenerator.gallery.shapes import BOTH, LANDSCAPE, PORTRAIT
 from origenerator.gui import folder_icons, icons
-from origenerator.media import MediaType
+from origenerator.media import ItemType, MediaType
 from origenerator.workflows.non_ai import non_ai_workflow
 from origenerator.workflows.outside import outside_workflow
 
@@ -172,9 +172,9 @@ def test_an_item_type_mark_is_a_white_glyph_on_a_translucent_dark_ground(qtbot):
 
 
 def test_the_mark_among_words_is_drawn_without_the_ground(qtbot):
-    for media_type in (MediaType.IMAGE, MediaType.VIDEO):
-        drawn = icons.media_type_icon(media_type).pixmap(icons.ITEM_TYPE_ICON_SIZE).toImage()
-        ground = drawn.pixelColor(drawn.width() // 2, 3)
+    for item_type in ItemType:
+        drawn = icons.item_type_mark(item_type).pixmap(icons.ITEM_TYPE_ICON_SIZE).toImage()
+        ground = drawn.pixelColor(0, 0)
         inked = any(drawn.pixelColor(x, y).alpha() > 40 for x in range(drawn.width())
                     for y in range(drawn.height()))
 

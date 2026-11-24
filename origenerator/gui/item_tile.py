@@ -29,7 +29,7 @@ from origenerator.gui.progress_bar import ProgressBar
 from origenerator.gui.style_property import set_style_property
 from origenerator.gui.tile_rules import CAPTION, ITEM_TILE, SEED_BUTTON, SELECTED, THUMBNAIL
 from origenerator.gui.tile_status_scrim import TileStatusScrim
-from origenerator.media import MediaType
+from origenerator.media import ItemType
 from origenerator.trash_collection import why_it_cannot_be_restored
 
 _IMAGE_SIZE = tile_shape.thumbnail_size()
@@ -45,7 +45,7 @@ class CornerButton(NamedTuple):
 @dataclass(frozen=True)
 class TileAppearance:
     caption: str | None = None
-    media_type: str | None = None
+    item_type: str | None = None
     video_seconds: float | None = None
     movie_path: str | None = None
     favorite: bool = False
@@ -128,7 +128,7 @@ class ItemTile(QWidget):
         layout.addWidget(self._text_label)
         self._style_by_selection()
 
-        self._media_type = appearance.media_type
+        self._item_type = appearance.item_type
         self._kind_mark = self._mark_its_kind(appearance)
 
         layout.activate()  # Qt gives the thumbnail its rectangle only once the layout has run
@@ -160,10 +160,10 @@ class ItemTile(QWidget):
             self._image_label.setText("No preview")
 
     def _mark_its_kind(self, appearance: TileAppearance) -> ItemTypeIcon | None:
-        if not appearance.media_type:
+        if not appearance.item_type:
             return None
-        mark = ItemTypeIcon(appearance.media_type, self)
-        if appearance.media_type == MediaType.VIDEO and appearance.video_seconds:
+        mark = ItemTypeIcon(appearance.item_type, self)
+        if appearance.item_type != ItemType.IMAGE and appearance.video_seconds:
             VideoLength(appearance.video_seconds, mark)
         return mark
 
@@ -182,7 +182,7 @@ class ItemTile(QWidget):
     @staticmethod
     def look_of(prompt_id: str, thumb_path: str | None, label_text: str,
                 appearance: TileAppearance = PLAIN_APPEARANCE) -> tuple:
-        return (prompt_id, thumb_path, label_text, appearance.media_type,
+        return (prompt_id, thumb_path, label_text, appearance.item_type,
                 appearance.video_seconds, appearance.movie_path, appearance.restore,
                 tuple(action.action_id for action in appearance.corner_buttons or ()))
 
@@ -230,7 +230,7 @@ class ItemTile(QWidget):
         waiting = self._enhancing is not None and not self._enhancing.rendering
         self._controls.show_for(favorite=self._favorite,
                                 enhance=icons.ENHANCE_QUEUED if waiting else self._enhance,
-                                kind=self._media_type)
+                                kind=self._item_type)
 
     @property
     def enhancing(self) -> RunReading | None:

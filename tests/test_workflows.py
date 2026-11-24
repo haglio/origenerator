@@ -16,7 +16,7 @@ from origenerator.comfy_graph import dual_sampler_model_files, graph_model_param
 from origenerator.gui.param_fields import clamped_number
 from origenerator.gui.param_sections import section_title
 from origenerator.importer import _GRAPH_SIGNATURES, _workflow_from_nodes
-from origenerator.media import MediaType
+from origenerator.media import ItemType, MediaType
 from origenerator.what_from_what import KINDS
 from origenerator.workflows import (
     RETIRED_WORKFLOW_NAMES,
@@ -91,10 +91,10 @@ def test_workflows_declare_the_params_that_identify_their_lora():
     assert Wan22T2iWorkflow().lora_keys == ()
 
 
-def test_only_the_flf2v_workflow_declares_itself_looping():
-    assert Wan22Flf2vLoopWorkflow().looping is True
-    assert Wan22I2vWorkflow().looping is False
-    assert SdxlT2iWorkflow().looping is False
+def test_only_the_looping_workflow_makes_flicks():
+    assert Wan22Flf2vLoopWorkflow().item_type is ItemType.FLICK
+    assert Wan22I2vWorkflow().item_type is ItemType.VIDEO
+    assert SdxlT2iWorkflow().item_type is ItemType.IMAGE
 
 
 def test_wan_video_workflows_expose_lora_pickers(monkeypatch):

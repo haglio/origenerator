@@ -94,7 +94,7 @@ from origenerator.gui.tracked_prompt import _Tracker
 from origenerator.item_actions import ItemActions, actions_of
 from origenerator.item_names import ItemNames
 from origenerator.library_views import NO_VIEWS, TabViews
-from origenerator.media import MediaType
+from origenerator.media import ItemType, MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import FrameFolders, OutsideVideo, Record, rows_bringing_in
 from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES
@@ -4308,7 +4308,7 @@ _LOOP = "wan22_flf2v_loop"
 
 def _lane_video(db, lane, prompt_id="vid1"):
     return _video_row(db, prompt_id,
-                      workflow_name=_LOOP if lane.carries_loops else "wan22_i2v")
+                      workflow_name=_LOOP if lane.carries is ItemType.FLICK else "wan22_i2v")
 
 
 def _lane_offers(tab):

@@ -84,7 +84,7 @@ def test_item_type_icon_shows_only_when_the_item_names_a_type(qtbot):
     plain = InFlightTile(_item())
     qtbot.addWidget(plain)
     assert plain.findChildren(ItemTypeIcon) == []
-    typed = InFlightTile(_item(media_type="video"))
+    typed = InFlightTile(_item(item_type="video"))
     qtbot.addWidget(typed)
     assert len(typed.findChildren(ItemTypeIcon)) == 1
 
@@ -327,10 +327,10 @@ def test_the_bar_is_drawn_over_the_scrim_it_sits_on(qtbot):
 
 
 def test_a_tile_brought_up_to_date_still_wears_one_item_type_icon(qtbot):
-    tile = InFlightTile(_item(media_type="video"))
+    tile = InFlightTile(_item(item_type="video"))
     qtbot.addWidget(tile)
 
-    tile.update_item(_item(media_type="video", status="running"))
+    tile.update_item(_item(item_type="video", status="running"))
 
     assert len(tile.findChildren(ItemTypeIcon)) == 1, (
         "a job's kind is fixed, so the icon is placed once when the tile is made")

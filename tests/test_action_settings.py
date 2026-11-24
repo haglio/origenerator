@@ -4,6 +4,7 @@ import json
 
 from origenerator import action_settings, animation_names
 from origenerator.animation_names import item_actions_named
+from origenerator.content import as_sentence
 from origenerator.item_actions import stored
 
 
@@ -131,12 +132,12 @@ def test_most_used_video_keeps_each_action_to_the_videos_launched_as_it():
 
 
 
-def test_genau_mines_only_looping_videos():
+def test_each_lane_takes_settings_only_from_what_it_makes_a_video_or_a_flick():
     rows = [
         _video("v1", "beta", "2026-01-01", lora_high="Z"),
         _loop("l1", "beta", "2026-01-02", lora_high="Z"),
     ]
-    assert action_settings.most_used_video("beta", rows) == "l1"
+    assert action_settings.most_used_video("beta", rows) == "v1"
     assert action_settings.most_used_video("beta", rows, action_settings.GENAU) == "l1"
 
     long_form_only = [_video("v1", "beta", "2026-01-01", lora_high="Z")]
@@ -152,7 +153,7 @@ def test_genau_available_categories_need_a_loop_or_pinned_settings():
     ]
     assert action_settings.available_categories(rows, action_settings.GENAU) == {
         "alpha + beta", "beta"}
-    assert action_settings.available_categories(rows) == {"alpha", "alpha + beta"}
+    assert action_settings.available_categories(rows) == {"alpha"}
 
 
 def test_the_two_curated_tables_are_independent():
@@ -164,8 +165,6 @@ def test_the_two_curated_tables_are_independent():
 
 
 def test_an_action_with_no_past_video_says_so_in_its_lanes_own_words(monkeypatch):
-    monkeypatch.setattr(action_settings, "genau_flick_word", lambda: "flick")
-
     assert action_settings.no_past_video("alpha", action_settings.VIDEO) == (
         "no past “alpha” video to take settings from yet")
     assert action_settings.no_past_video("alpha", action_settings.GENAU) == (
@@ -173,7 +172,7 @@ def test_an_action_with_no_past_video_says_so_in_its_lanes_own_words(monkeypatch
 
 
 def test_a_line_that_opens_a_sentence_capitalizes_its_first_letter_alone():
-    assert action_settings.as_sentence("no past “Alpha” video") == "No past “Alpha” video"
+    assert as_sentence("no past “Alpha” video") == "No past “Alpha” video"
 
 
 def test_offering_every_button_builds_the_video_words_once(monkeypatch):

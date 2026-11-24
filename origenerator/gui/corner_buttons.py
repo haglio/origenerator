@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QPushButton, QWidget
 from shared_ui.spacing import BUTTON_GAP, BUTTON_SIZE, MARGIN_STANDARD
 
 from origenerator import gallery
+from origenerator.content import item_words
 from origenerator.gui import icons, square_buttons
 from origenerator.gui.progress_bar import BAR_HEIGHT
 from origenerator.gui.tile_rules import CORNER_FACE
@@ -109,7 +110,7 @@ class CornerButtons(QObject):
         self._available = False
         self._favorite = False
         self._enhance: str | None = None
-        self._kind = "item"
+        self._said = "item"
         self._placed_in: QRect | None = None
         self._star = _CornerButtonFace(
             host, lambda armed: icons.corner_star_icon(favorite=self._favorite, armed=armed)
@@ -145,7 +146,7 @@ class CornerButtons(QObject):
         self._available = True
         self._favorite = favorite
         self._enhance = enhance
-        self._kind = kind or "item"
+        self._said = item_words(kind)[0] if kind else "item"
         self._redraw()
 
     def hide_all(self):
@@ -185,9 +186,9 @@ class CornerButtons(QObject):
 
     def _retip(self):
         favoring = "Unfavorite" if self._favorite else "Favorite"
-        self._star.setToolTip(self._restore_tip or f"{favoring} this {self._kind}")
+        self._star.setToolTip(self._restore_tip or f"{favoring} this {self._said}")
         self._trash.setToolTip(_DELETE_FOR_GOOD_TIP if self._restore_tip
-                               else f"Delete this {self._kind}")
+                               else f"Delete this {self._said}")
         if self._enhance is not None:
             self._enhance_button.setToolTip(_TIPS[self._enhance][0])
 

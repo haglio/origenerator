@@ -13,10 +13,9 @@ from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.link_heading import link_heading
 from origenerator.gui.looping_preview import play_gray_in, play_in, stop_what_plays_in
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
-from origenerator.media import MediaType
+from origenerator.media import ItemType
 
 _DEFAULT_HEADING = "From source image"
-_DEFAULT_MEDIA_TYPE = MediaType.IMAGE
 _WORDS_ON_ONE_LINE = 3
 
 
@@ -59,7 +58,7 @@ class SourceTile(QWidget):
             f"border: 1px solid {BORDER_SUBTLE.name()}; border-radius: {BUTTON_RADIUS}px;"
         )
         column.addWidget(self._thumb, 0, Qt.AlignmentFlag.AlignHCenter)
-        self._item_type_icon = ItemTypeIcon(_DEFAULT_MEDIA_TYPE, self._thumb)
+        self._item_type_icon = ItemTypeIcon(ItemType.IMAGE, self._thumb)
 
         self._name = QLabel()
         self._name.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
@@ -77,12 +76,12 @@ class SourceTile(QWidget):
         return self._heading.text().replace("\n", " ")
 
     def show_source(self, row: dict, name: str, heading: str | None = None,
-                    media_type: str | None = None, movie: str | None = None,
+                    item_type: str | None = None, movie: str | None = None,
                     gray: bool = False):
         self._prompt_id = row["prompt_id"]
         self._heading.setText(_in_lines(heading or _DEFAULT_HEADING,
                                         self._heading.fontMetrics().horizontalAdvance))
-        self._item_type_icon.set_media_type(media_type or _DEFAULT_MEDIA_TYPE)
+        self._item_type_icon.wear(item_type or ItemType.IMAGE)
         self._name.setText(name)
         if movie:
             (play_gray_in if gray else play_in)(self._thumb, movie, THUMBNAIL_BOX)

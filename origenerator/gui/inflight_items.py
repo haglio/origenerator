@@ -6,17 +6,17 @@ from dataclasses import dataclass
 from functools import partial
 
 from origenerator import gallery, timing
+from origenerator.content import an_item, as_sentence
 from origenerator.generation_state import GenerationStatus
 from origenerator.gui.generation_job import display_status
 from origenerator.gui.inflight import FOLDER_CELLS, InFlightItem, RunReading
-from origenerator.media import MediaType
 from origenerator.voice.dictation import words_of
 from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.derived_size import resolve_input_image_path
 
 logger = logging.getLogger(__name__)
 
-SOURCE_FRAME_KINDS = (gallery.JobKind.VIDEO, gallery.JobKind.ENHANCE)
+SOURCE_FRAME_KINDS = (gallery.JobKind.VIDEO, gallery.JobKind.FLICK, gallery.JobKind.ENHANCE)
 TRAINING_KEY = "fix training"
 
 
@@ -115,7 +115,7 @@ class InFlightItems:
                     typical_seconds=self._typical_seconds(workflow_name, typical),
                 ),
                 reveal=reveal,
-                media_type=gallery.media_type_of_row(row),
+                item_type=gallery.item_type_of(row),
                 cancel=cancel,
                 shield=shield,
                 shielded=shielded,
@@ -200,8 +200,8 @@ def source_file_of(asked_of: dict | None, params: dict, kind: str) -> str | None
 
 def requested_of(row: dict, workflow, params: dict) -> dict:
     kind = gallery.job_kind_label(workflow.name)
-    made = "A video" if workflow.output_type == MediaType.VIDEO else "An image"
+    made = as_sentence(an_item(workflow.item_type))
     return {"caption": f"{made} from a Request, still being started",
-            "media_type": workflow.output_type, "job_kind": kind, "requested": True,
+            "item_type": workflow.item_type, "job_kind": kind, "requested": True,
             "source_image": start_frame_of(kind, params),
             "source_file": source_file_of(row, params, kind)}

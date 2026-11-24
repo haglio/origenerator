@@ -4,6 +4,7 @@ from PySide6.QtCore import QObject, Signal
 
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.inflight import InFlightItem, RunReading
+from origenerator.media import ItemType
 
 
 class StartingRows(QObject):
@@ -32,7 +33,7 @@ class StartingRows(QObject):
     def placed_among(self, items: list, line) -> list:
         placed = list(items)
         for row in self._rows.values():
-            before = line.joins_before(row.media_type)
+            before = line.joins_before(ItemType(row.item_type).filed_as)
             placed.insert(next((at for at, item in enumerate(placed) if item.key == before),
                                len(placed)), row)
         return placed

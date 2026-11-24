@@ -41,7 +41,7 @@ from origenerator.gui.gallery_view import _GROUP_ROLE, GalleryView
 from origenerator.gui.hud_queue import queue_section
 from origenerator.gui.inflight import InFlightItem, RunReading, cancel_tooltip
 from origenerator.item_shape import base_of
-from origenerator.media import MediaType
+from origenerator.media import ItemType
 from origenerator.output_places import OutputPlaces
 from origenerator.slideshow import SlideshowFilters
 from origenerator.trash import Trash
@@ -2391,7 +2391,7 @@ def test_a_row_standing_in_for_an_image_waits_in_front_of_the_videos(qtbot, tmp_
     making, waiting = view._jobs.queue_order
 
     standing = view._starting.show(caption="An image from a Request, still being started",
-                                   media_type=MediaType.IMAGE)
+                                   item_type=ItemType.IMAGE)
 
     assert [item.key for item in view.job_queue.view._items] == [making, standing, waiting]
     assert [item.key for item in view.job_queue.now()[0]] == [making, standing, waiting]

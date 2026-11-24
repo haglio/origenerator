@@ -203,8 +203,8 @@ def item_type_icon(media_type: str, size: int = ITEM_TYPE_ICON_SIZE) -> QPixmap:
 
 
 @cache
-def media_type_icon(media_type: str) -> QIcon:
-    return qt_icon(icon_name(media_type), size=_SIZE)
+def item_type_mark(item_type: str) -> QIcon:
+    return qt_icon(icon_name(item_type), size=_SIZE)
 
 
 ENHANCE_OPEN = "open"

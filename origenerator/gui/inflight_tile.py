@@ -79,8 +79,8 @@ class InFlightTile(QWidget):
         self._place_overlays()
         self.update_item(item)
 
-        if item.media_type:
-            ItemTypeIcon(item.media_type, self).place(self._image.geometry())
+        if item.item_type:
+            ItemTypeIcon(item.item_type, self).place(self._image.geometry())
 
     @property
     def key(self) -> str:
@@ -93,7 +93,7 @@ class InFlightTile(QWidget):
         self._bar.setToolTip(cancel_tooltip(item.populating) if item.cancel is not None else "")
         if item.is_an_item:
             self._controls.show_for(favorite=item.favorite, enhance=_enhance_of(item),
-                                    kind=item.media_type)
+                                    kind=item.item_type)
         else:
             self._controls.hide_all()
         self._draw_the_thumbnail(item)

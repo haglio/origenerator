@@ -505,7 +505,7 @@ def test_all_shows_its_collections_then_images_and_videos_as_squares(qtbot):
     (mark,) = [label for label in square.findChildren(QLabel)
                if label.toolTip() == "Images" and not label.pixmap().isNull()]
     size = mark.pixmap().size()
-    assert mark.pixmap().toImage() == icons.media_type_icon("image").pixmap(size).toImage()
+    assert mark.pixmap().toImage() == icons.item_type_mark("image").pixmap(size).toImage()
 
 
 def _both_kinds_in_every_collection():
@@ -1931,15 +1931,15 @@ def test_clicking_a_step_during_a_search_puts_the_search_away_and_goes_there(qtb
 
 
 def test_a_workflow_that_made_both_kinds_has_a_folder_of_each_kind(qtbot):
-    still = _row("still", "wan22_flf2v_loop", {"seed": 1}, "flf2v_loop_00001_.png")
-    video = _row("clip", "wan22_flf2v_loop", {"seed": 2}, "flf2v_loop_00002_.mp4")
+    still = _row("still", "wan22_i2v", {"seed": 1}, "i2v_00001_.png")
+    video = _row("video", "wan22_i2v", {"seed": 2}, "i2v_00002_.mp4")
     view = GalleryView(database_of([still, video]))
     qtbot.addWidget(view)
     view.refresh()
-    looping = workflow_label("wan22_flf2v_loop")
+    animating = workflow_label("wan22_i2v")
 
-    assert list(_workflow_rows(view._tree, "image")) == [looping]
-    assert list(_workflow_rows(view._tree, "video")) == [looping]
+    assert list(_workflow_rows(view._tree, "image")) == [animating]
+    assert list(_workflow_rows(view._tree, "video")) == [animating]
 
 
 def test_with_several_folders_picked_the_path_up_top_links_nothing(qtbot):

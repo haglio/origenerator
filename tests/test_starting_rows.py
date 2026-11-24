@@ -3,7 +3,7 @@ from __future__ import annotations
 from origenerator.gui.generation_job import JobState
 from origenerator.gui.inflight import InFlightItem, RunReading
 from origenerator.gui.starting_rows import StartingRows
-from origenerator.media import MediaType
+from origenerator.media import ItemType
 
 
 class FakeLine:
@@ -25,7 +25,7 @@ def test_a_row_shown_stands_in_the_line_until_it_is_dropped(qtbot):
     rows.changed.connect(lambda: redraws.append(True))
 
     key = rows.show(caption="A video from Combine, still being started",
-                    media_type=MediaType.VIDEO)
+                    item_type=ItemType.VIDEO)
 
     (row,) = rows.rows()
     assert row.key == key
@@ -41,9 +41,9 @@ def test_a_row_shown_stands_in_the_line_until_it_is_dropped(qtbot):
 def test_a_row_stands_where_the_line_would_take_its_job(qtbot):
     rows = StartingRows()
     image = rows.show(caption="An image from a Request, still being started",
-                      media_type=MediaType.IMAGE)
+                      item_type=ItemType.IMAGE)
     video = rows.show(caption="A video from Combine, still being started",
-                      media_type=MediaType.VIDEO)
+                      item_type=ItemType.VIDEO)
 
     line = rows.placed_among([_job("making"), _job("waiting")], FakeLine(image="waiting"))
 

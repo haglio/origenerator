@@ -28,8 +28,8 @@ from origenerator.gallery.keys import (
     source_image_key,
 )
 from origenerator.gallery.labels import (
-    MEDIA_LABELS,
     _source_image_label,
+    item_type_labels,
     lora_label,
     model_label,
     workflow_label,
@@ -38,6 +38,8 @@ from origenerator.gallery.moments import BEFORE_EVERY_RECORD, moment_of
 from origenerator.gallery.non_ai import leaf_folder_label
 from origenerator.gallery.output import (
     is_in_progress,
+    item_type_of,
+    makes_flicks,
     media_type_of_row,
 )
 from origenerator.gallery.signatures import (
@@ -55,7 +57,7 @@ from origenerator.gallery.signatures import (
 )
 from origenerator.gallery.source_image import build_image_config_index
 from origenerator.generation_state import GenerationSource, in_sight
-from origenerator.media import MediaType
+from origenerator.media import ItemType, MediaType
 from origenerator.output_files import produced_output
 from origenerator.workflows.non_ai import FOLDER_KINDS, folder_kind, non_ai_folder
 
@@ -94,7 +96,7 @@ def folder_key_at_level(row: dict, level: str, image_index: dict | None = None) 
     workflow_name = row.get("workflow_name") or "unknown"
     params_json = row.get("params_json")
     if level == "media":
-        return media_type
+        return item_type_of(row)
     if level == "workflow":
         return f"{media_type}/{workflow_name}"
     if level == "model":
@@ -107,6 +109,13 @@ def folder_key_at_level(row: dict, level: str, image_index: dict | None = None) 
     if level == "settings":
         return settings_folder_key(row, image_index)
     raise ValueError(f"unknown folder level: {level!r}")
+
+
+def media_folder_holding(key: str) -> str:
+    filed_as, _, below = key.partition("/")
+    a_flick_s = filed_as == MediaType.VIDEO and any(
+        makes_flicks(name) for name in (below, below.rpartition("/")[0]) if name)
+    return ItemType.FLICK if a_flick_s else filed_as
 
 
 def folder_chain(row: dict, image_index: dict | None = None) -> tuple[str, ...]:
@@ -497,15 +506,17 @@ def build_gallery_tree(
         image_index = start_frame_index(rows)
     kept = kept or KeptFolders()
     rows = placeable_rows(rows)
-    by_kind = dict(_group_by_creation(rows, media_type_of_row))
-    media = [_media_folder(media_type, by_kind[media_type], folder_meta, image_index,
+    by_type = dict(_group_by_creation(rows, item_type_of))
+    media = [_media_folder(item_type, by_type[item_type], folder_meta, image_index,
                            name_of or _unnamed, kept)
-             for media_type in MediaType if media_type in by_kind]
+             for item_type in ItemType if item_type in by_type]
     return kept.kept("tree", media, list, media)
 
 
-def _media_folder(media_type, rows, folder_meta, image_index, name_of, kept) -> MediaGroup:
-    label, favorite = _overlay(MEDIA_LABELS[media_type], media_type, folder_meta)
+def _media_folder(item_type: ItemType, rows, folder_meta, image_index, name_of,
+                  kept) -> MediaGroup:
+    label, favorite = _overlay(item_type_labels()[item_type], item_type, folder_meta)
+    media_type = item_type.filed_as
     workflows = []
     for wf_name, wf_rows in _group_by_creation(
         rows, lambda r: r.get("workflow_name") or "unknown"
@@ -517,7 +528,7 @@ def _media_folder(media_type, rows, folder_meta, image_index, name_of, kept) -> 
                                           tier, wf_key, wf_label, wf_rows, wf_favorite))
     workflows = sorted(in_alphabetical_order(workflows),
                        key=lambda workflow: FOLDER_KINDS.index(folder_kind(workflow.workflow_name)))
-    return kept.kept(str(media_type), workflows, MediaGroup, str(media_type), label, workflows,
+    return kept.kept(str(item_type), workflows, MediaGroup, str(item_type), label, workflows,
                      favorite)
 
 

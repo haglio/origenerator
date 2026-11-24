@@ -23,8 +23,8 @@ from tests.drop_style_seen import worn
 _NO_LOOKUPS = ZoneLookups(lent_by=lambda pid: pid, preview=lambda pid: (None, None))
 
 
-def _zone(qtbot, kind="image", placeholder="Drop here", grayscale=False, lookups=_NO_LOOKUPS):
-    zone = DropZone(kind=kind, lookups=lookups, placeholder=placeholder, grayscale=grayscale)
+def _zone(qtbot, kind="image", grayscale=False, lookups=_NO_LOOKUPS):
+    zone = DropZone(kind=kind, lookups=lookups, grayscale=grayscale)
     qtbot.addWidget(zone)
     return zone
 
@@ -336,7 +336,7 @@ def test_accepts_delegates_to_the_predicate(qtbot):
 def test_the_item_type_icon_appears_only_once_filled(qtbot, kind):
     zone = _zone(qtbot, kind=kind)
     icon = zone.findChild(ItemTypeIcon)
-    assert icon.media_type == kind
+    assert icon.item_type == kind
     # Qt's isVisible is False for every widget whose window was never shown; isHidden answers for the widget alone.
     assert icon.isHidden()
 

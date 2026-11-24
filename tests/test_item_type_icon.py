@@ -21,9 +21,9 @@ def test_the_icon_follows_the_kind_of_its_subject_when_that_changes(qtbot):
     qtbot.addWidget(tile)
     icon = ItemTypeIcon("image", tile)
 
-    icon.set_media_type("video")
+    icon.wear("video")
 
-    assert (icon.media_type, icon.pixmap().toImage()) == (
+    assert (icon.item_type, icon.pixmap().toImage()) == (
         "video", icons.item_type_icon("video", icon.width()).toImage()), (
         "the Generate tab's source tile shows an image or a video in the one place, so its item "
         "type mark follows the kind it is handed rather than saying image over both")

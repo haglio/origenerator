@@ -1360,7 +1360,7 @@ class GalleryView(QWidget):
                               name=self._item_names.of(job.prompt_id),
                               favorite=bool(row.get("starred")),
                               enhance=_enhance_of_a_run(job, row),
-                              kind=job.workflow.output_type,
+                              kind=job.workflow.item_type,
                               populating=self._populate.is_active(key),
                               typical_seconds=timing.typical_run_seconds(self._db, job),
                               made_from=self._job_made_from(

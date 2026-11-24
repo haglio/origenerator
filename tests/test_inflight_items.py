@@ -355,7 +355,7 @@ def test_the_row_standing_in_for_a_request_is_the_row_its_run_will_get(build, so
 
     standing = requested_of(asked_of, WORKFLOW_REGISTRY["sdxl_t2i"], {})
 
-    drawn = ("media_type", "job_kind", "requested", "source_image", "source_file")
+    drawn = ("item_type", "job_kind", "requested", "source_image", "source_file")
     assert {name: standing[name] for name in drawn} == {
         name: getattr(tile, name) for name in drawn}
 

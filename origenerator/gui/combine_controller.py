@@ -21,6 +21,7 @@ from origenerator.animation_names import (
 )
 from origenerator.combine_runs import CombineRun
 from origenerator.config import COMFYUI_INPUT_DIR, OUTPUT_PLACES
+from origenerator.content import an_item, as_sentence, item_words
 from origenerator.default_animation_settings import (
     the_default_animation_settings_window,
 )
@@ -35,7 +36,7 @@ from origenerator.gui.zone_items import FilesOnly
 from origenerator.item_actions import actions_of
 from origenerator.item_names import ItemNames
 from origenerator.library_views import KeptUntilTheLibraryChanges
-from origenerator.media import MediaType, media_type_from_filename
+from origenerator.media import ItemType, MediaType, media_type_from_filename
 from origenerator.video_history import video_history
 
 logger = logging.getLogger(__name__)
@@ -45,7 +46,6 @@ ALREADY_MAKING_ONE = "already making it — handing that one over"
 
 NOT_AN_IMAGE = "only an image can be animated"
 
-NO_PAST_VIDEO = "No past video yet"
 
 
 class CombineHost(Protocol):
@@ -141,7 +141,11 @@ class CombineController(QObject):
         return lent["prompt_id"] if lent is not None else None
 
     def _accepts_video(self, prompt_id: str) -> bool:
-        return combine_runs.rebuildable_video(self._db.get_generation(prompt_id))
+        return self._fits_the_lane(prompt_id, self.widget.selected_intent())
+
+    def _fits_the_lane(self, prompt_id: str, lane: str) -> bool:
+        row = self._db.get_generation(prompt_id)
+        return combine_runs.rebuildable_video(row) and action_settings.lane_of(row) == lane
 
     def _video_lent_by(self, prompt_id: str) -> str | None:
         return prompt_id if self._accepts_video(prompt_id) else None
@@ -184,7 +188,7 @@ class CombineController(QObject):
         if not isinstance(videos, dict):
             videos = {self.widget.selected_intent(): saved.get("video")}
         self.widget.set_dropped_videos({lane: video for lane, video in videos.items()
-                                       if video and self._accepts_video(video)})
+                                       if video and self._fits_the_lane(video, lane)})
         self.widget.set_checked_boxes(saved.get("checked") or ())
         self.widget.set_category(saved.get("category") or "")
 
@@ -269,10 +273,11 @@ class CombineController(QObject):
                if video_id and not category else None)
         edited = run is not None and gallery.prompts_differ_from(run.params, video_row,
                                                                  run.workflow)
+        made = action_settings.made_in(intent)
         return self._starting.show(
-            caption="A video from Combine, still being started",
-            media_type=MediaType.VIDEO,
-            job_kind=gallery.JobKind.VIDEO,
+            caption=f"{as_sentence(an_item(made))} from Combine, still being started",
+            item_type=made,
+            job_kind=gallery.JobKind.FLICK if made is ItemType.FLICK else gallery.JobKind.VIDEO,
             action=category,
             source_video_thumbnail=None if category else (video_row or {}).get("thumbnail_path"),
             prompt_edited=edited,
@@ -361,8 +366,9 @@ class CombineController(QObject):
         if self._slideshows.showing is not None:
             self._slideshows.note_voice_run(None, said, kind=WARNING)
             return
-        self._host.tell(NO_PAST_VIDEO, f"{action_settings.as_sentence(said)} — make one first, "
-                                       "or drop a specific video instead.")
+        one = item_words(action_settings.made_in(intent))[0]
+        self._host.tell(f"No past {one} yet", f"{as_sentence(said)} — make one first, "
+                                              f"or drop a specific {one} instead.")
 
     def _curated_combination(self, image_id: str, category: str,
                              intent: str = action_settings.VIDEO) -> CombineRun | None:

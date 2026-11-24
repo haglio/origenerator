@@ -26,7 +26,7 @@ from origenerator.gui.generate_tab import GenerateTab
 from origenerator.gui.how_many import HOW_MANY
 from origenerator.item_names import ItemNames
 from origenerator.library_views import NO_VIEWS, LibraryViews, TabViews
-from origenerator.media import MediaType
+from origenerator.media import ItemType, MediaType
 from origenerator.workflows import workflow_named
 
 _MARKS_KEPT = 64
@@ -102,7 +102,7 @@ class GeneratePane(QTabWidget):
         self._how_many = HOW_MANY[0]
         self._request_auto_generate = False
         self._thumbnail_marks = ReadEachWhenChanged(_thumbnail_mark, most=_MARKS_KEPT)
-        self._media_marks: dict[MediaType | None, QIcon] = {}
+        self._media_marks: dict[ItemType | None, QIcon] = {}
         self._add_subtab()
 
     def _front_tab_relayout(self, _index: int = -1) -> None:
@@ -193,7 +193,7 @@ class GeneratePane(QTabWidget):
             return mark
         if media not in self._media_marks:
             self._media_marks[media] = tab_mark(
-                icons.media_type_icon(media) if media else QIcon())
+                icons.item_type_mark(media) if media else QIcon())
         return self._media_marks[media]
 
     def _update_tab(self, tab: GenerateTab, title: str):

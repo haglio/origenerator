@@ -8,8 +8,9 @@ from PySide6.QtWidgets import QVBoxLayout, QWidget
 from shared_ui.flow_layout import FlowLayout
 from shared_ui.spacing import GAP_MEDIUM
 
-from origenerator.content import non_ai_clip_heading
+from origenerator.content import as_sentence, item_words, non_ai_clip_heading
 from origenerator.gallery import (
+    item_type_of,
     media_type_of_row,
     start_images_among,
     videos_from_source_image,
@@ -43,14 +44,20 @@ def _cut_into(row: dict) -> str:
 LINKS = "Links"
 ANIMATED_FROM = "Animated from"
 ANIMATED_FROM_STARTING_FRAME_OF = "Animated from starting frame of"
-ANIMATED_USING_VIDEO_SETTINGS_OF = "Animated using video settings of"
 ANIMATED_INTO = "Animated into"
 STARTING_FRAME_ANIMATED_INTO = "Starting frame animated into"
-VIDEO_SETTINGS_USED_FOR_ANIMATION_OF = "Video settings used for animation of"
 TRIMMED_FROM = "Trimmed from"
 TRIMMED_INTO = "Trimmed into"
 FULL_VIDEO = "Full video"
 ALTERNATE_VERSION_OF = "Alternate version of"
+
+
+def animated_using_settings_of(lender: dict) -> str:
+    return f"Animated using {item_words(item_type_of(lender))[0]} settings of"
+
+
+def settings_used_for_animation_of(lender: dict) -> str:
+    return f"{as_sentence(item_words(item_type_of(lender))[0])} settings used for animation of"
 
 
 class _LinkRow(QWidget):
@@ -82,8 +89,8 @@ class _LinkRow(QWidget):
         tile.change_mark.show_change(tip)
         tile.activated.connect(self.activated)
         tile.show_source(row, name_of(row["prompt_id"]), heading=heading,
-                         media_type=media_type_of_row(row), movie=self._movie_of(row),
-                         gray=heading == ANIMATED_USING_VIDEO_SETTINGS_OF)
+                         item_type=item_type_of(row), movie=self._movie_of(row),
+                         gray=heading == animated_using_settings_of(row))
         return tile
 
 
@@ -147,7 +154,7 @@ class RelatedMedia(QWidget):
         self._animations.show_links(
             animated_from + self._settings_from(row)
             + [(into, video) for video in self._animated_videos(row, start_image_of, videos)]
-            + self._made_with_settings_of(prompt_id, videos),
+            + self._made_with_settings_of(row, videos),
             self._name_of, self._trashed())
         alternates = alternate_versions(row, videos) if prompt_id else []
         cut_from_here = {prompt_id, *(version["prompt_id"] for version in alternates)} - {None}
@@ -204,10 +211,11 @@ class RelatedMedia(QWidget):
     def _settings_from(self, row: dict) -> list[tuple[str, dict]]:
         video_id = row.get("source_video")
         video = self._item(video_id) if video_id else None
-        return [(ANIMATED_USING_VIDEO_SETTINGS_OF, video)] if video is not None else []
+        return [(animated_using_settings_of(video), video)] if video is not None else []
 
-    def _made_with_settings_of(self, prompt_id: str | None, videos: list[dict]) -> list:
-        return [(VIDEO_SETTINGS_USED_FOR_ANIMATION_OF, video) for video in videos
+    def _made_with_settings_of(self, lender: dict, videos: list[dict]) -> list:
+        prompt_id = lender.get("prompt_id")
+        return [(settings_used_for_animation_of(lender), video) for video in videos
                 if prompt_id and video.get("source_video") == prompt_id]
 
     def show_requests_and_batch_modified(self, prompt_id: str | None) -> None:

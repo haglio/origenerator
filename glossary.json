@@ -265,7 +265,7 @@
         "[\"pictures\"]",
         "\"outside picture:\"",
         "close-up photo of",
-        "else \"photo\"",
+        "ItemType.IMAGE: \"photo\"",
         "(\"photo\", \"photograph\"",
         "(\"picture\", \"image\", \"render\")"
       ]

@@ -7,8 +7,10 @@ from shared_ui.tick_control import TickControl
 
 from origenerator.action_setter_tool import the_setter_tool
 from origenerator.action_vocabulary import vocabulary
+from origenerator.content import as_sentence, item_words
 from origenerator.gallery import media_type_of_row
 from origenerator.gallery.non_ai import started_from_no_image
+from origenerator.gallery.output import item_type_of
 from origenerator.gallery.source_image import image_actions_row, inherits_image_actions
 from origenerator.gui.eliding import ElidingLabel
 from origenerator.gui.label_cells import LabelCell, LabelForm
@@ -20,9 +22,15 @@ from origenerator.own_window import show_or_say, still_open
 
 ACTION_LABEL = "Action"
 ACTIONS_LABEL = "Actions"
-SIDE_LABELS = {MediaType.IMAGE: "Image actions", MediaType.VIDEO: "Video actions"}
 ADD = "Add with setter tool…"
 EDIT = "Edit with setter tool…"
+
+
+def actions_label(item_type: str) -> str:
+    return f"{as_sentence(item_words(item_type)[0])} actions"
+
+
+SIDE_LABELS = {side: actions_label(side) for side in MediaType}
 
 _TIPS = {MediaType.IMAGE: "Set this image's actions, then every image that has none, one press apiece",
          MediaType.VIDEO: "Set this video's actions, then every video that has none, one press apiece"}
@@ -199,6 +207,7 @@ class ActionRow(QWidget):
 
     def _show_video_actions(self, rows: list[dict]) -> None:
         video = self._sides[MediaType.VIDEO]
+        self._names[MediaType.VIDEO].setText(actions_label(item_type_of(rows[0])))
         video.show_actions({row["prompt_id"]: actions_of(row, MediaType.VIDEO) for row in rows})
         self._form.setRowVisible(video, True)
 

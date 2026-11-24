@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from app_support.gallery_rows import source_of
 
-from origenerator.gallery import JobKind, job_kind_label
+from origenerator.gallery import JobKind, job_kind_label, job_kind_said
 from origenerator.generation_state import GenerationSource
 from origenerator.timing import clock_duration
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -33,8 +33,8 @@ class Toast:
 def _title(outcome: RunOutcome) -> str | None:
     if outcome.kind == JobKind.TRAINING:
         return "LoRA ready" if outcome.ok else "Training failed"
-    if outcome.kind == JobKind.VIDEO and outcome.source == GenerationSource.GENERATED:
-        return f"{outcome.kind} {'ready' if outcome.ok else 'failed'}"
+    if outcome.kind in (JobKind.VIDEO, JobKind.FLICK) and outcome.source == GenerationSource.GENERATED:
+        return f"{job_kind_said(outcome.kind)} {'ready' if outcome.ok else 'failed'}"
     return None
 
 

@@ -80,12 +80,12 @@ def test_survives_a_missing_thumbnail_file(tile):
 
 
 def test_a_relation_named_for_one_showing_does_not_carry_to_the_next(tile):
-    tile.show_source({"prompt_id": "vid1", "thumbnail_path": None}, "cycle.mp4", heading="Trimmed from", media_type="video")
+    tile.show_source({"prompt_id": "vid1", "thumbnail_path": None}, "cycle.mp4", heading="Trimmed from", item_type="video")
 
     tile.show_source({"prompt_id": "img1", "thumbnail_path": None}, "start.png")
 
     assert tile.heading == "From source image"
-    assert tile._item_type_icon.media_type == "image"
+    assert tile._item_type_icon.item_type == "image"
 
 
 def test_a_heading_of_more_than_three_words_takes_two_lines_and_a_shorter_one_takes_one(tile):

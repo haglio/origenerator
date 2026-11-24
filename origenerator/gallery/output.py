@@ -8,13 +8,15 @@ from pathlib import Path
 from app_support.comfy_file_refs import frame_name
 from app_support.video_names import stem_as_made, stem_of_either_copy
 
+from origenerator.content import item_words
 from origenerator.gallery.signatures import workflow_output_type
 from origenerator.generation_state import GenerationStatus
-from origenerator.media import MediaType, media_type_from_filename, sibling_of_type
+from origenerator.media import ItemType, MediaType, media_type_from_filename, sibling_of_type
 from origenerator.one_look import is_file
 from origenerator.output_files import READINGS_KEPT, parse_file_list
 from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import animated_thumbnail_path, generate_animated_thumbnail
+from origenerator.workflows import workflow_named
 
 logger = logging.getLogger(__name__)
 
@@ -53,13 +55,30 @@ def media_type_of_row(row: dict) -> MediaType:
     return _media_type_of(row.get("output_files"), row.get("workflow_name"))
 
 
+def item_type_of(row: dict) -> ItemType:
+    filed_as = media_type_of_row(row)
+    if filed_as is MediaType.VIDEO and makes_flicks(row.get("workflow_name")):
+        return ItemType.FLICK
+    return ItemType(filed_as)
+
+
+def makes_flicks(workflow_name: str | None) -> bool:
+    workflow = workflow_named(workflow_name)
+    return workflow is not None and workflow.item_type is ItemType.FLICK
+
+
+def is_a_flick(row: dict) -> bool:
+    return item_type_of(row) is ItemType.FLICK
+
+
 def counted(rows) -> str:
-    kinds = {media_type_of_row(row) for row in rows}
+    kinds = {item_type_of(row) for row in rows}
     return counted_of(len(rows), kinds.pop() if len(kinds) == 1 else None)
 
 
-def counted_of(count: int, kind: MediaType | None) -> str:
-    return f"{count} {kind or 'item'}{'' if count == 1 else 's'}"
+def counted_of(count: int, kind: str | None) -> str:
+    one, many = item_words(kind) if kind else ("item", "items")
+    return f"{count} {one if count == 1 else many}"
 
 
 @lru_cache(maxsize=READINGS_KEPT)

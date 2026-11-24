@@ -1628,8 +1628,7 @@ class GalleryView(QWidget):
                       tip=why_not or POPULATE_TIP)
 
     def _in_populating(self) -> bool:
-        collection = folder_collection(_base_of(self.selected_folder_key()))
-        return collection is not None and collection.which == _POPULATING_KEY
+        return self._gallery_pane.showing_populating()
 
     def _why_populate_cannot(self, group) -> str | None:
         if not isinstance(group, gallery.SettingsGroup):

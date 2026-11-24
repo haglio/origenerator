@@ -26,6 +26,7 @@ ABANDONED = RequestState.ABANDONED
 # As Whisper renders the lead word; a hurried "request:" comes back in the trailing forms.
 LEAD_WORDS = ("request", "requests", "requested")
 _END_WORDS = ("over",)
+_RETRY_WORDS = ("retry",)
 
 _MAX_UTTERANCES = 8
 
@@ -36,6 +37,10 @@ def _without_leading_word(text: str) -> str:
 
 def _without_trailing_word(text: str) -> str:
     return re.sub(r"\W*[\w']+\W*$", "", text or "", count=1)
+
+
+def _ends_on(heard: list[str], markers: tuple) -> bool:
+    return bool(heard) and sounds_like(heard[-1], markers)
 
 
 def _join(parts: list) -> str:
@@ -85,14 +90,19 @@ class RequestDictation:
         self._opened_at = spoken_at
         self._heard = [text]
         body = _without_leading_word(text)
-        if self._ends_the_request(heard):
+        if _ends_on(heard, _RETRY_WORDS):
+            return self._retry(text)
+        if _ends_on(heard, _END_WORDS):
             return self._finish(_without_trailing_word(body))
         self._parts = [body]
         return SpokenRequest(OPENED, _join(self._parts), _join(self._heard), self._opened_at)
 
     def _continue(self, text: str):
         self._heard.append(text)
-        if self._ends_the_request(words(text, keep_apostrophes=True)):
+        heard = words(text, keep_apostrophes=True)
+        if _ends_on(heard, _RETRY_WORDS):
+            return self._retry(text)
+        if _ends_on(heard, _END_WORDS):
             return self._finish(_join([*self._parts, _without_trailing_word(text)]))
         self._parts.append(text)
         if len(self._heard) >= self._max:
@@ -101,9 +111,10 @@ class RequestDictation:
             return SpokenRequest(ABANDONED, "", given_up, opened_at)
         return SpokenRequest(COLLECTING, _join(self._parts), _join(self._heard), self._opened_at)
 
-    @staticmethod
-    def _ends_the_request(heard: list[str]) -> bool:
-        return bool(heard) and sounds_like(heard[-1], _END_WORDS)
+    def _retry(self, text: str):
+        self._parts = []
+        self._heard = [text]
+        return SpokenRequest(COLLECTING, "", text, self._opened_at)
 
     def _finish(self, body: str):
         heard, opened_at = _join(self._heard), self._opened_at
@@ -125,4 +136,4 @@ def words_of(record: dict | None) -> str:
 
 def request_bias() -> str:
     # A short marker word off a quiet mic comes back as something else unless Whisper is told to expect it.
-    return "Voice requests: request, over."
+    return "Voice requests: request, over, retry."

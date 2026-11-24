@@ -127,6 +127,24 @@ def test_watch_totals_land_on_each_videos_row_and_a_video_with_none_is_counted(t
     assert (row["watch_completions"], row["watch_skips"], row["watch_locks"]) == (3, 1, 2)
 
 
+def test_two_copies_of_one_video_add_their_counts_on_its_row_once(tmp_path, capsys):
+    db = _the_gallery(tmp_path)
+    video = _filed(_places(tmp_path))
+    _outside(db, "o1", video)
+    copy = tmp_path / "genau" / video.name
+    copy.parent.mkdir(parents=True)
+    copy.write_bytes(b"not really a video")
+    totals = {str(video): {"completions": 5, "skips": 2, "locks": 0},
+              str(copy): {"completions": 0, "skips": 0, "locks": 0}}
+
+    said = _run(tmp_path, capsys, "watched", "--totals", _json_file(tmp_path, "totals.json", totals))
+    said_again = _run(tmp_path, capsys, "watched", "--totals", _json_file(tmp_path, "totals.json", totals))
+
+    row = db.get_generation("o1")
+    assert (row["watch_completions"], row["watch_skips"]) == (5, 2)
+    assert (said["changed"], said_again["changed"]) == (1, 0)
+
+
 def test_watch_totals_for_many_videos_read_the_gallery_once(tmp_path, capsys, monkeypatch):
     _the_gallery(tmp_path)
     reads = []

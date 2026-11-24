@@ -9,6 +9,7 @@ from pathlib import Path
 from app_support.gallery_rows import VideoRows
 from app_support.json_store import read_json
 from app_support.logging_utils import configure_logging, install_exception_logging
+from app_support.watch_weights import add_counts
 
 from origenerator import config
 from origenerator.db import Database
@@ -94,15 +95,15 @@ def _written_on_their_rows(db, args) -> list[bool]:
 
 def _watch_totals_written(db, rows, row_of, totals: dict) -> tuple[list[bool], int]:
     by_id = {row["prompt_id"]: row for row in rows}
-    found, moved = [], {}
+    found, on_its_row = [], {}
     for video, counts in totals.items():
         prompt_id = row_of(Path(video))
         found.append(prompt_id is not None)
-        if prompt_id is None:
-            continue
-        wanted = watch_columns_of(counts)
-        if any(by_id.get(prompt_id, {}).get(column) != value for column, value in wanted.items()):
-            moved[prompt_id] = counts
+        if prompt_id is not None:
+            on_its_row[prompt_id] = add_counts(on_its_row.get(prompt_id), counts)
+    moved = {prompt_id: counts for prompt_id, counts in on_its_row.items()
+             if any(by_id.get(prompt_id, {}).get(column) != value
+                    for column, value in watch_columns_of(counts).items())}
     db.set_many_watch_counts(moved)
     return found, len(moved)
 

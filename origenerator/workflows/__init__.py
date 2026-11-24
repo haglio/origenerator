@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from functools import cache
 
-from origenerator.media import MediaType
+from origenerator.media import ItemType, MediaType
 from origenerator.workflows.base import WorkflowTemplate
 from origenerator.workflows.flux_t2i_upscaled import FluxT2iUpscaledWorkflow
 from origenerator.workflows.image_enhance import ImageEnhanceWorkflow
@@ -38,6 +38,13 @@ WORKFLOW_REGISTRY: dict[str, WorkflowTemplate] = {
 def offered_workflows(*, makes: MediaType | None) -> list[WorkflowTemplate]:
     return [wf for wf in WORKFLOW_REGISTRY.values()
             if wf.selectable and makes in (None, wf.output_type)]
+
+
+def grouped_by_item_type(workflows: list[WorkflowTemplate]
+                         ) -> list[tuple[ItemType, list[WorkflowTemplate]]]:
+    groups = [(item_type, [wf for wf in workflows if wf.item_type is item_type])
+              for item_type in ItemType]
+    return [(item_type, group) for item_type, group in groups if group]
 
 
 RETIRED_WORKFLOW_NAMES: dict[str, str] = {

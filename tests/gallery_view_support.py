@@ -52,7 +52,7 @@ from origenerator.motion_engine import Motion
 from origenerator.output_places import OutputPlaces
 from origenerator.prompt_edit import work_out
 from origenerator.trash import Trash
-from origenerator.workflows import WORKFLOW_REGISTRY
+from origenerator.workflows import WORKFLOW_REGISTRY, grouped_by_item_type, offered_workflows
 from tests import gestures
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.qt_exec import faking_exec
@@ -303,6 +303,16 @@ def _press_ctrl_f(view, monkeypatch):
     monkeypatch.setattr(view.keys, "other_window_owns_keys", lambda: False)
     return view.keys.eventFilter(
         view, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_F, _CTRL))
+
+
+def listed_workflows(tab):
+    dropdown = tab._workflow_dropdown
+    return [name for i in range(dropdown.count()) if (name := dropdown.itemData(i))]
+
+
+def offered_in_order(kind):
+    return [wf.name for _item_type, group in grouped_by_item_type(offered_workflows(makes=kind))
+            for wf in group]
 
 
 def _tab_with_prompts(view, key="sdxl_t2i"):

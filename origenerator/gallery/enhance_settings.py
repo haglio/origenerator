@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from types import MappingProxyType
 
 from origenerator.model_titles import model_title
 from origenerator.workflows import WORKFLOW_REGISTRY
@@ -16,10 +17,10 @@ ENHANCE_SETTING_KEYS = (
 
 MATCH_SOURCE_MODEL = "(match the source image)"
 
-LABELS_ON_THE_ENHANCE_PANE = {
+LABELS_ON_THE_ENHANCE_PANE = MappingProxyType({
     "checkpoint": "Model", "upscale_model": "Upscaler", "enhance_scale": "Scale",
     "enhance_steps": "Steps", "enhance_denoise": "Redraw amount",
-}
+})
 
 
 def match_source_model_label() -> str:

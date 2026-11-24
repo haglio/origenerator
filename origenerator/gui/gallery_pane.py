@@ -19,6 +19,7 @@ from shared_ui.flow_layout import FlowLayout
 from shared_ui.spacing import GAP_DIALOG, GAP_MEDIUM, MARGIN_DIALOG
 
 from origenerator import gallery, search
+from origenerator.content import item_words
 from origenerator.gallery.collection import (
     EXPERIMENTS_KEY,
     LATEST_KEY,
@@ -929,8 +930,9 @@ class GalleryPane(QObject):
     def _seed_reroll_actions(self, row) -> list:
         if not gallery.rerollable(row):
             return []
-        actions = [CornerButton(REROLL_VIDEO, icons.reroll_seed_icon(MediaType.VIDEO),
-                                "Randomize video seed")]
+        made = gallery.item_type_of(row)
+        actions = [CornerButton(REROLL_VIDEO, icons.reroll_seed_icon(made),
+                                f"Randomize {item_words(made)[0]} seed")]
         if gallery.rebuildable_source_image_id_in(row, self._model.image_index) is not None:
             actions.append(CornerButton(REROLL_IMAGE, icons.reroll_seed_icon(MediaType.IMAGE),
                                         "Randomize image seed"))

@@ -4,6 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from origenerator import config
+from origenerator.content import item_words
 from origenerator.display_names import in_parentheses, shown_name
 from origenerator.media import ItemType, MediaType
 from origenerator.workflows.base import ParamDef, ParamType
@@ -63,8 +64,6 @@ def folder_kind(workflow_name: str | None) -> str:
 
 class NonAiWorkflow(MadeElsewhereWorkflow):
     version = "non_ai"
-    why_it_cannot_be_made_again = "A Non-AI video wasn't generated, so it can't be made again"
-    why_it_has_no_settings = "This video wasn't generated, so it has no generation settings."
     output_type = MediaType.VIDEO
 
     def __init__(self, folder: str):
@@ -78,6 +77,16 @@ class NonAiWorkflow(MadeElsewhereWorkflow):
     @property
     def item_type(self) -> ItemType:
         return ItemType.FLICK if genau_keeps(self._folder) else ItemType.VIDEO
+
+    @property
+    def why_it_cannot_be_made_again(self) -> str:
+        return (f"A Non-AI {item_words(self.item_type)[0]} wasn't generated, "
+                "so it can't be made again")
+
+    @property
+    def why_it_has_no_settings(self) -> str:
+        return (f"This {item_words(self.item_type)[0]} wasn't generated, "
+                "so it has no generation settings.")
 
     def param_definitions(self) -> list[ParamDef]:
         return [ParamDef(FOLDER_KEY, "Folder", ParamType.STR, "")]

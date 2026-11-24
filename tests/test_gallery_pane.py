@@ -1326,3 +1326,16 @@ def test_a_video_just_below_the_view_holds_still_until_it_scrolls_into_it(qtbot,
         QMovie.MovieState.Paused, QMovie.MovieState.Running), (
         "only what is on screen plays: each loop playing out of sight costs the window "
         "a decode for every frame")
+
+
+def test_a_flick_s_tile_offers_to_randomize_the_flick_s_seed(qtbot, db):
+    flick = {**_row("loop", 2), "workflow_name": "wan22_flf2v_loop",
+             "params_json": json.dumps({"input_image": "picked.png", "noise_seed": 2}),
+             "output_files": json.dumps([{"filename": "loop.mp4", "subfolder": ""}])}
+    pane, _scroll = _pane(qtbot, db, [flick])
+    pane.set_model(LibrarySnapshot([flick]))
+
+    pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=[flick]))
+
+    assert [b.toolTip() for b in pane._thumb_widgets["loop"]._corner_buttons] == [
+        "Randomize flick seed"]

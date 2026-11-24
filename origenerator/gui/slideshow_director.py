@@ -411,8 +411,25 @@ class SlideshowDirector:
         return self.open(items[:1], rows=rows, start=0, shuffle=in_order, hud=hud,
                          locked=True)
 
-    def can_open_on_tile(self, generation) -> bool:
-        return bool(self._slides_on_tile(self._row_for(generation)))
+    def can_open_on(self, prompt_ids: list[str]) -> bool:
+        rows = self._rows_for(prompt_ids)
+        return self._being_made_alone(rows) or bool(self.items_of(rows))
+
+    def open_on(self, prompt_ids: list[str]):
+        rows = self._rows_for(prompt_ids)
+        if self._being_made_alone(rows):
+            return self.open_on_preview(None, rows[0]["prompt_id"])
+        if len(rows) == 1:
+            return self.open_on_tile(rows[0]["prompt_id"])
+        return self.open(self.items_of(rows), rows=rows, start=0, shuffle=in_order,
+                         hud=HudFacts(order_label=LATEST_LABEL))
+
+    def _rows_for(self, prompt_ids: list[str]) -> list[dict]:
+        return [row for pid in prompt_ids if (row := self._row_for(pid)) is not None]
+
+    @staticmethod
+    def _being_made_alone(rows: list[dict]) -> bool:
+        return len(rows) == 1 and gallery.is_in_progress(rows[0])
 
     def _slides_on_tile(self, row: dict | None) -> list:
         return self.items_of([row]) if row is not None else []

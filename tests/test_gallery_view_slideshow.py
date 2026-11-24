@@ -59,7 +59,6 @@ from tests.gallery_view_support import (
     _in_view,
     _key,
     _keys_are_the_gallerys,
-    _menu_labels,
     _on_screen,
     _open_latest,
     _open_leaf,
@@ -1770,30 +1769,18 @@ def test_open_in_slideshow_on_an_items_menu_opens_the_slideshow_a_double_click_o
     slideshow.close()
 
 
-def test_open_in_slideshow_is_offered_for_one_item_that_can_play(qtbot, monkeypatch):
+def test_open_in_slideshow_on_picked_items_plays_those_items_alone(qtbot, monkeypatch):
     keep_rows_on_disk(monkeypatch)
-    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2),
+                                    _image("i3", "a cat", 50, 3)]))
     qtbot.addWidget(view)
     view.refresh()
     _select_first_leaf(view)
-    labels = []
-    _menu_labels(monkeypatch, labels)
+    _answer_menu(monkeypatch, "Open in slideshow")
 
-    view.generation_menu(["i1", "i2"], QPoint(0, 0))
+    view.generation_menu(["i1", "i3"], QPoint(0, 0))
 
-    assert labels
-    assert "Open in slideshow" not in labels
-
-
-def test_open_in_slideshow_is_not_offered_for_an_item_still_being_made(qtbot, monkeypatch):
-    keep_rows_on_disk(monkeypatch)
-    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _running_row("r1")]))
-    qtbot.addWidget(view)
-    view.refresh()
-    labels = []
-    _menu_labels(monkeypatch, labels)
-
-    view.generation_menu(["r1"], QPoint(0, 0))
-
-    assert labels
-    assert "Open in slideshow" not in labels
+    slideshow = view.slideshows.showing
+    assert slideshow is not None
+    assert {item[2] for item in slideshow._set.playlist._items} == {"i1", "i3"}
+    slideshow.close()

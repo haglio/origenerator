@@ -55,6 +55,7 @@ from tests.gallery_view_support import (
     _WAN_I2V,
     _alls,
     _answer_confirmation,
+    _answer_menu,
     _at,
     _collection,
     _combine_db,
@@ -622,6 +623,24 @@ def test_a_run_double_clicked_from_another_folder_is_the_one_its_slideshow_follo
     assert win._set.current_prompt_id() == job.prompt_id, (
         "a double click on the picture of an item being made opens the slideshow on that item's "
         "generation as it goes, whatever the Gallery pane happens to be showing")
+    assert engine_of(win.shown).on_screen.read_bytes() == _png_bytes()
+    win.close()
+
+
+def test_open_in_slideshow_on_an_item_being_made_follows_its_generation_as_it_goes(
+        qtbot, tmp_path, monkeypatch):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    _key, job = _a_streaming_run_listed_in_flight(view, client)
+    _answer_menu(monkeypatch, "Open in slideshow")
+
+    view.generation_menu([job.prompt_id], QPoint(0, 0))
+
+    win = view.slideshows.showing
+    assert win is not None
+    assert win._set.current_prompt_id() == job.prompt_id
     assert engine_of(win.shown).on_screen.read_bytes() == _png_bytes()
     win.close()
 

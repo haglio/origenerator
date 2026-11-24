@@ -147,17 +147,16 @@ class GalleryEdits:
                               redo=lambda: self.delete_enhance_versions(row, filenames)))
         return True
 
-    def choose_fix(self, row: dict, filename: str, part: str, choice: str) -> bool:
+    def change_fix(self, row: dict, filename: str, part: str, what: str, to: bool) -> bool:
         files = row_output_files(row)
         at = next((at for at, entry in enumerate(files) if entry.get("filename") == filename), None)
-        chosen = None if at is None else fix_switches.chosen(files[at], part, choice)
+        chosen = None if at is None else fix_switches.changed(files[at], part, what, to)
         if chosen is None:
             return False
-        shows = fix_switches.shows_the_fix(choice)
         drawn = None
-        if fix_switches.switch_of(files[at], part).on != shows:
+        if what == fix_switches.ON:
             try:
-                drawn = self._set_down_redrawn(files[at], part, on=shows)
+                drawn = self._set_down_redrawn(files[at], part, on=to)
             except OSError:
                 logger.exception("Could not switch a fix of %s", row["prompt_id"])
             if drawn is None:

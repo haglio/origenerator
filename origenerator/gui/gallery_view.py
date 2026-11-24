@@ -730,9 +730,10 @@ class GalleryView(QWidget):
         tab.enhance_requested.connect(lambda pid: self.enhance.enhance_items([pid]))
         tab.versions_delete_requested.connect(lambda prompt_id, filenames: self.edit_versions(
             prompt_id, lambda row: self._edits.delete_enhance_versions(row, filenames)))
-        tab.fix_choice_requested.connect(lambda prompt_id, filename, part, choice: self.edit_versions(
-            prompt_id, lambda row: self._edits.choose_fix(row, filename, part, choice),
-            then_show=filename))
+        tab.fix_change_requested.connect(
+            lambda prompt_id, filename, part, what, to: self.edit_versions(
+                prompt_id, lambda row: self._edits.change_fix(row, filename, part, what, to),
+                then_show=filename))
         tab.enhance_again_requested.connect(self.enhance.enhance_again)
         tab.set_enhance_settings(self.enhance.settings)
         tab.set_fullscreen_factory(self.slideshows.open_on_preview)

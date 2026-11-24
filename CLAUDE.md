@@ -393,7 +393,11 @@ A Request to add a thing his prompts already have never reaches the model.
 `his_edits.the_way_he_adds` reads the edits he made by hand (a prompt of his
 that holds an earlier one and a few things more), takes the nearest ones that
 added the thing, and adds it in their words, with what nearly all of them
-brought and kept out beside it. It replaced statistics on what his prompts
+brought and kept out beside it; only the times he first added the thing
+count. A thing many of his prompts have also brings the part holding a word
+those prompts usually have and his other prompts seldom do, when the prompt
+lacks that word (asked to add a part of a man, a prompt with no man gains the
+man, his rule). It replaced statistics on what his prompts
 "usually" hold with a thing, and model questions asked after them, which added
 unrelated parts through four days of review (2026-11-23); nothing goes back to
 that. `python -m origenerator.request_measure [how many]` scores the answering

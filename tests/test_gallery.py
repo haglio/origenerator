@@ -134,9 +134,9 @@ def test_job_kind_separates_a_video_from_an_image():
         "a job's kind is what it costs: an image takes seconds, a video minutes"
 
 
-def test_every_video_workflow_is_one_kind_of_job():
-    videos = ("wan22_i2v", "wan22_flf2v_loop")
-    assert {job_kind_label(name) for name in videos} == {"Video"}
+def test_a_job_s_kind_is_the_type_of_item_its_workflow_makes():
+    assert [job_kind_label(name) for name in ("sdxl_t2i", "wan22_i2v", "wan22_flf2v_loop")] == [
+        "Image", "Video", "Flick"]
 
 
 def test_an_enhancement_is_its_own_kind_of_job():
@@ -1612,14 +1612,14 @@ def test_a_models_lora_folders_are_in_alphabetical_order_with_no_lora_last():
 def test_non_ai_folders_come_first_then_sites_then_workflows_each_in_alphabetical_order():
     rows = [dict(_LOOP_VIDEO, prompt_id=name, workflow_name=name) for name in (
         outside_workflow("zeta-site", MediaType.VIDEO), "wan22_i2v", non_ai_workflow("zeta folder"),
-        outside_workflow("alpha-site", MediaType.VIDEO), "wan22_flf2v_loop",
+        outside_workflow("alpha-site", MediaType.VIDEO), "wan22_t2v",
         non_ai_workflow("alpha folder"))]
 
     videos = build_gallery_tree(rows)[0]
 
     assert [w.label for w in videos.children] == [
         "Alpha folder", "Zeta folder", "alpha-site", "zeta-site",
-        workflow_label("wan22_i2v"), workflow_label("wan22_flf2v_loop")]
+        workflow_label("wan22_i2v"), workflow_label("wan22_t2v")]
 
 
 def _names_by_row(tree, folder_meta, custom_collections=()):

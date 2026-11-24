@@ -4,14 +4,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from origenerator.action_settings import loops
 from origenerator.config import EVOLVER_SOURCE, GENAU_SOURCE
-from origenerator.content import genau_flick_word
+from origenerator.content import item_words
 from origenerator.db import Database
 from origenerator.funscript import funscript_of
-from origenerator.gallery import resolve_preview
+from origenerator.gallery import is_a_flick, resolve_preview
 from origenerator.gallery_contract import LANES
-from origenerator.media import MediaType
+from origenerator.media import ItemType, MediaType
 
 
 @dataclass(frozen=True)
@@ -23,16 +22,15 @@ class ExportLane:
     source: str
     mark: Callable[[Database, str], None]
     unmark: Callable[[Database, str], None]
-    word: Callable[[], str]
+    carries: ItemType
     send_help: str
     unsend_help: str
     withdrawn_help: str
     hands_over_funscript: bool
-    carries_loops: bool
 
     @property
     def noun(self) -> str:
-        return self.word()
+        return item_words(self.carries)[0]
 
     @property
     def tooltip(self) -> str:
@@ -86,7 +84,7 @@ KINO = ExportLane(
     name="Kino", source_key="evolver", source=EVOLVER_SOURCE,
     mark=lambda db, prompt_id: db.mark_evolver_exported(prompt_id),
     unmark=lambda db, prompt_id: db.mark_evolver_unsent(prompt_id),
-    word=lambda: "video",
+    carries=ItemType.VIDEO,
     send_help="Send this {noun} to Kino: Evolver sorts and enhances it on its usual "
               "schedule, then files it where Kino plays it.",
     unsend_help="Delete the copy Evolver holds, wherever it has filed it by "
@@ -94,14 +92,13 @@ KINO = ExportLane(
     withdrawn_help="An earlier copy of this {noun} is down for deletion in "
                    "Evolver. Sending puts a fresh one in its inbox.",
     hands_over_funscript=True,
-    carries_loops=False,
 )
 
 GENAU = ExportLane(
     name="Genau", source_key="genau", source=GENAU_SOURCE,
     mark=lambda db, prompt_id: db.mark_genau_exported(prompt_id),
     unmark=lambda db, prompt_id: db.mark_genau_unsent(prompt_id),
-    word=genau_flick_word,
+    carries=ItemType.FLICK,
     send_help="Send this {noun} to Genau: Evolver enhances it on its "
               "usual schedule, then delivers it to the folder Genau plays from.",
     unsend_help="Delete this {noun} from the folder Genau plays from. Evolver "
@@ -109,7 +106,6 @@ GENAU = ExportLane(
     withdrawn_help="An earlier copy of this {noun} is down for deletion in "
                    "Genau's folder. Sending starts a fresh one.",
     hands_over_funscript=False,
-    carries_loops=True,
 )
 
 EXPORT_LANES = (KINO, GENAU)
@@ -119,7 +115,8 @@ UNSEND_CAPTION = "Unsend"
 
 
 def lane_for(row: dict) -> ExportLane:
-    own = next(lane for lane in EXPORT_LANES if lane.carries_loops == loops(row))
+    carried = ItemType.FLICK if is_a_flick(row) else ItemType.VIDEO
+    own = next(lane for lane in EXPORT_LANES if lane.carries is carried)
     holding_a_stray_copy = (lane for lane in EXPORT_LANES
                             if lane is not own and row.get(lane.flag))
     return next(holding_a_stray_copy, own)

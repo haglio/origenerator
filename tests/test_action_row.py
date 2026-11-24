@@ -657,3 +657,12 @@ def test_a_partial_pill_is_drawn_faded_with_gray_text_inside_a_dashed_edge():
     assert (partial.ground.alpha() == whole.ground.alpha() // 2, partial.ink == TEXT_SECONDARY,
             partial.edge.style(), whole.edge.style()) == (
         True, True, Qt.PenStyle.CustomDashLine, Qt.PenStyle.SolidLine)
+
+
+def test_a_flick_s_actions_are_named_a_flick_s_and_a_video_s_a_video_s(action):
+    shown = []
+    for workflow in ("wan22_flf2v_loop", "wan22_i2v"):
+        action.show_folder([dict(_video(), workflow_name=workflow)])
+        shown.append(action._names[MediaType.VIDEO].text())
+
+    assert shown == ["Flick actions", "Video actions"]

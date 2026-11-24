@@ -553,7 +553,7 @@ def test_latest_tiles_wear_an_image_or_video_item_type_icon(qtbot):
 
     def icon_type(pid):
         icons_found = view._gallery_pane._thumb_widgets[pid].findChildren(ItemTypeIcon)
-        return icons_found[0].media_type if icons_found else None
+        return icons_found[0].item_type if icons_found else None
 
     assert icon_type("i1") == "image", (
         "the collection mixes kinds, so each tile says its own at a glance")
@@ -568,7 +568,7 @@ def test_a_folder_of_one_kind_still_marks_each_tile_with_its_kind(qtbot):
     _select_first_leaf(view)
 
     (mark,) = view._gallery_pane._thumb_widgets["i1"].findChildren(ItemTypeIcon)
-    assert mark.media_type == "image", (
+    assert mark.item_type == "image", (
         "every tile says its kind wherever it is drawn, so a video's tile in a settings folder "
         "shows its length beside the mark as it does in Latest")
 
@@ -581,7 +581,7 @@ def test_an_inflight_tile_wears_the_item_type_icon_of_its_media_type(qtbot):
     view.refresh()
 
     items = {it.key: it for it in view.job_queue.items()}
-    assert items["rr1"].media_type == "video"
+    assert items["rr1"].item_type == "video"
 
 
 def _source_tile(view):

@@ -10,7 +10,7 @@ from typing import Any
 from origenerator import points_of_interest
 from origenerator.box_breaks import BOX_BREAK, prompt_boxes, unboxed
 from origenerator.gallery_contract import SILENT_COPY_ROLE
-from origenerator.media import MediaType
+from origenerator.media import ItemType, MediaType
 from origenerator.workflows.derived_size import (
     TARGET_MEGAPIXELS,
     measure_derived_size,
@@ -216,7 +216,6 @@ class WorkflowTemplate(ABC):
     version: str
     display_name: str
     output_type: MediaType
-    looping: bool = False
     derives_size_from_input: bool = False
     native_fps: float = NATIVE_FPS
     video_model: str = "WAN 2.2"
@@ -235,6 +234,10 @@ class WorkflowTemplate(ABC):
     redraw_keys: tuple[str, ...] = ()
     output_node_id: str
     base_output_node_id: str | None = None
+
+    @property
+    def item_type(self) -> ItemType:
+        return ItemType(self.output_type)
 
     def source_model_of(self, params: dict) -> dict | None:
         if not self.redraw_model_key or not params.get(self.redraw_model_key):

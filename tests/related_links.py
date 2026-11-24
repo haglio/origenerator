@@ -3,13 +3,14 @@ from __future__ import annotations
 from origenerator.gui.related_media import (
     ANIMATED_FROM,
     ANIMATED_FROM_STARTING_FRAME_OF,
-    ANIMATED_USING_VIDEO_SETTINGS_OF,
     TRIMMED_FROM,
-    VIDEO_SETTINGS_USED_FOR_ANIMATION_OF,
 )
 from origenerator.gui.source_tile import SourceTile
 
 _MADE_FROM = (ANIMATED_FROM, ANIMATED_FROM_STARTING_FRAME_OF, TRIMMED_FROM)
+_USING_SETTINGS_OF = ("Animated using video settings of", "Animated using flick settings of")
+_SETTINGS_USED_FOR = ("Video settings used for animation of",
+                      "Flick settings used for animation of")
 
 
 class _NoTile:
@@ -30,7 +31,7 @@ def source_tile(related):
 
 
 def settings_tile(related):
-    return next(iter(_tiles(related, (ANIMATED_USING_VIDEO_SETTINGS_OF,))), _NoTile())
+    return next(iter(_tiles(related, _USING_SETTINGS_OF)), _NoTile())
 
 
 def no_sources(related) -> bool:
@@ -39,11 +40,11 @@ def no_sources(related) -> bool:
 
 def settings_used_for(related) -> list[tuple[str, str]]:
     return [(tile.heading, tile._prompt_id)
-            for tile in _tiles(related, (VIDEO_SETTINGS_USED_FOR_ANIMATION_OF,))]
+            for tile in _tiles(related, _SETTINGS_USED_FOR)]
 
 
-POINTING_BACK = ("Requested from", "Batch-modified from", *_MADE_FROM, ANIMATED_USING_VIDEO_SETTINGS_OF)
+POINTING_BACK = ("Requested from", "Batch-modified from", *_MADE_FROM, *_USING_SETTINGS_OF)
 
 
 def settings_used_for_tiles(related) -> list:
-    return _tiles(related, (VIDEO_SETTINGS_USED_FOR_ANIMATION_OF,))
+    return _tiles(related, _SETTINGS_USED_FOR)

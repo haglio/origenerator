@@ -34,12 +34,13 @@ from origenerator.record_fold import fold_record_into
 from origenerator.thumbnail import generate_animated_thumbnail, generate_thumbnail
 from origenerator.workflows.non_ai import (
     FOLDER_KEY,
-    FOLDER_PARTS_IN_A_NAME,
     TITLE_KEY,
     VERSION_GROUP_KEY,
     VIDEO_ID_KEY,
     NonAiWorkflow,
+    folder_named,
     non_ai_workflow,
+    where_genaus_flicks_are_named_from,
 )
 
 
@@ -75,7 +76,7 @@ def places_here() -> NonAiPlaces:
 
 def more_places_here() -> tuple[Kept, ...]:
     vr = [] if config.VR_DIR is None else [Kept(config.VR_DIR, named_from=config.VR_DIR.parent.parent)]
-    return (*vr, *(Kept(folder, named_from=config.GENAU_DIR.parent)
+    return (*vr, *(Kept(folder, named_from=where_genaus_flicks_are_named_from())
                    for folder in config.GENAU_FLICKS_NO_MODEL_MADE))
 
 
@@ -203,7 +204,7 @@ def non_ai_videos(folder: Path) -> list[Path]:
 
 
 def named_folder(video: Path, named_from: Path) -> str:
-    return " ".join(video.parent.relative_to(named_from).parts[:FOLDER_PARTS_IN_A_NAME])
+    return folder_named(video.parent, named_from)
 
 
 def row_bringing_in(video: Path, kept: Kept, thumb_dir: Path) -> dict:

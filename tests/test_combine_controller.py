@@ -34,7 +34,7 @@ from origenerator.gui.combine_controller import (
 from origenerator.gui.recent_videos import RecentVideo
 from origenerator.gui.starting_rows import StartingRows
 from origenerator.item_actions import ItemActions
-from origenerator.media import MediaType
+from origenerator.media import ItemType, MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import (
     FrameFolders,
@@ -139,6 +139,8 @@ class _Signal:
 
 
 class FakeWorkflow:
+    item_type = ItemType.VIDEO
+
     def __init__(self, name=VIDEO_WORKFLOW, version="3"):
         self.name = name
         self.version = version
@@ -472,7 +474,8 @@ def test_a_restore_ticks_the_boxes_that_were_ticked(combine):
 
 
 def test_a_restore_hands_each_lane_back_the_video_it_had_if_it_still_fits(combine):
-    controller, _host = combine(rows=([_image("img"), _video("clip"), _video("loop")]))
+    controller, _host = combine(rows=([_image("img"), _video("clip"),
+                                       _video("loop", workflow_name=LOOP_WORKFLOW)]))
 
     controller.restore({"image": "img", "intent": action_settings.GENAU,
                         "videos": {action_settings.VIDEO: "clip", action_settings.GENAU: "loop",
@@ -1430,3 +1433,14 @@ def test_a_picked_action_runs_its_pinned_settings_on_a_browsed_image(combine, tm
 
     assert built is not None
     assert (built.params["input_image"], built.params["steps"]) == (photo, 7)
+
+
+def test_the_second_slot_takes_a_video_or_a_flick_whichever_combine_is_making(combine):
+    controller, _host = combine(rows=([
+        _video("full"), _video("loop", workflow_name=LOOP_WORKFLOW)]))
+    making_videos = [controller._accepts_video(item) for item in ("full", "loop")]
+
+    controller.widget.set_intent(action_settings.GENAU)
+
+    assert (making_videos, [controller._accepts_video(item) for item in ("full", "loop")]) == (
+        [True, False], [False, True])

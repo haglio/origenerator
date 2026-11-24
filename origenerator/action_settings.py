@@ -7,8 +7,8 @@ from funestra.video_families import normalized_text
 
 from origenerator.action_vocabulary import vocabulary
 from origenerator.animation_names import Animation, animation_of, named
-from origenerator.content import genau_flick_word, load_content
-from origenerator.media import MediaType
+from origenerator.content import item_words, load_content
+from origenerator.media import ItemType, MediaType
 
 _CONTENT = load_content()
 
@@ -46,15 +46,18 @@ def in_its_lane(settings: dict, intent: str) -> dict:
     return settings if settings.get("workflow") else {**settings, "workflow": _STARTING_WORKFLOWS[intent]}
 
 
-def loops(row) -> bool:
-    from origenerator.workflows import WORKFLOW_REGISTRY  # noqa: PLC0415 — keeps this module light
+def is_a_flick(row) -> bool:
+    from origenerator.gallery import output  # noqa: PLC0415 — the gallery imports this module
 
-    workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
-    return bool(workflow and workflow.looping)
+    return output.is_a_flick(row)
 
 
 def lane_of(row) -> str:
-    return GENAU if loops(row) else VIDEO
+    return GENAU if is_a_flick(row) else VIDEO
+
+
+def made_in(lane: str) -> ItemType:
+    return ItemType.FLICK if lane == GENAU else ItemType.VIDEO
 
 _SETTINGS_EXCLUDE = frozenset((
     "positive_prompt", "negative_prompt", "input_image",
@@ -87,37 +90,31 @@ def _created(row) -> str:
     return row.get("created_at") or ""
 
 
-def _action_settings_groups(name: str, video_rows, *, loop_only: bool = False) -> dict:
+def _action_settings_groups(name: str, video_rows, lane: str) -> dict:
     words = vocabulary(MediaType.VIDEO)
     groups = defaultdict(list)
     for row in video_rows:
-        if animation_of(row, words) != name:
-            continue
-        if loop_only and not loops(row):
-            continue
-        groups[_settings_signature(row)].append(row)
+        if animation_of(row, words) == name and lane_of(row) == lane:
+            groups[_settings_signature(row)].append(row)
     return groups
 
 
 def no_past_video(action: str, lane: str) -> str:
-    what = f"looping “{action}” {genau_flick_word()}" if lane == GENAU else f"“{action}” video"
+    one = item_words(made_in(lane))[0]
+    what = f"looping “{action}” {one}" if lane == GENAU else f"“{action}” {one}"
     return f"no past {what} to take settings from yet"
-
-
-def as_sentence(said: str) -> str:
-    return said[:1].upper() + said[1:]
 
 
 def available_categories(video_rows, intent: str = VIDEO, checked=()) -> set[str]:
     words = vocabulary(MediaType.VIDEO)
-    made = {animation_of(row, words) for row in video_rows if intent != GENAU or loops(row)}
+    made = {animation_of(row, words) for row in video_rows if lane_of(row) == intent}
     return {action for action in words.buttons
             if (name := Animation(action, tuple(checked)).name) in made
             or pinned_settings(name, intent, words) is not None}
 
 
 def most_used_video(name: str, video_rows, intent: str = VIDEO) -> str | None:
-    groups = _action_settings_groups(name, video_rows, loop_only=intent == GENAU)
+    groups = _action_settings_groups(name, video_rows, intent)
     if not groups:
         return None
     best = max(groups.values(), key=lambda g: (len(g), max(_created(r) for r in g)))

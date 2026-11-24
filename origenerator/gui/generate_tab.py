@@ -46,6 +46,7 @@ from origenerator.gallery import (
     describe_enhance_params,
     displayed_versions,
     enhance_params_for,
+    item_type_of,
     media_type_of_row,
     output_file_path,
     prompts_differ_from,
@@ -120,7 +121,7 @@ from origenerator.gui.warning_mark import WarningMark
 from origenerator.gui.zone_items import ZoneFolders, ZoneItems
 from origenerator.item_names import ItemNames
 from origenerator.library_views import NO_VIEWS, LibraryViews, TabViews
-from origenerator.media import MediaType, ShownFile
+from origenerator.media import ItemType, MediaType, ShownFile
 from origenerator.one_look import one_look
 from origenerator.osr2_driver import drive_target_for
 from origenerator.prompt_checks import duplicate_things
@@ -1068,10 +1069,11 @@ class GenerateTab(DropZones):
     def reaches(self) -> tuple[DropZone, ...]:
         return () if self._param_form is None else self._param_form.drop_zones()
 
-    def tab_mark_source(self) -> tuple[str | None, MediaType | None]:
+    def tab_mark_source(self) -> tuple[str | None, ItemType | None]:
         row = self._shown_row()
-        media = media_type_of_row(row) if row is not None else self._makes()
-        return (row or {}).get("thumbnail_path"), media
+        workflow = workflow_named(self._workflow_dropdown.currentData())
+        made = item_type_of(row) if row is not None else workflow and workflow.item_type
+        return (row or {}).get("thumbnail_path"), made
 
     def prefill(self, workflow_name: str, params: dict):
         with self._loading():
@@ -1309,7 +1311,7 @@ class GenerateTab(DropZones):
         self._viewport.set_actions(
             row["prompt_id"], favorite=bool(row.get("starred")),
             enhance=enhance_state(row, self._enhance_settings),
-            kind=gallery.media_type_of_row(row),
+            kind=gallery.item_type_of(row),
         )
 
     def reconcile_preview(self, live_ids):

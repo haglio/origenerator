@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from functools import lru_cache
+from pathlib import Path
+
+from origenerator import config
 from origenerator.display_names import in_parentheses, shown_name
-from origenerator.media import MediaType
+from origenerator.media import ItemType, MediaType
 from origenerator.workflows.base import ParamDef, ParamType
 from origenerator.workflows.outside import MadeElsewhereWorkflow, outside_source
 
@@ -16,6 +20,24 @@ OTHER = "other"
 
 def non_ai_workflow(folder: str) -> str:
     return _PREFIX + folder
+
+
+def folder_named(folder: Path, named_from: Path) -> str:
+    return " ".join(folder.relative_to(named_from).parts[:FOLDER_PARTS_IN_A_NAME])
+
+
+@lru_cache(maxsize=1)
+def _folders_named(folders: tuple[Path, ...], named_from: Path) -> frozenset[str]:
+    return frozenset(folder_named(folder, named_from) for folder in folders)
+
+
+def where_genaus_flicks_are_named_from() -> Path:
+    return config.GENAU_DIR.parent
+
+
+def genau_keeps(folder: str) -> bool:
+    return folder in _folders_named(tuple(config.GENAU_FLICKS_NO_MODEL_MADE),
+                                    where_genaus_flicks_are_named_from())
 
 
 def non_ai_folder(workflow_name: str | None) -> str | None:
@@ -52,6 +74,10 @@ class NonAiWorkflow(MadeElsewhereWorkflow):
     @property
     def display_name(self) -> str:
         return shown_name(self.name, otherwise=shown_folder(self._folder))
+
+    @property
+    def item_type(self) -> ItemType:
+        return ItemType.FLICK if genau_keeps(self._folder) else ItemType.VIDEO
 
     def param_definitions(self) -> list[ParamDef]:
         return [ParamDef(FOLDER_KEY, "Folder", ParamType.STR, "")]

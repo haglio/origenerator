@@ -637,7 +637,7 @@ class GalleryPane(QObject):
         return self._draw_tile(
             flow, row, _REVIEW_TILE if corner_buttons else _COLLECTION_TILE, wire,
             TileAppearance(
-                media_type=gallery.media_type_of_row(row),
+                item_type=gallery.item_type_of(row),
                 video_seconds=row.get("video_seconds"),
                 movie_path=self._host.animated_preview(row),
                 favorite=bool(row.get("starred")),
@@ -689,7 +689,7 @@ class GalleryPane(QObject):
         return [item for item in items if item.key in populating]
 
     def _latest_empty_hint(self) -> str:
-        noun = next((label.lower() for kind, label in gallery.MEDIA_LABELS.items()
+        noun = next((label.lower() for kind, label in gallery.item_type_labels().items()
                      if key_holds(kind, self._collection_folder)), "generations")
         return (f"No recent {noun} yet.\n\nItems you make — from a Generate tab or a "
                 "gallery re-roll — collect here, newest first.")
@@ -806,7 +806,7 @@ class GalleryPane(QObject):
             flow, row, _TRASH_TILE, wire,
             TileAppearance(
                 caption=f"{OLD_VERSION} · {name}" if row.get("old_version_of") else name,
-                media_type=gallery.media_type_of_row(row),
+                item_type=gallery.item_type_of(row),
                 video_seconds=row.get("video_seconds"),
                 movie_path=self._host.animated_preview(row),
                 favorite=bool(row.get("starred")),
@@ -882,7 +882,7 @@ class GalleryPane(QObject):
             self._draw_tile(
                 flow, row, _SEEDS_TILE if i2v else _FOLDER_TILE, wire,
                 TileAppearance(
-                    media_type=gallery.media_type_of_row(row),
+                    item_type=gallery.item_type_of(row),
                     video_seconds=row.get("video_seconds"),
                     movie_path=self._host.animated_preview(row),
                     favorite=bool(row.get("starred")),

@@ -5,6 +5,7 @@ from enum import StrEnum
 
 from app_support.comfy_file_refs import frame_name, reference_basename, unannotated
 
+from origenerator.content import as_sentence, item_words
 from origenerator.display_names import in_parentheses, shown_name
 from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW
 from origenerator.gallery.keys import folder_id, settings_key
@@ -15,11 +16,13 @@ from origenerator.gallery.signatures import (
     workflow_model_keys,
     workflow_output_type,
 )
-from origenerator.media import MediaType
+from origenerator.media import ItemType, MediaType
 from origenerator.model_titles import model_title
-from origenerator.workflows import RETIRED_WORKFLOW_NAMES, workflow_named
+from origenerator.workflows import RETIRED_WORKFLOW_NAMES, WORKFLOW_REGISTRY, workflow_named
 
-MEDIA_LABELS = {MediaType.IMAGE: "Images", MediaType.VIDEO: "Videos"}
+
+def item_type_labels() -> dict[ItemType, str]:
+    return {item_type: as_sentence(item_words(item_type)[1]) for item_type in ItemType}
 
 
 def workflow_label(workflow_name: str | None) -> str:
@@ -76,17 +79,29 @@ def config_folder_name(workflow_name: str, signature: str,
 class JobKind(StrEnum):
     IMAGE = "Image"
     VIDEO = "Video"
+    FLICK = "Flick"
     ENHANCE = "Enhance"
     TRAINING = "Training"
 
 
-def job_kind_label(workflow_name: str | None) -> str:
+_MADE_BY_A_JOB = {JobKind.IMAGE: ItemType.IMAGE, JobKind.VIDEO: ItemType.VIDEO,
+                  JobKind.FLICK: ItemType.FLICK}
+_JOB_MAKING = {made: kind for kind, made in _MADE_BY_A_JOB.items()}
+
+
+def made_by_a_job(job_kind: str) -> ItemType | None:
+    return _MADE_BY_A_JOB.get(job_kind)
+
+
+def job_kind_said(job_kind: str) -> str:
+    return as_sentence(item_words(ItemType.FLICK)[0]) if job_kind == JobKind.FLICK else str(job_kind)
+
+
+def job_kind_label(workflow_name: str | None) -> JobKind | str:
     if workflow_name == ENHANCE_WORKFLOW:
         return JobKind.ENHANCE
-    output_type = workflow_output_type(workflow_name)
-    if output_type is None:
-        return ""
-    return JobKind.VIDEO if output_type == MediaType.VIDEO else JobKind.IMAGE
+    workflow = WORKFLOW_REGISTRY.get(workflow_name or "")
+    return _JOB_MAKING[workflow.item_type] if workflow is not None else ""
 
 
 def _source_image_label(params: dict, image_index: dict,

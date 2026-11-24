@@ -19,19 +19,19 @@ _LENGTH_CSS = (
 
 
 class ItemTypeIcon(QLabel):
-    def __init__(self, media_type: str, tile: QWidget):
+    def __init__(self, item_type: str, tile: QWidget):
         super().__init__(tile)
-        self.media_type = media_type
+        self.item_type = item_type
         self._corner = QPoint()
         self._beside_it: list[VideoLength] = []
         self.draw_at_the_huds_scale_again()
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.raise_()
 
-    def set_media_type(self, media_type: str):
-        if media_type != self.media_type:
-            self.media_type = media_type
-            self._wear(media_type)
+    def wear(self, item_type: str):
+        if item_type != self.item_type:
+            self.item_type = item_type
+            self._draw(item_type)
 
     def place(self, area: QRect) -> None:
         self._corner = area.topLeft()
@@ -39,7 +39,7 @@ class ItemTypeIcon(QLabel):
 
     def draw_at_the_huds_scale_again(self) -> None:
         inset = square_buttons.landing(MARGIN_STANDARD)
-        self._wear(self.media_type)
+        self._draw(self.item_type)
         self.move(self._corner + QPoint(inset, inset))
         for beside in self._beside_it:
             beside.draw_at_the_huds_scale_again()
@@ -47,8 +47,8 @@ class ItemTypeIcon(QLabel):
     def keep_beside(self, length: VideoLength) -> None:
         self._beside_it.append(length)
 
-    def _wear(self, media_type: str):
-        pixmap = icons.item_type_icon(media_type, square_buttons.landing(icons.ITEM_TYPE_ICON_SIZE))
+    def _draw(self, item_type: str):
+        pixmap = icons.item_type_icon(item_type, square_buttons.landing(icons.ITEM_TYPE_ICON_SIZE))
         self.setPixmap(pixmap)
         self.setFixedSize(pixmap.size())
 

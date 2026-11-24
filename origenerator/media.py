@@ -16,14 +16,27 @@ class MediaType(StrEnum):
     VIDEO = "video"
 
 
+class ItemType(StrEnum):
+    IMAGE = "image"
+    VIDEO = "video"
+    FLICK = "flick"
+
+    @property
+    def filed_as(self) -> MediaType:
+        return MediaType.IMAGE if self is ItemType.IMAGE else MediaType.VIDEO
+
+
 class ShownFile(NamedTuple):
     path: str
     media_type: MediaType
     thumbnail: str | None = None
 
 
-def icon_name(media_type: str) -> str:
-    return "play" if media_type == MediaType.VIDEO else "photo"
+_ICONS = {ItemType.IMAGE: "photo", ItemType.VIDEO: "play", ItemType.FLICK: "flick"}
+
+
+def icon_name(item_type: str) -> str:
+    return _ICONS[ItemType(item_type)]
 
 
 def media_type_from_filename(filename: str) -> MediaType | None:

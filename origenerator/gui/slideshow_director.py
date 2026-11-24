@@ -19,7 +19,6 @@ from shared_ui.foreground import bring_to_front
 from shared_ui.message_shape import FAVORITE, INFO, WARNING
 
 from origenerator import gallery
-from origenerator.action_settings import loops
 from origenerator.config import FRAMES_BEING_MADE_DIR, OUTPUT_PLACES, STATE_DIR
 from origenerator.fun_time_bridge import (
     ask_for_omnipause,
@@ -433,7 +432,7 @@ class SlideshowDirector:
             or self._fun_time is not None)
 
     def _plays_in_genau(self, row: dict | None) -> bool:
-        return self._fun_time is None and row is not None and loops(row)
+        return self._fun_time is None and row is not None and gallery.is_a_flick(row)
 
     def _show_genau_on(self, row: dict, path):
         return self._show_genau(row_shape(row), Path(path))

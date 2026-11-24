@@ -11,6 +11,7 @@ from shared_ui.colors import TEXT_PRIMARY
 from shared_ui.icons import icon_pixmap
 from shared_ui.spacing import GAP_SMALL
 
+from origenerator.content import an_item, item_words
 from origenerator.gui import tile_shape
 from origenerator.gui.drags import under_way
 from origenerator.gui.drop_style import AIMED, LIT
@@ -21,14 +22,12 @@ from origenerator.gui.looping_preview import play_gray_in, play_in, put_down
 from origenerator.gui.style_property import set_style_property
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 
-DROP_AN_IMAGE = "Drop an image"
-DROP_A_VIDEO = "Drop a video"
 PASTE_NAME = "Paste Origenerator name"
 BROWSE = "Browse..."
 
 
 def placeholder_for(kind: str) -> str:
-    return DROP_A_VIDEO if kind == "video" else DROP_AN_IMAGE
+    return f"Drop {an_item(kind)}"
 
 
 class DropZones(QWidget):
@@ -98,7 +97,6 @@ class DropZone(DropZones):
         self,
         kind: str,
         lookups: ZoneLookups,
-        placeholder: str,
         parent=None,
         *,
         grayscale: bool = False,
@@ -106,12 +104,11 @@ class DropZone(DropZones):
         super().__init__(parent=parent)
         self._lent_by = lookups.lent_by
         self._preview = lookups.preview
-        self._placeholder = placeholder
         self._named = lookups.named
         self._name_of = lookups.name_of
         self._browse = lookups.browse
         self._leads_to = lookups.leads_to
-        self._go_to_tip = f"Click to go to this {kind}"
+        self._kind = kind
         self._grayscale = grayscale
         self._current_id: str | None = None
         self._movie: QMovie | None = None
@@ -120,7 +117,7 @@ class DropZone(DropZones):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(GAP_SMALL)
         # A plain QWidget subclass paints no stylesheet border without WA_StyledBackground.
-        self._label = QLabel(placeholder)
+        self._label = QLabel(placeholder_for(kind))
         self._label.setObjectName("dropZone")
         self._label.setProperty(LIT, False)
         self._label.setProperty(AIMED, False)
@@ -140,6 +137,15 @@ class DropZone(DropZones):
 
     def current_id(self) -> str | None:
         return self._current_id
+
+    def take(self, kind: str) -> None:
+        if kind == self._kind:
+            return
+        self._kind = kind
+        self._item_type_icon.wear(kind)
+        if self._current_id is None:
+            self._label.setText(placeholder_for(kind))
+        self.reread_name()
 
     def set_item(self, prompt_id: str):
         self._current_id = prompt_id
@@ -169,7 +175,7 @@ class DropZone(DropZones):
         self.reread_name()
         if self._current_id is None:
             self._label.setPixmap(QPixmap())
-            self._label.setText(self._placeholder)
+            self._label.setText(placeholder_for(self._kind))
             self._item_type_icon.setVisible(False)
             return
         thumb_path, movie_path = self._preview(self._current_id)
@@ -189,7 +195,8 @@ class DropZone(DropZones):
 
     def _show_where_a_click_goes(self, held: str | None, named: str) -> None:
         leads = held is not None and self._leads_to(held) is not None
-        self.setToolTip(named or (self._go_to_tip if leads else ""))
+        go_to = f"Click to go to this {item_words(self._kind)[0]}"
+        self.setToolTip(named or (go_to if leads else ""))
         if leads:
             self.setCursor(Qt.CursorShape.PointingHandCursor)
         else:

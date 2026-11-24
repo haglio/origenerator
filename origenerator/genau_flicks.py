@@ -4,11 +4,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from app_support.gallery_rows import made_here
 from funestra.genau_status import GenauStatus
 from funestra.inclusion_pair import BOTH, Included
 
-from origenerator.action_settings import loops
+from origenerator.gallery.output import is_a_flick
 from origenerator.gallery.shapes import PORTRAIT
 from origenerator.item_shape import row_shape
 
@@ -81,7 +80,7 @@ class FlicksLibrary(Protocol):
 
 def _kept(row: dict, library: FlicksLibrary, filters: GenauFilters) -> bool:
     portrait, landscape = filters.shapes
-    return (loops(row) and made_here(row)
+    return (is_a_flick(row)
             and (portrait if row_shape(row) == PORTRAIT else landscape)
             and (not filters.favorites or bool(row.get("starred")))
             and (not filters.enhanced or library.is_enhanced(row)))

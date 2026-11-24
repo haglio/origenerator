@@ -20,7 +20,7 @@ def _wide_thumbnail(tmp_path) -> str:
 
 def _as_the_drop_box_draws_it(qtbot, path) -> QSize:
     box = DropZone(
-        MediaType.IMAGE, ZoneLookups(lambda pid: pid, lambda pid: (path, None)), "Drop an image")
+        MediaType.IMAGE, ZoneLookups(lambda pid: pid, lambda pid: (path, None)))
     qtbot.addWidget(box)
     box.set_item("img")
     return box._label.pixmap().size()

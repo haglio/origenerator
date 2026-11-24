@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import dataclasses
-
 from origenerator.content import genau_flick_word
 from origenerator.export_lane import GENAU, KINO
 
 
 def test_the_genau_lane_calls_what_it_sends_by_genaus_word_for_it():
-    lane = dataclasses.replace(GENAU, word=lambda: "flick")
+    lane = GENAU
 
     said = [lane.tooltip, lane.unsend_tooltip, lane.withdrawn_tooltip, lane.failure_body("gone")]
 
@@ -27,7 +25,7 @@ def test_the_kino_lane_calls_what_it_sends_a_video():
 
 
 def test_each_send_button_says_it_sends_to_its_app_in_plain_words():
-    lane = dataclasses.replace(GENAU, word=lambda: "flick")
+    lane = GENAU
 
     said = [lane.tooltip, lane.withdrawn_tooltip, KINO.tooltip, KINO.withdrawn_tooltip]
 

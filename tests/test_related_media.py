@@ -171,7 +171,7 @@ def test_a_video_animated_from_another_videos_starting_frame_points_at_that_vide
     related.show_row(made_here, [_hidden_frame()])
 
     tile = source_tile(related)
-    assert (tile._prompt_id, tile.heading, tile._item_type_icon.media_type) == (
+    assert (tile._prompt_id, tile.heading, tile._item_type_icon.item_type) == (
         "vid1", "Animated from starting frame of", "video")
 
 
@@ -212,7 +212,7 @@ def test_a_video_combine_made_points_at_the_video_whose_settings_it_followed(mak
     assert not settings_tile(related).isHidden()
     assert settings_tile(related)._prompt_id == "vid0"
     assert settings_tile(related).heading == "Animated using video settings of"
-    assert settings_tile(related)._item_type_icon.media_type == "video"
+    assert settings_tile(related)._item_type_icon.item_type == "video"
     assert settings_tile(related)._name.text() == "77B2E1A0 012"
 
 
@@ -677,7 +677,7 @@ def test_a_cut_points_back_at_the_clip_it_was_cut_out_of(make_related):
     assert not source_tile(related).isHidden()
     assert source_tile(related)._prompt_id == "vid1"
     assert source_tile(related).heading == "Trimmed from"
-    assert source_tile(related)._item_type_icon.media_type == "video"
+    assert source_tile(related)._item_type_icon.item_type == "video"
 
 
 def test_a_clip_points_at_each_cut_out_of_it_under_trims(make_related):
@@ -786,7 +786,7 @@ def test_a_cut_whose_clip_is_gone_falls_back_to_the_start_frame(make_related):
     related.show_row(_trim_row(trimmed_from="deleted"), [_image_row()])
 
     assert source_tile(related)._prompt_id == "img1"
-    assert source_tile(related)._item_type_icon.media_type == "image"
+    assert source_tile(related)._item_type_icon.item_type == "image"
 
 
 def test_a_cut_whose_video_is_in_the_trash_still_points_back_at_the_video(make_related):

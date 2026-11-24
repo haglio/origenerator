@@ -9,6 +9,7 @@ from app_support import haglio_settings
 from app_support import overlay as _overlay
 
 from origenerator.branch_session import THIS_CHECKOUT, production_checkout
+from origenerator.media import ItemType
 
 PROJECT_DIR = THIS_CHECKOUT
 _OVERLAY_NAME = "content.local.json"
@@ -74,8 +75,22 @@ def genau_flick_words() -> tuple[str, str]:
     return words["one"], words["many"]
 
 
+def as_sentence(said: str) -> str:
+    return said[:1].upper() + said[1:]
+
+
 def genau_flick_word() -> str:
     return genau_flick_words()[0]
+
+
+def item_words(item_type: str) -> tuple[str, str]:
+    item_type = ItemType(item_type)
+    return genau_flick_words() if item_type is ItemType.FLICK else (item_type, f"{item_type}s")
+
+
+def an_item(item_type: str) -> str:
+    one = item_words(item_type)[0]
+    return f"{'an' if one[:1] in 'aeiou' else 'a'} {one}"
 
 
 def non_ai_clip_heading() -> str:

@@ -10,13 +10,12 @@ from PIL import Image
 from shared_ui.orientation import orientation_of_size as shape_of_size
 
 from origenerator import gallery
-from origenerator.action_settings import loops
 from origenerator.config import OUTPUT_PLACES
 from origenerator.gallery.collection import LATEST_KEY, folder_collection
 from origenerator.gallery.shapes import LANDSCAPE, SHAPES_AND_BOTH, on_shape
 from origenerator.gallery.signatures import canonical_settings
 from origenerator.generation_state import GenerationStatus
-from origenerator.media import MediaType
+from origenerator.media import ItemType, MediaType
 from origenerator.output_files import READINGS_KEPT
 from origenerator.workflows.derived_size import resolve_input_image_path
 
@@ -35,6 +34,8 @@ def key_holds(outer: str, inner: str) -> bool:
     inner_base, inner_side = split_key(inner)
     if outer_side != inner_side or not outer_base or not inner_base:
         return False
+    if outer_base in tuple(ItemType):
+        return gallery.media_folder_holding(inner_base) == outer_base
     return inner_base == outer_base or inner_base.startswith(outer_base + "/")
 
 
@@ -56,7 +57,7 @@ def what_plays_at(key: str | None, rows: list[dict]) -> list[dict]:
 
 
 def plays_in_a_slideshow(rows: Iterable[dict]) -> list[dict]:
-    return [row for row in rows if not loops(row)]
+    return [row for row in rows if not gallery.is_a_flick(row)]
 
 
 def together(rows: list[dict], more: list[dict]) -> list[dict]:

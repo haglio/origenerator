@@ -5,7 +5,7 @@ from collections import defaultdict
 from app_support.comfy_file_refs import frame_name
 
 from origenerator import animation_paths, gallery
-from origenerator.action_settings import GENAU, VIDEO, loops
+from origenerator.action_settings import lane_of
 from origenerator.action_vocabulary import vocabulary
 from origenerator.animation_names import animation_of, image_button_of
 from origenerator.content import load_content
@@ -52,10 +52,9 @@ def samples_by_path(rows: list[dict], *, content: dict | None = None
             gallery.parse_params(video.get("params_json")).get("input_image")), "")
         if not action or not state:
             continue
-        lanes = (VIDEO, GENAU) if loops(video) else (VIDEO,)
-        for lane in lanes:
-            if animation_paths.allows_in(table, words, lane, action, state):
-                found[(lane, action, state)].append(video)
+        lane = lane_of(video)
+        if animation_paths.allows_in(table, words, lane, action, state):
+            found[(lane, action, state)].append(video)
     return dict(found)
 
 

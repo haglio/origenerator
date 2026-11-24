@@ -11,7 +11,7 @@ from shared_ui.tick_control import TickControl
 from shared_ui.toggle_switch import ToggleSwitch
 from shared_ui.tooltip_shape import shaped
 
-from origenerator.gui.drop_zone import DropZone, ZoneLookups, placeholder_for
+from origenerator.gui.drop_zone import DropZone, ZoneLookups
 from origenerator.gui.file_pick import AUDIO_FILE_FILTER, FILE_FILTERS
 from origenerator.gui.no_wheel import NoWheelDoubleSpinBox, NoWheelDropdown, NoWheelSpinBox
 from origenerator.gui.param_help import option_help
@@ -145,8 +145,7 @@ class _Drop(FieldKind):
                 lambda prompt_id: self._items.lends(prompt_id, self._kind),
                 self._items.preview,
                 named=self._items.named, name_of=self._items.name_of,
-                browse=lambda: self._browse(pd.key), leads_to=self._items.item_of),
-            placeholder_for(self._kind))
+                browse=lambda: self._browse(pd.key), leads_to=self._items.item_of))
         self.write(pd, zone, pd.default)
         return zone
 

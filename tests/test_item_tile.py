@@ -20,7 +20,7 @@ from origenerator.gui.gallery_pane import REROLL_IMAGE, REROLL_VIDEO
 from origenerator.gui.inflight import RunReading
 from origenerator.gui.item_tile import CornerButton, ItemTile, TileAppearance
 from origenerator.gui.item_type_icon import ItemTypeIcon, VideoLength
-from origenerator.media import MediaType
+from origenerator.media import ItemType, MediaType
 from tests.heard_drags import HeardDrags
 from tests.tile_drawing import drawn_under_the_app_stylesheet
 
@@ -188,14 +188,14 @@ def test_item_type_icon_appears_only_when_a_type_is_given(qtbot):
     plain = ItemTile("p1", None, "label")
     qtbot.addWidget(plain)
     assert plain.findChildren(ItemTypeIcon) == []
-    typed = ItemTile("p2", None, "label", TileAppearance(media_type=MediaType.VIDEO))
+    typed = ItemTile("p2", None, "label", TileAppearance(item_type=MediaType.VIDEO))
     qtbot.addWidget(typed)
     assert len(typed.findChildren(ItemTypeIcon)) == 1
 
 
 def _video_tile(qtbot, **appearance):
     tile = ItemTile("p1", None, "label", TileAppearance(
-        media_type=MediaType.VIDEO, favorite=True, enhance=icons.ENHANCE_OPEN, **appearance))
+        item_type=MediaType.VIDEO, favorite=True, enhance=icons.ENHANCE_OPEN, **appearance))
     qtbot.addWidget(tile)
     with qtbot.waitExposed(tile):
         tile.show()
@@ -242,7 +242,7 @@ def test_a_video_tile_shows_how_long_the_video_runs_just_right_of_its_video_mark
 
 def test_a_tile_with_no_known_length_shows_none(qtbot):
     unmeasured = _video_tile(qtbot)
-    image = ItemTile("p2", None, "label", TileAppearance(media_type=MediaType.IMAGE,
+    image = ItemTile("p2", None, "label", TileAppearance(item_type=MediaType.IMAGE,
                                                          video_seconds=3.0))
     qtbot.addWidget(image)
 
@@ -308,7 +308,7 @@ def test_every_corner_of_a_tile_is_up_at_rest(qtbot):
 
 
 def test_a_tiles_image_or_video_icon_stands_in_from_its_images_corner_like_its_star(qtbot):
-    tw = ItemTile("p1", None, "label", TileAppearance(media_type="video", video_seconds=7))
+    tw = ItemTile("p1", None, "label", TileAppearance(item_type="video", video_seconds=7))
     qtbot.addWidget(tw)
     image, star = tw._image_label.geometry(), _corners(tw)[0].geometry()
     (icon,) = tw.findChildren(ItemTypeIcon)
@@ -392,7 +392,7 @@ def test_a_corner_control_click_names_the_tile_and_the_act(qtbot):
 
 def test_the_corners_sit_one_to_a_corner_of_the_thumbnail(qtbot):
     tw = ItemTile("p1", None, "label", TileAppearance(favorite=True,
-                         enhance=icons.ENHANCE_HELD, media_type=MediaType.IMAGE))
+                         enhance=icons.ENHANCE_HELD, item_type=MediaType.IMAGE))
     qtbot.addWidget(tw)
     star, trash, plus = (b.geometry() for b in _corners(tw))
     area = tw._image_label.geometry()
@@ -614,7 +614,7 @@ def test_an_enhancing_tiles_corners_are_drawn_over_its_scrim(qtbot):
 
 
 def test_an_enhancing_tiles_bar_is_drawn_over_its_scrim_and_its_item_type_icon(qtbot):
-    tw = ItemTile("p1", None, "label", TileAppearance(media_type="image", enhancing=_run()))
+    tw = ItemTile("p1", None, "label", TileAppearance(item_type="image", enhancing=_run()))
     qtbot.addWidget(tw)
 
     tw.set_enhancing(_run(frame=_png_bytes()))
@@ -729,7 +729,7 @@ def test_picking_and_unpicking_a_tile_parses_no_style_sheet(qtbot, monkeypatch):
 
 _A_CHANGE_TO = {
     "caption": lambda: "another name",
-    "media_type": lambda: MediaType.VIDEO,
+    "item_type": lambda: ItemType.VIDEO,
     "video_seconds": lambda: 5.0,
     "movie_path": lambda: "moving.webp",
     "favorite": lambda: True,

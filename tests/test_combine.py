@@ -10,6 +10,7 @@ from shared_ui.testing import appending_to, ground
 from shared_ui.tick_control import TickControl
 
 from origenerator import action_settings
+from origenerator.gui import icons
 from origenerator.gui.action_row import ACTION_LABEL
 from origenerator.gui.combine import (
     Combine,
@@ -20,9 +21,11 @@ from origenerator.gui.combine import (
 )
 from origenerator.gui.drags import under_way
 from origenerator.gui.generation_drag import generation_mime
+from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.recent_videos import RecentVideo
 from origenerator.gui.stylesheet import build_stylesheet
 from origenerator.gui.thumbnail_dropdown import THUMBNAILS_ROLE
+from origenerator.media import ItemType
 
 TOOLTIP = Qt.ItemDataRole.ToolTipRole
 
@@ -847,12 +850,12 @@ def test_generate_emits_the_picked_action(qtbot):
 
 
 
-def test_the_lane_defaults_to_kino(qtbot):
+def test_combine_makes_a_video_until_it_is_told_to_make_a_flick(qtbot):
     combine = _panel(qtbot)
     assert combine.selected_intent() == action_settings.VIDEO, (
         "Kino is the default because it is what Combine has long done and by far the more "
         "common ask; Genau is the deliberate detour")
-    assert combine._video_radio.text() == "Kino"
+    assert (combine._video_radio.text(), combine._genau_radio.text()) == ("Video", "Flick")
     assert combine._video_radio.isChecked()
     assert not combine._genau_radio.isChecked()
 
@@ -1008,3 +1011,45 @@ def test_both_zones_paste_a_name_and_only_the_image_zone_browses(qtbot):
     assert browsed == ["asked"]
     assert combine.image_zone.current_id() == "img1"
     assert combine.image_zone.toolTip() == "AB12CD34 001"
+
+
+def test_the_second_drop_zone_asks_for_a_flick_while_combine_makes_flicks(qtbot):
+    combine = _panel(qtbot)
+    asked_for = [combine.video_zone._label.text()]
+
+    _pick_lane(combine, action_settings.GENAU)
+    asked_for.append(combine.video_zone._label.text())
+    wears = combine.video_zone.findChild(ItemTypeIcon).item_type
+    _pick_lane(combine, action_settings.VIDEO)
+    asked_for.append(combine.video_zone._label.text())
+
+    assert (asked_for, wears) == ([
+        "Drop a video", "Drop a flick", "Drop a video"], ItemType.FLICK)
+
+
+def test_generate_says_it_needs_an_action_or_a_flick_while_combine_makes_flicks(qtbot):
+    combine = _panel(qtbot)
+    combine.image_zone.set_item("img1")
+    needs = [combine._generate_btn.toolTip()]
+
+    _pick_lane(combine, action_settings.GENAU)
+    needs.append(combine._generate_btn.toolTip())
+
+    assert needs == ["Pick an action or drop a video first",
+                     "Pick an action or drop a flick first"]
+
+
+def test_each_choice_of_what_to_make_wears_the_icon_of_that_type_of_item(qtbot):
+    combine = _panel(qtbot)
+    size = combine._video_radio.iconSize()
+
+    assert [radio.icon().pixmap(size).toImage() for radio in (
+        combine._video_radio, combine._genau_radio)] == [
+            icons.item_type_mark(made).pixmap(size).toImage()
+            for made in (ItemType.VIDEO, ItemType.FLICK)]
+
+
+def test_the_choices_of_what_to_make_read_video_and_the_word_for_a_flick(qtbot):
+    combine = _panel(qtbot)
+
+    assert [combine._video_radio.text(), combine._genau_radio.text()] == ["Video", "Flick"]

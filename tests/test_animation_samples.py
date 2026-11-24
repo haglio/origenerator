@@ -84,7 +84,7 @@ def test_a_clip_whose_image_nobody_sorted_is_no_example_yet(samples):
     assert samples(rows) == {}
 
 
-def test_only_a_looping_clip_is_an_example_for_the_loop_lane(samples):
+def test_a_flick_is_an_example_for_the_genau_lane_and_a_video_for_the_kino_lane(samples):
     rows = [
         _image("pic", "state two"),
         _video("long", made_from="pic", starred=1),
@@ -94,8 +94,7 @@ def test_only_a_looping_clip_is_an_example_for_the_loop_lane(samples):
     found = samples(rows)
 
     assert [row["prompt_id"] for row in found[(GENAU, "alpha", "state two")]] == ["loop"]
-    assert sorted(row["prompt_id"] for row in found[(VIDEO, "alpha", "state two")]) == [
-        "long", "loop"]
+    assert [row["prompt_id"] for row in found[(VIDEO, "alpha", "state two")]] == ["long"]
 
 
 def test_an_animation_the_table_rules_out_gets_no_example_however_it_was_made(samples):

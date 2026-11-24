@@ -20,13 +20,12 @@ from shared_ui.spacing import BUTTON_GAP, BUTTON_GROUP_GAP, GAP_MEDIUM, GAP_SMAL
 from shared_ui.tick_control import TickControl
 from shared_ui.tooltip_shape import shaped
 
-from origenerator.action_settings import GENAU, VIDEO, as_sentence, no_past_video
+from origenerator.action_settings import GENAU, VIDEO, made_in, no_past_video
 from origenerator.action_vocabulary import vocabulary
-from origenerator.content import genau_flick_word
+from origenerator.content import an_item, as_sentence, item_words
+from origenerator.gui import icons
 from origenerator.gui.action_row import ACTION_LABEL
 from origenerator.gui.drop_zone import (
-    DROP_A_VIDEO,
-    DROP_AN_IMAGE,
     DropZone,
     DropZones,
     ZoneLookups,
@@ -39,7 +38,7 @@ from origenerator.gui.generate_button import (
 )
 from origenerator.gui.inflight import ALREADY_MAKING_ONE_TIP
 from origenerator.gui.recent_videos import RecentVideo, RecentVideos
-from origenerator.media import MediaType
+from origenerator.media import ItemType, MediaType
 
 _NEUTRAL_LABEL = "(custom)"
 
@@ -47,7 +46,6 @@ _NEUTRAL_LABEL = "(custom)"
 def combine_checkbox(name: str) -> str:
     return f"combine.checkbox.{name}"
 _NEEDS_IMAGE = "Nothing to start from — drop an image first"
-_NEEDS_ACTION_OR_VIDEO = "Pick an action or drop a video first"
 _EDIT_TIP = "Load this combination into a generate tab to edit before running it."
 
 
@@ -105,9 +103,8 @@ class Combine(QWidget):
         super().__init__(parent)
         self._preview = video_lookups.preview
         self._history = history
-        self.image_zone = DropZone(MediaType.IMAGE, image_lookups, DROP_AN_IMAGE)
-        self.video_zone = DropZone(MediaType.VIDEO, video_lookups, DROP_A_VIDEO,
-                                   grayscale=True)
+        self.image_zone = DropZone(ItemType.IMAGE, image_lookups)
+        self.video_zone = DropZone(ItemType.VIDEO, video_lookups, grayscale=True)
         _keep_its_room_when_hidden(self.video_zone)
         self._between = DropZones((self.image_zone, self.video_zone))
         self._between.setFixedHeight(BUTTON_GAP + BUTTON_GROUP_GAP)
@@ -127,6 +124,7 @@ class Combine(QWidget):
         self._build_the_intent_part()
 
         self._lay_out_the_combine()
+        self._say_what_it_makes()
         self._show_the_boxes_where_they_apply()
         self._sync()
 
@@ -134,10 +132,6 @@ class Combine(QWidget):
         self._category = QComboBox()
         self._list_the_actions()
         open_the_list_in_full(self._category)
-        self._category.setToolTip(
-            "Pick an action and Generate — the app reuses a fitting past video's settings "
-            "on the dropped image. Or pick (custom) and drop a specific video instead."
-        )
         self._category.currentIndexChanged.connect(self._on_category_changed)
         self._boxes: dict[str, TickControl] = {}
         listed_with_its_boxes = QHBoxLayout()
@@ -172,16 +166,12 @@ class Combine(QWidget):
         video_row.addWidget(self.video_zone, 1)
 
     def _build_the_intent_part(self) -> None:
-        self._video_radio = QRadioButton("Kino")
-        self._video_radio.setToolTip(
-            "Make a full-length video for the Satellite Funestras."
-        )
+        self._video_radio = self._radio_making(
+            ItemType.VIDEO, "Make a full-length video for the Satellite Funestras.")
         self._video_radio.setChecked(True)
-        self._genau_radio = QRadioButton("Genau")
-        self._genau_radio.setToolTip(
-            f"Make a Genau {genau_flick_word()}: one complete cycle, looping, sent to "
-            "Genau when done."
-        )
+        self._genau_radio = self._radio_making(
+            ItemType.FLICK, f"Make a Genau {item_words(ItemType.FLICK)[0]}: one complete "
+                            "cycle, looping, sent to Genau when done.")
         self._intent_group = QButtonGroup(self)
         self._intent_group.addButton(self._video_radio)
         self._intent_group.addButton(self._genau_radio)
@@ -193,6 +183,13 @@ class Combine(QWidget):
         intent_row.addWidget(self._video_radio)
         intent_row.addWidget(self._genau_radio)
         intent_row.addStretch(1)
+
+    @staticmethod
+    def _radio_making(item_type: ItemType, tip: str) -> QRadioButton:
+        radio = QRadioButton(as_sentence(item_words(item_type)[0]))
+        radio.setIcon(icons.item_type_mark(item_type))
+        radio.setToolTip(tip)
+        return radio
 
     def _lay_out_the_combine(self) -> None:
         self._generate_btn = GenerateButton()
@@ -208,12 +205,9 @@ class Combine(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, GAP_SMALL, 0, 0)
         layout.setSpacing(BUTTON_GAP)
-        heading = QLabel("Combine")
-        heading.setObjectName("combineHeading")
-        heading.setToolTip(
-            "Re-run a video's settings on the dropped image: pick an action, or drop a video."
-        )
-        layout.addWidget(heading)
+        self._heading = QLabel("Combine")
+        self._heading.setObjectName("combineHeading")
+        layout.addWidget(self._heading)
         parted = QVBoxLayout()
         parted.setSpacing(0)
         parted.addWidget(self.image_zone)
@@ -228,6 +222,19 @@ class Combine(QWidget):
     def selected_intent(self) -> str:
         return GENAU if self._genau_radio.isChecked() else VIDEO
 
+    def makes(self) -> ItemType:
+        return made_in(self.selected_intent())
+
+    def _say_what_it_makes(self) -> None:
+        made = self.makes()
+        one, a = item_words(made)[0], an_item(made)
+        self.video_zone.take(made)
+        self._heading.setToolTip(
+            f"Re-run {a}'s settings on the dropped image: pick an action, or drop {a}.")
+        self._category.setToolTip(
+            f"Pick an action and Generate — the app reuses a fitting past {one}'s settings "
+            f"on the dropped image. Or pick (custom) and drop a specific {one} instead.")
+
     def set_intent(self, intent: str):
         self._genau_radio.setChecked(intent == GENAU)
         self._video_radio.setChecked(intent != GENAU)
@@ -235,9 +242,11 @@ class Combine(QWidget):
     def _on_intent_changed(self, _button, checked: bool):
         # Qt's buttonToggled fires twice for one click, off for the old radio and on for the new.
         if checked:
+            self._say_what_it_makes()
             if not self.selected_category():
                 self._show_dropped()
             self._show_the_boxes_where_they_apply()
+            self._sync()
             self.intent_changed.emit(self.selected_intent())
 
     def _list_the_actions(self) -> None:
@@ -353,7 +362,8 @@ class Combine(QWidget):
         self._generate_btn.set_caption(
             RANDOM_SEED_CAPTION if can_run and remakes_its_own else DEFAULT_CAPTION)
         self._open_btn.setEnabled(ready)
-        missing = "" if ready else _NEEDS_IMAGE if not image_id else _NEEDS_ACTION_OR_VIDEO
+        needs_a_source = f"Pick an action or drop {an_item(self.makes())} first"
+        missing = "" if ready else _NEEDS_IMAGE if not image_id else needs_a_source
         self._generate_btn.setToolTip(
             missing or (ALREADY_MAKING_ONE_TIP if self._folder_generating else ""))
         self._open_btn.setToolTip(missing or _EDIT_TIP)

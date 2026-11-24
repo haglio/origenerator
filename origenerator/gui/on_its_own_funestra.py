@@ -55,7 +55,10 @@ _WASD_AS_ARROWS = {
     Qt.Key.Key_D: Qt.Key.Key_Right,
 }
 _MODES_PICKED = {command: mode for command, _label, mode in MODE_BUTTONS}
-_FIX_STEPS = {Qt.Key.Key_Left: "prev_fix", Qt.Key.Key_Right: "next_fix"}
+_NAV_MAP_STEPS = {Qt.Key.Key_Left: "left", Qt.Key.Key_Right: "right", Qt.Key.Key_Up: "up",
+                  Qt.Key.Key_Down: "down"}
+_SHIFTED_STEPS = {Qt.Key.Key_Left: "prev_fix", Qt.Key.Key_Right: "next_fix",
+                  Qt.Key.Key_Up: "cycle_version", Qt.Key.Key_Down: "cycle_version_back"}
 _GENAUS_KEYS = {
     Qt.Key.Key_Left: PREV_FLICK,
     Qt.Key.Key_Right: NEXT_FLICK,
@@ -450,10 +453,10 @@ class OnItsOwnFunestra(QObject):
              said_at: float | None = None) -> bool:
         key = _WASD_AS_ARROWS.get(key, key)
         if alt:
-            step = _FIX_STEPS.get(key)
-            if step is None or self._mode is MainMode.GENAU:
+            direction = _NAV_MAP_STEPS.get(key)
+            if direction is None or self._mode is MainMode.GENAU:
                 return False
-            answer(self._slideshow, step)
+            self._slideshow.slideshow_nav(direction)
         elif ctrl:
             direction = _HUD_MOVES.get(key)
             if direction is None or self._actions.move_hud is None:
@@ -471,16 +474,16 @@ class OnItsOwnFunestra(QObject):
 
     def _kinos_key(self, key, *, shifted: bool, said_at: float | None) -> bool:
         slideshow = self._slideshow
-        if key == Qt.Key.Key_Left:
-            answer(slideshow, "cycle_version_back") if shifted else slideshow.slideshow_step(-1)
+        if shifted and key in _SHIFTED_STEPS:
+            answer(slideshow, _SHIFTED_STEPS[key])
+        elif key == Qt.Key.Key_Left:
+            slideshow.slideshow_step(-1)
         elif key == Qt.Key.Key_Right:
-            answer(slideshow, "cycle_version") if shifted else slideshow.slideshow_step(1)
+            slideshow.slideshow_step(1)
         elif key == Qt.Key.Key_Up:
-            slideshow.slideshow_nav("up") if shifted else self._on_the_slide_it_was_pressed_over(
-                slideshow.slideshow_cull, said_at)
+            self._on_the_slide_it_was_pressed_over(slideshow.slideshow_cull, said_at)
         elif key == Qt.Key.Key_Down:
-            slideshow.slideshow_nav("down") if shifted else self._on_the_slide_it_was_pressed_over(
-                slideshow.slideshow_toggle_lock, said_at)
+            self._on_the_slide_it_was_pressed_over(slideshow.slideshow_toggle_lock, said_at)
         elif key in (Qt.Key.Key_E, Qt.Key.Key_Home):
             slideshow.slideshow_loop_cycle()
         else:

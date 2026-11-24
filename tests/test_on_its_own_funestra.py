@@ -308,6 +308,10 @@ def _shift(view, key):
     _press(view, key, Qt.KeyboardModifier.ShiftModifier)
 
 
+def _alt(view, key):
+    _press(view, key, Qt.KeyboardModifier.AltModifier)
+
+
 class _Arrows(NamedTuple):
     up: Qt.Key
     left: Qt.Key
@@ -880,19 +884,38 @@ def _a_column_of_two(prompt_id):
 
 
 @_ARROW_KEYS_OR_WASD
-def test_shift_down_and_up_walk_the_maps_column_as_a_sessions_map_keys_do(qtbot, arrows):
+def test_alt_down_and_up_walk_the_maps_column_of_actions_as_a_sessions_map_keys_do(qtbot, arrows):
     deleted = []
     view = _view(qtbot, _KEYED,
                  actions=SlideshowActions(neighbors=_a_column_of_two, delete=deleted.append))
     shown = _put_up(view)
 
-    _shift(view, arrows.down)
+    _alt(view, arrows.down)
     view.slideshow.show_item("a.png")
     _settle(view)
-    _shift(view, arrows.up)
+    _alt(view, arrows.up)
 
     assert shown == ["id-c", "id-a", "id-d"]
     assert (deleted, view.slideshow.locked) == ([], False)
+
+
+def _a_row_of_two_seeds(prompt_id):
+    if prompt_id != "id-a":
+        return NavMapNeighbors()
+    return NavMapNeighbors(seeds=(Slide("c.png", "image", "id-c"), Slide("d.png", "image", "id-d")))
+
+
+@_ARROW_KEYS_OR_WASD
+def test_alt_right_and_left_walk_the_maps_row_of_seeds(qtbot, arrows):
+    view = _view(qtbot, _KEYED, actions=SlideshowActions(neighbors=_a_row_of_two_seeds))
+    shown = _put_up(view)
+
+    _alt(view, arrows.right)
+    view.slideshow.show_item("a.png")
+    _settle(view)
+    _alt(view, arrows.left)
+
+    assert shown == ["id-c", "id-a", "id-d"]
 
 
 def test_entering_a_loop_lets_go_of_a_locked_slide_as_a_funestra_does(qtbot):
@@ -1669,12 +1692,12 @@ def test_shift_arrows_step_the_versions_of_the_image_on_screen(qtbot, tmp_path):
     view.slideshow.set_versions({enhanced: [(enhanced, "image"), (original, "image")]})
     _settle(view)
 
-    _shift(view, Qt.Key.Key_Right)
+    _shift(view, Qt.Key.Key_Up)
     assert _media_on_screen(view) == original, (
-        "Shift+Right moves within the one image rather than along the set, because a version is "
+        "Shift+Up moves within the one image rather than along the set, because a version is "
         "not a neighbor: two versions of an image are compared by texture, which cannot be told "
         "apart from memory, from a thumbnail or over an image that is moving")
-    _shift(view, Qt.Key.Key_Right)
+    _shift(view, Qt.Key.Key_Up)
     assert _media_on_screen(view) == enhanced
 
 
@@ -1692,12 +1715,12 @@ def test_versions_that_arrive_with_places_hand_the_funestra_the_image_on_screens
 
 
 @_ARROW_KEYS_OR_WASD
-def test_alt_with_a_step_key_steps_the_image_on_screen_through_its_fixes(qtbot, tmp_path, arrows):
+def test_shift_right_and_left_step_the_image_on_screen_through_its_fixes(qtbot, tmp_path, arrows):
     image = _png(tmp_path / "e1.png")
     view = _view(qtbot, [(image, "image", "id-a")])
 
     for arrow in (arrows.right, arrows.left):
-        _press(view, arrow, Qt.KeyboardModifier.AltModifier)
+        _shift(view, arrow)
 
     assert (_engine(view).fix_steps, _media_on_screen(view)) == ([1, -1], image)
 
@@ -1708,13 +1731,13 @@ def test_a_version_stepped_to_goes_up_with_its_own_places(qtbot, tmp_path):
     view.slideshow.set_versions({newest: [(newest, "image", "Enhance 2", FACE),
                               (older, "image", "Enhance 1", ((0.0, 0.0, 0.5, 0.5),))]})
 
-    _shift(view, Qt.Key.Key_Right)
+    _shift(view, Qt.Key.Key_Up)
 
     assert _engine(view).points_told[-1] == ((0.0, 0.0, 0.5, 0.5),)
 
 
 @_ARROW_KEYS_OR_WASD
-def test_shift_left_counts_the_enhancements_down_and_shift_right_counts_them_up(
+def test_shift_down_counts_the_enhancements_down_and_shift_up_counts_them_up(
         qtbot, tmp_path, arrows):
     newest, middle, original = (_png(tmp_path / n) for n in ("e2.png", "e1.png", "src.png"))
     view = _view(qtbot, [(newest, "image", "id-a")])
@@ -1723,7 +1746,7 @@ def test_shift_left_counts_the_enhancements_down_and_shift_right_counts_them_up(
                               (original, "image", "Original")]})
 
     named = []
-    for arrow in (arrows.left, arrows.left, arrows.right, arrows.right):
+    for arrow in (arrows.down, arrows.down, arrows.up, arrows.up):
         _shift(view, arrow)
         named.append(view.slideshow.hud_item_note)
 
@@ -1738,7 +1761,7 @@ def test_a_version_shift_stepped_to_comes_up_still_and_holds_the_slideshow(qtbot
     view.slideshow.set_versions({enhanced: [(enhanced, "image"), (original, "image")]})
     _settle(view)
 
-    _shift(view, Qt.Key.Key_Right)
+    _shift(view, Qt.Key.Key_Up)
     _runs_out(view)
 
     assert _engine(view).opened_at_pace[-1] == 0
@@ -1752,7 +1775,7 @@ def test_a_plain_arrow_after_comparing_versions_sets_the_slideshow_going_again(
     view = _view(qtbot, [(enhanced, "image", "id-a"), (other, "image", "id-b")])
     view.slideshow.set_versions({enhanced: [(enhanced, "image"), (original, "image")]})
     _settle(view)
-    _shift(view, Qt.Key.Key_Right)
+    _shift(view, Qt.Key.Key_Up)
 
     _press(view, arrow)
 
@@ -1767,7 +1790,7 @@ def test_a_pace_set_while_versions_are_compared_waits_for_the_arrow_that_moves_o
     view = _view(qtbot, [(enhanced, "image", "id-a"), (other, "image", "id-b")])
     view.slideshow.set_versions({enhanced: [(enhanced, "image"), (original, "image")]})
     _settle(view)
-    _shift(view, Qt.Key.Key_Right)
+    _shift(view, Qt.Key.Key_Up)
     opened = list(_engine(view).opened)
 
     view.slideshow.step_dwell(5)
@@ -1785,7 +1808,7 @@ def test_a_version_landing_while_versions_are_compared_keeps_the_slideshow_held(
     view = _view(qtbot, [(a, "image", "id-a"), ("b.png", "image", "id-b")])
     view.slideshow.set_versions({a: [(a, "image", "Enhancement 1/1"), (a_base, "image", "Original")]})
     _settle(view)
-    _shift(view, Qt.Key.Key_Right)
+    _shift(view, Qt.Key.Key_Up)
 
     view.slideshow.note_enhanced("id-a", better)
     _settle(view)
@@ -1799,7 +1822,7 @@ def test_comparing_a_videos_versions_holds_the_slideshow_on_them_too(qtbot):
     view.slideshow.set_versions({"clip_evolved.mp4": [("clip_evolved.mp4", "video", "Evolved"),
                                                       ("clip.mp4", "video", "Original")]})
 
-    _shift(view, Qt.Key.Key_Left)
+    _shift(view, Qt.Key.Key_Down)
     _runs_out(view)
 
     assert _media_on_screen(view) == "clip.mp4"
@@ -1812,7 +1835,7 @@ def test_an_image_being_enhanced_is_not_moved_on_early_while_its_versions_are_co
     view = _view(qtbot, [(a, "image", "id-a"), ("b.png", "image", "id-b")], enhancing={"id-a": "running"})
     view.slideshow.set_versions({a: [(a, "image", "Enhancement 1/1"), (a_base, "image", "Original")]})
     _settle(view)
-    _shift(view, Qt.Key.Key_Right)
+    _shift(view, Qt.Key.Key_Up)
 
     _time_passes(view, 3)
 
@@ -1825,7 +1848,7 @@ def test_shift_arrows_do_nothing_for_an_image_with_one_version(qtbot, tmp_path):
     view.slideshow.set_versions({})
     _settle(view)
 
-    _shift(view, Qt.Key.Key_Right)
+    _shift(view, Qt.Key.Key_Up)
 
     assert _media_on_screen(view) == lone
     assert _engine(view).pace_s == view.slideshow.dwell_s
@@ -1839,7 +1862,7 @@ def test_stepping_to_another_image_starts_its_versions_from_the_top(qtbot, tmp_p
     _settle(view)
 
     _press(view, Qt.Key.Key_Right)
-    _shift(view, Qt.Key.Key_Right)
+    _shift(view, Qt.Key.Key_Up)
 
     assert _media_on_screen(view) == second_base
 
@@ -1851,7 +1874,7 @@ def test_the_hud_says_which_version_is_on_screen(qtbot, tmp_path):
                                 (original, "image", "Original")]})
 
     assert view.slideshow.hud_item_note == "Enhancement 1/1"
-    _shift(view, Qt.Key.Key_Right)
+    _shift(view, Qt.Key.Key_Up)
     assert view.slideshow.hud_item_note == "Original"
     assert view._note.isHidden()
 
@@ -1869,7 +1892,7 @@ def test_a_version_step_keeps_the_item_as_the_enhance_target(qtbot, tmp_path):
     view.slideshow.set_versions({enhanced: [(enhanced, "image"), (original, "image")]})
     _settle(view)
 
-    _shift(view, Qt.Key.Key_Right)
+    _shift(view, Qt.Key.Key_Up)
 
     assert view.slideshow.voice_target() == "id-a"
 
@@ -1882,7 +1905,7 @@ def test_a_version_step_re_aims_the_device(qtbot, tmp_path):
     changed = []
     view.slideshow.media_changed.connect(lambda: changed.append(True))
 
-    _shift(view, Qt.Key.Key_Right)
+    _shift(view, Qt.Key.Key_Up)
 
     assert changed == [True]
 
@@ -2313,7 +2336,7 @@ def test_a_reopened_slideshow_shows_the_version_that_was_on_screen(qtbot, tmp_pa
     closed = _view(qtbot, [(enhanced, "image", "id-a")])
     closed.slideshow.set_versions(levels)
     _settle(closed)
-    _shift(closed, Qt.Key.Key_Left)
+    _shift(closed, Qt.Key.Key_Down)
 
     reopened = _view(qtbot, [(enhanced, "image", "id-a")])
     reopened.slideshow.set_versions(levels)
@@ -2649,7 +2672,7 @@ def test_the_version_the_last_slideshow_was_on_is_not_stepped_on_what_is_being_m
     closed = _view(qtbot, items)
     closed.slideshow.set_versions(levels)
     _settle(closed)
-    _shift(closed, Qt.Key.Key_Right)
+    _shift(closed, Qt.Key.Key_Up)
     reopened = _view(qtbot, items, enhancing={"id-c": "running"})
     reopened.slideshow.set_versions(levels)
     _settle(reopened)
@@ -2683,7 +2706,7 @@ def test_an_image_enhanced_during_the_slideshow_steps_its_versions_without_reope
 
     view.slideshow.add_versions({better: [(better, "image", "Enhancement 1/1"), (a, "image", "Original")]})
     _settle(view)
-    _shift(view, Qt.Key.Key_Right)
+    _shift(view, Qt.Key.Key_Up)
 
     assert _media_on_screen(view) == a
     assert view.slideshow.hud_item_note == "Original"
@@ -2825,7 +2848,7 @@ def test_a_version_stepped_to_while_the_image_is_enhanced_stays_up(qtbot, tmp_pa
     view.slideshow.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes()})
     _settle(view)
 
-    _shift(view, Qt.Key.Key_Right)
+    _shift(view, Qt.Key.Key_Up)
     view.slideshow.note_enhancing({"id-a": "running"}, frames={"id-a": _png_bytes(color=(1, 2, 3))})
     _settle(view)
 
@@ -2924,7 +2947,7 @@ def test_an_enhancement_landing_on_an_older_version_stepped_to_counts_from_the_n
     view = _view(qtbot, [(a, "image", "id-a"), ("b.png", "image", "id-b")])
     view.slideshow.set_versions({a: [(a, "image", "Enhancement 1/1"), (a_base, "image", "Original")]})
     _settle(view)
-    _shift(view, Qt.Key.Key_Right)
+    _shift(view, Qt.Key.Key_Up)
 
     view.slideshow.note_enhanced("id-a", better)
     _settle(view)

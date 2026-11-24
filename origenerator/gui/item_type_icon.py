@@ -7,7 +7,6 @@ from shared_ui.spacing import BUTTON_RADIUS, GAP_SMALL, MARGIN_STANDARD
 from shared_ui.type_scale import SIZE_TINY, in_pixels
 
 from origenerator.gui import icons, square_buttons
-from origenerator.timing import clock_duration
 
 _LENGTH_PADDING = GAP_SMALL
 _LENGTH_CSS = (
@@ -54,8 +53,8 @@ class ItemTypeIcon(QLabel):
 
 
 class VideoLength(QLabel):
-    def __init__(self, seconds: float, beside: ItemTypeIcon):
-        super().__init__(clock_duration(round(seconds)), beside.parentWidget())
+    def __init__(self, said: str, beside: ItemTypeIcon):
+        super().__init__(said, beside.parentWidget())
         self.setStyleSheet(_LENGTH_CSS)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._beside = beside

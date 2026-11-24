@@ -4,11 +4,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from origenerator.action_settings import lane_of, made_in
 from origenerator.config import EVOLVER_SOURCE, GENAU_SOURCE
 from origenerator.content import item_words
 from origenerator.db import Database
 from origenerator.funscript import funscript_of
-from origenerator.gallery import is_a_flick, resolve_preview
+from origenerator.gallery import resolve_preview
 from origenerator.gallery_contract import LANES
 from origenerator.media import ItemType, MediaType
 
@@ -115,7 +116,7 @@ UNSEND_CAPTION = "Unsend"
 
 
 def lane_for(row: dict) -> ExportLane:
-    carried = ItemType.FLICK if is_a_flick(row) else ItemType.VIDEO
+    carried = made_in(lane_of(row))
     own = next(lane for lane in EXPORT_LANES if lane.carries is carried)
     holding_a_stray_copy = (lane for lane in EXPORT_LANES
                             if lane is not own and row.get(lane.flag))

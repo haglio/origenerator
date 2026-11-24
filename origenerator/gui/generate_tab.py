@@ -37,6 +37,7 @@ from origenerator.config import (
     OUTPUT_PLACES,
     THUMB_DIR,
 )
+from origenerator.content import with_its_article
 from origenerator.db import Database, NewSeedUse
 from origenerator.export_lane import UNSEND_CAPTION, lane_for
 from origenerator.gallery import (
@@ -188,9 +189,8 @@ def _same_item(one: dict | None, other: dict | None) -> bool:
 
 
 def _nothing_to_start_from(missing_inputs: list[str]) -> str:
-    named = spoken_list(missing_inputs, "and")
-    article = "an" if named[:1].lower() in "aeiou" else "a"
-    return f"Nothing to start from — pick {article} {named} first"
+    named = with_its_article(spoken_list(missing_inputs, "and"))
+    return f"Nothing to start from — pick {named} first"
 
 
 def _lost_workflow_note(workflow_name: str) -> str:

@@ -355,6 +355,7 @@ class VoiceRouter(QObject):
         self._request_target = None
         self._pause_for_request(slideshow, spoken)
         if spoken.state is CANCELED:
+            self._answer_request(slideshow, "request canceled", spoken)
             return
         if spoken.state != COMPLETED:
             self._answer_request(slideshow, f"request dropped — never heard “{SUBMIT_WORD}”",

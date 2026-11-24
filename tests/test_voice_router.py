@@ -859,7 +859,7 @@ def test_a_request_whose_terminator_never_came_is_dropped_and_says_so(router):
     assert slideshow.requests == [("request dropped — never heard “submit”", False, INFO)]
 
 
-def test_a_canceled_request_lets_the_slideshow_go_on_and_begins_nothing(router):
+def test_a_canceled_request_lets_the_slideshow_go_on_and_says_so(router):
     slideshow = FakeSlideshow(target="g1")
     voice, _host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow),
                                        rows=[_row("g1")])
@@ -869,7 +869,7 @@ def test_a_canceled_request_lets_the_slideshow_go_on_and_begins_nothing(router):
 
     voice.on_spoken_request(Spoken("", state=CANCELED))
 
-    assert (begun, slideshow.requests) == ([], [])
+    assert (begun, slideshow.requests) == ([], [("request canceled", False, INFO)])
     assert slideshow.pauses[-1] == (False, "")
     assert voice._request_target is None
 

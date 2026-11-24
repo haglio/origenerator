@@ -13,11 +13,11 @@ from pathlib import Path
 
 from app_support import origenerator_handoff
 from app_support.process_identity import ProcessNamer
-from shared_ui.preview import Preview, taskbar_identity, window_title
+from shared_ui.preview import Preview, taskbar_identity
 
 from origenerator import alert
 from origenerator.boot_passes import MAINTENANCE, Library, run_maintenance
-from origenerator.branch_session import LAUNCHER, shown_as
+from origenerator.branch_session import shown_as
 
 _CLIENT_ID_KEY = "comfyui_client_id"
 
@@ -37,15 +37,10 @@ CHECKOUT = Path(__file__).resolve().parent.parent
 
 
 def _the_preview_on_the_taskbar(preview: Preview | None, state_dir: Path):
-    if preview is None:
-        return None
-    from app_support.win32 import TaskbarApp
-    from shared_ui.preview_icon_pil import icon_file
+    from shared_ui.preview_taskbar import preview_on_the_taskbar
 
     from origenerator.fun_time_mode import WINDOW_TITLE
-    return TaskbarApp(name=window_title(WINDOW_TITLE, preview),
-                      icon=icon_file(CHECKOUT / "icon.ico", preview, state_dir),
-                      relaunch=f'wscript.exe "{CHECKOUT / LAUNCHER}"')
+    return preview_on_the_taskbar(WINDOW_TITLE, CHECKOUT / "icon.ico", preview, CHECKOUT, state_dir)
 
 
 def _taskbar_identity(app, fun_time, preview: Preview | None, state_dir: Path):

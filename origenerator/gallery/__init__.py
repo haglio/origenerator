@@ -54,6 +54,8 @@ from origenerator.gallery.enhance_settings import (
     EnhanceSettings,
     default_enhance_params,
     describe_enhance_params,
+    enhance_settings_fields,
+    fix_details,
     full_settings,
 )
 from origenerator.gallery.groups import (
@@ -208,6 +210,7 @@ __all__ = [
     "displayed_versions",
     "enhance_params_for",
     "enhance_run_targets_row",
+    "enhance_settings_fields",
     "enhance_target_id",
     "enhance_targets_row",
     "enhanced_generations",
@@ -218,6 +221,7 @@ __all__ = [
     "favorite_folders",
     "favorite_generations",
     "find_source_image_id",
+    "fix_details",
     "fix_params_for",
     "fold_completed_enhancements",
     "fold_enhancement",

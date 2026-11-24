@@ -451,8 +451,7 @@ class EnhanceController:
         if job is None:
             return None
         run = self._as_run(job)
-        return RunningEnhancement(run.status, run.frame,
-                                  gallery.describe_enhance_params(job.params))
+        return RunningEnhancement(run.status, run.frame, job.params)
 
     def jobs_targeting(self, rows) -> list:
         running = self._enhances_in_flight()

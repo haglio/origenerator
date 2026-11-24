@@ -21,6 +21,8 @@ from origenerator.gallery.enhance_settings import (
     EnhanceSettings,
     default_enhance_params,
     describe_enhance_params,
+    enhance_settings_fields,
+    fix_details,
     full_settings,
     version_settings,
 )
@@ -594,3 +596,26 @@ def test_a_folder_stored_with_the_old_detail_pass_still_fixes_what_it_asked_for(
         "enhance_detail_fix": True, "enhance_detail_denoise": 0.45,
         "enhance_face_detector": "teeth_yolov8n.pt"}})
     assert EnhanceSettings.parse(raw).params["enhance_detail_fixes"] == {"teeth": 0.45}
+
+
+def test_an_enhancements_settings_are_fields_under_the_enhance_panes_own_labels(titled_models):
+    titled_models({"driftwood_v1": "Driftwood v1"})
+
+    assert enhance_settings_fields({
+        "enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.15,
+        "checkpoint": "driftwood_v1.safetensors",
+        "enhance_detail_fixes": {"faces": 0.45},
+    }) == [("Upscale factor", "2x"), ("Enhance steps", "20"),
+           ("Enhance redraw amount", "0.15"), ("Model", "Driftwood v1")]
+    assert enhance_settings_fields({"checkpoint": MATCH_SOURCE_MODEL}) == []
+
+
+def test_each_fix_says_its_amount_and_its_lora_in_the_order_the_fixes_are_drawn(titled_models):
+    titled_models({"steady_hands": "Steady Hands 1.0"})
+
+    assert fix_details({
+        "enhance_detail_fixes": {"hands": 0.6, "faces": 0.45},
+        "enhance_fix_prompts": {"hands": {"lora": "steady_hands.safetensors", "strength": 0.8}},
+    }) == {"faces": "0.45", "hands": "0.6 · Steady Hands 1.0 0.8"}
+    assert list(fix_details({"enhance_detail_fixes": {"hands": 0.6, "faces": 0.45}})) == [
+        "faces", "hands"]

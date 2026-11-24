@@ -8,8 +8,8 @@ from origenerator.prompt_checks import things_of
 
 _MOST_THINGS_AN_EDIT_ADDS = 4
 _FEWEST_THINGS_BEFORE_AN_EDIT = 3
-_NEAREST_EDITS_ASKED = 8
-_SHARE_OF_THEM_THAT_BROUGHT_IT = 0.9
+_HIS_LATEST_PROMPTS_WITH_IT = 100
+_NEAREST_OF_THEM = 8
 _HOW_MUCH_MORE_A_NEARER_ONE_COUNTS = 3
 _EVEN_THE_FARTHEST_COUNTS = 0.001
 _FEWEST_PROMPTS_WITH_IT = 400
@@ -26,8 +26,6 @@ _SAYING_NOTHING = frozenset({
 class Edit:
     before: frozenset
     added: dict
-    kept_out: dict
-    stands_after: dict
     made_from: int
     position: int
 
@@ -39,7 +37,30 @@ class Addition:
     beside: str = ""
 
 
-def _alike(one: frozenset, other: frozenset) -> float:
+@dataclass(frozen=True)
+class _PromptWithIt:
+    things: dict
+    naming_it: dict
+    keeping_it_out: dict
+
+    @property
+    def beside_it(self) -> dict:
+        return {thing: written for thing, written in self.things.items() if thing not in self.naming_it}
+
+    def stands_after(self) -> str | None:
+        order = list(self.things)
+        first = min(order.index(thing) for thing in self.naming_it)
+        return order[first - 1] if first else None
+
+
+@dataclass(frozen=True)
+class _HisPrompts:
+    with_it: list
+    said_without_it: Counter
+    without_it: int
+
+
+def _alike(one, other) -> float:
     shared = len(one & other)
     return shared / (len(one) + len(other) - shared) if shared else 0.0
 
@@ -51,54 +72,28 @@ def _counted(alike: float) -> float:
 def _the_prompt_it_was_made_from(things: frozenset, held_by: dict, earlier: list) -> int | None:
     shared = Counter(index for thing in things for index in held_by[thing])
     fits = [index for index, count in shared.items()
-            if count == len(earlier[index][0]) >= _FEWEST_THINGS_BEFORE_AN_EDIT
+            if count == len(earlier[index]) >= _FEWEST_THINGS_BEFORE_AN_EDIT
             and 0 < len(things) - count <= _MOST_THINGS_AN_EDIT_ADDS]
-    return max(fits, key=lambda index: (len(earlier[index][0]), index), default=None)
+    return max(fits, key=lambda index: (len(earlier[index]), index), default=None)
 
 
 def edits_in(prompts) -> list[Edit]:
-    read: list[tuple[dict, dict]] = []
+    read: list[dict] = []
     held_by: dict[str, list[int]] = defaultdict(list)
     edits = []
-    for positive, negative in prompts:
-        things, kept_out = things_of(positive), things_of(negative)
+    for positive, _negative in prompts:
+        things = things_of(positive)
         source = _the_prompt_it_was_made_from(frozenset(things), held_by, read)
         if source is not None:
-            before, before_kept_out = read[source]
-            order = list(things)
+            before = read[source]
             edits.append(Edit(
                 frozenset(before),
                 {thing: written for thing, written in things.items() if thing not in before},
-                {thing: written for thing, written in kept_out.items() if thing not in before_kept_out},
-                dict(zip(order[1:], order, strict=False)), source, len(read)))
+                source, len(read)))
         for thing in things:
             held_by[thing].append(len(read))
-        read.append((things, kept_out))
+        read.append(things)
     return edits
-
-
-def _as_his_nearest_prompt_writes_it(names_it, prompts, there: dict) -> Addition | None:
-    written: Counter = Counter()
-    for positive, _negative in prompts:
-        things = things_of(positive)
-        counted = _counted(_alike(frozenset(there), frozenset(things)))
-        for thing, as_written in things.items():
-            if thing not in there and names_it(as_written):
-                written[as_written] += counted
-    return Addition((written.most_common(1)[0][0],), ()) if written else None
-
-
-def _usually_brought(sides: list[tuple[dict, float]], there: dict, always=frozenset()) -> tuple:
-    counted: Counter = Counter()
-    as_written: dict[str, str] = {}
-    for brought, weight in sides:
-        for thing, written in brought.items():
-            counted[thing] += weight
-            as_written.setdefault(thing, written)
-    whole = sum(weight for _brought, weight in sides)
-    return tuple(as_written[thing] for thing, count in counted.most_common()
-                 if thing not in there
-                 and (thing in always or count / whole >= _SHARE_OF_THEM_THAT_BROUGHT_IT))
 
 
 def _words(thing: str) -> set[str]:
@@ -106,35 +101,56 @@ def _words(thing: str) -> set[str]:
             if len(word) >= _SHORTEST_WORD and word not in _SAYING_NOTHING}
 
 
-def _what_is_tied_to_it(names_it, prompts, there: dict, adding: tuple) -> tuple:
-    with_it, without_it = [], Counter()
-    others = 0
-    for positive, _negative in prompts:
+def _said_in(things) -> set[str]:
+    return set().union(*map(_words, things)) if things else set()
+
+
+def _read_for(names_it, prompts) -> _HisPrompts:
+    with_it, said_without_it = [], Counter()
+    without_it = 0
+    for positive, negative in prompts:
         things = things_of(positive)
-        beside_it = {thing: written for thing, written in things.items() if not names_it(written)}
-        said = set().union(*map(_words, beside_it)) if beside_it else set()
-        if len(beside_it) < len(things):
-            with_it.append((things, beside_it, said))
+        naming_it = {thing: written for thing, written in things.items() if names_it(written)}
+        if naming_it:
+            with_it.append(_PromptWithIt(things, naming_it, {
+                thing: written for thing, written in things_of(negative).items() if names_it(written)}))
         else:
-            others += 1
-            without_it.update(said)
-    if len(with_it) < _FEWEST_PROMPTS_WITH_IT:
+            without_it += 1
+            said_without_it.update(_said_in(things))
+    return _HisPrompts(with_it, said_without_it, without_it)
+
+
+def _most_like_this_one(with_it: list, here: frozenset) -> _PromptWithIt:
+    nearest = sorted(enumerate(with_it[-_HIS_LATEST_PROMPTS_WITH_IT:]),
+                     key=lambda found: (-_alike(here, frozenset(found[1].beside_it)), -found[0]))
+    nearest = [his for _position, his in nearest[:_NEAREST_OF_THEM]]
+    said = [_said_in([*his.naming_it, *his.keeping_it_out]) for his in nearest]
+
+    def as_the_others_word_it(place: int) -> float:
+        return sum(_alike(said[place], other) for at, other in enumerate(said) if at != place)
+
+    return nearest[max(range(len(nearest)), key=lambda place: (as_the_others_word_it(place), -place))]
+
+
+def _what_is_tied_to_it(his: _HisPrompts, there: dict, adding: tuple) -> tuple:
+    if len(his.with_it) < _FEWEST_PROMPTS_WITH_IT:
         return ()
-    beside = Counter(word for _things, _beside_it, said in with_it for word in said)
-    said_already = set().union(*map(_words, [*there, *adding])) if there or adding else set()
+    said_beside_it = [_said_in(prompt.beside_it) for prompt in his.with_it]
+    beside = Counter(word for said in said_beside_it for word in said)
+    said_already = _said_in([*there, *adding])
     here = frozenset(there)
     brought = []
     for word, count in beside.most_common():
-        share = count / len(with_it)
+        share = count / len(his.with_it)
         if share < _SHARE_OF_ITS_PROMPTS_A_TIED_WORD_IS_IN:
             break
-        elsewhere = without_it[word] / others if others else 0.0
+        elsewhere = his.said_without_it[word] / his.without_it if his.without_it else 0.0
         if word in said_already or elsewhere > _AT_MOST_THIS_MUCH_AS_COMMON_WITHOUT_IT * share:
             continue
         written: Counter = Counter()
-        for things, beside_it, _said in with_it:
-            counted = _counted(_alike(here, frozenset(things)))
-            for thing, as_written in beside_it.items():
+        for prompt in his.with_it:
+            counted = _counted(_alike(here, frozenset(prompt.things)))
+            for thing, as_written in prompt.beside_it.items():
                 if thing not in there and word in _words(thing):
                     written[as_written] += counted
         if written:
@@ -145,35 +161,15 @@ def _what_is_tied_to_it(names_it, prompts, there: dict, adding: tuple) -> tuple:
 
 
 def the_way_he_adds(names_it, prompts, pair: tuple[str, str]) -> Addition | None:
-    his = _the_way_his_edits_add(names_it, prompts, pair)
-    if his is None:
-        return None
-    there = things_of(pair[0])
-    tied_to_it = _what_is_tied_to_it(names_it, prompts, there, his.positive)
-    return Addition((*tied_to_it, *his.positive), his.negative, his.beside)
-
-
-def _the_way_his_edits_add(names_it, prompts, pair: tuple[str, str]) -> Addition | None:
     there, kept_out = things_of(pair[0]), things_of(pair[1])
-    here = frozenset(there)
-    adding_it = sorted(
-        ((_alike(here, edit.before), position, edit)
-         for position, edit in enumerate(edits_in(prompts))
-         if any(names_it(written) for thing, written in edit.added.items() if thing not in there)
-         and not any(names_it(thing) for thing in edit.before)),
-        key=lambda found: (-found[0], -found[1]))[:_NEAREST_EDITS_ASKED]
-    if not adding_it:
-        return _as_his_nearest_prompt_writes_it(names_it, prompts, there)
-    nearest = [(edit, _counted(alike)) for alike, _position, edit in adding_it]
-    naming: Counter = Counter()
-    for edit, weight in nearest:
-        for thing, written in edit.added.items():
-            if thing not in there and names_it(written):
-                naming[thing] += weight
-    the_thing = naming.most_common(1)[0][0]
-    stands_after = next((edit.stands_after.get(the_thing) for edit, _weight in nearest
-                         if edit.stands_after.get(the_thing) in there), None)
+    his = _read_for(names_it, prompts)
+    if not his.with_it:
+        return None
+    like_this = _most_like_this_one(his.with_it, frozenset(there))
+    naming_it = tuple(written for thing, written in like_this.naming_it.items() if thing not in there)
+    if not naming_it:
+        return None
     return Addition(
-        _usually_brought([(edit.added, weight) for edit, weight in nearest], there, {the_thing}),
-        _usually_brought([(edit.kept_out, weight) for edit, weight in nearest], kept_out),
-        beside=there[stands_after] if stands_after else "")
+        (*_what_is_tied_to_it(his, there, naming_it), *naming_it),
+        tuple(written for thing, written in like_this.keeping_it_out.items() if thing not in kept_out),
+        beside=there.get(like_this.stands_after(), ""))

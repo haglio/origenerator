@@ -8,7 +8,6 @@ import pytest
 from PIL import Image
 from PySide6.QtCore import QPoint, QRect, Qt
 from PySide6.QtWidgets import QApplication, QFrame, QLabel
-from shared_ui.colors import BORDER_SUBTLE
 
 from origenerator import gallery, item_shape
 from origenerator.gallery.collection import (
@@ -32,6 +31,7 @@ from origenerator.gui.gallery_tree import GROUP_ROLE
 from origenerator.gui.gallery_view import GalleryView
 from origenerator.gui.split_folder_tree import SplitFolderTree
 from origenerator.gui.stylesheet import CHOSEN, build_stylesheet
+from origenerator.gui.thin_divider import THIN_DIVIDER_COLOR
 from origenerator.item_shape import (
     base_of,
     filter_rows,
@@ -497,12 +497,12 @@ def test_together_s_list_is_ruled_off_above_as_each_of_separate_s_lists_is(qtbot
     app.setStyleSheet(build_stylesheet())
     try:
         pane = _laid_out(qtbot, 300)
-        separate = [_rows_from_the_lighter_line_to_the_list(pane, shape)
+        separate = [_rows_from_the_line_to_the_list(pane, shape)
                     for shape in pane.shapes]
         pane.choose_shapes(TOGETHER)
         app.processEvents()
         pane.layout().activate()
-        together = [_rows_from_the_lighter_line_to_the_list(pane, shape)
+        together = [_rows_from_the_line_to_the_list(pane, shape)
                     for shape in pane.shapes]
     finally:
         app.setStyleSheet(prior)
@@ -556,13 +556,13 @@ def _clear_rows_over_the_line(pane, shape, above) -> int:
     return line - ink - 1
 
 
-def _rows_from_the_lighter_line_to_the_list(pane, shape) -> int | None:
+def _rows_from_the_line_to_the_list(pane, shape) -> int | None:
     section, tree = pane._sections[shape], pane._trees[shape]
     image = section.grab().toImage()
     top = tree.mapTo(section, QPoint()).y()
     across = section.width() // 2
     return next((top - row for row in range(top - 1, -1, -1)
-                 if image.pixelColor(across, row) == BORDER_SUBTLE), None)
+                 if image.pixelColor(across, row) == THIN_DIVIDER_COLOR), None)
 
 
 def _sections(view):

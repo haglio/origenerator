@@ -26,7 +26,7 @@ from shared_ui.colors import (
 )
 from shared_ui.palette import PREVIEW_INK
 from shared_ui.preview import Preview
-from shared_ui.spacing import GAP_SMALL
+from shared_ui.spacing import GAP_SMALL, MARGIN_STANDARD
 
 from origenerator.gui.stylesheet import (
     _RADIO_MARK,
@@ -35,6 +35,7 @@ from origenerator.gui.stylesheet import (
     build_stylesheet,
     dress_application,
 )
+from origenerator.gui.thin_divider import THIN_DIVIDER_COLOR
 from origenerator.spin_arrows import arrow_paths
 
 
@@ -255,7 +256,7 @@ def test_the_selected_tab_is_underlined_and_the_others_are_not(qtbot):
     assert image.pixelColor(other.center().x(), low) != BLUE
 
 
-def test_a_time_heading_is_ruled_off_above_like_a_search_sections_heading(qtbot):
+def _time_heading_drawn(qtbot):
     app = QApplication.instance()
     prior = app.styleSheet()
     app.setStyleSheet(build_stylesheet())
@@ -264,11 +265,20 @@ def test_a_time_heading_is_ruled_off_above_like_a_search_sections_heading(qtbot)
         heading.setObjectName("tileGroupHeading")
         qtbot.addWidget(heading)
         heading.resize(300, heading.sizeHint().height())
-        image = heading.grab().toImage()
+        return heading.grab().toImage()
     finally:
         app.setStyleSheet(prior)
 
-    assert image.pixelColor(150, 0) == BORDER_SUBTLE
+
+def test_a_time_heading_is_ruled_off_above_in_the_thin_dividers_gray(qtbot):
+    assert _time_heading_drawn(qtbot).pixelColor(150, 0) == THIN_DIVIDER_COLOR
+
+
+def test_a_time_headings_line_stops_a_margin_short_of_the_right_edge(qtbot):
+    image = _time_heading_drawn(qtbot)
+
+    assert [image.pixelColor(x, 0) == THIN_DIVIDER_COLOR
+            for x in (299 - MARGIN_STANDARD, 300 - MARGIN_STANDARD)] == [True, False]
 
 
 def test_a_hairline_still_separates_one_tab_from_the_next(qtbot):

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtWidgets import QFrame, QSizePolicy, QWidget
+from shared_ui.colors import BG_SECONDARY
 from shared_ui.spacing import HAIRLINE
 
 THIN_DIVIDER = "thinDivider"
+THIN_DIVIDER_COLOR = BG_SECONDARY
 
 
 class ThinDivider(QFrame):

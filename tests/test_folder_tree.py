@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
     QStyleOptionViewItem,
     QTreeWidgetItem,
 )
-from shared_ui.colors import BLUE, BORDER_SUBTLE, TEXT_MUTED, TEXT_PRIMARY
+from shared_ui.colors import BLUE, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.testing import appending_to
 
 from origenerator.gallery.collection import ALL_ITEMS_KEY, FAVORITES_KEY, collection
@@ -50,6 +50,7 @@ from origenerator.gui.folder_tree import (
 )
 from origenerator.gui.generation_drag import generation_mime
 from origenerator.gui.stylesheet import build_stylesheet
+from origenerator.gui.thin_divider import THIN_DIVIDER_COLOR
 from origenerator.item_shape import shaped_key
 from tests.drop_style_seen import worn
 from tests.heard_drags import HeardDrags
@@ -1140,13 +1141,13 @@ def test_right_clicking_a_frozen_folder_offers_no_menu_for_the_row_under_it(qtbo
     assert asked == []
 
 
-def test_a_gray_line_runs_under_the_frozen_folders(qtbot):
+def test_a_line_in_the_thin_dividers_gray_runs_under_the_frozen_folders(qtbot):
     tree, rows = _long_tree(qtbot)
     tree.setStyleSheet(build_stylesheet())
     _scroll_to_the_top(tree, rows["a/i/3"])
     under = sum(tree.visualItemRect(row).height() for row in tree.frozen_rows())
 
-    assert set(_strip(tree, under, 1)) == {BORDER_SUBTLE.name()}
+    assert set(_strip(tree, under, 1)) == {THIN_DIVIDER_COLOR.name()}
 
 
 def test_the_picked_folder_and_its_folders_stay_frozen_once_scrolled_past_in_list_order(qtbot):

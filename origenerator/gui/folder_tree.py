@@ -23,12 +23,13 @@ from PySide6.QtWidgets import (
     QStyleOptionViewItem,
     QTreeWidget,
 )
-from shared_ui.colors import BLUE, BORDER_SUBTLE, TEXT_MUTED, TEXT_PRIMARY
+from shared_ui.colors import BLUE, TEXT_MUTED, TEXT_PRIMARY
 from shared_ui.spacing import BUTTON_ICON, GAP_SMALL
 
 from origenerator.gui import drop_style, icons
 from origenerator.gui.drags import carry, under_way
 from origenerator.gui.generation_drag import dragged_generation
+from origenerator.gui.thin_divider import THIN_DIVIDER_COLOR
 
 _ICON = BUTTON_ICON
 _PAD = GAP_SMALL
@@ -288,7 +289,7 @@ class FolderTree(QTreeWidget):
         for row, place in places:
             self._paint_frozen(painter, self.indexFromItem(row), place)
         under = places[-1][1].bottom() + 1
-        painter.fillRect(QRect(0, under, self.viewport().width(), 1), BORDER_SUBTLE)
+        painter.fillRect(QRect(0, under, self.viewport().width(), 1), THIN_DIVIDER_COLOR)
         painter.end()
 
     def _paint_frozen(self, painter, index, place: QRect) -> None:

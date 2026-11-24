@@ -2024,18 +2024,15 @@ def test_the_loop_keys_first_press_locks_the_item_on_screen(qtbot, tmp_path):
     assert (slideshow.locked, slideshow.hud_map().loop, said) == (True, "", ["Locked"])
 
 
-def test_the_loop_keys_off_stop_lets_go_of_a_lock_taken_inside_the_loop(qtbot, tmp_path):
-    said = []
-    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=_around), say=_into(said))
+def test_a_lock_taken_while_a_loop_runs_ends_the_loop(qtbot, tmp_path):
+    slideshow = _slideshow(qtbot, tmp_path, actions=SlideshowActions(neighbors=_around))
     slideshow.slideshow_loop("action")
+
     slideshow.slideshow_toggle_lock()
-    _sent(slideshow)
-    said.clear()
 
-    slideshow.slideshow_loop_cycle()
-
-    assert "LOCK_OFF" in _sent(slideshow)
-    assert (slideshow.locked, slideshow.hud_map().loop, said) == (False, "", ["Loop off"])
+    assert (slideshow.locked, slideshow.hud_map().loop) == (True, ""), (
+        "the lock is the loop of the one item on screen, the fourth stop of the loop key, "
+        "so it takes the place of the loop that was running")
 
 
 def test_the_loop_key_is_the_lock_where_there_is_nothing_to_loop(qtbot, tmp_path):

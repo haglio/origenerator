@@ -466,6 +466,8 @@ class FunestraSlideshow(QObject):
             self._actions.lock(prompt_id)
 
     def _lock(self, on: bool, *, by_him: bool = False) -> None:
+        if on:
+            self._set.end_loop()
         self._locked = on
         if not on:
             self._gesture_owed = False
@@ -594,10 +596,9 @@ class FunestraSlideshow(QObject):
         if self._set.start_loop(axis):
             self._flash(looping_note(self._set))
         else:
-            self._lock_instead_of_looping()
+            self._lock_what_is_on_screen()
 
-    def _lock_instead_of_looping(self) -> None:
-        self._set.end_loop()
+    def _lock_what_is_on_screen(self) -> None:
         self.set_locked(True)
         self._flash("Locked")
 
@@ -607,16 +608,14 @@ class FunestraSlideshow(QObject):
         return bool(self._actions.browse_all(self))
 
     def slideshow_loop_cycle(self) -> None:
-        looping = self._set.loop is not None
         stop = self._set.step_loop(self.locked, self._browse_it_all)
         if stop == LOCK:
-            self.set_locked(True)
-            self._flash("Locked")
+            self._lock_what_is_on_screen()
         elif stop:
             self._flash(looping_note(self._set))
         else:
+            self._flash("Unlocked" if self.locked else "Loop off")
             self._unlock()
-            self._flash("Loop off" if looping else "Unlocked")
 
     def slideshow_more_seeds(self) -> None:
         if self._set.more_seeds():

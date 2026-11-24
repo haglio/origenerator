@@ -7,7 +7,6 @@ from app_support import haglio_settings, siblings
 from shared_ui.preview import Preview, preview_of, window_title
 
 ENV_FLAG = "ORIGENERATOR_BRANCH_SESSION"
-LAUNCHER = "launch_preview_branch.vbs"
 THIS_CHECKOUT = Path(__file__).resolve().parents[1]
 
 

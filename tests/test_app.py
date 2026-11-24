@@ -35,6 +35,7 @@ from PySide6.QtWidgets import QApplication, QWidget
 from shared_ui.alert import Level
 from shared_ui.colors import BLUE
 from shared_ui.preview import Preview
+from shared_ui.preview_taskbar import PREVIEW_LAUNCHER
 from shared_ui.testing import brought_to_front
 
 from origenerator import app_link, config, content, evolver_agreement, gallery, warm_gun_records
@@ -60,7 +61,7 @@ from origenerator.boot_passes import (
     _merge_silent_copies,
     _tidy_video_previews,
 )
-from origenerator.branch_session import ENV_FLAG, LAUNCHER
+from origenerator.branch_session import ENV_FLAG
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.config import STATE_DIR
 from origenerator.db import Database, NewGeneration
@@ -857,7 +858,7 @@ def test_a_preview_is_named_on_its_taskbar_button_by_the_feature_it_demos(tmp_pa
     assert app.name == "Origenerator — preview of the new seed row"
     assert app.icon == tmp_path / "preview_icon.ico"
     assert app.icon.is_file()
-    assert app.relaunch == f'wscript.exe "{REPO_ROOT / LAUNCHER}"'
+    assert app.relaunch == f'wscript.exe "{REPO_ROOT / PREVIEW_LAUNCHER}"'
 
 
 def test_the_live_app_leaves_its_button_to_its_pinned_shortcut(tmp_path):

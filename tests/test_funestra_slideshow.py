@@ -1457,6 +1457,14 @@ class TestVersions:
 
         assert _sent(slideshow) == ["SET_PACE 0", f"NEXT_VERSION {_FAMILY}"]
 
+    def test_a_step_through_the_fixes_is_handed_to_the_funestra_as_it_is(self, qtbot, tmp_path):
+        slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+
+        slideshow.slideshow_step_fix(1)
+        slideshow.slideshow_step_fix(-1)
+
+        assert _sent(slideshow) == ["NEXT_FIX", "PREV_FIX"]
+
     @pytest.mark.parametrize(("move", "verb"), [
         (lambda slideshow: slideshow.slideshow_step(1), "NEXT"),
         (lambda slideshow: slideshow.slideshow_step(-1), "PREV"),

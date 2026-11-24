@@ -12,7 +12,9 @@ from funestra.funestra_verbs import (
     LOCK_OFF,
     LOCK_ON,
     NEXT,
+    NEXT_FIX,
     PREV,
+    PREV_FIX,
     RELOAD_PLAYLIST,
     SET_PACE,
     SHOW_FRAME,
@@ -369,6 +371,9 @@ class FunestraSlideshow(QObject):
             self._tell_the_pace()
         self._send(step_version(delta, [self._version_item(version) for version in versions]))
         self.media_changed.emit()
+
+    def slideshow_step_fix(self, steps: int) -> None:
+        self._send(NEXT_FIX if steps > 0 else PREV_FIX)
 
     def _version_item(self, version: Version):
         return playlist_item(version.path, version.media_type, version.points_of_interest,

@@ -38,7 +38,7 @@ from origenerator.gui.item_tile import ItemTile
 from origenerator.item_actions import ItemActions, actions_of
 from origenerator.media import MediaType
 from origenerator.output_places import OutputPlaces
-from origenerator.workflows import WORKFLOW_REGISTRY, offered_workflows
+from origenerator.workflows import WORKFLOW_REGISTRY
 from tests import drops
 from tests.gallery_view_support import (
     _SDXL,
@@ -50,6 +50,8 @@ from tests.gallery_view_support import (
     _reroll_client,
     _selected_folder,
     _write_looping_webp,
+    listed_workflows,
+    offered_in_order,
 )
 from tests.qt_exec import faking_exec
 from tests.related_links import settings_tile, source_tile
@@ -188,9 +190,8 @@ def test_the_tab_edit_individual_opens_lists_only_the_video_workflows(qtbot, tmp
 
     view.combine._open_combination("img", "vid")
 
-    dropdown = view.generate_pane.current_generate_tab()._workflow_dropdown
-    assert [dropdown.itemData(i) for i in range(dropdown.count())] == [
-        workflow.name for workflow in offered_workflows(makes=MediaType.VIDEO)]
+    assert (listed_workflows(view.generate_pane.current_generate_tab())
+            == offered_in_order(MediaType.VIDEO))
 
 
 def test_open_combination_takes_over_the_blank_tab_and_marks_it_italic(qtbot, tmp_path):

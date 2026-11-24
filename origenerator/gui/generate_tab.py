@@ -56,6 +56,7 @@ from origenerator.gallery import (
     version_matching_settings,
     workflow_output_type,
 )
+from origenerator.gallery.labels import item_type_labels
 from origenerator.gallery.shapes import PORTRAIT
 from origenerator.gallery.source_image import start_images_among
 from origenerator.generation_config import (
@@ -149,6 +150,7 @@ from origenerator.setting_advice import (
 from origenerator.timing import estimate_label
 from origenerator.workflows import (
     RETIRED_WORKFLOW_NAMES,
+    grouped_by_item_type,
     offered_workflows,
     workflow_named,
 )
@@ -1092,16 +1094,24 @@ class GenerateTab(DropZones):
     def _offer_workflows(self, *, makes: MediaType | None, holding: str | None) -> None:
         dropdown = self._workflow_dropdown
         current = dropdown.currentData()
-        listed = [workflow.name for workflow in offered_workflows(makes=makes)]
-        if holding is not None and holding not in listed:
-            listed.append(holding)
-        if listed == [dropdown.itemData(index) for index in range(dropdown.count())]:
+        offered = offered_workflows(makes=makes)
+        if holding is not None and holding not in {workflow.name for workflow in offered}:
+            offered.append(workflow_named(holding))
+        headings = item_type_labels()
+        rows = [row for item_type, group in grouped_by_item_type(offered)
+                for row in [(headings[item_type], None),
+                            *((workflow.display_name, workflow.name) for workflow in group)]]
+        if rows == [(dropdown.itemText(index), dropdown.itemData(index))
+                    for index in range(dropdown.count())]:
             return
         blocked = dropdown.blockSignals(True)
         try:
             dropdown.clear()
-            for name in listed:
-                dropdown.addItem(workflow_named(name).display_name, name)
+            for text, name in rows:
+                if name is None:
+                    dropdown.add_heading(text)
+                else:
+                    dropdown.addItem(text, name)
             dropdown.setCurrentIndex(dropdown.findData(current) if current is not None else -1)
         finally:
             dropdown.blockSignals(blocked)

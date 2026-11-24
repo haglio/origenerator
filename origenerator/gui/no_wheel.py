@@ -1,16 +1,27 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QSize, Qt
-from PySide6.QtGui import QPalette
+from PySide6.QtGui import QPalette, QStandardItem
 from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
     QSizePolicy,
     QSpinBox,
     QStyle,
+    QStyledItemDelegate,
     QStyleOptionComboBox,
     QStylePainter,
 )
+from shared_ui.spacing import MARGIN_STANDARD
+
+
+class _RowsUnderHeadings(QStyledItemDelegate):
+    def initStyleOption(self, option, index):
+        super().initStyleOption(option, index)
+        if index.flags() & Qt.ItemFlag.ItemIsSelectable:
+            option.rect.adjust(MARGIN_STANDARD, 0, 0, 0)
+        else:
+            option.font.setBold(True)
 
 
 class NoWheelDropdown(QComboBox):
@@ -25,6 +36,13 @@ class NoWheelDropdown(QComboBox):
 
     def wheelEvent(self, event):
         event.ignore()
+
+    def add_heading(self, text: str) -> None:
+        heading = QStandardItem(text)
+        heading.setFlags(Qt.ItemFlag.NoItemFlags)
+        self.model().appendRow(heading)
+        if not isinstance(self.itemDelegate(), _RowsUnderHeadings):
+            self.setItemDelegate(_RowsUnderHeadings(self))
 
     def minimumSizeHint(self):
         """:attr:`floor_chars` wide, whatever the items or the placeholder say (Qt widens its hints to hold both)."""

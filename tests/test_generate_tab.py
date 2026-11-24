@@ -62,6 +62,7 @@ from origenerator.db_requests import Turn
 from origenerator.funscript import funscript_path_for
 from origenerator.gallery import media_type_of_row as gallery_media_type
 from origenerator.gallery.keys import folder_id, settings_key
+from origenerator.gallery.labels import item_type_labels
 from origenerator.gallery.tree import settings_folder_key
 from origenerator.generation_config import ConfigSnapshot
 from origenerator.generation_state import GenerationSource
@@ -98,7 +99,7 @@ from origenerator.media import ItemType, MediaType
 from origenerator.output_places import OutputPlaces
 from origenerator.outside_videos import FrameFolders, OutsideVideo, Record, rows_bringing_in
 from origenerator.prompt_tokens import CUT_OFF, READ_IN_PIECES
-from origenerator.workflows import WORKFLOW_REGISTRY, offered_workflows
+from origenerator.workflows import WORKFLOW_REGISTRY
 from origenerator.workflows.base import story_of
 from origenerator.workflows.derived_size import scale_to_total_pixels
 from origenerator.workflows.model_arch import KREA2, WAN
@@ -106,7 +107,7 @@ from origenerator.workflows.model_files import NO_LORA
 from tests import drops
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.funscript_files import back_and_forth_actions, write_funscript
-from tests.gallery_view_support import _struck_and_lit
+from tests.gallery_view_support import _struck_and_lit, listed_workflows, offered_in_order
 from tests.marked_words import words_shown
 from tests.qt_exec import faking_exec
 from tests.real_db import database_in, kept_on_disk
@@ -1279,18 +1280,36 @@ def test_workflow_picker_hides_machinery_workflows(qtbot, tmp_path):
     assert dropdown.currentData() == "image_enhance"
 
 
-def _listed_workflows(tab):
+def _dropdown_rows(tab):
     dropdown = tab._workflow_dropdown
-    return [dropdown.itemData(i) for i in range(dropdown.count())]
+    return [(dropdown.itemText(i), dropdown.itemData(i)) for i in range(dropdown.count())]
 
 
-def _offered(kind):
-    return [wf.name for wf in offered_workflows(makes=kind)]
+def test_a_new_generation_tabs_dropdown_puts_a_heading_over_its_images_videos_and_flicks(
+        blank_panel):
+    labels = item_type_labels()
+    expected = []
+    for item_type in (ItemType.IMAGE, ItemType.VIDEO, ItemType.FLICK):
+        expected.append((labels[item_type], None))
+        expected += [(wf.display_name, wf.name) for wf in WORKFLOW_REGISTRY.values()
+                     if wf.selectable and wf.item_type is item_type]
+
+    assert _dropdown_rows(blank_panel) == expected
+
+
+def test_a_heading_in_the_workflow_dropdown_cannot_be_picked(blank_panel):
+    model = blank_panel._workflow_dropdown.model()
+    headings = [row for row, (_text, data) in enumerate(_dropdown_rows(blank_panel))
+                if data is None]
+
+    assert headings
+    assert all(model.flags(model.index(row, 0)) & Qt.ItemFlag.ItemIsSelectable
+               == Qt.ItemFlag.NoItemFlags for row in headings)
 
 
 def test_a_new_generation_tab_lists_the_workflows_of_both_kinds(blank_panel):
-    assert set(_listed_workflows(blank_panel)) == {
-        *_offered(MediaType.IMAGE), *_offered(MediaType.VIDEO)}
+    assert set(listed_workflows(blank_panel)) == {
+        *offered_in_order(MediaType.IMAGE), *offered_in_order(MediaType.VIDEO)}
 
 
 @pytest.mark.parametrize(("picked", "kind"), [("wan22_i2v", MediaType.VIDEO),
@@ -1306,7 +1325,7 @@ def test_a_workflow_picked_in_a_new_generation_tab_leaves_only_its_kind_listed(
                      pos=view.visualRect(row).center())
 
     assert dropdown.currentData() == picked
-    assert _listed_workflows(blank_panel) == _offered(kind)
+    assert listed_workflows(blank_panel) == offered_in_order(kind)
 
 
 def test_a_tab_showing_a_video_lists_only_the_video_workflows(saved_panel):
@@ -1314,7 +1333,7 @@ def test_a_tab_showing_a_video_lists_only_the_video_workflows(saved_panel):
 
     tab.show_saved_generation(_video_row(db), [])
 
-    assert _listed_workflows(tab) == _offered(MediaType.VIDEO)
+    assert listed_workflows(tab) == offered_in_order(MediaType.VIDEO)
 
 
 def test_a_tab_that_showed_a_video_lists_only_the_image_workflows_once_it_shows_an_image(
@@ -1325,7 +1344,7 @@ def test_a_tab_that_showed_a_video_lists_only_the_image_workflows_once_it_shows_
 
     tab.show_saved_generation(image, [image])
 
-    assert _listed_workflows(tab) == _offered(MediaType.IMAGE)
+    assert listed_workflows(tab) == offered_in_order(MediaType.IMAGE)
     assert tab._workflow_dropdown.currentData() == "sdxl_t2i"
 
 
@@ -2696,7 +2715,7 @@ def test_a_retired_workflows_video_lists_the_video_workflows_to_make_another_wit
 
     tab.show_saved_generation(video, [image])
 
-    assert _listed_workflows(tab) == _offered(MediaType.VIDEO)
+    assert listed_workflows(tab) == offered_in_order(MediaType.VIDEO)
 
 
 def test_an_import_from_a_workflow_the_app_never_had_says_so(saved_panel):

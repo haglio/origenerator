@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from funestra.file_channel import consume_command_file
 from funestra.funestra_verbs import play_file, set_speed
-from funestra.hud_title import LATEST_LABEL
+from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.messages import SaidMessage, read_message
 from funestra.modes import MessageLevel
 from funestra.playback_rate import NORMAL_RATE
@@ -1440,7 +1440,7 @@ def test_a_reorder_lets_go_and_hands_the_funestra_the_new_list_from_its_top(qtbo
     _sent(slideshow)
 
     slideshow.reorder([("five.png", "image", "id-5"), ("four.png", "image", "id-4")],
-                      latest=True)
+                      order_label=LATEST_LABEL)
 
     assert _sent(slideshow) == ["LOCK_OFF", f"SET_PACE {slideshow.dwell_s}",
                                 "PLAY_FILE five.png", "RELOAD_PLAYLIST"]
@@ -1454,7 +1454,7 @@ def test_a_reorder_keeping_the_slide_leaves_the_funestra_on_the_image_it_has(qtb
     _sent(slideshow)
 
     slideshow.reorder([("nine.png", "image", "id-9"), ("one.png", "image", "id-1")],
-                      latest=True, keep_slide=True)
+                      order_label=LATEST_LABEL, keep_slide=True)
 
     assert _sent(slideshow) == [f"SET_PACE {slideshow.dwell_s}", "RELOAD_PLAYLIST"]
     played = [str(item.path) for item in read_playlist(slideshow.channel.playlist)]
@@ -1464,7 +1464,7 @@ def test_a_reorder_keeping_the_slide_leaves_the_funestra_on_the_image_it_has(qtb
 def test_a_reorder_of_a_slideshow_not_locked_sends_no_unlock(qtbot, tmp_path):
     slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="two.png")
 
-    slideshow.reorder(_ITEMS, latest=True)
+    slideshow.reorder(_ITEMS, order_label=LATEST_LABEL)
 
     assert _sent(slideshow)[:3] == [f"SET_PACE {slideshow.dwell_s}", "PLAY_FILE one.png",
                                     "RELOAD_PLAYLIST"]
@@ -1512,7 +1512,7 @@ class TestVersions:
         (lambda slideshow: slideshow.slideshow_step(-1), "PREV"),
         (lambda slideshow: slideshow.slideshow_cull(), "TRASH one.png"),
         (lambda slideshow: slideshow.show_item("three.png"), "PLAY_FILE three.png"),
-        (lambda slideshow: slideshow.reorder([("five.png", "image", "id-5")], latest=True),
+        (lambda slideshow: slideshow.reorder([("five.png", "image", "id-5")], order_label=LATEST_LABEL),
          "PLAY_FILE five.png"),
         (lambda slideshow: slideshow.release_media(["one.png"]), "TRASH one.png"),
     ], ids=["next", "previous", "a cull", "a click on the map", "a new order",
@@ -2775,7 +2775,7 @@ _THE_LIBRARY = [*_A_FOLDER_OF_TWO, ("three.mp4", "video", "id-3")]
 def _a_folder_whose_favorites_leave_one(qtbot, tmp_path) -> FunestraSlideshow:
     slideshow = _slideshow(qtbot, tmp_path, _A_FOLDER_OF_TWO, actions=SlideshowActions(
         is_favorite={"id-1", "id-3"}.__contains__,
-        browse_all=lambda s: s.reorder(_THE_LIBRARY, latest=False, keep_slide=True) or True))
+        browse_all=lambda s: s.reorder(_THE_LIBRARY, order_label=SHUFFLE_LABEL, keep_slide=True) or True))
     slideshow.take_up(SlideshowFilters(favorites=True))
     _sent(slideshow)
     return slideshow

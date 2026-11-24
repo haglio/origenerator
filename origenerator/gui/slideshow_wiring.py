@@ -7,6 +7,7 @@ from funestra.hud_title import SHUFFLE_LABEL
 from funestra.volume import VolumeHud
 
 from origenerator import video_records
+from origenerator.gallery import sort_order
 from origenerator.slideshow import Slide, SlideshowFilters
 
 
@@ -102,6 +103,7 @@ class DirectorSources:
     learn_weights: Callable[[list], None] = list
     record_group_of: Callable[[object, bool], Hashable | None] | None = None
     record_loops_of: Callable[[object], tuple] | None = None
+    chosen_sort: Callable[[], str] = lambda: sort_order.LATEST
 
     @classmethod
     def of_this_library(cls, **sources) -> DirectorSources:

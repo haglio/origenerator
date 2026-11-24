@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import fields, replace
 
-from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL, looping_label
+from funestra.hud_title import SHUFFLE_LABEL, looping_label
 from funestra.loop_cycle import ACTION, LOCK, OFF, SEED, next_stop, standing_at
 from funestra.satellite_hud import actions_are_filtered
 
@@ -162,16 +162,17 @@ class SlideshowSet:
     def retune(self, items) -> None:
         dropped = self.filters != SlideshowFilters()
         self.filters = SlideshowFilters()
-        self.reorder(items, latest=False)
+        self.reorder(items, order_label=SHUFFLE_LABEL)
         if dropped:
             self._tell_of_the_filters()
 
-    def reorder(self, items, *, latest: bool, keep_slide: bool = False) -> None:
+    def reorder(self, items, *, order_label: str, keep_slide: bool = False) -> None:
+        latest = order_label != SHUFFLE_LABEL
         self._shuffle = in_order if latest else None
         self.loop = None
         self.library_moved()
         self.all_items = [Slide.of(item) for item in items]
-        self.wear(HudFacts(order_label=LATEST_LABEL if latest else SHUFFLE_LABEL,
+        self.wear(HudFacts(order_label=order_label,
                            enhancing=self.enhance_status))
         kept = [item for item in self.all_items if self.passes(item)]
         if not kept:

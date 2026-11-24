@@ -334,10 +334,12 @@ class GalleryView(QWidget):
             self._jobs, client, starting=self._starting,
             in_flight=self._in_flight_items,
             listed=lambda: (self.library.reading.rows, self.library.requests), asks_over=self)
+        self.sort_by = SortBy()
         self.slideshows = SlideshowDirector(
             self,
             DirectorSources.of_this_library(db=db, jobs=self._jobs, names=self._item_names,
-                                            library=lambda: self.library.reading, listing=self.listing),
+                                            library=lambda: self.library.reading, listing=self.listing,
+                                            chosen_sort=self.sort_by.chosen),
             DirectorSurroundings(
                 pace=self._pace, motion=self.osr2.motion, osr2=self.osr2,
                 job_queue=self.job_queue, fun_time=self._fun_time,
@@ -465,7 +467,6 @@ class GalleryView(QWidget):
     def _build_the_panes(self, db, client):
         self._selected_row: dict | None = None
         self._scroll = GalleryPaneScrollArea()
-        self.sort_by = SortBy()
         self._gallery_pane = GalleryPane(
             self._scroll, db, self._jobs, self._populate,
             PaneHost(

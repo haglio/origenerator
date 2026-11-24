@@ -12,7 +12,7 @@ import pytest
 from app_support.kino_folder import upscale_in, upscales_in
 from funestra.funestra_verbs import play_file
 from funestra.hud_placement import HudCorner
-from funestra.hud_title import LATEST_LABEL
+from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
 from funestra.modes import MainMode
 from funestra.playlist import PlaylistItem
 from PIL import Image
@@ -186,8 +186,8 @@ class FakeSlideshow(QObject):
     def retune(self, items):
         self.retuned = list(items)
 
-    def reorder(self, items, *, latest, keep_slide=False):
-        self.reordered = (list(items), latest)
+    def reorder(self, items, *, order_label, keep_slide=False):
+        self.reordered = (list(items), order_label != SHUFFLE_LABEL)
         self.kept_the_slide = keep_slide
 
     def note_added(self, slide):

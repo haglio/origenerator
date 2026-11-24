@@ -18,6 +18,10 @@ def offered(rows: list[dict]) -> tuple[str, ...]:
     return _BY_DATE
 
 
+def applied(chosen: str, rows: list[dict]) -> str:
+    return chosen if chosen in offered(rows) else LATEST
+
+
 def in_order(rows: list[dict], headings: list[str | None], sort: str
              ) -> tuple[list[dict], list[str | None]]:
     if sort == LATEST:

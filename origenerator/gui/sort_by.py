@@ -38,7 +38,7 @@ class SortBy(QWidget):
 
     def for_listing(self, rows: list[dict]) -> str:
         offered = sort_order.offered(rows)
-        applied = self._chosen if self._chosen in offered else sort_order.LATEST
+        applied = sort_order.applied(self._chosen, rows)
         self.dropdown.blockSignals(True)
         self.dropdown.clear()
         for sort in offered:

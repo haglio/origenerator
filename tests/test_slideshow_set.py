@@ -150,7 +150,7 @@ def test_latest_plays_the_new_set_as_listed_from_the_top_still_narrowed():
     newest_first = [("five.png", "image", "id-5"), ("four.png", "image", "id-4"),
                     ("one.png", "image", "id-1")]
 
-    slideshow_set.reorder(newest_first, latest=True)
+    slideshow_set.reorder(newest_first, order_label=LATEST_LABEL)
 
     assert dealt == [False]
     assert _pass(slideshow_set) == ["id-5", "id-1"]
@@ -173,7 +173,7 @@ def seeded():
 def test_shuffle_plays_the_new_set_in_a_random_order(seeded):
     slideshow_set, _dealt = _set()
 
-    slideshow_set.reorder(_TWELVE, latest=False)
+    slideshow_set.reorder(_TWELVE, order_label=SHUFFLE_LABEL)
 
     listed = [item[2] for item in _TWELVE]
     assert sorted(_pass(slideshow_set)) == sorted(listed)
@@ -185,7 +185,7 @@ def test_a_new_set_the_switches_would_empty_plays_whole_with_them_off():
     slideshow_set, _dealt = _set(is_favorite={"id-1"}.__contains__)
     slideshow_set.set_filters(SlideshowFilters(favorites=True))
 
-    slideshow_set.reorder([("nine.png", "image", "id-9")], latest=True)
+    slideshow_set.reorder([("nine.png", "image", "id-9")], order_label=LATEST_LABEL)
 
     assert slideshow_set.filters.favorites is False
     assert _pass(slideshow_set) == ["id-9"]
@@ -193,7 +193,7 @@ def test_a_new_set_the_switches_would_empty_plays_whole_with_them_off():
 
 def test_a_reset_after_latest_deals_a_shuffled_pass_with_the_switches_off(seeded):
     slideshow_set, _dealt = _set(is_favorite={"id-1", "id-2"}.__contains__)
-    slideshow_set.reorder(_TWELVE, latest=True)
+    slideshow_set.reorder(_TWELVE, order_label=LATEST_LABEL)
     slideshow_set.set_filters(SlideshowFilters(favorites=True))
 
     slideshow_set.retune(_TWELVE)
@@ -239,7 +239,7 @@ def test_a_new_set_opens_on_the_image_being_made_in_it():
     slideshow_set, _dealt = _set()
     slideshow_set.note_enhancing({"id-2": "running"})
 
-    slideshow_set.reorder(_ITEMS, latest=True)
+    slideshow_set.reorder(_ITEMS, order_label=LATEST_LABEL)
 
     assert slideshow_set.current_prompt_id() == "id-2"
 
@@ -713,7 +713,7 @@ def test_a_set_taken_up_under_the_slide_on_screen_plays_on_from_it():
     slideshow_set.playlist.jump_to(1)
     wider = [("two.png", "image", "id-2"), ("nine.png", "image", "id-9")]
 
-    slideshow_set.reorder(wider, latest=True, keep_slide=True)
+    slideshow_set.reorder(wider, order_label=LATEST_LABEL, keep_slide=True)
 
     assert dealt == [True]
     assert slideshow_set.current_prompt_id() == "id-2"
@@ -723,10 +723,10 @@ def test_a_set_taken_up_under_the_slide_on_screen_plays_on_from_it():
 def test_a_set_taken_up_under_the_slide_is_no_row_to_be_dealt_as_a_loop():
     slideshow_set, _dealt = _set(items=_ROW, neighbors=_row_mates)
 
-    slideshow_set.reorder(_ROW, latest=True, keep_slide=True)
+    slideshow_set.reorder(_ROW, order_label=LATEST_LABEL, keep_slide=True)
     assert slideshow_set.loop is None
 
-    slideshow_set.reorder(_ROW, latest=True)
+    slideshow_set.reorder(_ROW, order_label=LATEST_LABEL)
     assert slideshow_set.loop is not None
 
 

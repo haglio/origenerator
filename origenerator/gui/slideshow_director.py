@@ -10,7 +10,14 @@ from typing import Protocol
 
 from app_support.gallery_rows import source_of
 from funestra.hud_placement import HudCorner
-from funestra.hud_title import LATEST_LABEL, SHUFFLE_LABEL
+from funestra.hud_title import (
+    IN_ORDER_LABELS,
+    LATEST_LABEL,
+    LONGEST_LABEL,
+    OLDEST_LABEL,
+    SHORTEST_LABEL,
+    SHUFFLE_LABEL,
+)
 from funestra.volume import VolumeHud
 from PySide6.QtCore import QObject, QTimer
 from PySide6.QtGui import QGuiApplication
@@ -27,6 +34,7 @@ from origenerator.fun_time_bridge import (
 )
 from origenerator.fun_time_mode import majority_shape, region_for_items
 from origenerator.funscript import funscript_of
+from origenerator.gallery import sort_order
 from origenerator.gallery.collection import (
     ALL_ITEMS_KEY as _ALL_ITEMS_KEY,
 )
@@ -118,6 +126,10 @@ _ABOUT_THE_SLIDE_SAID_OVER = frozenset({AppCommand.CULL, AppCommand.FAVORITE, Ap
 
 _OPENINGS_KEPT_FRESH_MS = 10 * 60 * 1000
 
+
+
+_ORDER_LABELS = {sort_order.LATEST: LATEST_LABEL, sort_order.OLDEST: OLDEST_LABEL,
+                 sort_order.LONGEST: LONGEST_LABEL, sort_order.SHORTEST: SHORTEST_LABEL}
 
 
 class SlideshowHost(Protocol):
@@ -212,17 +224,13 @@ class SlideshowDirector:
     def __init__(self, host: SlideshowHost, sources: DirectorSources,
                  surroundings: DirectorSurroundings):
         self._host = host
+        self._take_the_sources(sources)
         self._radio = surroundings.radio
         self._genau = surroundings.genau
         self._buttons_of = surroundings.buttons_of
         self._enhancing_of = surroundings.enhancing_of
         self._volume_left_at: VolumeHud | None = None
-        self._db = sources.db
         self._runs_being_made: dict[str, dict] = {}
-        self._names = sources.names
-        self._listing = sources.listing
-        self._weight_of = sources.weight_of
-        self._jobs = sources.jobs
         self._pace = surroundings.pace
         self._region_paces: dict[str, SlideshowPace] = {}
         self._motion = surroundings.motion
@@ -260,12 +268,17 @@ class SlideshowDirector:
         self._picked_as_the_slideshow_up_opened: tuple[str, ...] = ()
         self._filters, self._genau_left = SlideshowFilters(), AS_GENAU_STARTS
         self._enhance_status: dict[str, str] = {}
-        self._library = sources.library
         self._groups = SlideGroups(library=self._library, sources=sources)
         self._taken_into_the_session: dict[str, HeldSlideshow] = {}
         self._regions_left: dict[str, RegionLeft] = {}
         self._giving_them_back = False
         self._have_a_funestra_waiting()
+
+    def _take_the_sources(self, sources: DirectorSources) -> None:
+        self._db, self._library = sources.db, sources.library
+        self._names, self._listing = sources.names, sources.listing
+        self._chosen_sort, self._weight_of, self._jobs = (
+            sources.chosen_sort, sources.weight_of, sources.jobs)
 
     def become_hosted(self, session) -> None:
         self._taken_into_the_session = self._held_for_the_session()
@@ -343,10 +356,12 @@ class SlideshowDirector:
             rows = together(self.rows_at(location), self.rows_at(shaped_key(collection.key, shape)))
         else:
             rows = self._one_per_run_where_the_order_is_newest_first(location, listing.rows)
+        latest = _plays_newest_first(location)
+        if latest:
+            rows = self._in_the_gallerys_order(rows)
         items = self.items_of(rows)
         if not items:
             return
-        latest = _plays_newest_first(location)
         picked = [] if latest else self._picked_since_the_slideshow_up_opened()
         one_picked = picked[0] if len(picked) == 1 else None
         resume = None if latest else self._place_coming_back_to(location, items)
@@ -357,7 +372,7 @@ class SlideshowDirector:
                   carrying=Carrying(
                       resume=None if picked_elsewhere else resume,
                       filters=replace(self._filters, **{switch: True}) if switch else None),
-                  **self._order(latest))
+                  **self._order(latest, rows))
         logger.info("Slideshow of %s: %d items, %s",
                     listing.subject, len(items),
                     "latest" if latest else "shuffled")
@@ -382,9 +397,18 @@ class SlideshowDirector:
             return []
         return list(picked)
 
-    def _order(self, latest: bool) -> dict:
+    def _order(self, latest: bool, rows: list[dict]) -> dict:
         return {"shuffle": in_order if latest else None,
-                "hud": HudFacts(order_label=LATEST_LABEL if latest else SHUFFLE_LABEL)}
+                "hud": HudFacts(order_label=self._order_label(latest, rows))}
+
+    def _order_label(self, latest: bool, rows: list[dict]) -> str:
+        if not latest:
+            return SHUFFLE_LABEL
+        return _ORDER_LABELS[sort_order.applied(self._chosen_sort(), rows)]
+
+    def _in_the_gallerys_order(self, rows: list[dict]) -> list[dict]:
+        sort = sort_order.applied(self._chosen_sort(), rows)
+        return sort_order.in_order(rows, [None] * len(rows), sort)[0]
 
     @looking_once
     def open_on_preview(self, media, generation):
@@ -1073,7 +1097,7 @@ class SlideshowDirector:
                       start=_place_of(left.state.current, opening.items),
                       carrying=Carrying(resume=left.state, filters=left.filters,
                                         versions=opening.versions),
-                      **self._order(_plays_newest_first(opening.location)))
+                      **self._order(_plays_newest_first(opening.location), opening.rows))
             logger.info("The %s region opens where it was left: %d items",
                         shape, len(opening.items))
             return
@@ -1147,26 +1171,31 @@ class SlideshowDirector:
         return self._standalone_shape if slideshow is self._slideshow else None
 
     def reorder_slideshow(self, slideshow, latest: bool) -> None:
-        if not self._play_the_library(slideshow, latest=latest, keep_slide=False):
+        played_as = self._play_the_library(slideshow, latest=latest, keep_slide=False)
+        if played_as is None:
             slideshow.note_voice_command("Nothing there to play", kind=WARNING)
             return
-        slideshow.note_voice_command(LATEST_LABEL if latest else SHUFFLE_LABEL)
+        slideshow.note_voice_command(played_as)
 
     def browse_it_all(self, slideshow) -> bool:
         return self._play_the_library(
-            slideshow, latest=slideshow.hud_order_label == LATEST_LABEL, keep_slide=True)
+            slideshow, latest=slideshow.hud_order_label in IN_ORDER_LABELS,
+            keep_slide=True) is not None
 
-    def _play_the_library(self, slideshow, *, latest: bool, keep_slide: bool) -> bool:
+    def _play_the_library(self, slideshow, *, latest: bool, keep_slide: bool) -> str | None:
         shape = self._base_side(slideshow)
         key = shaped_key(_ALL_ITEMS_KEY, shape) if latest else self.base_location(shape)
         rows = self.rows_at(key)
+        if latest:
+            rows = self._in_the_gallerys_order(rows)
         items = self.items_of(rows)
         if not items:
-            return False
+            return None
         self._repoint(slideshow, key)
         slideshow.set_versions(self.versions_of(rows))
-        slideshow.reorder(items, latest=latest, keep_slide=keep_slide)
-        return True
+        order_label = self._order_label(latest, rows)
+        slideshow.reorder(items, order_label=order_label, keep_slide=keep_slide)
+        return order_label
 
     def set_room_paused(self, paused: bool) -> None:
         self._room_paused = paused
@@ -1338,12 +1367,15 @@ class SlideshowDirector:
         shape = (command.shape if command.shape and self._fun_time is not None
                 else self._listing().shape)
         key = shaped_key(command.collection_key, shape)
+        latest = _plays_newest_first(key)
         rows = self.rows_at(key)
+        if latest:
+            rows = self._in_the_gallerys_order(rows)
         items = self.items_of(rows)
         if not items:
             return
         self.open(items, rows=rows, location=key, shape=command.shape,
-                  **self._order(_plays_newest_first(key)))
+                  **self._order(latest, rows))
 
     def set_favorites_filter(self, shape, on: bool) -> None:
         slideshow = self.surface_for(shape)

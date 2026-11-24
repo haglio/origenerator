@@ -7,6 +7,7 @@ from typing import NamedTuple
 
 import pytest
 from app_support.funscript import read_actions
+from funestra.hud_title import LATEST_LABEL
 from funestra.session_quit import SESSION_QUIT
 from funestra.volume import VolumeHud
 from PIL import Image
@@ -2514,7 +2515,7 @@ def test_a_reorder_puts_the_top_of_the_new_set_on_screen_and_lets_go(qtbot, tmp_
     view.slideshow.slideshow_toggle_lock()
     _settle(view)
 
-    view.slideshow.reorder(_named(tmp_path, "e", "d"), latest=True)
+    view.slideshow.reorder(_named(tmp_path, "e", "d"), order_label=LATEST_LABEL)
     _settle(view)
 
     assert view.slideshow._set.playlist.current()[2] == "e"
@@ -2528,7 +2529,7 @@ def test_a_reorder_keeping_the_slide_leaves_the_image_up_and_browses_on(qtbot, t
     _settle(view)
     shown = _put_up(view)
 
-    view.slideshow.reorder(_named(tmp_path, "d", "b"), latest=True, keep_slide=True)
+    view.slideshow.reorder(_named(tmp_path, "d", "b"), order_label=LATEST_LABEL, keep_slide=True)
     _settle(view)
 
     assert shown == []

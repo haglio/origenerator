@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from funestra.hud_kinds import HudFacts, HudKind, slideshow_title
-from funestra.hud_title import LATEST_LABEL
+from funestra.hud_title import IN_ORDER_LABELS, LATEST_LABEL
 from funestra.inclusion_pair import media_pair
 from funestra.loop_cycle import SEED
 from funestra.satellite_hud import HudCell, HudModel
@@ -37,6 +37,11 @@ class HudPlacement:
 USUAL_PLACEMENT = HudPlacement()
 
 
+def _in_order(slideshow) -> str:
+    label = slideshow.hud_order_label
+    return label if label in IN_ORDER_LABELS else LATEST_LABEL
+
+
 def slideshow_hud_model(shape: str, slideshow, placement: HudPlacement = USUAL_PLACEMENT, *,
                         foot=None) -> HudModel | None:
     shown = slideshow.hud_map()
@@ -46,7 +51,8 @@ def slideshow_hud_model(shape: str, slideshow, placement: HudPlacement = USUAL_P
     facts = HudFacts(
         funestra=shape, locked=slideshow.locked, favorite=slideshow.hud_is_favorite,
         favorites=slideshow.hud_favorites_filter, enhanced=slideshow.hud_enhanced_filter,
-        latest=slideshow.hud_order_label == LATEST_LABEL, media=slideshow.hud_media,
+        latest=slideshow.hud_order_label in IN_ORDER_LABELS, in_order=_in_order(slideshow),
+        media=slideshow.hud_media,
         hosted=placement.hosted,
         has_other_versions=slideshow.has_other_versions, clip_seconds=slideshow.dwell_s,
         has_osr2=placement.drives_the_osr2 or slideshow.transport.has_osr2,

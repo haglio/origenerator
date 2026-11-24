@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 from app_support.threading_utils import wait_until
+from funestra.hud_title import OLDEST_LABEL
 from PySide6.QtCore import (
     QEvent,
     QPoint,
@@ -20,6 +21,7 @@ from origenerator import (
     library_views,
 )
 from origenerator.fun_time_mode import Rect
+from origenerator.gallery import sort_order
 from origenerator.gallery.collection import (
     ALL_ITEMS_KEY,
     ENHANCED_KEY,
@@ -1765,4 +1767,31 @@ def test_open_in_slideshow_on_picked_items_plays_those_items_alone(qtbot, monkey
     slideshow = view.slideshows.showing
     assert slideshow is not None
     assert {item[2] for item in slideshow._set.playlist._items} == {"i1", "i3"}
+    slideshow.close()
+
+
+def _in_play_order(slideshow) -> list[str]:
+    playlist = slideshow._set.playlist
+    return [playlist.items[index][2] for index in playlist.order]
+
+
+def test_a_slideshow_plays_in_the_order_sort_by_shows_and_its_hud_names_that_order(
+        qtbot, monkeypatch):
+    keep_rows_on_disk(monkeypatch)
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a dog", 40, 2),
+                                    _image("i3", "a cow", 30, 3)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    view._tree.setCurrentItem(_alls(view._tree)["Images"])
+    newest_first = list(view.listed_prompt_ids())
+    dropdown = view.sort_by.dropdown
+    dropdown.setCurrentIndex(dropdown.findData(sort_order.OLDEST))
+    assert list(view.listed_prompt_ids()) == newest_first[::-1]
+
+    view.slideshows.start()
+
+    slideshow = view.slideshows.showing
+    model = slideshow_hud_model(slideshow.shown.hud_shape, slideshow, HudPlacement(hosted=False))
+    assert _in_play_order(slideshow) == list(view.listed_prompt_ids())
+    assert OLDEST_LABEL in model.title
     slideshow.close()

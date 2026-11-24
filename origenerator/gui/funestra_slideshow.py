@@ -560,9 +560,9 @@ class FunestraSlideshow(QObject):
         self._unlock()
         self._set.retune(items)
 
-    def reorder(self, items, *, latest: bool, keep_slide: bool = False) -> None:
+    def reorder(self, items, *, order_label: str, keep_slide: bool = False) -> None:
         self._unlock()
-        self._set.reorder(items, latest=latest, keep_slide=keep_slide)
+        self._set.reorder(items, order_label=order_label, keep_slide=keep_slide)
 
     def show_item(self, path, *, lock: bool = False) -> bool:
         slide = self._set.slide_for_path(path)

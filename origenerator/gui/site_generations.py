@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import urllib.request
 from collections.abc import Callable
 
 from app_support import haglio_settings
@@ -13,6 +12,7 @@ from origenerator.display_names import shown_name
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.output_places import OutputFolders
 from origenerator.site_chrome import SiteChrome, chrome_here
+from origenerator.site_download import downloaded
 from origenerator.site_generation import (
     CHROME_FAILED,
     NEVER_ANSWERED,
@@ -26,7 +26,6 @@ logger = logging.getLogger(__name__)
 
 NOT_DOWNLOADED = "not downloaded"
 NOT_SET_UP = "not set up"
-DOWNLOADS_WITHIN_S = 120
 
 _WHY = {
     NEVER_ANSWERED: "the site never answered",
@@ -39,12 +38,6 @@ _WHY = {
 
 def why_in_words(site: str, reason: str) -> str:
     return f"{shown_name(site)} did not make the image: {_WHY.get(reason, reason)}."
-
-
-def _downloaded(address: str) -> bytes:
-    asked = urllib.request.Request(address, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(asked, timeout=DOWNLOADS_WITHIN_S) as answered:
-        return answered.read()
 
 
 class _NothingToMakeItWith:
@@ -73,7 +66,7 @@ class SiteGenerations(QObject):
     failed = Signal(str, str)
 
     def __init__(self, db, folders: OutputFolders, parent=None, *,
-                 site: Callable = the_site_here, download: Callable[[str], bytes] = _downloaded,
+                 site: Callable = the_site_here, download: Callable[[str], bytes] = downloaded,
                  run_off: Callable = _off_the_window_thread):
         super().__init__(parent)
         self._db, self._folders = db, folders
@@ -111,11 +104,13 @@ class SiteGenerations(QObject):
     def _made_by(self, site: str, params: dict):
         try:
             made = self._site.make(sites.address_asking_for_an_image(site, params))
-            return made, self._download(made.image)
+            image = self._download(made.image)
+            site_items.kind_of(image)
+            return made, image
         except SiteRefused as refused:
             return refused
         except OSError as failed:
-            logger.warning("An image a site made could not be downloaded: %r", failed)
+            logger.warning("An image a site made could not be downloaded or read: %r", failed)
             return SiteRefused(NOT_DOWNLOADED)
         finally:
             if not self._waiting:

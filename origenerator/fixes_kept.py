@@ -3,8 +3,10 @@ from __future__ import annotations
 import glob
 import os
 import shutil
+import time
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import quote, unquote
 
 from PIL import Image, ImageChops
 from PIL.PngImagePlugin import PngInfo
@@ -13,6 +15,8 @@ _FOLDER = "kept from fixes"
 _BEFORE, _AFTER, _CHANGED = "before", "after", "changed"
 _BLANK = (0, 0, 0)
 _WAITING = ".switching"
+_HALF_WRITTEN = ".writing"
+_NONE_OFF = "-"
 _QUICK_TO_WRITE = 1
 
 
@@ -50,41 +54,69 @@ def keep(stages: list[Path], parts: list[str], into: Path) -> list[dict]:
     return fixes
 
 
-def redrawn(image: Path, kept: Path, at: int, box: list[int], *, on: bool) -> Redrawn | None:
-    piece, mask = _kept_file(kept, at, _AFTER if on else _BEFORE), _kept_file(kept, at, _CHANGED)
-    if not (image.is_file() and piece.is_file() and mask.is_file()):
+def opened(image: Path) -> Redrawn | None:
+    if not image.is_file():
         return None
-    with Image.open(image) as opened:
-        written_inside = dict(getattr(opened, "text", {}))
-        whole = opened.copy()
+    with Image.open(image) as on_disk:
+        return Redrawn(on_disk.copy(), dict(getattr(on_disk, "text", {})))
+
+
+def with_the_fix(whole: Image.Image, kept: Path, at: int, box: list[int], *,
+                 on: bool) -> Image.Image | None:
+    piece, mask = _kept_file(kept, at, _AFTER if on else _BEFORE), _kept_file(kept, at, _CHANGED)
+    if not (piece.is_file() and mask.is_file()):
+        return None
+    redrawn = whole.copy()
     with Image.open(piece) as drawn, Image.open(mask) as where:
-        whole.paste(drawn.convert(whole.mode), (box[0], box[1]), where)
-    return Redrawn(whole, written_inside)
+        redrawn.paste(drawn.convert(redrawn.mode), (box[0], box[1]), where)
+    return redrawn
 
 
-def set_down(drawn: Redrawn, kept: Path, image: Path, part: str, *, on: bool) -> Path:
-    waiting = kept / f"{image.name}.{part}.{'on' if on else 'off'}{_WAITING}"
-    half_written = waiting.with_name(waiting.name + ".writing")
+def write_over(drawn: Redrawn, kept: Path, image: Path, off: list[str]) -> None:
+    waiting = kept / _waiting_name(image, off)
+    half_written = waiting.with_name(waiting.name + _HALF_WRITTEN)
     drawn.image.save(half_written, format="PNG", pnginfo=_as_png_text(drawn.written_inside),
                      compress_level=_QUICK_TO_WRITE)
     os.replace(half_written, waiting)
-    return waiting
+    _put_in_place(waiting, image)
+    for earlier in _waiting(kept, image):
+        if earlier != waiting:
+            earlier.unlink(missing_ok=True)
 
 
-def put_in_place(waiting: Path, image: Path) -> None:
+def finish_what_was_written(kept: Path, image: Path) -> list[str] | None:
+    waiting = _waiting(kept, image)
+    if not waiting:
+        return None
+    newest = max(waiting, key=lambda path: path.name)
+    _put_in_place(newest, image)
+    return _off_named_in(newest, image)
+
+
+def forget_what_was_written(kept: Path, image: Path) -> None:
+    for left in map(Path, glob.glob(str(kept / f"{glob.escape(image.name)}.*{_WAITING}*"))):
+        left.unlink(missing_ok=True)
+
+
+def _put_in_place(waiting: Path, image: Path) -> None:
     # A slideshow showing the image holds it open, and Windows replaces no file held open; it does let one be written over.
     with open(image, "r+b") as shown:
         shown.write(waiting.read_bytes())
         shown.truncate()
-    waiting.unlink()
 
 
-def set_down_and_never_put_in_place(kept: Path, image: Path) -> list[tuple[Path, str, bool]]:
-    found = []
-    for waiting in map(Path, glob.glob(str(kept / f"{glob.escape(image.name)}.*{_WAITING}"))):
-        part, state = waiting.name[len(image.name) + 1:-len(_WAITING)].rsplit(".", 1)
-        found.append((waiting, part, state == "on"))
-    return found
+def _waiting_name(image: Path, off: list[str]) -> str:
+    named = ",".join(quote(part, safe="") for part in off) or _NONE_OFF
+    return f"{image.name}.{time.time_ns():020d}.{named}{_WAITING}"
+
+
+def _waiting(kept: Path, image: Path) -> list[Path]:
+    return list(map(Path, glob.glob(str(kept / f"{glob.escape(image.name)}.*{_WAITING}"))))
+
+
+def _off_named_in(waiting: Path, image: Path) -> list[str]:
+    _written_at, named = waiting.name[len(image.name) + 1:-len(_WAITING)].split(".", 1)
+    return [] if named == _NONE_OFF else [unquote(part) for part in named.split(",")]
 
 
 def forget_all_but(root: Path, kept_names, *, settled_before: float) -> int:

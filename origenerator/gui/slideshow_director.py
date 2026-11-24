@@ -1243,19 +1243,18 @@ class SlideshowDirector:
                                   still=row.get("thumbnail_path"))
             surface.add_versions(versions)
 
-    def note_versions_deleted(self, row: dict, redrawn: str | None = None) -> None:
+    def note_versions_deleted(self, row: dict) -> None:
         preview = gallery.resolve_preview(row, OUTPUT_PLACES)
         if preview is None:
             return
         versions = self.versions_of([row])
-        drawn_again = [gallery.output_file_path(entry, OUTPUT_PLACES)
-                       for entry in gallery.row_output_files(row)
-                       if redrawn is not None and entry.get("filename") == redrawn]
         for surface in self.surfaces():
             surface.note_versions_deleted(row["prompt_id"], preview[0], preview[1],
                                           still=row.get("thumbnail_path"), versions=versions)
-            for path in drawn_again:
-                surface.show_again(path)
+
+    def show_again(self, path) -> None:
+        for surface in self.surfaces():
+            surface.show_again(path)
 
     def note_enhancing(self, statuses: dict, frames=None) -> None:
         self._enhance_status = dict(statuses)

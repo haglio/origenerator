@@ -2483,7 +2483,7 @@ def test_every_surface_is_told_to_show_again_an_enhancement_whose_file_was_drawn
     director.open([("a.png", "image", "g1", None)], shape=LANDSCAPE)
     director.open([("b.png", "image", "g2", None)], shape=PORTRAIT)
 
-    director.note_versions_deleted(_row("g1", files=("better.png",)), redrawn="better.png")
+    director.show_again(output / "better.png")
 
     assert [slideshow.shown_again for slideshow in made] == [(output / "better.png",)] * 2
 

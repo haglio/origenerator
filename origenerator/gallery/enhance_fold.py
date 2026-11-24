@@ -6,7 +6,7 @@ from pathlib import Path
 
 from origenerator import fixes_kept
 from origenerator.file_refs import reference_path
-from origenerator.fix_switches import KEPT_KEY, switch_of
+from origenerator.fix_switches import KEPT_KEY, with_these_off
 from origenerator.gallery.enhance import (
     enhance_target_id,
     enhance_version_params,
@@ -143,16 +143,20 @@ def forget_fixes_of_enhancements_gone(db, kept_root: Path, *, now: float) -> int
 def finish_fix_switches_cut_short(db, kept_root: Path, places: OutputPlaces) -> int:
     finished = 0
     for row in db.list_generations():
-        for entry in row_output_files(row):
+        files = row_output_files(row)
+        recorded = []
+        for entry in files:
             if not isinstance(entry.get(KEPT_KEY), str):
+                recorded.append(entry)
                 continue
-            image = output_file_path(entry, places)
-            for waiting, part, on in fixes_kept.set_down_and_never_put_in_place(
-                    kept_root / entry[KEPT_KEY], image):
-                switch = switch_of(entry, part)
-                if switch is not None and switch.on == on and image.is_file():
-                    fixes_kept.put_in_place(waiting, image)
-                    finished += 1
-                else:
-                    waiting.unlink()
+            image, kept = output_file_path(entry, places), kept_root / entry[KEPT_KEY]
+            off = fixes_kept.finish_what_was_written(kept, image) if image.is_file() else None
+            recorded.append(entry if off is None else with_these_off(entry, off))
+            finished += off is not None
+        if recorded != files:
+            db.update_generation(row["prompt_id"], output_files=json.dumps(recorded))
+        for entry in files:
+            if isinstance(entry.get(KEPT_KEY), str):
+                fixes_kept.forget_what_was_written(
+                    kept_root / entry[KEPT_KEY], output_file_path(entry, places))
     return finished

@@ -204,6 +204,13 @@ class Viewport(QWidget):
             self._decode_off_the_window_thread(path, last_frame)
         self.media_resized.emit()
 
+    def show_redrawn(self, path, image: QImage, generation: str | None = None) -> None:
+        self._take_the_pane((path, MediaType.IMAGE), generation=generation)
+        self._image_size = image.size()
+        self._show_image(QPixmap.fromImage(image))
+        self._place_controls()
+        self.media_resized.emit()
+
     def _decode_off_the_window_thread(self, path, last_frame: QPixmap | None) -> None:
         if last_frame is not None:
             self._image_label.setPixmap(last_frame)

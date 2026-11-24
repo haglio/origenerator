@@ -243,43 +243,89 @@ def test_binning_a_version_tells_the_slideshows_what_the_image_has_left(qtbot, t
     (job,) = view._jobs.all_jobs
     client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
     told = []
-    view.slideshows.note_versions_deleted = lambda row, redrawn=None: told.append(row)
+    view.slideshows.note_versions_deleted = told.append
 
     view.generate_pane.current_generate_tab().versions_delete_requested.emit("g0", ["image_enhance_00001_.png"])
 
     assert [row["prompt_id"] for row in told] == ["g0"]
 
 
-def test_a_change_made_to_a_fix_on_an_enhancements_row_is_carried_out_and_that_enhancement_stays_shown(
+class FakeChoosingFixes:
+    def __init__(self):
+        self.asked: list = []
+
+    def change(self, *asked) -> None:
+        self.asked.append(("change", *asked))
+
+    def settle(self) -> None:
+        self.asked.append("settle")
+
+    def close(self) -> None:
+        self.asked.append("close")
+
+
+def test_a_change_made_to_a_fix_on_an_enhancements_row_goes_to_the_choosing_of_fixes(
         qtbot, tmp_path):
     client = _reroll_client()
-    db = _enhanceable_db(tmp_path, count=1)
-    actions = FakeActions()
-    view = GalleryView(db, client=client, actions=actions)
+    view = GalleryView(_enhanceable_db(tmp_path, count=1), client=client, actions=FakeActions())
     qtbot.addWidget(view)
     view.refresh()
     view._on_thumbnail_clicked("g0")
-    tab = view.generate_pane.current_generate_tab()
     view.enhance_items(["g0"])
     (job,) = view._jobs.all_jobs
     client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
-    shown = []
-    tab._versions.version_selected.connect(shown.append)
+    asked = []
+    view.choosing_fixes._fixes.change = lambda row, *change: asked.append(
+        (row["prompt_id"], *change))
 
-    redrawn_files = []
-    view.slideshows.note_versions_deleted = lambda row, redrawn=None: redrawn_files.append(redrawn)
-    refreshes = []
-    view.refresh = lambda **_how: refreshes.append(1)
+    view.generate_pane.current_generate_tab()._versions.fix_change_requested.emit(
+        0, "faces", "on", False)
 
-    tab._versions.fix_change_requested.emit(0, "faces", "on", False)
+    assert asked == [("g0", "image_enhance_00001_.png", "faces", "on", False)]
 
-    assert actions.fixes_changed == [("g0", "image_enhance_00001_.png", "faces", "on", False)]
-    assert shown == [0]
-    assert redrawn_files == ["image_enhance_00001_.png"], (
-        "a slideshow showing the enhancement is told which file was drawn again, to show it again")
-    assert refreshes == [], (
-        "the whole gallery is read again only once the choosing rests, so each choice shows at once")
-    assert view._refresh_once_the_choosing_rests.isActive()
+
+def test_making_an_enhancement_again_first_records_the_fixes_just_chosen(qtbot, tmp_path):
+    client = _reroll_client()
+    view = GalleryView(_enhanceable_db(tmp_path, count=1), client=client, actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    view._on_thumbnail_clicked("g0")
+    view.enhance_items(["g0"])
+    (job,) = view._jobs.all_jobs
+    client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
+    settled_with = []
+    view.choosing_fixes._fixes.settle = lambda: settled_with.append(len(view._jobs.all_jobs)) or []
+
+    view.generate_pane.current_generate_tab().enhance_again_requested.emit(
+        "g0", "image_enhance_00001_.png")
+
+    assert settled_with == [0], (
+        "a Re-enhance pressed straight after a click would leave out what the record said, "
+        "never what the screen showed")
+    assert len(view._jobs.all_jobs) == 1
+
+
+def test_deleting_a_version_first_records_the_fixes_just_chosen(qtbot, tmp_path):
+    view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client(),
+                       actions=FakeActions())
+    qtbot.addWidget(view)
+    view.choosing_fixes = FakeChoosingFixes()
+    deleted = []
+
+    view.edit_versions("g0", lambda row: deleted.append(view.choosing_fixes.asked[:]) or False)
+
+    assert deleted == [["settle"]], (
+        "the record a version is deleted from would lack the fixes the screen already shows")
+
+
+def test_closing_the_window_records_the_fixes_just_chosen(qtbot, tmp_path):
+    view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.choosing_fixes = FakeChoosingFixes()
+
+    view.close()
+
+    assert view.choosing_fixes.asked == ["close"]
 
 
 def test_enhance_items_queues_the_picked_images(qtbot, tmp_path):

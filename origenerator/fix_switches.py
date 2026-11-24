@@ -50,6 +50,13 @@ def marked(file_entry: dict, part: str, bad: bool) -> dict | None:
     return _named_or_not(file_entry, LEFT_OUT_KEY, part, named=bad)
 
 
+def with_these_off(file_entry: dict, off: list[str]) -> dict:
+    entry = {key: value for key, value in file_entry.items() if key != OFF_KEY}
+    if off:
+        entry[OFF_KEY] = list(off)
+    return entry
+
+
 def changed(file_entry: dict, part: str, what: str, to: bool) -> dict | None:
     return (switched if what == ON else marked)(file_entry, part, to)
 

@@ -49,6 +49,7 @@ from origenerator.config import (
 from origenerator.db import Database, NewRequest
 from origenerator.db_generations import ENHANCE_WHEN_FINISHED, TRASH_WHEN_FINISHED
 from origenerator.evolver_trash import in_the_background as delete_through_evolver
+from origenerator.fixes_being_chosen import FixesBeingChosen
 from origenerator.fun_time_bridge import ask_for_origenerator_mode
 from origenerator.fun_time_mode import FunTimeSession
 from origenerator.gallery.collection import (
@@ -92,6 +93,7 @@ from origenerator.gui.action_row import sides_under
 from origenerator.gui.app_keys import AppKeys, Presses
 from origenerator.gui.app_title import under
 from origenerator.gui.busy_cursor import working
+from origenerator.gui.choosing_fixes import ChoosingFixes
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController, CombineParts
 from origenerator.gui.copy_names import copy_names, offer_copy_names_above_a_line
@@ -223,7 +225,6 @@ logger = logging.getLogger(__name__)
 
 
 _POLL_INTERVAL_MS = 1500
-_A_PAUSE_IN_CHOOSING_MS = 250
 _SATELLITE_SHAPES = ("portrait", "landscape")
 
 
@@ -408,10 +409,6 @@ class GalleryView(QWidget):
 
         self._poll_inflight = False
         self._last_poll_read = None
-        self._refresh_once_the_choosing_rests = QTimer(self)
-        self._refresh_once_the_choosing_rests.setSingleShot(True)
-        self._refresh_once_the_choosing_rests.setInterval(_A_PAUSE_IN_CHOOSING_MS)
-        self._refresh_once_the_choosing_rests.timeout.connect(self.refresh)
         self._poll_timer = QTimer(self)
         self._poll_timer.setInterval(_POLL_INTERVAL_MS)
         self._poll_timer.timeout.connect(self._poll)
@@ -643,6 +640,11 @@ class GalleryView(QWidget):
             views=TabViews(heights=self._prompt_heights, names=self._item_names,
                            animated_preview=self.animated_preview,
                            requests=self._voice.requests, request_aims=RequestAims(self)))
+        self.choosing_fixes = ChoosingFixes(
+            FixesBeingChosen(self._db, OUTPUT_PLACES, THUMB_DIR, off_thread=self.off_thread,
+                             written=self.slideshows.show_again),
+            db=self._db, tabs=self.generate_pane, slideshows=self.slideshows,
+            read_the_gallery_again=self.refresh, parent=self)
         self._find_bar = FindBar("Find in prompts:", "a word you wrote…",
                                  dismiss_key="Esc", reveal=reveal_prompt)
         self.generate_pane.tab_added.connect(self._wire_generate_tab)
@@ -730,11 +732,9 @@ class GalleryView(QWidget):
         tab.enhance_requested.connect(lambda pid: self.enhance.enhance_items([pid]))
         tab.versions_delete_requested.connect(lambda prompt_id, filenames: self.edit_versions(
             prompt_id, lambda row: self._edits.delete_enhance_versions(row, filenames)))
-        tab.fix_change_requested.connect(
-            lambda prompt_id, filename, part, what, to: self.edit_versions(
-                prompt_id, lambda row: self._edits.change_fix(row, filename, part, what, to),
-                then_show=filename))
-        tab.enhance_again_requested.connect(self.enhance.enhance_again)
+        tab.fix_change_requested.connect(self.choosing_fixes.change)
+        tab.enhance_again_requested.connect(
+            self.choosing_fixes.settled_before(self.enhance.enhance_again))
         tab.set_enhance_settings(self.enhance.settings)
         tab.set_fullscreen_factory(self.slideshows.open_on_preview)
         tab.set_setter_host(self._setter_host)
@@ -966,6 +966,7 @@ class GalleryView(QWidget):
         self._voice.close()
         self._jobs.close()
         self._sites.close()
+        self.choosing_fixes.close()
         super().closeEvent(event)
 
     def refresh(self, *, only_if_moved: bool = False):
@@ -1770,19 +1771,17 @@ class GalleryView(QWidget):
         self.refresh()
         return "Request submitted", INFO
 
-    def edit_versions(self, prompt_id: str, edit, then_show: str | None = None):
+    def edit_versions(self, prompt_id: str, edit):
+        self.choosing_fixes.settle()
         row = self._db.get_generation(prompt_id)
         if row is None or not edit(row):
             return
-        if then_show is None:
-            self.refresh()
-        else:
-            self._refresh_once_the_choosing_rests.start()
+        self.refresh()
         updated = self._db.get_generation(prompt_id)
         if updated is not None:
-            self.generate_pane.refresh_displayed(updated, self.library.reading.image_rows,
-                                                  then_show)
-            self.slideshows.note_versions_deleted(updated, redrawn=then_show)
+            self.generate_pane.refresh_displayed(updated, self.library.reading.image_rows)
+            self.slideshows.note_versions_deleted(updated)
+
 
     def slideshow_location(self):
         collection = self._current_collection_key()

@@ -9,6 +9,7 @@ from app_support.local_time import when_words
 from PIL import Image
 from PySide6.QtCore import QEvent, QMimeData, QPoint, QPointF, QRect, QSize, Qt
 from PySide6.QtGui import (
+    QColor,
     QDragLeaveEvent,
     QEnterEvent,
     QFocusEvent,
@@ -2958,6 +2959,19 @@ def test_a_change_to_a_fix_shows_on_the_same_row_without_listing_the_versions_ag
     assert (_switch(faces).isEnabled(), _bad_mark_shown(faces)) == (True, "x")
     assert not _switch(_lines(versions)["Eyes"]).isChecked()
     assert not _again_button(versions).isHidden()
+
+
+def test_a_redrawn_enhancement_shows_on_its_rows_thumbnail_without_its_file_being_read(qtbot):
+    versions = EnhanceVersions(read=lambda path: pytest.fail("the redrawn image is in memory"))
+    qtbot.addWidget(versions)
+    versions.show_versions(_items([_enhancement_with_fixes(_fix("faces"))]))
+    (row,) = _rows(versions)
+    redrawn = QImage(64, 48, QImage.Format.Format_RGB888)
+    redrawn.fill(QColor(200, 0, 0))
+
+    versions.show_redrawn(0, redrawn)
+
+    assert row._thumbnail.pixmap().toImage().pixelColor(2, 2) == QColor(200, 0, 0)
 
 
 def test_a_fix_with_another_drawn_over_it_cannot_be_taken_off_and_says_which_to_turn_off_first(qtbot):

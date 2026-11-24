@@ -30,11 +30,13 @@ def an_enhancement_with_three_fixes(tmp_path):
     return stages[-1], kept, fixes_kept.keep(stages, ["faces", "hands", "eyes"], kept)
 
 
-def _switch(image, kept, at: int, box, *, on: bool) -> bool:
-    drawn = fixes_kept.redrawn(image, kept, at, box, on=on)
-    if drawn is None:
+def _switch(image, kept, at: int, box, *, on: bool, off=("hands",)) -> bool:
+    before = fixes_kept.opened(image)
+    redrawn = fixes_kept.with_the_fix(before.image, kept, at, box, on=on)
+    if redrawn is None:
         return False
-    fixes_kept.put_in_place(fixes_kept.set_down(drawn, kept, image, "hands", on=on), image)
+    fixes_kept.write_over(fixes_kept.Redrawn(redrawn, before.written_inside), kept, image,
+                          [] if on else list(off))
     return True
 
 
@@ -145,14 +147,42 @@ def test_a_switch_redraws_an_image_another_program_holds_open(tmp_path):
     assert colors_at(enhanced, IN_THE_HAND) == [PLAIN]
 
 
-def test_the_redrawn_image_waits_whole_beside_the_kept_pieces_until_it_is_put_in_place(tmp_path):
+def test_drawing_a_fix_off_leaves_the_image_it_was_drawn_from_as_it_was(tmp_path):
     enhanced, kept, fixes = an_enhancement_with_three_fixes(tmp_path)
-    drawn = fixes_kept.redrawn(enhanced, kept, 1, fixes[1]["box"], on=False)
+    before = fixes_kept.opened(enhanced)
 
-    waiting = fixes_kept.set_down(drawn, kept, enhanced, "hands", on=False)
+    redrawn = fixes_kept.with_the_fix(before.image, kept, 1, fixes[1]["box"], on=False)
 
-    assert colors_at(waiting, IN_THE_HAND) == [PLAIN]
+    assert (redrawn.getpixel(IN_THE_HAND), before.image.getpixel(IN_THE_HAND)) == (
+        PLAIN, HAND_FIXED), "the screen and the writer each hold their own image"
     assert colors_at(enhanced, IN_THE_HAND) == [HAND_FIXED]
-    assert fixes_kept.set_down_and_never_put_in_place(kept, enhanced) == [(waiting, "hands", False)]
-    fixes_kept.put_in_place(waiting, enhanced)
-    assert fixes_kept.set_down_and_never_put_in_place(kept, enhanced) == []
+
+
+def test_an_image_written_over_leaves_a_whole_copy_saying_which_fixes_are_off_until_forgotten(
+        tmp_path):
+    enhanced, kept, fixes = an_enhancement_with_three_fixes(tmp_path)
+    _switch(enhanced, kept, 2, fixes[2]["box"], on=False, off=("eyes",))
+    Image.new("RGB", SIZE, FACE_FIXED).save(enhanced)
+
+    assert fixes_kept.finish_what_was_written(kept, enhanced) == ["eyes"]
+
+    assert colors_at(enhanced, IN_THE_EYES, IN_THE_HAND) == [FACE_FIXED, HAND_FIXED], (
+        "a write cut short part way through the image is finished from the whole copy")
+    fixes_kept.forget_what_was_written(kept, enhanced)
+    assert fixes_kept.finish_what_was_written(kept, enhanced) is None
+
+
+def test_only_the_last_image_written_over_is_kept_to_finish_from(tmp_path):
+    enhanced, kept, fixes = an_enhancement_with_three_fixes(tmp_path)
+    _switch(enhanced, kept, 2, fixes[2]["box"], on=False, off=("eyes",))
+
+    _switch(enhanced, kept, 2, fixes[2]["box"], on=True)
+
+    assert fixes_kept.finish_what_was_written(kept, enhanced) == []
+    assert len([left for left in kept.iterdir() if "enhanced.png" in left.name]) == 1
+
+
+def test_an_image_never_written_over_has_nothing_to_finish(tmp_path):
+    enhanced, kept, _fixes = an_enhancement_with_three_fixes(tmp_path)
+
+    assert fixes_kept.finish_what_was_written(kept, enhanced) is None

@@ -90,6 +90,45 @@ def test_over_only_ends_a_request_as_the_last_word():
     assert dictation.push("and no hat. Over.").state == COMPLETED
 
 
+def test_retry_throws_away_what_was_misheard_and_goes_on_listening():
+    dictation = RequestDictation()
+    dictation.push("Request, no hat", spoken_at=3.0)
+
+    retried = dictation.push("no cat. Retry.")
+
+    assert retried.state == COLLECTING
+    assert retried.text == ""
+    assert dictation.push("no hat, over").text == "no hat"
+
+
+def test_retry_said_in_the_same_breath_as_request_still_listens():
+    dictation = RequestDictation()
+
+    retried = dictation.push("Request, no cat, retry", spoken_at=4.0)
+
+    assert (retried.listening, retried.text) == (True, "")
+    done = dictation.push("no hat. Over.")
+    assert (done.state, done.text, done.opened_at) == (COMPLETED, "no hat", 4.0), (
+        "the request is still about what was on screen when he first said request")
+
+
+def test_retry_starts_the_count_toward_giving_up_again():
+    dictation = RequestDictation(max_utterances=3)
+    dictation.push("Request.")
+    dictation.push("no cat")
+    dictation.push("retry")
+
+    assert dictation.push("no hat").state == COLLECTING
+    assert dictation.push("and no scarf").state == ABANDONED
+
+
+def test_retry_only_counts_as_the_last_word():
+    dictation = RequestDictation()
+    dictation.push("Request.")
+
+    assert dictation.push("retry the red coat").text == "retry the red coat"
+
+
 def test_a_mangled_lead_word_still_opens_one():
     dictation = RequestDictation()
 
@@ -158,7 +197,8 @@ def test_a_record_s_words_are_its_own_else_what_was_heard_between_the_markers():
     assert words_of(None) == ""
 
 
-def test_the_bias_names_both_markers():
+def test_the_bias_names_every_marker():
     bias = request_bias().lower()
     assert "request" in bias
     assert "over" in bias
+    assert "retry" in bias

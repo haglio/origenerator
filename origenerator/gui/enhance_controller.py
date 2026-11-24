@@ -8,7 +8,15 @@ from typing import NamedTuple, Protocol
 from app_support.comfy_file_refs import frame_name
 from shared_ui.message_shape import ERROR, INFO, WARNING
 
-from origenerator import alert, config, enhance_presets, fix_training, gallery, lora_training
+from origenerator import (
+    alert,
+    config,
+    enhance_presets,
+    fix_switches,
+    fix_training,
+    gallery,
+    lora_training,
+)
 from origenerator.gallery.enhance_settings import basic_enhance_settings
 from origenerator.generation_config import randomize_seeds
 from origenerator.generation_state import GenerationSource
@@ -20,7 +28,12 @@ from origenerator.gui.training_run import TrainingRun
 from origenerator.media import MediaType
 from origenerator.timing import typical_run_seconds
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.detail_parts import detector_folder, name_parts, part_named
+from origenerator.workflows.detail_parts import (
+    detail_fixes_of,
+    detector_folder,
+    name_parts,
+    part_named,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,19 +52,21 @@ def _folder_of(workflow, params: dict, image_index: dict) -> str:
     )
 
 
-def launch_enhancements(jobs, db, asks, image_index, *, source=GenerationSource.GENERATED
+def launch_enhancements(jobs, db, asks, image_index, *, source=GenerationSource.GENERATED,
+                        seeds_as_asked: bool = False, even_if_made: bool = False,
                         ) -> list[tuple[dict, dict, str, str | None]]:
     workflow = WORKFLOW_REGISTRY[gallery.ENHANCE_WORKFLOW]
     by_folder: dict[str, list[tuple[dict, dict]]] = {}
     for row, params in asks:
-        if _made_or_on_its_way(jobs, row, params):
+        if _made_or_on_its_way(jobs, row, params, even_if_made=even_if_made):
             logger.info("Not enhancing %s again: it has, or has on its way, an enhancement "
                         "at these settings", row.get("prompt_id"))
             continue
         by_folder.setdefault(_folder_of(workflow, params, image_index), []).append((row, params))
     launched = []
     for key, entries in by_folder.items():
-        batch = [randomize_seeds(params, workflow.seed_keys()) for _row, params in entries]
+        batch = [params if seeds_as_asked else randomize_seeds(params, workflow.seed_keys())
+                 for _row, params in entries]
         for (row, params), prompt_id in zip(entries, jobs.start_batch(key, workflow, batch,
                                                                       source=source), strict=True):
             if prompt_id:
@@ -60,8 +75,8 @@ def launch_enhancements(jobs, db, asks, image_index, *, source=GenerationSource.
     return launched
 
 
-def _made_or_on_its_way(jobs, row: dict, params: dict) -> bool:
-    if gallery.version_matching_params(row, params) is not None:
+def _made_or_on_its_way(jobs, row: dict, params: dict, *, even_if_made: bool = False) -> bool:
+    if not even_if_made and gallery.version_matching_params(row, params) is not None:
         return True
     image = frame_name(params.get("input_image"))
     return any(job.workflow.name == gallery.ENHANCE_WORKFLOW
@@ -262,6 +277,33 @@ class EnhanceController:
     def enhance_rows(self, rows: list[dict],
                      settings: gallery.EnhanceSettings | None = None) -> None:
         self._enqueue(rows, settings or self._settings)
+
+    def enhance_again(self, prompt_id: str, filename: str, in_its_place: bool) -> None:
+        row = self._db.get_generation(prompt_id) or {}
+        version = next((version for version in gallery.enhancement_versions(row)
+                        if version.file.get("filename") == filename), None)
+        if version is None:
+            return
+        settings = dict(version.params)
+        if not in_its_place:
+            left_out = fix_switches.left_out_of_a_re_enhance(version.file)
+            settings["enhance_detail_fixes"] = {
+                name: amount for name, amount in detail_fixes_of(settings).items()
+                if name not in left_out}
+        params = gallery.enhance_params_for(
+            row, gallery.EnhanceSettings(params=gallery.full_settings(settings)))
+        if params is None:
+            return
+        if in_its_place:
+            params[gallery.IN_PLACE_OF] = filename
+        seed = version.seed if version.seed is not None else gallery.seed_written_in(
+            gallery.output_file_path(version.file, config.OUTPUT_PLACES))
+        if seed is not None:
+            params["seed"] = seed
+        for launched in launch_enhancements(
+                self._jobs, self._db, [(row, params)], self._library.reading.image_index,
+                seeds_as_asked=seed is not None, even_if_made=in_its_place):
+            self._note_launch(*launched)
 
     def enhance_a_videos_start_image(self, row: dict) -> None:
         self._enqueue([row], basic_enhance_settings())

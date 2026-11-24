@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import glob
 import os
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 
 from PIL import Image, ImageChops
@@ -10,6 +12,14 @@ from PIL.PngImagePlugin import PngInfo
 _FOLDER = "kept from fixes"
 _BEFORE, _AFTER, _CHANGED = "before", "after", "changed"
 _BLANK = (0, 0, 0)
+_WAITING = ".switching"
+_QUICK_TO_WRITE = 1
+
+
+@dataclass(frozen=True)
+class Redrawn:
+    image: Image.Image
+    written_inside: dict
 
 
 def folder_beside(thumb_dir: Path) -> Path:
@@ -40,19 +50,41 @@ def keep(stages: list[Path], parts: list[str], into: Path) -> list[dict]:
     return fixes
 
 
-def switch(image: Path, kept: Path, at: int, box: list[int], *, on: bool) -> bool:
+def redrawn(image: Path, kept: Path, at: int, box: list[int], *, on: bool) -> Redrawn | None:
     piece, mask = _kept_file(kept, at, _AFTER if on else _BEFORE), _kept_file(kept, at, _CHANGED)
     if not (image.is_file() and piece.is_file() and mask.is_file()):
-        return False
+        return None
     with Image.open(image) as opened:
         written_inside = dict(getattr(opened, "text", {}))
-        redrawn = opened.copy()
+        whole = opened.copy()
     with Image.open(piece) as drawn, Image.open(mask) as where:
-        redrawn.paste(drawn.convert(redrawn.mode), (box[0], box[1]), where)
-    written = kept / f"{image.name}.switching"
-    redrawn.save(written, format="PNG", pnginfo=_as_png_text(written_inside))
-    os.replace(written, image)
-    return True
+        whole.paste(drawn.convert(whole.mode), (box[0], box[1]), where)
+    return Redrawn(whole, written_inside)
+
+
+def set_down(drawn: Redrawn, kept: Path, image: Path, part: str, *, on: bool) -> Path:
+    waiting = kept / f"{image.name}.{part}.{'on' if on else 'off'}{_WAITING}"
+    half_written = waiting.with_name(waiting.name + ".writing")
+    drawn.image.save(half_written, format="PNG", pnginfo=_as_png_text(drawn.written_inside),
+                     compress_level=_QUICK_TO_WRITE)
+    os.replace(half_written, waiting)
+    return waiting
+
+
+def put_in_place(waiting: Path, image: Path) -> None:
+    # A slideshow showing the image holds it open, and Windows replaces no file held open; it does let one be written over.
+    with open(image, "r+b") as shown:
+        shown.write(waiting.read_bytes())
+        shown.truncate()
+    waiting.unlink()
+
+
+def set_down_and_never_put_in_place(kept: Path, image: Path) -> list[tuple[Path, str, bool]]:
+    found = []
+    for waiting in map(Path, glob.glob(str(kept / f"{glob.escape(image.name)}.*{_WAITING}"))):
+        part, state = waiting.name[len(image.name) + 1:-len(_WAITING)].rsplit(".", 1)
+        found.append((waiting, part, state == "on"))
+    return found
 
 
 def forget_all_but(root: Path, kept_names, *, settled_before: float) -> int:

@@ -53,6 +53,7 @@ class EnhanceVersion:
     label: str
     file: dict
     params: dict = field(default_factory=dict)
+    seed: int | None = None
 
     @property
     def settings(self) -> str:
@@ -93,7 +94,8 @@ def enhancement_versions(row: dict) -> list[EnhanceVersion]:
     def version(index: int, count: int, f: dict) -> EnhanceVersion:
         entry = history.get(f.get("filename")) or {}
         params = entry.get("params") if isinstance(entry.get("params"), dict) else inline
-        return EnhanceVersion(index, f"Enhancement {index}/{count}", f, version_settings(params))
+        return EnhanceVersion(index, f"Enhancement {index}/{count}", f, version_settings(params),
+                              seed=entry.get("seed"))
 
     originals = original_files_of(row)
     if originals and len(files) > len(originals):

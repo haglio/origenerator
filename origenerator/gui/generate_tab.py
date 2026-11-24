@@ -230,7 +230,8 @@ class GenerateTab(DropZones):
     displayed_changed = Signal()
     enhance_requested = Signal(str)
     versions_delete_requested = Signal(str, list)
-    fix_switch_requested = Signal(str, str, str, bool)
+    fix_choice_requested = Signal(str, str, str, str)
+    enhance_again_requested = Signal(str, str, bool)
     train_requested = Signal(str)
     trash_requested = Signal(str)
     actions_saved = Signal(str, object)
@@ -407,7 +408,12 @@ class GenerateTab(DropZones):
         self._versions.version_selected.connect(self._show_version)
         self._versions.enhance_requested.connect(self._on_enhance_requested)
         self._versions.delete_requested.connect(self._on_versions_delete_requested)
-        self._versions.fix_switch_requested.connect(self._on_fix_switch_requested)
+        self._versions.fix_choice_requested.connect(
+            lambda position, part, choice: self._ask_of_the_version(
+                position, self.fix_choice_requested, part, choice))
+        self._versions.enhance_again_requested.connect(
+            lambda position, in_its_place: self._ask_of_the_version(
+                position, self.enhance_again_requested, in_its_place))
         body.addWidget(self._versions)
 
     def _build_settings_pane(self) -> QWidget:
@@ -1657,11 +1663,10 @@ class GenerateTab(DropZones):
         if names:
             self.versions_delete_requested.emit(row["prompt_id"], names)
 
-    def _on_fix_switch_requested(self, position: int, part: str, on: bool):
+    def _ask_of_the_version(self, position: int, asked, *what):
         row = self._displayed_row
         if row is not None and 0 <= position < len(self._listed_versions):
-            self.fix_switch_requested.emit(
-                row["prompt_id"], self._listed_versions[position].file.get("filename"), part, on)
+            asked.emit(row["prompt_id"], self._listed_versions[position].file.get("filename"), *what)
 
     def _refresh_versions(self):
         row = self._displayed_row

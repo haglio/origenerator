@@ -6,7 +6,7 @@ from pathlib import Path
 
 from origenerator import fixes_kept
 from origenerator.file_refs import reference_path
-from origenerator.fix_switches import KEPT_KEY
+from origenerator.fix_switches import KEPT_KEY, switch_of
 from origenerator.gallery.enhance import (
     enhance_target_id,
     enhance_version_params,
@@ -15,6 +15,7 @@ from origenerator.gallery.enhance import (
 from origenerator.gallery.enhance_settings import ENHANCE_WORKFLOW, version_settings
 from origenerator.gallery.output import (
     media_type_of_row,
+    output_file_path,
     parse_file_list,
     row_output_files,
 )
@@ -26,15 +27,27 @@ from origenerator.record_fold import file_key
 
 logger = logging.getLogger(__name__)
 
+IN_PLACE_OF = "enhance_in_place_of"
+
 
 def _history_entries(files: list[dict], params: dict, enhance_row: dict) -> list[dict]:
     settings = version_settings(params)
     return [
         {"filename": f.get("filename"), "params": settings,
          "run_id": enhance_row.get("id"),
-         "finished_at": enhance_row.get("completed_at")}
+         "finished_at": enhance_row.get("completed_at"),
+         **_seed_kept(enhance_row)}
         for f in files if f.get("filename")
     ]
+
+
+def _seed_kept(enhance_row: dict) -> dict:
+    seed = parse_params(enhance_row.get("params_json")).get("seed")
+    return {"seed": seed} if isinstance(seed, int) else {}
+
+
+def in_place_of(enhance_row: dict) -> str | None:
+    return parse_params(enhance_row.get("params_json")).get(IN_PLACE_OF)
 
 
 def fold_enhancement(db, enhance_row: dict,
@@ -52,12 +65,16 @@ def fold_enhancement(db, enhance_row: dict,
     source_files = row_output_files(source)
     listed = {file_key(entry) for entry in source_files}
     new_files = [entry for entry in enhanced_files if file_key(entry) not in listed]
+    history = parse_file_list(source.get("enhance_history"))
+    replaced = in_place_of(enhance_row)
     updates = {
-        "output_files": json.dumps(new_files + source_files),
-        "enhance_history": json.dumps(
-            _history_entries(new_files, enhance_version_params(enhance_row), enhance_row)
-            + parse_file_list(source.get("enhance_history"))
-        ),
+        "output_files": json.dumps(_put_in_at(
+            source_files, new_files,
+            lambda entry: replaced is not None and entry.get("filename") == replaced)),
+        "enhance_history": json.dumps(_put_in_at(
+            history, _history_entries(new_files, enhance_version_params(enhance_row), enhance_row),
+            lambda entry: (replaced is not None and isinstance(entry, dict)
+                           and entry.get("filename") == replaced))),
     }
     if not source.get("original_files"):
         updates["original_files"] = source.get("output_files")
@@ -66,6 +83,11 @@ def fold_enhancement(db, enhance_row: dict,
     db.update_generation(source_id, **updates)
     db.delete_generation(enhance_row["prompt_id"])
     return source_id
+
+
+def _put_in_at(listed: list, new: list, is_the_one_replaced) -> list:
+    at = next((at for at, entry in enumerate(listed) if is_the_one_replaced(entry)), 0)
+    return listed[:at] + new + listed[at:]
 
 
 def fold_completed_enhancements(db) -> int:
@@ -132,3 +154,21 @@ def forget_fixes_of_enhancements_gone(db, kept_root: Path, *, now: float) -> int
     listed = {entry.get(KEPT_KEY) for row in rows for entry in row_output_files(row)}
     return fixes_kept.forget_all_but(kept_root, listed,
                                      settled_before=now - _LONG_ENOUGH_TO_HAVE_LANDED)
+
+
+def finish_fix_switches_cut_short(db, kept_root: Path, places: OutputPlaces) -> int:
+    finished = 0
+    for row in db.list_generations():
+        for entry in row_output_files(row):
+            if not isinstance(entry.get(KEPT_KEY), str):
+                continue
+            image = output_file_path(entry, places)
+            for waiting, part, on in fixes_kept.set_down_and_never_put_in_place(
+                    kept_root / entry[KEPT_KEY], image):
+                switch = switch_of(entry, part)
+                if switch is not None and switch.on == on and image.is_file():
+                    fixes_kept.put_in_place(waiting, image)
+                    finished += 1
+                else:
+                    waiting.unlink()
+    return finished

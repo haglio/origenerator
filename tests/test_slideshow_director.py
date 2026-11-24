@@ -238,6 +238,11 @@ class FakeSlideshow(QObject):
     def note_versions_deleted(self, prompt_id, path, media_type, *, still, versions):
         self.versions_deleted.append((prompt_id, str(path), media_type, versions))
 
+    shown_again = ()
+
+    def show_again(self, path):
+        self.shown_again = (*self.shown_again, path)
+
     def reset_in_place(self):
         self.retuned = "in place"
 
@@ -2465,6 +2470,22 @@ def test_every_surface_hears_which_file_and_versions_an_item_has_left_after_a_de
 
     assert [[(pid, Path(path).name) for pid, path, *_ in slideshow.versions_deleted]
             for slideshow in made] == [[("g1", "better.png")], [("g1", "better.png")]]
+    assert [slideshow.shown_again for slideshow in made] == [(), ()]
+
+
+def test_every_surface_is_told_to_show_again_an_enhancement_whose_file_was_drawn_again(
+        slideshows, tmp_path, monkeypatch):
+    output = tmp_path / "output"
+    output.mkdir()
+    (output / "better.png").write_bytes(b"pixels")
+    monkeypatch.setattr(module, "OUTPUT_PLACES", OutputPlaces.in_one_folder(output))
+    director, _host, made = slideshows(fun_time=FakeSession())
+    director.open([("a.png", "image", "g1", None)], shape=LANDSCAPE)
+    director.open([("b.png", "image", "g2", None)], shape=PORTRAIT)
+
+    director.note_versions_deleted(_row("g1", files=("better.png",)), redrawn="better.png")
+
+    assert [slideshow.shown_again for slideshow in made] == [(output / "better.png",)] * 2
 
 
 def _image(prompt_id, prompt, *, seed, steps=50, size_in_its_settings=(100, 200)):

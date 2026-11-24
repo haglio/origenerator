@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+
+from PIL import Image
 
 from origenerator.workflows.base import UPSCALE_MODEL_FACTOR
 from origenerator.workflows.detail_parts import detector_part_label
@@ -35,6 +38,10 @@ def _graph_of(row: dict) -> dict:
         graph = json.loads(row.get("workflow_json") or "{}")
     except (TypeError, ValueError):
         return {}
+    return _a_graph(graph)
+
+
+def _a_graph(graph) -> dict:
     return graph if isinstance(graph, dict) else {}
 
 
@@ -76,3 +83,13 @@ def _linked_inputs(graph: dict, ref) -> dict:
     node = graph.get(str(ref[0]))
     inputs = node.get("inputs") if isinstance(node, dict) else None
     return inputs if isinstance(inputs, dict) else {}
+
+
+def seed_written_in(image: Path) -> int | None:
+    try:
+        with Image.open(image) as opened:
+            graph = json.loads(getattr(opened, "text", {}).get("prompt") or "{}")
+    except (OSError, ValueError):
+        return None
+    seeds = (inputs.get("seed") for _node_id, inputs, _type in _nodes_of(_a_graph(graph)))
+    return next((seed for seed in seeds if isinstance(seed, int) and not isinstance(seed, bool)), None)

@@ -30,6 +30,14 @@ def an_enhancement_with_three_fixes(tmp_path):
     return stages[-1], kept, fixes_kept.keep(stages, ["faces", "hands", "eyes"], kept)
 
 
+def _switch(image, kept, at: int, box, *, on: bool) -> bool:
+    drawn = fixes_kept.redrawn(image, kept, at, box, on=on)
+    if drawn is None:
+        return False
+    fixes_kept.put_in_place(fixes_kept.set_down(drawn, kept, image, "hands", on=on), image)
+    return True
+
+
 def colors_at(path, *points) -> list:
     with Image.open(path) as image:
         return [image.getpixel(point) for point in points]
@@ -46,7 +54,7 @@ def test_each_fix_is_kept_as_where_it_drew_and_which_earlier_fixes_it_drew_over(
 def test_switching_a_fix_off_puts_back_what_was_under_it_and_leaves_the_other_fixes(tmp_path):
     enhanced, kept, fixes = an_enhancement_with_three_fixes(tmp_path)
 
-    assert fixes_kept.switch(enhanced, kept, 1, fixes[1]["box"], on=False)
+    assert _switch(enhanced, kept, 1, fixes[1]["box"], on=False)
 
     assert colors_at(enhanced, IN_THE_FACE, IN_THE_HAND, IN_THE_EYES) == [
         FACE_FIXED, PLAIN, EYES_FIXED]
@@ -54,9 +62,9 @@ def test_switching_a_fix_off_puts_back_what_was_under_it_and_leaves_the_other_fi
 
 def test_switching_a_fix_back_on_draws_it_again(tmp_path):
     enhanced, kept, fixes = an_enhancement_with_three_fixes(tmp_path)
-    fixes_kept.switch(enhanced, kept, 1, fixes[1]["box"], on=False)
+    _switch(enhanced, kept, 1, fixes[1]["box"], on=False)
 
-    fixes_kept.switch(enhanced, kept, 1, fixes[1]["box"], on=True)
+    _switch(enhanced, kept, 1, fixes[1]["box"], on=True)
 
     assert colors_at(enhanced, IN_THE_HAND) == [HAND_FIXED]
 
@@ -70,7 +78,7 @@ def test_a_fix_puts_back_only_what_it_changed_however_far_apart_its_places_are(t
     kept = tmp_path / "kept"
 
     fixes = fixes_kept.keep(stages, ["hands", "faces"], kept)
-    fixes_kept.switch(stages[-1], kept, 0, fixes[0]["box"], on=False)
+    _switch(stages[-1], kept, 0, fixes[0]["box"], on=False)
 
     assert fixes[1]["over"] == []
     assert colors_at(stages[-1], (10, 10), BETWEEN_TWO_HANDS, (90, 90)) == [
@@ -109,7 +117,7 @@ def test_a_switch_keeps_the_note_written_inside_the_image(tmp_path):
     with Image.open(enhanced) as image:
         image.save(enhanced, pnginfo=note)
 
-    fixes_kept.switch(enhanced, kept, 1, fixes[1]["box"], on=False)
+    _switch(enhanced, kept, 1, fixes[1]["box"], on=False)
 
     with Image.open(enhanced) as image:
         assert image.info.get("made_up_note") == "kept"
@@ -119,9 +127,32 @@ def test_a_switch_whose_kept_pieces_are_gone_leaves_the_image_alone(tmp_path):
     enhanced, kept, fixes = an_enhancement_with_three_fixes(tmp_path)
     (kept / "1_before.png").unlink()
 
-    assert not fixes_kept.switch(enhanced, kept, 1, fixes[1]["box"], on=False)
+    assert not _switch(enhanced, kept, 1, fixes[1]["box"], on=False)
     assert colors_at(enhanced, IN_THE_HAND) == [HAND_FIXED]
 
 
 def test_what_was_kept_sits_beside_the_thumbnails(tmp_path):
     assert fixes_kept.folder_beside(tmp_path / "thumbnails") == tmp_path / "kept from fixes"
+
+
+def test_a_switch_redraws_an_image_another_program_holds_open(tmp_path):
+    enhanced, kept, fixes = an_enhancement_with_three_fixes(tmp_path)
+
+    with open(enhanced, "rb"):
+        assert _switch(enhanced, kept, 1, fixes[1]["box"], on=False), (
+            "a slideshow showing the image holds it open, and Windows replaces no file held open")
+
+    assert colors_at(enhanced, IN_THE_HAND) == [PLAIN]
+
+
+def test_the_redrawn_image_waits_whole_beside_the_kept_pieces_until_it_is_put_in_place(tmp_path):
+    enhanced, kept, fixes = an_enhancement_with_three_fixes(tmp_path)
+    drawn = fixes_kept.redrawn(enhanced, kept, 1, fixes[1]["box"], on=False)
+
+    waiting = fixes_kept.set_down(drawn, kept, enhanced, "hands", on=False)
+
+    assert colors_at(waiting, IN_THE_HAND) == [PLAIN]
+    assert colors_at(enhanced, IN_THE_HAND) == [HAND_FIXED]
+    assert fixes_kept.set_down_and_never_put_in_place(kept, enhanced) == [(waiting, "hands", False)]
+    fixes_kept.put_in_place(waiting, enhanced)
+    assert fixes_kept.set_down_and_never_put_in_place(kept, enhanced) == []

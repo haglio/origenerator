@@ -1399,3 +1399,83 @@ def test_a_tiles_cancel_clears_the_generate_tabs_waiting_row(enhance, monkeypatc
 
     assert tab.pending is None, (
         "the redraw after the cancel is what takes the waiting row out of the Generate tab")
+
+
+_PLACE = [10, 10, 40, 40]
+
+
+def _enhanced_with_fixes(*, seed=None, kept=True, off=(), left_out=()):
+    settings = {"enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.1,
+                "enhance_detail_fixes": {"faces": 0.45, "hands": 0.5, "eyes": 0.3}}
+    better = {"filename": "better.png"}
+    if kept:
+        better.update(fixes_kept="run-0", fixes_off=list(off), fixes_left_out=list(left_out),
+                      fixes=[{"part": part, "box": _PLACE, "over": []}
+                             for part in ("faces", "hands", "eyes")])
+    made = {"filename": "better.png", "params": settings}
+    return {**_image("i1", params={"checkpoint": "made up.safetensors"}),
+            "output_files": json.dumps([better, {"filename": "one.png"}]),
+            "original_files": json.dumps([{"filename": "one.png"}]),
+            "enhance_history": json.dumps([made if seed is None else {**made, "seed": seed}])}
+
+
+def _launching_what_is_asked(monkeypatch, *, seed_in_the_file=None):
+    monkeypatch.setattr(module.gallery, "enhance_params_for",
+                        lambda row, settings: {"input_image": "one.png", "seed": 1,
+                                               **settings.params})
+    monkeypatch.setattr(module.gallery, "settings_folder_key", lambda row, index: "k")
+    monkeypatch.setattr(module.gallery, "seed_written_in", lambda image: seed_in_the_file)
+    monkeypatch.setitem(module.WORKFLOW_REGISTRY, ENHANCE, FakeWorkflow())
+
+
+def test_a_re_enhance_is_the_same_enhancement_from_the_same_seed_without_the_fixes_off_or_left_out(
+        enhance, monkeypatch, stored):
+    _launching_what_is_asked(monkeypatch)
+    jobs = FakeReroll()
+    controller, _host = enhance(
+        db=stored([_enhanced_with_fixes(seed=4242, off=["hands"], left_out=["eyes"])]), jobs=jobs)
+
+    controller.enhance_again("i1", "better.png", False)
+
+    ((_key, asked),) = jobs.prepared
+    assert (asked["seed"], asked["enhance_detail_fixes"], asked["enhance_steps"]) == (
+        4242, {"faces": 0.45}, 20)
+    assert module.gallery.IN_PLACE_OF not in asked
+
+
+def test_a_redo_is_asked_in_the_old_ones_place_though_the_image_has_those_settings_already(
+        enhance, monkeypatch, stored):
+    _launching_what_is_asked(monkeypatch, seed_in_the_file=777)
+    monkeypatch.setattr(module.gallery, "version_matching_params", lambda row, wanted: 0)
+    jobs = FakeReroll()
+    controller, _host = enhance(db=stored([_enhanced_with_fixes(kept=False)]), jobs=jobs)
+
+    controller.enhance_again("i1", "better.png", True)
+
+    ((_key, asked),) = jobs.prepared
+    assert (asked["seed"], asked[module.gallery.IN_PLACE_OF]) == (777, "better.png"), (
+        "an enhancement folded before seeds were kept still has its seed written inside its file")
+    assert asked["enhance_detail_fixes"] == {"faces": 0.45, "hands": 0.5, "eyes": 0.3}
+
+
+def test_an_enhancement_whose_seed_is_nowhere_is_made_again_from_a_new_one(
+        enhance, monkeypatch, stored):
+    _launching_what_is_asked(monkeypatch)
+    jobs = FakeReroll()
+    controller, _host = enhance(db=stored([_enhanced_with_fixes(kept=False)]), jobs=jobs)
+
+    controller.enhance_again("i1", "better.png", True)
+
+    ((_key, asked),) = jobs.prepared
+    assert asked["seed"] != 1
+
+
+def test_asking_again_for_an_enhancement_the_image_no_longer_lists_launches_nothing(
+        enhance, monkeypatch, stored):
+    _launching_what_is_asked(monkeypatch)
+    jobs = FakeReroll()
+    controller, _host = enhance(db=stored([_enhanced_with_fixes(seed=5)]), jobs=jobs)
+
+    controller.enhance_again("i1", "gone.png", False)
+
+    assert jobs.prepared == []

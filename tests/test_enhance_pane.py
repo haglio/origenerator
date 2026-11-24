@@ -32,7 +32,6 @@ from shared_ui.colors import BG_PRIMARY, BLUE, BORDER_SUBTLE, TEXT_MUTED, TEXT_P
 from shared_ui.icons import CANVAS
 from shared_ui.spacing import BUTTON_SIZE_HUD
 from shared_ui.testing import appending_to
-from shared_ui.tick_control import TickControl
 from shared_ui.toggle_switch import ToggleSwitch
 
 import origenerator.gui.enhance_pane as enhance_pane_module
@@ -42,6 +41,7 @@ import origenerator.workflows.detail_parts as parts
 from origenerator import config, fix_training
 from origenerator.box_breaks import BOX_BREAK
 from origenerator.enhance_presets import Preset
+from origenerator.fix_switches import CHOICES
 from origenerator.gallery import (
     MATCH_SOURCE_MODEL,
     EnhanceSettings,
@@ -2711,16 +2711,38 @@ def _fix(part: str, *over: str, box=A_PLACE) -> dict:
     return {"part": part, "box": box, "over": list(over)}
 
 
-def _enhancement_with_fixes(*fixes, off=(), params=None):
+def _enhancement_with_fixes(*fixes, off=(), left_out=(), params=None):
     file = {"filename": "img.png", "fixes_kept": "run-1", "fixes": list(fixes)}
     if off:
         file["fixes_off"] = list(off)
+    if left_out:
+        file["fixes_left_out"] = list(left_out)
     return EnhanceVersion(1, "Enhancement 1/1", file, params or {"enhance_scale": 2.0})
 
 
-def _fix_boxes(versions) -> dict:
+def _fix_marks(versions) -> dict:
     (row,) = _rows(versions)
-    return {box.text(): box for box in row.findChildren(TickControl)}
+    lines = row.findChild(QWidget, "fixList").layout()
+    marks = {}
+    for at in range(lines.rowCount()):
+        choices = lines.itemAtPosition(at, 0)
+        marks[lines.itemAtPosition(at, 1).widget().text()] = {} if choices is None else {
+            choice: choices.widget().findChild(QWidget, f"fix {choice}") for choice in CHOICES}
+    return marks
+
+
+def _picked(marks: dict) -> str:
+    (picked,) = [choice for choice, mark in marks.items() if mark.property("picked")]
+    return picked
+
+
+def _offered(marks: dict) -> list[str]:
+    return [choice for choice, mark in marks.items() if mark.isEnabled()]
+
+
+def _again_button(versions):
+    (row,) = _rows(versions)
+    return row.findChild(QPushButton, "enhanceAgainButton")
 
 
 def _showing(qtbot, version) -> EnhanceVersions:
@@ -2730,20 +2752,23 @@ def _showing(qtbot, version) -> EnhanceVersions:
     return versions
 
 
-def test_an_enhancements_row_lists_its_fixes_each_with_a_checkbox_the_last_one_drawn_first(qtbot):
+def test_an_enhancements_row_lists_its_fixes_each_with_its_three_choices_the_last_one_drawn_first(
+        qtbot):
     versions = _showing(qtbot, _enhancement_with_fixes(
-        _fix("faces"), _fix("hands"), off=["hands"]))
+        _fix("faces"), _fix("hands"), _fix("eyes"), off=["hands"], left_out=["eyes"]))
 
-    boxes = _fix_boxes(versions)
+    marks = _fix_marks(versions)
 
-    assert [(name, box.isChecked(), box.isEnabled()) for name, box in boxes.items()] == [
-        ("Hands", False, True), ("Faces", True, True)]
+    assert [(name, _picked(choices), _offered(choices)) for name, choices in marks.items()] == [
+        ("Eyes", "left out", ["on", "off", "left out"]),
+        ("Hands", "off", ["on", "off", "left out"]),
+        ("Faces", "on", ["on", "off", "left out"])]
 
 
 def _fix_lines(versions) -> list[list[str]]:
     (row,) = _rows(versions)
     lines = row.findChild(QWidget, "fixList").layout()
-    return [[lines.itemAtPosition(at, column).widget().text() for column in range(2)]
+    return [[lines.itemAtPosition(at, column).widget().text() for column in (1, 2)]
             for at in range(lines.rowCount())]
 
 
@@ -2758,17 +2783,55 @@ def test_each_fix_says_its_amount_and_its_lora_beside_its_checkbox_and_nowhere_e
     assert _facts(_rows(versions)[0]).count("0.45") == 1
 
 
-def test_an_enhancement_made_before_fixes_were_kept_names_its_fixes_with_no_checkbox_and_says_why(
+def test_an_enhancement_made_before_fixes_were_kept_names_its_fixes_with_no_choices_and_says_why(
         qtbot):
     versions = _showing(qtbot, EnhanceVersion(
         1, "Enhancement 1/1", {"filename": "img.png"},
         {"enhance_scale": 2.0, "enhance_detail_fixes": {"faces": 0.4, "hands": 0.5}}))
 
-    assert _fix_boxes(versions) == {}
+    assert _fix_marks(versions) == {"Hands": {}, "Faces": {}}
     assert _fix_lines(versions) == [["Hands", "0.5"], ["Faces", "0.4"]]
     (row,) = _rows(versions)
     assert {label.toolTip() for label in row.findChild(QWidget, "fixList").findChildren(QLabel)} == {
         "This enhancement was made before fixes were individually removable"}
+
+
+def test_an_enhancement_made_before_fixes_were_kept_has_a_button_to_redo_it_in_its_place(qtbot):
+    versions = _showing(qtbot, EnhanceVersion(
+        1, "Enhancement 1/1", {"filename": "img.png"},
+        {"enhance_scale": 2.0, "enhance_detail_fixes": {"faces": 0.4}}))
+    asked = []
+    versions.enhance_again_requested.connect(lambda *told: asked.append(told))
+
+    redo = _again_button(versions)
+    redo.click()
+
+    assert redo.text() == "Redo"
+    assert asked == [(0, True)]
+
+
+def test_an_enhancement_made_with_no_fixes_has_nothing_to_redo(qtbot):
+    versions = _showing(qtbot, EnhanceVersion(
+        1, "Enhancement 1/1", {"filename": "img.png"}, {"enhance_scale": 2.0}))
+
+    assert _again_button(versions) is None
+
+
+def test_re_enhance_shows_beside_the_fixes_label_once_a_fix_is_off_or_left_out(qtbot):
+    all_on = _showing(qtbot, _enhancement_with_fixes(_fix("faces"), _fix("hands")))
+    one_off = _showing(qtbot, _enhancement_with_fixes(_fix("faces"), _fix("hands"), off=["hands"]))
+    one_left_out = _showing(qtbot, _enhancement_with_fixes(_fix("faces"), left_out=["faces"]))
+    asked = []
+    one_off.enhance_again_requested.connect(lambda *told: asked.append(told))
+
+    assert _again_button(all_on) is None
+    assert (_again_button(one_off).text(), _again_button(one_left_out).text()) == (
+        "Re-enhance", "Re-enhance")
+    fixes_label = next(label for label in _rows(one_off)[0].findChildren(QLabel)
+                       if label.text() == "Fixes")
+    assert _again_button(one_off).parentWidget() is fixes_label.parentWidget()
+    _again_button(one_off).click()
+    assert asked == [(0, False)]
 
 
 def test_the_fixes_keep_the_apps_own_background_while_their_row_is_picked(qtbot):
@@ -2812,48 +2875,57 @@ def test_every_cell_of_the_file_line_shares_one_middle(qtbot, tmp_path):
         "the bottom of one line")
 
 
-def test_unchecking_a_fix_asks_for_it_to_be_switched_off_on_that_enhancement(qtbot):
+def test_pressing_a_choice_asks_for_it_on_that_fix_of_that_enhancement(qtbot):
     versions = _showing(qtbot, _enhancement_with_fixes(_fix("faces")))
     asked = []
-    versions.fix_switch_requested.connect(lambda *told: asked.append(told))
+    versions.fix_choice_requested.connect(lambda *told: asked.append(told))
+    marks = _fix_marks(versions)["Faces"]
 
-    _fix_boxes(versions)["Faces"].click()
+    marks["off"].click()
+    QTest.mouseClick(marks["left out"], Qt.MouseButton.LeftButton)
+    marks["on"].click()
 
-    assert asked == [(0, "faces", False)]
+    assert asked == [(0, "faces", "off"), (0, "faces", "left out")], (
+        "the choice a fix already has asks for nothing")
 
 
-def test_a_fix_with_another_drawn_over_it_is_grayed_and_says_which_to_turn_off_first(qtbot):
+def test_a_fix_with_another_drawn_over_it_cannot_be_taken_off_and_says_which_to_turn_off_first(qtbot):
     versions = _showing(qtbot, _enhancement_with_fixes(
         _fix("faces"), _fix("eyes", "faces")))
 
-    faces = _fix_boxes(versions)["Faces"]
+    faces = _fix_marks(versions)["Faces"]
 
-    assert (faces.isChecked(), faces.isEnabled()) == (True, False)
-    assert faces.toolTip() == "Eyes was drawn over part of this fix. Turn off Eyes first."
+    assert (_picked(faces), _offered(faces)) == ("on", ["on", "left out"]), (
+        "the red x is how a fix under another is left out of a Re-enhance")
+    assert faces["off"].toolTip() == "Eyes was drawn over part of this fix. Turn off Eyes first."
 
 
 def test_a_fix_with_several_drawn_over_it_names_them_all_as_a_list(qtbot):
     versions = _showing(qtbot, _enhancement_with_fixes(
         _fix("faces"), _fix("eyes", "faces"), _fix("skin", "faces"), _fix("hair", "faces")))
 
-    assert _fix_boxes(versions)["Faces"].toolTip() == (
+    assert _fix_marks(versions)["Faces"]["off"].toolTip() == (
         "Eyes, Skin and Hair were drawn over part of this fix. Turn off Eyes, Skin and Hair first.")
 
 
-def test_an_off_fix_drawn_over_another_off_fix_is_grayed_and_says_which_to_turn_on_first(qtbot):
+def test_an_off_fix_drawn_over_another_off_fix_cannot_go_on_and_says_which_to_turn_on_first(qtbot):
     versions = _showing(qtbot, _enhancement_with_fixes(
         _fix("faces"), _fix("eyes", "faces"), off=["eyes", "faces"]))
 
-    eyes = _fix_boxes(versions)["Eyes"]
+    eyes = _fix_marks(versions)["Eyes"]
 
-    assert (eyes.isChecked(), eyes.isEnabled()) == (False, False)
-    assert eyes.toolTip() == "This fix was drawn over part of Faces. Turn on Faces first."
+    assert (_picked(eyes), _offered(eyes)) == ("off", ["off"])
+    assert {eyes["on"].toolTip(), eyes["left out"].toolTip()} == {
+        "This fix was drawn over part of Faces. Turn on Faces first."}
 
 
-def test_a_fix_that_found_nothing_is_grayed_and_says_so(qtbot):
+def test_a_fix_that_found_nothing_offers_no_choice_and_says_so(qtbot):
     versions = _showing(qtbot, _enhancement_with_fixes(_fix("teeth", box=None)))
 
-    teeth = _fix_boxes(versions)["Teeth"]
+    teeth = _fix_marks(versions)["Teeth"]
 
-    assert not teeth.isEnabled()
-    assert teeth.toolTip() == "This fix found nothing to redraw in this image"
+    assert _offered(teeth) == []
+    assert {mark.toolTip() for mark in teeth.values()} == {
+        "This fix found nothing to redraw in this image"}
+
+

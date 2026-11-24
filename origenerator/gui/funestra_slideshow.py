@@ -782,6 +782,10 @@ class FunestraSlideshow(QObject):
             self._hand_over()
         self._publish()
 
+    def show_again(self, path) -> None:
+        if str(path) in (self._on_funestra.file, self._on_funestra.item):
+            self._send(f"{SHOW_FRAME} {path}")
+
     def _enhance_current(self) -> None:
         current = self._set.playlist.current()
         if self._actions.enhance is None or current is None or current.is_live:

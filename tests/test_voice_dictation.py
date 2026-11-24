@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from origenerator.voice.dictation import (
     ABANDONED,
+    CANCELED,
     COLLECTING,
     COMPLETED,
     OPENED,
@@ -22,7 +23,7 @@ def test_an_utterance_that_does_not_open_with_the_lead_word_is_not_ours():
 def test_a_whole_request_in_one_breath_completes_at_once():
     dictation = RequestDictation()
 
-    spoken = dictation.push("Request, no silver earrings, over.")
+    spoken = dictation.push("Request, no silver earrings, submit.")
 
     assert spoken.state == COMPLETED
     assert spoken.text == "no silver earrings"
@@ -30,7 +31,7 @@ def test_a_whole_request_in_one_breath_completes_at_once():
 
 
 def test_a_state_is_one_of_the_four_named_states_and_not_a_word():
-    spoken = RequestDictation().push("Request, no silver earrings, over.")
+    spoken = RequestDictation().push("Request, no silver earrings, submit.")
 
     assert isinstance(spoken.state, RequestState)
     assert spoken.state != "completed"
@@ -44,13 +45,13 @@ def test_a_request_spoken_across_pauses_is_collected_whole():
     assert opened.state == OPENED
     assert dictation.listening
     middle = dictation.push("no silver earrings")
-    done = dictation.push("and more freckles. Over.")
+    done = dictation.push("and more freckles. Submit.")
 
     assert middle.state == COLLECTING
     assert done.state == COMPLETED
     assert not dictation.listening
     assert done.text == "no silver earrings and more freckles"
-    assert done.heard == "Request. no silver earrings and more freckles. Over."
+    assert done.heard == "Request. no silver earrings and more freckles. Submit."
 
 
 def test_a_request_keeps_the_time_its_first_step_was_spoken():
@@ -58,13 +59,13 @@ def test_a_request_keeps_the_time_its_first_step_was_spoken():
 
     opened = dictation.push("Request.", spoken_at=10.0)
     middle = dictation.push("no silver earrings", spoken_at=12.0)
-    done = dictation.push("Over.", spoken_at=14.0)
+    done = dictation.push("Submit.", spoken_at=14.0)
 
     assert (opened.opened_at, middle.opened_at, done.opened_at) == (10.0, 10.0, 10.0)
 
 
 def test_a_request_said_in_one_breath_keeps_the_time_it_was_spoken():
-    done = RequestDictation().push("Request, no hat, over", spoken_at=7.5)
+    done = RequestDictation().push("Request, no hat, submit", spoken_at=7.5)
 
     assert done.state == COMPLETED
     assert done.opened_at == 7.5
@@ -78,16 +79,38 @@ def test_every_utterance_of_an_open_request_is_swallowed():
     assert dictation.push("a woman in a red coat") is not None
 
 
-def test_over_only_ends_a_request_as_the_last_word():
+def test_submit_only_ends_a_request_as_the_last_word():
     dictation = RequestDictation()
     dictation.push("Request.")
 
-    carrying_on = dictation.push("a blanket over her legs")
-    assert carrying_on.state == COLLECTING, (
-        "over is radio's own word for it, chosen because nothing in a prompt ends on it by "
-        "accident")
+    carrying_on = dictation.push("submit to a red coat")
+    assert carrying_on.state == COLLECTING
 
-    assert dictation.push("and no hat. Over.").state == COMPLETED
+    assert dictation.push("and no hat. Submit.").state == COMPLETED
+
+
+def test_over_no_longer_ends_a_request():
+    dictation = RequestDictation()
+    dictation.push("Request.")
+
+    assert dictation.push("a blanket. Over.").state == COLLECTING, (
+        "submit took over's place, so a prompt can end on over again")
+
+
+def test_cancel_drops_the_request_and_stops_listening():
+    dictation = RequestDictation()
+    dictation.push("Request, no hat", spoken_at=5.0)
+
+    canceled = dictation.push("never mind. Cancel.")
+
+    assert (canceled.state, canceled.text, canceled.opened_at) == (CANCELED, "", 5.0)
+    assert not canceled.listening
+    assert not dictation.listening
+    assert dictation.push("a woman in a red coat") is None
+
+
+def test_cancel_said_in_the_same_breath_as_request_drops_it():
+    assert RequestDictation().push("Request, no hat, cancel").state == CANCELED
 
 
 def test_retry_throws_away_what_was_misheard_and_goes_on_listening():
@@ -98,7 +121,7 @@ def test_retry_throws_away_what_was_misheard_and_goes_on_listening():
 
     assert retried.state == COLLECTING
     assert retried.text == ""
-    assert dictation.push("no hat, over").text == "no hat"
+    assert dictation.push("no hat, submit").text == "no hat"
 
 
 def test_retry_said_in_the_same_breath_as_request_still_listens():
@@ -107,7 +130,7 @@ def test_retry_said_in_the_same_breath_as_request_still_listens():
     retried = dictation.push("Request, no cat, retry", spoken_at=4.0)
 
     assert (retried.listening, retried.text) == (True, "")
-    done = dictation.push("no hat. Over.")
+    done = dictation.push("no hat. Submit.")
     assert (done.state, done.text, done.opened_at) == (COMPLETED, "no hat", 4.0), (
         "the request is still about what was on screen when he first said request")
 
@@ -132,14 +155,14 @@ def test_retry_only_counts_as_the_last_word():
 def test_a_mangled_lead_word_still_opens_one():
     dictation = RequestDictation()
 
-    spoken = dictation.push("Requesf, no hat, over.")
+    spoken = dictation.push("Requesf, no hat, submit.")
 
     assert getattr(spoken, "state", None) == COMPLETED, (
         "\"request\" is distinctive enough that one slip is safe, the same tolerance the fix"
         " commands allow their lead word")
 
 
-def test_a_request_that_never_hears_over_is_given_up_on():
+def test_a_request_that_never_hears_submit_is_given_up_on():
     dictation = RequestDictation(max_utterances=3)
     dictation.push("Request.")
     dictation.push("no hat")
@@ -147,7 +170,7 @@ def test_a_request_that_never_hears_over_is_given_up_on():
     spoken = dictation.push("and more freckles")
 
     assert spoken.state == ABANDONED, (
-        "the failure this guards is the over being missed: without a cap the dictation would "
+        "the failure this guards is the submit being missed: without a cap the dictation would "
         "swallow every later utterance for the rest of the session, and the user would have no "
         "way to tell why nothing said was landing")
     assert not dictation.listening
@@ -178,15 +201,15 @@ def test_reset_drops_a_half_said_request():
 def test_a_request_with_nothing_between_the_markers_still_completes():
     dictation = RequestDictation()
 
-    spoken = dictation.push("Request. Over.")
+    spoken = dictation.push("Request. Submit.")
 
     assert spoken.state == COMPLETED
     assert spoken.text == ""
 
 
 def test_what_was_heard_reads_back_as_the_request_alone():
-    assert request_words("Request, no silver earrings, over.") == "no silver earrings"
-    assert request_words("Request. a red coat. Over.") == "a red coat"
+    assert request_words("Request, no silver earrings, submit.") == "no silver earrings"
+    assert request_words("Request. a red coat. Submit.") == "a red coat"
 
 
 def test_a_record_s_words_are_its_own_else_what_was_heard_between_the_markers():
@@ -200,5 +223,6 @@ def test_a_record_s_words_are_its_own_else_what_was_heard_between_the_markers():
 def test_the_bias_names_every_marker():
     bias = request_bias().lower()
     assert "request" in bias
-    assert "over" in bias
+    assert "submit" in bias
     assert "retry" in bias
+    assert "cancel" in bias

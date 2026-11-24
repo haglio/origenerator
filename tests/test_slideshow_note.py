@@ -24,7 +24,7 @@ def _mid_request(qtbot, tmp_path, monkeypatch):
     view = _requesting_view(qtbot, tmp_path, monkeypatch)
     monkeypatch.setattr(view._voice.requests, "ask", lambda *a, **kw: None)
     view._voice.listener.speak("Request.")
-    view._voice.listener.speak("no hat. Over.")
+    view._voice.listener.speak("no hat. Submit.")
     return view
 
 

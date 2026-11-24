@@ -30,7 +30,7 @@ from origenerator.voice.commands import (
     shaped_app_command,
     spoken_phrases,
 )
-from origenerator.voice.dictation import COMPLETED
+from origenerator.voice.dictation import CANCELED, COMPLETED
 from origenerator.voice.slideshow_commands import SlideshowCommand
 from tests.real_db import database_in
 
@@ -268,7 +268,7 @@ class AnswererThatAsksNoLocalModel:
 
 class Spoken:
     def __init__(self, text="no hat", *, listening=False, state=COMPLETED,
-                 heard="Request, no hat, over.", opened_at=None):
+                 heard="Request, no hat, submit.", opened_at=None):
         self.text = text
         self.listening = listening
         self.state = state
@@ -782,7 +782,7 @@ def test_an_opening_request_pauses_the_slideshow_and_says_so(router):
 
     voice.on_spoken_request(Spoken("no hat", listening=True))
 
-    assert slideshow.pauses == [(True, "Request: no hat… — say “over” to submit")]
+    assert slideshow.pauses == [(True, "Request: no hat… — or say “submit”/“retry”/“cancel”")]
 
 
 def test_a_request_said_to_a_named_region_is_about_that_regions_slide(router):
@@ -794,7 +794,7 @@ def test_a_request_said_to_a_named_region_is_about_that_regions_slide(router):
 
     assert (portrait.went_back_for, landscape.went_back_for) == ([4.0], []), (
         "the region named, not the slideshow showing, says which image the request is about")
-    assert portrait.pauses == [(True, "Request: no hat… — say “over” to submit")]
+    assert portrait.pauses == [(True, "Request: no hat… — or say “submit”/“retry”/“cancel”")]
 
 
 def test_the_target_is_taken_at_the_opening_step_and_kept(router):
@@ -835,7 +835,7 @@ def test_words_in_a_request_are_a_request_even_when_they_name_a_fix(router):
     voice._begin_request = lambda prompt_id, spoken, shape=None: begun.append(prompt_id)
     voice.on_spoken_request(Spoken("fix hands", listening=True))
 
-    voice.on_spoken_request(Spoken("fix hands", heard="Request, fix hands, over."))
+    voice.on_spoken_request(Spoken("fix hands", heard="Request, fix hands, submit."))
 
     assert begun == ["g1"]
     assert host.fixed == []
@@ -856,7 +856,22 @@ def test_a_request_whose_terminator_never_came_is_dropped_and_says_so(router):
 
     voice.on_spoken_request(Spoken("no hat", state="never got there"))
 
-    assert slideshow.requests == [("request dropped — never heard “over”", False, INFO)]
+    assert slideshow.requests == [("request dropped — never heard “submit”", False, INFO)]
+
+
+def test_a_canceled_request_lets_the_slideshow_go_on_and_begins_nothing(router):
+    slideshow = FakeSlideshow(target="g1")
+    voice, _host, _slideshows = router(slideshows=FakeSlideshows(showing=slideshow),
+                                       rows=[_row("g1")])
+    begun = []
+    voice._begin_request = lambda prompt_id, spoken, shape=None: begun.append(prompt_id)
+    voice.on_spoken_request(Spoken("no hat", listening=True))
+
+    voice.on_spoken_request(Spoken("", state=CANCELED))
+
+    assert (begun, slideshow.requests) == ([], [])
+    assert slideshow.pauses[-1] == (False, "")
+    assert voice._request_target is None
 
 
 def test_a_request_over_nothing_is_answered_rather_than_queued(router):

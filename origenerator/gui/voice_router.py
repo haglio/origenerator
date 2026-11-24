@@ -53,7 +53,14 @@ from origenerator.voice.commands import (
     split_shape,
     spoken_phrases,
 )
-from origenerator.voice.dictation import COMPLETED, RequestDictation
+from origenerator.voice.dictation import (
+    CANCEL_WORD,
+    CANCELED,
+    COMPLETED,
+    RETRY_WORD,
+    SUBMIT_WORD,
+    RequestDictation,
+)
 from origenerator.voice.listener import CommandAndRequestListener, Phrases
 from origenerator.workflows import WORKFLOW_REGISTRY
 
@@ -347,8 +354,11 @@ class VoiceRouter(QObject):
         target = self._request_target
         self._request_target = None
         self._pause_for_request(slideshow, spoken)
+        if spoken.state is CANCELED:
+            return
         if spoken.state != COMPLETED:
-            self._answer_request(slideshow, "request dropped — never heard “over”", spoken)
+            self._answer_request(slideshow, f"request dropped — never heard “{SUBMIT_WORD}”",
+                                 spoken)
             return
         self._begin_request(target, spoken, shape)
 
@@ -364,7 +374,8 @@ class VoiceRouter(QObject):
     def _pause_for_request(self, slideshow, spoken) -> None:
         if slideshow is None:
             return
-        note = (f"Request: {spoken.text}… — say “over” to submit"
+        note = (f"Request: {spoken.text}… — or say "
+                f"“{SUBMIT_WORD}”/“{RETRY_WORD}”/“{CANCEL_WORD}”"
                 if spoken.listening else "")
         slideshow.pause_for_request(spoken.listening, note)
 

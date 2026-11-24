@@ -526,7 +526,7 @@ def test_a_spoken_request_from_the_session_is_collected_here(qtbot, tmp_path, mo
     assert not begun
 
     (tmp_path / "origenerator_cmd.txt").write_text(
-        "PORTRAIT_SAY:over\n", encoding="utf-8")
+        "PORTRAIT_SAY:submit\n", encoding="utf-8")
     bridge._tick()
 
     assert begun == [("no feet", "portrait")], (
@@ -543,7 +543,7 @@ def test_the_words_of_a_request_are_not_read_as_commands(qtbot, tmp_path, monkey
     monkeypatch.setattr(view._voice, "_begin_request", lambda *a, **kw: None)
 
     (tmp_path / "origenerator_cmd.txt").write_text(
-        "PORTRAIT_SAY:request no feet\nPORTRAIT_SAY:favorites\nPORTRAIT_SAY:over\n",
+        "PORTRAIT_SAY:request no feet\nPORTRAIT_SAY:favorites\nPORTRAIT_SAY:submit\n",
         encoding="utf-8")
     bridge._tick()
 
@@ -570,13 +570,15 @@ def test_the_room_is_told_a_request_has_opened_on_the_side_it_was_said_to(
     assert _the_room_was_told(tmp_path) == ["portrait_request_open"]
 
 
-def test_the_room_is_told_the_request_is_over_once_over_is_said(qtbot, tmp_path, monkeypatch):
+@pytest.mark.parametrize("ending", ["submit", "cancel"])
+def test_the_room_is_told_the_request_is_over_once_it_is_submitted_or_canceled(
+        qtbot, tmp_path, monkeypatch, ending):
     view, bridge = _view_with_bridge(qtbot, tmp_path)
     _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     monkeypatch.setattr(view._voice, "_begin_request", lambda *a, **kw: None)
     _said_to_this_app(bridge, tmp_path, "PORTRAIT_SAY:request", "PORTRAIT_SAY:no feet")
 
-    _said_to_this_app(bridge, tmp_path, "PORTRAIT_SAY:over")
+    _said_to_this_app(bridge, tmp_path, f"PORTRAIT_SAY:{ending}")
 
     told = _the_room_was_told(tmp_path)
     assert told == ["portrait_request_open", "portrait_request_closed"]
@@ -589,7 +591,7 @@ def test_a_request_said_in_one_breath_leaves_the_room_nothing_to_hear(
     _open_portrait_slideshow(qtbot, view, monkeypatch, tmp_path)
     monkeypatch.setattr(view._voice, "_begin_request", lambda *a, **kw: None)
 
-    _said_to_this_app(bridge, tmp_path, "PORTRAIT_SAY:request no feet over")
+    _said_to_this_app(bridge, tmp_path, "PORTRAIT_SAY:request no feet submit")
 
     assert _the_room_was_told(tmp_path) == []
 

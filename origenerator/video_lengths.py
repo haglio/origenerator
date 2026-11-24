@@ -17,10 +17,14 @@ def as_recorded(length: VideoHeader) -> dict:
     return {"video_seconds": length.seconds, "video_frames": round(length.frames)}
 
 
+def _unmeasured(row: dict) -> bool:
+    return row.get("video_seconds") is None or (
+        row.get("video_frames") is None and gallery.is_a_flick(row))
+
+
 def record_video_lengths(db, places: OutputPlaces) -> int:
     measured = {row["prompt_id"]: (row, as_recorded(length)) for row in db.list_generations()
-                if row["status"] == GenerationStatus.COMPLETED
-                and any(row.get(column) is None for column in ("video_seconds", "video_frames"))
+                if row["status"] == GenerationStatus.COMPLETED and _unmeasured(row)
                 and (length := video_length_of(row, places)) is not None}
     for column in ("video_seconds", "video_frames"):
         db.fill_in(column, {prompt_id: found[column] for prompt_id, (row, found) in measured.items()

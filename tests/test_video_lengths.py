@@ -13,8 +13,8 @@ from origenerator.output_places import OutputPlaces
 from tests.media_files import write_mp4
 
 
-def _added(db, prompt_id, files, *, status=GenerationStatus.COMPLETED):
-    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name="made_up",
+def _added(db, prompt_id, files, *, status=GenerationStatus.COMPLETED, workflow_name="made_up"):
+    db.insert_generation(NewGeneration(prompt_id=prompt_id, workflow_name=workflow_name,
                                        workflow_version="v001", params_json="{}",
                                        workflow_json="{}"))
     db.update_generation(prompt_id, status=status, output_files=json.dumps(files))
@@ -41,7 +41,7 @@ def test_a_finished_video_keeps_how_long_it_runs(db, tmp_path):
 def test_recording_measures_each_finished_video_that_has_no_length(db, tmp_path, places):
     _added(db, "unmeasured", _video(tmp_path, "video one", 1.0))
     _added(db, "measured", _video(tmp_path, "video two", 1.0))
-    db.set_library_record("measured", video_seconds=9.0, video_frames=270)
+    db.set_library_record("measured", video_seconds=9.0)
     _added(db, "image", [{"filename": "made-up.png", "library_path": str(tmp_path / "x.png")}])
     _added(db, "running", _video(tmp_path, "video three", 1.0), status=GenerationStatus.RUNNING)
 
@@ -82,9 +82,9 @@ def test_a_finished_video_keeps_how_many_frames_its_file_holds(db, tmp_path):
         video_header(tmp_path / "video one.mp4").fps)
 
 
-def test_recording_counts_the_frames_of_a_video_measured_before_frames_were_kept(
+def test_recording_counts_the_frames_of_a_flick_measured_before_frames_were_kept(
         db, tmp_path, places):
-    _added(db, "timed", _video(tmp_path, "video one", 1.0))
+    _added(db, "timed", _video(tmp_path, "video one", 1.0), workflow_name="wan22_flf2v_loop")
     db.set_library_record("timed", video_seconds=9.0)
 
     recorded = video_lengths.record_video_lengths(db, places)
@@ -92,3 +92,13 @@ def test_recording_counts_the_frames_of_a_video_measured_before_frames_were_kept
     kept = db.get_generation("timed")
     assert (recorded, kept["video_seconds"], kept["video_frames"]) == (
         1, 9.0, round(video_header(tmp_path / "video one.mp4").frames))
+
+
+def test_recording_opens_no_video_again_for_frames_only_a_flick_s_tile_shows(
+        db, tmp_path, places, monkeypatch):
+    _added(db, "timed", _video(tmp_path, "video one", 1.0))
+    db.set_library_record("timed", video_seconds=9.0)
+    opened = []
+    monkeypatch.setattr(video_lengths, "video_header", opened.append)
+
+    assert (video_lengths.record_video_lengths(db, places), opened) == (0, [])

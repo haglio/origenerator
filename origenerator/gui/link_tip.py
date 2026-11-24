@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QObject, QPoint, QRect, Qt, QTimer, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 from shared_ui import tooltip_look
 from shared_ui.colors import BLUE
 from shared_ui.spacing import GAP_SMALL
 
 
-def link(href: str, text: str) -> str:
-    return f'<a href="{href}" style="color: {BLUE.name()};">{text}</a>'
+def link(href: str, text: str, color: QColor = BLUE) -> str:
+    return f'<a href="{href}" style="color: {color.name()};">{text}</a>'
 
 _APPEAR_MS = 500
 _LINGER_MS = 400

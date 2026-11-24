@@ -129,6 +129,24 @@ def test_clearing_the_search_gives_the_pane_back_to_the_open_folder(qtbot):
     assert not view._gallery_pane.showing_search()
 
 
+def test_a_search_that_finds_nothing_offers_a_yellow_clear_search_link(qtbot):
+    rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
+    view = GalleryView(database_of(rows))
+    qtbot.addWidget(view)
+    view.refresh()
+    _search_for(view, "aardvark")
+    hint = view._gallery_pane._scroll.widget()
+    assert "Clear search" in hint.text()
+    assert YELLOW.name() in hint.text(), (
+        "the user forgets a search is still in the box when the pane is empty, so the way "
+        "out stands out in yellow")
+
+    hint.linkActivated.emit("clear-search")
+
+    assert view.search.field.text() == ""
+    assert not view._gallery_pane.showing_search()
+
+
 def test_esc_in_the_search_field_clears_the_search(qtbot):
     rows = [_image("i1", "a cat", 50, 1), _image("i2", "a dog", 50, 2)]
     view = GalleryView(database_of(rows))

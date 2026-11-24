@@ -154,7 +154,7 @@ class GallerySearchController(QObject):
         self._pane.show_search_results(self._tiles, search.SearchTerms(
             sort_mode=self._sort, query=self._query, outcome=self._outcome,
             scope=scope.path, collapsed=self._collapsed,
-            on_section_toggled=self._on_section_toggled,
+            on_section_toggled=self._on_section_toggled, on_clear_search=self.field.clear,
         ))
         self._host.search_results_drawn()
 

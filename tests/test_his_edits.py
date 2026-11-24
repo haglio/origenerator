@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+import pytest
+
 from origenerator import his_edits
 from origenerator.his_edits import Addition, edits_in, the_way_he_adds
 
 _BEACH = "a man on a beach, white sand, blue sea"
 _STREET = "a man on a street, tall buildings, wet pavement"
 _FOREST = "a man in a forest, tall pines, morning fog"
+
+
+@pytest.fixture(autouse=True)
+def _a_few_prompts_are_enough(monkeypatch):
+    monkeypatch.setattr(his_edits, "_FEWEST_PROMPTS_WITH_IT", 5)
 
 
 def _names_a_hat(thing: str) -> bool:
@@ -89,3 +96,67 @@ def test_reading_his_edits_looks_no_prompt_up_among_all_the_others(monkeypatch):
     edits_in(prompts)
 
     assert len(read) == 2 * len(prompts)
+
+
+def test_reading_what_is_tied_to_a_thing_reads_each_prompt_a_few_times_at_most(monkeypatch):
+    read = []
+    things_of = his_edits.things_of
+    monkeypatch.setattr(his_edits, "things_of", lambda text: read.append(text) or things_of(text))
+    prompts = _prompts_where_a_beard_is_always_a_mans()
+
+    the_way_he_adds(_names_a_beard, prompts, ("a woman, a porch", "blurry"))
+
+    assert len(read) <= 4 * len(prompts) + 3
+
+
+def _names_a_beard(thing: str) -> bool:
+    return "beard" in thing.split()
+
+
+def _prompts_where_a_beard_is_always_a_mans() -> list[tuple[str, str]]:
+    scenes = ("a harbor, fog, gulls", "a field, dusk, crows", "a deck, rain, ropes",
+              "a kitchen, steam, copper pans", "a library, dust, tall shelves")
+    men = ("a tall man in a wool coat", "an old man", "a tall man in a wool coat", "a man asleep",
+           "a tall man in a wool coat")
+    return [pair for scene, man in zip(scenes, men, strict=True)
+            for pair in ((f"a woman, {scene}, sharp focus", "blurry"),
+                         (f"{man}, a gray beard, {scene}, sharp focus", "blurry"))]
+
+
+def test_a_thing_brings_what_his_prompts_tie_to_it_when_the_prompt_lacks_it():
+    added = the_way_he_adds(_names_a_beard, _prompts_where_a_beard_is_always_a_mans(),
+                            ("a woman, a porch, snow, sharp focus", "blurry"))
+
+    assert added.positive == ("a tall man in a wool coat", "a gray beard")
+
+
+def test_what_the_prompt_already_says_in_other_words_is_not_brought_again():
+    added = the_way_he_adds(_names_a_beard, _prompts_where_a_beard_is_always_a_mans(),
+                            ("a short man, a porch, snow", "blurry"))
+
+    assert added.positive == ("a gray beard",)
+
+
+def test_what_is_as_common_without_the_thing_is_not_brought_with_it():
+    added = the_way_he_adds(_names_a_beard, _prompts_where_a_beard_is_always_a_mans(),
+                            ("a short man, a porch, snow", "blurry"))
+
+    assert "sharp focus" not in added.positive
+
+
+def test_a_thing_too_few_of_his_prompts_have_brings_nothing_with_it():
+    added = the_way_he_adds(_names_a_beard, _prompts_where_a_beard_is_always_a_mans()[:6],
+                            ("a woman, a porch, snow", "blurry"))
+
+    assert added.positive == ("a gray beard",)
+
+
+def test_only_the_times_he_first_added_a_thing_say_how_it_goes_in():
+    prompts = [("a man on a beach, sand, sea, a straw hat", ""),
+               ("a man on a beach, sand, sea, a straw hat, hat ribbon", ""),
+               ("a man in a forest, pines, fog", ""),
+               ("a man in a forest, pines, fog, a felt hat", "")]
+
+    added = the_way_he_adds(_names_a_hat, prompts, ("a man on a beach, sand, sea", ""))
+
+    assert added.positive == ("a felt hat",)

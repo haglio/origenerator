@@ -116,6 +116,14 @@ def _forget_fixes_of_enhancements_gone(library: Library):
         library.db, fixes_kept.folder_beside(library.thumb_dir), now=time.time())
 
 
+def _finish_fix_switches_cut_short(library: Library):
+    from origenerator import fixes_kept
+    from origenerator.gallery import finish_fix_switches_cut_short
+
+    return finish_fix_switches_cut_short(
+        library.db, fixes_kept.folder_beside(library.thumb_dir), library.places)
+
+
 def _repair_thumbnails(library: Library):
     from origenerator.importer import backfill_shared_thumbnails
 
@@ -213,6 +221,9 @@ MAINTENANCE = (
     BootPass(None, _forget_fixes_of_enhancements_gone,
              counted="Forgot what the fixes of %d enhancement(s) no longer listed had kept",
              failure="Forgetting what gone enhancements' fixes kept failed: %s"),
+    BootPass(None, _finish_fix_switches_cut_short,
+             counted="Finished %d fix switch(es) the last run was cut short in",
+             failure="Finishing fix switches cut short failed: %s"),
     BootPass("Repairing thumbnails...", _repair_thumbnails,
              counted="Repaired %d colliding thumbnails",
              failure="Thumbnail repair failed: %s"),

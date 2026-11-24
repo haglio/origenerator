@@ -25,7 +25,7 @@ from origenerator.gallery.output import (
 from origenerator.one_look import looking_once
 from origenerator.output_files import library_paths_in
 from origenerator.output_places import OutputPlaces
-from origenerator.thumbnail import generate_thumbnail
+from origenerator.thumbnail import generate_thumbnail, thumbnail_of
 from origenerator.trash import Genau, KeptBesideItsTrash, Kino, TrashedBatch, take_out_of_play
 from origenerator.undo_stack import UndoEntry, UndoStack
 
@@ -147,32 +147,41 @@ class GalleryEdits:
                               redo=lambda: self.delete_enhance_versions(row, filenames)))
         return True
 
-    def switch_fix(self, row: dict, filename: str, part: str, *, on: bool) -> bool:
-        thumb_dir = self._environment.thumb_dir
+    def choose_fix(self, row: dict, filename: str, part: str, choice: str) -> bool:
         files = row_output_files(row)
         at = next((at for at, entry in enumerate(files) if entry.get("filename") == filename), None)
-        if thumb_dir is None or at is None:
+        chosen = None if at is None else fix_switches.chosen(files[at], part, choice)
+        if chosen is None:
             return False
-        switched = fix_switches.switched(files[at], part, on)
-        drawn = fix_switches.drawn_as(files[at], part)
-        if switched is None or drawn is None:
-            return False
-        image = output_file_path(files[at], self._places)
-        if self._environment.release_files is not None:
-            self._environment.release_files([image], the_item_stays=True)
-        kept = fixes_kept.folder_beside(Path(thumb_dir)) / files[at][fix_switches.KEPT_KEY]
-        try:
-            if not fixes_kept.switch(image, kept, *drawn, on=on):
+        shows = fix_switches.shows_the_fix(choice)
+        drawn = None
+        if fix_switches.switch_of(files[at], part).on != shows:
+            try:
+                drawn = self._set_down_redrawn(files[at], part, on=shows)
+            except OSError:
+                logger.exception("Could not switch a fix of %s", row["prompt_id"])
+            if drawn is None:
                 return False
-        except OSError:
-            logger.exception("Could not switch a fix of %s", row["prompt_id"])
-            return False
-        files[at] = switched
+        files[at] = chosen
         self._db.update_generation(row["prompt_id"], output_files=json.dumps(files))
-        self._redraw_thumbnail(row["prompt_id"])
+        if drawn is not None:
+            whole, waiting, image = drawn
+            fixes_kept.put_in_place(waiting, image)
+            self._redraw_thumbnail(row["prompt_id"], drawn=(image, whole))
         return True
 
-    def _redraw_thumbnail(self, prompt_id: str) -> None:
+    def _set_down_redrawn(self, entry: dict, part: str, *, on: bool):
+        thumb_dir, drawn_as = self._environment.thumb_dir, fix_switches.drawn_as(entry, part)
+        if thumb_dir is None or drawn_as is None:
+            return None
+        image = output_file_path(entry, self._places)
+        kept = fixes_kept.folder_beside(Path(thumb_dir)) / entry[fix_switches.KEPT_KEY]
+        redrawn = fixes_kept.redrawn(image, kept, *drawn_as, on=on)
+        if redrawn is None:
+            return None
+        return redrawn.image, fixes_kept.set_down(redrawn, kept, image, part, on=on), image
+
+    def _redraw_thumbnail(self, prompt_id: str, drawn=None) -> None:
         thumb_dir = self._environment.thumb_dir
         if thumb_dir is None:
             return
@@ -181,8 +190,12 @@ class GalleryEdits:
         if preview is None:
             return
         try:
-            path = generate_thumbnail(preview[0], preview[1], Path(thumb_dir),
-                                      name=prompt_id)
+            if drawn is None:
+                path = generate_thumbnail(preview[0], preview[1], Path(thumb_dir), name=prompt_id)
+            elif Path(preview[0]) == drawn[0]:
+                path = thumbnail_of(drawn[1], Path(thumb_dir), name=prompt_id)
+            else:
+                return
         except Exception:
             logger.exception("Could not redraw the thumbnail for %s", prompt_id)
             return

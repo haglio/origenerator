@@ -36,6 +36,10 @@ def frame_thumbnail(frame: bytes, thumb_dir: Path, *, name: str) -> Path | None:
     return _saved_thumbnail(img, thumb_dir, name)
 
 
+def thumbnail_of(img: Image.Image, thumb_dir: Path, *, name: str) -> Path:
+    return _saved_thumbnail(img.copy(), thumb_dir, name)
+
+
 def _saved_thumbnail(img: Image.Image, thumb_dir: Path, name: str) -> Path:
     thumb_dir.mkdir(parents=True, exist_ok=True)
     dest = still_thumbnail_path(thumb_dir, name)

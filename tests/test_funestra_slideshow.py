@@ -3052,3 +3052,21 @@ def test_what_is_sent_while_a_write_is_under_way_follows_it_in_order(
                                 "RELOAD_PLAYLIST"]
     assert [str(item.path) for item in read_playlist(slideshow.channel.playlist)] == [
         "two.png", "three.png"]
+
+
+def test_an_image_drawn_again_where_it_lies_is_shown_again_on_the_funestra_showing_it(qtbot, tmp_path):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+
+    slideshow.show_again("one.png")
+
+    assert _sent(slideshow) == ["SHOW_FRAME one.png"], (
+        "the Funestra read the file when it first showed it, so a fix taken off the image "
+        "showed only on the next visit")
+
+
+def test_an_image_drawn_again_that_no_funestra_shows_sends_nothing(qtbot, tmp_path):
+    slideshow = _slideshow_with_the_funestra_on(qtbot, tmp_path, video="one.png")
+
+    slideshow.show_again("two.png")
+
+    assert _sent(slideshow) == []

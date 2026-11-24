@@ -243,14 +243,14 @@ def test_binning_a_version_tells_the_slideshows_what_the_image_has_left(qtbot, t
     (job,) = view._jobs.all_jobs
     client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
     told = []
-    view.slideshows.note_versions_deleted = told.append
+    view.slideshows.note_versions_deleted = lambda row, redrawn=None: told.append(row)
 
     view.generate_pane.current_generate_tab().versions_delete_requested.emit("g0", ["image_enhance_00001_.png"])
 
     assert [row["prompt_id"] for row in told] == ["g0"]
 
 
-def test_a_fix_checkbox_pressed_on_an_enhancements_row_switches_that_fix_and_keeps_showing_that_enhancement(
+def test_a_choice_made_for_a_fix_on_an_enhancements_row_is_carried_out_and_that_enhancement_stays_shown(
         qtbot, tmp_path):
     client = _reroll_client()
     db = _enhanceable_db(tmp_path, count=1)
@@ -266,10 +266,20 @@ def test_a_fix_checkbox_pressed_on_an_enhancements_row_switches_that_fix_and_kee
     shown = []
     tab._versions.version_selected.connect(shown.append)
 
-    tab._versions.fix_switch_requested.emit(0, "faces", False)
+    redrawn_files = []
+    view.slideshows.note_versions_deleted = lambda row, redrawn=None: redrawn_files.append(redrawn)
+    refreshes = []
+    view.refresh = lambda **_how: refreshes.append(1)
 
-    assert actions.fixes_switched == [("g0", "image_enhance_00001_.png", "faces", False)]
+    tab._versions.fix_choice_requested.emit(0, "faces", "off")
+
+    assert actions.fixes_chosen == [("g0", "image_enhance_00001_.png", "faces", "off")]
     assert shown == [0]
+    assert redrawn_files == ["image_enhance_00001_.png"], (
+        "a slideshow showing the enhancement is told which file was drawn again, to show it again")
+    assert refreshes == [], (
+        "the whole gallery is read again only once the choosing rests, so each choice shows at once")
+    assert view._refresh_once_the_choosing_rests.isActive()
 
 
 def test_enhance_items_queues_the_picked_images(qtbot, tmp_path):
@@ -905,3 +915,29 @@ def test_an_image_auto_enhanced_as_it_lands_leaves_the_folders_enhance_offer_at_
     view._on_reroll_finished(gallery.settings_folder_key(db.get_generation("g0")), "g0")
 
     assert button.toolTip().startswith("Enhance 1 not-yet-enhanced image in this folder")
+
+
+def test_an_enhancement_made_again_lands_in_the_old_ones_place_and_the_old_one_is_deleted(
+        qtbot, tmp_path):
+    client = _reroll_client()
+    db = _enhanceable_db(tmp_path, count=1)
+    actions = FakeActions()
+    deleted = []
+    actions.delete_enhance_versions = (
+        lambda row, filenames: deleted.append((row["prompt_id"], list(filenames))) or True)
+    view = GalleryView(db, client=client, actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    view.enhance_items(["g0"])
+    (job,) = view._jobs.all_jobs
+    client.job_completed.emit(job.prompt_id, _ENHANCE_HISTORY)
+
+    view.enhance.enhance_again("g0", "image_enhance_00001_.png", True)
+    (again,) = view._jobs.all_jobs
+    client.job_completed.emit(again.prompt_id, {"outputs": {"12": {"images": [
+        {"filename": "image_enhance_00002_.png", "subfolder": "image", "type": "output"}]}}})
+
+    assert deleted == [("g0", ["image_enhance_00001_.png"])]
+    assert [f["filename"] for f in gallery.row_output_files(db.get_generation("g0"))] == [
+        "image_enhance_00002_.png", "image_enhance_00001_.png", "sdxl_t2i_g0.png"], (
+        "the new one is listed where the old one is, so it has the old one's place once that goes")

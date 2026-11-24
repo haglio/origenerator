@@ -223,6 +223,7 @@ logger = logging.getLogger(__name__)
 
 
 _POLL_INTERVAL_MS = 1500
+_A_PAUSE_IN_CHOOSING_MS = 250
 _SATELLITE_SHAPES = ("portrait", "landscape")
 
 
@@ -407,6 +408,10 @@ class GalleryView(QWidget):
 
         self._poll_inflight = False
         self._last_poll_read = None
+        self._refresh_once_the_choosing_rests = QTimer(self)
+        self._refresh_once_the_choosing_rests.setSingleShot(True)
+        self._refresh_once_the_choosing_rests.setInterval(_A_PAUSE_IN_CHOOSING_MS)
+        self._refresh_once_the_choosing_rests.timeout.connect(self.refresh)
         self._poll_timer = QTimer(self)
         self._poll_timer.setInterval(_POLL_INTERVAL_MS)
         self._poll_timer.timeout.connect(self._poll)
@@ -725,9 +730,10 @@ class GalleryView(QWidget):
         tab.enhance_requested.connect(lambda pid: self.enhance.enhance_items([pid]))
         tab.versions_delete_requested.connect(lambda prompt_id, filenames: self.edit_versions(
             prompt_id, lambda row: self._edits.delete_enhance_versions(row, filenames)))
-        tab.fix_switch_requested.connect(lambda prompt_id, filename, part, on: self.edit_versions(
-            prompt_id, lambda row: self._edits.switch_fix(row, filename, part, on=on),
+        tab.fix_choice_requested.connect(lambda prompt_id, filename, part, choice: self.edit_versions(
+            prompt_id, lambda row: self._edits.choose_fix(row, filename, part, choice),
             then_show=filename))
+        tab.enhance_again_requested.connect(self.enhance.enhance_again)
         tab.set_enhance_settings(self.enhance.settings)
         tab.set_fullscreen_factory(self.slideshows.open_on_preview)
         tab.set_setter_host(self._setter_host)
@@ -1767,12 +1773,15 @@ class GalleryView(QWidget):
         row = self._db.get_generation(prompt_id)
         if row is None or not edit(row):
             return
-        self.refresh()
+        if then_show is None:
+            self.refresh()
+        else:
+            self._refresh_once_the_choosing_rests.start()
         updated = self._db.get_generation(prompt_id)
         if updated is not None:
             self.generate_pane.refresh_displayed(updated, self.library.reading.image_rows,
                                                   then_show)
-            self.slideshows.note_versions_deleted(updated)
+            self.slideshows.note_versions_deleted(updated, redrawn=then_show)
 
     def slideshow_location(self):
         collection = self._current_collection_key()
@@ -1979,10 +1988,13 @@ class GalleryView(QWidget):
         folded = False
         if finished_row is not None \
                 and finished_row.get("workflow_name") == gallery.ENHANCE_WORKFLOW:
+            replaced = gallery.in_place_of(finished_row)
             source_id = gallery.fold_enhancement(self._db, finished_row)
             if source_id is not None:
                 folded = True
                 finished_row = self._db.get_generation(source_id)
+                if replaced and self._edits.delete_enhance_versions(finished_row, [replaced]):
+                    finished_row = self._db.get_generation(source_id)
                 self.slideshows.note_enhanced(finished_row)
         self.combine.send_to_genau_if_requested(finished_row)
         self.carry_out_when_finished()

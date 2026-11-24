@@ -4,9 +4,13 @@ import json
 import os
 from typing import NamedTuple
 
-from origenerator import gallery
+from PIL import Image
+from PIL.PngImagePlugin import PngInfo
+
+from origenerator import fixes_kept, gallery
 from origenerator.db import Database, NewGeneration
 from origenerator.gallery import (
+    finish_fix_switches_cut_short,
     fold_completed_enhancements,
     fold_enhancement,
     forget_fixes_of_enhancements_gone,
@@ -33,10 +37,10 @@ def _add_source(db, prompt_id="src", filename="sdxl_t2i_src.png", favorite=False
     return db.get_generation(prompt_id)
 
 
-def _add_enhance(db, prompt_id, input_ref, filename, status="completed"):
+def _add_enhance(db, prompt_id, input_ref, filename, status="completed", **asked):
     db.insert_generation(NewGeneration(
         prompt_id=prompt_id, workflow_name="image_enhance", workflow_version="v001",
-        params_json=json.dumps({"input_image": input_ref, "positive_prompt": "a cat"}),
+        params_json=json.dumps({"input_image": input_ref, "positive_prompt": "a cat", **asked}),
         workflow_json="{}",
     ))
     fields = {"status": status}
@@ -598,3 +602,89 @@ def test_a_folded_enhancement_still_lists_its_fixes_on_the_image_it_was_made_fro
 
     newest = gallery.enhancement_versions(db.get_generation("src"))[0]
     assert [(switch.part, switch.on) for switch in newest.fixes] == [("faces", True)]
+
+
+def test_fold_keeps_the_seed_the_enhancement_was_made_from(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _add_source(db)
+    fold_enhancement(db, _add_enhance(db, "e1", "image/sdxl_t2i_src.png [output]",
+                                      "image_enhance_00001_.png", seed=4242))
+
+    (version, _original) = gallery.enhancement_versions(db.get_generation("src"))
+    assert version.seed == 4242, (
+        "the run's row is deleted once folded, and an enhancement made again from the same seed "
+        "is the one way it comes out the same")
+
+
+def test_an_enhancement_made_in_the_place_of_another_is_listed_where_that_one_is(tmp_path):
+    db = Database(tmp_path / "t.db")
+    _add_source(db)
+    for run, saved in (("e1", "image_enhance_00001_.png"), ("e2", "image_enhance_00002_.png")):
+        fold_enhancement(db, _add_enhance(db, run, "image/sdxl_t2i_src.png [output]", saved))
+    again = _add_enhance(db, "e3", "image/sdxl_t2i_src.png [output]", "image_enhance_00003_.png",
+                         **{gallery.IN_PLACE_OF: "image_enhance_00001_.png"})
+
+    assert gallery.in_place_of(again) == "image_enhance_00001_.png"
+    fold_enhancement(db, again)
+
+    upgraded = db.get_generation("src")
+    assert [f["filename"] for f in gallery.row_output_files(upgraded)] == [
+        "image_enhance_00002_.png", "image_enhance_00003_.png", "image_enhance_00001_.png",
+        "sdxl_t2i_src.png"]
+    assert [entry["filename"] for entry in json.loads(upgraded["enhance_history"])] == [
+        "image_enhance_00002_.png", "image_enhance_00003_.png", "image_enhance_00001_.png"]
+
+
+_UNDER, _FIXED = (10, 10, 10), (200, 0, 0)
+
+
+def _a_switch_cut_short(tmp_path, *, recorded_off: bool):
+    db = Database(tmp_path / "t.db")
+    _add_source(db)
+    places = OutputPlaces.in_one_folder(tmp_path / "out")
+    (tmp_path / "out" / "image").mkdir(parents=True)
+    image = tmp_path / "out" / "image" / "enhanced.png"
+    Image.new("RGB", (20, 20), _FIXED).save(image)
+    entry = {"filename": "enhanced.png", "subfolder": "image", "fixes_kept": "run-1",
+             "fixes": [{"part": "faces", "box": [0, 0, 20, 20], "over": []}]}
+    if recorded_off:
+        entry["fixes_off"] = ["faces"]
+    db.update_generation("src", output_files=json.dumps([entry]))
+    kept = tmp_path / "kept from fixes" / "run-1"
+    kept.mkdir(parents=True)
+    waiting = fixes_kept.set_down(
+        fixes_kept.Redrawn(Image.new("RGB", (20, 20), _UNDER), {}), kept, image, "faces", on=False)
+    return db, places, image, waiting
+
+
+def test_a_switch_cut_short_after_it_was_written_down_is_finished_at_the_next_launch(tmp_path):
+    db, places, image, waiting = _a_switch_cut_short(tmp_path, recorded_off=True)
+
+    assert finish_fix_switches_cut_short(db, tmp_path / "kept from fixes", places) == 1
+
+    with Image.open(image) as redrawn:
+        assert redrawn.getpixel((5, 5)) == _UNDER
+    assert not waiting.exists()
+
+
+def test_a_switch_cut_short_before_it_was_written_down_is_dropped(tmp_path):
+    db, places, image, waiting = _a_switch_cut_short(tmp_path, recorded_off=False)
+
+    assert finish_fix_switches_cut_short(db, tmp_path / "kept from fixes", places) == 0
+
+    with Image.open(image) as untouched:
+        assert untouched.getpixel((5, 5)) == _FIXED
+    assert not waiting.exists()
+
+
+def test_the_seed_of_an_enhancement_is_read_from_what_comfyui_wrote_inside_its_file(tmp_path):
+    written = PngInfo()
+    written.add_text("prompt", json.dumps({
+        "1": {"class_type": "LoadImage", "inputs": {"image": "made up.png"}},
+        "fix0_detailer": {"class_type": "DetailerForEach", "inputs": {"seed": 99, "steps": 20}}}))
+    Image.new("RGB", (4, 4)).save(tmp_path / "enhanced.png", pnginfo=written)
+    Image.new("RGB", (4, 4)).save(tmp_path / "says nothing.png")
+
+    assert gallery.seed_written_in(tmp_path / "enhanced.png") == 99
+    assert gallery.seed_written_in(tmp_path / "says nothing.png") is None
+    assert gallery.seed_written_in(tmp_path / "gone.png") is None

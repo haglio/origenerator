@@ -92,7 +92,7 @@ class FakeActions:
         self.trashed_files = []
         self.restored = []
         self.purged = []
-        self.fixes_switched = []
+        self.fixes_chosen = []
         self.undo_count = 0
         self.redo_count = 0
         self._label = None
@@ -116,8 +116,8 @@ class FakeActions:
     def delete_enhance_versions(self, row, filenames):
         return True
 
-    def switch_fix(self, row, filename, part, *, on):
-        self.fixes_switched.append((row["prompt_id"], filename, part, on))
+    def choose_fix(self, row, filename, part, choice):
+        self.fixes_chosen.append((row["prompt_id"], filename, part, choice))
         return True
 
     def trash_file(self, path, already_at=None):

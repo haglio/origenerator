@@ -1086,7 +1086,7 @@ def test_switching_a_fix_off_redraws_the_enhancement_without_it_and_writes_it_do
     actions, db, output_dir = _actions(tmp_path, thumb_dir=thumb_dir)
     row = _row_enhanced_with_a_fix(db, output_dir, thumb_dir)
 
-    assert actions.switch_fix(row, "enhanced.png", "faces", on=False) is True
+    assert actions.choose_fix(row, "enhanced.png", "faces", "off") is True
 
     assert _color_in_the_fix(output_dir) == UNDER_THE_FIX
     listed = json.loads(db.get_generation("p1")["output_files"])
@@ -1097,26 +1097,54 @@ def test_switching_a_fix_off_redraws_the_enhancement_without_it_and_writes_it_do
 def test_switching_a_fix_back_on_draws_it_again(tmp_path):
     thumb_dir = tmp_path / "thumbnails"
     actions, db, output_dir = _actions(tmp_path, thumb_dir=thumb_dir)
-    actions.switch_fix(_row_enhanced_with_a_fix(db, output_dir, thumb_dir),
-                       "enhanced.png", "faces", on=False)
+    actions.choose_fix(_row_enhanced_with_a_fix(db, output_dir, thumb_dir),
+                       "enhanced.png", "faces", "off")
 
-    assert actions.switch_fix(db.get_generation("p1"), "enhanced.png", "faces", on=True) is True
+    assert actions.choose_fix(db.get_generation("p1"), "enhanced.png", "faces", "on") is True
 
     assert _color_in_the_fix(output_dir) == FIXED
     assert "fixes_off" not in json.loads(db.get_generation("p1")["output_files"])[0]
 
 
-def test_a_switch_lets_go_of_the_image_before_redrawing_it(tmp_path):
+def test_a_switch_asks_nothing_to_let_go_of_the_image_and_redraws_it_while_it_is_held_open(tmp_path):
     thumb_dir = tmp_path / "thumbnails"
     seen = []
     actions, db, output_dir = _actions(
         tmp_path, thumb_dir=thumb_dir,
         release_files=lambda paths, **told: seen.append((list(paths), told)))
+    row = _row_enhanced_with_a_fix(db, output_dir, thumb_dir)
 
-    actions.switch_fix(_row_enhanced_with_a_fix(db, output_dir, thumb_dir),
-                       "enhanced.png", "faces", on=False)
+    with open(output_dir / "image" / "enhanced.png", "rb"):
+        assert actions.choose_fix(row, "enhanced.png", "faces", "off") is True
 
-    assert seen == [([output_dir / "image" / "enhanced.png"], {"the_item_stays": True})]
+    assert seen == [], (
+        "letting go made a slideshow drop the image it was showing, and a slideshow of that one "
+        "image closed")
+    assert _color_in_the_fix(output_dir) == UNDER_THE_FIX
+
+
+def test_leaving_a_fix_out_of_a_re_enhance_writes_it_down_and_leaves_the_image_as_it_is(tmp_path):
+    thumb_dir = tmp_path / "thumbnails"
+    actions, db, output_dir = _actions(tmp_path, thumb_dir=thumb_dir)
+    row = _row_enhanced_with_a_fix(db, output_dir, thumb_dir)
+    written = (output_dir / "image" / "enhanced.png").read_bytes()
+
+    assert actions.choose_fix(row, "enhanced.png", "faces", "left out") is True
+
+    assert json.loads(db.get_generation("p1")["output_files"])[0]["fixes_left_out"] == ["faces"]
+    assert (output_dir / "image" / "enhanced.png").read_bytes() == written
+
+
+def test_the_thumbnail_follows_a_switch_of_the_enhancement_the_item_shows(tmp_path):
+    thumb_dir = tmp_path / "thumbnails"
+    actions, db, output_dir = _actions(tmp_path, thumb_dir=thumb_dir)
+
+    actions.choose_fix(_row_enhanced_with_a_fix(db, output_dir, thumb_dir),
+                       "enhanced.png", "faces", "off")
+
+    with Image.open(db.get_generation("p1")["thumbnail_path"]) as thumbnail:
+        red, green, blue = thumbnail.getpixel((20, 20))
+    assert max(abs(red - green), abs(red - blue)) < 12, "the fix was red, and what was under it gray"
 
 
 def test_a_fix_whose_kept_places_are_gone_stays_as_it_is(tmp_path):
@@ -1125,6 +1153,6 @@ def test_a_fix_whose_kept_places_are_gone_stays_as_it_is(tmp_path):
     row = _row_enhanced_with_a_fix(db, output_dir, thumb_dir)
     (thumb_dir.parent / "kept from fixes" / "run-1" / "0_before.png").unlink()
 
-    assert actions.switch_fix(row, "enhanced.png", "faces", on=False) is False
+    assert actions.choose_fix(row, "enhanced.png", "faces", "off") is False
 
     assert db.get_generation("p1")["output_files"] == row["output_files"]

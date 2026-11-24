@@ -16,14 +16,14 @@ from origenerator.prompt_edit import (
     REWRITTEN,
     UNANSWERED,
     WhatIsKnown,
+    answer_to,
     ask_the_model,
     build_request_messages,
-    company_of,
+    known_from,
     parse_request,
     prompts_touching,
     work_out,
 )
-from origenerator.usual_company import UsualCompany
 from origenerator.workflows.base import ParamDef, ParamType, story_of
 
 
@@ -607,163 +607,44 @@ def test_a_weight_the_model_writes_is_left_out_where_the_prompts_take_none():
     assert revision.positive == "a woman, freckles, a red scarf"
 
 
-_HAT_COMPANY = UsualCompany(positive=("a wide straw hat", "frayed brim"),
-                            negative=("bare head", "paper hat"))
+_HIS_HATS = (("a man on a pier, fog, gulls", "blurry"),
+             ("a man on a pier, a wide straw hat, frayed brim, fog, gulls", "blurry, bare head"))
 
 
-def test_what_his_prompts_usually_have_with_the_thing_is_told_to_the_model():
-    messages = build_request_messages("a man", "blurry", "add a hat",
-                                      WhatIsKnown(company=_HAT_COMPANY), "system")
+def test_a_thing_his_prompts_have_goes_in_the_way_he_added_it_and_the_model_is_not_asked():
+    ask, asked = _answers_in_turn()
 
-    assert ("USUALLY HAVE WITH IT (parts many of his newest ones have and his other prompts seldom "
-            "do):\n"
-            "positive (the app adds those that name it or bring the person it is part of): a wide "
-            "straw hat, frayed brim\n"
-            "negative (the app adds those that name it): bare head, paper hat") in messages[-1]["content"]
+    answered = answer_to("a man on a pier, fog, gulls, rain", "blurry", "add a hat",
+                         WhatIsKnown(his_prompts=_HIS_HATS), llm=ask)
 
-
-def test_with_no_usual_company_the_messages_say_none():
-    messages = build_request_messages("a man", "blurry", "add a hat", WhatIsKnown(), "system")
-
-    assert "USUALLY HAVE WITH IT" not in messages[-1]["content"]
+    assert asked == []
+    assert answered["changes"] == [
+        {"prompt": "positive", "add": "a wide straw hat, frayed brim", "after": "a man on a pier",
+         "for": "add a hat"},
+        {"prompt": "negative", "add": "bare head", "for": "add a hat"}]
 
 
-_A_STRAW_HAT = UsualCompany(positive=("a wide straw hat",), negative=("bare head", "paper hat"))
-_ADDS_A_HAT = '{"prompt": "positive", "add": "a wide straw hat", "for": "add a hat"}'
+def test_a_thing_added_his_way_stands_beside_what_it_stood_beside_in_his_prompts():
+    revision = work_out("a man on a pier, fog, gulls, rain", "blurry", "add a hat",
+                        his_prompts=_HIS_HATS)
+
+    assert revision.positive == "a man on a pier, a wide straw hat, frayed brim, fog, gulls, rain"
+    assert revision.negative == "blurry, bare head"
 
 
-def _asked_to_add_a_hat(negative: str, its_negative: str = "", company=_A_STRAW_HAT):
-    its_own = (', {"prompt": "negative", "add": "' + its_negative + '", "for": "add a hat"}'
-               if its_negative else "")
-    ask, asked = _answers_in_turn('{"changes": [' + _ADDS_A_HAT + its_own + "]}",
-                                  '{"people": {}}', '{"left_open": []}')
-    answered = ask_the_model("a man", negative, "add a hat", WhatIsKnown(company=company), llm=ask)
-    return answered["changes"][1:], asked
+@pytest.mark.parametrize("request_words", ["add a scarf", "no hat", "add a hat and a scarf"])
+def test_what_his_prompts_cannot_answer_is_asked_of_the_model(request_words):
+    ask, asked = _answers_in_turn('{"changes": [], "why": "Nothing to do."}')
 
+    answer_to("a man on a pier, fog, gulls", "blurry", request_words,
+              WhatIsKnown(his_prompts=_HIS_HATS), llm=ask)
 
-def test_adding_a_thing_keeps_out_only_the_usual_parts_that_name_it():
-    changes, asked = _asked_to_add_a_hat("blurry")
-
-    assert changes == [{"prompt": "negative", "add": "paper hat", "for": "add a hat"}]
-    assert len(asked) == 3
-
-
-def test_where_usual_parts_name_the_thing_nothing_of_the_models_own_is_kept_out():
-    changes, _asked = _asked_to_add_a_hat("blurry", "low angle shot, Bare Head, a felt hat")
-
-    assert changes == [{"prompt": "negative", "add": "paper hat", "for": "add a hat"}]
-
-
-def test_where_no_usual_part_names_the_thing_the_model_keeps_out_only_what_holds_his_word():
-    changes, _asked = _asked_to_add_a_hat(
-        "blurry", "low angle shot, a felt hat",
-        UsualCompany(positive=("a wide straw hat",), negative=("bare head",)))
-
-    assert changes == [{"prompt": "negative", "add": "a felt hat", "for": "add a hat"}]
-
-
-def test_a_negative_change_of_the_models_that_leaves_nothing_to_keep_out_is_dropped():
-    changes, _asked = _asked_to_add_a_hat("blurry, (paper hat, cap:1.2)", "low angle shot")
-
-    assert changes == []
-
-
-def test_a_request_that_adds_nothing_to_the_positive_prompt_keeps_out_none_of_his_usual_company():
-    ask, asked = _answers_in_turn('{"changes": [{"gone": "hat", "in_positive": "a hat", '
-                                  '"instead": "", "for": "no hat"}]}')
-
-    answered = ask_the_model("a man, a hat", "blurry", "no hat", WhatIsKnown(company=_A_STRAW_HAT),
-                             llm=ask)
-
-    assert len(answered["changes"]) == 1
     assert len(asked) == 1
 
 
-_MAN_COMPANY = UsualCompany(positive=("a tall man in a wool coat", "a full gray beard",
-                                      "low angle shot"))
-_A_BEARD = ('{"changes": [{"prompt": "positive", "add": "a tall man, a gray beard, thick eyebrows, '
-            'beside her", "after": "a woman", "for": "add a beard"}]}')
-_THE_MAN = '{"people": {"a tall man in a wool coat": "man"}}'
-
-
-def _asked_to_add_a_beard(positive: str, *answers):
-    ask, asked = _answers_in_turn(_A_BEARD, *answers)
-    answered = ask_the_model(positive, "", "add a beard", WhatIsKnown(company=_MAN_COMPANY), llm=ask)
-    return answered["changes"], asked
-
-
-def test_the_usual_parts_that_name_the_thing_or_bring_a_person_go_in_as_he_writes_them():
-    changes, asked = _asked_to_add_a_beard(
-        "a woman", '{"people": {"A tall man in a wool coat": "man", "a cat": "cat"}}',
-        '{"left_open": ["a tall man", "beside her"]}')
-
-    assert changes[0]["add"] == "a tall man in a wool coat, a full gray beard"
-    question = asked[1][0][-1]["content"]
-    assert 'He asked: "add a beard".' in question
-    assert '["a tall man in a wool coat", "a full gray beard", "low angle shot"]' in question
-    assert asked[1][1]["temperature"] == 0
-
-
-@pytest.mark.parametrize("positive", ["two men at a bar", "a man, a woman"])
-def test_a_usual_person_stays_out_of_a_prompt_that_already_has_one_named_the_same(positive):
-    changes, _asked = _asked_to_add_a_beard(positive, _THE_MAN, '{"left_open": []}')
-
-    assert changes[0]["add"] == "a full gray beard"
-
-
-@pytest.mark.parametrize("people", ['{"people": {"low angle shot": "man"}}',
-                                    '{"people": {"a tall man in a wool coat": "her"}}',
-                                    '{"people": {}}', '{"people": ["a tall man in a wool coat"]}',
-                                    "no json here", TimeoutError("the model gave no answer")])
-def test_a_part_that_brings_no_one_its_own_words_name_stays_out(people):
-    changes, _asked = _asked_to_add_a_beard("a woman", people, '{"left_open": ["beside her"]}')
-
-    assert changes[0]["add"] == "a full gray beard"
-
-
-def test_a_usual_part_the_positive_prompt_already_has_is_not_added_again():
-    changes, _asked = _asked_to_add_a_beard("a woman, (A Tall Man In A Wool Coat:1.2)", _THE_MAN,
-                                            '{"left_open": []}')
-
-    assert [change["add"] for change in changes] == ["a full gray beard"]
-
-
-def _asked_to_add_a_beard_knowing_only_the_angle(its_own_words: str):
-    ask, _asked = _answers_in_turn(
-        '{"changes": [{"prompt": "positive", "add": "' + its_own_words + '", "for": "add a beard"}]}',
-        '{"people": {}}', '{"left_open": []}')
-    answered = ask_the_model("a woman", "", "add a beard", WhatIsKnown(
-        company=UsualCompany(positive=("low angle shot",))), llm=ask)
-    return answered["changes"][0]["add"]
-
-
-def test_of_the_models_own_parts_only_those_holding_a_word_he_asked_for_go_in():
-    assert _asked_to_add_a_beard_knowing_only_the_angle(
-        "two sailors, a Gray Beard, a harbor") == "a Gray Beard"
-
-
-def test_when_none_of_the_models_parts_holds_a_word_he_asked_for_the_thing_itself_goes_in():
-    assert _asked_to_add_a_beard_knowing_only_the_angle("two sailors, whiskers") == "beard"
-
-
-def test_a_usual_part_that_neither_names_the_thing_nor_brings_a_person_is_not_added():
-    ask, _asked = _answers_in_turn(
-        '{"changes": [{"prompt": "positive", "add": "a gray beard, Low Angle Shot, thick eyebrows", '
-        '"for": "add a beard"}]}', '{"people": {}}', '{"left_open": []}')
-
-    answered = ask_the_model("a woman", "", "add a beard", WhatIsKnown(company=_MAN_COMPANY), llm=ask)
-
-    assert answered["changes"][0]["add"] == "a full gray beard"
-
-
-def test_a_usual_person_stays_out_of_a_prompt_that_counts_one_named_the_same():
-    ask, _asked = _answers_in_turn(
-        _A_BEARD, '{"people": {"2men at a bar": "2men"}}', '{"left_open": []}')
-
-    answered = ask_the_model("1man, a sofa", "", "add a beard", WhatIsKnown(
-        company=UsualCompany(positive=("a full gray beard", "2men at a bar"))), llm=ask)
-
-    assert answered["changes"][0]["add"] == "a full gray beard"
+def test_what_is_known_from_his_prompts_is_those_touching_the_request_and_all_of_them():
+    assert known_from(list(_HIS_HATS), "add a hat") == {
+        "examples": [_HIS_HATS[1]], "his_prompts": _HIS_HATS}
 
 
 def test_asked_to_add_a_thing_a_model_that_only_edits_the_negative_prompt_still_gets_it_added():
@@ -802,9 +683,7 @@ def test_only_a_request_to_add_answered_in_the_negative_prompt_alone_gains_the_t
 def test_a_request_for_a_part_the_prompt_already_has_asks_for_more_of_it(answer, request_words):
     ask, asked = _answers_in_turn(answer)
 
-    answered = ask_the_model("a man, a tall hat, a pier", "", request_words, WhatIsKnown(
-        company=UsualCompany(positive=("a tall hat with a feather",), negative=("a short hat",))),
-        llm=ask)
+    answered = answer_to("a man, a tall hat, a pier", "", request_words, WhatIsKnown(), llm=ask)
 
     assert asked == []
     assert answered["changes"] == [{"more": "a tall hat", "stronger": "a tall hat", "opposite": "",
@@ -815,100 +694,9 @@ def test_more_of_a_part_already_there_moves_it_first_and_says_so():
     ask, _asked = _answers_in_turn('{"changes": [], "why": "It already has a tall hat."}')
 
     revision = work_out("a man, a tall hat, a pier", "", "tall hat", weights=False,
-                        ask=lambda *told: ask_the_model(*told, llm=ask))
+                        ask=lambda *told: answer_to(*told, llm=ask))
 
     assert revision.positive == "a tall hat, a man, a pier"
-
-
-def _asked_to_add_a_beard_they_usually_wear(positive: str, usual: str, people: str):
-    ask, _asked = _answers_in_turn(_A_BEARD, people, '{"left_open": []}')
-    answered = ask_the_model(positive, "", "add a beard", WhatIsKnown(
-        company=UsualCompany(positive=("a full gray beard", usual))), llm=ask)
-    return answered["changes"][0]["add"]
-
-
-def test_a_usual_part_that_names_the_thing_and_brings_someone_new_goes_in():
-    assert _asked_to_add_a_beard_they_usually_wear(
-        "a woman", "a man with a gray beard", '{"people": {"a man with a gray beard": "man"}}'
-    ) == "a full gray beard, a man with a gray beard"
-
-
-def test_a_usual_part_that_names_the_thing_and_someone_the_prompt_already_has_stays_out():
-    assert _asked_to_add_a_beard_they_usually_wear(
-        "a sailor on a deck", "two tall sailors with a gray beard",
-        '{"people": {"two tall sailors with a gray beard": "sailors"}}') == "a full gray beard"
-
-
-def test_a_usual_part_that_names_the_thing_and_counts_someone_the_prompt_counts_stays_out():
-    assert _asked_to_add_a_beard_they_usually_wear(
-        "1sailor, a deck", "2 tall sailors with a gray beard", '{"people": {}}'
-    ) == "a full gray beard"
-
-
-def test_a_part_of_the_models_own_that_counts_someone_the_prompt_counts_stays_out():
-    ask, _asked = _answers_in_turn(
-        '{"changes": [{"prompt": "positive", "add": "2sailors with a beard, a Gray Beard", '
-        '"for": "add a beard"}]}', '{"people": {}}', '{"left_open": []}')
-
-    answered = ask_the_model("1sailor, a deck", "", "add a beard", WhatIsKnown(
-        company=UsualCompany(positive=("low angle shot",))), llm=ask)
-
-    assert answered["changes"][0]["add"] == "a Gray Beard"
-
-
-def test_after_a_replacement_each_usual_part_of_the_things_own_is_added_by_itself():
-    ask, _asked = _answers_in_turn(
-        '{"changes": [{"prompt": "positive", "replace": "a woman", "with": "a woman, A Full Gray '
-        'Beard", "for": "add a beard"}]}', _THE_MAN, '{"left_open": []}')
-
-    answered = ask_the_model("a woman", "", "add a beard", WhatIsKnown(company=_MAN_COMPANY), llm=ask)
-
-    assert answered["changes"][1:] == [
-        {"prompt": "positive", "add": "a tall man in a wool coat", "for": "add a beard"},
-        {"prompt": "positive", "add": "a full gray beard", "for": "add a beard"}]
-
-
-def test_a_usual_part_a_replacement_already_wrote_is_not_written_twice():
-    model = _Model(_answer(_replace("a woman", "a woman, A Full Gray Beard", for_="add a beard"),
-                           _add("a tall man in a wool coat", for_="add a beard"),
-                           _add("a full gray beard", for_="add a beard")))
-
-    revision = work_out("a woman", "", "add a beard", ask=model)
-
-    assert revision.positive == "a woman, A Full Gray Beard, a tall man in a wool coat"
-
-
-def test_a_change_that_puts_nothing_into_the_positive_prompt_is_asked_nothing_about_usual_parts():
-    ask, asked = _answers_in_turn('{"changes": [{"gone": "hat", "in_positive": "", "instead": "", '
-                                  '"for": "no hat"}]}')
-
-    ask_the_model("a woman", "", "no hat", WhatIsKnown(company=_MAN_COMPANY), llm=ask)
-
-    assert len(asked) == 1
-
-
-def _hat_twins(came: str, kept_out: str) -> list:
-    return [pair for scene in ("a fisherman, harbor, fog", "a farmer, a field, dusk",
-                               "a sailor, a deck, rain")
-            for pair in ((scene, "blurry"), (f"{scene}, {came}", f"blurry, {kept_out}"))]
-
-
-def test_the_company_of_a_request_comes_with_the_one_thing_that_holds_every_word_it_names():
-    prompts = _hat_twins("a red hat, frayed brim", "bare head") + _hat_twins(
-        "a red car, a tall hat, a feather", "cap")
-
-    assert company_of("add a red hat", prompts) == UsualCompany(
-        positive=("a red hat", "frayed brim"), negative=("bare head",))
-    assert company_of("please", prompts) == UsualCompany()
-
-
-def test_a_request_for_two_things_gathers_the_company_of_each():
-    prompts = _hat_twins("a red hat, frayed brim", "bare head") + _hat_twins(
-        "a wool scarf, long fringe", "bare neck")
-
-    assert company_of("add a hat and a scarf", prompts) == UsualCompany(
-        positive=("a red hat", "frayed brim", "a wool scarf", "long fringe"),
-        negative=("bare head", "bare neck"))
 
 
 def test_an_added_thing_the_prompt_already_has_is_left_out_of_what_is_added():

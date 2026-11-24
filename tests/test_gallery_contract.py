@@ -129,3 +129,11 @@ def test_the_document_names_the_workflow_name_each_kind_of_outside_row_starts_wi
         "image_to_video": outside_workflow("a-site", MediaType.VIDEO, VideoKind.IMAGE_TO_VIDEO),
         "text_to_video": outside_workflow("a-site", MediaType.VIDEO, VideoKind.TEXT_TO_VIDEO),
         "image": outside_workflow("a-site", MediaType.IMAGE)}
+
+
+def test_the_document_says_which_type_of_item_each_workflow_makes():
+    said = _document()["item_type_by_workflow"]
+
+    assert (said["sdxl_t2i"], said["wan22_i2v"], said["wan22_flf2v_loop"]) == (
+        "image", "video", "flick")
+    assert set(said) == set(WORKFLOW_REGISTRY)

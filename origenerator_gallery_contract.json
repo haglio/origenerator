@@ -62,6 +62,19 @@
     "wan22_i2v": 16.0,
     "wan22_t2v": 16.0
   },
+  "item_type_by_workflow": {
+    "flux_t2i_upscaled": "image",
+    "image_enhance": "image",
+    "krea2_t2i": "image",
+    "minimax_h3_i2v": "video",
+    "sdxl_pose_transfer": "image",
+    "sdxl_t2i": "image",
+    "wan22_animate": "video",
+    "wan22_flf2v_loop": "flick",
+    "wan22_i2v": "video",
+    "wan22_t2i": "image",
+    "wan22_t2v": "video"
+  },
   "downtime_command": [
     ".venv/Scripts/python.exe",
     "-m",

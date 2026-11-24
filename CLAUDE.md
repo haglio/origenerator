@@ -83,6 +83,18 @@ for one thing cost four. So:
   "Starting frame animated in", where one animated from an image reads "From
   source image" (his ruling, 2026-11-05, after both headings were changed to
   say source image and read as false).
+- **An item is an image, a video or a flick, and one place says which.**
+  `media.ItemType` names the three, and `gallery.item_type_of(row)` is the
+  only code that answers for a row: what a looping workflow made is a flick,
+  and so is a video no model made that sits in a folder Genau keeps. A flick
+  has a folder of its own in the TOC, after Images and Videos, and an icon of
+  its own, and every text that names an item's type says the word the shared
+  settings give a flick (`content.item_words`). Combine makes one type at a
+  time, a video or a flick, and offers only items of that type as its source.
+  `MediaType` says only how a file is kept and played, as an image file or a
+  video file (`ItemType.filed_as`). A flick's folders keep the keys they had
+  when a flick was filed under Videos, so no item was renamed; only the top
+  folder's key says flick (`gallery.media_folder_holding`).
 - **An item is an image or a video, and neither is a picture or a record.**
   This code said "picture" all through it where it meant an image, and still
   says "record" where it means an item or the row behind one. Neither is the

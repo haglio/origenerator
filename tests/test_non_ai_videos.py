@@ -39,7 +39,7 @@ from origenerator.output_places import OutputPlaces
 from origenerator.thumbnail import animated_thumbnail_path
 from origenerator.trash import Trash
 from origenerator.workflows import workflow_named
-from origenerator.workflows.non_ai import NonAiWorkflow, non_ai_folder, non_ai_workflow
+from origenerator.workflows.non_ai import non_ai_folder, non_ai_workflow
 from tests.comfyui_folders import SUITE_FOLDERS
 from tests.media_files import write_mp4
 
@@ -389,7 +389,8 @@ def test_a_non_ai_videos_tab_says_it_has_no_settings_and_cannot_generate(qtbot, 
             tab._no_settings_note.text()) == (
         True, False, "This video wasn't generated, so it has no generation settings.")
     assert not tab._generate_pair.isEnabled()
-    assert tab._generate_btn.toolTip() == NonAiWorkflow.why_it_cannot_be_made_again
+    assert tab._generate_btn.toolTip() == (
+        "A Non-AI video wasn't generated, so it can't be made again")
 
 
 def test_the_line_saying_there_are_no_settings_sits_in_the_middle_of_the_empty_top_section(

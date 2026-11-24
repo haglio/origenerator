@@ -220,6 +220,18 @@
       ]
     },
     {
+      "id": "flick",
+      "thing": "a looping item Genau plays, a third type of item beside an image and a video, with a folder of its own in the TOC and an icon of its own",
+      "screen": null,
+      "his_word": "the word the shared settings give as genau_flick_words",
+      "code_today": [
+        "flick"
+      ],
+      "code_word": "flick",
+      "status": "ruled",
+      "ruled": "2026-11-23, his words: no longer a video, a third type of item with its own TOC section and icon"
+    },
+    {
       "id": "non_ai_clip",
       "thing": "a short Non-AI video cut from a full video, which its tab's Links name under the words the shared settings give",
       "screen": [
@@ -272,7 +284,7 @@
     },
     {
       "id": "item",
-      "thing": "an image or a video, when either will do",
+      "thing": "an image, a video or a flick, when any will do",
       "screen": [
         "3 items",
         "Delete 2 items permanently",
@@ -614,7 +626,7 @@
     },
     {
       "id": "item_type_icon",
-      "thing": "the small picture at the top-left of a Latest tile saying whether it is an image or a video",
+      "thing": "the small picture at the top-left of a Latest tile saying whether it is an image, a video or a flick",
       "screen": null,
       "his_word": "item type icon (2026-10-30)",
       "code_today": [

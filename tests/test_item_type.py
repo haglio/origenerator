@@ -6,7 +6,7 @@ from origenerator import config, gallery
 from origenerator.gallery.output import item_type_of
 from origenerator.item_shape import key_holds
 from origenerator.media import ItemType, icon_name
-from origenerator.workflows.non_ai import non_ai_workflow
+from origenerator.workflows.non_ai import NonAiWorkflow, non_ai_workflow
 
 
 def _made(workflow_name: str, filename: str) -> dict:
@@ -81,3 +81,20 @@ def test_a_job_making_a_flick_is_said_in_the_word_the_settings_give_a_flick():
 
 def test_each_type_of_item_has_an_icon_of_its_own():
     assert [icon_name(item_type) for item_type in ItemType] == ["photo", "play", "flick"]
+
+
+def test_a_flick_no_model_made_is_called_a_flick_where_it_says_it_was_never_generated(
+        tmp_path, monkeypatch):
+    genau = tmp_path / "videos" / "sample app"
+    monkeypatch.setattr(config, "GENAU_DIR", genau)
+    monkeypatch.setattr(config, "GENAU_FLICKS_NO_MODEL_MADE",
+                        (genau / "flicks" / "2D" / "non_AI", genau / "flicks" / "VR"))
+
+    said = [(workflow.why_it_cannot_be_made_again, workflow.why_it_has_no_settings)
+            for workflow in (NonAiWorkflow("sample app flicks"), NonAiWorkflow("sample full"))]
+
+    assert said == [
+        ("A Non-AI flick wasn't generated, so it can't be made again",
+         "This flick wasn't generated, so it has no generation settings."),
+        ("A Non-AI video wasn't generated, so it can't be made again",
+         "This video wasn't generated, so it has no generation settings.")]

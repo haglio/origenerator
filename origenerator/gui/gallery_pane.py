@@ -105,11 +105,11 @@ def _search_empty_hint(outcome, query: str, scope: str) -> str:
         missing = ", ".join(f"“{escape(word)}”" for word in outcome.unmatched)
         found_nothing = f"Nothing in {escape(scope)} matches {missing}."
         why = ("Every word has to be found somewhere in a generation, so dropping "
-               "that one — or searching a wider folder — widens the search.")
+               "that one, or searching a wider folder, widens the search.")
     else:
         found_nothing = f"No generation in {escape(scope)} matches all of “{escape(query)}”."
         why = ("Each of those words is in there somewhere, but no single item has "
-               "them all — try fewer of them.")
+               "them all, so try fewer of them.")
     return (f"<p>{found_nothing}</p><p>{link(CLEAR_SEARCH, 'Clear search', YELLOW)}</p>"
             f"<p>{why}</p>")
 

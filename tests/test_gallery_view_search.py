@@ -137,6 +137,7 @@ def test_a_search_that_finds_nothing_offers_a_yellow_clear_search_link(qtbot):
     _search_for(view, "aardvark")
     hint = view._gallery_pane._scroll.widget()
     assert "Clear search" in hint.text()
+    assert "—" not in hint.text(), "the user asked for the hint without dashes"
     assert YELLOW.name() in hint.text(), (
         "the user forgets a search is still in the box when the pane is empty, so the way "
         "out stands out in yellow")

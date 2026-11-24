@@ -906,7 +906,6 @@ def test_each_version_carries_its_own_file_and_created_rows(qtbot):
                          dating=Dating("2026-08-01"))
 
     facts = _facts(_rows(versions)[0])
-    assert "Enhancement" in facts
     assert "2x" in facts
     assert "File" in facts
     assert "image/e1.png" in facts
@@ -924,13 +923,12 @@ def test_a_file_row_can_be_copied_and_revealed(qtbot):
     assert "revealButton" in names
 
 
-def test_a_versions_settings_caption_its_row(qtbot):
+def test_a_versions_settings_are_each_a_field_of_its_row(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(1, {"enhance_scale": 2.0, "enhance_steps": 20})))
     facts = _facts(_rows(versions)[0])
-    assert "2x" in facts
-    assert "20 steps" in facts
+    assert "Upscale factor / 2x / Enhance steps / 20" in facts
 
 
 def test_rebuilding_for_another_image_drops_the_old_rows(qtbot):
@@ -1098,7 +1096,7 @@ def test_an_arrow_off_either_end_of_the_list_stays_where_it_is(qtbot, clicked, a
 def _clicked_under_the_enhance_row(qtbot, duplicate_of=None):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_versions(_items(_versions(2)), add=EnhanceOffer("2x · 20 steps", duplicate_of))
+    versions.show_versions(_items(_versions(2)), add=EnhanceOffer({"enhance_scale": 2.0, "enhance_steps": 20}, duplicate_of))
     (enhance_row,) = versions._host.findChildren(_AddRow)
     row = _rows(versions)[0]
     _click(qtbot, row)
@@ -1533,7 +1531,7 @@ def test_a_deletable_versions_trash_can_says_what_it_does(qtbot):
 def test_the_add_tile_leads_the_strip_and_reports_its_press(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_versions(_items(_versions(1)), add=EnhanceOffer("2x · 20 steps", None))
+    versions.show_versions(_items(_versions(1)), add=EnhanceOffer({"enhance_scale": 2.0, "enhance_steps": 20}, None))
     tiles = [tile for tile in versions._host.findChildren(QWidget) if isinstance(tile, (_VersionRow, _AddRow))]
     assert isinstance(tiles[0], _AddRow)
 
@@ -1546,8 +1544,8 @@ def test_the_add_tile_leads_the_strip_and_reports_its_press(qtbot):
 def test_a_running_enhance_takes_the_add_tiles_slot_rather_than_sitting_beside_it(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_versions(_items(_versions(1)), pending=RunningEnhancement("running", None, "2x"),
-                         add=EnhanceOffer("2x", None))
+    versions.show_versions(_items(_versions(1)), pending=RunningEnhancement("running", None, {"enhance_scale": 2.0}),
+                         add=EnhanceOffer({"enhance_scale": 2.0}, None))
     tiles = [tile for tile in versions._host.findChildren(QWidget)
              if isinstance(tile, (_PendingRow, _AddRow, _VersionRow))]
     assert isinstance(tiles[0], _PendingRow)
@@ -1563,7 +1561,7 @@ def _share_painted(image, color) -> float:
 def test_the_add_rows_thumbnail_is_the_yellow_press_and_the_row_beside_it_is_not(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_versions(_items(_versions(1)), add=EnhanceOffer("2x · 20 steps", None))
+    versions.show_versions(_items(_versions(1)), add=EnhanceOffer({"enhance_scale": 2.0, "enhance_steps": 20}, None))
     versions.resize(420, 600)
     versions.show()
     QApplication.processEvents()
@@ -1581,7 +1579,7 @@ def test_the_add_rows_thumbnail_is_the_yellow_press_and_the_row_beside_it_is_not
 def test_the_add_tiles_plus_is_drawn_big_in_its_tile(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_versions(_items(_versions(1)), add=EnhanceOffer("2x · 20 steps", None))
+    versions.show_versions(_items(_versions(1)), add=EnhanceOffer({"enhance_scale": 2.0, "enhance_steps": 20}, None))
     (add_row,) = versions._host.findChildren(_AddRow)
     plus = add_row._thumbnail.pixmap().toImage()
 
@@ -1594,7 +1592,7 @@ def test_the_add_tiles_plus_is_drawn_big_in_its_tile(qtbot):
 def test_an_image_with_nothing_yet_still_gets_the_tile(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_versions([], add=EnhanceOffer("2x", None))
+    versions.show_versions([], add=EnhanceOffer({"enhance_scale": 2.0}, None))
     assert not versions.isHidden()
     assert versions._host.findChildren(_AddRow)
 
@@ -1602,7 +1600,7 @@ def test_an_image_with_nothing_yet_still_gets_the_tile(qtbot):
 def test_the_tile_dims_when_it_would_only_duplicate_a_version(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_versions(_items(_versions(1)), add=EnhanceOffer("2x · 20 steps", 0))
+    versions.show_versions(_items(_versions(1)), add=EnhanceOffer({"enhance_scale": 2.0, "enhance_steps": 20}, 0))
     (add_row,) = versions._host.findChildren(_AddRow)
 
     pressed = []
@@ -1615,7 +1613,7 @@ def test_the_tile_dims_when_it_would_only_duplicate_a_version(qtbot):
 def test_hovering_the_dimmed_tile_outlines_the_version_it_would_duplicate_in_white(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_versions(_items(_versions(2)), add=EnhanceOffer("2x", 1))
+    versions.show_versions(_items(_versions(2)), add=EnhanceOffer({"enhance_scale": 2.0}, 1))
     (add_row,) = versions._host.findChildren(_AddRow)
     duplicate = versions._rows[1]._thumbnail
     point = QPointF(add_row.rect().center())
@@ -1755,7 +1753,7 @@ def test_a_missing_file_drags_without_a_thumbnail(qtbot, monkeypatch):
 def test_a_running_enhance_leads_the_strip(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_versions(_items(_versions(1)), RunningEnhancement("running", None, "2x"))
+    versions.show_versions(_items(_versions(1)), RunningEnhancement("running", None, {"enhance_scale": 2.0}))
     tiles = [tile for tile in versions._host.findChildren(QWidget) if isinstance(tile, (_PendingRow, _VersionRow))]
     assert isinstance(tiles[0], _PendingRow)
 
@@ -1763,7 +1761,7 @@ def test_a_running_enhance_leads_the_strip(qtbot):
 def test_a_first_enhance_brings_the_strip_out_on_its_own(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_versions(_items(_versions(0)), RunningEnhancement("queued", None, "2x"))
+    versions.show_versions(_items(_versions(0)), RunningEnhancement("queued", None, {"enhance_scale": 2.0}))
     assert not versions.isHidden()
 
 
@@ -1771,21 +1769,22 @@ def test_the_live_tile_names_the_settings_it_is_running_at(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.show_versions(_items(_versions(1)),
-                         RunningEnhancement("queued", None, "3x · 40 steps · 0.35 redraw"))
+                         RunningEnhancement("queued", None, {"enhance_scale": 3.0, "enhance_steps": 40, "enhance_denoise": 0.35}))
     texts = [lbl.text().replace("\u200b", "")
              for lbl in versions._pending.findChildren(QLabel)]
     assert "Queued…" in texts
-    assert any("40 steps" in t and "0.35 redraw" in t for t in texts)
+    assert [texts[texts.index(label) + 1] for label in (
+        "Upscale factor", "Enhance steps", "Enhance redraw amount")] == ["3x", "40", "0.35"]
     assert "3x · 40 steps · 0.35 redraw" in versions._pending.toolTip()
 
 
 def test_a_new_frame_updates_the_tile_without_a_rebuild(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_versions(_items(_versions(1)), RunningEnhancement("running", None, "2x"))
+    versions.show_versions(_items(_versions(1)), RunningEnhancement("running", None, {"enhance_scale": 2.0}))
     thumbnail = versions._pending
 
-    assert versions.update_pending(RunningEnhancement("running", b"not a real png", "2x")) is True
+    assert versions.update_pending(RunningEnhancement("running", b"not a real png", {"enhance_scale": 2.0})) is True
     assert versions._pending is thumbnail, (
         "a run streams frames several times a second, and rebuilding the strip on each "
         "would thrash its layout under the cursor mid-drag")
@@ -1885,7 +1884,7 @@ def test_the_panel_stays_as_it_is_while_anything_else_is_dragged(qtbot):
 def test_the_strip_folds_away_like_the_form_sections_above_it(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_versions(_items(_versions(1)), add=EnhanceOffer("2x", None))
+    versions.show_versions(_items(_versions(1)), add=EnhanceOffer({"enhance_scale": 2.0}, None))
 
     (section,) = versions.findChildren(CollapsibleSection)
     assert section._header.text() == "Enhancements"
@@ -1900,7 +1899,7 @@ def test_folding_survives_a_rebuild_for_another_image(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
     versions.set_collapsed(True)
-    versions.show_versions(_items(_versions(2)), add=EnhanceOffer("2x", None))
+    versions.show_versions(_items(_versions(2)), add=EnhanceOffer({"enhance_scale": 2.0}, None))
     assert versions.is_collapsed()
 
 
@@ -2640,10 +2639,10 @@ def test_a_second_load_clears_the_parts_the_first_one_ticked(qtbot):
 def test_a_new_frame_at_the_same_settings_leaves_the_rows_facts_in_place(qtbot):
     versions = EnhanceVersions()
     qtbot.addWidget(versions)
-    versions.show_versions(_items(_versions(1)), RunningEnhancement("running", None, "2x"))
+    versions.show_versions(_items(_versions(1)), RunningEnhancement("running", None, {"enhance_scale": 2.0}))
     facts = versions._pending.findChildren(QLabel)
 
-    versions.update_pending(RunningEnhancement("running", b"not a real png", "2x"))
+    versions.update_pending(RunningEnhancement("running", b"not a real png", {"enhance_scale": 2.0}))
 
     assert versions._pending.findChildren(QLabel) == facts, (
         "a run streams several frames a second, and each would otherwise rebuild the row under the cursor")
@@ -2712,11 +2711,11 @@ def _fix(part: str, *over: str, box=A_PLACE) -> dict:
     return {"part": part, "box": box, "over": list(over)}
 
 
-def _enhancement_with_fixes(*fixes, off=()):
+def _enhancement_with_fixes(*fixes, off=(), params=None):
     file = {"filename": "img.png", "fixes_kept": "run-1", "fixes": list(fixes)}
     if off:
         file["fixes_off"] = list(off)
-    return EnhanceVersion(1, "Enhancement 1/1", file, {"enhance_scale": 2.0})
+    return EnhanceVersion(1, "Enhancement 1/1", file, params or {"enhance_scale": 2.0})
 
 
 def _fix_boxes(versions) -> dict:
@@ -2731,22 +2730,83 @@ def _showing(qtbot, version) -> EnhanceVersions:
     return versions
 
 
-def test_an_enhancements_row_lists_its_fixes_each_with_a_checkbox_in_the_order_they_were_drawn(qtbot):
+def test_an_enhancements_row_lists_its_fixes_each_with_a_checkbox_the_last_one_drawn_first(qtbot):
     versions = _showing(qtbot, _enhancement_with_fixes(
         _fix("faces"), _fix("hands"), off=["hands"]))
 
     boxes = _fix_boxes(versions)
 
     assert [(name, box.isChecked(), box.isEnabled()) for name, box in boxes.items()] == [
-        ("Faces", True, True), ("Hands", False, True)]
+        ("Hands", False, True), ("Faces", True, True)]
 
 
-def test_an_enhancement_made_before_fixes_were_kept_shows_no_fix_checkboxes(qtbot):
+def _fix_lines(versions) -> list[list[str]]:
+    (row,) = _rows(versions)
+    lines = row.findChild(QWidget, "fixList").layout()
+    return [[lines.itemAtPosition(at, column).widget().text() for column in range(2)]
+            for at in range(lines.rowCount())]
+
+
+def test_each_fix_says_its_amount_and_its_lora_beside_its_checkbox_and_nowhere_else_in_the_row(
+        qtbot, titled_models):
+    titled_models({"steady_hands": "Steady Hands 1.0"})
+    versions = _showing(qtbot, _enhancement_with_fixes(_fix("faces"), _fix("hands"), params={
+        "enhance_scale": 2.0, "enhance_detail_fixes": {"faces": 0.45, "hands": 0.6},
+        "enhance_fix_prompts": {"hands": {"lora": "steady_hands.safetensors", "strength": 0.8}}}))
+
+    assert _fix_lines(versions) == [["Hands", "0.6 · Steady Hands 1.0 0.8"], ["Faces", "0.45"]]
+    assert _facts(_rows(versions)[0]).count("0.45") == 1
+
+
+def test_an_enhancement_made_before_fixes_were_kept_names_its_fixes_with_no_checkbox_and_says_why(
+        qtbot):
     versions = _showing(qtbot, EnhanceVersion(
         1, "Enhancement 1/1", {"filename": "img.png"},
-        {"enhance_scale": 2.0, "enhance_detail_fixes": {"faces": 0.4}}))
+        {"enhance_scale": 2.0, "enhance_detail_fixes": {"faces": 0.4, "hands": 0.5}}))
 
     assert _fix_boxes(versions) == {}
+    assert _fix_lines(versions) == [["Hands", "0.5"], ["Faces", "0.4"]]
+    (row,) = _rows(versions)
+    assert {label.toolTip() for label in row.findChild(QWidget, "fixList").findChildren(QLabel)} == {
+        "This enhancement was made before fixes were individually removable"}
+
+
+def test_the_fixes_keep_the_apps_own_background_while_their_row_is_picked(qtbot):
+    versions = _showing(qtbot, _enhancement_with_fixes(_fix("faces")))
+    (row,) = _rows(versions)
+
+    row.set_selected(True)
+
+    listed = row.findChild(QWidget, "fixList")
+    assert listed.testAttribute(Qt.WidgetAttribute.WA_StyledBackground)
+    assert f"background-color: {BG_PRIMARY.name()}" in listed.styleSheet(), (
+        "a checkbox and its grayed word are drawn for the app's own background, and on a picked "
+        "row's blue the word could not be read and a checked box could not be seen")
+    fixes_label = next(label for label in row.findChildren(QLabel) if label.text() == "Fixes")
+    assert TEXT_PRIMARY.name() in fixes_label.styleSheet()
+
+
+def test_every_cell_of_the_file_line_shares_one_middle(qtbot, tmp_path):
+    versions = EnhanceVersions()
+    qtbot.addWidget(versions)
+    versions.show_versions([(_versions(1, {"enhance_scale": 2.0})[0], _an_image(tmp_path / "e1.png")),
+                            (_versions(1)[1], None)])
+    versions.resize(900, 600)
+    versions.show()
+    row = _rows(versions)[0]
+    row.layout().activate()
+    facts = row._facts
+    line = next(at for at in range(facts.rowCount())
+                if (cell := facts.itemAtPosition(at, 0)) is not None
+                and getattr(cell.widget(), "text", lambda: "")() == "File")
+    cells = [facts.itemAtPosition(line, column).widget() for column in range(facts.columnCount())
+             if facts.itemAtPosition(line, column) is not None]
+
+    assert len(cells) >= 4
+    middles = [cell.geometry().center().y() for cell in cells]
+    assert max(middles) - min(middles) <= 1, (
+        "the label, the text and buttons of two heights were laid at the top, the middle and "
+        "the bottom of one line")
 
 
 def test_unchecking_a_fix_asks_for_it_to_be_switched_off_on_that_enhancement(qtbot):
@@ -2767,6 +2827,14 @@ def test_a_fix_with_another_drawn_over_it_is_grayed_and_says_which_to_turn_off_f
 
     assert (faces.isChecked(), faces.isEnabled()) == (True, False)
     assert faces.toolTip() == "Eyes was drawn over part of this fix. Turn off Eyes first."
+
+
+def test_a_fix_with_several_drawn_over_it_names_them_all_as_a_list(qtbot):
+    versions = _showing(qtbot, _enhancement_with_fixes(
+        _fix("faces"), _fix("eyes", "faces"), _fix("skin", "faces"), _fix("hair", "faces")))
+
+    assert _fix_boxes(versions)["Faces"].toolTip() == (
+        "Eyes, Skin and Hair were drawn over part of this fix. Turn off Eyes, Skin and Hair first.")
 
 
 def test_an_off_fix_drawn_over_another_off_fix_is_grayed_and_says_which_to_turn_on_first(qtbot):

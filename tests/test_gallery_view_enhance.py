@@ -439,12 +439,12 @@ def test_a_running_enhance_shows_in_the_strip_of_the_tab_showing_that_image(qtbo
     assert tab._versions._host.findChildren(_PendingRow)
     (job,) = view._live_jobs.values()
     view._client.preview_image.emit(job.prompt_id, b"a frame")
-    status, frame, settings = tab._pending_enhancement
+    status, frame, params = tab._pending_enhancement
     assert (status, frame) == ("running", b"a frame")
-    assert settings.startswith("2x · 20 steps · 0.15 redraw")
+    assert gallery.describe_enhance_params(params).startswith("2x · 20 steps · 0.15 redraw")
 
     view.enhance_items(["g1"])
-    assert tab._pending_enhancement == ("queued", None, settings)
+    assert tab._pending_enhancement == ("queued", None, params)
 
 
 def test_each_tab_reads_its_own_image_out_of_a_batch_of_enhances(qtbot, tmp_path):
@@ -466,10 +466,8 @@ def test_each_tab_reads_its_own_image_out_of_a_batch_of_enhances(qtbot, tmp_path
     assert view.enhance.run_of(db.get_generation("g1")).status == "queued"
 
     view._client.preview_image.emit(leader.prompt_id, b"a frame")
-    assert first._pending_enhancement == (
-        "running", b"a frame", gallery.describe_enhance_params(leader.params))
-    assert second._pending_enhancement == (
-        "queued", None, gallery.describe_enhance_params(follower.params))
+    assert first._pending_enhancement == ("running", b"a frame", leader.params)
+    assert second._pending_enhancement == ("queued", None, follower.params)
 
 
 def test_a_running_enhance_also_streams_onto_the_images_own_tile(qtbot, tmp_path):

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from functools import cache
 
 from origenerator.model_titles import model_title
 from origenerator.workflows import WORKFLOW_REGISTRY
-from origenerator.workflows.detail_parts import detail_fixes_of, fix_prompts
+from origenerator.workflows.detail_parts import detail_fixes_of, fix_prompts, part_table
 
 ENHANCE_WORKFLOW = "image_enhance"
 
@@ -83,21 +84,54 @@ class EnhanceSettings:
 
 
 def describe_enhance_params(params: dict) -> str:
-    bits = []
+    said = _settings_said(params)
+    fixes = detail_fixes_of(params)
+    bits = [
+        said.get("enhance_scale"),
+        f"{said['enhance_steps']} steps" if "enhance_steps" in said else None,
+        f"{said['enhance_denoise']} redraw" if "enhance_denoise" in said else None,
+        " & ".join(f"{name} {value:g}" for name, value in fixes.items()),
+        said.get("checkpoint"),
+    ]
+    return " · ".join(bit for bit in bits if bit)
+
+
+def enhance_settings_fields(params: dict) -> list[tuple[str, str]]:
+    labels = _labels_on_the_enhance_pane()
+    return [(labels[key], value) for key, value in _settings_said(params).items()]
+
+
+def fix_details(params: dict) -> dict[str, str]:
+    amounts = detail_fixes_of(params)
+    prompts = fix_prompts(params)
+    drawn_in_order = [part.name for part in part_table() if part.name in amounts]
+    return {name: _fix_detail(amounts[name], prompts.get(name, {}))
+            for name in [*drawn_in_order, *(name for name in amounts if name not in drawn_in_order)]}
+
+
+def _fix_detail(amount: float, own: dict) -> str:
+    lora = own.get("lora")
+    return f"{amount:g} · {model_title(lora)} {own['strength']:g}" if lora else f"{amount:g}"
+
+
+def _settings_said(params: dict) -> dict[str, str]:
+    said = {}
     scale = params.get("enhance_scale")
     if scale is not None:
-        bits.append(f"{float(scale):g}x")
+        said["enhance_scale"] = f"{float(scale):g}x"
     steps = params.get("enhance_steps")
     if steps is not None:
-        bits.append(f"{steps} steps")
+        said["enhance_steps"] = str(steps)
     denoise = params.get("enhance_denoise")
     if denoise is not None:
-        bits.append(f"{float(denoise):g} redraw")
-    fixes = detail_fixes_of(params)
-    if fixes:
-        bits.append(" & ".join(f"{name} {value:g}"
-                               for name, value in fixes.items()))
+        said["enhance_denoise"] = f"{float(denoise):g}"
     checkpoint = params.get("checkpoint")
     if checkpoint and checkpoint != MATCH_SOURCE_MODEL:
-        bits.append(model_title(checkpoint))
-    return " · ".join(bits)
+        said["checkpoint"] = model_title(checkpoint)
+    return said
+
+
+@cache
+def _labels_on_the_enhance_pane() -> dict[str, str]:
+    return {definition.key: definition.label
+            for definition in WORKFLOW_REGISTRY[ENHANCE_WORKFLOW].param_definitions()}

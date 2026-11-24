@@ -16,11 +16,12 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.colors import BG_PRIMARY, TEXT_PRIMARY, YELLOW
+from shared_ui.colors import BG_PRIMARY, TEXT_MUTED, TEXT_PRIMARY, YELLOW
 from shared_ui.icons import icon_pixmap
 from shared_ui.spacing import BUTTON_RADIUS, GAP_MEDIUM, GAP_SMALL
 from shared_ui.tick_control import TickControl
 
+from origenerator.gallery import describe_enhance_params, enhance_settings_fields, fix_details
 from origenerator.generation_metadata import UNDATED, Dating, MetadataItem, created_item, file_item
 from origenerator.gui import icons, palette
 from origenerator.gui.collapsible_section import CollapsibleSection
@@ -31,6 +32,7 @@ from origenerator.gui.metadata_section import label_column_width, metadata_cells
 from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.param_fields import NOT_KNOWN
 from origenerator.gui.picking import Picking
+from origenerator.gui.text_color import color_text
 from origenerator.gui.thumbnail_box import THUMBNAIL_BOX, fitted_in_the_box
 
 ENHANCE_VERSION_MIME = "application/x-origenerator-enhance-version"
@@ -40,14 +42,17 @@ _PENDING_BORDER = f"2px solid {palette.IN_FLIGHT_BORDER}"
 _MATCH_BORDER = f"2px solid {palette.MATCH_BORDER}"
 _VALUE_COLUMN = 1
 _FIXES = "Fixes"
-_FACT_KEYS = ("Enhancement", _FIXES, "File", "Created")
+_FACTS_OF_A_FILE = ("File", "Created")
 _FOUND_NOTHING = "This fix found nothing to redraw in this image"
+_MADE_BEFORE_FIXES_WERE_KEPT = "This enhancement was made before fixes were individually removable"
 # The app's global QWidget background paints every label opaque over the row's fill.
 _ROW_CSS = "#versionRow QLabel { background-color: transparent; }"
 _SELECTED_ROW_CSS = (
     f"#versionRow {{ background-color: {palette.SELECTED_FILL}; border-radius: {BUTTON_RADIUS}px; }}"
     + _ROW_CSS
 )
+_FIX_LIST_CSS = (
+    f"#fixList {{ background-color: {BG_PRIMARY.name()}; border-radius: {BUTTON_RADIUS}px; }}")
 _PICKED_FACT_CSS = f"color: {TEXT_PRIMARY.name()};"
 _ADD_TILE_CSS = f"background-color: {YELLOW.name()}; border-radius: {BUTTON_RADIUS}px;"
 _ARROW_STEPS = {Qt.Key.Key_Up: -1, Qt.Key.Key_Left: -1,
@@ -79,17 +84,20 @@ def _pass_mouse_through(widget) -> None:
 
 
 def _named(parts) -> str:
-    return " and ".join(part.capitalize() for part in parts)
+    *earlier, last = (part.capitalize() for part in parts)
+    return f"{', '.join(earlier)} and {last}" if earlier else last
 
 
 def _fix_tooltip(switch) -> str:
     if not switch.redrew_something:
         return _FOUND_NOTHING
-    held_by = _named(switch.held_by)
-    if held_by and switch.on:
-        return f"{held_by} was drawn over part of this fix. Turn off {held_by} first."
-    if held_by:
-        return f"This fix was drawn over part of {held_by}. Turn on {held_by} first."
+    if switch.held_by and switch.on:
+        were = "was" if len(switch.held_by) == 1 else "were"
+        return (f"{_named(switch.held_by)} {were} drawn over part of this fix. "
+                f"Turn off {_named(switch.held_by)} first.")
+    if switch.held_by:
+        return (f"This fix was drawn over part of {_named(switch.held_by)}. "
+                f"Turn on {_named(switch.held_by)} first.")
     return ("Uncheck to take this fix off the image" if switch.on
             else "Check to put this fix back on the image")
 
@@ -97,12 +105,24 @@ def _fix_tooltip(switch) -> str:
 class RunningEnhancement(NamedTuple):
     status: str
     frame: bytes | None
-    settings: str = ""
+    params: dict | None = None
 
 
 class EnhanceOffer(NamedTuple):
-    settings: str
+    params: dict
     duplicate_of: object = None
+
+
+def _fact_label_width() -> int:
+    labels = [label for label, _value in enhance_settings_fields(
+        {"enhance_scale": 1, "enhance_steps": 1, "enhance_denoise": 0, "checkpoint": "any"})]
+    return label_column_width([MetadataItem(label, "") for label in (*labels, _FIXES, *_FACTS_OF_A_FILE)])
+
+
+def _named_fix(name: str) -> QLabel:
+    label = QLabel(name.capitalize())
+    _pass_mouse_through(label)
+    return label
 
 
 class _Row(QWidget):
@@ -180,31 +200,79 @@ class _Row(QWidget):
         self._wrapped = wrapped
         self.updateGeometry()
 
-    def _show_facts(self, items: list[MetadataItem],
-                    beside_copy: QWidget | None = None) -> None:
+    def _show_settings(self, params: dict, fix_controls=None) -> int:
+        self._clear_facts()
+        line = self._add_facts([MetadataItem(label, value)
+                                for label, value in enhance_settings_fields(params)], line=1)
+        details = fix_details(params)
+        listed = (fix_controls(details) if fix_controls is not None
+                  else [(_named_fix(name), detail) for name, detail in details.items()])
+        return self._add_fixes(listed[::-1], line)
+
+    def _clear_facts(self) -> None:
         for widget in self._fact_cells:
             self._facts.removeWidget(widget)
             widget.setParent(None)
             widget.deleteLater()
         self._fact_cells = []
         self._resting_ink = {}
-        key_width = label_column_width([MetadataItem(key, "") for key in _FACT_KEYS])
-        for line, item in enumerate(items, start=1):
+
+    def _add_facts(self, items: list[MetadataItem], line: int,
+                   beside_copy: QWidget | None = None) -> int:
+        key_width = _fact_label_width()
+        for at, item in enumerate(items, start=line):
             label, value, copy, reveal = metadata_cells(item, key_width)
             beside = (beside_copy,) if beside_copy is not None and copy is not None else ()
             for column, widget in enumerate((label, value, copy, *beside, reveal)):
                 if widget is None:
                     continue
-                if isinstance(widget, QLabel):
-                    _pass_mouse_through(widget)
                 if column == _VALUE_COLUMN:
-                    self._facts.addWidget(widget, line, column)
+                    self._facts.addWidget(widget, at, column)
                 else:
-                    self._facts.addWidget(widget, line, column,
-                                          Qt.AlignmentFlag.AlignTop)
-                self._fact_cells.append(widget)
-                if isinstance(widget, QLabel):
-                    self._resting_ink[widget] = widget.styleSheet()
+                    self._facts.addWidget(widget, at, column, Qt.AlignmentFlag.AlignVCenter)
+                self._keep_fact(widget)
+        return line + len(items)
+
+    def _add_fixes(self, drawn_last_first: list[tuple[QWidget, str]], line: int) -> int:
+        if not drawn_last_first:
+            return line
+        listed = QWidget()
+        listed.setObjectName("fixList")
+        listed.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        listed.setStyleSheet(_FIX_LIST_CSS)
+        lines = QGridLayout(listed)
+        lines.setContentsMargins(GAP_SMALL, GAP_SMALL, GAP_SMALL, GAP_SMALL)
+        lines.setHorizontalSpacing(GAP_MEDIUM)
+        lines.setVerticalSpacing(GAP_SMALL)
+        lines.setColumnStretch(1, 1)
+        for at, (control, detail) in enumerate(drawn_last_first):
+            said = QLabel(detail)
+            said.setToolTip(control.toolTip())
+            color_text(said, TEXT_MUTED)
+            _pass_mouse_through(said)
+            lines.addWidget(control, at, 0, Qt.AlignmentFlag.AlignVCenter)
+            lines.addWidget(said, at, 1, Qt.AlignmentFlag.AlignVCenter)
+        label = metadata_cells(MetadataItem(_FIXES, ""), _fact_label_width())[0]
+        label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        label.setFixedHeight(drawn_last_first[0][0].sizeHint().height())
+        beside_the_first = QWidget()
+        above = QVBoxLayout(beside_the_first)
+        above.setContentsMargins(0, GAP_SMALL, 0, 0)
+        above.addWidget(label)
+        above.addStretch(1)
+        _pass_mouse_through(beside_the_first)
+        self._facts.addWidget(beside_the_first, line, 0)
+        self._facts.addWidget(listed, line, _VALUE_COLUMN, 1, -1)
+        self._fact_cells += [beside_the_first, listed]
+        _pass_mouse_through(label)
+        self._resting_ink[label] = label.styleSheet()
+        return line + 1
+
+    def _keep_fact(self, widget: QWidget) -> None:
+        self._fact_cells.append(widget)
+        if isinstance(widget, QLabel):
+            _pass_mouse_through(widget)
+            self._resting_ink[widget] = widget.styleSheet()
 
     def _show_thumbnail(self, pixmap: QPixmap) -> None:
         self._thumbnail.setPixmap(fitted_in_the_box(pixmap))
@@ -269,18 +337,15 @@ class _VersionRow(_Row):
         self._drag_thumbnail = QPixmap()
         if thumbnails is not _STILL_COMING:
             self.take_thumbnails(thumbnails)
-        items = []
-        if version.settings:
-            items.append(MetadataItem("Enhancement", version.settings))
-        items.append(file_item(version.file, held_days=dating.held_days))
-        items.append(created_item(version.file, dating.created_fallback))
         trash = None
         if deletable:
             trash = IconButton(icons.delete_icon(), "Delete this version", "deleteButton")
             trash.clicked.connect(
                 lambda _checked=False: self.delete_pressed.emit(self._position))
-        self._show_facts(items, beside_copy=trash)
-        self._show_fixes(version.fixes, line=len(items) + 1)
+        line = self._show_settings(self._params, lambda details: self._fix_controls(version, details))
+        self._add_facts([file_item(version.file, held_days=dating.held_days),
+                         created_item(version.file, dating.created_fallback)],
+                        line, beside_copy=trash)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -304,25 +369,25 @@ class _VersionRow(_Row):
             self._thumbnail.setText(NOT_KNOWN)
             self._thumbnail.setToolTip("This version's file is no longer on disk")
 
-    def _show_fixes(self, switches, line: int) -> None:
-        if not switches:
-            return
-        key_width = label_column_width([MetadataItem(key, "") for key in _FACT_KEYS])
-        label = metadata_cells(MetadataItem(_FIXES, ""), key_width)[0]
-        _pass_mouse_through(label)
-        self._facts.addWidget(label, line, 0, Qt.AlignmentFlag.AlignTop)
-        listed = QVBoxLayout()
-        listed.setContentsMargins(0, 0, 0, 0)
-        listed.setSpacing(GAP_SMALL)
-        for switch in switches:
-            box = TickControl(switch.part.capitalize())
-            box.setChecked(switch.on)
-            box.setEnabled(switch.can_be_switched)
-            box.setToolTip(_fix_tooltip(switch))
-            box.clicked.connect(lambda on, part=switch.part:
-                                self.fix_switched.emit(self._position, part, on))
-            listed.addWidget(box, 0, Qt.AlignmentFlag.AlignLeft)
-        self._facts.addLayout(listed, line, _VALUE_COLUMN)
+    def _fix_controls(self, version, details: dict[str, str]) -> list[tuple[QWidget, str]]:
+        if version.fixes:
+            return [(self._fix_box(switch), details.get(switch.part, ""))
+                    for switch in version.fixes]
+        made_before = []
+        for name, detail in details.items():
+            named = _named_fix(name)
+            named.setToolTip(_MADE_BEFORE_FIXES_WERE_KEPT)
+            made_before.append((named, detail))
+        return made_before
+
+    def _fix_box(self, switch) -> TickControl:
+        box = TickControl(switch.part.capitalize())
+        box.setChecked(switch.on)
+        box.setEnabled(switch.can_be_switched)
+        box.setToolTip(_fix_tooltip(switch))
+        box.clicked.connect(lambda on, part=switch.part:
+                            self.fix_switched.emit(self._position, part, on))
+        return box
 
     def set_highlighted(self, on: bool) -> None:
         self._thumbnail.setStyleSheet(
@@ -350,7 +415,7 @@ class _PendingRow(_Row):
             f"background-color: transparent; border: {_PENDING_BORDER};"
             f" border-radius: {BUTTON_RADIUS}px;"
         )
-        self._settings = ""
+        self._settings: dict | None = None
         self.setToolTip("An enhancement of this image is being generated")
 
     def update_pending(self, pending: RunningEnhancement):
@@ -361,12 +426,13 @@ class _PendingRow(_Row):
             self._thumbnail.setText(
                 "Generating…" if pending.status == JobState.RUNNING else "Queued…"
             )
-        if pending.settings != self._settings:
-            self._settings = pending.settings
-            self._show_facts([MetadataItem("Enhancement", pending.settings)] if pending.settings else [])
+        if pending.params != self._settings:
+            self._settings = pending.params
+            self._show_settings(pending.params or {})
+        settings = describe_enhance_params(pending.params or {})
         self.setToolTip(
-            f"An enhancement of this image is being generated at {pending.settings}"
-            if pending.settings else "An enhancement of this image is being generated"
+            f"An enhancement of this image is being generated at {settings}"
+            if settings else "An enhancement of this image is being generated"
         )
 
 
@@ -374,13 +440,13 @@ class _AddRow(_Row):
     clicked = Signal()
     hovered = Signal(bool)
 
-    def __init__(self, settings: str, duplicate_of: int | None, parent=None):
+    def __init__(self, params: dict, duplicate_of: int | None, parent=None):
         super().__init__("Enhance", parent)
         self._enabled = duplicate_of is None
         self._thumbnail.setStyleSheet(_ADD_TILE_CSS)
         self._thumbnail.setPixmap(icon_pixmap("plus", _PLUS, BG_PRIMARY))
-        if settings:
-            self._show_facts([MetadataItem("Enhancement", settings)])
+        self._show_settings(params)
+        settings = describe_enhance_params(params)
         # Opacity rather than setEnabled: Qt delivers no mouse events to a disabled widget, and the hover is the point.
         if not self._enabled:
             effect = QGraphicsOpacityEffect(self)
@@ -465,7 +531,7 @@ class EnhanceVersions(QWidget):
             self._pending.update_pending(pending)
             column.addWidget(self._pending)
         elif add is not None:
-            self._enhance_row = _AddRow(add.settings, add.duplicate_of)
+            self._enhance_row = _AddRow(add.params, add.duplicate_of)
             self._enhance_row.clicked.connect(self.enhance_requested)
             self._enhance_row.hovered.connect(
                 lambda on, at=add.duplicate_of: self._highlight_version(at, on))

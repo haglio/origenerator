@@ -44,7 +44,6 @@ from origenerator.gallery import (
     EnhanceSettings,
     config_folder_key,
     config_folder_name,
-    describe_enhance_params,
     displayed_versions,
     enhance_params_for,
     item_type_of,
@@ -1705,7 +1704,7 @@ class GenerateTab(DropZones):
 
     def _add_row_for(self, row: dict) -> EnhanceOffer:
         params = enhance_params_for(row, self._enhance_settings)
-        return EnhanceOffer(describe_enhance_params(params or {}),
+        return EnhanceOffer(params or {},
                             version_matching_settings(row, self._enhance_settings))
 
     @staticmethod

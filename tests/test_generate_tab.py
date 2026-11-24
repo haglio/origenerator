@@ -1875,7 +1875,7 @@ def test_a_levels_facts_sit_one_gap_after_their_longest_key_as_a_field_after_its
     tab.resize(1200, 1400)
     tab.show()
     tab.layout().activate()
-    facts = next(row for row in _version_rows(tab) if "Enhancement" in _row_texts(row))._facts
+    facts = next(row for row in _version_rows(tab) if "Upscale factor" in _row_texts(row))._facts
     lines = [line for line in range(1, facts.rowCount()) if facts.itemAtPosition(line, 1)]
     keys = [facts.itemAtPosition(line, 0).widget() for line in lines]
     values = [facts.itemAtPosition(line, 1).widget() for line in lines]
@@ -1884,14 +1884,14 @@ def test_a_levels_facts_sit_one_gap_after_their_longest_key_as_a_field_after_its
     assert {value.x() - (key.x() + longest) for key, value in zip(keys, values, strict=True)} == {GAP_MEDIUM}
 
 
-def test_a_levels_fact_that_wraps_keeps_its_key_level_with_the_values_first_line(saved_panel):
+def test_a_levels_fact_that_wraps_keeps_its_key_and_buttons_at_its_middle(saved_panel):
     tab, db = saved_panel
     image = _enhanced_image_row(db)
     tab.show_saved_generation(image, [image])
     tab.resize(300, 1400)
     tab.show()
     tab.layout().activate()
-    facts = next(row for row in _version_rows(tab) if "Enhancement" in _row_texts(row))._facts
+    facts = next(row for row in _version_rows(tab) if "Upscale factor" in _row_texts(row))._facts
     line = max((line for line in range(1, facts.rowCount()) if facts.itemAtPosition(line, 1)),
                key=lambda line: facts.itemAtPosition(line, 1).widget().height())
     cells = [facts.itemAtPosition(line, column).widget() for column in range(facts.columnCount())
@@ -1900,8 +1900,10 @@ def test_a_levels_fact_that_wraps_keeps_its_key_level_with_the_values_first_line
     beside = [cell for cell in cells if cell is not value]
 
     assert value.height() > max(cell.sizeHint().height() for cell in beside)
-    assert {(cell.y(), cell.height() - cell.sizeHint().height()) for cell in beside} == {(value.y(), 0)}, (
-        "a key and a button sit at the top of a line the value has grown taller than")
+    middle = value.geometry().center().y()
+    assert all(abs(cell.geometry().center().y() - middle) <= 1
+               and cell.height() == cell.sizeHint().height() for cell in beside), (
+        "a key and a button sit at the middle of a line the value has grown taller than")
 
 
 def test_an_unenhanced_image_still_shows_its_original_and_the_add_tile(saved_panel):
@@ -1994,9 +1996,7 @@ def test_an_enhanced_image_lists_its_levels_newest_first(saved_panel):
     rows = _version_rows(tab)
     first = " / ".join(t for t in _row_texts(rows[0]) if t and t != "—")
     assert first.startswith("Enhancement 1/1")
-    assert "2x" in first
-    assert "20 steps" in first
-    assert "0.15 redraw" in first
+    assert "Upscale factor / 2x / Enhance steps / 20 / Enhance redraw amount / 0.15" in first
     assert "Original" in _row_texts(rows[1])
 
 
@@ -2049,7 +2049,7 @@ def test_an_enhancement_in_flight_shows_in_the_strip(saved_panel):
     tab.show_saved_generation(image, [image])
     assert not tab._versions._host.findChildren(_PendingRow)
 
-    tab.set_pending_enhancement(RunningEnhancement("running", None, "2x · 20 steps · 0.15 redraw"))
+    tab.set_pending_enhancement(RunningEnhancement("running", None, {"enhance_scale": 2.0, "enhance_steps": 20, "enhance_denoise": 0.15}))
 
     assert not tab._versions.isHidden()
     assert tab._versions._host.findChildren(_PendingRow)
@@ -2074,7 +2074,7 @@ def test_a_running_enhancement_streams_into_the_preview(saved_panel, tmp_path,
     tab._viewport.show_frame = MagicMock()
     tab._viewport.show_media.reset_mock()
 
-    tab.set_pending_enhancement(RunningEnhancement("running", b"\x89PNG-ish", "2x"))
+    tab.set_pending_enhancement(RunningEnhancement("running", b"\x89PNG-ish", {"enhance_scale": 2.0}))
     shown = tab._viewport.show_frame.call_args_list
     assert shown == [((b"\x89PNG-ish",), {"enhancing": True})], (
         "the preview at the top of the tab is where this app shows what is being made, and an "
@@ -3215,11 +3215,11 @@ def test_an_enhancement_streaming_in_leaves_the_mark_standing(saved_panel, tmp_p
     tab.show_saved_generation(image, [image])
     _set_prompt(tab, "a dog")
 
-    tab.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path), "2x"))
+    tab.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path), {"enhance_scale": 2.0}))
 
     assert _message(tab) == "(not yet generated with modifications)"
 
-    tab.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path, 10), "2x"))
+    tab.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path, 10), {"enhance_scale": 2.0}))
 
     assert _message(tab) == "(not yet generated with modifications)"
 
@@ -3236,7 +3236,7 @@ def test_the_enhancement_landing_leaves_the_mark_standing(saved_panel, tmp_path,
     image = _image_row(db, "img1", prompt="a cat")
     tab.show_saved_generation(image, [image])
     _set_prompt(tab, "a dog")
-    tab.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path), "2x"))
+    tab.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path), {"enhance_scale": 2.0}))
 
     enhanced = _fold_enhancement(db, "img1")
     tab.refresh_displayed(enhanced, [enhanced])
@@ -3252,7 +3252,7 @@ def _shown_again(tab, image, _tmp_path):
 
 
 def _enhanced_to_the_end(tab, _image, tmp_path):
-    tab.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path), "2x"))
+    tab.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path), {"enhance_scale": 2.0}))
     tab.set_pending_enhancement(None)
 
 
@@ -4193,7 +4193,7 @@ def test_an_enhancement_streaming_into_the_preview_keeps_its_corners(
     image = _image_row(db, "img1")
     tab.show_saved_generation(image, [image])
 
-    tab.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path), "2x"))
+    tab.set_pending_enhancement(RunningEnhancement("running", _frame_bytes(tmp_path), {"enhance_scale": 2.0}))
 
     assert tab._viewport.actions_id() == "img1"
 

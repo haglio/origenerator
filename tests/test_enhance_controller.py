@@ -703,8 +703,6 @@ def test_the_tile_the_version_list_and_the_slideshow_all_learn_of_a_run(enhance,
                                                                         monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
-    monkeypatch.setattr(module.gallery, "describe_enhance_params",
-                        lambda params: "upscale x2")
     row = _image("i1")
     tab = FakeGenerateTab(row)
     gallery_pane, slideshows = FakeGalleryPane(), FakeSlideshows()
@@ -714,7 +712,7 @@ def test_the_tile_the_version_list_and_the_slideshow_all_learn_of_a_run(enhance,
 
     controller.reconcile()
 
-    assert tab.pending == ("running", b"frame", "upscale x2"), (
+    assert tab.pending == ("running", b"frame", {"input_image": "one.png"}), (
         "a tab holds none of the gallery's jobs, so the controller makes the match and tells "
         "the tab what is being made of its image")
     assert set(gallery_pane.enhancing) == {"i1"}
@@ -1346,11 +1344,9 @@ def test_a_spoken_enhance_still_takes_the_panes_settings(enhance, monkeypatch, s
     assert params["enhance_steps"] == 35
 
 
-def test_a_run_is_described_by_its_jobs_settings_not_the_panes(enhance, monkeypatch, stored):
+def test_a_run_shows_its_jobs_settings_not_the_panes(enhance, monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
-    monkeypatch.setattr(module.gallery, "describe_enhance_params",
-                        lambda params: f"at {params.get('enhance_scale')}")
     row = _image("i1")
     tab = FakeGenerateTab(row)
     launched = FakeJob("run-a")
@@ -1362,7 +1358,7 @@ def test_a_run_is_described_by_its_jobs_settings_not_the_panes(enhance, monkeypa
 
     controller.reconcile()
 
-    assert tab.pending[2] == "at 3", (
+    assert tab.pending[2]["enhance_scale"] == 3, (
         "the Enhance pane may have moved on since the run was launched, so the job's own settings "
         "are the only true word on what is being made")
 
@@ -1370,7 +1366,6 @@ def test_a_run_is_described_by_its_jobs_settings_not_the_panes(enhance, monkeypa
 def test_a_generate_pane_built_after_the_controller_still_hears_of_a_run(enhance, monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
-    monkeypatch.setattr(module.gallery, "describe_enhance_params", lambda params: "upscale x2")
     row = _image("i1")
     built_later = []
     parts = EnhanceParts(jobs=FakeReroll([FakeJob("run-a")]), gallery_pane=FakeGalleryPane(),
@@ -1382,7 +1377,7 @@ def test_a_generate_pane_built_after_the_controller_still_hears_of_a_run(enhance
 
     controller.reconcile()
 
-    assert tab.pending == ("running", b"frame", "upscale x2"), (
+    assert tab.pending == ("running", b"frame", {"input_image": "one.png"}), (
         "the tabs are built by the window's own layout after the controller, so they are asked "
         "for at each run rather than held from the start")
 
@@ -1390,7 +1385,6 @@ def test_a_generate_pane_built_after_the_controller_still_hears_of_a_run(enhance
 def test_a_tiles_cancel_clears_the_generate_tabs_waiting_row(enhance, monkeypatch, stored):
     monkeypatch.setattr(module.gallery, "enhance_run_targets_row",
                         lambda target, image, row: True)
-    monkeypatch.setattr(module.gallery, "describe_enhance_params", lambda params: "upscale x2")
     row = _image("i1")
     tab = FakeGenerateTab(row)
     jobs = FakeReroll([FakeJob("run-a")])
@@ -1399,7 +1393,7 @@ def test_a_tiles_cancel_clears_the_generate_tabs_waiting_row(enhance, monkeypatc
                          slideshows=FakeSlideshows(), info_tabs_of=lambda: FakeTabs([tab]))
     controller, _host = _assembled(FakeHost(rows=[row]), parts, stored())
     controller.reconcile()
-    assert tab.pending == ("running", b"frame", "upscale x2")
+    assert tab.pending == ("running", b"frame", {"input_image": "one.png"})
 
     controller.cancel_for([row])
 

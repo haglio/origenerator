@@ -83,14 +83,17 @@ def test_a_second_image_from_the_site_takes_the_next_number(library):
     assert names == ["madeup_image_00001_.webp", "madeup_image_00002_.webp"]
 
 
-def test_an_address_that_names_no_kind_of_image_is_kept_as_the_kind_the_site_sends(library):
+def test_an_image_is_kept_as_the_kind_of_file_it_is_whatever_its_address_says(library):
     db, folders = library
     prompt_id = site_items.begin(db, A_SITES_IMAGES, ASKED)
+    as_a_png = io.BytesIO()
+    Image.new("RGB", (90, 120)).save(as_a_png, "PNG")
 
-    site_items.take_in(db, prompt_id, Made("https://example.com/made/a"), _webp(), folders)
+    site_items.take_in(db, prompt_id, Made("https://example.com/made/a"), as_a_png.getvalue(),
+                       folders)
 
     assert parse_file_list(db.get_generation(prompt_id)["output_files"])[0]["filename"].endswith(
-        ".webp")
+        ".png")
 
 
 def test_an_image_whose_item_was_deleted_meanwhile_is_not_filed(library):

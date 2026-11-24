@@ -130,6 +130,17 @@ def test_an_image_that_cannot_be_downloaded_fails(making):
     assert heard["failed"] == [(KEY, why_in_words("madeup", NOT_DOWNLOADED))]
 
 
+def test_a_download_that_is_no_image_fails_before_anything_is_filed(making):
+    generations, db, later, heard = making(FakeSite(Made("https://example.com/a.webp")),
+                                           lambda address: b"<html>not found</html>")
+
+    (prompt_id,) = generations.start_batch(KEY, _its_images(), [ASKED])
+    later.run_one()
+
+    assert heard["failed"] == [(KEY, why_in_words("madeup", NOT_DOWNLOADED))]
+    assert db.get_generation(prompt_id)["status"] == GenerationStatus.ERROR
+
+
 def test_an_image_deleted_while_the_site_made_it_ends_without_a_word(making):
     generations, db, later, heard = making(FakeSite(Made("https://example.com/a.webp")))
     (prompt_id,) = generations.start_batch(KEY, _its_images(), [ASKED])

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import time
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -637,12 +637,11 @@ def test_reconnect_resumes_the_elapsed_count_from_the_real_start(qtbot, tmp_path
     assert job.started_at == began
 
 
-def test_a_run_comfyui_starts_before_its_send_returns_keeps_its_real_start(
-        qtbot, tmp_path, monkeypatch):
+def test_a_run_comfyui_starts_before_its_send_returns_keeps_its_real_start(qtbot, tmp_path):
     client = _client()
-    job = GenerationJob(client, JobSpec(SDXL, _params_with_the_two_sampler_enhance_tail(), prompt_id="comfy-A"), JobFolders(places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs"))
     now = [100.0]
-    monkeypatch.setattr(generation_job_module, "time", SimpleNamespace(time=lambda: now[0]))
+    job = GenerationJob(client, JobSpec(SDXL, _params_with_the_two_sampler_enhance_tail(), prompt_id="comfy-A"), JobFolders(places=OutputPlaces.in_one_folder(tmp_path), thumb_dir=tmp_path / "thumbs"),
+                        clock=lambda: now[0])
 
     def send_that_returns_later(payload, prompt_id):
         client.progress.emit(prompt_id, "5", 1, 50)
@@ -928,3 +927,57 @@ def test_a_server_that_cannot_be_asked_after_the_stopped_run_is_taken_to_hold_no
     client.submit_job.assert_called_once_with(job.payload, "comfy-A")
     client.forget_history.assert_not_called()
     assert job.state == "queued"
+
+
+def _job_on_a_clock(tmp_path, now):
+    client = _client()
+    job = GenerationJob(client, JobSpec(SDXL, SDXL.default_params(), prompt_id="comfy-A"),
+                        JobFolders(places=OutputPlaces.in_one_folder(tmp_path),
+                                   thumb_dir=tmp_path / "thumbs"),
+                        clock=lambda: now[0])
+    job.start()
+    return job, client
+
+
+def _job_lines(caplog) -> list[str]:
+    return [record.getMessage() for record in caplog.records
+            if record.getMessage().startswith("Job ")]
+
+
+def test_a_job_says_when_it_begins_running_in_comfyui_and_once_only(qtbot, tmp_path, caplog):
+    _job, client = _job_on_a_clock(tmp_path, [100.0])
+
+    with caplog.at_level(logging.INFO, logger="origenerator.gui.generation_job"):
+        client.node_executing.emit("comfy-A", "5")
+        client.progress.emit("comfy-A", "5", 1, 20)
+
+    assert _job_lines(caplog) == ["Job running in ComfyUI: comfy-A"]
+
+
+@pytest.mark.parametrize(("ending", "said"), [
+    (lambda job, client: client.job_completed.emit("comfy-A", SDXL_HISTORY), "done"),
+    (lambda job, client: client.job_error.emit("comfy-A", "made-up error"), "failed"),
+    (lambda job, client: job.cancel(), "canceled"),
+    (lambda job, client: job.defer(), "put back to run later"),
+])
+def test_a_job_that_ran_says_how_it_ended_and_how_long_it_ran(qtbot, tmp_path, caplog, ending,
+                                                              said):
+    now = [100.0]
+    job, client = _job_on_a_clock(tmp_path, now)
+    client.node_executing.emit("comfy-A", "5")
+    now[0] = 142.5
+
+    with caplog.at_level(logging.INFO, logger="origenerator.gui.generation_job"):
+        caplog.clear()
+        ending(job, client)
+
+    assert _job_lines(caplog) == [f"Job ended in ComfyUI: comfy-A, {said} after 42.5 s"]
+
+
+def test_a_job_canceled_before_it_ran_says_nothing_of_a_run(qtbot, tmp_path, caplog):
+    job, _client_of_it = _job_on_a_clock(tmp_path, [100.0])
+
+    with caplog.at_level(logging.INFO, logger="origenerator.gui.generation_job"):
+        job.cancel()
+
+    assert _job_lines(caplog) == []

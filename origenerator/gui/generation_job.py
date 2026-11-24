@@ -82,9 +82,10 @@ class GenerationJob(QObject):
     unreachable = Signal(str)
 
     def __init__(self, client, spec: JobSpec, folders: JobFolders = NO_FOLDERS, *,
-                 speaker=None, run=None):
+                 speaker=None, run=None, clock=time.time):
         super().__init__()
         self._client = client
+        self._clock = clock
         self._attached = False
         self._run = run or run_off_thread
         self.workflow = spec.workflow
@@ -282,6 +283,7 @@ class GenerationJob(QObject):
         self.failed.emit(message)
 
     def cancel(self):
+        self._say_the_run_ended("canceled")
         self._filing_canceled.set()
         self._detach()
         self._stop_on_server()
@@ -290,6 +292,7 @@ class GenerationJob(QObject):
     def defer(self) -> bool:
         if self._state not in (JobState.QUEUED, JobState.RUNNING):
             return False
+        self._say_the_run_ended("put back to run later")
         self._detach()
         self._stop_on_server()
         self._state = JobState.IDLE
@@ -354,7 +357,8 @@ class GenerationJob(QObject):
 
     def _mark_running(self):
         if self._started_at is None:
-            self._started_at = time.time()
+            self._started_at = self._clock()
+            logger.info("Job running in ComfyUI: %s", self.prompt_id)
         if self._state == JobState.QUEUED:
             self._state = JobState.RUNNING
             self._foreign_ahead = None
@@ -396,6 +400,7 @@ class GenerationJob(QObject):
     def _complete(self, history_data: dict):
         if self._state not in (JobState.QUEUED, JobState.RUNNING):
             return
+        self._say_the_run_ended("done")
         self._finish(history_data)
 
     def _finish(self, history_data: dict):
@@ -444,6 +449,12 @@ class GenerationJob(QObject):
     def _on_error(self, prompt_id: str, message: str):
         if not self._is_mine(prompt_id):
             return
+        self._say_the_run_ended("failed")
         self._detach()
         self._state = JobState.FAILED
         self.failed.emit(message)
+
+    def _say_the_run_ended(self, how: str) -> None:
+        if self._state == JobState.RUNNING and self._started_at is not None:
+            logger.info("Job ended in ComfyUI: %s, %s after %.1f s", self.prompt_id, how,
+                        self._clock() - self._started_at)

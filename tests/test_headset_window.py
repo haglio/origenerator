@@ -37,6 +37,7 @@ def test_the_poll_says_how_much_it_has_handled_while_the_room_has_it(
     try:
         with caplog.at_level(logging.INFO):
             headset.publish(now=1.0)
+            wait_until(lambda: _frame_pixels(tmp_path)[0])
             headset.said_how_it_goes(now=1.0)
             headset.said_how_it_goes(now=1.0 + HEARTBEAT_S / 2)
             beats = caplog.text.count("Still publishing")
@@ -112,6 +113,33 @@ def test_a_tick_hands_over_the_presses_already_read_without_opening_the_file(tmp
         headset.close()
 
     assert pressed == ["5,5"]
+
+
+def test_a_frame_is_scaled_compared_and_written_off_the_windows_thread(
+        tmp_path, qtbot, monkeypatch):
+    written_on: list[int] = []
+
+    class _Watched(headset_window.FrameWriter):
+        def write(self, *args, **kwargs):
+            written_on.append(threading.get_ident())
+            return super().write(*args, **kwargs)
+
+    monkeypatch.setattr(headset_window, "FrameWriter", _Watched)
+    window = QWidget()
+    qtbot.addWidget(window)
+    window.resize(CAP_PX * 2, 100)
+    window.show()
+    headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
+    try:
+        headset.publish(now=1.0)
+    finally:
+        headset.close()
+
+    assert len(written_on) == 1, "closing the window's headset sends the frame it last looked at"
+    assert threading.get_ident() not in written_on, (
+        "converting, scaling to the cap, copying out and comparing a frame took about 10 ms "
+        "of the window's thread at every look")
+    assert _frame_pixels(tmp_path)[:2] == (CAP_PX, 100 // 2)
 
 
 def test_the_frame_a_preview_is_playing_is_in_the_frame_the_room_gets(tmp_path):

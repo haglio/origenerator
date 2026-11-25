@@ -2047,8 +2047,7 @@ class GalleryView(QWidget):
         finished_row = self._db.get_generation(prompt_id)
         if finished_row is None or finished_row.get("source") in (GenerationSource.EXPERIMENT,
                                                                   GenerationSource.REMAKE):
-            self.refresh()
-            self._populate.note_finished(key)
+            self.refresh_off_the_window_thread(lambda: self._populate.note_finished(key))
             return
         folded = False
         if finished_row is not None \
@@ -2063,7 +2062,11 @@ class GalleryView(QWidget):
         if key == self._selected_reroll_key and not self._populate.is_active(key):
             self._clear_reroll_selection()
         self.slideshows.note_landed(finished_row)
-        self.refresh()
+        self.refresh_off_the_window_thread(
+            lambda: self._once_the_landing_is_drawn(key, finished_row, launcher, folded=folded))
+
+    def _once_the_landing_is_drawn(self, key: str, finished_row: dict, launcher, *,
+                                   folded: bool) -> None:
         self.slideshows.note_finished(finished_row)
         self._show_reroll_result_in_tab(finished_row, launcher)
         if folded:

@@ -14,7 +14,9 @@ from origenerator.comfyui_api import ForeignQueue
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.gui.gallery_view import GalleryView
 from tests.gallery_view_support import (
+    _REROLL_HISTORY,
     _image,
+    _new_tile,
     _reroll_client,
     _seeded_db,
     _select_first_leaf,
@@ -298,3 +300,34 @@ def test_a_refresh_handed_off_the_windows_thread_draws_the_library_and_then_says
     assert said == [_selected_folder(view)]
     assert "i1" in view.library.live_ids
     assert set(built_in) == {"in the read handed off"}
+
+
+def test_a_job_that_finishes_has_the_library_worked_out_in_a_read_handed_off(
+        qtbot, tmp_path, monkeypatch):
+    client = _reroll_client()
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=client)
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    _new_tile(view).add_requested.emit()
+    prompt_id = view._live_jobs[key].prompt_id
+    where = ["on the window's thread"]
+    built_in = []
+    building = library_views.gallery.build_gallery_tree
+    monkeypatch.setattr(library_views.gallery, "build_gallery_tree",
+                        lambda *a, **kw: built_in.append(where[0]) or building(*a, **kw))
+    hops = []
+    view.off_thread = lambda work, done: hops.append((work, done))
+
+    client.job_completed.emit(prompt_id, _REROLL_HISTORY)
+    while hops:
+        work, done = hops.pop(0)
+        where[0] = "in the read handed off"
+        answer = work()
+        where[0] = "on the window's thread"
+        done(answer)
+
+    assert prompt_id in view.library.live_ids
+    assert set(built_in) == {"in the read handed off"}, (
+        "the library a finished job changed is worked out off the window's thread, which "
+        "only draws it")

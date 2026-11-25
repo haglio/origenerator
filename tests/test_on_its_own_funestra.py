@@ -3107,3 +3107,24 @@ def test_a_minimized_slideshow_shown_where_it_was_comes_back(qtbot):
     view.resize(1280, 720)
 
     assert (len(view.program.shown_on), view.program.minimized) == (shown + 1, False)
+
+
+def test_each_press_on_its_hud_is_written_down_with_what_became_of_it(qtbot, caplog):
+    view = _on_screen_wearing_its_hud(qtbot, _view(qtbot))
+    view.shown.room_paused(True)
+
+    with caplog.at_level("INFO", logger="origenerator.gui.on_its_own_funestra"):
+        view.click(button_on_screen(view, "portrait_minimize"))
+
+    assert view.program.minimized
+    assert "HUD press portrait_minimize while paused: answered" in caplog.messages
+
+
+def test_a_minimized_slideshow_shown_again_says_so(qtbot, caplog):
+    view = _view(qtbot, _KEYED)
+    view.program.minimize()
+
+    with caplog.at_level("INFO", logger="origenerator.gui.on_its_own_funestra"):
+        view.resize(1280, 720)
+
+    assert "Showing the slideshow's Funestra again after it was minimized" in caplog.messages

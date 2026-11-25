@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -40,6 +41,8 @@ from origenerator.slideshow_buttons import (
     PRESSES_ON_THE_QUEUE,
     answer,
 )
+
+logger = logging.getLogger(__name__)
 
 _RATE_STEPS = {"speed_up": SPEED_UP, "speed_down": SPEED_DOWN}
 _HUD_MOVES = {
@@ -194,6 +197,8 @@ class OnItsOwnFunestra(QObject):
         place = device_rect_of(screen)
         if place == self._program.place and not self._program.minimized:
             return
+        if self._program.minimized:
+            logger.info("Showing the slideshow's Funestra again after it was minimized")
         self._over = QRect(screen.geometry())
         self.over_the_funestra.setGeometry(self._over)
         self._program.show_on(place)
@@ -290,7 +295,11 @@ class OnItsOwnFunestra(QObject):
             self.press(command, at)
 
     def press(self, command: str, said_at: float | None = None) -> bool:
-        if not self._route(command, said_at):
+        answered = self._route(command, said_at)
+        logger.info("HUD press %s while %s: %s", command.partition("|")[0],
+                    "paused" if self._paused else "playing",
+                    "answered" if answered else "not answered")
+        if not answered:
             return False
         self._answered()
         return True

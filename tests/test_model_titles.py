@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from datetime import datetime
 
 import pytest
@@ -271,3 +272,28 @@ def test_within_one_look_a_models_title_is_worked_out_once(titled_models):
 
     assert (first, again, model_title("example_model.safetensors")) == (
         "Example Model v2", "Example Model v2", "Example Model the third")
+
+
+def test_a_pass_under_way_on_another_thread_answers_none_of_this_threads_titles(monkeypatch):
+    worked_out = iter(range(1, 100))
+    monkeypatch.setattr(model_titles, "_title_of", lambda value: f"title {next(worked_out)}")
+    inside, leave = threading.Event(), threading.Event()
+    seen_there = []
+
+    def another_pass():
+        with model_titles.each_title_worked_out_once():
+            seen_there.append(model_titles.model_title("made_up.safetensors"))
+            inside.set()
+            leave.wait()
+
+    there = threading.Thread(target=another_pass)
+    there.start()
+    inside.wait()
+    seen_here = model_titles.model_title("made_up.safetensors")
+    leave.set()
+    there.join()
+
+    assert (seen_there, seen_here) == (["title 1"], "title 2"), (
+        "the library worked out off the window's thread keeps its titles to itself, so the "
+        "window never reads a title that pass kept, and neither thread can take the other's "
+        "pass away mid-look")

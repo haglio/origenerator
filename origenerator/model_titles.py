@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
@@ -26,7 +27,8 @@ _FOLDERS_SHOWN_BY_TITLE = ("diffusion_models", "checkpoints", "loras")
 _NOTES = re.compile(r"\s*\((?P<notes>[^()]*)\)$")
 _PASSES = ("high", "low")
 _READERS: dict[tuple[str, object], ReadWhenChanged] = {}
-_TITLES_OF_THE_PASS_UNDER_WAY: list[dict[str, str]] = []
+_PASSES_UNDER_WAY = threading.local()
+_ONE_THREAD_AT_A_TIME_KEEPS_A_READING = threading.Lock()
 
 
 @dataclass(frozen=True, order=True)
@@ -59,7 +61,7 @@ def option_title(option) -> str:
 
 @contextmanager
 def each_title_worked_out_once():
-    under_way = _TITLES_OF_THE_PASS_UNDER_WAY
+    under_way = _passes_on_this_thread()
     under_way.append(under_way[-1] if under_way else {})
     try:
         yield
@@ -67,10 +69,17 @@ def each_title_worked_out_once():
         under_way.pop()
 
 
+def _passes_on_this_thread() -> list[dict[str, str]]:
+    if not hasattr(_PASSES_UNDER_WAY, "titles"):
+        _PASSES_UNDER_WAY.titles = []
+    return _PASSES_UNDER_WAY.titles
+
+
 def model_title(value) -> str:
-    if not _TITLES_OF_THE_PASS_UNDER_WAY:
+    under_way = _passes_on_this_thread()
+    if not under_way:
         return _title_of(value)
-    titles = _TITLES_OF_THE_PASS_UNDER_WAY[-1]
+    titles = under_way[-1]
     key = str(value)
     if key not in titles:
         titles[key] = _title_of(value)
@@ -201,7 +210,8 @@ def _until_it_changes(path, read):
     key = (str(path), read)
     reader = _READERS.get(key)
     if reader is None:
-        reader = _READERS[key] = ReadWhenChanged(Path(path), read)
+        reader = _READERS[key] = ReadWhenChanged(
+            Path(path), read, guard=_ONE_THREAD_AT_A_TIME_KEEPS_A_READING)
     return reader.latest()
 
 

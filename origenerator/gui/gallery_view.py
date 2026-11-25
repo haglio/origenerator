@@ -94,7 +94,7 @@ from origenerator.gui import corner_buttons, icons, omnipause, square_buttons
 from origenerator.gui.action_row import sides_under
 from origenerator.gui.app_keys import AppKeys, Presses
 from origenerator.gui.app_title import under
-from origenerator.gui.busy_cursor import working
+from origenerator.gui.busy_cursor import spin_the_pointer, working
 from origenerator.gui.choosing_fixes import ChoosingFixes
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController, CombineParts
@@ -156,6 +156,7 @@ from origenerator.gui.inflight import (
 from origenerator.gui.item_tile import ItemTile
 from origenerator.gui.item_type_icon import ItemTypeIcon
 from origenerator.gui.job_queue import JobQueue
+from origenerator.gui.library_redraws import LibraryRedraws
 from origenerator.gui.look_training_controller import LookTrainingController
 from origenerator.gui.modify_batch_tile import ModifyBatchTile
 from origenerator.gui.motion_hud import apply_motion_key
@@ -307,6 +308,10 @@ class GalleryView(QWidget):
         self._item_names = ItemNames(db)
         self.library = LibraryReadings(db, self._item_names, shared.publish_names,
                                        populating=self._populated_ids)
+        self._redraws = LibraryRedraws(
+            version=db.library_version, drawn_version=lambda: self.library.drawn_version,
+            read=lambda *, even_unmoved: self._read_and_work_out(None, even_unmoved=even_unmoved),
+            draw=self._draw_a_read, off_thread=self._read_off_the_window_thread)
         self._build_what_the_satellites_play(db, client)
         self._edits_given = actions
         self._aims_held: bool | None = None
@@ -899,12 +904,12 @@ class GalleryView(QWidget):
             return []
         key, launched = launch
         if not the_tab_follows:
-            self.refresh()
+            self.refresh_off_the_window_thread()
             return launched
         if launching is not None:
             for prompt_id in launched:
                 launching.note_launched(prompt_id, made_of=batch[0])
-        self._stand_on_the_run_in(key, rebuild=True)
+        self._stand_on_the_run_once_drawn(key)
         return launched
 
     def _launch(self, workflow_name: str, batch: list[dict], launching,
@@ -946,9 +951,18 @@ class GalleryView(QWidget):
                         new_negative=batch[0].get("negative_prompt", ""), **asked))
         return key, launched
 
-    def _stand_on_the_run_in(self, key: str, *, rebuild: bool = False) -> bool:
-        if rebuild:
-            self.refresh()
+    def _stand_on_the_run_once_drawn(self, key: str) -> None:
+        self._once_drawn_unless_he_moved(lambda: self._stand_on_the_run_in(key))
+
+    def _once_drawn_unless_he_moved(self, then: Callable[[], None]) -> None:
+        standing = self.toc.selected_folder_key()
+
+        def drawn() -> None:
+            if self.toc.selected_folder_key() == standing:
+                then()
+        self.refresh_off_the_window_thread(drawn)
+
+    def _stand_on_the_run_in(self, key: str) -> bool:
         item = self.toc.item_for(key)
         if item is None:
             return False
@@ -989,16 +1003,18 @@ class GalleryView(QWidget):
         self._draw_the_library(rows, meta, moved=self.library.moved_to(rows, meta),
                                only_if_moved=only_if_moved)
 
-    def refresh_off_the_window_thread(self, then: Callable[[], None]) -> None:
-        def drawn(read) -> None:
-            if read is None:
-                self.refresh()
-            else:
-                self._draw_the_library(read.rows, read.meta,
-                                       moved=self.library.moved_to_read(read),
-                                       prepared=read.prepared)
-            then()
-        self.off_thread(self._read_and_work_out(None, even_unmoved=True), drawn)
+    def refresh_off_the_window_thread(self, then: Callable[[], None] | None = None) -> None:
+        self._redraws.ask(None if then is None else lambda _drew: then())
+
+    def _draw_a_read(self, read: Read | None, *, even_unmoved: bool) -> bool:
+        if read is None:
+            self.refresh()
+            return True
+        moved = self.library.moved_to_read(read)
+        if not (moved or even_unmoved):
+            return False
+        self._draw_the_library(read.rows, read.meta, moved=moved, prepared=read.prepared)
+        return True
 
     def _draw_the_library(self, rows, meta, *, moved: bool, only_if_moved: bool = False,
                           prepared: Prepared | None = None) -> None:
@@ -1511,7 +1527,7 @@ class GalleryView(QWidget):
         logger.info("Requested changes to %s: %d of %d images queued into %s",
                     folder_key, launched, len(rows), key)
         if launched:
-            self._stand_on_the_run_in(key, rebuild=True)
+            self._stand_on_the_run_once_drawn(key)
 
     def _job_source_image(self, job) -> str | None:
         if job is None:
@@ -1833,7 +1849,7 @@ class GalleryView(QWidget):
             new_positive=revised["positive_prompt"], new_negative=revised["negative_prompt"],
             turns=(revision.turn(spoken.text),),
         ))
-        self.refresh()
+        self.refresh_off_the_window_thread()
         return "Request submitted", INFO
 
     def edit_versions(self, prompt_id: str, edit):
@@ -1917,6 +1933,9 @@ class GalleryView(QWidget):
             return []
         return [row for row in rows if gallery.rerollable(row)]
 
+    def _read_off_the_window_thread(self, work, done):
+        self.off_thread(work, done)
+
     def off_thread(self, work, done):
         run_off_thread(work, done, owner=self)
 
@@ -1943,9 +1962,9 @@ class GalleryView(QWidget):
 
     def _reveal_reroll(self, key: str):
         self.search.leave()
-        if not (self._stand_on_the_run_in(key)
-                or self._stand_on_the_run_in(key, rebuild=True)):
-            logger.info("Nothing to reveal for %s: no folder row", key)
+        if not self._stand_on_the_run_in(key):
+            self._once_drawn_unless_he_moved(lambda: self._stand_on_the_run_in(key) or logger.info(
+                "Nothing to reveal for %s: no folder row", key))
 
     def _select_reroll(self, key: str):
         job = self._live_jobs.get(key)
@@ -2097,11 +2116,12 @@ class GalleryView(QWidget):
         self._generation_failed.say(format_execution_error(message))
 
     def _rerender_current_leaf(self):
+        if isinstance(self.current_group(), gallery.SettingsGroup):
+            self._redraws.ask(self._rerender_the_leaf_unless_drawn, even_unmoved=False)
+
+    def _rerender_the_leaf_unless_drawn(self, drew: bool):
         group = self.current_group()
-        if isinstance(group, gallery.SettingsGroup) and self.library.moved_to(*self.library.read()):
-            self.refresh()
-            return
-        if isinstance(group, gallery.SettingsGroup):
+        if not drew and isinstance(group, gallery.SettingsGroup):
             if self._lead_drawn_for != self._lead_state(group):
                 place = self._gallery_pane.place()
                 self._gallery_pane.show_thumbnails(group)
@@ -2254,7 +2274,7 @@ class GalleryView(QWidget):
                 else ENHANCE_WHEN_FINISHED)
         self._db.ask_when_finished(prompt_id, wish)
         if wish == TRASH_WHEN_FINISHED:
-            self.refresh()
+            self.refresh_off_the_window_thread()
             return
         tile = self._generating_tile
         if tile is not None and tile.prompt_id == prompt_id:
@@ -2361,19 +2381,16 @@ class GalleryView(QWidget):
             logged=f"Failed to restore {len(prompt_ids)} deleted item(s)")
 
     def _edit_then_redraw(self, edit, then, *, failed: str, could_not: str, logged: str):
-        error = None
-        with working():
-            try:
-                outcome = edit()
-            except Exception as e:
-                logger.exception(logged)
-                error = e
-            else:
-                self._gallery_pane.clear_selection()
-                self.refresh()
-                then(outcome)
-        if error is not None:
-            alert.error(failed, f"{could_not}:\n\n{error}")
+        stop_spinning = spin_the_pointer()
+        try:
+            outcome = edit()
+        except Exception as e:
+            logger.exception(logged)
+            stop_spinning()
+            alert.error(failed, f"{could_not}:\n\n{e}")
+            return
+        self._gallery_pane.clear_selection()
+        self.refresh_off_the_window_thread(lambda: (then(outcome), stop_spinning()))
 
     def purge_from_trash(self, prompt_ids):
         if not prompt_ids:
@@ -2406,18 +2423,16 @@ class GalleryView(QWidget):
             return
         focus = self._edits.undo()
         self._gallery_pane.clear_selection()
-        self.refresh()
         if focus:
-            self.go_to_generation(focus)
-        self._re_aim_every_button()
+            self._once_drawn_unless_he_moved(lambda: self.go_to_generation(focus))
+        self.refresh_off_the_window_thread(self._re_aim_every_button)
 
     def _redo(self):
         if not self._edits.can_redo():
             return
         self._edits.redo()
         self._gallery_pane.clear_selection()
-        self.refresh()
-        self._re_aim_every_button()
+        self.refresh_off_the_window_thread(self._re_aim_every_button)
 
     def _confirm(self, text: str) -> bool:
         return asked_to_delete(self, text)

@@ -497,6 +497,22 @@ def _completed_image(db, prompt_id, positive_prompt, seed):
         [{"filename": f"sdxl_{prompt_id}.png", "subfolder": ""}]))
 
 
+def held_off_the_window_thread(view, monkeypatch) -> list:
+    held = []
+    monkeypatch.setattr(view, "off_thread", lambda work, done: held.append((work, done)))
+
+    def refused():
+        raise AssertionError("the library was read on the window's thread")
+    monkeypatch.setattr(view.library, "read", refused)
+    return held
+
+
+def land(held) -> None:
+    while held:
+        work, done = held.pop(0)
+        done(work())
+
+
 def _generate_in_current_tab(view, positive_prompt, seed):
     tab = view.generate_pane.current_generate_tab()
     params = dict(_SDXL.default_params(), positive_prompt=positive_prompt, seed=seed)

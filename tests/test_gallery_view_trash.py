@@ -70,6 +70,8 @@ from tests.gallery_view_support import (
     _trash_db,
     _video_workflow,
     _workflow_rows,
+    held_off_the_window_thread,
+    land,
 )
 from tests.qt_exec import faking_exec
 from tests.real_db import database_of, keep_rows_on_disk, on_disk
@@ -1354,6 +1356,25 @@ def test_redoing_a_delete_draws_the_folder_without_the_item_at_once(qtbot, tmp_p
     assert view.listed_prompt_ids() == ["i1"]
 
 
+def test_a_delete_its_undo_and_its_redo_read_the_library_off_the_window_thread(
+        qtbot, tmp_path, monkeypatch):
+    view, _db, _file = _shown_view_with_one_image(qtbot, tmp_path)
+    view._tree.setCurrentItem(view.toc.leaf_by_id["i1"])
+    (row,) = view._db.list_generations()
+    held = held_off_the_window_thread(view, monkeypatch)
+
+    view._delete_rows([row])
+    land(held)
+    after_the_delete = view.listed_prompt_ids()
+    view._undo()
+    land(held)
+    after_the_undo = view.listed_prompt_ids()
+    view._redo()
+    land(held)
+
+    assert (after_the_delete, after_the_undo, view.listed_prompt_ids()) == ([], ["i1"], [])
+
+
 def test_a_deleted_item_picked_in_the_trash_has_nothing_to_favorite(qtbot):
     view = _trash_collection_view(qtbot, FakeActions())
 
@@ -1407,8 +1428,8 @@ class _PointerWatchingActions(FakeActions):
 
 def _pointer_while_redrawing(view, monkeypatch):
     seen = []
-    real = view.refresh
-    monkeypatch.setattr(view, "refresh", lambda *a, **kw: (
+    real = view._rebuild
+    monkeypatch.setattr(view, "_rebuild", lambda *a, **kw: (
         seen.append((cursor := QApplication.overrideCursor()) and cursor.shape()),
         real(*a, **kw))[1])
     return seen
@@ -1424,10 +1445,12 @@ def test_each_trash_action_spins_the_pointer_until_the_gallery_is_redrawn(qtbot,
     view.refresh()
     monkeypatch.setattr(view, "_confirm", lambda text: True)
     redrawing = _pointer_while_redrawing(view, monkeypatch)
+    held = held_off_the_window_thread(view, monkeypatch)
 
     {"restore": lambda: view.restore_from_trash(["d1"]),
      "purge": lambda: view.purge_from_trash(["d1"]),
      "send to trash": lambda: view._delete_rows([db.get_generation("i1")])}[act]()
+    land(held)
 
     assert actions.pointers == redrawing == [Qt.CursorShape.WaitCursor]
     assert QApplication.overrideCursor() is None

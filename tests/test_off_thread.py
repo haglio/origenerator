@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gc
 import threading
+import weakref
 
 import pytest
 import shiboken6
@@ -72,6 +73,27 @@ def test_the_carrier_is_held_from_a_root_until_it_delivers(qtbot, owner):
 
     _wait_for(qtbot, got)
     assert len(_in_flight) == before
+
+
+class _Answered:
+    def __init__(self, got):
+        self.got = got
+
+    def take(self, value):
+        self.got.append(value)
+
+
+def test_a_delivered_answer_lets_go_of_its_handler(qtbot, owner):
+    got = []
+    answered = _Answered(got)
+    gone = weakref.ref(answered)
+
+    run_off_thread(lambda: 1, answered.take, owner=owner)
+    del answered
+    _wait_for(qtbot, got)
+    gc.collect()
+
+    assert gone() is None
 
 
 class _SetNotingThreads(set):

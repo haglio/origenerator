@@ -35,6 +35,11 @@ def read_foreign_queue(client) -> ForeignQueue | None:
         return ForeignQueue(running=[], pending=[])
 
 
+def _as_shown(items: list, foreign_total: int) -> tuple:
+    return foreign_total, tuple(
+        tuple(value for value in vars(item).values() if not callable(value)) for item in items)
+
+
 class ShownJobQueue(QObject):
     changed = Signal(object, int)
 
@@ -50,6 +55,7 @@ class ShownJobQueue(QObject):
         self._asks_over = asks_over
         self._cursor = cursor
         self._foreign = ForeignQueue(running=[], pending=[])
+        self._told_of: tuple | None = None
         self.view = JobQueueView()
         self.view.move_requested.connect(jobs.move)
         self.view.clear_queue_requested.connect(self.clear_foreign)
@@ -80,6 +86,10 @@ class ShownJobQueue(QObject):
 
     def update(self, items=None) -> None:
         items = self.items() if items is None else items
+        shown = _as_shown(items, self._foreign.total)
+        if shown == self._told_of:
+            return
+        self._told_of = shown
         self.view.set_items(items, self._foreign.total)
         self.changed.emit(items, self._foreign.total)
 

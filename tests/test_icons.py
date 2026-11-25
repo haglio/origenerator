@@ -22,7 +22,7 @@ from shared_ui.icons import icon_pixmap, qt_icon
 from shared_ui.spacing import BUTTON_FILLING_ICON
 
 import origenerator
-from origenerator import gallery
+from origenerator import content, gallery
 from origenerator.gallery.collection import (
     ENHANCED_KEY,
     EXPERIMENTS_KEY,
@@ -110,6 +110,22 @@ def test_a_non_ai_folder_wears_a_blue_n(qtbot):
     assert word == "Non-AI"
     assert icon.pixmap(48, 48).toImage() == QIcon(
         icons._render_toc_initial("N", BLUE)).pixmap(48, 48).toImage()
+
+
+def test_an_image_folders_mark_leaves_the_word_for_another_type_unasked(qtbot, monkeypatch):
+    asked = []
+    monkeypatch.setattr(content, "genau_flick_words",
+                        lambda: asked.append(1) or ("made-up one", "made-up many"))
+    folder = gallery.SettingsGroup("k", "S", [{
+        "prompt_id": "i1", "workflow_name": "sdxl_t2i", "status": "completed",
+        "output_files": '[{"filename": "i1.png", "subfolder": ""}]'}])
+
+    _icon, word = folder_icons.folder_kind_icon(folder)
+
+    assert word == "Images"
+    assert asked == [], (
+        "each asking reads the settings all of Haglio shares again, and the TOC asks once "
+        "per folder each time it is drawn: 0.7 s of an 11,000-folder TOC's 1.0 s")
 
 
 def _letter_height(letter, color) -> int:

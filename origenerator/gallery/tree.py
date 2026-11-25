@@ -29,7 +29,7 @@ from origenerator.gallery.keys import (
 )
 from origenerator.gallery.labels import (
     _source_image_label,
-    item_type_labels,
+    item_type_label,
     lora_label,
     model_label,
     workflow_label,
@@ -515,7 +515,7 @@ def build_gallery_tree(
 
 def _media_folder(item_type: ItemType, rows, folder_meta, image_index, name_of,
                   kept) -> MediaGroup:
-    label, favorite = _overlay(item_type_labels()[item_type], item_type, folder_meta)
+    label, favorite = _overlay(item_type_label(item_type), item_type, folder_meta)
     media_type = item_type.filed_as
     workflows = []
     for wf_name, wf_rows in _group_by_creation(

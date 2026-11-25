@@ -337,6 +337,48 @@ def test_every_later_hand_over_finds_its_videos_scripts_by_listing_their_folders
     assert handed == [scripts["clip.mp4"], None, None]
 
 
+def test_a_hand_over_looks_for_its_videos_scripts_where_the_list_is_written(
+        qtbot, tmp_path, monkeypatch):
+    scripts = _scripted(monkeypatch, tmp_path, "clip.mp4")
+    items = [("one.png", "image", "id-1"), ("clip.mp4", "video", "id-2"),
+             ("bare.mp4", "video", "id-3")]
+    held_back = []
+    monkeypatch.setattr(funestra_slideshow, "run_off_thread",
+                        lambda work, done, *, owner: held_back.append((work, done)))
+    looked = []
+    look = slideshow_pass.funscript_of
+    monkeypatch.setattr(slideshow_pass, "funscript_of",
+                        lambda path, **kwargs: looked.append(Path(path).name) or look(path, **kwargs))
+
+    _slideshow(qtbot, tmp_path, items=items)
+    looked_on_the_window = list(looked)
+    while held_back:
+        work, done = held_back.pop(0)
+        done(work())
+
+    assert looked_on_the_window == [], (
+        "looking up every video's funscript on disk at each hand over held the window "
+        "0.6 to 1.9 s with a slideshow of thousands of items")
+    assert [item.funscript for item in read_playlist(_channel(tmp_path).playlist)] == [
+        None, scripts["clip.mp4"], None]
+
+
+def test_a_funscript_that_appears_or_goes_is_handed_over_as_it_now_is(
+        qtbot, tmp_path, monkeypatch):
+    _scripted(monkeypatch, tmp_path)
+    items = [("clip.mp4", "video", "id-1"), ("more.mp4", "video", "id-2")]
+    slideshow = _slideshow(qtbot, tmp_path, items=items)
+    scripts = _scripted(monkeypatch, tmp_path, "clip.mp4")
+
+    slideshow.play(Playing(items, shuffle=in_order))
+    appeared = [item.funscript for item in read_playlist(slideshow.channel.playlist)]
+    scripts["clip.mp4"].unlink()
+    slideshow.play(Playing(items, shuffle=in_order))
+    gone = [item.funscript for item in read_playlist(slideshow.channel.playlist)]
+
+    assert (appeared, gone) == ([scripts["clip.mp4"], None], [None, None])
+
+
 def test_a_video_the_session_s_funestra_plays_is_none_on_this_app_s_own_screen(qtbot, tmp_path):
     slideshow = _slideshow(qtbot, tmp_path, items=[("clip.mp4", "video", "id-1")])
 

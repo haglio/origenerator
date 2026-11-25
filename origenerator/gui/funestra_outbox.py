@@ -18,8 +18,8 @@ class FunestraOutbox(QObject):
         self._writing = False
         self._gathering = 0
 
-    def write_playlist(self, items) -> None:
-        self._waiting.append((_LIST, list(items)))
+    def write_playlist(self, making: Callable[[], list]) -> None:
+        self._waiting.append((_LIST, making))
         self._flush()
 
     def send(self, verb: str) -> None:
@@ -49,7 +49,7 @@ class FunestraOutbox(QObject):
         lost = []
         for kind, what in batch:
             if kind == _LIST:
-                self._channel.write_playlist(what)
+                self._channel.write_playlist(what())
             elif not self._channel.send_all(what):
                 lost.extend(what)
         return lost

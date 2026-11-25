@@ -8,6 +8,7 @@ import shiboken6
 from app_support.frame_channel import LOOK_AGAIN_AFTER_S
 from app_support.threading_utils import wait_until
 from funestra.file_channel import append_command, consume_command_file
+from funestra.off_the_loop import AtOnce
 from PySide6.QtCore import QEvent, QObject, QPoint, Qt
 from PySide6.QtGui import QColor, QImage
 from PySide6.QtQuickWidgets import QQuickWidget
@@ -19,7 +20,6 @@ from origenerator.gui.headset_window import (
     CAP_PX,
     HEARTBEAT_S,
     HeadsetWindow,
-    PressReader,
     windows_opened_over,
     within_the_cap,
 )
@@ -68,51 +68,32 @@ def test_presses_the_channel_cannot_read_name_themselves(tmp_path, qtbot, caplog
         "a room whose presses go nowhere looks exactly like one whose screen is dead")
 
 
-def test_the_presses_file_is_read_off_the_windows_thread(tmp_path):
+def test_the_presses_file_is_read_off_the_windows_thread(tmp_path, qtbot, monkeypatch):
     read_on: list[int] = []
 
     def read(path, **kwargs):
         read_on.append(threading.get_ident())
         return consume_command_file(path, **kwargs)
 
-    presses = PressReader(tmp_path / "input.txt", read=read).start()
-    try:
-        append_command(tmp_path / "input.txt", "press 1 2")
-        taken: list[str] = []
-        wait_until(lambda: taken.extend(presses.taken()) or taken)
-    finally:
-        presses.stop()
-
-    assert taken == ["press 1 2"]
-    assert threading.get_ident() not in read_on, (
-        "renaming, reading and deleting the presses file took 4.5 ms on average and 88 ms at "
-        "worst on his computer, and the room writes it 90 times a second, so on the window's "
-        "thread it held the window still while he pointed")
-
-
-def test_a_tick_hands_over_the_presses_already_read_without_opening_the_file(tmp_path, qtbot):
+    monkeypatch.setattr(headset_window, "consume_command_file", read)
     window = QWidget()
     qtbot.addWidget(window)
     window.resize(200, 100)
     label = QLabel("x", window)
     label.setGeometry(20, 30, 60, 20)
     pressed = _presses_on(label)
-
-    class _ReadAlready:
-        def taken(self):
-            return ["press 25 35"]
-
-        def stop(self):
-            pass
-
-    headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path),
-                            presses=_ReadAlready())
+    headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
     try:
-        headset._tick()
+        append_command(tmp_path / "input.txt", "press 25 35")
+        wait_until(lambda: pressed, pump=QApplication.processEvents)
     finally:
         headset.close()
 
     assert pressed == ["5,5"]
+    assert threading.get_ident() not in read_on, (
+        "renaming, reading and deleting the presses file took 4.5 ms on average and 88 ms at "
+        "worst on his computer, and the room writes it 90 times a second, so on the window's "
+        "thread it held the window still while he pointed")
 
 
 def test_a_frame_is_scaled_compared_and_written_off_the_windows_thread(
@@ -325,7 +306,8 @@ class TestTheRoomsPressesReachTheWindow:
 
         window = self._window(qtbot)
         window.show()
-        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path),
+                                off_the_loop=AtOnce())
         try:
             headset.publish(now=1.0)
             first = published()

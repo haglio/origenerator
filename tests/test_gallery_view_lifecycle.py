@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import gc
+import weakref
 from unittest.mock import MagicMock, call
 
 import pytest
-from PySide6.QtCore import QEvent, Qt
+from PySide6.QtCore import QCoreApplication, QEvent, Qt
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QApplication, QWidget
 
@@ -32,6 +34,19 @@ def _press_escape_elsewhere(qtbot):
     qtbot.addWidget(elsewhere)
     QApplication.sendEvent(elsewhere, QKeyEvent(
         QEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier))
+
+
+def test_a_deleted_gallery_is_let_go_of_whole():
+    view = GalleryView(database_of([_image("i1", "scene one", 50, 1)]))
+    gone = weakref.ref(view)
+    view.close()
+    view.deleteLater()
+    del view
+
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    gc.collect()
+
+    assert gone() is None
 
 
 def test_closing_a_gallery_that_was_never_shown_stops_its_poll(qtbot):

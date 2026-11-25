@@ -524,8 +524,10 @@ class GalleryView(QWidget):
                                toc=self.toc, pane=self._gallery_pane, enhance=self.enhance,
                                combine=self.combine),
             parent=self, motion=self.osr2.motion)
-        self._gallery_pane.selection_changed.connect(
-            lambda: self._voice.note_picks(self._gallery_pane.picks(), now=time.monotonic()))
+        self._gallery_pane.selection_changed.connect(self._note_picks_for_the_voice)
+
+    def _note_picks_for_the_voice(self) -> None:
+        self._voice.note_picks(self._gallery_pane.picks(), now=time.monotonic())
 
     def _motion_key(self, key) -> bool:
         if not apply_motion_key(self.osr2.motion, key, on_drive_toggle=self.osr2.toggle):

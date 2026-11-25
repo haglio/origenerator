@@ -1,6 +1,9 @@
+import sqlite3
+
 import pytest
 
 from origenerator.db import Database, NewGeneration
+from origenerator.db_generations import _ASKED_WHEN_FINISHED
 from origenerator.generation_state import GenerationSource
 
 
@@ -119,3 +122,15 @@ def test_rows_read_together_are_the_rows_read_one_by_one(tmp_path):
     db = _video(tmp_path)
 
     assert db.get_generations(["vid-001", "never-made"]) == {"vid-001": db.get_generation("vid-001")}
+
+
+def test_asking_what_waits_for_a_finish_reads_only_the_items_that_asked(tmp_path):
+    Database(tmp_path / "test.db")
+    with sqlite3.connect(tmp_path / "test.db") as conn:
+        plan = conn.execute(f"EXPLAIN QUERY PLAN {_ASKED_WHEN_FINISHED}", ("completed",)).fetchall()
+
+    assert [step[-1] for step in plan] == [
+        "SEARCH generations USING INDEX idx_generations_asked_when_finished (status=?)"], (
+        "a walk of every finished item reads the whole of each item's row to reach the two "
+        "columns, settings and all, on the window's thread as Origenerator opens and as "
+        "each job finishes")

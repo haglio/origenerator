@@ -8,7 +8,12 @@ from app_support.watch_weights import COUNT_FIELDS
 
 from origenerator.box_breaks import unboxed
 from origenerator.db_connection import SqliteFile, Store
-from origenerator.db_schema import GENERATION_COLUMNS, as_read, as_stored
+from origenerator.db_schema import (
+    GENERATION_COLUMNS,
+    WAITS_FOR_ITS_FINISH,
+    as_read,
+    as_stored,
+)
 from origenerator.gallery.output import FilesMade
 from origenerator.generation_state import (
     MADE_ELSEWHERE,
@@ -33,8 +38,7 @@ _FORGET_THE_TRASH = "UPDATE generations SET trash_requested_at = NULL WHERE prom
 _FORGET_THE_ENHANCE = "UPDATE generations SET enhance_requested_at = NULL WHERE prompt_id = ?"
 _ASKED_WHEN_FINISHED = (
     "SELECT prompt_id, trash_requested_at, enhance_requested_at FROM generations"
-    " WHERE status = ? AND (trash_requested_at IS NOT NULL"
-    " OR enhance_requested_at IS NOT NULL)")
+    f" WHERE status = ? AND ({WAITS_FOR_ITS_FINISH})")
 
 WATCH_COLUMNS = tuple((field, f"watch_{field}") for field in COUNT_FIELDS)
 def watch_columns_of(counts: dict) -> dict[str, int]:

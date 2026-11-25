@@ -1635,8 +1635,8 @@ def test_a_slideshow_up_when_the_gallery_is_taken_into_a_session_goes_on_on_its_
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=2))
     assert view.slideshow_showing_on() == "portrait"
 
-    view.become_hosted(_session())
     monkeypatch.setattr(view.slideshows, "items_of", lambda rows: [])
+    view.become_hosted(_session())
     open_both_shapes(view.slideshows)
 
     carried = view.region_slideshow("portrait")
@@ -1654,8 +1654,8 @@ def test_a_slideshow_moved_onto_a_set_of_the_other_shape_goes_on_as_that_set_in_
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("wide", 200, 100, count=2))
     _open_slideshow(view, monkeypatch, tmp_path, _Slides("tall", 100, 200, count=2))
 
-    view.become_hosted(_session())
     monkeypatch.setattr(view.slideshows, "items_of", lambda rows: [])
+    view.become_hosted(_session())
     open_both_shapes(view.slideshows)
 
     carried = view.region_slideshow("portrait")
@@ -1684,8 +1684,8 @@ def test_a_slideshow_of_both_shapes_taken_into_a_session_goes_on_on_both_satelli
     view.slideshows.start()
     assert view.slideshow_showing_on() == "both"
 
-    view.become_hosted(_session())
     monkeypatch.setattr(view.slideshows, "items_of", lambda rows: [])
+    view.become_hosted(_session())
     open_both_shapes(view.slideshows)
 
     carried = {shape: view.region_slideshow(shape) for shape in ("portrait", "landscape")}

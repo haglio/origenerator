@@ -100,7 +100,6 @@ from origenerator.nav_map import (
     actions_lines,
     beyond_the_row,
     one_per_stretch,
-    surroundings,
 )
 from origenerator.one_look import looking_once
 from origenerator.slideshow import (
@@ -807,14 +806,13 @@ class SlideshowDirector:
     def _slides_of(self, rows) -> tuple[Slide, ...]:
         return tuple(Slide.of(item) for item in self.items_of(plays_in_a_slideshow(rows)))
 
+    @looking_once
     def neighbors_of(self, prompt_id: str, *, shape: str) -> NavMapNeighbors:
         row = self._row_for(prompt_id) if prompt_id else None
         if row is None:
             return NavMapNeighbors()
-        around = surroundings(row, self._library().on_the_map(shape),
-                              image_index=self._library().image_index,
-                              filed=self._groups.loops_filed_for(row, shape=shape,
-                                                                 items_of=self.items_of))
+        around = self._groups.index(shape).surroundings(
+            row, self._groups.loops_filed_for(row, shape=shape, items_of=self.items_of))
         named = [(generation, label, True) for generation, label in around.configs]
         named += [(generation, label, False) for generation, label in around.actions]
         return NavMapNeighbors(

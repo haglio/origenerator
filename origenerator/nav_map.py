@@ -27,23 +27,11 @@ def _others(current: dict, rows) -> list[dict]:
 
 
 def seed_group(current: dict, rows, *, image_index) -> list[dict]:
-    key = gallery.settings_folder_key(current, image_index)
-    return [current, *(row for row in _others(current, rows)
-                       if gallery.settings_folder_key(row, image_index) == key)]
+    return NavIndex(rows, image_index).seed_group(current)
 
 
 def config_family(current: dict, rows, *, image_index) -> list[dict]:
-    seed = gallery.generation_seed(current)
-    if seed is None:
-        return [current]
-    model = gallery.folder_key_at_level(current, "model", image_index)
-    settings = gallery.settings_folder_key(current, image_index)
-    return [current, *(
-        row for row in _others(current, rows)
-        if gallery.generation_seed(row) == seed
-        and gallery.folder_key_at_level(row, "model", image_index) == model
-        and gallery.settings_folder_key(row, image_index) != settings
-    )]
+    return NavIndex(rows, image_index).config_family(current)
 
 
 def _likeness(one: frozenset[str], other: frozenset[str]) -> float:
@@ -115,15 +103,68 @@ class FiledRows(NamedTuple):
     more_seeds: tuple[dict, ...] = ()
 
 
+class _Workflow(NamedTuple):
+    settings_of: dict[str, str]
+    in_settings: dict[str, list[dict]]
+    in_family: dict[tuple, list[dict]]
+
+
+class NavIndex:
+    def __init__(self, rows, image_index) -> None:
+        self.rows = rows
+        self.image_index = image_index
+        self.animations = _Animations(rows, image_index)
+        self._workflows: dict[str | None, _Workflow] = {}
+
+    def _of_workflow(self, workflow: str | None) -> _Workflow:
+        if workflow not in self._workflows:
+            indexed = _Workflow({}, {}, {})
+            for row in self.rows:
+                if row.get("workflow_name") != workflow:
+                    continue
+                settings = gallery.settings_folder_key(row, self.image_index)
+                indexed.settings_of[row["prompt_id"]] = settings
+                indexed.in_settings.setdefault(settings, []).append(row)
+                seed = gallery.generation_seed(row)
+                if seed is not None:
+                    model = gallery.folder_key_at_level(row, "model", self.image_index)
+                    indexed.in_family.setdefault((seed, model), []).append(row)
+            self._workflows[workflow] = indexed
+        return self._workflows[workflow]
+
+    def _settings(self, row: dict, indexed: _Workflow) -> str:
+        known = indexed.settings_of.get(row["prompt_id"])
+        return known if known is not None else gallery.settings_folder_key(row, self.image_index)
+
+    def seed_group(self, current: dict) -> list[dict]:
+        indexed = self._of_workflow(current.get("workflow_name"))
+        return [current, *_others(current, indexed.in_settings.get(
+            self._settings(current, indexed), ()))]
+
+    def config_family(self, current: dict) -> list[dict]:
+        seed = gallery.generation_seed(current)
+        if seed is None:
+            return [current]
+        indexed = self._of_workflow(current.get("workflow_name"))
+        model = gallery.folder_key_at_level(current, "model", self.image_index)
+        settings = self._settings(current, indexed)
+        return [current, *(row for row in _others(current, indexed.in_family.get((seed, model), ()))
+                           if indexed.settings_of[row["prompt_id"]] != settings)]
+
+    def surroundings(self, current: dict, filed: FiledRows | None = None) -> Surroundings:
+        return _surroundings(current, self, filed)
+
+
 def surroundings(current: dict, rows, *, image_index,
                  filed: FiledRows | None = None) -> Surroundings:
-    return _surroundings(current, rows, _Animations(rows, image_index), image_index, filed)
+    return NavIndex(rows, image_index).surroundings(current, filed)
 
 
-def _surroundings(current: dict, rows, animations: _Animations, image_index,
+def _surroundings(current: dict, index: NavIndex,
                   filed: FiledRows | None = None) -> Surroundings:
+    animations = index.animations
     own = animations.actions_line_of(current)
-    seeds, configs, group = _made_here_around(current, rows, animations, image_index)
+    seeds, configs, group = _made_here_around(current, index)
     if filed is not None:
         seeds, group = (*filed.seeds, *seeds), (*filed.actions, *group)
     return Surroundings(
@@ -143,16 +184,17 @@ def _alike_in_origin(current: dict) -> Callable[[dict], bool]:
     return lambda row: not made_here(row)
 
 
-def _made_here_around(current: dict, rows, animations: _Animations, image_index):
+def _made_here_around(current: dict, index: NavIndex):
+    animations = index.animations
     alike = _alike_in_origin(current)
     own = animations.actions_line_of(current)
     image = animations.image_of(current)
     if image is None:
-        seeds = seed_group(current, rows, image_index=image_index)[1:]
-        configs = config_family(current, rows, image_index=image_index)[1:]
+        seeds = index.seed_group(current)[1:]
+        configs = index.config_family(current)[1:]
     else:
         seeds = [video
-                 for sibling in seed_group(image, rows, image_index=image_index)
+                 for sibling in index.seed_group(image)
                  for video in animations.videos_of(sibling)
                  if video["prompt_id"] != current["prompt_id"]
                  and animations.actions_line_of(video) == own]
@@ -191,8 +233,9 @@ def beyond_the_row(current: dict, rows, *, image_index, additions: int = WIDEN_A
         made_here_beyond = beyond_the_row(current, rows, image_index=image_index,
                                           additions=additions)
         return [*filed.more_seeds, *made_here_beyond][:max(additions, 0)]
-    animations = _Animations(rows, image_index)
-    around = _surroundings(current, rows, animations, image_index)
+    index = NavIndex(rows, image_index)
+    animations = index.animations
+    around = _surroundings(current, index)
     kept = {current["prompt_id"], *(row["prompt_id"] for row in around.seeds)}
     model = gallery.folder_key_at_level(current, "model", image_index)
     lora = gallery.folder_key_at_level(current, "lora", image_index)
@@ -248,6 +291,16 @@ class SlideGroups:
         self.learn = sources.learn_weights
         self._read = None
         self._found: dict = {}
+        self._indexes: dict[str, tuple[list, NavIndex]] = {}
+
+    def index(self, shape: str) -> NavIndex:
+        library = self._library()
+        rows = library.on_the_map(shape)
+        kept = self._indexes.get(shape)
+        if kept is None or kept[0] is not rows:
+            kept = rows, NavIndex(rows, library.image_index)
+            self._indexes[shape] = kept
+        return kept[1]
 
     def _kept(self, key, work_out):
         reading = self._library()

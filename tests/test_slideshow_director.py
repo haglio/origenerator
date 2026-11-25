@@ -53,6 +53,7 @@ from origenerator.item_names import ItemNames
 from origenerator.item_shape import shaped_key
 from origenerator.library_views import LibrarySnapshot
 from origenerator.media import MediaType
+from origenerator.one_look import entries_in
 from origenerator.output_places import OutputPlaces
 from origenerator.slideshow import Slide, SlideshowFilters, SlideshowState
 from origenerator.video_records import FiledLoops
@@ -2566,6 +2567,29 @@ def _library(rows):
     return FakeHost(rows=rows)
 
 
+def test_a_slides_neighbors_are_found_in_one_look_at_the_disk(slideshows, tmp_path):
+    fox = _image("g1", "a red fox", seed=1)
+    fox["output_files"] = json.dumps([{"filename": "g1.png"}])
+    rows = [fox, _image("g2", "a red fox", seed=2),
+            _animation("v1", frame="g1.png", action="alpha", tmp_path=tmp_path),
+            _animation("v2", frame="g1.png", action="beta", tmp_path=tmp_path)]
+    director, _host, _made = slideshows(_library(rows), db=_db_of(rows))
+    items_of = director.items_of
+    looks = []
+
+    def items_in_a_look(rows):
+        looks.append(entries_in(tmp_path))
+        return items_of(rows)
+
+    director.items_of = items_in_a_look
+    director.neighbors_of("g1", shape="portrait")
+
+    assert len(looks) > 1
+    assert all(look is looks[0] for look in looks), (
+        "each part of the map in a look of its own listed the same folders again for one slide: "
+        "0.75 s on a library of 11,000 items")
+
+
 def test_the_library_of_the_slideshows_side_answers_for_the_map_around_a_generation(slideshows, tmp_path):
     fox = _image("g1", "a red fox", seed=1)
     fox["output_files"] = json.dumps([{"filename": "g1.png"}])
@@ -2601,6 +2625,43 @@ def test_every_row_shows_its_items_actions_and_nothing_when_it_has_none_as_in_ki
 
     assert (around.label, {row.slide.prompt_id: row.label for row in around.column}) == (
         "", {"c1": "alpha, first box", "c2": ""})
+
+
+def _one_reading_of(director, shape="portrait") -> list:
+    library = director._library()
+    rows = type(library).on_the_map(library, shape)
+    library.on_the_map = lambda _shape: rows
+    return rows
+
+
+def test_the_map_works_out_the_librarys_groups_once_for_each_reading(slideshows, monkeypatch):
+    rows = [_fox(f"g{n}", seed=n) for n in range(40)]
+    director, _host, _made = slideshows(_library(rows), db=_db_of(rows))
+    _one_reading_of(director)
+    director.neighbors_of("g1", shape="portrait")
+    asked = []
+    settings_key = gallery.settings_folder_key
+    monkeypatch.setattr(gallery, "settings_folder_key",
+                        lambda row, index: asked.append(row["prompt_id"]) or settings_key(row, index))
+
+    director.neighbors_of("g2", shape="portrait")
+
+    assert len(asked) < len(rows) / 4, (
+        "grouping the whole library of a shape again for every slide took 75 ms a slide on "
+        "a library of 11,000 items")
+
+
+def test_the_map_of_a_new_reading_holds_what_it_brought(slideshows):
+    rows = [_fox("g1", seed=1), _fox("g2", seed=2)]
+    director, host, _made = slideshows(_library(rows), db=_db_of(rows))
+    _one_reading_of(director)
+    director.neighbors_of("g1", shape="portrait")
+
+    host.rows.append(_image("g3", "a red fox", seed=1, steps=20))
+    _one_reading_of(director)
+    around = director.neighbors_of("g1", shape="portrait")
+
+    assert [row.slide.prompt_id for row in around.column] == ["g3"]
 
 
 def test_the_map_is_drawn_against_the_gallerys_reading_of_the_library_never_a_reading_of_its_own(

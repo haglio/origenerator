@@ -56,10 +56,7 @@ def media_type_of_row(row: dict) -> MediaType:
 
 
 def item_type_of(row: dict) -> ItemType:
-    filed_as = media_type_of_row(row)
-    if filed_as is MediaType.VIDEO and makes_flicks(row.get("workflow_name")):
-        return ItemType.FLICK
-    return ItemType(filed_as)
+    return ItemType.FLICK if is_a_flick(row) else ItemType(media_type_of_row(row))
 
 
 def makes_flicks(workflow_name: str | None) -> bool:
@@ -68,7 +65,7 @@ def makes_flicks(workflow_name: str | None) -> bool:
 
 
 def is_a_flick(row: dict) -> bool:
-    return item_type_of(row) is ItemType.FLICK
+    return makes_flicks(row.get("workflow_name")) and media_type_of_row(row) is MediaType.VIDEO
 
 
 def counted(rows) -> str:

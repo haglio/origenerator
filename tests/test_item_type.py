@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from origenerator import config, gallery
+from origenerator.gallery import output
 from origenerator.gallery.output import item_type_of
 from origenerator.item_shape import key_holds
 from origenerator.media import ItemType, icon_name
@@ -98,3 +99,15 @@ def test_a_flick_no_model_made_is_called_a_flick_where_it_says_it_was_never_gene
          "This flick wasn't generated, so it has no generation settings."),
         ("A Non-AI video wasn't generated, so it can't be made again",
          "This video wasn't generated, so it has no generation settings.")]
+
+
+def test_a_row_of_a_workflow_that_makes_no_flicks_is_no_flick_without_reading_its_files(
+        monkeypatch):
+    def read(*_args):
+        raise AssertionError("read the files of a row whose workflow makes no flicks")
+
+    monkeypatch.setattr(output, "_media_type_of", read)
+
+    assert [output.is_a_flick(row) for row in (_AN_IMAGE, _A_VIDEO)] == [False, False], (
+        "asked of every row of a folder of thousands, five times a press of back or forward, "
+        "reading each row's files took 100 ms of the window's thread")

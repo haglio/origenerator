@@ -163,6 +163,7 @@ SCHEMA = {
 
 SQLITES_OWN_INDEXES = "sqlite_autoindex_"
 DECLARED_INDEXES = (
+    "idx_generations_asked_when_finished",
     "idx_generations_created",
     "idx_generations_status",
     "idx_generations_workflow",

@@ -359,6 +359,11 @@ ADDED_COLUMNS = {
 
 RENAMED_TABLES = {"custom_collection_members": "custom_folder_items"}
 
+WAITS_FOR_ITS_FINISH = "trash_requested_at IS NOT NULL OR enhance_requested_at IS NOT NULL"
+_INDEX_WHAT_WAITS_FOR_ITS_FINISH = (
+    "CREATE INDEX IF NOT EXISTS idx_generations_asked_when_finished ON generations(status)"
+    f" WHERE {WAITS_FOR_ITS_FINISH}")
+
 _NEW_FILES_FORGET_THE_RECORDED_SHAPE = """CREATE TRIGGER IF NOT EXISTS new_files_forget_the_recorded_shape
 AFTER UPDATE OF output_files, thumbnail_path, params_json, workflow_name ON generations
 WHEN NEW.shape IS OLD.shape AND NEW.shape IS NOT NULL
@@ -428,6 +433,7 @@ def migrate(conn) -> None:
                 conn.execute(
                     f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
     conn.execute(_NEW_FILES_FORGET_THE_RECORDED_SHAPE)
+    conn.execute(_INDEX_WHAT_WAITS_FOR_ITS_FINISH)
     conn.execute("DROP TABLE IF EXISTS branch_curation")
     give_old_seed_uses_their_kind(conn)
     forget_the_seeds_tabs_picked_for_their_next_press(conn)

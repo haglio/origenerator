@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 from pathlib import Path
 
@@ -19,39 +19,55 @@ class RegionOpening:
     scripts: dict[str, Path | None]
     lead: int = 0
     lead_neighbors: NavMapNeighbors | None = None
+    location: str | None = None
 
 
 class RegionOpenings(QObject):
-    def __init__(self, rows_of: Callable[[str], list[dict]],
+    def __init__(self, rows_at: Callable[[str], list[dict]],
                  make: Callable[[list[dict]], RegionOpening],
-                 finish: Callable[[RegionOpening, str], RegionOpening], parent=None) -> None:
+                 finish: Callable[[RegionOpening, str], RegionOpening], *,
+                 made: Callable[[str], None] = lambda _side: None, parent=None) -> None:
         super().__init__(parent)
-        self._rows_of = rows_of
+        self._rows_at = rows_at
         self._make = make
         self._finish = finish
+        self._then = made
         self._ready: dict[str, RegionOpening] = {}
+        self._wanted_at: dict[str, str] = {}
         self._making: set[str] = set()
         self._asked_again: set[str] = set()
 
-    def of(self, side: str) -> RegionOpening | None:
-        return self._ready.get(side)
+    def of(self, side: str, location: str) -> RegionOpening | None:
+        ready = self._ready.get(side)
+        return ready if ready is not None and ready.location == location else None
+
+    def making(self, side: str) -> bool:
+        return side in self._making
 
     def library_moved(self) -> None:
         self._ready.clear()
         self._asked_again.update(self._making)
 
-    def make_ready(self, side: str) -> None:
+    def make_ready(self, side: str, location: str) -> None:
         if side in self._making:
-            self._asked_again.add(side)
+            if self._wanted_at.get(side) != location:
+                self._asked_again.add(side)
+            self._wanted_at[side] = location
             return
+        self._wanted_at[side] = location
         self._making.add(side)
-        rows = self._rows_of(side)
-        run_off_thread(partial(self._make, rows), partial(self._made, side), owner=self)
+        run_off_thread(partial(self._made_at, location), partial(self._made, side, location),
+                       owner=self)
 
-    def _made(self, side: str, opening: RegionOpening | None) -> None:
+    def _made_at(self, location: str) -> RegionOpening:
+        return replace(self._make(self._rows_at(location)), location=location)
+
+    def _made(self, side: str, location: str, opening: RegionOpening | None) -> None:
         self._making.discard(side)
-        if side in self._asked_again:
+        if side in self._asked_again or self._wanted_at.get(side) != location:
             self._asked_again.discard(side)
-            self.make_ready(side)
-        elif opening is not None and opening.items:
+            self.make_ready(side, self._wanted_at[side])
+            return
+        if opening is not None and opening.items:
             self._ready[side] = self._finish(opening, side)
+        self._then(side)

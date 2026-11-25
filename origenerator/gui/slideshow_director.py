@@ -246,8 +246,10 @@ class SlideshowDirector:
         self._huds = HudPlaces()
         self._live_slideshows: list[tuple] = []
         self._regions_wanted: set[str] = set()
-        self._openings = RegionOpenings(self._rows_of_the_base_state, self._opening_of,
-                                        self._with_its_lead_on_the_map)
+        self._openings = RegionOpenings(self._rows_it_opens_on, self._opening_of,
+                                        self._with_its_lead_on_the_map,
+                                        made=self._opening_made)
+        self._opening_at: dict[str, tuple[str, float]] = {}
         self._openings_kept_fresh = _every(_OPENINGS_KEPT_FRESH_MS, self.make_the_openings_ready,
                                            lasting_as_long_as=host)
         self._asked_for: dict[str, partial] = {}
@@ -1024,10 +1026,7 @@ class SlideshowDirector:
             return
         if self._put_back_what_was_taken_over(shape) or self.region_slideshow(shape) is not None:
             return
-        if self._open_where_it_was_left(shape):
-            return
-        if not self._fill_region(shape):
-            logger.info("Nothing of %s shape to open on the %s region yet", shape, shape)
+        self._open_once_made(shape, self._where_it_opens(shape))
 
     def _put_back_what_was_taken_over(self, shape: str) -> bool:
         taken = self._taken_into_the_session.pop(shape, None)
@@ -1039,38 +1038,52 @@ class SlideshowDirector:
                     "session took this window over: %d items", shape, len(taken.items))
         return True
 
-    def _open_where_it_was_left(self, shape: str) -> bool:
-        left = self._regions_left.get(shape)
-        if left is None:
-            return False
-        location = left.state.location
-        ready = self._openings.of(shape) if location == self.base_location(shape) else None
-        rows = ready.rows if ready is not None else self.rows_at(location)
-        items = ready.items if ready is not None else self.items_of(rows)
-        if not items:
-            return False
-        self.open(items, rows=rows, location=location, shape=shape,
-                  start=_place_of(left.state.current, items),
-                  carrying=Carrying(resume=left.state, filters=left.filters,
-                                    versions=ready.versions if ready is not None else None),
-                  **self._order(_plays_newest_first(location)))
-        logger.info("The %s region opens where it was left: %d items", shape, len(items))
-        return True
+    def _rows_it_opens_on(self, location: str) -> list[dict]:
+        return self.rows_at(location)
 
-    def _fill_region(self, shape: str) -> bool:
-        began = time.perf_counter()
-        opening = self._openings.of(shape) or self._opening_of(self._rows_of_the_base_state(shape))
-        if not opening.items:
-            return False
-        self.open(opening.items, rows=opening.rows, location=self.base_location(shape), shape=shape,
+    def _where_it_opens(self, shape: str) -> str:
+        left = self._regions_left.get(shape)
+        return left.state.location if left is not None else self.base_location(shape)
+
+    def _open_once_made(self, shape: str, location: str) -> None:
+        self._opening_at[shape] = (location, time.perf_counter())
+        if self._openings.of(shape, location) is not None:
+            self._opening_made(shape)
+        else:
+            self._openings.make_ready(shape, location)
+
+    def _opening_made(self, shape: str) -> None:
+        if (shape not in self._opening_at or shape not in self._regions_wanted
+                or self.region_slideshow(shape) is not None):
+            return
+        location, began = self._opening_at[shape]
+        opening = self._openings.of(shape, location)
+        if opening is not None:
+            del self._opening_at[shape]
+            self._open_the_made(shape, opening, began)
+        elif location != self.base_location(shape):
+            self._regions_left.pop(shape, None)
+            self._open_once_made(shape, self.base_location(shape))
+        else:
+            del self._opening_at[shape]
+            logger.info("Nothing of %s shape to open on the %s region yet", shape, shape)
+
+    def _open_the_made(self, shape: str, opening: RegionOpening, began: float) -> None:
+        left = self._regions_left.get(shape)
+        if left is not None and left.state.location == opening.location:
+            self.open(opening.items, rows=opening.rows, location=opening.location, shape=shape,
+                      start=_place_of(left.state.current, opening.items),
+                      carrying=Carrying(resume=left.state, filters=left.filters,
+                                        versions=opening.versions),
+                      **self._order(_plays_newest_first(opening.location)))
+            logger.info("The %s region opens where it was left: %d items",
+                        shape, len(opening.items))
+            return
+        self.open(opening.items, rows=opening.rows, location=opening.location, shape=shape,
                   carrying=Carrying(versions=opening.versions), opening=opening)
         logger.info("The %s region opens on the library of its shape: "
                     "%d items, filled in %d ms",
                     shape, len(opening.items), (time.perf_counter() - began) * 1000)
-        return True
-
-    def _rows_of_the_base_state(self, shape: str) -> list[dict]:
-        return self.rows_at(self.base_location(shape))
 
     @looking_once
     def _opening_of(self, rows: list[dict]) -> RegionOpening:
@@ -1083,6 +1096,8 @@ class SlideshowDirector:
             lead=randrange(len(items)) if items else 0)
 
     def _with_its_lead_on_the_map(self, opening: RegionOpening, shape: str) -> RegionOpening:
+        if opening.location != self.base_location(shape):
+            return opening
         return replace(opening, lead_neighbors=self.neighbors_of(
             opening.items[opening.lead][2], shape=shape))
 
@@ -1098,12 +1113,12 @@ class SlideshowDirector:
     def _make_ready_what_opens_next(self, shape: str) -> None:
         if (self._fun_time is not None and self._fun_time.funestra(shape) is not None
                 and self.region_slideshow(shape) is None):
-            self._openings.make_ready(shape)
+            self._openings.make_ready(shape, self._where_it_opens(shape))
 
     def _refill_region(self, shape: str) -> None:
         if shape not in self._regions_wanted or self.region_slideshow(shape) is not None:
             return
-        self._fill_region(shape)
+        self._open_once_made(shape, self.base_location(shape))
 
     def _shape_of(self, slideshow) -> str | None:
         return next((shape for shape, on_that_side in self._region_slideshows.items()

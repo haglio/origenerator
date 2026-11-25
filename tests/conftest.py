@@ -41,6 +41,7 @@ from origenerator.gui import (
     looping_preview,
     off_the_machine,
     omnipause,
+    region_openings,
     square_buttons,
     viewport,
     voice_router,
@@ -570,7 +571,7 @@ def _off_thread_work_runs_inline(request, monkeypatch):
 
     monkeypatch.setattr(GalleryView, "off_thread",
                         lambda self, work, done: done(work()))
-    for module in (viewport, funestra_slideshow, enhance_versions):
+    for module in (viewport, funestra_slideshow, enhance_versions, region_openings):
         monkeypatch.setattr(module, "run_off_thread",
                             lambda work, done, *, owner: done(work()))
     monkeypatch.setattr(CombineController, "_after_painting",

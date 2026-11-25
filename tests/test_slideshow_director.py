@@ -35,8 +35,8 @@ from origenerator.gallery.shapes import BOTH
 from origenerator.genau_flicks import GenauFilters, GenauLeft
 from origenerator.genau_flicks import saved as genau_saved
 from origenerator.generation_state import GenerationSource
+from origenerator.gui import region_openings, two_screens
 from origenerator.gui import slideshow_director as module
-from origenerator.gui import two_screens
 from origenerator.gui.funestra_program import OwnFunestras
 from origenerator.gui.on_its_own_funestra import device_rect_of
 from origenerator.gui.slideshow_director import (
@@ -1348,6 +1348,60 @@ def test_a_region_comes_back_where_it_was_left_after_origenerator_itself_restart
     back = second.region_slideshow(PORTRAIT)
     assert back.resumed == replace(_LEFT_LOOPING_ON_G5, location=ALL_PORTRAIT)
     assert back.taken_up == (_LEFT_NARROWED, True)
+
+
+def _openings_held_back(monkeypatch) -> list:
+    held = []
+    monkeypatch.setattr(region_openings, "run_off_thread",
+                        lambda work, done, *, owner: held.append((work, done)))
+    return held
+
+
+def _let_go(held: list) -> None:
+    while held:
+        work, done = held.pop(0)
+        done(work())
+
+
+def _walks_counted(director) -> list:
+    walked = []
+    items_of = director.items_of
+    director.items_of = lambda rows: walked.append(1) or items_of(rows)
+    return walked
+
+
+def test_a_region_left_away_from_its_base_is_worked_out_off_the_window_then_opens_there(
+        slideshows, monkeypatch):
+    director, _host, _made = _regions_of_two_images(slideshows)
+    director.remember_regions({PORTRAIT: {"state": {"current": "g4", "location": LATEST_PORTRAIT},
+                                          "filters": {}}})
+    held = _openings_held_back(monkeypatch)
+    walked = _walks_counted(director)
+
+    director.fill_the_region(PORTRAIT)
+    walked_on_the_window = list(walked)
+    _let_go(held)
+
+    assert walked_on_the_window == [], (
+        "working out a region left on Latest held the window 1.8 s on a library of 11,000 items")
+    back = director.region_slideshow(PORTRAIT)
+    assert [item[2] for item in back.items] == ["g5", "g4"]
+    assert back.items[back.opened_with["start"]][2] == "g4"
+
+
+def test_a_side_whose_opening_is_not_ready_opens_once_it_is_made_off_the_window(
+        slideshows, monkeypatch):
+    director, _host, made = _regions_of_two_images(slideshows)
+    held = _openings_held_back(monkeypatch)
+    walked = _walks_counted(director)
+
+    director.fill_the_region(PORTRAIT)
+    walked_on_the_window = list(walked)
+    opened_before = list(made)
+    _let_go(held)
+
+    assert (walked_on_the_window, opened_before) == ([], [])
+    assert [item[2] for item in director.region_slideshow(PORTRAIT).items] == ["g4", "g5"]
 
 
 def test_a_region_left_on_latest_comes_back_on_latest(slideshows):
@@ -3229,7 +3283,7 @@ def _a_session_side_with_its_opening_ready(slideshows, qtbot, gallery_pane):
     director, host, made = slideshows(gallery_pane=gallery_pane,
                                       fun_time=FakeSession(funestras={PORTRAIT: object()}))
     director.make_the_openings_ready()
-    qtbot.waitUntil(lambda: director._openings.of(PORTRAIT) is not None)
+    qtbot.waitUntil(lambda: director._openings.of(PORTRAIT, ALL_PORTRAIT) is not None)
     return director, host, made
 
 
@@ -3273,7 +3327,7 @@ def test_a_sides_opening_learns_the_weights_of_its_videos_while_it_is_made_ready
                                       ("g5.mp4", "video", "g5", None)]
 
     director.make_the_openings_ready()
-    qtbot.waitUntil(lambda: director._openings.of(PORTRAIT) is not None)
+    qtbot.waitUntil(lambda: director._openings.of(PORTRAIT, ALL_PORTRAIT) is not None)
 
     assert weights.learned == ["g5.mp4"]
 

@@ -2011,7 +2011,7 @@ class GalleryView(QWidget):
     def reconnect_running_jobs(self):
         self.enhance.take_up_trainings()
         self._look_training.take_up_trainings()
-        self._jobs.reconnect_running()
+        self._jobs.reconnect_running(folder_key_of=self.library.folder_keys())
         self._remakes.start()
 
     def _cancel_reroll(self, key: str):

@@ -372,7 +372,7 @@ def test_reconnected_experiments_stay_preemptible(qtbot, tmp_path):
                          params_json=json.dumps({**wf.default_params(), "seed": 1}),
                          workflow_json="{}", source="experiment"))
     db.update_generation("exp-rr", status="running")
-    queue.reconnect_running()
+    queue.reconnect_running(folder_key_of=gallery.settings_folder_key)
 
     queue.start_prepared("user-key", _I2V, _params(seed=7))
 
@@ -415,6 +415,35 @@ def test_progress_persistence_is_throttled(qtbot, tmp_path, monkeypatch):
     assert db.get_generation(pid)["progress_json"] != first
 
 
+def test_taking_the_jobs_back_reads_the_library_once_and_files_them_where_the_gallery_does(
+        qtbot, tmp_path, monkeypatch):
+    client = _client()
+    client.executing_prompts.return_value = {"rr"}
+    db = Database(tmp_path / "test.db")
+    queue = JobQueue(db, client)
+    wf = WORKFLOW_REGISTRY["sdxl_t2i"]
+    for prompt_id, status in (("rr", "running"), ("pp", "pending")):
+        db.insert_generation(NewGeneration(
+            prompt_id=prompt_id, workflow_name="sdxl_t2i", workflow_version="v",
+            positive_prompt="x", seed=1, params_json=json.dumps({**wf.default_params(), "seed": 1}),
+            workflow_json="{}"))
+        db.update_generation(prompt_id, status=status)
+    db.restore_generation(_image_row())
+    for prompt_id in ("vid-1", "vid-2"):
+        db.restore_generation({**_video_row(prompt_id=prompt_id), "status": "pending",
+                               "workflow_version": _I2V.version, "workflow_json": "{}"})
+    queue.enhance_images_with(lambda image: None)
+    listed = []
+    listing = db.list_generations
+    monkeypatch.setattr(db, "list_generations", lambda: listed.append(1) or listing())
+
+    queue.reconnect_running(folder_key_of=lambda row: f"folder of {row['prompt_id']}")
+
+    assert len(listed) == 1, "each listing copies every item of the library on the window's thread"
+    assert [queue.job_for(f"folder of {prompt_id}").prompt_id
+            for prompt_id in ("rr", "pp", "vid-1", "vid-2")] == ["rr", "pp", "vid-1", "vid-2"]
+
+
 def test_reconnect_running_seeds_progress_from_the_row(qtbot, tmp_path):
     client = _client()
     client.executing_prompts.return_value = {"rr"}
@@ -429,32 +458,13 @@ def test_reconnect_running_seeds_progress_from_the_row(qtbot, tmp_path):
         {"last_progress": [30, 50],
          "tracker": {"total": 50, "banked": 0, "stage_max": 50, "last_value": 30}}))
 
-    queue.reconnect_running()
+    queue.reconnect_running(folder_key_of=gallery.settings_folder_key)
 
     job = next(j for j in queue.jobs.values() if j.prompt_id == "rr")
     assert job.last_progress == (30, 50), (
         "the value last shown is saved beside the tracker, so even a job with no recognized "
         "sampler, whose raw numbers, a node at a time, give the tracker no ramp to restore, "
         "comes back at what it last showed")
-
-
-def test_a_video_reconnected_at_startup_finds_its_folder_by_its_start_frames_settings(
-        qtbot, tmp_path):
-    db = Database(tmp_path / "test.db")
-    image = _image_row()
-    video = {**_video_row(prompt_id="vid-run"), "status": "running",
-             "workflow_version": _I2V.version, "workflow_json": "{}"}
-    db.restore_generation(image)
-    db.restore_generation(video)
-    queue = JobQueue(db, _client())
-
-    queue.reconnect_running()
-
-    by_its_frame = gallery.settings_folder_key(video, gallery.image_config_index_of([image]))
-    assert by_its_frame != gallery.settings_folder_key(video)
-    assert getattr(queue.job_for(by_its_frame), "prompt_id", None) == "vid-run", (
-        "at startup the gallery has not built its tree yet, so a run reconnected then reads "
-        "its start frame's settings from the database to find its folder")
 
 
 def _image_params(**over):
@@ -937,7 +947,7 @@ def test_a_submit_refused_as_the_app_closes_waits_for_the_next_copy_to_send_it(q
 
     assert said == []
     next_copy = JobQueue(db, _client())
-    next_copy.reconnect_running()
+    next_copy.reconnect_running(folder_key_of=gallery.settings_folder_key)
     assert next_copy.queue_order[-1] == waiting.prompt_id
 
 
@@ -1000,7 +1010,7 @@ def test_a_queue_held_when_the_app_closed_comes_back_as_a_queue(qtbot, tmp_path)
     _pending_row(db, "held-1")
     _pending_row(db, "held-2")
 
-    queue.reconnect_running()
+    queue.reconnect_running(folder_key_of=gallery.settings_folder_key)
 
     assert [call.args[1] for call in client.submit_job.call_args_list] == ["held-1"]
     assert queue.queue_order == ["held-1", "held-2"]
@@ -1012,7 +1022,7 @@ def test_a_re_adopted_queue_starts_moving_again_at_once(qtbot, tmp_path):
     queue = JobQueue(db, client)
     _pending_row(db, "held-1")
 
-    queue.reconnect_running()
+    queue.reconnect_running(folder_key_of=gallery.settings_folder_key)
 
     client.submit_job.assert_called_once()
     assert db.get_generation("held-1")["status"] == "running"
@@ -1023,7 +1033,7 @@ def test_a_held_row_whose_workflow_is_gone_is_dropped(qtbot, tmp_path):
     queue = JobQueue(db, _client())
     _pending_row(db, "orphan", workflow_name="a_workflow_that_left", params={})
 
-    queue.reconnect_running()
+    queue.reconnect_running(folder_key_of=gallery.settings_folder_key)
 
     assert db.get_generation("orphan") is None
     assert queue.queue_order == []
@@ -1706,7 +1716,7 @@ def test_every_video_the_server_holds_is_pulled_back_for_the_image(qtbot, tmp_pa
                              params_json=json.dumps(_params(seed=1)), workflow_json="{}"))
         db.update_generation(pid, status="running")
     queue = JobQueue(db, client)
-    queue.reconnect_running()
+    queue.reconnect_running(folder_key_of=gallery.settings_folder_key)
 
     image = _launch_image(queue, "i")
 
@@ -1726,7 +1736,7 @@ def test_a_restart_takes_back_every_job_comfyui_holds_but_is_not_making(qtbot, t
         db.update_generation(pid, status="running")
     queue = JobQueue(db, client)
 
-    queue.reconnect_running()
+    queue.reconnect_running(folder_key_of=gallery.settings_folder_key)
 
     assert queue.queue_order == ["v-old", "v-new"], (
         "every still-in-flight row is taken back, even for a folder the user has not opened "
@@ -1746,7 +1756,7 @@ def test_the_run_comfyui_is_making_is_the_front_of_the_line(qtbot, tmp_path):
                              params_json=json.dumps(_params(seed=1)), workflow_json="{}"))
         db.update_generation(pid, status="running")
     queue = JobQueue(db, client)
-    queue.reconnect_running()
+    queue.reconnect_running(folder_key_of=gallery.settings_folder_key)
 
     client.progress.emit("v-new", "s", 1, 10)
 
@@ -1936,7 +1946,7 @@ def test_a_shield_on_the_run_being_made_survives_a_restart(qtbot, tmp_path):
     queue.shield(video.prompt_id, True)
 
     restarted = JobQueue(db, _client())
-    restarted.reconnect_running()
+    restarted.reconnect_running(folder_key_of=gallery.settings_folder_key)
 
     assert restarted.job_for_prompt(video.prompt_id).shielded
 
@@ -1949,7 +1959,7 @@ def test_a_shield_on_a_run_still_waiting_survives_a_restart(qtbot, tmp_path):
     queue.shield(waiting.prompt_id, True)
 
     restarted = JobQueue(db, _client())
-    restarted.reconnect_running()
+    restarted.reconnect_running(folder_key_of=gallery.settings_folder_key)
 
     assert restarted.job_for_prompt(waiting.prompt_id).shielded
 
@@ -2261,7 +2271,7 @@ def test_a_video_held_over_a_restart_starts_from_the_enhancement_its_image_gaine
     _image(db, enhanced=True)
     queue = _enhanced_into(JobQueue(db, client), [])
 
-    queue.reconnect_running()
+    queue.reconnect_running(folder_key_of=gallery.settings_folder_key)
 
     assert _ENHANCED_REF in json.dumps(client.submit_job.call_args_list[-1].args[0])
     assert json.loads(db.get_generation("video")["params_json"])["input_image"] == _ENHANCED_REF
@@ -2278,7 +2288,7 @@ def test_a_video_held_over_a_restart_does_not_ask_again_for_the_enhance_a_newer_
     enhanced = []
     queue = _enhanced_into(JobQueue(db, _client()), enhanced)
 
-    queue.reconnect_running()
+    queue.reconnect_running(folder_key_of=gallery.settings_folder_key)
 
     assert enhanced == []
 

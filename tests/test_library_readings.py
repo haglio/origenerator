@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 
-from origenerator import library_readings
+from origenerator import gallery, library_readings
 from origenerator.item_names import ItemNames
 from origenerator.library_readings import LibraryReadings, read_whole
+from origenerator.workflows import WORKFLOW_REGISTRY
 from tests.real_db import database_in, put_rows
 
 _SHAPES = ("landscape", "portrait")
@@ -195,3 +196,44 @@ def test_rows_the_poll_fingerprinted_are_not_fingerprinted_again_when_taken(tmp_
     readings.take(read.rows, read.meta, _SHAPES)
 
     assert counted == []
+
+
+def _a_start_frame_and_its_video() -> tuple[dict, dict]:
+    image_workflow, video_workflow = WORKFLOW_REGISTRY["sdxl_t2i"], WORKFLOW_REGISTRY["wan22_i2v"]
+    image = {"prompt_id": "img-1", "workflow_name": "sdxl_t2i",
+             "workflow_version": image_workflow.version, "status": "completed",
+             "params_json": json.dumps({**image_workflow.default_params(), "seed": 100}),
+             "output_files": json.dumps([{"filename": "frame_001.png", "subfolder": "",
+                                          "type": "output"}])}
+    video = {"prompt_id": "vid-run", "workflow_name": "wan22_i2v",
+             "workflow_version": video_workflow.version, "status": "running",
+             "params_json": json.dumps({**video_workflow.default_params(),
+                                        "input_image": "frame_001.png [output]"})}
+    return image, video
+
+
+def test_a_library_not_yet_read_files_a_video_by_its_start_frames_settings(tmp_path):
+    image, video = _a_start_frame_and_its_video()
+    readings, _db, _published = _readings(tmp_path, image, video)
+
+    by_its_frame = gallery.settings_folder_key(video, gallery.image_config_index_of([image]))
+
+    assert by_its_frame != gallery.settings_folder_key(video)
+    assert readings.folder_keys()(video) == by_its_frame, (
+        "Standalone takes its running jobs back before the gallery has read its library, so "
+        "a video is filed by its start frame's settings read from the database")
+
+
+def test_a_library_read_files_by_the_reading_it_holds_without_listing_again(
+        tmp_path, monkeypatch):
+    image, video = _a_start_frame_and_its_video()
+    readings, db, _published = _readings(tmp_path, image, video)
+    readings.take(*readings.read(), _SHAPES)
+    listed = []
+    listing = db.list_generations
+    monkeypatch.setattr(db, "list_generations", lambda: listed.append(1) or listing())
+
+    filed = readings.folder_keys()(video)
+
+    assert filed == gallery.settings_folder_key(video, gallery.image_config_index_of([image]))
+    assert listed == []

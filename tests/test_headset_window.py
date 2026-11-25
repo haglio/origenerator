@@ -8,8 +8,9 @@ import shiboken6
 from app_support.frame_channel import LOOK_AGAIN_AFTER_S
 from app_support.threading_utils import wait_until
 from funestra.file_channel import append_command, consume_command_file
-from PySide6.QtCore import QEvent, QPoint, Qt
+from PySide6.QtCore import QEvent, QObject, QPoint, Qt
 from PySide6.QtGui import QColor, QImage
+from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import QApplication, QComboBox, QDialog, QLabel, QMenu, QWidget
 
 from origenerator.gui import headset_window
@@ -132,16 +133,16 @@ class TestHowBigAPublishedFrameMayBe:
         assert within.format() == QImage.Format.Format_RGBA8888
 
 
-def _counting_grabs(window) -> list[int]:
-    grabbed: list[int] = []
-    grab = window.grab
+def _counting_looks(monkeypatch) -> list[int]:
+    looked: list[int] = []
+    look = headset_window.what_the_window_shows
 
-    def counted(*args, **kwargs):
-        grabbed.append(1)
-        return grab(*args, **kwargs)
+    def counted(window):
+        looked.append(1)
+        return look(window)
 
-    window.grab = counted
-    return grabbed
+    monkeypatch.setattr(headset_window, "what_the_window_shows", counted)
+    return looked
 
 
 def _presses_on(label: QLabel) -> list[str]:
@@ -310,18 +311,18 @@ class TestTheRoomsPressesReachTheWindow:
         assert again == first, "the same frame was published twice"
 
 
-    def test_a_hover_alone_does_not_grab_the_window_again(self, tmp_path, qtbot):
+    def test_a_hover_alone_does_not_grab_the_window_again(self, tmp_path, qtbot, monkeypatch):
         window = self._window(qtbot)
         window.show()
         headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset.publish(now=1.0)
-            grabbed = _counting_grabs(window)
+            looked = _counting_looks(monkeypatch)
 
             headset._heard("hover 30 40")
             headset.publish(now=1.0 + LOOK_AGAIN_AFTER_S / 2)
 
-            assert grabbed == [], (
+            assert looked == [], (
                 "pointing at the window is not a change to it, and the room sends a hover every "
                 "time the laser moves a pixel: taken as a reason to look, each one costs a grab "
                 "of the whole window at the poll's rate, which in the headset halved the room's "
@@ -331,7 +332,7 @@ class TestTheRoomsPressesReachTheWindow:
             headset.close()
 
     def test_a_press_that_changes_the_window_has_it_looked_at_without_waiting(
-            self, tmp_path, qtbot):
+            self, tmp_path, qtbot, monkeypatch):
         window = self._window(qtbot)
         window.show()
         label = window.findChild(QLabel, "target")
@@ -339,26 +340,27 @@ class TestTheRoomsPressesReachTheWindow:
         headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset.publish(now=1.0)
-            grabbed = _counting_grabs(window)
+            looked = _counting_looks(monkeypatch)
 
             headset._heard("press 30 40")
             QApplication.processEvents()
             headset.publish(now=1.0 + LOOK_AGAIN_AFTER_S / 2)
 
-            assert grabbed == [1], (
+            assert looked == [1], (
                 "what a press does to the window is what the room is waiting to see, so that "
                 "one is worth the grab it costs")
         finally:
             headset.close()
 
-    def test_a_window_nothing_has_changed_on_is_never_grabbed_again(self, tmp_path, qtbot):
+    def test_a_window_nothing_has_changed_on_is_never_looked_at_again(
+            self, tmp_path, qtbot, monkeypatch):
         window = self._window(qtbot)
         window.show()
         QApplication.processEvents()
         headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset.publish(now=1.0)
-            grabbed = _counting_grabs(window)
+            looked = _counting_looks(monkeypatch)
 
             headset._heard("press 30 40")
             headset._heard("release")
@@ -366,28 +368,112 @@ class TestTheRoomsPressesReachTheWindow:
                 QApplication.processEvents()
                 headset.publish(now=1.0 + tick * LOOK_AGAIN_AFTER_S)
 
-            assert grabbed == [], (
-                "a grab draws every widget of the window again, so a window that looks as it "
-                "did is never grabbed, however often the timer comes round")
+            assert looked == [], (
+                "a look copies the whole window and compares it, so a window that looks as it "
+                "did is never looked at, however often the timer comes round")
         finally:
             headset.close()
 
-    def test_a_change_on_the_window_is_grabbed_once(self, tmp_path, qtbot):
+    def test_a_change_on_the_window_is_looked_at_once(self, tmp_path, qtbot, monkeypatch):
         window = self._window(qtbot)
         window.show()
         headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         try:
             headset.publish(now=1.0)
-            grabbed = _counting_grabs(window)
+            looked = _counting_looks(monkeypatch)
 
             window.findChild(QLabel, "target").setText("changed")
             for tick in range(1, 6):
                 QApplication.processEvents()
                 headset.publish(now=1.0 + tick * LOOK_AGAIN_AFTER_S)
 
-            assert grabbed == [1]
+            assert looked == [1]
         finally:
             headset.close()
+
+
+class _Paints(QObject):
+    def __init__(self, *widgets: QWidget) -> None:
+        super().__init__()
+        self.of: list[str] = []
+        for widget in widgets:
+            widget.installEventFilter(self)
+
+    def eventFilter(self, watched, event) -> bool:
+        if event.type() == QEvent.Type.Paint:
+            self.of.append(type(watched).__name__)
+        return False
+
+
+def _frame_pixels(tmp_path) -> tuple[int, int, bytes]:
+    published = (tmp_path / "frame.bin").read_bytes()
+    _sequence, _token, width, height = struct.unpack("<QIII", published[:20])
+    return width, height, published[20:20 + width * height * 4]
+
+
+def _grabbed_pixels(window) -> tuple[int, int, bytes]:
+    image = window.grab().toImage().convertToFormat(QImage.Format.Format_RGBA8888)
+    return image.width(), image.height(), bytes(image.constBits())
+
+
+class TestWhatTheFrameShows:
+    def _window(self, qtbot, *, on_screen=True) -> QWidget:
+        window = QWidget()
+        qtbot.addWidget(window)
+        window.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, not on_screen)
+        window.resize(240, 160)
+        label = QLabel("a made-up line", window)
+        label.setGeometry(20, 30, 120, 20)
+        window.show()
+        wait_until(lambda: window.windowHandle().isExposed() or not on_screen,
+                   pump=QApplication.processEvents)
+        QApplication.processEvents()
+        return window
+
+    def test_the_frame_is_the_window_as_it_last_drew_itself_without_drawing_it_again(
+            self, tmp_path, qtbot):
+        window = self._window(qtbot)
+        paints = _Paints(window.findChild(QLabel))
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
+        try:
+            headset.publish(now=1.0)
+        finally:
+            headset.close()
+
+        assert paints.of == [], (
+            "drawing the whole window again for each frame, the TOC and every tile included, "
+            "was most of what held the window still while he pointed in the headset; the "
+            "window already holds what it drew for the screen")
+        assert _frame_pixels(tmp_path) == _grabbed_pixels(window)
+
+    def test_a_window_that_draws_nothing_for_the_screen_is_drawn_for_its_frame(
+            self, tmp_path, qtbot):
+        window = self._window(qtbot, on_screen=False)
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
+        try:
+            headset.publish(now=1.0)
+        finally:
+            headset.close()
+
+        assert _frame_pixels(tmp_path) == _grabbed_pixels(window)
+
+    def test_what_the_graphics_card_draws_is_drawn_again_and_nothing_else(
+            self, tmp_path, qtbot):
+        window = self._window(qtbot)
+        in_qt_quick = QQuickWidget(window)
+        in_qt_quick.setGeometry(150, 40, 60, 50)
+        in_qt_quick.show()
+        QApplication.processEvents()
+        paints = _Paints(window.findChild(QLabel), in_qt_quick)
+        headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
+        try:
+            headset.publish(now=1.0)
+        finally:
+            headset.close()
+
+        assert paints.of == ["QQuickWidget"], (
+            "a video playing in a preview is drawn on the graphics card and is missing from "
+            "what the window drew for the screen, so its part is drawn again for the frame")
 
 
 class TestWhatOpensOverTheWindow:
@@ -439,14 +525,14 @@ class TestWhatOpensOverTheWindow:
         menu.close()
 
     def test_a_menu_that_opens_over_a_published_window_is_grabbed_into_it(
-            self, tmp_path, qtbot):
+            self, tmp_path, qtbot, monkeypatch):
         window = self._window(qtbot)
         headset = HeadsetWindow(window, a_headset_session_publishing_into(tmp_path))
         menu = QMenu(window)
         menu.addAction("one")
         try:
             headset.publish(now=1.0)
-            grabbed = _counting_grabs(window)
+            looked = _counting_looks(monkeypatch)
 
             menu.popup(window.mapToGlobal(QPoint(40, 60)))
             wait_until(menu.isVisible, pump=QApplication.processEvents)
@@ -460,7 +546,7 @@ class TestWhatOpensOverTheWindow:
             headset.close()
             menu.close()
 
-        assert grabbed == [1, 1], "the menu opening and the menu closing are each one grab"
+        assert looked == [1, 1], "the menu opening and the menu closing are each one grab"
 
     def test_a_menu_open_over_the_window_is_off_the_monitors_too(
             self, tmp_path, qtbot, monkeypatch):

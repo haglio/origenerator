@@ -12,6 +12,8 @@ from tests.gallery_view_support import (
     _reroll_client,
     _seeded_db,
     _select_first_leaf,
+    held_off_the_window_thread,
+    land,
 )
 
 
@@ -59,6 +61,17 @@ def test_the_trash_on_a_tile_being_generated_lets_the_run_finish_into_trash(qtbo
     assert db.get_generation(prompt_id) is None
     assert db.asked_when_finished() == []
     assert prompt_id in {row["prompt_id"] for row in db.list_trashed()}
+
+
+def test_the_trash_on_a_tile_being_generated_reads_the_library_off_the_window_thread(
+        qtbot, tmp_path, monkeypatch):
+    view, _db, _client, _prompt_id = _a_run_on_its_way(qtbot, tmp_path)
+    held = held_off_the_window_thread(view, monkeypatch)
+
+    _generating_tile(view).control_triggered.emit(TRASH)
+    land(held)
+
+    assert _generating_tile(view) is None
 
 
 def test_the_enhance_on_an_image_being_generated_enhances_it_once_it_finishes(qtbot, tmp_path):

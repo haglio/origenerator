@@ -88,6 +88,8 @@ from tests.gallery_view_support import (
     _struck_and_lit,
     _tab_with_prompts,
     _viewport_of,
+    held_off_the_window_thread,
+    land,
 )
 from tests.qt_exec import faking_exec
 from tests.real_db import database_of, keep_on_disk, keep_rows_on_disk, put_rows
@@ -2858,6 +2860,23 @@ def test_a_run_in_a_folder_the_tree_has_not_drawn_yet_is_gone_to_all_the_same(qt
         db.get_generation("gen1"), gallery.build_image_config_index(view.library.reading.image_rows))
 
     view._reveal_reroll(folder)
+
+    assert _selected_folder(view) == folder
+
+
+def test_a_run_in_a_folder_the_tree_has_not_drawn_yet_is_read_for_off_the_window_thread(
+        qtbot, monkeypatch):
+    db = database_of([_image("i1", "a cat", 50, 1)])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    put_rows(db, [_running_row("gen1", prompt="a dog")])
+    folder = gallery.settings_folder_key(
+        db.get_generation("gen1"), gallery.build_image_config_index(view.library.reading.image_rows))
+    held = held_off_the_window_thread(view, monkeypatch)
+
+    view._reveal_reroll(folder)
+    land(held)
 
     assert _selected_folder(view) == folder
 

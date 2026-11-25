@@ -61,6 +61,8 @@ from tests.gallery_view_support import (
     _selected_folder,
     _struck_and_lit,
     _tile_kinds_in_order,
+    held_off_the_window_thread,
+    land,
 )
 from tests.real_db import database_of, kept_on_disk
 from tests.waiting import until
@@ -418,6 +420,21 @@ def test_the_rewrite_lands_in_one_folder_beside_the_one_it_came_from(qtbot, tmp_
     landing = set(view._jobs.jobs_by_folder)
     assert len(landing) == 1
     assert landing != {key}
+
+
+def test_a_request_reads_the_library_off_the_window_thread_then_stands_on_its_folder(
+        qtbot, tmp_path, monkeypatch):
+    view = GalleryView(_folder_db(tmp_path), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    key = _select_first_leaf(view)
+    held = held_off_the_window_thread(view, monkeypatch)
+
+    _rewritten(view, key)
+    land(held)
+
+    (landing,) = view._jobs.jobs_by_folder
+    assert _selected_folder(view) == landing
 
 
 def test_each_rewritten_image_is_linked_to_the_one_it_came_from(qtbot, tmp_path):
@@ -946,6 +963,36 @@ def test_generate_navigates_to_a_brand_new_folder_immediately(qtbot, tmp_path):
     assert view.toc.item_for(folder) is not None
     assert folder in view._live_jobs
     assert _selected_folder(view) == folder
+
+
+def test_generate_reads_the_library_off_the_window_thread_then_stands_on_the_run(
+        qtbot, tmp_path, monkeypatch):
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    held = held_off_the_window_thread(view, monkeypatch)
+
+    folder = _generate_in_current_tab(view, positive_prompt="a totally new prompt", seed=5)
+    land(held)
+
+    assert folder in view._live_jobs
+    assert _selected_folder(view) == folder
+
+
+def test_a_folder_clicked_while_a_generate_is_read_keeps_him_there(
+        qtbot, tmp_path, monkeypatch):
+    view = GalleryView(_seeded_db(tmp_path, seed=7), client=_reroll_client())
+    qtbot.addWidget(view)
+    view.refresh()
+    held = held_off_the_window_thread(view, monkeypatch)
+
+    _generate_in_current_tab(view, positive_prompt="a totally new prompt", seed=5)
+    clicked = _select_first_leaf(view)
+    land(held)
+
+    assert _selected_folder(view) == clicked, (
+        "his click came after the press, so it is where he wants to be, as it was when the "
+        "press held the window and the click waited behind it")
 
 
 

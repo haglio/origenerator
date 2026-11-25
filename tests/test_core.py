@@ -1746,8 +1746,7 @@ def test_a_crossing_takes_the_presses_the_room_writes(qtbot, tmp_path):
     assert _frame_published(tmp_path / "frame.bin") != (0, 0)
     append_command(presses, "hover 10 10")
 
-    _headset_tick(win)
-    assert not presses.exists() or not presses.read_text(encoding="utf-8").strip()
+    wait_until(lambda: not presses.exists() or not presses.read_text(encoding="utf-8").strip())
 
 
 def test_a_window_parked_on_the_monitors_is_up_again_once_it_crosses(qtbot, tmp_path):

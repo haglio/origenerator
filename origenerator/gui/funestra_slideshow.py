@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, replace
+from functools import partial
 from pathlib import Path
 
 from funestra.funestra_verbs import (
@@ -43,7 +44,7 @@ from origenerator.gui.off_thread import run_off_thread
 from origenerator.gui.on_a_sessions_funestra import OnASessionsFunestra
 from origenerator.gui.slideshow_pace import STEP_S as PACE_STEP_S
 from origenerator.gui.slideshow_pace import SlideshowPace
-from origenerator.gui.slideshow_pass import playlist_item, rotated_onto, slide_item
+from origenerator.gui.slideshow_pass import playlist_item, playlist_items, rotated_onto
 from origenerator.gui.slideshow_playing import NO_HOSTING, Hosting, Playing, Seat
 from origenerator.gui.slideshow_set import (
     SetDeal,
@@ -169,7 +170,8 @@ class FunestraSlideshow(QObject):
         if current is None:
             return
         rotated = rotated_onto(self._set.playlist.in_play_order(), current)
-        self._outbox.write_playlist([self._funestra_item(item) for item in rotated])
+        self._outbox.write_playlist(partial(playlist_items, [self._entry(item) for item in rotated],
+                                            scripts=self._scripts_on_opening))
         lands = land and current is not None and self._file_of(current) != self._on_funestra.item
         if lands and self._comparing:
             self._comparing = False
@@ -213,11 +215,14 @@ class FunestraSlideshow(QObject):
             return str(self._frames.first_of(slide.prompt_id))
         return str(slide.path)
 
-    def _funestra_item(self, slide) -> PlaylistItem:
+    def _entry(self, slide) -> tuple[str, str, tuple]:
+        file = self._file_of(slide)
         if slide.is_live:
-            return PlaylistItem(Path(self._file_of(slide)))
-        return slide_item(slide, self._places_of(self._file_of(slide)),
-                          scripts=self._scripts_on_opening)
+            return file, MediaType.IMAGE, ()
+        return file, slide.media_type, self._places_of(file)
+
+    def _funestra_item(self, slide) -> PlaylistItem:
+        return playlist_item(*self._entry(slide), scripts=self._scripts_on_opening)
 
     def _off_the_window(self, work, done, *, owner) -> None:
         if self.channel.waits_on_the_disk:

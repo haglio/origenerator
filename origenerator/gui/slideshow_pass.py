@@ -9,6 +9,7 @@ from funestra.playlist import PlaylistItem
 from origenerator.config import OUTPUT_PLACES
 from origenerator.funscript import funscript_of
 from origenerator.media import MediaType
+from origenerator.one_look import one_look
 
 
 def playlist_item(path, media_type: str, points_of_interest: tuple = (), *,
@@ -21,9 +22,10 @@ def playlist_item(path, media_type: str, points_of_interest: tuple = (), *,
     return PlaylistItem(path, funscript_of(path, places=OUTPUT_PLACES))
 
 
-def slide_item(slide, points_of_interest: tuple = (), *,
-               scripts: Mapping = MappingProxyType({})) -> PlaylistItem:
-    return playlist_item(slide.path, slide.media_type, points_of_interest, scripts=scripts)
+def playlist_items(entries, *, scripts: Mapping = MappingProxyType({})) -> list[PlaylistItem]:
+    with one_look():
+        return [playlist_item(path, media_type, points_of_interest, scripts=scripts)
+                for path, media_type, points_of_interest in entries]
 
 
 def rotated_onto(items: list, current) -> list:

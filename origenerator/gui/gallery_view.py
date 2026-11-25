@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
+from contextlib import contextmanager
 from functools import partial
 from typing import NamedTuple
 
@@ -206,7 +207,7 @@ from origenerator.item_shape import (
 from origenerator.item_shape import (
     split_key as _split_collection_key,
 )
-from origenerator.library_readings import LibraryReadings, arrived, read_whole
+from origenerator.library_readings import LibraryReadings, Prepared, Read, arrived
 from origenerator.media import MediaType
 from origenerator.one_look import looking_once
 from origenerator.output_places import OutputFolders
@@ -306,6 +307,7 @@ class GalleryView(QWidget):
                                        populating=self._populated_ids)
         self._build_what_the_satellites_play(db, client)
         self._edits_given = actions
+        self._aims_held: bool | None = None
         self.rest_built = False
         if not the_rest_later:
             self.build_the_rest()
@@ -970,11 +972,27 @@ class GalleryView(QWidget):
 
     def refresh(self, *, only_if_moved: bool = False):
         rows, meta = self.library.read()
-        if self.library.moved_to(rows, meta) or not only_if_moved:
-            if self.rest_built:
-                self._rebuild(rows, meta)
+        self._draw_the_library(rows, meta, moved=self.library.moved_to(rows, meta),
+                               only_if_moved=only_if_moved)
+
+    def refresh_off_the_window_thread(self, then: Callable[[], None]) -> None:
+        def drawn(read) -> None:
+            if read is None:
+                self.refresh()
             else:
-                self.library.take(rows, meta, self._tree.shapes)
+                self._draw_the_library(read.rows, read.meta,
+                                       moved=self.library.moved_to_read(read),
+                                       prepared=read.prepared)
+            then()
+        self.off_thread(self._read_and_work_out(None, even_unmoved=True), drawn)
+
+    def _draw_the_library(self, rows, meta, *, moved: bool, only_if_moved: bool = False,
+                          prepared: Prepared | None = None) -> None:
+        if moved or not only_if_moved:
+            if self.rest_built:
+                self._rebuild(rows, meta, prepared=prepared)
+            else:
+                self.library.take(rows, meta, self._tree.shapes, prepared)
             self.slideshows.library_moved()
         self.slideshows.fill_the_wanted_regions()
 
@@ -997,11 +1015,23 @@ class GalleryView(QWidget):
         except Exception:
             self._poll_inflight = False
             raise
-        db = self._db
         read_at = self.library.drawn_version
-        last = self._last_poll_read
-        self.off_thread(lambda: read_whole(db, last),
+        self.off_thread(self._read_and_work_out(self._last_poll_read),
                         lambda read: self._finish_poll_rebuild(read, read_at))
+
+    def _read_and_work_out(self, last, *, even_unmoved: bool = False) -> Callable[[], Read]:
+        library, index, shapes = self.library, self.search.index, tuple(self._tree.shapes)
+
+        def work() -> Read:
+            read = library.read_and_prepare(last, shapes, even_unmoved=even_unmoved)
+            prepared = read.prepared
+            if prepared is None:
+                return read
+            worked = prepared.library
+            return read._replace(prepared=prepared._replace(searched=index.worked_out(
+                worked.rows + worked.held_rows, prepared.named_folders(),
+                item_name=prepared.name_of)))
+        return work
 
     def _finish_poll_rebuild(self, read, read_at: int):
         try:
@@ -1010,7 +1040,7 @@ class GalleryView(QWidget):
             self._last_poll_read = read
             if self.library.is_news(read, read_at):
                 listed_before = self.library.reading.rows
-                self._rebuild(read.rows, read.meta)
+                self._rebuild(read.rows, read.meta, prepared=read.prepared)
                 self.slideshows.note_arrived(arrived(self.library.reading.rows, listed_before))
             else:
                 self._gallery_pane.refresh_inflight(rows=read.rows, requests=read.requests)
@@ -1028,7 +1058,24 @@ class GalleryView(QWidget):
             job.take_executing(job.prompt_id in facts.executing)
         self.job_queue.take_foreign(facts.foreign)
 
-    def _rebuild(self, rows, meta):
+    def _rebuild(self, rows, meta, *, prepared: Prepared | None = None):
+        with self._buttons_aimed_once_at_the_end():
+            self._redraw(rows, meta, prepared)
+
+    @contextmanager
+    def _buttons_aimed_once_at_the_end(self):
+        if self._aims_held is not None:
+            yield
+            return
+        self._aims_held = False
+        try:
+            yield
+        finally:
+            asked, self._aims_held = self._aims_held, None
+            if asked:
+                self._re_aim_every_button()
+
+    def _redraw(self, rows, meta, prepared: Prepared | None):
         standing = self.toc.selected_folder_key()
         place = self._gallery_pane.place()
         toc_place = self.toc.place()
@@ -1041,12 +1088,14 @@ class GalleryView(QWidget):
         self._pending_key = self._pending_selection = None
         self.combine.offer_the_actions(rows)
         trash_collection.settle_regenerations(self._db)
-        library = self.library.take(rows, meta, self._tree.shapes)
+        library = self.library.take(rows, meta, self._tree.shapes, prepared)
+        drawn_from = self.library.drawn_from
         rows = library.rows
         trees = {shape: library.tree(shape) for shape in self._tree.shapes}
-        self.search.index.update(rows + library.held_rows, gallery.named_folders(
-            [folder for tree in trees.values() for folder in tree], meta,
-            self.library.customs), item_name=self._item_names.of)
+        searched = drawn_from.searched
+        if searched is None or not self.search.index.take_worked_out(searched):
+            self.search.index.update(rows + library.held_rows, drawn_from.named_folders(),
+                                     item_name=drawn_from.name_of)
         requests = self.library.requests
         self._gallery_pane.set_model(library, requests=requests)
         self.toc.populate(
@@ -1592,6 +1641,9 @@ class GalleryView(QWidget):
         return "this folder"
 
     def _re_aim_every_button(self) -> None:
+        if self._aims_held is not None:
+            self._aims_held = True
+            return
         enhance = self.enhance.offer()
         self._buttons.apply(self.button_states())
         self.enhance.sync_pane(enhance)

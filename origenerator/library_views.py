@@ -12,13 +12,18 @@ from app_support.media_renditions import original_rendition
 from origenerator import gallery, points_of_interest, trash_collection
 from origenerator.config import EVOLVER_AI_DIR, EVOLVER_SOURCE, KINO_UPSCALES_DIR, OUTPUT_PLACES
 from origenerator.evolver_upscales import EvolverUpscales, original_stem
-from origenerator.gallery.collection import collection, folder_collection
+from origenerator.gallery.collection import (
+    FolderCollection,
+    all_collections,
+    collection,
+    folder_collection,
+)
 from origenerator.gallery.custom import index_folders
 from origenerator.gallery.enhance import EnhanceVersion, file_at, upscale_and_original
 from origenerator.gallery.output import FilesMade
 from origenerator.gallery.placement import Placement
 from origenerator.gallery.shapes import LANDSCAPE, shape_covers
-from origenerator.gallery.tree import KeptFolders, all_the_same
+from origenerator.gallery.tree import ALL_KEY, KeptFolders, all_the_same
 from origenerator.generation_state import on_the_map
 from origenerator.item_shape import filter_rows, row_shape, split_key
 from origenerator.media import MediaType
@@ -301,6 +306,13 @@ class LibrarySnapshot:
 
     def in_collection(self, which: str, shape: str | None, folder: str) -> list[dict]:
         return self.placement(shape).held_by(folder, self.on_shape(shape, which))
+
+    def collection_counts(self, shape: str) -> dict[str, int]:
+        placement = self.placement(shape)
+        tallies = {counted.key: placement.tally(self.in_collection(counted.key, shape, ALL_KEY))
+                   for counted in all_collections() if counted.counted}
+        return {FolderCollection(which, folder).key: count
+                for which, tally in tallies.items() for folder, count in tally.items()}
 
     @cached_property
     def image_config_index(self) -> dict:

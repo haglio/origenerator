@@ -7,6 +7,7 @@ from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QApplication, QWidget
 
+from origenerator import item_names, library_views, search
 from origenerator.comfyui_api import ForeignQueue
 from origenerator.comfyui_client import ComfyUIClient
 from origenerator.gui.gallery_view import GalleryView
@@ -15,6 +16,7 @@ from tests.gallery_view_support import (
     _reroll_client,
     _seeded_db,
     _select_first_leaf,
+    _selected_folder,
 )
 from tests.real_db import database_of, put_rows
 
@@ -197,3 +199,87 @@ def test_a_listing_that_could_not_be_read_draws_nothing_and_leaves_the_next_tick
 
     assert view.library.drawn_version == drawn
     assert view._poll_inflight is False
+
+
+def test_a_rebuild_works_out_the_buttons_once(qtbot, monkeypatch):
+    db = database_of([_image("i1", "scene one", 50, 1)])
+    view = _gallery(qtbot, db)
+    view.refresh()
+    _select_first_leaf(view)
+    put_rows(db, [_image("i2", "scene two", 50, 2)])
+    worked_out = []
+    states = view.button_states
+    monkeypatch.setattr(view, "button_states", lambda: worked_out.append(1) or states())
+
+    view.refresh()
+
+    assert len(worked_out) == 1, (
+        "each working out of the buttons walks every item the open folder plays, so a rebuild "
+        "that did it once per signal held the window for a fifth of a second")
+
+
+def test_a_change_the_poll_finds_is_worked_out_in_the_read_it_hands_off(qtbot, monkeypatch):
+    db = database_of([_image("i1", "scene one", 50, 1)])
+    view = _gallery(qtbot, db)
+    view.refresh()
+    put_rows(db, [_image("i2", "scene two", 50, 2)])
+    where = ["on the window's thread"]
+    built_in = []
+    building = library_views.gallery.build_gallery_tree
+    monkeypatch.setattr(library_views.gallery, "build_gallery_tree",
+                        lambda *a, **kw: built_in.append(where[0]) or building(*a, **kw))
+    named_in = []
+    working_out = item_names.ItemNames.work_out
+    monkeypatch.setattr(item_names.ItemNames, "work_out",
+                        lambda *a, **kw: named_in.append(where[0]) or working_out(*a, **kw))
+    enhanced_in = []
+    enhanced = library_views.LibrarySnapshot.is_enhanced
+    monkeypatch.setattr(library_views.LibrarySnapshot, "is_enhanced",
+                        lambda *a, **kw: enhanced_in.append(where[0]) or enhanced(*a, **kw))
+    indexed_in = []
+    indexing = search._build_entry
+    monkeypatch.setattr(search, "_build_entry",
+                        lambda row: indexed_in.append(where[0]) or indexing(row))
+    hops = []
+    view.off_thread = lambda work, done: hops.append((work, done))
+
+    view._poll()
+    while hops:
+        work, done = hops.pop(0)
+        where[0] = "in the read handed off"
+        answer = work()
+        where[0] = "on the window's thread"
+        done(answer)
+
+    assert "i2" in view.library.live_ids
+    assert view.search.index.search("two").results
+    assert set(built_in) == set(named_in) == set(enhanced_in) == set(indexed_in) == {
+        "in the read handed off"}, (
+        "the folders, the item names, the counts of the collections and what a search finds "
+        "of a library that changed are worked out off the window's thread, which only draws "
+        "them")
+
+
+def test_a_refresh_handed_off_the_windows_thread_draws_the_library_and_then_says_so(
+        qtbot, monkeypatch):
+    view = _gallery(qtbot, database_of([_image("i1", "scene one", 50, 1)]))
+    where = ["on the window's thread"]
+    built_in = []
+    building = library_views.gallery.build_gallery_tree
+    monkeypatch.setattr(library_views.gallery, "build_gallery_tree",
+                        lambda *a, **kw: built_in.append(where[0]) or building(*a, **kw))
+    hops = []
+    view.off_thread = lambda work, done: hops.append((work, done))
+    said = []
+
+    view.refresh_off_the_window_thread(lambda: said.append(_selected_folder(view)))
+    assert said == []
+    work, done = hops.pop()
+    where[0] = "in the read handed off"
+    answer = work()
+    where[0] = "on the window's thread"
+    done(answer)
+
+    assert said == [_selected_folder(view)]
+    assert "i1" in view.library.live_ids
+    assert set(built_in) == {"in the read handed off"}

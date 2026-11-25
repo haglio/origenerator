@@ -9,7 +9,7 @@ from shared_ui.icons import icon_pixmap
 
 from origenerator.gallery.collection import Glyph, collection
 from origenerator.gallery.groups import MediaGroup, SettingsGroup, folder_level, rows_under
-from origenerator.gallery.labels import item_type_labels
+from origenerator.gallery.labels import item_type_label
 from origenerator.gallery.output import item_type_of
 from origenerator.gallery.shapes import BOTH, LANDSCAPE, PORTRAIT
 from origenerator.gui import icons
@@ -60,5 +60,5 @@ def folder_kind_icon(group) -> tuple[QIcon, str] | None:
         return icons.toc_initial_icon(level), LEVEL_LABELS[level]
     if isinstance(group, (MediaGroup, SettingsGroup)):
         item_type = item_type_of(rows_under(group)[0])
-        return icons.item_type_mark(item_type), item_type_labels()[item_type]
+        return icons.item_type_mark(item_type), item_type_label(item_type)
     return None

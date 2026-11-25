@@ -21,8 +21,12 @@ from origenerator.model_titles import model_title
 from origenerator.workflows import RETIRED_WORKFLOW_NAMES, WORKFLOW_REGISTRY, workflow_named
 
 
+def item_type_label(item_type: ItemType) -> str:
+    return as_sentence(item_words(item_type)[1])
+
+
 def item_type_labels() -> dict[ItemType, str]:
-    return {item_type: as_sentence(item_words(item_type)[1]) for item_type in ItemType}
+    return {item_type: item_type_label(item_type) for item_type in ItemType}
 
 
 def workflow_label(workflow_name: str | None) -> str:

@@ -96,9 +96,12 @@ def edits_in(prompts) -> list[Edit]:
     return edits
 
 
+def words_in_order(text: str) -> list[str]:
+    return [word for word in _WORD.findall(text.casefold()) if len(word) >= _SHORTEST_WORD]
+
+
 def _words(thing: str) -> set[str]:
-    return {word for word in _WORD.findall(thing.casefold())
-            if len(word) >= _SHORTEST_WORD and word not in _SAYING_NOTHING}
+    return set(words_in_order(thing)) - _SAYING_NOTHING
 
 
 def _said_in(things) -> set[str]:

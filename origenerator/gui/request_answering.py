@@ -6,7 +6,7 @@ import time
 import shiboken6
 from PySide6.QtCore import QObject
 
-from origenerator import collection_notes, config, graphics_card, local_llm, prompt_edit
+from origenerator import collection_notes, config, graphics_card, prompt_edit
 from origenerator.gui.off_thread import run_off_thread
 
 logger = logging.getLogger(__name__)
@@ -31,16 +31,6 @@ def _how_it_ended(by_the_model: bool, revision) -> str:
     return "A Request was answered by the model in %.1f s"
 
 
-def leave_the_graphics_card(*, unload=local_llm.let_go,
-                            give_back=graphics_card.let_go_of_the_graphics_card) -> None:
-    try:
-        unload(base_url=config.LOCAL_LLM_BASE_URL, model=config.REQUEST_LLM_MODEL)
-    except Exception as exc:  # noqa: BLE001 -- Ollama not answering has no model loaded to unload
-        logger.info("The Request's model could not be told to leave (%s)", type(exc).__name__)
-    finally:
-        give_back()
-
-
 class RequestAnswerer(QObject):
     def __init__(self, db, jobs, client, *, parent=None, **stand_ins):
         super().__init__(parent)
@@ -52,7 +42,7 @@ class RequestAnswerer(QObject):
         self._wait_for_the_graphics_card = stand_ins.get(
             "wait_for_the_graphics_card", graphics_card.wait_for_the_graphics_card)
         self._leave_the_graphics_card = stand_ins.get(
-            "leave_the_graphics_card", leave_the_graphics_card)
+            "leave_the_graphics_card", graphics_card.leave_the_graphics_card)
         self._clock = stand_ins.get("clock", time.monotonic)
 
     def ask(self, about: str | None, pair: tuple[str, str], words: str, *, owner: QObject, then,

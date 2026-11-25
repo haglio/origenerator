@@ -5,7 +5,7 @@ import os
 import subprocess
 import time
 
-from origenerator import card_claim
+from origenerator import card_claim, config, local_llm
 
 logger = logging.getLogger(__name__)
 
@@ -66,3 +66,12 @@ def wait_for_the_graphics_card(comfyui, holder: str, *, deadline_s: float = 600.
 
 def let_go_of_the_graphics_card(claim_path=None) -> None:
     card_claim.release(os.getpid(), claim_path)
+
+
+def leave_the_graphics_card(*, unload=local_llm.let_go, give_back=let_go_of_the_graphics_card) -> None:
+    try:
+        unload(base_url=config.LOCAL_LLM_BASE_URL, model=config.REQUEST_LLM_MODEL)
+    except Exception as exc:  # noqa: BLE001 -- Ollama not answering has no model loaded to unload
+        logger.info("The Request's model could not be told to leave (%s)", type(exc).__name__)
+    finally:
+        give_back()

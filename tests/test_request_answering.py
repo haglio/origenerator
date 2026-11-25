@@ -10,7 +10,8 @@ from origenerator import collection_notes, config
 from origenerator.collection_notes import CollectionNotes
 from origenerator.db import Database, NewGeneration, NewRequest
 from origenerator.db_requests import Turn
-from origenerator.gui.request_answering import RequestAnswerer, leave_the_graphics_card
+from origenerator.graphics_card import leave_the_graphics_card
+from origenerator.gui.request_answering import RequestAnswerer
 from origenerator.prompt_edit import NO_GRAPHICS_CARD
 from origenerator.queue_line import ModelHold
 from tests.waiting import until

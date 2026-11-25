@@ -44,8 +44,7 @@ class Prepared(NamedTuple):
     def named_folders(self) -> list:
         return gallery.named_folders(
             [folder for shape in self.shapes for folder in self.library.tree(shape)],
-            self.library.folder_meta,
-            [folder for folders in self.customs_by_shape.values() for folder in folders])
+            self.library.folder_meta, every_custom_collection(self.customs_by_shape))
 
 
 class _NamesOnceWorkedOut:
@@ -81,7 +80,7 @@ class LibraryReadings:
 
     @property
     def customs(self) -> list:
-        return [folder for folders in self.customs_by_shape.values() for folder in folders]
+        return every_custom_collection(self.customs_by_shape)
 
     def read(self) -> tuple[list[dict], dict]:
         return self._db.list_generations(), self._db.folder_meta_map()
@@ -176,6 +175,10 @@ class LibraryReadings:
             return row
         return next((held for held in self.reading.held_rows
                      if held["prompt_id"] == prompt_id), None)
+
+
+def every_custom_collection(customs_by_shape: dict[str, list]) -> list:
+    return [folder for folders in customs_by_shape.values() for folder in folders]
 
 
 def arrived(rows, before) -> list[dict]:

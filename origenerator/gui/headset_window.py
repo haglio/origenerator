@@ -11,7 +11,7 @@ from pathlib import Path
 import shiboken6
 from app_support.frame_channel import FrameLooks, FrameWriter
 from funestra.file_channel import consume_command_file
-from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, Qt, QTimer
+from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, QSize, Qt, QTimer
 from PySide6.QtGui import QContextMenuEvent, QImage, QMouseEvent, QPainter, QWheelEvent
 from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import QApplication, QWidget
@@ -129,10 +129,16 @@ def pixels_per_coordinate(image: QImage, window) -> float:
     return image.width() / window.width() if window.width() else 1.0
 
 
+def capped(size: QSize) -> QSize:
+    if max(size.width(), size.height()) <= CAP_PX:
+        return size
+    return size.scaled(CAP_PX, CAP_PX, Qt.AspectRatioMode.KeepAspectRatio)
+
+
 def within_the_cap(image: QImage) -> QImage:
-    if max(image.width(), image.height()) <= CAP_PX:
+    if capped(image.size()) == image.size():
         return image
-    return image.scaled(CAP_PX, CAP_PX, Qt.AspectRatioMode.KeepAspectRatio,
+    return image.scaled(capped(image.size()), Qt.AspectRatioMode.IgnoreAspectRatio,
                         Qt.TransformationMode.SmoothTransformation).convertToFormat(
         QImage.Format.Format_RGBA8888)
 
@@ -198,6 +204,51 @@ class PressReader:
             self._read_so_far.extend(self._read(self._input, logger=logger, uppercase=False))
 
 
+class FrameSender:
+    def __init__(self, frames: FrameWriter, looks: FrameLooks) -> None:
+        self._frames = frames
+        self._looks = looks
+        self._waiting: tuple[QImage, list[Patch]] | None = None
+        self._stopped = False
+        self._threw = False
+        self._turn = threading.Condition()
+        self._sending = threading.Thread(target=self._keep_sending, daemon=True,
+                                         name="headset-frames")
+        self._sending.start()
+
+    def send(self, drawn: QImage, patches: list[Patch]) -> None:
+        with self._turn:
+            self._waiting = (drawn, patches)
+            self._turn.notify_all()
+
+    def stop(self) -> None:
+        with self._turn:
+            self._stopped = True
+            self._turn.notify_all()
+        self._sending.join()
+
+    def _keep_sending(self) -> None:
+        while True:
+            with self._turn:
+                self._turn.wait_for(lambda: self._waiting is not None or self._stopped)
+                if self._waiting is None:
+                    return
+                (drawn, patches), self._waiting = self._waiting, None
+            try:
+                self._send(drawn, patches)
+            except Exception:
+                if not self._threw:
+                    self._threw = True
+                    logger.exception("A frame for the headset could not be sent; the next is tried")
+
+    def _send(self, drawn: QImage, patches: list[Patch]) -> None:
+        image = within_the_cap(painted_over(
+            drawn.convertToFormat(QImage.Format.Format_RGBA8888), patches))
+        pixels = bytes(image.constBits())
+        if self._looks.worth_sending(pixels):
+            self._frames.write(0, image.width(), image.height(), pixels)
+
+
 class HeadsetWindow(QObject):
     def __init__(self, window: QWidget, session: FunTimeSession, parent=None, *,
                  presses=None) -> None:
@@ -210,6 +261,7 @@ class HeadsetWindow(QObject):
         self._windows_pointed_into: list[QWidget] = []
         self._published: tuple[int, int] | None = None
         self._looks = FrameLooks()
+        self._sender = FrameSender(self._frames, self._looks)
         self._repaints = Repaints(window, self)
         self._taken = 0
         self._threw = False
@@ -224,6 +276,7 @@ class HeadsetWindow(QObject):
     def close(self) -> None:
         self._timer.stop()
         self._presses.stop()
+        self._sender.stop()
         self._frames.close()
         logger.info("Stopped publishing this window for the headset after %d "
                     "frames and %d presses", self._frames.written, self._taken)
@@ -352,12 +405,9 @@ class HeadsetWindow(QObject):
         if not self._looks.due(now):
             return
         self._keep_its_menus_off_the_monitors()
-        grabbed = what_the_window_shows(self._window).convertToFormat(QImage.Format.Format_RGBA8888)
-        image = within_the_cap(painted_over(grabbed, windows_opened_over(
-            self._window, scale=pixels_per_coordinate(grabbed, self._window))))
+        drawn = what_the_window_shows(self._window)
+        self._sender.send(drawn, windows_opened_over(
+            self._window, scale=pixels_per_coordinate(drawn, self._window)))
         self._repaints.looked()
-        pixels = bytes(image.constBits())
-        if not self._looks.worth_sending(pixels):
-            return
-        self._frames.write(0, image.width(), image.height(), pixels)
-        self._published = (image.width(), image.height())
+        sent = capped(drawn.size())
+        self._published = (sent.width(), sent.height())

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from functools import partial
 from typing import NamedTuple
 
@@ -343,8 +344,17 @@ class GalleryView(QWidget):
                    if self._fun_time is not None and self._fun_time.funestra(shape) is not None)
 
     def build_the_rest(self) -> None:
-        db, client = self._db, self._client
-        self._build_the_panes(db, client)
+        for piece in self.pieces_of_the_rest():
+            piece()
+
+    def pieces_of_the_rest(self) -> list[Callable[[], None]]:
+        if self.rest_built:
+            return []
+        return [lambda: self._build_the_panes(self._db, self._client), self._build_the_edits,
+                self._build_ui, self._start_answering]
+
+    def _build_the_edits(self) -> None:
+        db = self._db
         self._edits = self._edits_given or GalleryEdits(
             db, OUTPUT_PLACES, Trash(TRASH_DIR),
             environment=GalleryEnvironment(
@@ -376,7 +386,8 @@ class GalleryView(QWidget):
         self._tree.favorite_clicked.connect(self.toc_editing.toggle_favorite)
         self._tree.delete_clicked.connect(self.toc_editing.delete_folder_by_key)
         self._tree.dropped.connect(self.toc_editing.dropped)
-        self._build_ui()
+
+    def _start_answering(self) -> None:
         self._voice.bind_the_buttons(
             VoiceSwitches(
                 populate=self._buttons.populate, radio=self._buttons.radio,

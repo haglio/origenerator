@@ -4,6 +4,7 @@ import base64
 import contextlib
 import logging
 import time
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from operator import attrgetter
@@ -149,6 +150,7 @@ class Launch:
 class SatellitesServedFirst:
     now: Callable[[], float] = time.monotonic
     served: Callable[[], None] = lambda: None
+    later: Callable[[Callable[[], None]], None] | None = None
 
 
 class Core(QMainWindow):
@@ -195,6 +197,7 @@ class Core(QMainWindow):
         self._restored: frozenset[str] = frozenset()
         self._client, self._db, self._preview = client, db, preview
         self.rest_built = False
+        self._still_to_build = deque(self._pieces_of_the_rest())
         if satellites_first is None:
             self._build_the_rest()
         else:
@@ -203,18 +206,28 @@ class Core(QMainWindow):
     def _serve_the_satellites_first(self, serving: SatellitesServedFirst) -> None:
         self._restore(_THE_SATELLITES_LISTS_NEED)
         self._satellites_first = SatellitesFirst(
-            self, served=self._gallery_view.every_satellite_has_its_list, now=serving.now)
+            self, served=self._gallery_view.every_satellite_has_its_list, now=serving.now,
+            later=serving.later)
         self._satellites_first.then(serving.served)
-        self._satellites_first.then(self._build_the_rest)
+        for _piece in self._still_to_build:
+            self._satellites_first.then(self._build_a_piece)
         self._satellites_first.then(self._gallery_view.refresh)
         self._gallery_view.refresh()
 
+    def _pieces_of_the_rest(self) -> list[Callable[[], None]]:
+        return [*self._gallery_view.pieces_of_the_rest(), self._dress_the_window,
+                self._take_up_the_session, self._tidy_what_comfyui_was_left,
+                self._take_up_the_running_jobs]
+
+    def _build_a_piece(self) -> None:
+        if self._still_to_build:
+            self._still_to_build.popleft()()
+
     def _build_the_rest(self) -> None:
-        if self.rest_built:
-            return
-        client, db, fun_time = self._client, self._db, self._fun_time
-        if not self._gallery_view.rest_built:
-            self._gallery_view.build_the_rest()
+        while self._still_to_build:
+            self._still_to_build.popleft()()
+
+    def _dress_the_window(self) -> None:
         self._toasts = Toasts(self.windowIcon(), parent=self, shown_as=self._preview,
                                        video_in_front=self._gallery_view.video_in_front)
         self._gallery_view.run_ended.connect(self._toasts.note)
@@ -223,16 +236,20 @@ class Core(QMainWindow):
         self.hands_its_window_over: HeadsetWindow | None = None
         self._found: tuple[QByteArray, float, bool] | None = None
         self._borders = RememberedBorders(self)
-        if fun_time is not None and fun_time.in_a_headset:
-            self._hand_the_window_over(fun_time)
+        if self._fun_time is not None and self._fun_time.in_a_headset:
+            self._hand_the_window_over(self._fun_time)
 
         quit_shortcut = QShortcut(QKeySequence("Ctrl+Alt+Q"), self)
         quit_shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
         quit_shortcut.activated.connect(self.close)
         self._gallery_view.quit_asked.connect(self._close_if_sure)
 
+    def _take_up_the_session(self) -> None:
         self._restore_session()
         self._persist_the_session_as_it_changes()
+
+    def _tidy_what_comfyui_was_left(self) -> None:
+        client, db = self._client, self._db
         if not is_branch_session():
             cancel_experiments(db, client)
             drop_finales_in_flight(db, client)
@@ -241,6 +258,8 @@ class Core(QMainWindow):
         places_backfill.fold_found_places(db, client, places_backfill.RECORD)
         if not is_branch_session():
             downtime.forget_work_left()
+
+    def _take_up_the_running_jobs(self) -> None:
         self._gallery_view.reconnect_running_jobs()
         self.rest_built = True
         if self._bridge is not None:

@@ -72,3 +72,28 @@ def test_what_is_asked_after_the_satellites_were_served_runs_at_once(qtbot):
     first.then(lambda: ran.append("late"))
 
     assert ran == ["late"]
+
+
+def test_what_waits_runs_one_piece_a_turn_so_the_window_answers_between_them(qtbot):
+    ran = []
+    first = _waiting(lambda: True)
+    first.then(lambda: ran.append("the panes"))
+    first.then(lambda: ran.append("the library"))
+
+    first.look()
+
+    assert ran == ["the panes"]
+    _until(lambda: ran == ["the panes", "the library"])
+
+
+def test_what_is_asked_while_the_pieces_still_wait_their_turn_runs_after_them(qtbot):
+    ran = []
+    first = _waiting(lambda: True)
+    first.then(lambda: ran.append("the panes"))
+    first.then(lambda: ran.append("the library"))
+    first.look()
+
+    first.then(lambda: ran.append("late"))
+
+    _until(lambda: len(ran) == 3)
+    assert ran == ["the panes", "the library", "late"]

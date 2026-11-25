@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import time
+from collections import deque
 from collections.abc import Callable
+from functools import partial
 
 from PySide6.QtCore import QObject, QTimer
+
+from origenerator.gui.deferred import defer
 
 LONGEST_WAIT_S = 10.0
 _LOOK_EVERY_MS = 100
@@ -11,12 +15,14 @@ _LOOK_EVERY_MS = 100
 
 class SatellitesFirst(QObject):
     def __init__(self, parent: QObject, *, served: Callable[[], bool],
-                 now: Callable[[], float] = time.monotonic) -> None:
+                 now: Callable[[], float] = time.monotonic,
+                 later: Callable[[Callable[[], None]], None] | None = None) -> None:
         super().__init__(parent)
         self._served = served
         self._now = now
+        self._later = later or partial(defer, self)
         self._gives_up_at = now() + LONGEST_WAIT_S
-        self._waiting: list[Callable[[], None]] = []
+        self._waiting: deque[Callable[[], None]] = deque()
         self.over = False
         self._timer = QTimer(self)
         self._timer.setInterval(_LOOK_EVERY_MS)
@@ -24,7 +30,7 @@ class SatellitesFirst(QObject):
         self._timer.start()
 
     def then(self, run: Callable[[], None]) -> None:
-        if self.over:
+        if self.over and not self._waiting:
             run()
         else:
             self._waiting.append(run)
@@ -34,6 +40,12 @@ class SatellitesFirst(QObject):
             return
         self._timer.stop()
         self.over = True
-        waiting, self._waiting = self._waiting, []
-        for run in waiting:
-            run()
+        self._run_the_next()
+
+    def _run_the_next(self) -> None:
+        if not self._waiting:
+            return
+        run = self._waiting.popleft()
+        if self._waiting:
+            self._later(self._run_the_next)
+        run()

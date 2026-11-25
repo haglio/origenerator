@@ -2667,6 +2667,21 @@ def test_a_window_serving_the_satellites_first_builds_the_rest_once_they_have_th
     assert seen_as_they_were_served == [False]
 
 
+def test_a_window_serving_the_satellites_first_builds_the_rest_a_piece_a_turn(qtbot, tmp_path):
+    turns = []
+    win = _hosted_serving_the_satellites_first(qtbot, tmp_path, session=_fun_time_session(),
+                                               later=turns.append)
+    win._satellites_first.look()
+
+    turns.pop(0)()
+
+    assert not win.rest_built, (
+        "the whole rest built in one turn held the window still for seconds as it opened")
+    while turns:
+        turns.pop(0)()
+    assert (win.rest_built, _indexed_for_search(win)) == (True, ["g-1"])
+
+
 def test_a_window_serving_the_satellites_first_builds_the_rest_when_the_wait_is_over(
         qtbot, tmp_path):
     at = [0.0]

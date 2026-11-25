@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import random
-import re
 import sys
 import time
 from collections import Counter
@@ -11,14 +10,12 @@ from functools import partial
 from pathlib import Path
 
 from origenerator import collection_notes, config, graphics_card, local_llm, prompt_edit
-from origenerator.his_edits import edits_in
+from origenerator.his_edits import edits_in, words_in_order
 from origenerator.prompt_checks import things_of
 
 HOLDER = "Origenerator's Request measurement"
 SCORES_PATH = config.STATE_DIR / "request_measure.txt"
 _REQUESTS_MEASURED = 40
-_WORD = re.compile(r"[^\W_]+(?:'[^\W_]+)?")
-_SHORTEST_WORD = 3
 
 
 @dataclass(frozen=True)
@@ -33,12 +30,8 @@ class Case:
         return f"add {self.word}"
 
 
-def _words_in_order(text: str) -> list[str]:
-    return [word for word in _WORD.findall(text.casefold()) if len(word) >= _SHORTEST_WORD]
-
-
 def _words(things) -> set[str]:
-    return {word for thing in things for word in _words_in_order(thing)}
+    return {word for thing in things for word in words_in_order(thing)}
 
 
 def cases_in(prompts) -> list[Case]:
@@ -49,7 +42,7 @@ def cases_in(prompts) -> list[Case]:
         edit = edits.get(position)
         new_to_it = written_before - _words(edit.before) if edit else set()
         for thing in (edit.added if edit else ()):
-            named = [word for word in _words_in_order(thing) if word in new_to_it]
+            named = [word for word in words_in_order(thing) if word in new_to_it]
             if named:
                 cases.append(Case(prompts[edit.made_from], prompts[position], named[-1], position))
         written_before |= _words([positive])
@@ -137,13 +130,6 @@ def _takes_the_graphics_card() -> bool:
         ComfyUIClient(folders=comfyui_folders.COMFYUI_FOLDERS), HOLDER)
 
 
-def _leaves_the_graphics_card() -> None:
-    try:
-        local_llm.let_go(base_url=config.LOCAL_LLM_BASE_URL, model=config.REQUEST_LLM_MODEL)
-    finally:
-        graphics_card.let_go_of_the_graphics_card()
-
-
 def main(argv=None, *, scores_path: Path = SCORES_PATH, shown=os.startfile, **stand_ins) -> None:
     how_many = int((argv if argv is not None else sys.argv[1:] or [_REQUESTS_MEASURED])[0])
     prompts = stand_ins.get("his_prompts", _his_prompts)()
@@ -156,7 +142,7 @@ def main(argv=None, *, scores_path: Path = SCORES_PATH, shown=os.startfile, **st
             model.ask, collection_notes.read(stand_ins.get("notes_path", config.COLLECTION_NOTES_PATH))))
     finally:
         if model.taken:
-            stand_ins.get("leave", _leaves_the_graphics_card)()
+            stand_ins.get("leave", graphics_card.leave_the_graphics_card)()
     scores_path.parent.mkdir(parents=True, exist_ok=True)
     scores_path.write_text("\n".join(scores.lines()) + "\n", encoding="utf-8")
     shown(scores_path)

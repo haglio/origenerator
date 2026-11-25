@@ -5,6 +5,7 @@ import logging
 import math
 import time
 import weakref
+from collections.abc import Callable
 from itertools import pairwise
 from types import SimpleNamespace
 
@@ -319,11 +320,12 @@ class JobQueue(QObject):
     def enhance_images_with(self, enhance) -> None:
         self._enhance = enhance
 
-    def _enhanced_start_image_of(self, job: GenerationJob) -> str | None:
+    def _enhanced_start_image_of(self, job: GenerationJob,
+                                 rows: list[dict] | None = None) -> str | None:
         if self._enhance is None or not queue_line.is_video(job) or not job.start_image:
             return None
         start_image = job.params.get("input_image")
-        images = [row for row in self._db.list_generations()
+        images = [row for row in (self._db.list_generations() if rows is None else rows)
                   if gallery.media_type_of_row(row) == MediaType.IMAGE]
         image_id = gallery.source_image_id_for(start_image, images)
         image = next((row for row in images if row["prompt_id"] == image_id), None)
@@ -599,23 +601,23 @@ class JobQueue(QObject):
         if saved.error is not None:
             logger.debug("Could not persist progress for %s: %s", prompt_id, saved.error)
 
-    def reconnect_running(self):
+    def reconnect_running(self, *, folder_key_of: Callable[[dict], str]):
         if self._client is None:
             return
-        index = gallery.image_config_index_of(self._db.list_generations())
         readopted = []
         making = self._what_comfyui_is_making()
-        for row in reversed(self._db.list_generations()):
+        rows = self._db.list_generations()
+        for row in reversed(rows):
             if row.get("status") == GenerationStatus.RUNNING:
-                job = self._reconnect(row, index)
+                job = self._reconnect(row, folder_key_of)
                 if (job is not None and making is not None and job.prompt_id not in making
                         and not job.shielded and job.defer()):
                     self._back_in_the_line(job, queue_line.insertion_index(self._waiting, job))
                     logger.info("Took %s back from ComfyUI's queue into the line", job.prompt_id)
             elif row.get("status") == GenerationStatus.PENDING:
-                readopted.append(self._readopt(row, index))
+                readopted.append(self._readopt(row, folder_key_of))
         for job in filter(None, readopted):
-            if start_image := self._enhanced_start_image_of(job):
+            if start_image := self._enhanced_start_image_of(job, rows):
                 self._start_from(job, start_image)
         self._pump()
         self.changed.emit()
@@ -628,10 +630,10 @@ class JobQueue(QObject):
                            e)
             return None
 
-    def _reconnect(self, row: dict, image_index: dict):
-        key = gallery.settings_folder_key(row, image_index)
+    def _reconnect(self, row: dict, folder_key_of: Callable[[dict], str]):
         if self.job_for_prompt(row["prompt_id"]) is not None:
             return None
+        key = folder_key_of(row)
         workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
         if workflow is None:
             return None
@@ -649,10 +651,10 @@ class JobQueue(QObject):
         self._on_server.append(job)
         return job
 
-    def _readopt(self, row: dict, image_index: dict):
-        key = gallery.settings_folder_key(row, image_index)
+    def _readopt(self, row: dict, folder_key_of: Callable[[dict], str]):
         if self.job_for_prompt(row["prompt_id"]) is not None:
             return None
+        key = folder_key_of(row)
         workflow = WORKFLOW_REGISTRY.get(row.get("workflow_name") or "")
         try:
             if workflow is None:

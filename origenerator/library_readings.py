@@ -157,6 +157,12 @@ class LibraryReadings:
     def folder_key_of(self, row: dict) -> str:
         return gallery.settings_folder_key(row, self.reading.image_index)
 
+    def folder_keys(self) -> Callable[[dict], str]:
+        if self.drawn_version:
+            return self.folder_key_of
+        image_index = gallery.image_config_index_of(self._db.list_generations())
+        return lambda row: gallery.settings_folder_key(row, image_index)
+
     def folder_key_for(self, workflow_name: str, params: dict,
                        workflow_version: str | None = None) -> str:
         return gallery.folder_key_for(workflow_name, params, self.reading.image_index,

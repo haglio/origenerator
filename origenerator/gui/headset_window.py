@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
+from collections import deque
 from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
 
 import shiboken6
 from app_support.frame_channel import FrameLooks, FrameWriter
@@ -137,11 +140,43 @@ class Repaints(QObject):
         self.since_looked = False
 
 
+class PressReader:
+    def __init__(self, input_file: Path, *, read=consume_command_file,
+                 every_s: float = _POLL_MS / 1000) -> None:
+        self._input = input_file
+        self._read = read
+        self._every_s = every_s
+        self._read_so_far: deque[str] = deque()
+        self._stopped = threading.Event()
+        self._reading = threading.Thread(target=self._keep_reading, daemon=True,
+                                         name="headset-presses")
+
+    def start(self) -> PressReader:
+        self._reading.start()
+        return self
+
+    def stop(self) -> None:
+        self._stopped.set()
+        if self._reading.is_alive():
+            self._reading.join()
+
+    def taken(self) -> list[str]:
+        lines = []
+        while self._read_so_far:
+            lines.append(self._read_so_far.popleft())
+        return lines
+
+    def _keep_reading(self) -> None:
+        while not self._stopped.wait(self._every_s):
+            self._read_so_far.extend(self._read(self._input, logger=logger, uppercase=False))
+
+
 class HeadsetWindow(QObject):
-    def __init__(self, window: QWidget, session: FunTimeSession, parent=None) -> None:
+    def __init__(self, window: QWidget, session: FunTimeSession, parent=None, *,
+                 presses=None) -> None:
         super().__init__(parent)
         self._window = window
-        self._input = session.input_file
+        self._presses = presses or PressReader(session.input_file).start()
         self._frames = FrameWriter(session.frames_file, max_pixels=CAP_PX * CAP_PX)
         self._pointer = QPoint(0, 0)
         self._pressed: QWidget | None = None
@@ -157,18 +192,18 @@ class HeadsetWindow(QObject):
         self._timer.start(_POLL_MS)
         logger.info("Publishing this window for the headset every %dms, %dx%d to "
                     "start, and taking its presses from %s",
-                    _POLL_MS, window.width(), window.height(), self._input)
+                    _POLL_MS, window.width(), window.height(), session.input_file)
 
     def close(self) -> None:
         self._timer.stop()
+        self._presses.stop()
         self._frames.close()
         logger.info("Stopped publishing this window for the headset after %d "
                     "frames and %d presses", self._frames.written, self._taken)
 
     def _tick(self) -> None:
         try:
-            for line in consume_command_file(self._input, logger=logger,
-                                             uppercase=False):
+            for line in self._presses.taken():
                 self._taken += 1
                 self._heard(line)
             self.publish()

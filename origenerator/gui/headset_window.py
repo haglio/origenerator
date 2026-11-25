@@ -13,6 +13,7 @@ from app_support.frame_channel import FrameLooks, FrameWriter
 from funestra.file_channel import consume_command_file
 from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, Qt, QTimer
 from PySide6.QtGui import QContextMenuEvent, QImage, QMouseEvent, QPainter, QWheelEvent
+from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import QApplication, QWidget
 
 from origenerator.fun_time_mode import (
@@ -96,6 +97,32 @@ def painted_over(image: QImage, patches: list[Patch]) -> QImage:
     finally:
         painter.end()
     return image
+
+
+def what_the_window_shows(window: QWidget) -> QImage:
+    drawn = _drawn_for_the_screen(window)
+    if drawn is None:
+        return window.grab().toImage()
+    shown = drawn.copy()
+    painter = QPainter(shown)
+    try:
+        for in_qt_quick in window.findChildren(QQuickWidget):
+            visible = in_qt_quick.visibleRegion().translated(in_qt_quick.mapTo(window, QPoint()))
+            if not visible.isEmpty():
+                window.render(painter, visible.boundingRect().topLeft(), visible)
+    finally:
+        painter.end()
+    return shown
+
+
+def _drawn_for_the_screen(window: QWidget) -> QImage | None:
+    handle, store = window.windowHandle(), window.backingStore()
+    if handle is None or store is None or not handle.isExposed():
+        return None
+    drawn = store.paintDevice()
+    if not isinstance(drawn, QImage) or drawn.size() != window.size() * drawn.devicePixelRatio():
+        return None
+    return drawn
 
 
 def pixels_per_coordinate(image: QImage, window) -> float:
@@ -325,7 +352,7 @@ class HeadsetWindow(QObject):
         if not self._looks.due(now):
             return
         self._keep_its_menus_off_the_monitors()
-        grabbed = self._window.grab().toImage().convertToFormat(QImage.Format.Format_RGBA8888)
+        grabbed = what_the_window_shows(self._window).convertToFormat(QImage.Format.Format_RGBA8888)
         image = within_the_cap(painted_over(grabbed, windows_opened_over(
             self._window, scale=pixels_per_coordinate(grabbed, self._window))))
         self._repaints.looked()

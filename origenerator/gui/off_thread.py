@@ -41,6 +41,7 @@ def run_off_thread(work, done, *, owner: QObject,
 
     def deliver(value):
         _in_flight.discard(result)
+        result.ready.disconnect(deliver)
         if not shiboken6.isValid(owner):
             logger.info("An off-thread answer came back after the %s that asked "
                         "for it was gone", type(owner).__name__)

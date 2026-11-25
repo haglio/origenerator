@@ -27,8 +27,6 @@ from origenerator.gallery.collection import (
     LATEST_KEY,
     POPULATING_KEY,
     TRASH_KEY,
-    FolderCollection,
-    all_collections,
     collection,
     folder_collection,
 )
@@ -851,12 +849,7 @@ class GalleryPane(QObject):
         return self.selected_collection_rows()
 
     def collection_counts(self, shape: str) -> dict[str, int]:
-        placement = self._model.placement(shape)
-        tallies = {counted.key: placement.tally(
-                       self._model.in_collection(counted.key, shape, gallery.ALL_KEY))
-                   for counted in all_collections() if counted.counted}
-        return {FolderCollection(which, folder).key: count
-                for which, tally in tallies.items() for folder, count in tally.items()}
+        return self._model.collection_counts(shape)
 
     def selected_collection_rows(self) -> list[dict] | None:
         return self.rows_for_collection(self._tree.selected_folder_key())

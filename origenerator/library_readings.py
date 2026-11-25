@@ -6,6 +6,7 @@ from typing import NamedTuple
 from origenerator import gallery, trash_collection
 from origenerator.gallery.output import is_in_progress
 from origenerator.gallery.tree import is_an_enhance_being_made
+from origenerator.item_names import Naming
 from origenerator.library_views import LibrarySnapshot
 
 
@@ -15,6 +16,7 @@ class Read(NamedTuple):
     requests: list[dict]
     fingerprint: tuple[int, int]
     version: int | None = None
+    prepared: Prepared | None = None
 
 
 def read_whole(db, last: Read | None = None) -> Read:
@@ -24,6 +26,38 @@ def read_whole(db, last: Read | None = None) -> Read:
     rows = db.list_generations()
     meta = db.folder_meta_map()
     return Read(rows, meta, db.list_requests(), _fingerprint(rows, meta), version)
+
+
+class Prepared(NamedTuple):
+    library: LibrarySnapshot
+    names: _NamesOnceWorkedOut
+    over: LibrarySnapshot
+    state: tuple[int, int]
+    shapes: tuple
+    customs_by_shape: dict[str, list]
+    requests: list[dict]
+    searched: object = None
+
+    def name_of(self, prompt_id: str | None) -> str:
+        return self.names.of(prompt_id)
+
+    def named_folders(self) -> list:
+        return gallery.named_folders(
+            [folder for shape in self.shapes for folder in self.library.tree(shape)],
+            self.library.folder_meta,
+            [folder for folders in self.customs_by_shape.values() for folder in folders])
+
+
+class _NamesOnceWorkedOut:
+    def __init__(self, item_names) -> None:
+        self._item_names = item_names
+        self.naming: Naming | None = None
+
+    def of(self, prompt_id: str | None) -> str:
+        return (self.naming or self._item_names).of(prompt_id)
+
+    def version(self) -> int:
+        return (self.naming or self._item_names).version
 
 
 class LibraryReadings:
@@ -43,6 +77,7 @@ class LibraryReadings:
         self._fingerprint: tuple = (None, None)
         self._lists_built_from = None
         self._fingerprinted: tuple[list, int] | None = None
+        self.drawn_from: Prepared | None = None
 
     @property
     def customs(self) -> list:
@@ -52,7 +87,13 @@ class LibraryReadings:
         return self._db.list_generations(), self._db.folder_meta_map()
 
     def moved_to(self, rows, meta) -> bool:
-        fingerprint = self._fingerprint_of(rows, meta)
+        return self._moved_to(self._fingerprint_of(rows, meta))
+
+    def moved_to_read(self, read: Read) -> bool:
+        self._fingerprinted = (read.rows, read.fingerprint[0])
+        return self._moved_to(read.fingerprint)
+
+    def _moved_to(self, fingerprint) -> bool:
         moved = fingerprint != self._fingerprint
         self._fingerprint = fingerprint
         return moved
@@ -64,37 +105,55 @@ class LibraryReadings:
         self._fingerprint = read.fingerprint
         return True
 
-    def take(self, rows, meta, shapes) -> LibrarySnapshot:
+    def read_and_prepare(self, last: Read | None, shapes, *, even_unmoved: bool = False) -> Read:
+        read = read_whole(self._db, last)
+        if read.fingerprint == self._fingerprint and not even_unmoved:
+            return read
+        return read._replace(prepared=self.prepare(read.rows, read.meta, shapes, read.fingerprint))
+
+    def take(self, rows, meta, shapes, prepared: Prepared | None = None) -> LibrarySnapshot:
+        if prepared is None or not self.still_over(prepared, shapes):
+            prepared = self.prepare(rows, meta, shapes, self._fingerprint_of(rows, meta))
         self.folder_meta = meta
         self.drawn_version += 1
-        library = self.reading = self._reading_of(rows, meta)
+        self.drawn_from = prepared
+        library = self.reading = prepared.library
+        if prepared.names.naming is not None:
+            self._lists_built_from = prepared.state
+            self._item_names.adopt(prepared.names.naming)
+            self._publish_names(self._item_names.by_file(library.rows))
         self.live_ids = {row["prompt_id"] for row in library.rows}
         self._shapes = tuple(shapes)
-        self.customs_by_shape = {shape: library.custom_collections(shape) for shape in shapes}
-        self.requests = self._db.list_requests()
+        self.customs_by_shape = prepared.customs_by_shape
+        self.requests = prepared.requests
         return library
+
+    def prepare(self, rows, meta, shapes, state: tuple[int, int]) -> Prepared:
+        before = self.reading
+        moved = state != self._lists_built_from
+        names = _NamesOnceWorkedOut(self._item_names)
+        library = LibrarySnapshot(rows, trash_collection.trash_items(self._db.list_trashed()),
+                                  folder_meta=meta, name_of=names.of,
+                                  custom_collections=self._db.list_custom_collections(),
+                                  previous=before, names_version=names.version,
+                                  populating=self._populating)
+        if moved:
+            names.naming = self._item_names.work_out(
+                library.rows, library.held_rows, library.image_index, library.readings)
+        for shape in shapes:
+            library.collection_counts(shape)
+        return Prepared(library, names, before, state, tuple(shapes),
+                        {shape: library.custom_collections(shape) for shape in shapes},
+                        self._db.list_requests())
+
+    def still_over(self, prepared: Prepared, shapes) -> bool:
+        return prepared.over is self.reading and prepared.shapes == tuple(shapes)
 
     def _fingerprint_of(self, rows, meta) -> tuple[int, int]:
         known = self._fingerprinted
         if known is None or known[0] is not rows:
             known = self._fingerprinted = (rows, _rows_fingerprint(rows))
         return known[1], _folder_meta_fingerprint(meta)
-
-    def _reading_of(self, rows, meta) -> LibrarySnapshot:
-        state = self._fingerprint_of(rows, meta)
-        unmoved = state == self._lists_built_from
-        library = LibrarySnapshot(rows, trash_collection.trash_items(self._db.list_trashed()),
-                                  folder_meta=meta, name_of=self._item_names.of,
-                                  custom_collections=self._db.list_custom_collections(),
-                                  previous=self.reading,
-                                  names_version=lambda: self._item_names.version,
-                                  populating=self._populating)
-        if not unmoved:
-            self._lists_built_from = state
-            self._item_names.take(library.rows, library.held_rows, library.image_index,
-                                  library.readings)
-            self._publish_names(self._item_names.by_file(library.rows))
-        return library
 
     def folder_key_of(self, row: dict) -> str:
         return gallery.settings_folder_key(row, self.reading.image_index)

@@ -97,3 +97,21 @@ def test_what_is_asked_while_the_pieces_still_wait_their_turn_runs_after_them(qt
 
     _until(lambda: len(ran) == 3)
     assert ran == ["the panes", "the library", "late"]
+
+
+def test_a_piece_handed_off_the_windows_thread_holds_back_what_waits_until_it_is_done(qtbot):
+    ran = []
+    said_done = []
+    first = _waiting(lambda: True)
+    first.then_after(lambda done: (ran.append("the library, handed off"), said_done.append(done)))
+    first.then(lambda: ran.append("the window is built"))
+    first.look()
+    QApplication.processEvents()
+
+    first.then(lambda: ran.append("late"))
+    QApplication.processEvents()
+    assert ran == ["the library, handed off"]
+
+    said_done[0]()
+    _until(lambda: len(ran) == 3)
+    assert ran == ["the library, handed off", "the window is built", "late"]

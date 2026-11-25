@@ -211,7 +211,7 @@ class Core(QMainWindow):
         self._satellites_first.then(serving.served)
         for _piece in self._still_to_build:
             self._satellites_first.then(self._build_a_piece)
-        self._satellites_first.then(self._gallery_view.refresh)
+        self._satellites_first.then_after(self._gallery_view.refresh_off_the_window_thread)
         self._gallery_view.refresh()
 
     def _pieces_of_the_rest(self) -> list[Callable[[], None]]:

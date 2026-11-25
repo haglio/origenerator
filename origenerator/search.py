@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field, replace
 from functools import lru_cache
+from typing import NamedTuple
 
 from app_support.video_names import stem_of_either_copy
 
@@ -305,6 +306,13 @@ def _build_entry(row: dict) -> _Entry:
     )
 
 
+class SearchWorkedOut(NamedTuple):
+    over: dict
+    entries: dict
+    order: list
+    folders: list
+
+
 class GallerySearch:
     def __init__(self, *, synonyms=None):
         self._entries: dict[str, _Entry] = {}
@@ -313,10 +321,20 @@ class GallerySearch:
         self._synonyms = _SYNONYMS if synonyms is None else synonyms
 
     def update(self, rows, folders=(), item_name=None) -> None:
-        with each_title_worked_out_once():
-            self._take(rows, folders, item_name)
+        self.take_worked_out(self.worked_out(rows, folders, item_name))
 
-    def _take(self, rows, folders, item_name) -> None:
+    def worked_out(self, rows, folders=(), item_name=None) -> SearchWorkedOut:
+        with each_title_worked_out_once():
+            return self._work_out(rows, folders, item_name)
+
+    def take_worked_out(self, worked: SearchWorkedOut) -> bool:
+        if worked.over is not self._entries:
+            return False
+        self._entries, self._order, self._folders = worked.entries, worked.order, worked.folders
+        return True
+
+    def _work_out(self, rows, folders, item_name) -> SearchWorkedOut:
+        known_entries = self._entries
         entries: dict[str, _Entry] = {}
         order: list[str] = []
         folder_names: dict[str, list[str]] = {}
@@ -325,12 +343,11 @@ class GallerySearch:
                 folder_names.setdefault(prompt_id, []).append(folder.name)
         for row in rows:
             prompt_id = row.get("prompt_id")
-            if not prompt_id or prompt_id in entries \
-                    or not gallery.produced_output(row) or not in_sight(row):
+            if not prompt_id or prompt_id in entries                     or not gallery.produced_output(row) or not in_sight(row):
                 continue
             named = tuple(folder_names.get(prompt_id, ()))
             name = (item_name(prompt_id) if item_name else "").lower()
-            known = self._entries.get(prompt_id)
+            known = known_entries.get(prompt_id)
             entries[prompt_id] = (known if _as_it_was(known, row, named, name) else replace(
                 known if known is not None and known.row is row else _build_entry(row),
                 row=row, folders=_folder_stems(named), name=name, title=_title_stems(name),
@@ -338,11 +355,10 @@ class GallerySearch:
                 folder_tags=tuple(tag for folder in named for tag in _tags(folder)),
             ))
             order.append(prompt_id)
-        self._entries = entries
-        self._order = order
-        self._folders = [_Folder(folder.key, tuple(_words(folder.name)),
-                                 frozenset(folder.prompt_ids) & entries.keys())
-                         for folder in folders]
+        return SearchWorkedOut(known_entries, entries, order, [
+            _Folder(folder.key, tuple(_words(folder.name)),
+                    frozenset(folder.prompt_ids) & entries.keys())
+            for folder in folders])
 
     def _made_as(self, query: str) -> list[str]:
         named = stem_of_either_copy(query.strip())

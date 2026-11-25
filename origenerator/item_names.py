@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from typing import NamedTuple
 
 from origenerator import gallery
 from origenerator.gallery.item_numbers import item_name, number_items
@@ -9,6 +10,16 @@ from origenerator.gallery.output import stems_made_as
 from origenerator.gallery.tree import rows_with_a_folder
 from origenerator.row_readings import RowReadings
 from origenerator.trash_collection import trash_items
+
+
+class Naming(NamedTuple):
+    names: dict[str, str]
+    wearing: dict[str, str]
+    numbers_to_record: dict
+    version: int
+
+    def of(self, prompt_id: str | None) -> str:
+        return self.names.get(prompt_id, "")
 
 
 class ItemNames:
@@ -28,6 +39,10 @@ class ItemNames:
 
     def take(self, rows: list[dict], held_rows: list[dict], image_index: dict,
              readings: RowReadings | None = None) -> None:
+        self.adopt(self.work_out(rows, held_rows, image_index, readings))
+
+    def work_out(self, rows: list[dict], held_rows: list[dict], image_index: dict,
+                 readings: RowReadings | None = None) -> Naming:
         readings = readings or RowReadings()
         video_of_frame = _videos_of_starting_frames(rows, held_rows, readings.looking_up(
             "source image", gallery.source_image_id_in, image_index))
@@ -42,17 +57,22 @@ class ItemNames:
         on_its_way = {row["prompt_id"] for row in rows if gallery.is_in_progress(row)}
         changed = {prompt_id: item for prompt_id, item in numbering.items()
                    if recorded.get(prompt_id) != item and prompt_id not in on_its_way}
-        if changed:
-            self._numbers.record_item_numbers(changed)
         names = {prompt_id: item_name(item) for prompt_id, item in numbering.items()}
         names.update({row["prompt_id"]: title for row in rows
                       if (title := recorded_title(row)) is not None})
-        self._wearing = {name: prompt_id for prompt_id, name in names.items()}
+        wearing = {name: prompt_id for prompt_id, name in names.items()}
         names.update({frame: names[video] for frame, video in video_of_frame.items()
                       if video in names})
-        if names != self._names:
-            self.version += 1
-        self._names = names
+        named_before = self._names
+        return Naming(names, wearing, changed,
+                      self.version if names == named_before else self.version + 1)
+
+    def adopt(self, naming: Naming) -> None:
+        if naming.numbers_to_record:
+            self._numbers.record_item_numbers(naming.numbers_to_record)
+        self._names = naming.names
+        self._wearing = naming.wearing
+        self.version = naming.version
 
     def of(self, prompt_id: str | None) -> str:
         return self._names.get(prompt_id, "")

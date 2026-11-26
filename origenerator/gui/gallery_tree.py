@@ -11,7 +11,6 @@ from origenerator import gallery
 from origenerator.gallery.collection import (
     FolderCollection,
     all_collections,
-    folder_collection,
 )
 from origenerator.gallery.shapes import LANDSCAPE, SHAPE_LABELS, shape_holding
 from origenerator.gui import folder_icons, icons
@@ -48,6 +47,15 @@ def _tooltip_of(group, kind_icon) -> str:
     if kind_icon is None or isinstance(group, gallery.SettingsGroup) or kind_icon[1] == group.label:
         return group.label
     return f"{group.label} · {kind_icon[1]}"
+
+
+def _dress(item: QTreeWidgetItem, group) -> None:
+    item.setData(0, GROUP_ROLE, group)
+    item.setData(0, COUNT_ROLE, len(gallery.rows_under(group)))
+    kind_icon = folder_icons.folder_kind_icon(group)
+    if kind_icon is not None:
+        item.setIcon(0, kind_icon[0])
+    item.setToolTip(0, _tooltip_of(group, kind_icon))
 
 
 def _inside(group, inside: tuple) -> tuple:
@@ -168,7 +176,7 @@ class GalleryTree:
         for key in left_open:
             if (item := self.item_by_key.get(key)) is not None:
                 item.setExpanded(True)
-        self._take_the_counts_that_moved(shape)
+        self.set_collection_counts(shape.shape, shape.collection_counts)
 
     def _open_under(self, drawn: _DrawnFolder) -> set[str]:
         left_open = {key for key, item, _folder_key in drawn.own if item.isExpanded()}
@@ -183,12 +191,7 @@ class GalleryTree:
         item = drawn.item
         drawn.group = group
         item.setText(0, group.label)
-        item.setData(0, GROUP_ROLE, group)
-        item.setData(0, COUNT_ROLE, len(gallery.rows_under(group)))
-        kind_icon = folder_icons.folder_kind_icon(group)
-        if kind_icon is not None:
-            item.setIcon(0, kind_icon[0])
-        item.setToolTip(0, _tooltip_of(group, kind_icon))
+        _dress(item, group)
         if isinstance(group, gallery.SettingsGroup) and not inside:
             self._forget_the_leaves(drawn)
             drawn.leaves = [(row["prompt_id"], item) for row in group.rows]
@@ -255,16 +258,6 @@ class GalleryTree:
                 if split_key(key)[1] == shape:
                     self._mark_recent(self.item_by_key[key], key)
 
-    def _take_the_counts_that_moved(self, shape) -> None:
-        before = self._counts_drawn.get(shape.shape, {})
-        now = dict(shape.collection_counts)
-        for folder_key in {*before, *now}:
-            if before.get(folder_key, 0) == now.get(folder_key, 0):
-                continue
-            for key in self.keys_by_folder.get(folder_key, ()):
-                if split_key(key)[1] == shape.shape:
-                    self.item_by_key[key].setData(0, COUNT_ROLE, now.get(folder_key, 0))
-        self._counts_drawn[shape.shape] = now
 
     def _add_collections(self, folder_item, shape, group, inside=()) -> None:
         folder_key = group.key
@@ -344,12 +337,7 @@ class GalleryTree:
 
     def _add_folder(self, group, parent_item, shape, inside) -> QTreeWidgetItem:
         item = QTreeWidgetItem([group.label])
-        item.setData(0, GROUP_ROLE, group)
-        item.setData(0, COUNT_ROLE, len(gallery.rows_under(group)))
-        kind_icon = folder_icons.folder_kind_icon(group)
-        if kind_icon is not None:
-            item.setIcon(0, kind_icon[0])
-        item.setToolTip(0, _tooltip_of(group, kind_icon))
+        _dress(item, group)
         self._register(item, shaped_key(group.key, shape.shape, inside), parent_item,
                        folder_key=group.key)
         if not isinstance(group, gallery.SettingsGroup):
@@ -378,10 +366,14 @@ class GalleryTree:
 
     def set_collection_counts(self, shape: str, counts: dict[str, int]) -> None:
         blocked = self._tree.blockSignals(True)
-        for key, item in self.item_by_key.items():
-            base, drawn_on = split_key(key)
-            if drawn_on == shape and folder_collection(base) is not None:
-                item.setData(0, COUNT_ROLE, counts.get(base, 0))
+        before = self._counts_drawn.get(shape, {})
+        for folder_key in {*before, *counts}:
+            if before.get(folder_key, 0) == counts.get(folder_key, 0):
+                continue
+            for key in self.keys_by_folder.get(folder_key, ()):
+                if split_key(key)[1] == shape:
+                    self.item_by_key[key].setData(0, COUNT_ROLE, counts.get(folder_key, 0))
+        self._counts_drawn[shape] = dict(counts)
         self._tree.blockSignals(blocked)
 
     def default_item(self) -> QTreeWidgetItem | None:

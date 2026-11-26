@@ -2017,6 +2017,24 @@ def test_a_click_on_a_tile_shows_it_from_the_library_the_gallery_drew(qtbot, mon
     assert listed == [], "the gallery already holds a reading of the library; another costs a whole read"
 
 
+def test_a_folder_click_shows_its_tiles_first_and_its_first_item_on_the_turn_after(
+        qtbot, monkeypatch):
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]),
+                       client=ComfyUIClient(folders=SUITE_FOLDERS))
+    qtbot.addWidget(view)
+    view.refresh()
+    later = []
+    monkeypatch.setattr(view, "_after_painting", later.append)
+
+    _select_first_leaf(view)
+    picked_in_the_click = view.selected_prompt_ids()
+    while later:
+        later.pop(0)()
+
+    assert (picked_in_the_click, view.listed_prompt_ids(), view.selected_prompt_ids()) == (
+        [], ["i1"], ["i1"])
+
+
 def test_going_to_an_item_draws_its_folder_even_when_that_row_is_already_current(qtbot):
     view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), client=ComfyUIClient(folders=SUITE_FOLDERS))
     qtbot.addWidget(view)

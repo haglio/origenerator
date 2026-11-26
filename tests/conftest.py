@@ -576,6 +576,7 @@ def _off_thread_work_runs_inline(request, monkeypatch):
                             lambda work, done, *, owner: done(work()))
     monkeypatch.setattr(CombineController, "_after_painting",
                         lambda self, work: work())
+    monkeypatch.setattr(GalleryView, "_after_painting", lambda self, work: work())
 
 
 @pytest.fixture(autouse=True)

@@ -40,14 +40,6 @@ def _name_of(row) -> str:
     return group.label if group is not None else row.text(0)
 
 
-def _taken_out(item: QTreeWidgetItem) -> bool:
-    parent = item.parent()
-    if parent is None:
-        return False
-    parent.takeChild(parent.indexOfChild(item))
-    return True
-
-
 def _children(row) -> Iterator[QTreeWidgetItem]:
     return (row.child(i) for i in range(row.childCount()))
 
@@ -74,9 +66,9 @@ def _shown_collections(shape, group) -> list:
 class _DrawnFolder:
     group: object
     item: QTreeWidgetItem | None
-    registered: list = field(default_factory=list)
+    own: list = field(default_factory=list)
     leaves: list = field(default_factory=list)
-    inside: list = field(default_factory=list)
+    children: list = field(default_factory=list)
 
 
 @dataclass
@@ -103,43 +95,176 @@ class GalleryTree:
         self._drawn_shapes: frozenset[str] | None = None
         self._folders_left_open: set[str] = set()
         self._drawn_folders: dict[str, _DrawnFolder] = {}
-        self._drawn_before: dict[str, _DrawnFolder] = {}
+        self._customs_drawn: dict[str, list[_DrawnFolder]] = {}
+        self._counts_drawn: dict[str, dict[str, int]] = {}
         self._drawing: list[_DrawnFolder] = []
         self.picked_together = None
 
     def populate(self, shapes, *, folder_meta=None, recently_worked=()):
+        recent_before = self._recently_worked
         self._recently_worked = {shaped_key(key, shape)
                                  for shape, key in recently_worked}
-        self._folders_left_open = self.folders_left_open()
         self._tree.blockSignals(True)
-        self._drawn_before, self._drawn_folders = self._drawn_folders, {}
-        self.item_by_key = {}
-        self.leaf_by_id = {}
-        self.keys_by_folder = {}
-        drawn_sides = []
-        for shape in shapes:
-            side = QTreeWidgetItem()
-            self._add_side(side, shape, folder_meta)
-            drawn_sides.append((shape, side))
-        self._drawn_before = {}
+        drawing = frozenset(shape.shape for shape in shapes)
+        if self.built and drawing == self._drawn_shapes:
+            for shape in shapes:
+                self._bring_the_side_up_to_date(self._tree.root_for(shape.shape), shape,
+                                                folder_meta)
+            self._mark_what_turned_recent(recent_before ^ self._recently_worked)
+        else:
+            self._draw_every_side(shapes, folder_meta)
+        self._tree.blockSignals(False)
+        self._drawn_shapes = drawing
+
+    def _draw_every_side(self, shapes, folder_meta) -> None:
+        self._folders_left_open = self.folders_left_open()
         self._tree.clear()
-        for shape, side in drawn_sides:
-            self._tree.root_for(shape.shape).addChildren(side.takeChildren())
+        self.item_by_key, self.leaf_by_id, self.keys_by_folder = {}, {}, {}
+        self._drawn_folders, self._customs_drawn = {}, {}
+        for shape in shapes:
+            root = self._tree.root_for(shape.shape)
+            customs = self._add_customs(root, shape)
+            self._add_node(gallery.all_group(shape.tree_model, folder_meta), root,
+                           shape).setIcon(0, icons.all_icon())
+            self._fill_customs(customs, shape)
+            self._counts_drawn[shape.shape] = dict(shape.collection_counts)
         for key in self._folders_left_open:
             item = self.item_by_key.get(key)
             if item is not None:
                 item.setExpanded(True)
         self._open_all()
-        self._tree.blockSignals(False)
-        self._drawn_shapes = frozenset(shape.shape for shape in shapes)
 
-    def _add_side(self, root, shape, folder_meta) -> None:
-        customs = [(custom, self._add_custom_collection(custom, root, shape))
-                   for custom in shape.custom_collections]
-        all_row = self._add_node(gallery.all_group(shape.tree_model, folder_meta), root, shape)
-        all_row.setIcon(0, icons.all_icon())
-        for custom, row in customs:
-            self._add_children(custom, row, shape, (custom.key,))
+    def _add_customs(self, root, shape) -> list[_DrawnFolder]:
+        customs = []
+        for custom in shape.custom_collections:
+            holder = _DrawnFolder(custom, None)
+            self._drawing.append(holder)
+            holder.item = self._add_custom_collection(custom, root, shape)
+            self._drawing.pop()
+            customs.append(holder)
+        self._customs_drawn[shape.shape] = customs
+        return customs
+
+    def _fill_customs(self, customs: list[_DrawnFolder], shape) -> None:
+        for holder in customs:
+            self._drawing.append(holder)
+            self._add_children(holder.group, holder.item, shape, (holder.group.key,))
+            self._drawing.pop()
+
+    def _bring_the_side_up_to_date(self, root, shape, folder_meta) -> None:
+        left_open = set()
+        for holder in self._customs_drawn.pop(shape.shape, []):
+            left_open |= self._open_under(holder)
+            root.removeChild(holder.item)
+            self._forget(holder)
+        customs = self._add_customs(root, shape)
+        for place, holder in enumerate(customs):
+            root.removeChild(holder.item)
+            root.insertChild(place, holder.item)
+        everything = gallery.all_group(shape.tree_model, folder_meta)
+        self._bring_up_to_date(self._drawn_folders[shaped_key(everything.key, shape.shape)],
+                               everything, shape, ())
+        self._fill_customs(customs, shape)
+        for key in left_open:
+            if (item := self.item_by_key.get(key)) is not None:
+                item.setExpanded(True)
+        self._take_the_counts_that_moved(shape)
+
+    def _open_under(self, drawn: _DrawnFolder) -> set[str]:
+        left_open = {key for key, item, _folder_key in drawn.own if item.isExpanded()}
+        for child_key in drawn.children:
+            if (child := self._drawn_folders.get(child_key)) is not None:
+                left_open |= self._open_under(child)
+        return left_open
+
+    def _bring_up_to_date(self, drawn: _DrawnFolder, group, shape, inside) -> None:
+        if drawn.group is group:
+            return
+        item = drawn.item
+        drawn.group = group
+        item.setText(0, group.label)
+        item.setData(0, GROUP_ROLE, group)
+        item.setData(0, COUNT_ROLE, len(gallery.rows_under(group)))
+        kind_icon = folder_icons.folder_kind_icon(group)
+        if kind_icon is not None:
+            item.setIcon(0, kind_icon[0])
+        item.setToolTip(0, _tooltip_of(group, kind_icon))
+        if isinstance(group, gallery.SettingsGroup) and not inside:
+            self._forget_the_leaves(drawn)
+            drawn.leaves = [(row["prompt_id"], item) for row in group.rows]
+            self.leaf_by_id.update(drawn.leaves)
+        self._bring_the_children_up_to_date(drawn, group, shape, _inside(group, inside))
+
+    def _bring_the_children_up_to_date(self, drawn: _DrawnFolder, group, shape, inside) -> None:
+        item = drawn.item
+        wanted = []
+        self._drawing.append(drawn)
+        for child in gallery.child_groups(group):
+            child_key = shaped_key(child.key, shape.shape, inside)
+            child_drawn = self._drawn_folders.get(child_key)
+            if child_drawn is not None and child_drawn.item.parent() is item:
+                self._bring_up_to_date(child_drawn, child, shape, inside)
+            else:
+                if child_drawn is not None:
+                    self._drop(child_key)
+                self._add_node(child, item, shape, inside)
+                drawn.children.pop()
+            wanted.append(child_key)
+        self._drawing.pop()
+        keeping = set(wanted)
+        for gone in [child_key for child_key in drawn.children if child_key not in keeping]:
+            self._drop(gone)
+        drawn.children = wanted
+        first = len(self.collections_in(item))
+        for place, child_key in enumerate(wanted, start=first):
+            child_item = self._drawn_folders[child_key].item
+            if item.indexOfChild(child_item) != place:
+                item.removeChild(child_item)
+                item.insertChild(place, child_item)
+
+    def _drop(self, key: str) -> None:
+        drawn = self._drawn_folders.pop(key, None)
+        if drawn is None:
+            return
+        parent = drawn.item.parent()
+        if parent is not None:
+            parent.removeChild(drawn.item)
+        self._forget(drawn)
+
+    def _forget(self, drawn: _DrawnFolder) -> None:
+        for key, item, folder_key in drawn.own:
+            if self.item_by_key.get(key) is item:
+                del self.item_by_key[key]
+                if folder_key is not None and key in self.keys_by_folder.get(folder_key, ()):
+                    self.keys_by_folder[folder_key].remove(key)
+        self._forget_the_leaves(drawn)
+        for child_key in drawn.children:
+            child = self._drawn_folders.pop(child_key, None)
+            if child is not None:
+                self._forget(child)
+
+    def _forget_the_leaves(self, drawn: _DrawnFolder) -> None:
+        for prompt_id, item in drawn.leaves:
+            if self.leaf_by_id.get(prompt_id) is item:
+                del self.leaf_by_id[prompt_id]
+
+    def _mark_what_turned_recent(self, turned) -> None:
+        for recent in turned:
+            folder_key, shape = split_key(recent)
+            for key in self.keys_by_folder.get(folder_key, ()):
+                if split_key(key)[1] == shape:
+                    self._mark_recent(self.item_by_key[key], key)
+
+    def _take_the_counts_that_moved(self, shape) -> None:
+        before = self._counts_drawn.get(shape.shape, {})
+        now = dict(shape.collection_counts)
+        for folder_key in {*before, *now}:
+            if before.get(folder_key, 0) == now.get(folder_key, 0):
+                continue
+            for key in self.keys_by_folder.get(folder_key, ()):
+                if split_key(key)[1] == shape.shape:
+                    self.item_by_key[key].setData(0, COUNT_ROLE, now.get(folder_key, 0))
+        self._counts_drawn[shape.shape] = now
 
     def _add_collections(self, folder_item, shape, group, inside=()) -> None:
         folder_key = group.key
@@ -160,14 +285,16 @@ class GalleryTree:
         self._mark_recent(item, key)
         parent_item.addChild(item)
         self._keep_track_of(item, key, folder_key)
-        for drawing in self._drawing:
-            drawing.registered.append((key, item, folder_key))
+        if self._drawing:
+            self._drawing[-1].own.append((key, item, folder_key))
         return item
 
     def _keep_track_of(self, item, key: str, folder_key: str | None) -> None:
         self.item_by_key[key] = item
         if folder_key is not None:
-            self.keys_by_folder.setdefault(folder_key, []).append(key)
+            keys = self.keys_by_folder.setdefault(folder_key, [])
+            if key not in keys:
+                keys.append(key)
 
     def _mark_recent(self, item, key: str) -> None:
         recent = shaped_key(*split_key(key)) in self._recently_worked
@@ -202,41 +329,18 @@ class GalleryTree:
             self._add_children(group, item, shape, _inside(group, inside))
             return item
         key = shaped_key(group.key, shape.shape, inside)
-        drawn = self._drawn_before.pop(key, None)
-        if drawn is not None and drawn.group is group and _taken_out(drawn.item):
-            self._put_back(key, drawn, parent_item, shape)
-            return drawn.item
         drawn = _DrawnFolder(group, None)
-        for drawing in self._drawing:
-            drawing.inside.append((key, drawn))
+        if self._drawing:
+            self._drawing[-1].children.append(key)
         self._drawing.append(drawn)
         drawn.item = self._add_folder(group, parent_item, shape, inside)
         self._add_children(group, drawn.item, shape, _inside(group, inside))
-        if isinstance(group, gallery.SettingsGroup) and not inside:
-            drawn.leaves.extend((row["prompt_id"], drawn.item) for row in group.rows)
-            self.leaf_by_id.update(drawn.leaves)
         self._drawing.pop()
-        if self._drawing:
-            self._drawing[-1].leaves.extend(drawn.leaves)
+        if isinstance(group, gallery.SettingsGroup) and not inside:
+            drawn.leaves = [(row["prompt_id"], drawn.item) for row in group.rows]
+            self.leaf_by_id.update(drawn.leaves)
         self._drawn_folders[key] = drawn
         return drawn.item
-
-    def _put_back(self, key: str, drawn: _DrawnFolder, parent_item, shape) -> None:
-        parent_item.addChild(drawn.item)
-        for registered_key, item, folder_key in drawn.registered:
-            self._keep_track_of(item, registered_key, folder_key)
-            self._mark_recent(item, registered_key)
-            if folder_key is not None and folder_collection(folder_key) is not None:
-                item.setData(0, COUNT_ROLE, shape.collection_counts.get(folder_key, 0))
-        self.leaf_by_id.update(drawn.leaves)
-        for drawing in self._drawing:
-            drawing.registered.extend(drawn.registered)
-            drawing.inside.append((key, drawn))
-            drawing.inside.extend(drawn.inside)
-        if self._drawing:
-            self._drawing[-1].leaves.extend(drawn.leaves)
-        self._drawn_folders[key] = drawn
-        self._drawn_folders.update(drawn.inside)
 
     def _add_folder(self, group, parent_item, shape, inside) -> QTreeWidgetItem:
         item = QTreeWidgetItem([group.label])

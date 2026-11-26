@@ -1139,7 +1139,7 @@ class GalleryView(QWidget):
                   else None) or self.toc.default_item()
         with self._navigation.off_the_record():
             if target is not None:
-                self._tree.setCurrentItem(target)
+                self._show_the_folder_again(target)
                 self._reselect_generation(selected_gen)
             else:
                 self._folder_path.set_display("")
@@ -1158,6 +1158,12 @@ class GalleryView(QWidget):
         for tab in self.generate_pane.generate_tabs():
             tab.refresh_generate_caption()
         self._folder_switches.take_in_the_arrivals()
+
+    def _show_the_folder_again(self, item) -> None:
+        if self._tree.is_current(item):
+            self._on_folder_selected(item, None)
+        else:
+            self._tree.setCurrentItem(item)
 
     def _build_sides(self, trees):
         return [ShapeModel(
@@ -1313,14 +1319,22 @@ class GalleryView(QWidget):
         self._folder_path.show_folder(self.toc.path_steps(current))
         self._update_folder_average(group)
         self._show_group_contents(group, current)
+        if not self._navigation.suppressed:
+            self._after_painting(lambda: self._land_where_the_click_left_it(here, group))
+        self._re_aim_every_button()
+
+    def _after_painting(self, work: Callable[[], None]) -> None:
+        defer(self, work)
+
+    def _land_where_the_click_left_it(self, here: str | None, group) -> None:
+        if self.toc.selected_folder_key() != here or self._navigation.suppressed:
+            return
         landed = self._land_on_the_first_item()
         if group is not None:
             self._navigation.record(landed)
         self._re_aim_every_button()
 
     def _land_on_the_first_item(self) -> str | None:
-        if self._navigation.suppressed:
-            return None
         first = next(iter(self._gallery_pane.listed_prompt_ids()), None)
         if first is None or not self._show_generation(first):
             return None

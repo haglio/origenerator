@@ -189,19 +189,6 @@ def test_a_folder_renamed_draws_every_workflows_folders_again():
     assert after.tree("landscape")[0].label == "Stills"
 
 
-def test_new_item_names_draw_every_workflows_folders_again():
-    names = {"version": 1}
-    rows = [_in_workflow("flux-1", "flux_t2i_upscaled")]
-    before = LibrarySnapshot(rows, names_version=lambda: names["version"])
-    _workflows_in(before)
-    names["version"] = 2
-
-    after = LibrarySnapshot([dict(rows[0])], previous=before,
-                            names_version=lambda: names["version"])
-
-    assert _workflows_in(after)["flux_t2i_upscaled"] is not _workflows_in(before)["flux_t2i_upscaled"]
-
-
 def _models_in(library, shape):
     (images,) = library.tree(shape)
     (workflow,) = gallery.child_groups(images)
@@ -572,3 +559,60 @@ def test_the_versions_of_many_videos_read_where_kino_files_its_upscales_once(
 
     assert LibrarySnapshot(rows, evolvers_folder=tmp_path / "AI").versions_of(rows) == {}
     assert len(asked) <= 1
+
+
+def _made_row(prompt_id, workflow_name, params, filename):
+    return {"prompt_id": prompt_id, "workflow_name": workflow_name, "workflow_version": "v1",
+            "status": "completed", "source": "generated", "created_at": "2026-01-01",
+            "params_json": json.dumps(params),
+            "output_files": json.dumps([{"filename": filename, "subfolder": ""}])}
+
+
+def _folders_under(groups) -> dict:
+    found = {}
+    for group in groups:
+        found[group.key] = group
+        found.update(_folders_under(gallery.child_groups(group)))
+    return found
+
+
+def test_a_new_item_named_leaves_the_video_folders_it_did_not_touch_as_they_were():
+    image = _made_row("i1", "sdxl_t2i", {"positive_prompt": "scene one", "seed": 1},
+                      "sdxl_t2i_i1.png")
+    video = _made_row("v1", "wan22_i2v", {"positive_prompt": "a slow turn", "seed": 1,
+                                          "input_image": "sdxl_t2i_i1.png"}, "wan22_i2v_v1.mp4")
+    names = {"i1": "image one"}
+    version = [1]
+    first = LibrarySnapshot([image, video], name_of=names.get, names_version=lambda: version[0])
+    drawn = _folders_under(first.tree("landscape"))
+    added = _made_row("i2", "sdxl_t2i", {"positive_prompt": "scene two", "seed": 2},
+                      "sdxl_t2i_i2.png")
+    names["i2"], version[0] = "image two", 2
+
+    again = LibrarySnapshot([image, video, added], name_of=names.get,
+                            names_version=lambda: version[0], previous=first)
+
+    videos = {key: group for key, group in drawn.items() if key.startswith("video/")}
+    redrawn = _folders_under(again.tree("landscape"))
+    assert videos
+    assert all(redrawn[key] is group for key, group in videos.items())
+
+
+def test_a_new_name_for_a_start_image_draws_again_the_folders_that_show_it():
+    image = _made_row("i1", "sdxl_t2i", {"positive_prompt": "scene one", "seed": 1},
+                      "sdxl_t2i_i1.png")
+    video = _made_row("v1", "wan22_i2v", {"positive_prompt": "a slow turn", "seed": 1,
+                                          "input_image": "sdxl_t2i_i1.png"}, "wan22_i2v_v1.mp4")
+    names = {"i1": "image one"}
+    version = [1]
+    first = LibrarySnapshot([image, video], name_of=names.get, names_version=lambda: version[0])
+    drawn = _folders_under(first.tree("landscape"))
+    names["i1"], version[0] = "image renamed", 2
+
+    again = LibrarySnapshot([image, video], name_of=names.get,
+                            names_version=lambda: version[0], previous=first)
+
+    redrawn = _folders_under(again.tree("landscape"))
+    showing = [key for key, group in redrawn.items() if group.label == "image renamed"]
+    assert showing
+    assert all(redrawn[key] is not drawn[key] for key in showing)

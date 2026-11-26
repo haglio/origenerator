@@ -54,6 +54,7 @@ from origenerator.gallery.signatures import (
     model_signature,
     parse_params,
     settings_only,
+    start_image_entry,
 )
 from origenerator.gallery.source_image import build_image_config_index
 from origenerator.generation_state import GenerationSource, in_sight
@@ -361,11 +362,14 @@ class _Tier:
     kept: KeptFolders
 
     def kept_folder(self, key, rows: list[dict], make: Callable, *made_from):
-        return self.kept.kept(key, rows, make, *made_from, depends_on=self.depends_on)
+        return self.kept.kept(key, rows, make, *made_from,
+                              depends_on=self._start_images_of(rows))
 
-    @property
-    def depends_on(self) -> tuple:
-        return (self.image_index,) if made_from_an_image(self.workflow_name) else ()
+    def _start_images_of(self, rows: list[dict]) -> tuple:
+        if not made_from_an_image(self.workflow_name):
+            return ()
+        entries = (start_image_entry(row.get("params_json"), self.image_index) for row in rows)
+        return tuple((entry, entry and self.name_of(entry.prompt_id)) for entry in entries)
 
 
 def _leaf_label(workflow_name: str, key: str, rows: list[dict]) -> str:
@@ -474,8 +478,10 @@ def start_frame_index(rows: list[dict]) -> dict:
 
 
 class KeptFolders:
-    def __init__(self, before: KeptFolders | None = None, *, drawn_with: tuple = ()):
+    def __init__(self, before: KeptFolders | None = None, *, drawn_with: tuple = (),
+                 named_with: object = None):
         self.drawn_with = drawn_with
+        self.named_with = named_with
         self._before: dict = before.folders_drawn_with(drawn_with) if before is not None else {}
         self._now: dict = {}
 
@@ -483,11 +489,11 @@ class KeptFolders:
         return self._now if all_the_same(self.drawn_with, drawn_with) else {}
 
     def kept(self, key, parts: list, make: Callable, *made_from, depends_on: tuple = ()):
-        made_of = (*parts, *depends_on)
         before = self._before.get(key)
-        same = before is not None and all_the_same(before[0], made_of)
-        folder = before[1] if same else make(*made_from)
-        self._now[key] = (made_of, folder)
+        same = (before is not None and all_the_same(before[0], parts)
+                and before[1] == depends_on)
+        folder = before[2] if same else make(*made_from)
+        self._now[key] = (parts, depends_on, folder)
         return folder
 
 

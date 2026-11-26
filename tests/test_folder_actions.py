@@ -60,6 +60,16 @@ def test_a_leaf_folder_shows_the_actions_of_every_item_in_it(folder_actions, lib
         False, [("alpha", True)])
 
 
+def test_a_leaf_folder_reads_its_items_in_one_go(folder_actions, library, monkeypatch):
+    rows = [_image(library, f"item{n}", n) for n in range(5)]
+    read_alone = []
+    monkeypatch.setattr(library, "get_generation", read_alone.append)
+
+    folder_actions.show_folder(gallery.SettingsGroup("k", "S", rows))
+
+    assert (read_alone, folder_actions.isHidden()) == ([], False)
+
+
 def test_a_folder_that_is_no_leaf_folder_shows_none(folder_actions, library):
     rows = [_image(library, "one", 1)]
     folder_actions.show_folder(gallery.SettingsGroup("k", "S", rows))

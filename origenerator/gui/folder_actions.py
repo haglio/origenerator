@@ -35,8 +35,9 @@ class FolderActions(QWidget):
     def _finished_items_of(self, group) -> list[dict]:
         if not isinstance(group, gallery.SettingsGroup):
             return []
+        fresh = self._db.get_generations(listed["prompt_id"] for listed in group.rows)
         return [row for listed in group.rows
-                if (row := self._db.get_generation(listed["prompt_id"])) is not None
+                if (row := fresh.get(listed["prompt_id"])) is not None
                 and gallery.produced_output(row)]
 
     def hear(self, side: str, actions_by_id: dict) -> None:

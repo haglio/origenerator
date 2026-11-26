@@ -74,16 +74,30 @@ def test_a_save_cut_off_part_way_leaves_the_last_state_file_whole(tmp_path, monk
     state.set("gallery_folder", "image/sdxl_t2i")
     state.save()
     last_saved = path.read_text(encoding="utf-8")
-    write_text = Path.write_text
+    real_open = Path.open
 
-    def write_half_then_fail(self, text, *args, **kwargs):
-        write_text(self, text[: len(text) // 2], *args, **kwargs)
-        raise OSError("the disk filled part-way through the write")
+    class _FillsPartWay:
+        def __init__(self, handle):
+            self._handle = handle
 
-    monkeypatch.setattr(Path, "write_text", write_half_then_fail)
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            self._handle.close()
+
+        def write(self, text):
+            self._handle.write(text[: len(text) // 2])
+            raise OSError("the disk filled part-way through the write")
+
+    def open_filling_part_way(self, mode="r", *args, **kwargs):
+        handle = real_open(self, mode, *args, **kwargs)
+        return _FillsPartWay(handle) if "w" in mode else handle
+
+    monkeypatch.setattr(Path, "open", open_filling_part_way)
     state.set("gallery_folder", "video/wan_i2v")
 
-    with pytest.raises(OSError, match="the disk filled"):
+    with pytest.raises(OSError, match="could not replace"):
         state.save()
 
     assert path.read_text(encoding="utf-8") == last_saved, (
@@ -106,3 +120,29 @@ def test_saving_a_state_set_again_unchanged_writes_nothing_out(tmp_path, monkeyp
         state.save()
 
     assert dumped == []
+
+
+def test_saves_handed_off_leave_the_newest_whatever_order_their_writes_run_in(tmp_path):
+    path = tmp_path / "ui_state.json"
+    state = AppState(path)
+    handed = []
+    state.set("gallery_folder", "image/older")
+    state.save(hand_off=handed.append)
+    state.set("gallery_folder", "image/newer")
+    state.save(hand_off=handed.append)
+
+    for write in reversed(handed):
+        write()
+
+    assert AppState(path).get("gallery_folder") == "image/newer"
+
+
+def test_a_save_handed_off_writes_nothing_until_its_write_runs(tmp_path):
+    path = tmp_path / "ui_state.json"
+    state = AppState(path)
+    handed = []
+    state.set("gallery_folder", "image/sdxl_t2i")
+
+    state.save(hand_off=handed.append)
+
+    assert (path.exists(), len(handed)) == (False, 1)

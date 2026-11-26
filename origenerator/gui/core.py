@@ -10,7 +10,7 @@ from dataclasses import dataclass, replace
 from operator import attrgetter
 
 from app_support.loading_screen import MeetingPlace
-from PySide6.QtCore import QByteArray, Qt, QTimer, Signal
+from PySide6.QtCore import QByteArray, Qt, QThreadPool, QTimer, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QMainWindow
 from shared_ui.application import close_the_windows_it_opened
@@ -301,7 +301,7 @@ class Core(QMainWindow):
 
     def _persist_session_or_try_again_next_time(self) -> None:
         try:
-            self._persist_session()
+            self._persist_session(hand_off=self._off_the_window_thread)
         except Exception as e:
             logger.warning("Could not save the session; trying again shortly: %s", e)
 
@@ -502,7 +502,16 @@ class Core(QMainWindow):
             self, "Close Origenerator", "Are you sure you want to close Origenerator?")
         return self._he_said_yes_to_closing
 
-    def _persist_session(self) -> None:
+    def _off_the_window_thread(self, write: Callable[[], None]) -> None:
+        def written() -> None:
+            try:
+                write()
+            except OSError as e:
+                logger.warning("Could not save the session; trying again shortly: %s", e)
+        QThreadPool.globalInstance().start(written)
+
+    def _persist_session(self, *,
+                         hand_off: Callable[[Callable[[], None]], None] | None = None) -> None:
         for key, getter, _setter in SESSION_UI_STATE:
             if self._fun_time is not None and key in _KEYS_THE_SESSION_OWNS:
                 continue
@@ -521,4 +530,4 @@ class Core(QMainWindow):
             )
             if self._next_launch is not None:
                 self._next_launch.say_where_the_app_comes_up(the_window_on(self.screen()))
-        self._app_state.save()
+        self._app_state.save(hand_off=hand_off)

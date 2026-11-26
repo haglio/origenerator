@@ -13,7 +13,7 @@ from xml.etree import ElementTree
 import pytest
 import shiboken6
 from app_support import loading_screen as launchers_screen
-from app_support.file_channel import read_key_values
+from app_support.file_channel import read_key_values, write_whole
 from app_support.frame_channel import _HEADER
 from app_support.threading_utils import wait_until
 from funestra.file_channel import append_command
@@ -537,6 +537,21 @@ def test_saving_before_the_generate_tabs_are_back_keeps_the_ones_that_were_saved
     kept = AppState(tmp_path / "ui.json").get("generate_tabs")["tabs"]
     assert [tab["config"]["workflow_name"] for tab in kept] == ["sdxl_t2i", "wan22_i2v"], (
         "a save in the seconds before Core restores them would lose his tabs for good")
+
+
+def test_the_session_saved_every_few_seconds_is_written_off_the_window_thread(
+        qtbot, tmp_path, monkeypatch):
+    saved_to = tmp_path / "ui.json"
+    win = _window(qtbot, tmp_path)
+    handed = []
+    monkeypatch.setattr(win, "_off_the_window_thread", handed.append)
+
+    win._persist_session_or_try_again_next_time()
+    written_at_once = saved_to.exists()
+    for write in handed:
+        write()
+
+    assert (written_at_once, saved_to.exists()) == (False, True)
 
 
 @pytest.mark.parametrize("saved", [OSR2_PARKED, OSR2_DRIVING])
@@ -1159,17 +1174,14 @@ def test_a_session_save_the_disk_refuses_is_tried_again_rather_than_ending_the_a
         qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr(core, "SESSION_PERSIST_INTERVAL_MS", 10)
     path = tmp_path / "ui.json"
-    state = AppState(path)
     refusals = [PermissionError("the state file is open in another program")]
-    write = state.save
 
-    def save_once_the_disk_allows():
+    def write_once_the_disk_allows(to, text):
         if refusals:
             raise refusals.pop()
-        write()
+        write_whole(to, text)
 
-    monkeypatch.setattr(state, "save", save_once_the_disk_allows)
-    win = _window(qtbot, tmp_path, state)
+    win = _window(qtbot, tmp_path, AppState(path, write=write_once_the_disk_allows))
 
     _select_where_the_gallery_has_drawn_the_library(win, "xyz")
 

@@ -76,6 +76,7 @@ class _DrawnFolder:
     item: QTreeWidgetItem | None
     registered: list = field(default_factory=list)
     leaves: list = field(default_factory=list)
+    inside: list = field(default_factory=list)
 
 
 @dataclass
@@ -101,9 +102,9 @@ class GalleryTree:
         self._recently_worked: set[str] = set()
         self._drawn_shapes: frozenset[str] | None = None
         self._folders_left_open: set[str] = set()
-        self._drawn_workflows: dict[str, _DrawnFolder] = {}
-        self._to_put_back: dict[str, _DrawnFolder] = {}
-        self._drawing: _DrawnFolder | None = None
+        self._drawn_folders: dict[str, _DrawnFolder] = {}
+        self._drawn_before: dict[str, _DrawnFolder] = {}
+        self._drawing: list[_DrawnFolder] = []
         self.picked_together = None
 
     def populate(self, shapes, *, folder_meta=None, recently_worked=()):
@@ -111,16 +112,19 @@ class GalleryTree:
                                  for shape, key in recently_worked}
         self._folders_left_open = self.folders_left_open()
         self._tree.blockSignals(True)
-        self._to_put_back = {key: drawn for key, drawn in self._drawn_workflows.items()
-                             if _taken_out(drawn.item)}
-        self._drawn_workflows = {}
-        self._tree.clear()
+        self._drawn_before, self._drawn_folders = self._drawn_folders, {}
         self.item_by_key = {}
         self.leaf_by_id = {}
         self.keys_by_folder = {}
+        drawn_sides = []
         for shape in shapes:
-            self._add_side(self._tree.root_for(shape.shape), shape, folder_meta)
-        self._to_put_back = {}
+            side = QTreeWidgetItem()
+            self._add_side(side, shape, folder_meta)
+            drawn_sides.append((shape, side))
+        self._drawn_before = {}
+        self._tree.clear()
+        for shape, side in drawn_sides:
+            self._tree.root_for(shape.shape).addChildren(side.takeChildren())
         for key in self._folders_left_open:
             item = self.item_by_key.get(key)
             if item is not None:
@@ -156,8 +160,8 @@ class GalleryTree:
         self._mark_recent(item, key)
         parent_item.addChild(item)
         self._keep_track_of(item, key, folder_key)
-        if self._drawing is not None:
-            self._drawing.registered.append((key, item, folder_key))
+        for drawing in self._drawing:
+            drawing.registered.append((key, item, folder_key))
         return item
 
     def _keep_track_of(self, item, key: str, folder_key: str | None) -> None:
@@ -193,41 +197,46 @@ class GalleryTree:
                               folder_key=group.key)
 
     def _add_node(self, group, parent_item, shape, inside=()) -> QTreeWidgetItem:
-        if isinstance(group, gallery.WorkflowGroup) and not inside:
-            return self._add_workflow(group, parent_item, shape)
         if isinstance(group, gallery.CustomCollection):
             item = self._add_custom_collection(group, parent_item, shape, inside)
-        else:
-            item = self._add_folder(group, parent_item, shape, inside)
-        self._add_children(group, item, shape, _inside(group, inside))
+            self._add_children(group, item, shape, _inside(group, inside))
+            return item
+        key = shaped_key(group.key, shape.shape, inside)
+        drawn = self._drawn_before.pop(key, None)
+        if drawn is not None and drawn.group is group and _taken_out(drawn.item):
+            self._put_back(key, drawn, parent_item, shape)
+            return drawn.item
+        drawn = _DrawnFolder(group, None)
+        for drawing in self._drawing:
+            drawing.inside.append((key, drawn))
+        self._drawing.append(drawn)
+        drawn.item = self._add_folder(group, parent_item, shape, inside)
+        self._add_children(group, drawn.item, shape, _inside(group, inside))
         if isinstance(group, gallery.SettingsGroup) and not inside:
-            for row in group.rows:
-                self.leaf_by_id[row["prompt_id"]] = item
-                if self._drawing is not None:
-                    self._drawing.leaves.append((row["prompt_id"], item))
-        return item
-
-    def _add_workflow(self, group, parent_item, shape) -> QTreeWidgetItem:
-        key = shaped_key(group.key, shape.shape)
-        drawn = self._to_put_back.pop(key, None)
-        if drawn is not None and drawn.group is group:
-            self._put_back(drawn, parent_item, shape)
-        else:
-            drawn = self._drawing = _DrawnFolder(group, None)
-            drawn.item = self._add_folder(group, parent_item, shape, ())
-            self._add_children(group, drawn.item, shape, ())
-            self._drawing = None
-        self._drawn_workflows[key] = drawn
+            drawn.leaves.extend((row["prompt_id"], drawn.item) for row in group.rows)
+            self.leaf_by_id.update(drawn.leaves)
+        self._drawing.pop()
+        if self._drawing:
+            self._drawing[-1].leaves.extend(drawn.leaves)
+        self._drawn_folders[key] = drawn
         return drawn.item
 
-    def _put_back(self, drawn: _DrawnFolder, parent_item, shape) -> None:
+    def _put_back(self, key: str, drawn: _DrawnFolder, parent_item, shape) -> None:
         parent_item.addChild(drawn.item)
-        for key, item, folder_key in drawn.registered:
-            self._keep_track_of(item, key, folder_key)
-            self._mark_recent(item, key)
+        for registered_key, item, folder_key in drawn.registered:
+            self._keep_track_of(item, registered_key, folder_key)
+            self._mark_recent(item, registered_key)
             if folder_key is not None and folder_collection(folder_key) is not None:
                 item.setData(0, COUNT_ROLE, shape.collection_counts.get(folder_key, 0))
         self.leaf_by_id.update(drawn.leaves)
+        for drawing in self._drawing:
+            drawing.registered.extend(drawn.registered)
+            drawing.inside.append((key, drawn))
+            drawing.inside.extend(drawn.inside)
+        if self._drawing:
+            self._drawing[-1].leaves.extend(drawn.leaves)
+        self._drawn_folders[key] = drawn
+        self._drawn_folders.update(drawn.inside)
 
     def _add_folder(self, group, parent_item, shape, inside) -> QTreeWidgetItem:
         item = QTreeWidgetItem([group.label])

@@ -91,12 +91,14 @@ class LibrarySnapshot:
     def tree(self, shape: str) -> list:
         if shape not in self._drawn:
             before = self._drawn_before.get(shape)
-            drawn_with = (self.folder_meta, self._names_version())
-            if self._unmoved and before is not None and all_the_same(before[0].drawn_with,
-                                                                     drawn_with):
+            drawn_with, named_with = (self.folder_meta,), self._names_version()
+            if (self._unmoved and before is not None
+                    and all_the_same(before[0].drawn_with, drawn_with)
+                    and before[0].named_with == named_with):
                 self._drawn[shape] = before
             else:
-                kept = KeptFolders(before[0] if before else None, drawn_with=drawn_with)
+                kept = KeptFolders(before[0] if before else None, drawn_with=drawn_with,
+                                   named_with=named_with)
                 self._drawn[shape] = (kept, gallery.build_gallery_tree(
                     self._on_the_shape(self.rows, shape), self.folder_meta,
                     image_index=self.image_index, name_of=self._name_of, kept=kept))

@@ -222,6 +222,10 @@ def _unrecorded_choices(workflow_name: str | None, params: dict, settings: dict)
             and not (key in loras and is_no_lora(settings[key]))}
 
 
+def start_image_entry(params_json: str | None, image_index: dict):
+    return image_index.get(frame_name(_input_image_of(params_json)))
+
+
 @lru_cache(maxsize=READINGS_KEPT)
 def _input_image_of(params_json: str | None):
     return parse_params(params_json).get("input_image")

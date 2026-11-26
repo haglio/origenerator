@@ -473,3 +473,58 @@ def test_one_folder_picked_on_both_shapes_stays_two_folders(qtbot):
         shaped_key(folder, shape) for shape in (LANDSCAPE, PORTRAIT)), (
         "a row's key carries the shape it is drawn on, so a pick across both shapes stays two "
         "folders")
+
+
+def test_a_redraw_keeps_the_rows_of_every_folder_inside_a_touched_workflow_it_did_not_touch(
+        qtbot):
+    def stepped(prompt_id, steps):
+        return _row(prompt_id, "sdxl_t2i", {"positive_prompt": "scene one", "steps": steps,
+                                            "seed": 1}, f"sdxl_t2i_{prompt_id}.png")
+    alpha, beta = stepped("i1", 20), stepped("i2", 30)
+    kept = KeptFolders()
+    pane = SplitFolderTree(GROUP_ROLE)
+    qtbot.addWidget(pane)
+    tree = GalleryTree(pane)
+    tree.populate([ShapeModel(LANDSCAPE, gallery.build_gallery_tree([alpha, beta], kept=kept))])
+    beta_before, alpha_before = tree.leaf_by_id["i2"], tree.leaf_by_id["i1"]
+    beta_key = beta_before.data(0, TREE_KEY_ROLE)
+
+    again = gallery.build_gallery_tree([alpha, beta, stepped("i3", 20)], kept=KeptFolders(kept))
+    tree.populate([ShapeModel(LANDSCAPE, again)])
+
+    assert tree.leaf_by_id["i2"] is beta_before
+    assert tree.item_by_key[beta_key] is beta_before
+    assert tree.leaf_by_id["i1"] is not alpha_before
+    assert tree.leaf_by_id["i3"] is tree.leaf_by_id["i1"]
+    assert beta_before.treeWidget() is not None
+
+
+def _videos_folders(model) -> dict:
+    found = {}
+
+    def walk(groups):
+        for group in groups:
+            found[group.key] = group
+            walk(gallery.child_groups(group))
+    walk(model)
+    return {key: group for key, group in found.items() if key.startswith("video/")}
+
+
+def test_a_new_image_keeps_the_folders_of_videos_made_from_other_images():
+    first = _image("i1", "scene one")
+    animated = _row("v1", "wan22_i2v",
+                    {"positive_prompt": "a slow turn", "seed": 1,
+                     "input_image": "sdxl_t2i_i1.png"}, "wan22_i2v_v1.mp4")
+    before = [first, animated]
+    index = gallery.start_frame_index(before)
+    kept = KeptFolders()
+    drawn = gallery.build_gallery_tree(before, image_index=index, kept=kept)
+    added = _image("i2", "scene two")
+    index_after = {**index, **gallery.start_frame_index([added])}
+
+    again = gallery.build_gallery_tree([*before, added], image_index=index_after,
+                                       kept=KeptFolders(kept))
+
+    videos_before, videos_after = _videos_folders(drawn), _videos_folders(again)
+    assert videos_before
+    assert all(videos_after[key] is group for key, group in videos_before.items())

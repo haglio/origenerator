@@ -436,7 +436,8 @@ def test_a_redraw_keeps_the_rows_of_every_workflow_folder_the_change_did_not_tou
     tree, drawn = _drawn_twice(qtbot, [still, clip], [still, _video("v1", "beta")])
 
     assert tree.item_by_key[_STILLS] is drawn[_STILLS]
-    assert tree.item_by_key[_CLIPS] is not drawn[_CLIPS]
+    assert tree.item_by_key[_CLIPS] is drawn[_CLIPS]
+    assert tree.leaf_by_id["v1"].parent() is not None
     kept_inside = [key for key in drawn if key.startswith("image/sdxl_t2i")]
     assert all(tree.item_by_key[key] is drawn[key] for key in kept_inside)
     assert tree.item_by_key[_STILLS].parent() is tree.item_by_key[shaped_key("image", LANDSCAPE)]
@@ -494,7 +495,7 @@ def test_a_redraw_keeps_the_rows_of_every_folder_inside_a_touched_workflow_it_di
 
     assert tree.leaf_by_id["i2"] is beta_before
     assert tree.item_by_key[beta_key] is beta_before
-    assert tree.leaf_by_id["i1"] is not alpha_before
+    assert tree.leaf_by_id["i1"] is alpha_before
     assert tree.leaf_by_id["i3"] is tree.leaf_by_id["i1"]
     assert beta_before.treeWidget() is not None
 
@@ -528,3 +529,25 @@ def test_a_new_image_keeps_the_folders_of_videos_made_from_other_images():
     videos_before, videos_after = _videos_folders(drawn), _videos_folders(again)
     assert videos_before
     assert all(videos_after[key] is group for key, group in videos_before.items())
+
+
+def test_a_redraw_changes_the_rows_of_the_folders_it_touched_in_place(qtbot):
+    def stepped(prompt_id, steps):
+        return _row(prompt_id, "sdxl_t2i", {"positive_prompt": "scene one", "steps": steps,
+                                            "seed": 1}, f"sdxl_t2i_{prompt_id}.png")
+    alpha, beta = stepped("i1", 20), stepped("i2", 30)
+    kept = KeptFolders()
+    pane = SplitFolderTree(GROUP_ROLE)
+    qtbot.addWidget(pane)
+    tree = GalleryTree(pane)
+    tree.populate([ShapeModel(LANDSCAPE, gallery.build_gallery_tree([alpha, beta], kept=kept))])
+    drawn = dict(tree.item_by_key)
+    alpha_row = tree.leaf_by_id["i1"]
+
+    again = gallery.build_gallery_tree([alpha, beta, stepped("i3", 20)], kept=KeptFolders(kept))
+    tree.populate([ShapeModel(LANDSCAPE, again)])
+
+    assert all(tree.item_by_key[key] is item for key, item in drawn.items()), (
+        "a row the change touched is brought up to date where it is, never drawn again")
+    assert tree.leaf_by_id["i3"] is alpha_row
+    assert alpha_row.data(0, COUNT_ROLE) == 2

@@ -56,7 +56,7 @@
     "tests/test_fun_time_gallery.py": 5,
     "tests/test_fun_time_watch.py": 19,
     "tests/test_funestra_slideshow.py": 1,
-    "tests/test_gallery_pane.py": 12,
+    "tests/test_gallery_pane.py": 11,
     "tests/test_gallery_tree.py": 3,
     "tests/test_gallery_view.py": 6,
     "tests/test_gallery_view_folders.py": 8,

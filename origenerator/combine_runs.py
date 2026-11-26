@@ -87,6 +87,18 @@ def launch(jobs, db, key: str, run: CombineRun, *, name: str = "",
            checked: tuple[str, ...] = ()) -> str | None:
     prompt_id = jobs.start_prepared(key, run.workflow, run.params)
     if prompt_id:
-        db.set_settings_source(prompt_id, category=name, video_prompt_id=run.video_id)
-        give_the_launch_its_actions(db, prompt_id, name, checked)
+        note_its_settings(db, prompt_id, name, run.video_id, checked)
     return prompt_id
+
+
+def note_its_settings(db, prompt_id: str, category: str, video_id: str | None,
+                      checked: tuple[str, ...]) -> None:
+    if category or video_id:
+        db.set_settings_source(prompt_id, category=category, video_prompt_id=video_id)
+    give_the_launch_its_actions(db, prompt_id, category, checked)
+
+
+def note_the_video_it_used(db, prompt_id: str, category: str, lane: str,
+                           video_id: str | None) -> None:
+    if video_id and not category:
+        db.record_combine_video_use(lane, video_id, prompt_id)

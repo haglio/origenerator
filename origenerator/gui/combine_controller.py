@@ -329,9 +329,11 @@ class CombineController(QObject):
         run = self._combined_run(image_id, video_id, intent, category)
         if run is None:
             return
-        prompt_id = self._launch(run, category, send, checked)
-        if prompt_id and not category:
-            self._db.record_combine_video_use(intent, video_id, prompt_id)
+        with self._db.in_one_go():
+            prompt_id = self._launch(run, category, send, checked)
+            if prompt_id:
+                combine_runs.note_the_video_it_used(self._db, prompt_id, category, intent,
+                                                    video_id)
 
     def _launch(self, run: CombineRun, category: str, send: bool,
                 checked: tuple[str, ...] = ()) -> str | None:

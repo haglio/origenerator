@@ -25,6 +25,7 @@ from shared_ui.tick_control import TickControl
 
 from origenerator import (
     alert,
+    combine_runs,
     evolver_export,
     gallery,
     non_ai_videos,
@@ -215,7 +216,6 @@ from origenerator.media import MediaType
 from origenerator.one_look import looking_once
 from origenerator.output_places import OutputFolders
 from origenerator.prompt_tokens import boxed_as_typed
-from origenerator.published_actions import give_the_launch_its_actions
 from origenerator.radio import OrigeneratorRadio
 from origenerator.request_seed_remake import RemakesInTheQueue
 from origenerator.setting_advice import files_not_installed, made_with_files_not_installed
@@ -939,12 +939,9 @@ class GalleryView(QWidget):
             if launching is not None:
                 category, video_id, intent, checked = launching.settings_source()
                 for prompt_id in launched:
-                    if category or video_id:
-                        self._db.set_settings_source(prompt_id, category=category,
-                                                     video_prompt_id=video_id)
-                    give_the_launch_its_actions(self._db, prompt_id, category, checked)
-                    if video_id and not category:
-                        self._db.record_combine_video_use(intent, video_id, prompt_id)
+                    combine_runs.note_its_settings(self._db, prompt_id, category, video_id, checked)
+                    combine_runs.note_the_video_it_used(self._db, prompt_id, category, intent,
+                                                        video_id)
                     if asked is not None:
                         self._db.record_request(NewRequest(
                             prompt_id=prompt_id, heard="",

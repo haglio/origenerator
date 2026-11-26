@@ -932,23 +932,24 @@ class GalleryView(QWidget):
             batch[0] = randomize_seeds(batch[0], wf.seed_keys())
             if launching is not None:
                 launching.use_random_seed()
-        launched = [prompt_id for prompt_id in makers.start_batch(key, wf, batch) if prompt_id]
-        if not launched:
-            return None
-        if launching is not None:
-            category, video_id, intent, checked = launching.settings_source()
-            for prompt_id in launched:
-                if category or video_id:
-                    self._db.set_settings_source(prompt_id, category=category,
-                                                 video_prompt_id=video_id)
-                give_the_launch_its_actions(self._db, prompt_id, category, checked)
-                if video_id and not category:
-                    self._db.record_combine_video_use(intent, video_id, prompt_id)
-                if asked is not None:
-                    self._db.record_request(NewRequest(
-                        prompt_id=prompt_id, heard="",
-                        new_positive=batch[0].get("positive_prompt", ""),
-                        new_negative=batch[0].get("negative_prompt", ""), **asked))
+        with self._db.in_one_go():
+            launched = [prompt_id for prompt_id in makers.start_batch(key, wf, batch) if prompt_id]
+            if not launched:
+                return None
+            if launching is not None:
+                category, video_id, intent, checked = launching.settings_source()
+                for prompt_id in launched:
+                    if category or video_id:
+                        self._db.set_settings_source(prompt_id, category=category,
+                                                     video_prompt_id=video_id)
+                    give_the_launch_its_actions(self._db, prompt_id, category, checked)
+                    if video_id and not category:
+                        self._db.record_combine_video_use(intent, video_id, prompt_id)
+                    if asked is not None:
+                        self._db.record_request(NewRequest(
+                            prompt_id=prompt_id, heard="",
+                            new_positive=batch[0].get("positive_prompt", ""),
+                            new_negative=batch[0].get("negative_prompt", ""), **asked))
         return key, launched
 
     def _stand_on_the_run_once_drawn(self, key: str) -> None:

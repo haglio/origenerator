@@ -92,7 +92,7 @@ class GeneratePane(QTabWidget):
         self._fun_time = fun_time
         self.currentChanged.connect(self._front_tab_relayout)
         self._db = db
-        self._views = replace(views, library=LibraryViews(db),
+        self._views = replace(views, library=views.library or LibraryViews(db),
                               names=views.names or ItemNames(db))
         # Qt drops setTabsClosable when the bar is swapped afterwards.
         self.setTabBar(ElidingTabBar())

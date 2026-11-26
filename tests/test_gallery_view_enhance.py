@@ -42,6 +42,8 @@ from tests.gallery_view_support import (
     _reroll_client,
     _select_first_leaf,
     _set_enhance,
+    held_off_the_window_thread,
+    land,
 )
 from tests.real_db import keep_on_disk, keep_rows_on_disk
 from tests.slideshow_hud_support import funestra_of, press_key_on
@@ -316,6 +318,23 @@ def test_deleting_a_version_first_records_the_fixes_just_chosen(qtbot, tmp_path)
 
     assert deleted == [["settle"]], (
         "the record a version is deleted from would lack the fixes the screen already shows")
+
+
+def test_deleting_a_version_reads_the_library_off_the_window_thread(
+        qtbot, tmp_path, monkeypatch):
+    view = GalleryView(_enhanceable_db(tmp_path, count=1), client=_reroll_client(),
+                       actions=FakeActions())
+    qtbot.addWidget(view)
+    view.refresh()
+    held = held_off_the_window_thread(view, monkeypatch)
+    shown = []
+    monkeypatch.setattr(view.generate_pane, "refresh_displayed",
+                        lambda row, image_rows: shown.append(row["prompt_id"]))
+
+    view.edit_versions("g0", lambda row: True)
+    land(held)
+
+    assert shown == ["g0"]
 
 
 def test_closing_the_window_records_the_fixes_just_chosen(qtbot, tmp_path):

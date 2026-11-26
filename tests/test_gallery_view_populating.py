@@ -29,6 +29,8 @@ from tests.gallery_view_support import (
     _image_workflow,
     _reroll_client,
     _seeded_db,
+    held_off_the_window_thread,
+    land,
 )
 
 
@@ -155,6 +157,20 @@ def test_an_item_leaves_the_populating_folder_once_its_populate_stops(qtbot, tmp
     _open_populating(view)
 
     view._populate.stop(first)
+
+    assert (_listed(view), list(view._gallery_pane._inflight_tiles)) == ([], [])
+
+
+def test_a_populate_stopping_reads_the_library_off_the_window_thread(
+        qtbot, tmp_path, monkeypatch):
+    view, first, _second = _two_folders(qtbot, tmp_path)
+    _populate_in(view, first)
+    _finish_reroll(view, view._live_jobs[first])
+    _open_populating(view)
+    held = held_off_the_window_thread(view, monkeypatch)
+
+    view._populate.stop(first)
+    land(held)
 
     assert (_listed(view), list(view._gallery_pane._inflight_tiles)) == ([], [])
 

@@ -1375,6 +1375,20 @@ def test_a_delete_its_undo_and_its_redo_read_the_library_off_the_window_thread(
     assert (after_the_delete, after_the_undo, view.listed_prompt_ids()) == ([], ["i1"], [])
 
 
+def test_sending_a_file_to_trash_reads_the_library_off_the_window_thread(
+        qtbot, monkeypatch):
+    actions = FakeActions()
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1)]), actions=actions)
+    qtbot.addWidget(view)
+    view.refresh()
+    held = held_off_the_window_thread(view, monkeypatch)
+
+    view.trash_file("made_one.png")
+    land(held)
+
+    assert actions.trashed_files == ["made_one.png"]
+
+
 def test_a_deleted_item_picked_in_the_trash_has_nothing_to_favorite(qtbot):
     view = _trash_collection_view(qtbot, FakeActions())
 

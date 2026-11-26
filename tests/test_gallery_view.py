@@ -119,6 +119,8 @@ from tests.gallery_view_support import (
     _two_leaf_view,
     _video_workflow,
     _workflow_rows,
+    held_off_the_window_thread,
+    land,
 )
 from tests.qt_exec import faking_exec
 from tests.real_db import database_of, keep_rows_on_disk, put_rows
@@ -1051,6 +1053,20 @@ def test_keeping_an_experiment_clears_it_from_the_review_queue(qtbot):
     assert "T2I SDXL" in _workflow_rows(view._tree)
 
 
+def test_a_verdict_on_an_experiment_reads_the_library_off_the_window_thread(qtbot, monkeypatch):
+    db = database_of([_experiment_row("e1")])
+    view = GalleryView(db)
+    qtbot.addWidget(view)
+    view.refresh()
+    held = held_off_the_window_thread(view, monkeypatch)
+
+    view._on_experiment_verdict("e1", "keep")
+    land(held)
+
+    view._tree.setCurrentItem(_collection(view, EXPERIMENTS_KEY))
+    assert view.listed_prompt_ids() == []
+
+
 def test_rejecting_an_experiment_goes_through_the_undoable_action(qtbot):
     db = database_of([_experiment_row("e1")])
     actions = FakeActions()
@@ -1492,11 +1508,13 @@ def test_the_shapes_radio_wears_the_waiting_cursor_while_it_redraws(qtbot, monke
     qtbot.addWidget(view)
     view.refresh()
     while_drawing = []
-    real = view.refresh
-    monkeypatch.setattr(view, "refresh", lambda *a: (
-        while_drawing.append(QApplication.overrideCursor()), real(*a))[1])
+    real = view._rebuild
+    monkeypatch.setattr(view, "_rebuild", lambda *a, **kw: (
+        while_drawing.append(QApplication.overrideCursor()), real(*a, **kw))[1])
+    held = held_off_the_window_thread(view, monkeypatch)
 
     view._tree.together_button.click()
+    land(held)
 
     assert [cursor and cursor.shape() for cursor in while_drawing] == [Qt.CursorShape.WaitCursor], (
         "a redraw holds the window's thread, so without the cursor the window reads as dead for as "
@@ -2096,6 +2114,24 @@ def test_back_returns_from_a_followed_input_image_link_to_the_video(qtbot):
     assert view._selected["prompt_id"] == "img1"
     view._navigation.go_back()
     assert view._selected["prompt_id"] == "vid1"
+
+
+def test_a_press_of_back_or_forward_aims_the_buttons_once(qtbot, monkeypatch):
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    _pick_by_clicking(view, "i1")
+    _pick_by_clicking(view, "i2")
+    aimed = []
+    states = view.button_states
+    monkeypatch.setattr(view, "button_states", lambda: (aimed.append(1), states())[1])
+
+    view._buttons.back.click()
+    after_back = len(aimed)
+    view._buttons.forward.click()
+
+    assert (after_back, len(aimed)) == (1, 2)
 
 
 def test_nav_buttons_enable_only_when_there_is_somewhere_to_go(qtbot):

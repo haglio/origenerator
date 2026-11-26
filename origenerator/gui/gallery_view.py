@@ -94,7 +94,7 @@ from origenerator.gui import corner_buttons, icons, omnipause, square_buttons
 from origenerator.gui.action_row import sides_under
 from origenerator.gui.app_keys import AppKeys, Presses
 from origenerator.gui.app_title import under
-from origenerator.gui.busy_cursor import spin_the_pointer, working
+from origenerator.gui.busy_cursor import spin_the_pointer
 from origenerator.gui.choosing_fixes import ChoosingFixes
 from origenerator.gui.combination import Combination
 from origenerator.gui.combine_controller import CombineController, CombineParts
@@ -402,8 +402,8 @@ class GalleryView(QWidget):
             enhance=(OfferedPress(self._enhance_the_picked_offer),
                      self.enhance.enhance_the_selection),
             actions={
-                AppCommand.BACK: (self._buttons.back, self._navigation.go_back),
-                AppCommand.FORWARD: (self._buttons.forward, self._navigation.go_forward),
+                AppCommand.BACK: (self._buttons.back, self._go_back),
+                AppCommand.FORWARD: (self._buttons.forward, self._go_forward),
                 AppCommand.CULL: (OfferedPress(self._delete_the_picked_offer),
                                   self._delete_selection),
                 AppCommand.FAVORITE: (OfferedPress(self._favorite_the_picked_offer),
@@ -596,8 +596,8 @@ class GalleryView(QWidget):
         self._folder_actions.set_setter_host(self._setter_host)
         self._buttons = GalleryPaneButtons(
             ButtonHandlers(
-                go_back=self._navigation.go_back,
-                go_forward=self._navigation.go_forward,
+                go_back=self._go_back,
+                go_forward=self._go_forward,
                 undo=self._undo,
                 redo=self._redo,
                 start_slideshow=self.slideshows.start,
@@ -838,7 +838,7 @@ class GalleryView(QWidget):
             if row is not None:
                 self._edits.reject_experiment(row)
             self._re_aim_every_button()
-        self.refresh()
+        self.refresh_off_the_window_thread()
 
     def _config_folder_key(self, config) -> str:
         return self.library.folder_key_for(config.workflow_name, config.params)
@@ -1186,9 +1186,9 @@ class GalleryView(QWidget):
     def _on_shapes_changed(self):
         if not self.toc.built:
             return
-        with working():
-            self.refresh()
-        self._re_aim_every_button()
+        stop_spinning = spin_the_pointer()
+        self.refresh_off_the_window_thread(
+            lambda: (self._re_aim_every_button(), stop_spinning()))
 
     def _reselect_generation(self, prompt_id: str | None):
         if not prompt_id or prompt_id not in self._gallery_pane.listed_prompt_ids():
@@ -1252,6 +1252,14 @@ class GalleryView(QWidget):
 
     def clear_selection(self) -> None:
         self._clear_metadata()
+
+    def _go_back(self) -> None:
+        with self._buttons_aimed_once_at_the_end():
+            self._navigation.go_back()
+
+    def _go_forward(self) -> None:
+        with self._buttons_aimed_once_at_the_end():
+            self._navigation.go_forward()
 
     def nav_state_changed(self, can_go_back: bool, can_go_forward: bool) -> None:
         self._trail = (can_go_back, can_go_forward)
@@ -1622,7 +1630,7 @@ class GalleryView(QWidget):
         if key == self._selected_reroll_key and key not in self._live_jobs:
             self._clear_reroll_selection()
         if self._in_populating():
-            self.refresh()
+            self.refresh_off_the_window_thread()
         self._re_aim_every_button()
         self._sync_cancel_buttons()
 
@@ -1857,7 +1865,9 @@ class GalleryView(QWidget):
         row = self._db.get_generation(prompt_id)
         if row is None or not edit(row):
             return
-        self.refresh()
+        self.refresh_off_the_window_thread(lambda: self._show_versions_left(prompt_id))
+
+    def _show_versions_left(self, prompt_id: str) -> None:
         updated = self._db.get_generation(prompt_id)
         if updated is not None:
             self.generate_pane.refresh_displayed(updated, self.library.reading.image_rows)
@@ -1902,8 +1912,7 @@ class GalleryView(QWidget):
         except OSError:
             logger.exception("Could not send %s to Trash", path)
             return
-        self.refresh()
-        self._re_aim_every_button()
+        self.refresh_off_the_window_thread(self._re_aim_every_button)
 
     def _reroll_item_seed(self, prompt_id: str, which: str):
         if self._client is None:

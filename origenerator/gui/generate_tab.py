@@ -249,6 +249,7 @@ class GenerateTab(DropZones):
         self._client = client
         self._db = db
         self._library = views.library or LibraryViews(db)
+        self._library_as_it_stands = LibraryViews(db)
         self._names = views.names or ItemNames(db)
         self._animated_preview = views.animated_preview or (
             lambda row: gallery.animated_preview_if_made(row, OUTPUT_PLACES, THUMB_DIR))
@@ -1526,7 +1527,7 @@ class GenerateTab(DropZones):
         workflow = workflow_named(launch[0]) if launch is not None else None
         if workflow is None:
             return None
-        return (self._library.now().rows, workflow, launch[1],
+        return (self._library_as_it_stands.now().rows, workflow, launch[1],
                 self._db.get_generation(launch[2]["source_prompt_id"]))
 
     def _turn_makes_a_new_image(self, index: int) -> bool:

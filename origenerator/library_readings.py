@@ -7,7 +7,7 @@ from origenerator import gallery, trash_collection
 from origenerator.gallery.output import is_in_progress
 from origenerator.gallery.tree import is_an_enhance_being_made
 from origenerator.item_names import Naming
-from origenerator.library_views import LibrarySnapshot
+from origenerator.library_views import LibrarySnapshot, LibraryViews
 
 
 class Read(NamedTuple):
@@ -77,10 +77,18 @@ class LibraryReadings:
         self._lists_built_from = None
         self._fingerprinted: tuple[list, int] | None = None
         self.drawn_from: Prepared | None = None
+        self._before_drawn: LibraryViews | None = None
 
     @property
     def customs(self) -> list:
         return every_custom_collection(self.customs_by_shape)
+
+    def now(self) -> LibrarySnapshot:
+        if self.drawn_version:
+            return self.reading
+        if self._before_drawn is None:
+            self._before_drawn = LibraryViews(self._db)
+        return self._before_drawn.now()
 
     def read(self) -> tuple[list[dict], dict]:
         return self._db.list_generations(), self._db.folder_meta_map()

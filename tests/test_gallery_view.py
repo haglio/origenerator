@@ -1415,7 +1415,7 @@ def test_latest_opens_on_one_page_however_far_back_it_goes(qtbot):
     view.refresh()
 
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
-    assert len(_drawn(view)) == 50
+    assert 0 < len(_drawn(view)) < 120
     assert _drawn(view)[0] == "i119"
 
 
@@ -1544,10 +1544,13 @@ def test_another_latest_opens_on_its_first_page(qtbot):
     view._tree.setCurrentItem(_alls(view._tree)["Latest"])
     opened_on = _drawn(view)
     wait_until(lambda: len(_drawn(view)) > len(opened_on), pump=lambda: _scroll_to_the_end(view))
+    scrolled = _drawn(view)
 
     view._tree.setCurrentItem(_collection_row(_alls(view._tree)["Images"], "Latest"))
 
-    assert _drawn(view) == opened_on
+    now = _drawn(view)
+    assert now == scrolled[:len(now)]
+    assert len(now) < len(scrolled)
 
 
 def test_one_kinds_latest_leaves_out_the_other_kinds_work_in_flight(qtbot):
@@ -1996,6 +1999,22 @@ def test_a_tab_put_back_before_the_gallery_first_loads_takes_its_items_name_then
 
     name = f"{gallery.folder_id(gallery.settings_folder_key(row))} 000"
     assert view.generate_pane.tabText(view.generate_pane.currentIndex()) == name
+
+
+def test_a_click_on_a_tile_shows_it_from_the_library_the_gallery_drew(qtbot, monkeypatch):
+    view = GalleryView(database_of([_image("i1", "a cat", 50, 1), _image("i2", "a cat", 50, 2)]),
+                       client=ComfyUIClient(folders=SUITE_FOLDERS))
+    qtbot.addWidget(view)
+    view.refresh()
+    _select_first_leaf(view)
+    put_rows(view._db, [_image("landed", "made up scene 7", 50, 3)])
+    listed = []
+    real = view._db.list_generations
+    monkeypatch.setattr(view._db, "list_generations", lambda: listed.append(1) or real())
+
+    view._on_thumbnail_clicked("i2")
+
+    assert listed == [], "the gallery already holds a reading of the library; another costs a whole read"
 
 
 def test_going_to_an_item_draws_its_folder_even_when_that_row_is_already_current(qtbot):

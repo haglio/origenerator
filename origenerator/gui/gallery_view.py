@@ -657,7 +657,7 @@ class GalleryView(QWidget):
     def _build_generate_pane(self):
         self.generate_pane = GeneratePane(
             self._client, self._db, fun_time=self._fun_time, inbox=self._inbox,
-            views=TabViews(heights=self._prompt_heights, names=self._item_names,
+            views=TabViews(heights=self._prompt_heights, names=self._item_names, library=self.library,
                            animated_preview=self.animated_preview,
                            requests=self._voice.requests, request_aims=RequestAims(self)))
         self.choosing_fixes = ChoosingFixes(

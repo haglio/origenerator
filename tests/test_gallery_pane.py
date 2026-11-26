@@ -270,6 +270,22 @@ def _drawn(scroll, kind=ItemTile):
     return list(scroll.widget().findChildren(kind))
 
 
+def _drawn_to(scroll) -> int:
+    return scroll.widget().heightForWidth(scroll.viewport().width())
+
+
+def _drawn_ahead(scroll) -> None:
+    wait_until(lambda: _drawn_to(scroll) >= scroll.viewport().height() + gallery_pane._REACH,
+               pump=QApplication.processEvents)
+
+
+def _filling(scroll) -> int:
+    tile = next(iter(_drawn(scroll, ItemTile) or _drawn(scroll, FolderTile)))
+    across = max(1, scroll.viewport().width() // tile.sizeHint().width())
+    down = -(-scroll.viewport().height() // tile.sizeHint().height())
+    return across * down
+
+
 def _tiles_told_of_enhancing(scroll, monkeypatch) -> list[str]:
     told = []
     for tile in _drawn(scroll):
@@ -361,18 +377,22 @@ def _folder_of_your_own_of(pane, rows):
     (_folder_of_your_own_of, {}, True),
 ], ids=["latest", "settings_folder", "favorites", "trash", "experiments",
         "folder_of_your_own"])
-def test_a_folder_draws_a_page_at_a_time_of_everything_it_lists(qtbot, db, opened, marked,
-                                                                 in_the_database):
+def test_a_folder_draws_at_once_only_the_tiles_that_fill_the_gallery(qtbot, db, opened, marked,
+                                                                     in_the_database):
     rows = [dict(row, **marked) for row in _sixty()]
     pane, scroll = _pane(qtbot, db, rows if in_the_database else ())
+    scroll.setWidgetResizable(True)
+    scroll.resize(900, 400)
 
     opened(pane, rows)
 
     listed = [row["prompt_id"] for row in rows]
+    drawn = [tile.prompt_id for tile in _drawn(scroll)]
     assert pane.listed_prompt_ids() == listed
-    assert [tile.prompt_id for tile in _drawn(scroll)] == listed[:gallery_pane._PAGE], (
-        "building thousands of thumbnails in one pass locks the window, so a folder draws a "
-        "page at a time")
+    assert drawn == listed[:len(drawn)]
+    assert _drawn_to(scroll) >= scroll.viewport().height(), "a tile in view is never missing"
+    assert len(drawn) <= _filling(scroll) + gallery_pane._TILES_A_TURN, (
+        "every tile built in the click holds the window, so it builds only what shows")
 
 
 @pytest.mark.parametrize("opened", [_latest_of, _settings_folder_of, _trash_of],
@@ -392,9 +412,13 @@ def test_a_folder_of_folders_draws_a_page_of_them_at_a_time(qtbot, db):
                for n in range(60)]
     pane, scroll = _pane(qtbot, db)
 
+    scroll.setWidgetResizable(True)
+    scroll.resize(900, 400)
+
     pane.show_folder_tiles(folders)
 
-    assert len(_drawn(scroll, FolderTile)) == gallery_pane._PAGE
+    assert len(_drawn(scroll, FolderTile)) <= _filling(scroll) + gallery_pane._TILES_A_TURN
+    assert _drawn_to(scroll) >= scroll.viewport().height()
 
 
 _TWO_OF_ONE_NAME = [gallery.SettingsGroup(key="image/alpha/k1", label="30 steps", rows=[_row("a", 1)]),
@@ -446,8 +470,6 @@ def test_a_page_too_short_to_fill_the_pane_draws_on_until_the_pane_is_full(qtbot
     assert len(_drawn(scroll)) < len(rows)
 
 
-def _drawn_to(scroll) -> int:
-    return scroll.widget().heightForWidth(scroll.viewport().width())
 
 
 def test_a_pane_made_taller_after_it_was_drawn_draws_on_without_a_scroll(qtbot, db):
@@ -543,7 +565,7 @@ def test_only_the_videos_in_sight_play_their_loops(qtbot, db, tmp_path):
     with qtbot.waitExposed(scroll):
         scroll.show()
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
-    qtbot.wait(1)
+    _drawn_ahead(scroll)
     bar = scroll.verticalScrollBar()
     bar.setValue(bar.maximum())
     qtbot.wait(1)
@@ -1315,7 +1337,7 @@ def test_a_video_just_below_the_view_holds_still_until_it_scrolls_into_it(qtbot,
     scroll.resize(800, 600)
     scroll.show()
     pane.show_thumbnails(gallery.SettingsGroup(key="k1", label="scene one", rows=rows))
-    QApplication.processEvents()
+    _drawn_ahead(scroll)
     foot = scroll.viewport().height()
     below = next(tile for tile in _drawn(scroll) if foot < tile.y() < foot + gallery_pane._REACH)
     held = below._image_label.movie().state()

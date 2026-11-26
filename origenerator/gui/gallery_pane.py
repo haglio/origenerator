@@ -74,11 +74,10 @@ REROLL_IMAGE = "image"
 
 _TILE_SPACING = GAP_MEDIUM
 _PREVIEW_COUNT = 4
-_PAGE = 50
 _ROWS_PAST_A_REVEAL = 3
 _MOST_TILES_ACROSS = 4
 _NEIGHBORS_PAST_A_REVEAL = _ROWS_PAST_A_REVEAL * _MOST_TILES_ACROSS
-_MOST_TILES_DRAWN_FOR_A_REVEAL = 4 * _PAGE
+_MOST_TILES_DRAWN_FOR_A_REVEAL = 200
 _REACH = 600
 _TILES_A_TURN = 6
 _ROOM_ABOVE_A_SECTIONS_HEADING = GAP_DIALOG
@@ -353,7 +352,6 @@ class GalleryPane(QObject):
         for item in pages.items():
             self._selection.note_shown(item)
         self._listed_folders = pages.folders()
-        pages.draw(_PAGE)
         if pages.listing == self._pages.listing:
             pages.catch_up(self._pages)
         self.show_widget(container)

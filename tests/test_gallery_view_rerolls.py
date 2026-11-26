@@ -1563,6 +1563,18 @@ def test_a_turn_whose_change_would_make_an_image_already_made_shows_that_image_f
     assert (_generate_offered(exchange), exchange._made_of(0).item) == (False, "already")
 
 
+def test_a_requests_generate_writes_the_library_once(qtbot, tmp_path):
+    view = _tab_asked_for_two_cats(qtbot, tmp_path)
+    written = []
+    view._db.when_changed(lambda: written.append(1))
+
+    view._on_generate_requested("sdxl_t2i", [{"seed": 9, "positive_prompt": "two cats"}])
+
+    assert len(written) == 1, (
+        "each write to the library waits for the disk; a press's row, its settings, its "
+        "actions and its request go in one")
+
+
 def test_a_turn_whose_change_would_make_a_new_image_offers_generate(qtbot, tmp_path):
     view = _tab_asked_for_two_cats(qtbot, tmp_path)
 

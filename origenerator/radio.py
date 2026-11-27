@@ -40,12 +40,13 @@ def deal_stations(videos: Sequence[Path], count: int, *,
 
 
 def _open_a_station(videos: Sequence[Path]):
+    from funestra.cloud_playback import the_library  # noqa: PLC0415
     from funestra.mpv_engine import MpvStation  # noqa: PLC0415
 
     from origenerator.funestras_engine import offer_the_copy_beside_the_checkouts  # noqa: PLC0415
 
     offer_the_copy_beside_the_checkouts()
-    return MpvStation.opened(videos)
+    return MpvStation.opened(videos, playable=the_library().playable)
 
 
 class OrigeneratorRadio:

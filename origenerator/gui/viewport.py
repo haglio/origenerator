@@ -47,6 +47,7 @@ from origenerator.gui.scrubber import Scrubber
 from origenerator.gui.video_surface import (
     VideoSurface,
     release_media_player,
+    source_for,
     stop_and_let_go_of_the_file,
 )
 from origenerator.media import MediaType
@@ -246,7 +247,7 @@ class Viewport(QWidget):
         crash_notes.note(f"a viewer shows the video of item {generation}" if generation
                          else "a viewer shows a video that is no item")
         self._image_label.clear()
-        self._player.setSource(QUrl.fromLocalFile(str(Path(path))))
+        self._player.setSource(source_for(Path(path)))
         self._stack.setCurrentWidget(self._video)
         self._play_where_it_is_seen()
         self._show_scrubber(path)

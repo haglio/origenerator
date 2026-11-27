@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from app_support.threading_utils import wait_until
+from PySide6.QtCore import QUrl
 from PySide6.QtGui import QColor, QImage
 from PySide6.QtMultimedia import QVideoFrame
 from PySide6.QtWidgets import QApplication, QWidget
 
 from origenerator import ui_scale
-from origenerator.gui.video_surface import VideoSurface
+from origenerator.gui.video_surface import VideoSurface, as_source
 
 
 def _frame(color: str) -> QVideoFrame:
@@ -88,3 +89,10 @@ def test_in_fun_time_every_redraw_reaches_the_screen_from_the_windows_top_left(q
 
 def test_standalone_a_redraw_leaves_the_windows_top_left_alone(qtbot):
     assert _a_window_with_a_video_redrawn_away_from_its_top_left(qtbot) == []
+
+
+def test_a_file_playing_from_pcloud_is_opened_by_its_loopback_address_and_one_on_the_disk_by_its_path(tmp_path):
+    video = tmp_path / "video one.mp4"
+
+    assert (as_source("http://127.0.0.1:1/video%20one.mp4"), as_source(str(video))) == (
+        QUrl("http://127.0.0.1:1/video%20one.mp4"), QUrl.fromLocalFile(str(video)))

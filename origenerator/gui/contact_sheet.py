@@ -4,13 +4,13 @@ import math
 from pathlib import Path
 from typing import NamedTuple
 
-from PySide6.QtCore import QPoint, QRect, QSize, Qt, QUrl
+from PySide6.QtCore import QPoint, QRect, QSize, Qt
 from PySide6.QtGui import QImageReader, QPainter, QPixmap
 from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtWidgets import QWidget
 
 from origenerator.gui import omnipause
-from origenerator.gui.video_surface import VideoSurface, release_media_player
+from origenerator.gui.video_surface import VideoSurface, release_media_player, source_for
 from origenerator.media import MediaType, ShownFile
 
 SQUARE = 1.0
@@ -104,7 +104,7 @@ class ContactSheet(QWidget):
         player = self._make_player(self)
         player.setVideoOutput(surface.video_sink())
         player.setLoops(QMediaPlayer.Loops.Infinite)
-        player.setSource(QUrl.fromLocalFile(str(Path(file.path))))
+        player.setSource(source_for(Path(file.path)))
         _play_unless(omnipause.frozen(), player)
         surface.show()
         shape = QImageReader(str(file.thumbnail)).size() if _is_file(file.thumbnail) else QSize()

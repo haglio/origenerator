@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from functools import cache
+from pathlib import Path
 
+from funestra.cloud_playback import the_library
 from PySide6.QtCore import QEvent, QObject, QRect, Qt, QUrl
 from PySide6.QtGui import QImage
 from PySide6.QtMultimedia import QMediaPlayer, QVideoSink
@@ -9,6 +11,14 @@ from PySide6.QtQml import QQmlEngine
 from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import QApplication
 from shared_ui.colors import BLACK
+
+
+def as_source(address: str) -> QUrl:
+    return QUrl(address) if address.startswith("http://") else QUrl.fromLocalFile(address)
+
+
+def source_for(path: Path) -> QUrl:
+    return as_source(the_library().playable(path))
 
 
 def stop_and_let_go_of_the_file(player: QMediaPlayer) -> None:
